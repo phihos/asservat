@@ -1,6 +1,6 @@
 # Asservat
 
-**Catch the evidence before the container restarts.** Asservat records packet captures,
+**Catch the evidence before the pod restarts.** Asservat records packet captures,
 core dumps, profiles and logs from failing Kubernetes pods, for developers and
 their AI agents.
 
@@ -18,12 +18,9 @@ their AI agents.
 
 ## What you can capture
 
-When a container restarts, its process memory, `/proc` state and the files it
-wrote outside its volumes are gone. When the pod is replaced, its `emptyDir`
-volumes go too, memory-backed ones included. Network traffic and system calls
-are never stored unless something records them. Asservat captures this evidence on the pod
-while the problem happens, and you get each piece as an ordinary file for the
-tool you already use:
+A pod restart often destroys the evidence you need. Asservat captures it on the
+pod while the problem happens, and you get each piece as an ordinary file for
+the tool you already use:
 
 | Evidence | What you get | Open it with | Status |
 | --- | --- | --- | --- |
@@ -125,11 +122,11 @@ spec:
     value: 'panic:'
 ```
 
-When a container in an `api` pod restarts, fails its liveness probe or logs
-`panic:`, Asservat saves up to 13 MiB of encrypted evidence: the pod's
-Kubernetes state and events, process status, network sockets, and logs from 30
-seconds before to 10 seconds after the trigger. [More examples](examples/README.md)
-add packet captures, profiles and core dumps.
+When an `api` pod restarts, fails its liveness probe or logs `panic:`, Asservat
+saves up to 13 MiB of encrypted evidence: the pod's Kubernetes state and events,
+process status, network sockets, and logs from 30 seconds before to 10 seconds
+after the trigger. [More examples](examples/README.md) add packet captures,
+profiles and core dumps.
 
 ## Learn more
 
