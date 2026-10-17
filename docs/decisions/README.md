@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-201 — eBPF CPU profiles for every runtime](201-ebpf-cpu-profiles.md)
+takes CPU profiles for Java, Python, Node.js, .NET, Ruby, PHP and native code from one pinned
+OpenTelemetry eBPF profiler in the node collector, keeps only the selected pod's samples before any
+output, and leaves allocation and lock profiles to Go pprof and JVM JFR.
+
 [ADR-200 — On-demand capacity refresh](200-on-demand-capacity-refresh.md)
 keeps the five-second binding freshness bound and refreshes a workload's binding when a capture preview,
 request or download needs it: admission records a short demand, the hub-worker reconciles demanded

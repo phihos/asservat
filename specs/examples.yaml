@@ -32,6 +32,8 @@ examples:
   schema: https://asservat.io/spec/v1/policy.schema.json
 - file: examples/profile-metadata.json
   schema: https://asservat.io/spec/v1/profile.schema.json
+- file: examples/profile-metadata-ebpf.json
+  schema: https://asservat.io/spec/v1/profile.schema.json
 - file: examples/mcp-profile-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: get_profile_summary

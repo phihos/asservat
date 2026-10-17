@@ -27,7 +27,8 @@
         "dotnet",
         "python",
         "node",
-        "native"
+        "native",
+        "any"
       ]
     },
     "profileType": {
@@ -160,6 +161,12 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "mechanism": {
+          "enum": [
+            "endpoint",
+            "ebpfSampler"
+          ]
+        },
         "sourceRef": {
           "type": "string",
           "minLength": 1,
@@ -170,13 +177,77 @@
         },
         "settingsKnown": {
           "type": "boolean"
+        },
+        "unattributedSamples": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
         }
       },
-      "required": [
-        "sourceRef",
-        "forceGC",
-        "settingsKnown"
+      "oneOf": [
+        {
+          "properties": {
+            "mechanism": {
+              "const": "endpoint"
+            }
+          },
+          "required": [
+            "sourceRef",
+            "forceGC",
+            "settingsKnown"
+          ],
+          "not": {
+            "required": [
+              "unattributedSamples"
+            ]
+          }
+        },
+        {
+          "properties": {
+            "mechanism": {
+              "const": "ebpfSampler"
+            }
+          },
+          "required": [
+            "mechanism",
+            "settingsKnown",
+            "unattributedSamples"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "sourceRef"
+                ]
+              },
+              {
+                "required": [
+                  "forceGC"
+                ]
+              }
+            ]
+          }
+        }
       ]
+    },
+    "detectedRuntimes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "go",
+          "jvm",
+          "dotnet",
+          "python",
+          "node",
+          "native",
+          "ruby",
+          "php",
+          "perl",
+          "beam"
+        ]
+      },
+      "uniqueItems": true,
+      "maxItems": 10
     }
   },
   "required": [
@@ -191,5 +262,56 @@
     "lostSamples",
     "symbolCoverage",
     "acquisition"
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "acquisition": {
+            "properties": {
+              "mechanism": {
+                "const": "ebpfSampler"
+              }
+            },
+            "required": [
+              "mechanism"
+            ]
+          }
+        },
+        "required": [
+          "acquisition"
+        ]
+      },
+      "then": {
+        "properties": {
+          "runtime": {
+            "const": "any"
+          },
+          "profileType": {
+            "const": "cpu"
+          },
+          "format": {
+            "const": "pprof"
+          }
+        },
+        "required": [
+          "detectedRuntimes"
+        ]
+      },
+      "else": {
+        "properties": {
+          "runtime": {
+            "not": {
+              "const": "any"
+            }
+          }
+        },
+        "not": {
+          "required": [
+            "detectedRuntimes"
+          ]
+        }
+      }
+    }
   ]
 }
