@@ -115,6 +115,12 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 	}
 	// ADR-198 decision 6: the key service's key clients are the promoted
 	// owner's worker PKI.
+	if p := k.input.Public; p != nil && p.Promotion != nil && p.Promotion.Exposure != nil {
+		// ADR-202: an exposure is NodePort (optional fixed port) or LoadBalancer.
+		if e := p.Promotion.Exposure; !(e.ServiceType == "NodePort" && (e.NodePort == 0 || e.NodePort >= 30000 && e.NodePort <= 32767) || e.ServiceType == "LoadBalancer" && e.NodePort == 0) {
+			return nil, mounts.ErrUnavailable
+		}
+	}
 	if p := k.input.Public; p != nil && p.Federation != nil && p.Federation.KeyServiceEndpoint != "" && p.Promotion == nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -866,6 +872,14 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		// The driver's fixed phase and stop name where it ended; provider
 		// and SQL causes stay out of the message.
 		return &fixedStepError{result.Phase + "/" + string(result.Stop), errors.Join(mounts.ErrUnavailable, e)}
+	}
+	if p := k.input.Public; p != nil && p.Promotion != nil && p.Promotion.Exposure != nil {
+		// ADR-202: the public API's own L4 Service; TLS ends in the hub-api.
+		k.at("public/exposure")
+		e := p.Promotion.Exposure
+		if err = kube.EnsureOwnerPublicService(ctx, k.in.kubernetes("administrator-token"), inventory.Namespace.Name, k.record.Scope.InstallationID, inventory.OwnerDeployment.Name, e.ServiceType, e.NodePort); err != nil {
+			return err
+		}
 	}
 	if err = k.CapacityProjection(ctx, resources, bridge, inventory, input); err != nil {
 		return err
