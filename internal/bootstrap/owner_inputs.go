@@ -278,7 +278,8 @@ func (s *providerInputs) sqlConfig(ctx context.Context, name string) (*pgxpool.C
 	c.BeforeConnect = func(ctx context.Context, c *pgx.ConnConfig) error {
 		next, err := s.sqlCredential(ctx, name)
 		if err != nil || next.Username != credential.Username {
-			return mounts.ErrUnavailable
+			// Named so a failed connection says it was the credential re-read.
+			return &fixedStepError{"credential", mounts.ErrUnavailable}
 		}
 		c.Password = next.Password
 		return nil
