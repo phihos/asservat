@@ -376,23 +376,23 @@ func (s *InstalledOwnerProviderEffects) CloseAndJoin(ctx context.Context) error 
 func (s *InstalledOwnerProviderEffects) ReadAuditCredentials(ctx context.Context) (contracts.OwnerStorageCredential, time.Time, error) {
 	var zero contracts.OwnerStorageCredential
 	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil {
-		return zero, time.Time{}, ErrKeyService
+		return zero, time.Time{}, auditCredentialStep("start", ErrKeyService)
 	}
 	bounded, release, e := s.borrow(ctx, 5*time.Second)
 	if e != nil {
-		return zero, time.Time{}, e
+		return zero, time.Time{}, auditCredentialStep("borrow", e)
 	}
 	defer release()
 	ctx = bounded
 	first, err := s.configuration.ReadOwnerConfiguration(ctx)
 	if err != nil || !s.currentConfiguration(first) {
-		return zero, time.Time{}, ErrKeyService
+		return zero, time.Time{}, auditCredentialStep("configuration", ErrKeyService)
 	}
 	call, end := context.WithDeadline(ctx, first.FreshUntil)
 	defer end()
 	manifest, mounted, err := s.mounted(call)
 	if err != nil {
-		return zero, time.Time{}, err
+		return zero, time.Time{}, auditCredentialStep("mounted", err)
 	}
 	defer func() {
 		for _, b := range mounted {
@@ -402,19 +402,33 @@ func (s *InstalledOwnerProviderEffects) ReadAuditCredentials(ctx context.Context
 	raw, err := mounts.Read(call, s.files, contracts.OwnerProviderAuditCredentialFile, 32<<10)
 	defer clear(raw)
 	if err != nil {
-		return zero, time.Time{}, ErrKeyService
+		return zero, time.Time{}, auditCredentialStep("file", ErrKeyService)
 	}
 	credential, until, err := s.reader.ReadProviderAuditCredential(call, manifest, mounted, raw)
 	until = identity.Earlier(until, first.FreshUntil)
 	if err != nil {
-		return zero, time.Time{}, ErrKeyService
+		return zero, time.Time{}, auditCredentialStep("verify", ErrKeyService)
 	}
 	call, narrow := context.WithDeadline(call, until)
 	defer narrow()
 	last, err := s.configuration.ReadOwnerConfiguration(call)
 	until = identity.Earlier(until, last.FreshUntil)
 	if err != nil || !s.currentConfiguration(last) || !first.Configuration.Equal(last.Configuration) || call.Err() != nil || !time.Now().Before(until) {
-		return zero, time.Time{}, ErrKeyService
+		return zero, time.Time{}, auditCredentialStep("final", ErrKeyService)
 	}
 	return credential, until, nil
 }
+
+// auditCredentialStepError keeps the returned error and names the closed step
+// where reading the audit storage credential stopped, for diagnostics.
+type auditCredentialStepError struct {
+	step string
+	err  error
+}
+
+func auditCredentialStep(step string, err error) error {
+	return &auditCredentialStepError{step, err}
+}
+func (e *auditCredentialStepError) Error() string     { return e.err.Error() }
+func (e *auditCredentialStepError) Unwrap() error     { return e.err }
+func (e *auditCredentialStepError) FixedStep() string { return "credentials-" + e.step }

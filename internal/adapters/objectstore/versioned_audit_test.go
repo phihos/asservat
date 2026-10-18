@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -176,5 +177,34 @@ func TestPutSmallNamesTheStorageCause(t *testing.T) {
 				t.Fatal(err)
 			}
 		})
+	}
+}
+
+type namedCredentialFailure struct{}
+
+func (namedCredentialFailure) Retrieve(context.Context) (aws.Credentials, error) {
+	return aws.Credentials{}, namedStepError{}
+}
+
+type namedStepError struct{}
+
+func (namedStepError) Error() string     { return "credentials unavailable" }
+func (namedStepError) FixedStep() string { return "credentials-verify" }
+
+// A credential provider that names its failure is named through the SDK's
+// error chain; the request never reaches the server.
+func TestPutSmallNamesACredentialFailure(t *testing.T) {
+	var calls atomic.Int32
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls.Add(1) }))
+	defer server.Close()
+	store, err := NewVersionedAudit(server.URL, "test", "audit", namedCredentialFailure{}, server.Client())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	_, err = store.PutSmall(context.Background(), "audit-record", []byte("data"))
+	var step interface{ FixedStep() string }
+	if !errors.Is(err, ErrStorage) || !errors.As(err, &step) || step.FixedStep() != "credentials-verify" || calls.Load() != 0 {
+		t.Fatal(err, calls.Load())
 	}
 }

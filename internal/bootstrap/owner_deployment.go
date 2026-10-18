@@ -615,8 +615,17 @@ type providerAuditCredentials struct {
 
 func (s providerAuditCredentials) Retrieve(ctx context.Context) (aws.Credentials, error) {
 	c, until, err := s.providers.ReadAuditCredentials(ctx)
-	if err != nil || !time.Now().Before(until) {
-		return aws.Credentials{}, mounts.ErrUnavailable
+	if err != nil {
+		// The provider's own closed step (credentials-<step>) reaches the
+		// object store's diagnostics through the SDK's error chain.
+		var named interface{ FixedStep() string }
+		if errors.As(err, &named) {
+			return aws.Credentials{}, &fixedStepError{named.FixedStep(), mounts.ErrUnavailable}
+		}
+		return aws.Credentials{}, &fixedStepError{"credentials", mounts.ErrUnavailable}
+	}
+	if !time.Now().Before(until) {
+		return aws.Credentials{}, &fixedStepError{"credentials-expired", mounts.ErrUnavailable}
 	}
 	return aws.Credentials{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey, SessionToken: c.SessionToken, Source: "installed-owner-provider"}, nil
 }
