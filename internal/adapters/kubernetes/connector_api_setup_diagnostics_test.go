@@ -25,3 +25,11 @@ func TestConnectorAPISetupDiagnosticKeepsOriginalFailureClassification(t *testin
 		t.Fatal("unrecognized errors changed the original sentinel")
 	}
 }
+
+func TestConnectorAPISetupDiagnosticKeepsCompletedMarks(t *testing.T) {
+	input := &connectorAPIStepError{phase: "settings-guard", step: "settings-guard@3s after [source-open@20ms owned-process@1.2s]", err: errors.New("private")}
+	var fixed interface{ FixedStep() string }
+	if out := connectorAPISetupDiagnostic(input); !errors.As(out, &fixed) || fixed.FixedStep() != "setup after [source-open@20ms owned-process@1.2s]" {
+		t.Fatal("completed setup marks were dropped", out)
+	}
+}
