@@ -40,6 +40,11 @@ func PublisherName(installationID string) string {
 	return "asservat-" + strings.ReplaceAll(installationID, "-", "") + "-publisher"
 }
 
+// PublisherRuntimeProjectionName is the publisher's SQL login projection.
+func PublisherRuntimeProjectionName(installationID string) string {
+	return PublisherName(installationID) + "-sql"
+}
+
 // PublisherVerifierRole is the worker PKI role that signs only
 // key-client/verifier URIs (ADR-203 decision 4).
 func PublisherVerifierRole(installationID string) string {

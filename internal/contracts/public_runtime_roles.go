@@ -287,7 +287,9 @@ type PublicRuntimeRoleState struct {
 	FederationProjection *PublicRuntimeProjectionClaim `json:"federationProjection,omitempty"`
 	// ADR-198: the key service's immutable SQL projection.
 	KeyServiceProjection *PublicRuntimeProjectionClaim `json:"keyServiceProjection,omitempty"`
-	CapacitySetup        *CapacityRootSetupClaim       `json:"capacitySetup,omitempty"`
+	// ADR-203: the publisher's immutable SQL projection.
+	PublisherProjection *PublicRuntimeProjectionClaim `json:"publisherProjection,omitempty"`
+	CapacitySetup       *CapacityRootSetupClaim       `json:"capacitySetup,omitempty"`
 }
 
 // One original create claim for the separate immutable runtime projection.

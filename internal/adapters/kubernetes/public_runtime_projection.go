@@ -49,9 +49,10 @@ func clearRuntimeProjection(data map[string][]byte) {
 	}
 }
 
-func runtimeProjectionManifest(original contracts.PublicRuntimeRoleSnapshot) ([]byte, error) {
+// runtimeProjectionManifest proves each purpose's claim and receipt, in order.
+func runtimeProjectionManifest(original contracts.PublicRuntimeRoleSnapshot, purposes []string) ([]byte, error) {
 	m := contracts.PublicRuntimeCredentialManifest{Format: contracts.PublicRuntimeCredentialManifestFormat, Input: original.State.Input, RootUID: original.UID, SetupID: original.State.OperationID}
-	for _, purpose := range contracts.PublicRuntimeHubRolePurposes() {
+	for _, purpose := range purposes {
 		n := slices.IndexFunc(original.State.Roles, func(r contracts.PublicRuntimeRoleMaterial) bool { return r.Purpose == purpose })
 		if n < 0 || original.State.Roles[n].Claim == nil || original.State.Roles[n].Receipt == nil {
 			return nil, cfg.ErrUnavailable
@@ -84,7 +85,7 @@ func (s *PublicRuntimeRoleRoot) hubProjection() roleProjection {
 			if err != nil {
 				return nil, err
 			}
-			manifest, err := runtimeProjectionManifest(old)
+			manifest, err := runtimeProjectionManifest(old, contracts.PublicRuntimeHubRolePurposes())
 			if err != nil {
 				clearRuntimeProjection(data)
 				return nil, err
@@ -163,6 +164,32 @@ func (s *PublicRuntimeRoleRoot) PublishKeyServiceRuntimeProjection(ctx context.C
 		},
 		data: func(old contracts.PublicRuntimeRoleSnapshot) (map[string][]byte, error) {
 			return roleCredentialFiles(old.State, contracts.PublicRuntimeKeyServicePurposes(), "sql-")
+		}})
+}
+
+// PublishPublisherRuntimeProjection publishes the publisher's six SQL logins
+// and their manifest (ADR-203) with the same one-use claim and readback.
+func (s *PublicRuntimeRoleRoot) PublishPublisherRuntimeProjection(ctx context.Context, verified contracts.PublicRuntimeRoleSnapshot) (contracts.WorkerObjectReference, error) {
+	if s == nil {
+		return contracts.WorkerObjectReference{}, cfg.ErrInvalid
+	}
+	return s.publishProjection(ctx, verified, roleProjection{name: contracts.PublisherRuntimeProjectionName(s.input.InstallationID),
+		claim: func(v *contracts.PublicRuntimeRoleState) **contracts.PublicRuntimeProjectionClaim {
+			return &v.PublisherProjection
+		},
+		data: func(old contracts.PublicRuntimeRoleSnapshot) (map[string][]byte, error) {
+			purposes := contracts.PublicRuntimePublisherPurposes()
+			data, err := roleCredentialFiles(old.State, purposes, "sql-public-")
+			if err != nil {
+				return nil, err
+			}
+			manifest, err := runtimeProjectionManifest(old, purposes)
+			if err != nil {
+				clearRuntimeProjection(data)
+				return nil, err
+			}
+			data[contracts.PublisherCredentialManifestFile] = manifest
+			return data, nil
 		}})
 }
 
