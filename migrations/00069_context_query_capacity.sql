@@ -193,7 +193,7 @@ BEGIN
  retire:=cleanup+((2*(q->'History'->>'BackupHorizon')::numeric+(q->'History'->>'RetirementCleanup')::numeric)/1000)*interval '1 microsecond';
  IF hard>(c->>'PlannedUntil')::timestamptz THEN RETURN NULL;END IF;
  RETURN jsonb_build_object('RootID',s.root_id,'InstallationID',s.installation_id,'AcceptanceID',acceptance,'RootAttemptID',c->'AttemptID','RootPlanDigest',c->'PlanDigest',
-  'SetupInputDigest',to_jsonb(ARRAY(SELECT get_byte(decode(s.setup_receipt->>'inputDigest','hex'),k) FROM generate_series(0,31) k)),
+  'SetupInputDigest',to_jsonb(ARRAY(SELECT get_byte(decode(s.setup_receipt->>'inputDigest','hex'),byte_index.value) FROM generate_series(0,31) AS byte_index(value))),
   'Qualification',q,'Reservation',reservation,'HardUntil',public.capacity_json_timestamp(hard),'EffectsUntil',public.capacity_json_timestamp(effects),'CleanupUntil',public.capacity_json_timestamp(cleanup),'RetireBy',public.capacity_json_timestamp(retire));
 EXCEPTION WHEN data_exception OR no_data_found OR too_many_rows THEN RETURN NULL;
 END $$;
@@ -253,8 +253,8 @@ BEGIN
  IF clock_timestamp()>=until_at THEN RAISE EXCEPTION 'query capacity source expired' USING ERRCODE='23514';END IF;
  RETURN jsonb_build_object('Qualification',s.qualification,'Root',s.root_configuration,'System',pool.plan,'AcceptanceID',COALESCE(acceptance::text,''),'Ready',COALESCE(acceptance IS NOT NULL AND public.lock_context_query_capacity(r,acceptance) AND EXISTS(SELECT 1 FROM public.context_query_backing b WHERE b.root_id=r AND NOT b.suspended AND b.observed_at<=n AND n<b.fresh_until),false),
   'BackingUntil',public.capacity_json_timestamp(COALESCE((SELECT b.fresh_until FROM public.context_query_backing b WHERE b.root_id=r),n)),
-  'SetupInputDigest',to_jsonb(ARRAY(SELECT get_byte(decode(s.setup_receipt->>'inputDigest','hex'),k) FROM generate_series(0,31) k)),
-  'SourceRevision',s.accepted_revision,'SourceDigest',to_jsonb(ARRAY(SELECT get_byte(s.accepted_digest,k) FROM generate_series(0,31) k)),
+  'SetupInputDigest',to_jsonb(ARRAY(SELECT get_byte(decode(s.setup_receipt->>'inputDigest','hex'),byte_index.value) FROM generate_series(0,31) AS byte_index(value))),
+  'SourceRevision',s.accepted_revision,'SourceDigest',to_jsonb(ARRAY(SELECT get_byte(s.accepted_digest,byte_index.value) FROM generate_series(0,31) AS byte_index(value))),
   'Recovery',recovery,'ObservedAt',public.capacity_json_timestamp(n),'FreshUntil',public.capacity_json_timestamp(until_at));
 END $$;
 
