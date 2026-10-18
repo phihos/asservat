@@ -112,8 +112,34 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 		if accepted.CaptureID == "" || resolved.State != "accepted" || resolved.CaptureID != accepted.CaptureID {
 			t.Fatal("installed request was not accepted once", accepted, resolved)
 		}
-		var progress map[string]any
-		call("get_capture", map[string]string{"capture_id": accepted.CaptureID}, &progress)
-		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture as the Keycloak user; progress %v", progress["state"])
+		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture as the Keycloak user")
+		// The regional executor collects; the publisher verifies and publishes
+		// (ADR-203). Poll the capture until it is terminal and its results are
+		// ready, within bounded time.
+		var progress struct {
+			Phase        string `json:"phase"`
+			ResultAccess struct {
+				State    string   `json:"state"`
+				GrantIDs []string `json:"grantIDs"`
+			} `json:"result_access"`
+		}
+		terminal := map[string]bool{"Succeeded": true, "Partial": true, "Failed": true, "Cancelled": true, "Indeterminate": true}
+		deadline := time.Now().Add(5 * time.Minute)
+		for {
+			call("get_capture", map[string]string{"capture_id": accepted.CaptureID}, &progress)
+			if terminal[progress.Phase] && progress.ResultAccess.State != "WaitingForArtifacts" && progress.ResultAccess.State != "NotRequested" {
+				break
+			}
+			if time.Now().After(deadline) {
+				diagnose()
+				t.Fatal("installed capture did not finish", progress.Phase, progress.ResultAccess.State)
+			}
+			time.Sleep(5 * time.Second)
+		}
+		if progress.Phase != "Succeeded" || progress.ResultAccess.State != "Ready" || len(progress.ResultAccess.GrantIDs) == 0 {
+			diagnose()
+			t.Fatal("installed capture was not collected and published", progress.Phase, progress.ResultAccess.State, progress.ResultAccess.GrantIDs)
+		}
+		t.Logf("installed journey: the regional capture was collected, verified and published; %d result grant(s)", len(progress.ResultAccess.GrantIDs))
 	}
 }
