@@ -202,6 +202,47 @@ func TestWorkerConfigurationAuditSelection(t *testing.T) {
 	}
 }
 
+// The steps fail closed out of order: configuring needs the early worker
+// objects, the accepted owner configuration and the capacity store; the
+// acceptance wait, key service section, trust catalog and templates need a
+// configured profile. Without downloads every step is a no-op.
+func TestDownloadStepsFailClosedOutOfOrder(t *testing.T) {
+	public := contracts.InstallerPublicSettings{Federation: &contracts.InstallerFederationSettings{EvidenceStore: &contracts.InstallerEvidenceStore{Region: "r"}, KeyServiceEndpoint: "https://keys.synthetic.invalid"}, Promotion: &contracts.InstallerOwnerPromotion{}}
+	k := &InstallerContinuation{record: audit.InitialInstallation{Scope: fleet.InstallationWitnessScope{InstallationID: runtimeID, ClusterID: runtimeID}}}
+	ctx := t.Context()
+	if d, err := k.DownloadConfigure(ctx, kube.InitialRuntimeResourceInventory{}, contracts.OwnerDeployment{}, nil, nil); err != nil || d != nil || k.DownloadAccepted(ctx) != nil || k.downloadEvidenceSetup() != nil || k.workerProfileSource() != nil {
+		t.Fatal("download steps without downloads", err)
+	}
+	if s, err := k.keyServiceDownloads(contracts.OwnerDeployment{}); err != nil || s != nil {
+		t.Fatal("key service section without downloads", err)
+	}
+	if _, err := k.DownloadConfigure(ctx, kube.InitialRuntimeResourceInventory{}, contracts.OwnerDeployment{}, []byte("unexpected"), nil); err == nil {
+		t.Fatal("download credential accepted without downloads")
+	}
+	k.input.Public = &public
+	if _, err := k.DownloadConfigure(ctx, kube.InitialRuntimeResourceInventory{}, contracts.OwnerDeployment{}, []byte("{}"), nil); err == nil {
+		t.Fatal("configured before the worker objects exist")
+	}
+	k.downloads = &installerDownloads{sources: downloadTestSources()}
+	if _, err := k.DownloadConfigure(ctx, kube.InitialRuntimeResourceInventory{}, contracts.OwnerDeployment{}, []byte("{}"), [][]byte{{1}}); err == nil {
+		t.Fatal("configured before the owner configuration and capacity")
+	}
+	if k.DownloadAccepted(ctx) == nil || len(k.workerControls()) != 0 || k.downloadPathTemplateOrNil() != nil {
+		t.Fatal("unconfigured profile treated as configured")
+	}
+	if _, err := k.keyServiceDownloads(contracts.OwnerDeployment{Public: &contracts.OwnerPublicDeployment{}}); err == nil {
+		t.Fatal("key service section before configuration")
+	}
+	k.downloads.configured, k.downloads.control = true, []byte("control")
+	if c := k.workerControls(); len(c) != 1 || string(c[0]) != "control" || k.downloadPathTemplateOrNil() == nil || k.downloadEvidenceSetup() != public.Federation.EvidenceStore {
+		t.Fatal("configured pins", c)
+	}
+	if s, err := k.keyServiceDownloads(contracts.OwnerDeployment{Public: &contracts.OwnerPublicDeployment{ClusterCatalog: contracts.OwnerPublicGuardedSource{Source: contracts.WorkerObjectReference{Name: "catalog", UID: runtimeID}}}}); err != nil ||
+		s.WorkerSource != k.downloads.sources.Profile.Source || s.ClusterCatalog.Source.Name != "catalog" || s.RetentionTopologies == nil || len(s.RetentionTopologies) != 0 {
+		t.Fatal("key service section", s, err)
+	}
+}
+
 // ADR-204 decision 5: the operator's static read credential becomes the
 // worker's closed credentials.json; temporary credentials cannot renew in an
 // immutable Secret and are refused.
