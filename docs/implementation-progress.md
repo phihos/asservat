@@ -1,5 +1,26 @@
 # Sustained implementation progress
 
+## Query ledger and catalog native qualification (ADR-206)
+
+[Native run 39136964591](https://github.com/phihos/asservat/actions/runs/39136964591)
+passed on `89eb9b7cc62a51a814389d757d6294ff2b353b77`: all six selected children
+actually ran, covering the purpose-specific query ledger, ordinary private case
+routing and missing/NULL capture and verification audit receipts. The parent
+finished in 12.44 seconds; the query ledger child passed in 6.88 seconds.
+PostgreSQL/S3 accounting, current healthy invocation lineage, scoped-role denials,
+one-use starts, uncertain active generation and retained aggregate charges are
+qualified for this component. C-07 resource qualification, C-14 worker/closure
+proofs and human identity remain explicit synthetic inputs.
+
+All 2,637 recorded source hashes independently match the frozen commit archive;
+terminal exit is zero, sources stayed unchanged and cleanup failures are empty.
+Report: [`test/results/context-query-ci-2/custody-environment.json`](../test/results/context-query-ci-2/custody-environment.json),
+SHA-256 `9ea012bbf23fd60b34451adb83212d183f3a980c77399f5bf14963bddf90e8bd`.
+This resolves the earlier migration syntax/fixture blockers and qualifies the
+combined catalog changes. It does not qualify installed queries, worker dispatch,
+key-service authority, positive remote closure or public runtime availability.
+The protected query-capacity and worker continuation remain in progress.
+
 ## Query composition qualification in progress (ADR-206)
 
 The coordinator, SQL ledger, verified regional reader and audited browser/MCP
