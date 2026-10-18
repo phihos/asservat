@@ -37,8 +37,13 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 	}
 	if s.ReportOpening != nil && errors.As(cause, &timed) {
 		elapsed, remaining := timed.OpeningTiming()
+		var traced interface{ OpeningTrace() string }
+		trace := ""
+		if errors.As(cause, &traced) {
+			trace = traced.OpeningTrace()
+		}
 		if elapsed >= 0 && remaining >= 0 && remaining <= 5*time.Second {
-			s.ReportOpening(stage, elapsed, remaining)
+			s.ReportOpening(stage, elapsed, remaining, trace)
 			return
 		}
 	}
@@ -49,15 +54,18 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 
 // The event is already restricted by reportFailure. Durations never enter the
 // count map: many differently timed refusals still share one bounded key.
-func contextStartOpeningLog(out io.Writer) func(string, time.Duration, time.Duration) {
+func contextStartOpeningLog(out io.Writer) func(string, time.Duration, time.Duration, string) {
 	var mu sync.Mutex
 	counts := map[string]uint64{}
-	return func(event string, elapsed, remaining time.Duration) {
+	return func(event string, elapsed, remaining time.Duration, trace string) {
 		mu.Lock()
 		defer mu.Unlock()
 		counts[event]++
 		if n := counts[event]; n&(n-1) == 0 {
-			fmt.Fprintf(out, "regional context standby refused: %s (%d), elapsed=%s remaining=%s\n", event, n, elapsed.Round(10*time.Millisecond), remaining.Round(10*time.Millisecond))
+			if trace != "" {
+				trace = " setup=[" + trace + "]"
+			}
+			fmt.Fprintf(out, "regional context standby refused: %s (%d), elapsed=%s remaining=%s%s\n", event, n, elapsed.Round(10*time.Millisecond), remaining.Round(10*time.Millisecond), trace)
 		}
 	}
 }

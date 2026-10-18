@@ -168,7 +168,7 @@ type RegionalContextStartConnections struct {
 	Report func(string)
 	// ReportOpening keeps numeric timing outside the finite event-count key.
 	// It observes a joined refusal, never changes the opening's authority.
-	ReportOpening func(string, time.Duration, time.Duration)
+	ReportOpening func(string, time.Duration, time.Duration, string)
 }
 
 func (s RegionalContextStartConnections) Run(ctx context.Context) error {
