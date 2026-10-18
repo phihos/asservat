@@ -26,8 +26,10 @@ type ownerProviderSetupRequest struct {
 // connector PKI roles and audit transit key to the same artifact (ADR-193),
 // so the operator applies both compartments in one step. A publisher
 // deployment adds its roles, verifier PKI role and audit transit key and
-// describes its two operator storage credentials (ADR-203).
-func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time, federation *contracts.FederationDeployment, publisher *contracts.PublisherDeployment) ([]byte, error) {
+// describes its two operator storage credentials (ADR-203). A download
+// evidence store describes the download workers' own read-only evidence
+// credential (ADR-204 decision 5); it adds no provider request.
+func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time, federation *contracts.FederationDeployment, publisher *contracts.PublisherDeployment, downloads *contracts.InstallerEvidenceStore) ([]byte, error) {
 	if !authorization.UUID(in.ConfigurationUID) {
 		return nil, ErrSetupUnavailable
 	}
@@ -130,19 +132,28 @@ func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.
 			}
 		}
 	}
+	var downloadStorage *publisherStorage
+	if downloads != nil {
+		if !public || !validEndpoint(downloads.Endpoint) || downloads.Region == "" || len(downloads.Region) > 128 || downloads.Bucket == "" || len(downloads.Bucket) > 63 {
+			return nil, ErrSetupUnavailable
+		}
+		downloadStorage = &publisherStorage{Endpoint: downloads.Endpoint, Region: downloads.Region, Bucket: downloads.Bucket, SecretKey: "credentials.json", CredentialSchema: "https://asservat.io/spec/v1/owner-credentials.schema.json",
+			Prefixes: []string{}, Operations: []string{"GetObject", "GetObjectVersion"}, Semantics: "read-only/no-list-write-or-delete", BackendQualification: "required"}
+	}
 	return ownerProviderCanonical(struct {
-		Format                 string                      `json:"format"`
-		ConfigurationUID       string                      `json:"configurationUID"`
-		Setup                  OwnerSetupRecipe            `json:"setup"`
-		Federation             *FederationProviderSetup    `json:"federation,omitempty"`
-		Publisher              *publisherArtifact          `json:"publisher,omitempty"`
-		Public                 bool                        `json:"public,omitempty"`
-		Apply                  []ownerProviderSetupRequest `json:"apply"`
-		Inspect                []string                    `json:"inspect"`
-		AuditStorage           any                         `json:"auditStorage"`
-		FederationAuditStorage any                         `json:"federationAuditStorage,omitempty"`
-		ExternalAdministration bool                        `json:"externalAdministration"`
-	}{"asservat-owner-provider-setup/v1", in.ConfigurationUID, setup, federationSetup, publisherSection, public, requests, inspect, storage, federationStorage, true})
+		Format                      string                      `json:"format"`
+		ConfigurationUID            string                      `json:"configurationUID"`
+		Setup                       OwnerSetupRecipe            `json:"setup"`
+		Federation                  *FederationProviderSetup    `json:"federation,omitempty"`
+		Publisher                   *publisherArtifact          `json:"publisher,omitempty"`
+		Public                      bool                        `json:"public,omitempty"`
+		Apply                       []ownerProviderSetupRequest `json:"apply"`
+		Inspect                     []string                    `json:"inspect"`
+		AuditStorage                any                         `json:"auditStorage"`
+		FederationAuditStorage      any                         `json:"federationAuditStorage,omitempty"`
+		DownloadEvidenceReadStorage *publisherStorage           `json:"downloadEvidenceReadStorage,omitempty"`
+		ExternalAdministration      bool                        `json:"externalAdministration"`
+	}{"asservat-owner-provider-setup/v1", in.ConfigurationUID, setup, federationSetup, publisherSection, public, requests, inspect, storage, federationStorage, downloadStorage, true})
 }
 
 // publisherArtifact is the publisher's section of the phase-3 artifact

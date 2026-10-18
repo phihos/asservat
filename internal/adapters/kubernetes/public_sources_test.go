@@ -24,7 +24,7 @@ import (
 // promoted owner also gets the unconfigured worker configuration and the
 // download environment, each guarded.
 func TestPublicSourcesCreateAndRefuseForeignGuard(t *testing.T) {
-	for _, mode := range []string{"plain", "foreign", "promoted"} {
+	for _, mode := range []string{"plain", "foreign", "promoted", "worker-namespace"} {
 		foreign := mode == "foreign"
 		var mu sync.Mutex
 		objects := map[string]map[string]any{}
@@ -67,11 +67,18 @@ func TestPublicSourcesCreateAndRefuseForeignGuard(t *testing.T) {
 		admins := []cfg.KubernetesActor{{Kind: "User", Name: "system:serviceaccount:install:runner"}}
 		browser := contracts.BrowserSettings{SchemaVersion: "browser-settings/v1", Revision: 1, RootID: ownerID(3), SessionEpoch: ownerID(4)}
 		var environment *contracts.DownloadEnvironmentSettings
-		if mode == "promoted" {
+		// ADR-204 decision 2: the worker namespace's guarded profile source
+		// replaces the hub namespace marker.
+		var workerSource *contracts.OwnerPublicGuardedSource
+		if mode == "worker-namespace" {
+			workerSource = &contracts.OwnerPublicGuardedSource{Source: contracts.WorkerObjectReference{Name: contracts.DownloadWorkerProfileName(installation), UID: ownerID(8)},
+				Guard: contracts.OwnerDeploymentGuard{Name: contracts.DownloadWorkerProfileGuardName(installation), PolicyUID: ownerID(8), PolicyGeneration: 1, BindingUID: ownerID(8), BindingResourceVersion: "1"}}
+		}
+		if mode == "promoted" || mode == "worker-namespace" {
 			environment = &contracts.DownloadEnvironmentSettings{Format: contracts.DownloadEnvironmentFormat, RootID: ownerID(6), InstallationID: installation, RecoveryEpoch: ownerID(7), Revision: 1,
 				PermittedRegions: []string{}, Paths: []contracts.DownloadEnvironmentPath{}, Clients: []contracts.DownloadEnvironmentClient{}, Operators: []contracts.ProcessingOperator{{Issuer: "https://idp.synthetic.invalid", ClientID: "asservat", Kind: "user", ID: "operator"}}}
 		}
-		out, err := EnsurePublicSources(context.Background(), config, control, installation, admins, browser, contracts.IdentitySettings{SchemaVersion: "identity-settings/v1", Revision: 1}, environment)
+		out, err := EnsurePublicSources(context.Background(), config, control, installation, admins, browser, contracts.IdentitySettings{SchemaVersion: "identity-settings/v1", Revision: 1}, environment, workerSource)
 		if foreign {
 			if !errors.Is(err, cfg.ErrChanged) {
 				t.Fatal("adopted a foreign guard", err)
@@ -89,6 +96,9 @@ func TestPublicSourcesCreateAndRefuseForeignGuard(t *testing.T) {
 		if mode == "plain" && (worker != nil || out.WorkerConfiguration.Source.Name != "") {
 			t.Fatal("download sources created without promotion")
 		}
+		if mode == "worker-namespace" && (worker != nil || !reflect.DeepEqual(out.WorkerConfiguration, *workerSource) || out.DownloadEnvironment.Guard.PolicyUID == "") {
+			t.Fatal("hub namespace marker created beside the worker namespace source", out)
+		}
 		if mode == "promoted" {
 			if worker["data"].(map[string]any)["worker-profile.json"] != contracts.UnconfiguredWorkerConfiguration(installation) || out.WorkerConfiguration.Guard.Name != contracts.OwnerWorkerConfigurationName(installation)+"-guard" || out.WorkerConfiguration.Guard.PolicyUID == "" ||
 				out.DownloadEnvironment.Source.Name != contracts.OwnerDownloadEnvironmentName(installation) || out.DownloadEnvironment.Guard.Name != contracts.OwnerDownloadEnvironmentName(installation)+"-guard" || out.DownloadEnvironment.Guard.BindingUID == "" {
@@ -99,7 +109,7 @@ func TestPublicSourcesCreateAndRefuseForeignGuard(t *testing.T) {
 		if environment != nil {
 			environment.Revision = 2
 		}
-		again, err := EnsurePublicSources(context.Background(), config, control, installation, admins, contracts.BrowserSettings{RootID: ownerID(5)}, contracts.IdentitySettings{}, environment)
+		again, err := EnsurePublicSources(context.Background(), config, control, installation, admins, contracts.BrowserSettings{RootID: ownerID(5)}, contracts.IdentitySettings{}, environment, workerSource)
 		if err != nil || !reflect.DeepEqual(again, out) {
 			t.Fatal("rerun replaced original sources", err)
 		}

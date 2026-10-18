@@ -35,7 +35,7 @@ func TestWorkerSourceClientsFollowTheWorkerNamespace(t *testing.T) {
 		return contracts.OwnerNativeWorkerAPI{ClusterID: runtimeID, Namespace: contracts.WorkerObjectReference{Name: name, UID: uid}, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://api.synthetic.invalid"}}
 	}
 	workers := api("asservat-downloads", workerNamespaceID)
-	if got := nativeKubernetesProbeTokenName(workers); got != "native-kube-probe-"+runtimeID+"-"+workerNamespaceID+".token" || got == nativeKubernetesTokenName(workers) {
+	if got := nativeKubernetesProbeTokenName(workers); got != "native-kube-probe-"+runtimeID+"-asservat-downloads.token" || got == nativeKubernetesTokenName(workers) {
 		t.Fatal("probe token name", got)
 	}
 	workerClient := newClient(cfg.NamespaceRef{Name: workers.Namespace.Name, UID: workers.Namespace.UID})

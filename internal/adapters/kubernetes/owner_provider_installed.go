@@ -39,6 +39,27 @@ func BuildProviderOwnerWorkload(p OwnerWorkloadPlan, clusterID string, selection
 			Path: contracts.OwnerProviderTokenFile, Audience: contracts.OwnerProviderAudience(p.InstallationID, clusterID), ExpirationSeconds: ptr.To(int64(600)),
 		}},
 	)
+	// ADR-204: the hub-local download worker API's client and guard probe
+	// tokens join the backend (observation) root. This template is pinned
+	// before the worker namespace exists, so the files are named by cluster
+	// and fixed namespace name; both are the owner account's own default-
+	// audience tokens, as kube-observer.token is, and confer only the rights
+	// the downloads step later binds in that namespace.
+	observation := -1
+	for i, v := range pod.Volumes {
+		if v.Name == "observation" && v.Secret != nil {
+			observation = i
+		}
+	}
+	if observation < 0 {
+		return nil, cfg.ErrInvalid
+	}
+	workers := contracts.DownloadWorkerNamespaceName(p.InstallationID)
+	pod.Volumes[observation].VolumeSource = core.VolumeSource{Projected: &core.ProjectedVolumeSource{DefaultMode: ptr.To(int32(0440)), Sources: []core.VolumeProjection{
+		{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: contracts.OwnerObservationProjectionName(p.InstallationID)}, Optional: ptr.To(true)}},
+		{ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: contracts.NativeKubernetesTokenFile(clusterID, workers), ExpirationSeconds: ptr.To(int64(600))}},
+		{ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: contracts.NativeKubernetesProbeTokenFile(clusterID, workers), ExpirationSeconds: ptr.To(int64(600))}},
+	}}}
 	w.Role.Rules = append(w.Role.Rules, rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{selection.AuditCredentials.Name}, Verbs: []string{"get"}})
 	// ADR-185: the promoted hub-api reads its settings and proves each guarded
 	// public source's own denial with a dry-run UPDATE, so it holds update on

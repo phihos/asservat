@@ -9,7 +9,7 @@ ADR-122 adds a separate h2/TLS1.3 receiver to the existing protected `hub-api` o
 The audited `owner-pool.json` has an optional `nativePort`; omission and a zero-valued Go field preserve historical bytes. Nonzero values are 1024–65535 and distinct from the enrollment port. The public immutable startup `deployment.json` has optional `native` inputs:
 
 - Connector issuer roots, independently pinned by installation and checked against actual peer TLS plus current fleet registration.
-- One to 256 exact worker API projections, each with cluster UUID, control namespace name/UID and fixed HTTPS endpoint/CA roots. The token is read from `native-kube-<cluster UUID>-<namespace UUID>.token`; neither the wire nor a public request names a credential path.
+- One to 256 exact worker API projections, each with cluster UUID, control namespace name/UID and fixed HTTPS endpoint/CA roots. The token is read from `native-kube-<cluster UUID>-<namespace name>.token` (ADR-204: the installed owner template is pinned before the worker namespace exists, so its file names cannot contain the namespace UID; every client still checks the pinned UID, and two pins may not share a file); neither the wire nor a public request names a credential path.
 - One to 1024 immutable topology ConfigMap pins, each with target cluster UUID, name, UID and canonical SHA-256. Their current contents feed the existing retention transaction guard. Topology pins are protected installation data; current arbitrary labels or ConfigMap status cannot replace them.
 - Separate connection (1–64) and concurrent-operation (1–16, at most connections) limits.
 

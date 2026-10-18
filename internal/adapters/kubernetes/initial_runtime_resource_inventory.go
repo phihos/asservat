@@ -85,8 +85,9 @@ func (p *InitialPreparer) runtimeBridgeAdministration(c contracts.InitialInstall
 		out.SourceProbes = append(out.SourceProbes, cfg.InitialRuntimeSourceProbe{ConfigMap: installedProcessingSource(c.InstallationID), ServiceAccount: workerAccount.Name, ServiceAccountUID: workerAccount.UID})
 	}
 	if ownerLayout == contracts.OwnerProviderInstalledLayout {
-		// ADR-203: the publisher's catalog pair (ownerPublicSourceProbes).
-		out.RuntimeProbeAccounts = []string{contracts.PublisherName(c.InstallationID)}
+		// ADR-203/204: the publisher's and the key service's catalog pairs
+		// (ownerPublicSourceProbes).
+		out.RuntimeProbeAccounts = ownerRuntimeProbeAccounts(c.InstallationID)
 	}
 	if !out.Valid() {
 		return zero, cfg.ErrChanged

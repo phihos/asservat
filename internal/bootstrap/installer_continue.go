@@ -27,6 +27,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/audit"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	fleetvalue "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -66,6 +67,11 @@ type InstallerContinuation struct {
 	// Secret exist; the phase-3 artifact then carries its provider roles.
 	federation *contracts.FederationDeployment
 	publisher  *installerPublisher
+	// downloads is the ADR-204 worker state once its namespace objects exist;
+	// ownerConfiguration the accepted owner configuration read before the
+	// phase-3 outbox, whose pool and roots the worker control pins.
+	downloads          *installerDownloads
+	ownerConfiguration *fleetvalue.OwnerConfiguration
 	// The public role root and producer, kept open for the permission step.
 	publicRoot  *kube.PublicRuntimeRoleRoot
 	publicRoles *postgres.PublicRuntimeSQLRoles
@@ -192,9 +198,15 @@ func (k *InstallerContinuation) Resources(ctx context.Context) (*kube.InitialRun
 		return nil, snapshot, inventory, err
 	}
 	w, o := k.input.WorkerProvider, k.input.OwnerProvider
+	// ADR-204 decision 7: with downloads the selection, which binds this
+	// journal, also names the worker configuration audit key.
+	audit, err := k.workerConfigurationAudit()
+	if err != nil {
+		return nil, snapshot, inventory, err
+	}
 	k.at("resources/producer")
 	resources, err := kube.NewProviderInstalledRuntimeResources(ctx, k.preparer, k.sql, k.roots,
-		contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker},
+		contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit},
 		contracts.OwnerProviderSelection{AuthMount: o.AuthMount, AuthMountAccessor: o.AuthMountAccessor, AuditCredentials: owner})
 	if err != nil {
 		return nil, snapshot, inventory, err
@@ -449,8 +461,12 @@ func (k *InstallerContinuation) WorkerRecipe(ctx context.Context, resources *kub
 		return docs, err
 	}
 	w := k.input.WorkerProvider
+	audit, err := k.workerConfigurationAudit()
+	if err != nil || audit != (contracts.OwnerPublicTransit{}) && audit.Mount != original.KeyService.AuditMount {
+		return docs, errors.Join(mounts.ErrUnavailable, err)
+	}
 	k.at("worker/outbox")
-	artifact, err := providerconfig.ConfigurationProviderPairSetupArtifact(deployment, contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker}, inventory.WorkerAccount, snapshot.State.WorkerLayout, time.Now())
+	artifact, err := providerconfig.ConfigurationProviderPairSetupArtifact(deployment, contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit}, inventory.WorkerAccount, snapshot.State.WorkerLayout, time.Now())
 	if err != nil {
 		return docs, err
 	}
@@ -635,7 +651,9 @@ func (k *InstallerContinuation) PublicSources(ctx context.Context, inventory kub
 		identity.EligibleGroups = []string{}
 	}
 	control := cfg.NamespaceRef{Name: inventory.Namespace.Name, UID: inventory.Namespace.UID}
-	sources, err := kube.EnsurePublicSources(ctx, k.in.kubernetes("administrator-token"), control, k.record.Scope.InstallationID, inventory.BridgeAdministration.Owner.Administrators, browser, identity, environment)
+	// ADR-204 decision 2: with downloads the worker profile source lives in
+	// the worker namespace and replaces the hub namespace's marker.
+	sources, err := kube.EnsurePublicSources(ctx, k.in.kubernetes("administrator-token"), control, k.record.Scope.InstallationID, inventory.BridgeAdministration.Owner.Administrators, browser, identity, environment, k.workerProfileSource())
 	if err != nil {
 		return nil, err
 	}
@@ -645,10 +663,16 @@ func (k *InstallerContinuation) PublicSources(ctx context.Context, inventory kub
 
 // processingSettings is the first download environment document. ADR-192:
 // the capacity processing source and the owner download environment carry
-// the same settings.
+// the same settings. ADR-204: with downloads it permits the hub-local path's
+// one region and lists the download clients without paths; each joined
+// cluster's derived path is added to them by the join.
 func (k *InstallerContinuation) processingSettings(root string) contracts.DownloadEnvironmentSettings {
-	return contracts.DownloadEnvironmentSettings{Format: contracts.DownloadEnvironmentFormat, RootID: root, InstallationID: k.record.Scope.InstallationID, RecoveryEpoch: k.record.Scope.IssuerEpoch, Revision: 1,
+	s := contracts.DownloadEnvironmentSettings{Format: contracts.DownloadEnvironmentFormat, RootID: root, InstallationID: k.record.Scope.InstallationID, RecoveryEpoch: k.record.Scope.IssuerEpoch, Revision: 1,
 		PermittedRegions: []string{}, Paths: []contracts.DownloadEnvironmentPath{}, Clients: []contracts.DownloadEnvironmentClient{}, Operators: k.input.Public.ProcessingOperators}
+	if k.downloadsEnabled() {
+		s.PermittedRegions, s.Clients = []string{k.downloadRegion()}, downloadClients(*k.input.Public)
+	}
+	return s
 }
 
 // PublicRoles provisions the public runtime roles before the owner's one
@@ -743,6 +767,11 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	}
 	input, profile := bootstrap.Input, *bootstrap.Input.ProviderAuthentication
 	if k.input.Public != nil {
+		// ADR-204 decision 1: the worker namespace objects exist before the
+		// permission projection names their source.
+		if err = k.DownloadWorkers(ctx, inventory); err != nil {
+			return err
+		}
 		if err = k.Permission(ctx, resources, bridge, inventory, input); err != nil {
 			return err
 		}
@@ -784,6 +813,7 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	if err != nil || !observed.Valid(time.Now()) || observed.Configuration.Revision.UID != input.ConfigurationUID {
 		return errors.Join(mounts.ErrUnavailable, err)
 	}
+	k.ownerConfiguration = &observed.Configuration
 	k.at("owner/outbox")
 	// ADR-194: a promoted artifact also creates the derived public keys and
 	// roles; only their names are known before the readback.
@@ -796,7 +826,7 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		transit, signing, pki := promotedKeyNames(input.InstallationID, k.record.Scope.IssuerEpoch, *promotion)
 		named.Public = &contracts.OwnerPublicDeployment{SessionTransit: transit, WorkSigning: signing, WorkerPKI: pki}
 	}
-	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation, k.publisherSetup())
+	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation, k.publisherSetup(), k.downloadEvidenceSetup())
 	if err != nil {
 		return err
 	}
@@ -813,6 +843,12 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	defer clear(inbox.AuditCredential)
 	for _, b := range inbox.Public {
 		defer clear(b)
+	}
+	defer clear(inbox.DownloadEvidenceCredential)
+	// ADR-204 decision 5: the download workers' own evidence read principal,
+	// exactly when this installation has downloads.
+	if (k.downloads != nil) != (len(inbox.DownloadEvidenceCredential) != 0) {
+		return mounts.ErrUnavailable
 	}
 	if promotion != nil {
 		if len(inbox.Public) != len(contracts.InstallerInboxPublicFiles()) {
@@ -855,11 +891,14 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		}
 	}
 	if promotion != nil {
-		if input, err = k.promote(ctx, inventory, input, named, profile, inspector, inbox.Public); err != nil {
+		if input, err = k.promote(ctx, inventory, input, named, profile, inspector, inbox.Public, inbox.DownloadEvidenceCredential); err != nil {
 			return err
 		}
 	}
 	if err = k.PublisherCredentials(ctx, inventory, inbox, inspector, input); err != nil {
+		return err
+	}
+	if err = k.DownloadAccepted(ctx); err != nil {
 		return err
 	}
 	k.at("owner/projection")
@@ -966,6 +1005,10 @@ func (k *InstallerContinuation) KeyService(ctx context.Context, inventory kube.I
 	d := contracts.KeyServiceDeployment{Format: contracts.KeyServiceDeploymentFormat, InstallationID: installation, ClusterID: k.record.Scope.ClusterID, PermissionRootID: f.PermissionRootID, Port: contracts.KeyServicePort,
 		Namespace: inventory.Namespace, Kubernetes: owner.Kubernetes, KeySource: key.Configuration, KeyID: keyID, RecoveryEpoch: k.record.Scope.IssuerEpoch, Postgres: sql,
 		KeyClientRoots: owner.Public.WorkerPKI.Roots, ConnectorClientRoots: connectorRoots, Concurrency: 8}
+	// ADR-204 decision 8: acquisition unwraps for the configured profile.
+	if d.Downloads, err = k.keyServiceDownloads(owner); err != nil {
+		return nil, err
+	}
 	if err = kube.EnsureKeyServiceAccount(ctx, admin, namespace, installation); err != nil {
 		return nil, err
 	}
@@ -1019,14 +1062,21 @@ func (k *InstallerContinuation) RetentionBaseline(ctx context.Context, inventory
 }
 
 // promote is ADR-194 order step 6: the public key and role readback, the
-// derived promoted input, the empty worker-control catalog and the operator
-// public Secret, all before the owner projection.
-func (k *InstallerContinuation) promote(ctx context.Context, inventory kube.InitialRuntimeResourceInventory, input, named contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, inspector *providerconfig.SetupReader, public map[string][]byte) (contracts.OwnerDeployment, error) {
+// configured download workers (ADR-204), the derived promoted input, the
+// worker-control catalog and the operator public Secret, all before the
+// owner projection.
+func (k *InstallerContinuation) promote(ctx context.Context, inventory kube.InitialRuntimeResourceInventory, input, named contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, inspector *providerconfig.SetupReader, public map[string][]byte, downloadCredential []byte) (contracts.OwnerDeployment, error) {
 	if k.sources == nil || k.capacity == nil || k.publicProjection.UID == "" || k.input.Public.Federation == nil {
 		return input, mounts.ErrUnavailable
 	}
 	k.at("public/readback")
 	readback, err := inspector.VerifyOwnerPublic(ctx, named, profile)
+	if err != nil {
+		return input, err
+	}
+	// The worker control needs the read-back worker PKI roots; the owner
+	// input then pins the configured profile's revision.
+	downloads, err := k.DownloadConfigure(ctx, inventory, input, downloadCredential, readback.WorkerRoots)
 	if err != nil {
 		return input, err
 	}
@@ -1036,14 +1086,14 @@ func (k *InstallerContinuation) promote(ctx context.Context, inventory kube.Init
 		return input, err
 	}
 	promoted, err := derivePromotedOwner(input, promotedOwnerParts{Settings: *k.input.Public, Sources: *k.sources, Qualification: k.capacity.qualification, ConnectorRoots: connectorRoots,
-		IssuerEpoch: k.record.Scope.IssuerEpoch, Signing: readback.Signing, WorkerRoots: readback.WorkerRoots, Projection: k.publicProjection}, time.Now())
+		IssuerEpoch: k.record.Scope.IssuerEpoch, Signing: readback.Signing, WorkerRoots: readback.WorkerRoots, Projection: k.publicProjection, Downloads: downloads}, time.Now())
 	if err != nil {
 		return input, err
 	}
 	admin := k.in.kubernetes("administrator-token")
 	installation := k.record.Scope.InstallationID
 	k.at("public/observation-projection")
-	if err = kube.WriteOwnerObservationProjection(ctx, admin, inventory.Namespace.Name, installation, contracts.OwnerWorkerTrust{Format: contracts.OwnerWorkerTrustFormat, Controls: [][]byte{}}); err != nil {
+	if err = kube.WriteOwnerObservationProjection(ctx, admin, inventory.Namespace.Name, installation, contracts.OwnerWorkerTrust{Format: contracts.OwnerWorkerTrustFormat, Controls: k.workerControls()}); err != nil {
 		return input, err
 	}
 	k.at("public/operator-secret")
@@ -1191,6 +1241,11 @@ func (k *InstallerContinuation) Permission(ctx context.Context, resources *kube.
 	if err != nil {
 		return err
 	}
+	// ADR-204 decision 7: the worker profile source the hub-worker accepts.
+	workers, err := k.workerConfigurationSection(owner)
+	if err != nil {
+		return err
+	}
 	k.at("permission/projection")
 	// One projection instance owns the one claim attempt across replays; an
 	// uncertain claim is lookup-only afterwards.
@@ -1205,7 +1260,7 @@ func (k *InstallerContinuation) Permission(ctx context.Context, resources *kube.
 			if projection == nil {
 				deployment := contracts.PermissionDeployment{Format: contracts.PermissionDeploymentFormat, InstallationID: k.record.Scope.InstallationID, RootID: owner.PermissionRootID,
 					RoleRootUID: verified.UID, RoleSetupID: verified.State.OperationID, Postgres: owner.Postgres, Control: control,
-					Retention: &contracts.RetentionDeployment{Guard: retention}}
+					Retention: &contracts.RetentionDeployment{Guard: retention}, WorkerConfiguration: workers}
 				if projection, e = kube.NewPermissionRuntimeProjection(bridge, resources, k.publicRoot, deployment); e != nil {
 					return e
 				}
@@ -1330,7 +1385,8 @@ func (k *InstallerContinuation) CapacityProjection(ctx context.Context, resource
 			StatusUsers: []string{}, ProbeAccount: inventory.WorkerAccount},
 		Clusters: []contracts.CapacityClusterDeployment{{ClusterID: cluster, ProbeNamespace: s.ProbeNamespace, ProbeAccount: s.ProbeAccount, Guard: s.NamespaceGuard,
 			Keys: slices.Sorted(slices.Values(k.input.Public.Capacity.NamespaceKeys))}},
-		Processing:    contracts.CapacityProcessingDeployment{Source: s.ProcessingSource, Guard: s.ProcessingGuard, Paths: []contracts.DownloadEnvironmentPath{}},
+		// ADR-204 decision 4: the same path template as the owner input.
+		Processing:    contracts.CapacityProcessingDeployment{Source: s.ProcessingSource, Guard: s.ProcessingGuard, Paths: []contracts.DownloadEnvironmentPath{}, PathTemplate: k.downloadPathTemplateOrNil()},
 		Qualification: c.setup.Qualification}
 	// One projection instance owns the one claim attempt across replays; an
 	// uncertain claim is lookup-only afterwards.

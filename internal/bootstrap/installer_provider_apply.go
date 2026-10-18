@@ -76,6 +76,7 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	keyFile := flags.String("public-tls-key", "", "the hub-api's public TLS private key PEM file (phase 3 of a promoted owner)")
 	evidenceFile := flags.String("evidence-read-credential", "", "the publisher's read-only evidence storage credential JSON file (phase 3 with a publisher)")
 	publisherAuditFile := flags.String("publisher-audit-credential", "", "the publisher's scoped audit storage credential JSON file (phase 3 with a publisher)")
+	downloadEvidenceFile := flags.String("download-evidence-credential", "", "the download workers' read-only evidence storage credential JSON file (phase 3 with downloads)")
 	if flags.Parse(args) != nil || flags.NArg() != 0 || *installation == "" || *credentialFile == "" {
 		return mounts.ErrUnavailable
 	}
@@ -113,6 +114,12 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 			publisher[key] = b
 		}
 	}
+	// ADR-204 decision 5: the download workers' own evidence read principal.
+	downloads, err := readDownloadEvidenceCredential(*downloadEvidenceFile)
+	if err != nil {
+		return err
+	}
+	defer clear(downloads)
 	// ADR-194: a promoted owner's public material, all three or none.
 	var public map[string][]byte
 	if *clientSecretFile != "" || *certificateFile != "" || *keyFile != "" {
@@ -145,6 +152,7 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		Federation json.RawMessage `json:"federation"`
 		Publisher  json.RawMessage `json:"publisher"`
 		Public     bool            `json:"public"`
+		Downloads  json.RawMessage `json:"downloadEvidenceReadStorage"`
 	}
 	if json.Unmarshal(outbox.Recipe, &plan) == nil && len(plan.Federation) != 0 && string(plan.Federation) != "null" && federation == nil {
 		_, _ = fmt.Fprintln(out, "This recipe provisions the federation: pass --federation-audit-credential with its separately scoped audit credential.")
@@ -152,6 +160,10 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	}
 	if hasPublisher := len(plan.Publisher) != 0 && string(plan.Publisher) != "null"; hasPublisher != (publisher != nil) {
 		_, _ = fmt.Fprintln(out, "Pass --evidence-read-credential and --publisher-audit-credential exactly when this recipe provisions the publisher.")
+		return mounts.ErrUnavailable
+	}
+	if hasDownloads := len(plan.Downloads) != 0 && string(plan.Downloads) != "null"; hasDownloads != (downloads != nil) {
+		_, _ = fmt.Fprintln(out, "Pass --download-evidence-credential exactly when this recipe names the download workers' evidence read credential.")
 		return mounts.ErrUnavailable
 	}
 	if plan.Public != (public != nil) {
@@ -171,7 +183,7 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		return err
 	}
 	defer clear(token)
-	if err = kube.WriteInstallerInbox(ctx, configuration, resolved, *installation, outbox.Phase, token, credential, federation, public, publisher); err != nil {
+	if err = kube.WriteInstallerInbox(ctx, configuration, resolved, *installation, outbox.Phase, token, credential, federation, public, publisher, downloads); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintln(out, "Inbox written; the continuation verifies the provider before any use.")

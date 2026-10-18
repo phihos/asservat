@@ -202,11 +202,11 @@ func TestOwnerProviderArtifactCarriesPublisherSetup(t *testing.T) {
 	in.Public = &contracts.OwnerPublicDeployment{SessionTransit: contracts.OwnerPublicTransit{Mount: "public-transit", Key: "sessions"}, WorkSigning: contracts.OwnerPublicSigning{Mount: "public-transit", Name: "work"},
 		WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: "worker-pki", Role: "worker", IssuerEpoch: "10000000-0000-4000-8000-000000002039"}}
 	p := publisherSetupFixture(t, f)
-	base, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, nil)
+	base, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil)
 	if err != nil || bytes.Contains(base, []byte(`"publisher"`)) {
 		t.Fatal("publisher section without a publisher", err)
 	}
-	b, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, &p)
+	b, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, &p, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func TestOwnerProviderArtifactCarriesPublisherSetup(t *testing.T) {
 		public := *in.Public
 		o.Public = &public
 		mutate(&o, &q)
-		if _, err = OwnerProviderSetupArtifact(o, f.profile, f.pool, f.roots, time.Now(), nil, &q); err == nil {
+		if _, err = OwnerProviderSetupArtifact(o, f.profile, f.pool, f.roots, time.Now(), nil, &q, nil); err == nil {
 			t.Fatal("accepted:", name)
 		}
 	}

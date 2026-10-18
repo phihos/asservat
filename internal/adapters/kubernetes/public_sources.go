@@ -30,8 +30,11 @@ type PublicSources struct {
 // the empty cluster catalog with its guard. Existing settings are kept as the
 // administrator left them; an existing guard must match exactly. A non-nil
 // environment (ADR-194) also creates the unconfigured worker configuration
-// and the owner download environment, each with its guard.
-func EnsurePublicSources(ctx context.Context, config *rest.Config, control cfg.NamespaceRef, installation string, admins []cfg.KubernetesActor, browser contracts.BrowserSettings, identity contracts.IdentitySettings, environment *contracts.DownloadEnvironmentSettings) (PublicSources, error) {
+// and the owner download environment, each with its guard. A non-nil worker
+// is the guarded profile source in the download workers' own namespace
+// (ADR-204 decision 2): it replaces the hub namespace's worker marker, which
+// is then not created.
+func EnsurePublicSources(ctx context.Context, config *rest.Config, control cfg.NamespaceRef, installation string, admins []cfg.KubernetesActor, browser contracts.BrowserSettings, identity contracts.IdentitySettings, environment *contracts.DownloadEnvironmentSettings, worker *contracts.OwnerPublicGuardedSource) (PublicSources, error) {
 	var out PublicSources
 	if ctx == nil || config == nil || control.Name == "" || !authorization.UUID(control.UID) || !authorization.UUID(installation) || len(admins) == 0 || !authorization.UUID(browser.RootID) {
 		return out, cfg.ErrInvalid
@@ -103,12 +106,19 @@ func EnsurePublicSources(ctx context.Context, config *rest.Config, control cfg.N
 	// An administrator later replaces the marker with a worker-profile.json
 	// and the environment with download paths; reopening keeps both.
 	workerName, environmentName := contracts.OwnerWorkerConfigurationName(installation), contracts.OwnerDownloadEnvironmentName(installation)
-	w, err := ensureRaw(workerName, "worker-profile.json", contracts.UnconfiguredWorkerConfiguration(installation))
-	if err != nil {
-		return PublicSources{}, err
-	}
-	if out.WorkerConfiguration, err = guarded(w, workerName+"-guard", WorkerConfigurationAdmission); err != nil {
-		return PublicSources{}, err
+	if worker != nil {
+		if !installationRefValid(worker.Source.Name, worker.Source.UID) || !authorization.UUID(worker.Source.UID) || worker.Source.Name == workerName || worker.Guard.Name == "" || !authorization.UUID(worker.Guard.PolicyUID) || !authorization.UUID(worker.Guard.BindingUID) {
+			return PublicSources{}, cfg.ErrInvalid
+		}
+		out.WorkerConfiguration = *worker
+	} else {
+		w, err := ensureRaw(workerName, "worker-profile.json", contracts.UnconfiguredWorkerConfiguration(installation))
+		if err != nil {
+			return PublicSources{}, err
+		}
+		if out.WorkerConfiguration, err = guarded(w, workerName+"-guard", WorkerConfigurationAdmission); err != nil {
+			return PublicSources{}, err
+		}
 	}
 	e, err := ensure(environmentName, contracts.DownloadEnvironmentFile, environment)
 	if err != nil {
