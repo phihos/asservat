@@ -31,7 +31,12 @@ func installerEvidenceBucketPolicy(bucket string) string {
 		map[string]any{"Sid": "AllowEvidenceDeletion", "Effect": "Allow", "Principal": deletion, "Action": []string{"s3:DeleteObject", "s3:DeleteObjectVersion", "s3:AbortMultipartUpload"}, "Resource": resource + "/v1/*"},
 		map[string]any{"Sid": "AllowEvidenceInventory", "Effect": "Allow", "Principal": deletion, "Action": list, "Resource": resource, "Condition": map[string]any{"StringLike": map[string]any{"s3:prefix": "v1/*"}}},
 		map[string]any{"Sid": "DenyForeignInventory", "Effect": "Deny", "Principal": deletion, "Action": list, "Resource": resource, "Condition": map[string]any{"StringNotLike": map[string]any{"s3:prefix": "v1/*"}}},
-		map[string]any{"Sid": "DenyEvidenceReadWrite", "Effect": "Deny", "Principal": deletion, "Action": []string{"s3:GetObject", "s3:GetObjectVersion", "s3:PutObject"}, "Resource": object},
+		map[string]any{"Sid": "DenyEvidenceRead", "Effect": "Deny", "Principal": deletion, "Action": []string{"s3:GetObject", "s3:GetObjectVersion"}, "Resource": object},
+		// Pinned SeaweedFS 4.48 expands PutObject statements to multipart
+		// actions even for Deny, including AbortMultipartUpload. Its own
+		// request-method condition distinguishes cleanup DELETE from PUT/POST.
+		// This fixture-specific condition grants no coarse Write permission.
+		map[string]any{"Sid": "DenyEvidenceWrite", "Effect": "Deny", "Principal": deletion, "Action": []string{"s3:PutObject"}, "Resource": object, "Condition": map[string]any{"StringNotEquals": map[string]any{"s3:RequestMethod": "DELETE"}}},
 		map[string]any{"Sid": "DenyEvidenceAdministration", "Effect": "Deny", "Principal": deletion, "Action": []string{"s3:PutBucketVersioning", "s3:PutBucketPolicy", "s3:DeleteBucketPolicy", "s3:PutLifecycleConfiguration", "s3:PutBucketAcl", "s3:DeleteBucket"}, "Resource": resource},
 	}})
 	return string(policy)
@@ -48,6 +53,15 @@ func installerEvidenceDeleteCredential(t *testing.T, ctx context.Context, p *ini
 		return s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: &p.desired.AuditStore.Endpoint, UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider(key, secret, ""), HTTPClient: p.client, RetryMaxAttempts: 1})
 	}
 	admin, cleaner := client("synthetic-only", "synthetic-only-secret"), client(credential.AccessKeyID, credential.SecretAccessKey)
+	qualifyInstalledEvidenceDeleteCredential(t, ctx, admin, cleaner, bucket)
+	return raw
+}
+
+// Both the full installer and the small owned-S3 fixture run these exact
+// backend operations after independently provisioning the List-only identity.
+func qualifyInstalledEvidenceDeleteCredential(t *testing.T, ctx context.Context, admin, cleaner *s3.Client, bucket string) {
+	t.Helper()
+	var err error
 	policy := installerEvidenceBucketPolicy(bucket)
 	if _, err = admin.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &bucket, Policy: &policy}); err != nil {
 		t.Fatal("evidence deletion policy", err)
@@ -60,9 +74,17 @@ func installerEvidenceDeleteCredential(t *testing.T, ctx context.Context, p *ini
 	prefix := "v1/deletion-permission-probe/" + custodyID() + "/"
 	key, foreign := prefix+"object", "outside-v1/deletion-permission-probe/"+custodyID()
 	var versions []s3.DeleteObjectInput
+	var uploads []s3.AbortMultipartUploadInput
 	defer func() {
 		cleanup, end := context.WithTimeout(context.Background(), 10*time.Second)
 		defer end()
+		for _, upload := range uploads {
+			_, e := admin.AbortMultipartUpload(cleanup, &upload)
+			var failure smithy.APIError
+			if e != nil && (!errors.As(e, &failure) || failure.ErrorCode() != "NoSuchUpload") {
+				t.Error("deletion multipart probe cleanup", e)
+			}
+		}
 		for _, v := range versions {
 			if _, e := admin.DeleteObject(cleanup, &v); e != nil {
 				t.Error("deletion permission probe cleanup", e)
@@ -116,6 +138,11 @@ func installerEvidenceDeleteCredential(t *testing.T, ctx context.Context, p *ini
 		versions = append(versions, s3.DeleteObjectInput{Bucket: &bucket, Key: &key, VersionId: put.VersionId})
 	}
 	denied("evidence write", err)
+	created, err := cleaner.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{Bucket: &bucket, Key: &key})
+	if created != nil && aws.ToString(created.UploadId) != "" {
+		uploads = append(uploads, s3.AbortMultipartUploadInput{Bucket: &bucket, Key: &key, UploadId: created.UploadId})
+	}
+	denied("multipart creation", err)
 	_, err = cleaner.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}})
 	denied("bucket versioning", err)
 	_, err = cleaner.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &bucket, Policy: &policy})
@@ -137,20 +164,30 @@ func installerEvidenceDeleteCredential(t *testing.T, ctx context.Context, p *ini
 		t.Fatal("deletion multipart inventory", err)
 	}
 	upload, err := admin.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{Bucket: &bucket, Key: &key})
-	if err != nil {
+	if err != nil || upload == nil || aws.ToString(upload.UploadId) == "" {
 		t.Fatal("synthetic deletion multipart probe", err)
 	}
-	defer func() {
-		cleanup, end := context.WithTimeout(context.Background(), 5*time.Second)
-		defer end()
-		_, e := admin.AbortMultipartUpload(cleanup, &s3.AbortMultipartUploadInput{Bucket: &bucket, Key: &key, UploadId: upload.UploadId})
-		var failure smithy.APIError
-		if e != nil && (!errors.As(e, &failure) || failure.ErrorCode() != "NoSuchUpload") {
-			t.Error("deletion multipart probe cleanup", e)
-		}
-	}()
+	uploads = append(uploads, s3.AbortMultipartUploadInput{Bucket: &bucket, Key: &key, UploadId: upload.UploadId})
+	part, err := admin.UploadPart(ctx, &s3.UploadPartInput{Bucket: &bucket, Key: &key, UploadId: upload.UploadId, PartNumber: aws.Int32(1), Body: strings.NewReader("synthetic complete final part")})
+	if err != nil || part == nil || aws.ToString(part.ETag) == "" {
+		t.Fatal("synthetic deletion multipart part", err)
+	}
+	_, err = cleaner.UploadPart(ctx, &s3.UploadPartInput{Bucket: &bucket, Key: &key, UploadId: upload.UploadId, PartNumber: aws.Int32(1), Body: strings.NewReader("synthetic forbidden replacement part")})
+	denied("multipart part write", err)
+	_, err = cleaner.UploadPartCopy(ctx, &s3.UploadPartCopyInput{Bucket: &bucket, Key: &key, UploadId: upload.UploadId, PartNumber: aws.Int32(1), CopySource: aws.String(bucket + "/" + key)})
+	denied("multipart part copy", err)
+	completed, err := cleaner.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{Bucket: &bucket, Key: &key, UploadId: upload.UploadId,
+		MultipartUpload: &s3types.CompletedMultipartUpload{Parts: []s3types.CompletedPart{{PartNumber: aws.Int32(1), ETag: part.ETag}}}})
+	if completed != nil && aws.ToString(completed.VersionId) != "" {
+		versions = append(versions, s3.DeleteObjectInput{Bucket: &bucket, Key: &key, VersionId: completed.VersionId})
+	}
+	denied("multipart completion", err)
 	if _, err = cleaner.AbortMultipartUpload(ctx, &s3.AbortMultipartUploadInput{Bucket: &bucket, Key: &key, UploadId: upload.UploadId}); err != nil {
 		t.Fatal("deletion abort permission", err)
+	}
+	remaining, err := admin.ListMultipartUploads(ctx, &s3.ListMultipartUploadsInput{Bucket: &bucket, Prefix: &prefix, MaxUploads: aws.Int32(4)})
+	if err != nil || remaining == nil || remaining.IsTruncated == nil || *remaining.IsTruncated || len(remaining.Uploads) != 0 || len(remaining.CommonPrefixes) != 0 {
+		t.Fatal("cleaner did not remove the administrator's synthetic upload", err)
 	}
 	marker, err := cleaner.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: &bucket, Key: &key})
 	if err != nil || !aws.ToBool(marker.DeleteMarker) || aws.ToString(marker.VersionId) == "" {
@@ -162,5 +199,8 @@ func installerEvidenceDeleteCredential(t *testing.T, ctx context.Context, p *ini
 			t.Fatal("deletion version permission", err)
 		}
 	}
-	return raw
+	remainingVersions, err := admin.ListObjectVersions(ctx, &s3.ListObjectVersionsInput{Bucket: &bucket, Prefix: &prefix, MaxKeys: aws.Int32(4)})
+	if err != nil || remainingVersions == nil || remainingVersions.IsTruncated == nil || *remainingVersions.IsTruncated || len(remainingVersions.Versions) != 0 || len(remainingVersions.DeleteMarkers) != 0 || len(remainingVersions.CommonPrefixes) != 0 {
+		t.Fatal("cleaner did not remove the synthetic version and marker", err)
+	}
 }
