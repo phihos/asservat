@@ -3,12 +3,15 @@ package bootstrap
 import (
 	"context"
 	"crypto/ed25519"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/postgres"
 	capacityapp "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -147,6 +150,88 @@ func TestContextDeletionCapacityHandoffPreservesDeadlineAfterLock(t *testing.T) 
 	if _, _, ok := d.ContextDeletion(); ok {
 		t.Fatal("expired startup exposed deletion pins")
 	}
+}
+
+func TestContextDeletionSweepRevisitsFailuresWithoutStarvingLaterWork(t *testing.T) {
+	ctx := context.Background()
+	at := time.Now().UTC().Truncate(time.Microsecond)
+	var poison []artifact.Location
+	for i := range 16 {
+		poison = append(poison, artifact.Location{ClusterID: runtimeID, ArtifactID: runtimeID, AttemptID: fmt.Sprintf("20000000-0000-4000-8000-%012d", i+1)})
+	}
+	healthy := artifact.Location{ClusterID: runtimeID, ArtifactID: runtimeID, AttemptID: "30000000-0000-4000-8000-000000000001"}
+	afterPoison := postgres.ContextDeletionCursor{Through: at, AfterExpiresAt: at.Add(-time.Hour), AfterAttemptID: poison[15].AttemptID}
+	var cursor postgres.ContextDeletionCursor
+	seen := map[artifact.Location]int{}
+	lists := 0
+	list := func(call context.Context, got postgres.ContextDeletionCursor) (postgres.ContextDeletionPage, error) {
+		lists++
+		if until, ok := call.Deadline(); !ok || time.Until(until) > 5*time.Second {
+			t.Fatal("list has no finite original deadline")
+		}
+		switch lists {
+		case 1, 4:
+			if got != (postgres.ContextDeletionCursor{}) {
+				t.Fatal("completed pass did not wrap to retry failed attempts")
+			}
+			return postgres.ContextDeletionPage{Locations: poison, Next: afterPoison}, nil
+		case 2:
+			if got != afterPoison {
+				t.Fatal("failed oldest page prevented cursor progress")
+			}
+			return postgres.ContextDeletionPage{}, errors.New("synthetic list outage")
+		case 3:
+			if got != afterPoison {
+				t.Fatal("list outage discarded the existing pass cursor")
+			}
+			return postgres.ContextDeletionPage{Locations: []artifact.Location{healthy}}, nil
+		}
+		t.Fatal("unexpected extra page")
+		return postgres.ContextDeletionPage{}, nil
+	}
+	clean := func(call context.Context, loc artifact.Location) error {
+		if call != ctx {
+			t.Fatal("cleanup did not retain the original Lease context")
+		}
+		seen[loc]++
+		if loc != healthy {
+			return errors.New("synthetic permanently unavailable checkpoint")
+		}
+		return nil
+	}
+	for range 4 {
+		cursor, _ = sweepContextDeletionPage(ctx, cursor, list, clean)
+	}
+	if seen[healthy] != 1 {
+		t.Fatal("healthy later attempt starved")
+	}
+	for _, loc := range poison {
+		if seen[loc] != 2 {
+			t.Fatal("failed attempt was not retried on wraparound")
+		}
+	}
+}
+
+func TestContextDeletionSweepStopsOnCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	list := func(context.Context, postgres.ContextDeletionCursor) (postgres.ContextDeletionPage, error) {
+		cancel()
+		return postgres.ContextDeletionPage{Locations: []artifact.Location{{ClusterID: runtimeID, ArtifactID: runtimeID, AttemptID: runtimeID}}}, nil
+	}
+	clean := func(context.Context, artifact.Location) error {
+		t.Fatal("canceled list started cleanup")
+		return nil
+	}
+	cursor, _ := sweepContextDeletionPage(ctx, postgres.ContextDeletionCursor{}, list, clean)
+	if cursor != (postgres.ContextDeletionCursor{}) {
+		t.Fatal("canceled list advanced its cursor")
+	}
+	list = func(context.Context, postgres.ContextDeletionCursor) (postgres.ContextDeletionPage, error) {
+		t.Fatal("canceled sweep listed another page")
+		return postgres.ContextDeletionPage{}, nil
+	}
+	_, _ = sweepContextDeletionPage(ctx, cursor, list, clean)
 }
 
 func TestEvidenceDeleteStorageRereadsAndRefusesSessionTokens(t *testing.T) {
