@@ -29,7 +29,23 @@ type ServerCredentials interface {
 // serves the exact native Handler with h2/TLS1.3 only. Handshake admission does
 // not replace the handler's current per-frame SQL, proof and serving checks.
 func Serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *Handler, connections int) error {
-	return serve(ctx, listener, roots, credentials, handler, nil, connections, 0)
+	return serve(ctx, listener, roots, nil, credentials, handler, nil, connections, 0)
+}
+
+// ClientRoots returns the current client-certificate roots for one handshake.
+type ClientRoots func(time.Time) (*x509.CertPool, error)
+
+// ServeWorker is Serve for the acquisition worker's own path in the hub
+// (ADR-204 decision 9). Client roots are resolved for each handshake from the
+// current download profile's issuer roots, so a removed trust takes effect on
+// the next connection; an unavailable set refuses the handshake. These roots
+// only pre-authenticate TLS: the handler's admission still verifies the exact
+// worker, profile, Pod token and operation for every frame.
+func ServeWorker(ctx context.Context, listener net.Listener, roots ClientRoots, credentials ServerCredentials, handler *Handler, connections int) error {
+	if roots == nil || handler == nil || handler.path != contracts.NativeWorkerPath {
+		return contracts.ErrNativeProtocol
+	}
+	return serve(ctx, listener, nil, roots, credentials, handler, nil, connections, 0)
 }
 
 // ServeWithContextStart shares the accepted native port between exactly two
@@ -41,12 +57,13 @@ func ServeWithContextStart(ctx context.Context, listener net.Listener, roots *x5
 	if starts == nil || startConnections < 1 || startConnections > 64 || nativeConnections < 1 || nativeConnections+startConnections > 64 {
 		return contracts.ErrNativeProtocol
 	}
-	return serve(ctx, listener, roots, credentials, handler, starts, nativeConnections, startConnections)
+	return serve(ctx, listener, roots, nil, credentials, handler, starts, nativeConnections, startConnections)
 }
 
-func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, credentials ServerCredentials, handler *Handler, starts *contextstart.Handler, nativeConnections, startConnections int) error {
+// Exactly one of roots (fixed) and current (per handshake) supplies ClientCAs.
+func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, current ClientRoots, credentials ServerCredentials, handler *Handler, starts *contextstart.Handler, nativeConnections, startConnections int) error {
 	connections := nativeConnections + startConnections
-	if ctx == nil || ctx.Err() != nil || listener == nil || roots == nil || len(roots.Subjects()) == 0 || credentials == nil || handler == nil || nativeConnections < 1 || connections > 64 || cap(handler.slots) > nativeConnections {
+	if ctx == nil || ctx.Err() != nil || listener == nil || (roots == nil) == (current == nil) || roots != nil && len(roots.Subjects()) == 0 || credentials == nil || handler == nil || nativeConnections < 1 || connections > 64 || cap(handler.slots) > nativeConnections {
 		return contracts.ErrNativeProtocol
 	}
 	host, _, err := net.SplitHostPort(handler.host)
@@ -71,7 +88,10 @@ func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, cre
 	nativeSlots := make(chan struct{}, nativeConnections)
 	startSlots := make(chan struct{}, startConnections)
 	defer owned.Close()
-	config := &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, ClientAuth: tls.RequireAndVerifyClientCert, ClientCAs: roots.Clone(), SessionTicketsDisabled: true, NextProtos: []string{"h2"}}
+	config := &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, ClientAuth: tls.RequireAndVerifyClientCert, SessionTicketsDisabled: true, NextProtos: []string{"h2"}}
+	if roots != nil {
+		config.ClientCAs = roots.Clone()
+	}
 	// net/http may prepare compatibility ALPN entries internally. Enforce the
 	// private protocol on the completed handshake before any HTTP request.
 	config.VerifyConnection = func(state tls.ConnectionState) error {
@@ -113,6 +133,23 @@ func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, cre
 			return nil, contracts.ErrNativeProtocol
 		}
 		return cert, nil
+	}
+	if current != nil {
+		// Client roots of this one handshake; the selected config keeps every
+		// callback above, including the exact-name certificate checks.
+		base := config.Clone()
+		config.GetConfigForClient = func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
+			if hello == nil || hello.ServerName != sni || root.Err() != nil {
+				return nil, contracts.ErrNativeProtocol
+			}
+			pool, e := current(time.Now())
+			if e != nil || pool == nil || len(pool.Subjects()) == 0 {
+				return nil, contracts.ErrNativeProtocol
+			}
+			selected := base.Clone()
+			selected.ClientCAs = pool
+			return selected, nil
+		}
 	}
 	protocols := &http.Protocols{}
 	protocols.SetHTTP2(true)

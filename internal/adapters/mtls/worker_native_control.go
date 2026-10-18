@@ -20,6 +20,9 @@ type WorkerNativeSettings struct {
 	ExchangeEndpoint, StoreID, StoreEndpoint, StoreRegion, StoreBucket string
 	StoreCredentialSecretName, StoreCredentialSecretUID, KeyEndpoint   string
 	KeyScope                                                           value.KeyScope
+	// ExchangeAddress is the optional connectivity-only dial target for
+	// ExchangeEndpoint (contracts.WorkerNativeControl.ExchangeAddress).
+	ExchangeAddress string
 }
 
 type WorkerNativeTrust struct {
@@ -80,7 +83,10 @@ func parseWorkerNative(w contracts.WorkerNativeControl, installation string, tot
 			return nil, err
 		}
 	}
-	t := &WorkerNativeTrust{settings: WorkerNativeSettings{w.ExchangeEndpoint, s.ID, s.Endpoint, s.Region, s.Bucket, s.CredentialSecretName, s.CredentialSecretUID, k.Endpoint, scope}}
+	if err := workerAddress(w.ExchangeAddress); err != nil {
+		return nil, err
+	}
+	t := &WorkerNativeTrust{settings: WorkerNativeSettings{ExchangeEndpoint: w.ExchangeEndpoint, StoreID: s.ID, StoreEndpoint: s.Endpoint, StoreRegion: s.Region, StoreBucket: s.Bucket, StoreCredentialSecretName: s.CredentialSecretName, StoreCredentialSecretUID: s.CredentialSecretUID, KeyEndpoint: k.Endpoint, KeyScope: scope, ExchangeAddress: w.ExchangeAddress}}
 	for i, roots := range [][][]byte{w.ExchangeServerRoots, s.ServerRoots, k.ServerRoots} {
 		parsed, e := parseWorkerRootSet(roots, total)
 		if e != nil {
