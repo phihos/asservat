@@ -1,5 +1,9 @@
 # Decision records
 
+[ADR-205 — Installed context deletion](205-installed-context-deletion.md)
+deletes expired context evidence from the hub-worker: three SQL logins, a due list, the operator's
+own evidence delete credential, a deletion signing key in Transit and the acknowledged deletion record.
+
 [ADR-204 — Installed native downloads](204-installed-downloads.md)
 runs download workers in their own hub-cluster namespace with the profile source beside them, pins
 one hub-local path in the owner input, gives workers their own evidence read credential, accepts
