@@ -2,9 +2,12 @@ package integration
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -114,32 +117,82 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 		}
 		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture as the Keycloak user")
 		// The regional executor collects; the publisher verifies and publishes
-		// (ADR-203). Poll the capture until it is terminal and its results are
-		// ready, within bounded time.
+		// (ADR-203). Poll the capture until it is terminal, then its case until
+		// the published artifact is listed, within bounded time.
 		var progress struct {
-			Phase        string `json:"phase"`
-			ResultAccess struct {
-				State    string   `json:"state"`
-				GrantIDs []string `json:"grantIDs"`
-			} `json:"result_access"`
+			Phase  string `json:"phase"`
+			CaseID string `json:"case_id"`
 		}
 		terminal := map[string]bool{"Succeeded": true, "Partial": true, "Failed": true, "Cancelled": true, "Indeterminate": true}
 		deadline := time.Now().Add(5 * time.Minute)
-		for {
+		wait := func(what string, done func() bool) {
+			t.Helper()
+			for !done() {
+				if time.Now().After(deadline) {
+					diagnose()
+					t.Fatal("installed journey: timed out waiting for", what)
+				}
+				time.Sleep(5 * time.Second)
+			}
+		}
+		wait("a terminal capture", func() bool {
 			call("get_capture", map[string]string{"capture_id": accepted.CaptureID}, &progress)
-			if terminal[progress.Phase] && progress.ResultAccess.State != "WaitingForArtifacts" && progress.ResultAccess.State != "NotRequested" {
-				break
-			}
-			if time.Now().After(deadline) {
-				diagnose()
-				t.Fatal("installed capture did not finish", progress.Phase, progress.ResultAccess.State)
-			}
-			time.Sleep(5 * time.Second)
-		}
-		if progress.Phase != "Succeeded" || progress.ResultAccess.State != "Ready" || len(progress.ResultAccess.GrantIDs) == 0 {
+			return terminal[progress.Phase]
+		})
+		if progress.Phase != "Succeeded" || progress.CaseID == "" {
 			diagnose()
-			t.Fatal("installed capture was not collected and published", progress.Phase, progress.ResultAccess.State, progress.ResultAccess.GrantIDs)
+			t.Fatal("installed capture was not collected", progress.Phase, progress.CaseID)
 		}
-		t.Logf("installed journey: the regional capture was collected, verified and published; %d result grant(s)", len(progress.ResultAccess.GrantIDs))
+		var investigation struct {
+			Artifacts []struct {
+				ArtifactID string `json:"artifact_id"`
+			} `json:"artifacts"`
+		}
+		wait("the published artifact", func() bool {
+			call("get_case", map[string]string{"case_id": progress.CaseID}, &investigation)
+			return len(investigation.Artifacts) > 0
+		})
+		if len(investigation.Artifacts) != 1 {
+			t.Fatal("installed case lists more than the one pod-status artifact", investigation.Artifacts)
+		}
+		t.Logf("installed journey: the regional capture was collected, verified and published")
+		// A hub-local download worker (ADR-204) prepares the native file; the
+		// same MCP client fetches it with its download-route token.
+		var download struct {
+			DownloadID  string `json:"download_id"`
+			State       string `json:"state"`
+			SizeBytes   *int64 `json:"size_bytes"`
+			SHA256      string `json:"sha256"`
+			ContentPath string `json:"content_path"`
+		}
+		call("prepare_artifact_download", map[string]string{"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": "installed-journey-download"}, &download)
+		wait("a prepared download", func() bool {
+			if download.State == "Preparing" {
+				call("get_artifact_download", map[string]string{"download_id": download.DownloadID}, &download)
+			}
+			return download.State != "Preparing"
+		})
+		if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes == nil || download.SHA256 == "" {
+			diagnose()
+			t.Fatal("installed download was not prepared", download.State, download.ContentPath)
+		}
+		get, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(origin, "/")+download.ContentPath, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		get.Header.Set("Authorization", "Bearer "+identity.downloadToken())
+		response, err := (&http.Client{Transport: transport, Timeout: 2 * time.Minute}).Do(get)
+		if err != nil {
+			diagnose()
+			t.Fatal("installed download content", err)
+		}
+		defer response.Body.Close()
+		digest := sha256.New()
+		size, err := io.Copy(digest, io.LimitReader(response.Body, *download.SizeBytes+1))
+		if err != nil || response.StatusCode != http.StatusOK || size != *download.SizeBytes || hex.EncodeToString(digest.Sum(nil)) != download.SHA256 {
+			diagnose()
+			t.Fatal("installed download content differs from its prepared metadata", response.StatusCode, size, err)
+		}
+		t.Logf("installed journey: the Keycloak user downloaded the native pod-status file (%d bytes) through the hub-local worker", size)
 	}
 }
