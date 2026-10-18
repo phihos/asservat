@@ -141,7 +141,7 @@ func qualifyProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin
 	}
 	writer := pgx.Identifier{f.roles["capacity"].Config().ConnConfig.User}.Sanitize()
 	reader := pgx.Identifier{f.roles["capacity-profile-read"].Config().ConnConfig.User}.Sanitize()
-	if _, err = admin.Exec(ctx, "GRANT EXECUTE ON FUNCTION read_context_query_capacity_source(uuid,jsonb),read_context_query_capacity_plan(uuid,uuid,uuid,text,text,jsonb,bytea,uuid) TO "+reader+"; GRANT EXECUTE ON FUNCTION accept_context_query_capacity(uuid,jsonb,jsonb),allocate_context_query_capacity(uuid,uuid,uuid,text,text,uuid),suspend_context_query_capacity(uuid,timestamptz) TO "+writer); err != nil {
+	if _, err = admin.Exec(ctx, "GRANT EXECUTE ON FUNCTION read_context_query_capacity_source(uuid,jsonb),read_context_query_capacity_plan(uuid,uuid,uuid,text,text,jsonb,bytea,uuid) TO "+reader+"; GRANT EXECUTE ON FUNCTION begin_context_query_capacity_observation(uuid,jsonb,jsonb,uuid,bigint),accept_context_query_capacity(uuid,jsonb,jsonb,jsonb),complete_context_query_capacity_observation(uuid,jsonb,timestamptz),allocate_context_query_capacity(uuid,uuid,uuid,text,text,uuid),suspend_context_query_capacity(uuid,timestamptz) TO "+writer); err != nil {
 		t.Fatal("explicit fixture query purpose grants", err)
 	}
 	reads, err := postgres.NewContextQueryCapacityReads(ctx, f.roles["capacity-profile-read"], f.input.PermissionRootID, f.input.InstallationID)
