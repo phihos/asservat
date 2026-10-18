@@ -56,6 +56,7 @@ func (s *providerInputs) read(ctx context.Context, name string, limit int64) ([]
 	}
 	return mounts.Read(ctx, s.files, name, limit)
 }
+
 type ownerInputs struct {
 	*providerInputs
 	config contracts.OwnerDeployment

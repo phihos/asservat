@@ -43,10 +43,17 @@ func (e storageAnswer) FixedStep() string { return e.step }
 // provider answered at all.
 func storageRefusal(err error) error {
 	var response interface{ HTTPStatusCode() int }
-	if errors.As(err, &response) && response.HTTPStatusCode() >= 100 && response.HTTPStatusCode() < 600 {
+	var named interface{ FixedStep() string }
+	switch {
+	case errors.As(err, &response) && response.HTTPStatusCode() >= 100 && response.HTTPStatusCode() < 600:
 		return storageStatus{response.HTTPStatusCode()}
+	case errors.As(err, &named):
+		// A cause that names itself, e.g. the credential provider.
+		return storageAnswer{named.FixedStep()}
+	case errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled):
+		return storageAnswer{"deadline"}
 	}
-	return ErrStorage
+	return storageAnswer{"transport"}
 }
 
 var ErrExists = errors.New("immutable object already exists")
