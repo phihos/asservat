@@ -183,6 +183,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 				FederationAuditStorage *struct {
 					Prefixes []string `json:"prefixes"`
 				} `json:"federationAuditStorage"`
+				DownloadEvidenceReadStorage *struct {
+					Bucket string `json:"bucket"`
+				} `json:"downloadEvidenceReadStorage"`
 				Publisher *struct {
 					AuditStorage struct {
 						Prefixes []string `json:"prefixes"`
@@ -215,6 +218,19 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					t.Fatal(e)
 				}
 				args = append(args, "--federation-audit-credential", federationFile)
+			}
+			if a := artifact.DownloadEvidenceReadStorage; a != nil {
+				// ADR-204 decision 5: the download workers' own reader of the
+				// evidence bucket only.
+				if a.Bucket != evidenceBucket {
+					t.Fatal("download evidence storage section", a.Bucket)
+				}
+				users = append(users, "download-evidence")
+				file := filepath.Join(work, "download-evidence.json")
+				if e = os.WriteFile(file, installerOperatorStorage(t, limit, providers, "download-evidence", []string{"Read:" + evidenceBucket + "/*"}, users), 0o600); e != nil {
+					t.Fatal(e)
+				}
+				args = append(args, "--download-evidence-credential", file)
 			}
 			if a := artifact.Publisher; a != nil {
 				// ADR-203: the publisher's audit writer under its own prefix and a
