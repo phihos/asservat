@@ -1,5 +1,28 @@
 # Sustained implementation progress
 
+## Installed journey native 42: structured preview refusal (2026-10-18)
+
+[Run 39139924613](https://github.com/phihos/asservat/actions/runs/39139924613)
+tested frozen source `9130cb626fa7e0d8870cf0883814e8c94e9734b1`, including the
+operation-owned audit credential and shared transport-slot corrections. Installed
+services, regional enrollment and capacity binding reached their checks: six
+distinct binding observations and twelve samples with at least one second left
+in fifteen seconds. All four `preview_capture` calls returned schema-valid
+`NotAvailable` envelopes. The earlier audit-begin credential diagnostic did not
+recur in these logs, but this does not identify the remaining refusal or prove
+successful preview availability. Collection, publication, native download,
+revocation, expiry and deletion assertions were not reached.
+
+The parent test failed after 1,332.72 seconds; the continuation failed after
+1,009.47 seconds. Terminal exit is 1, all 2,684 recorded source hashes independently
+match the frozen commit archive, tested sources were unchanged and cleanup
+failures are empty. The [environment report](../test/results/installed-journey-ci-42/context-storage-environment.json)
+has SHA-256 `3070b2188b0583535b89f4cd4ce6adcd92de930946523627b051e9127267d1a3`;
+the adjacent run, PostgreSQL and kubelet logs preserve the failure. The next task
+is bounded diagnosis of the structured refusal before another full campaign.
+Original deadlines and current checks remain unchanged; S-02 remains incomplete.
+
+
 ## Installed public audit credential deadline correction (2026-10-18)
 
 The installed public operation and capture-intent audit adapters now obtain one
