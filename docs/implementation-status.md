@@ -1,6 +1,6 @@
 # Product implementation status
 
-Baseline reviewed on 2026-10-12; runtime-profile, owner-startup and regional-collection updates on 2026-10-14. This tracks the accepted first-release scope in
+Baseline reviewed on 2026-10-12; runtime-profile, owner-startup and regional-collection updates on 2026-10-14; installed-workflow qualification updated on 2026-10-18. This tracks the accepted first-release scope in
 [product](product.md) and the [implementation slices](architecture/implementation-slices.md).
 Actual commands, source snapshots, failures and subsequent corrections remain in
 [implementation progress](implementation-progress.md).
@@ -41,7 +41,7 @@ the features that depend on them.
 | --- | --- | --- |
 | Bootstrap with Helm | Packaged native reference test passes, including replay, managed setup cleanup and uninstall preservation. The separate full bootstrap-to-runtime guard handover also passes with nineteen inert resources and lost-response recovery. | Deploy the actual hub/console/MCP/collector services with qualified protected inputs. The chart still rejects runtime enablement. |
 | Sign in through browser/MCP | Keycloak, session/refresh/logout and browser/MCP components have real integration evidence. | Installed identity/source/provider composition, reviewer step-up and the internal-user alternative. |
-| Request and browse workload context | The bounded pod-status diagnostic, shared UI/MCP controls, SQL admission and encrypted publication have component/native evidence. The regional real-service fixture journey now completes collection, publication, case lookup, native download, Stop and revocation (native36/37). | Complete installed two-cluster request-to-case flow. The current diagnostic is limited to 4,096 native bytes and is not generic file/log/command collection. |
+| Request and browse workload context | The bounded pod-status diagnostic, shared UI/MCP controls, SQL admission and encrypted publication have component/native evidence. The regional real-service fixture journey now completes collection, publication, case lookup, native download, Stop and revocation (native36/37). | Complete installed two-cluster request-to-case flow. Native44 still fails at preview target resolution before capture; the targeted native setup pass does not qualify the installed composition. The current diagnostic is limited to 4,096 native bytes and is not generic file/log/command collection. |
 | Download, Stop and deliberately retry | The corrected combined real-service run passes ordinary content, range resume, interrupted original/new sessions, control negatives, exactly-one-winner admission, native exchange and real retention-observation expiry. Authenticated ranges reconstruct a 352-byte artifact without budget refill. Browser restart and cancellation/denial boundaries also pass. | Installed identity/provider composition, sustained availability and large-artifact qualification remain pending. The native fixture uses explicit synthetic identity/bootstrap facts; earlier failures and the correction of its write-on-read retention source remain in the chronological tracker. |
 | Download every evidence type for local tools | Persistent framed format and bounded decoder exist; a separate earlier feasibility lab transferred 2 GiB. | Generic large-object publication, full native transfer/window lifecycle, interruption, throughput/memory and local-tool qualification for product cores, PCAPs and derivatives. |
 | Automatic suspicious-event collection | Policy source, automation identity and acceptance components exist. | Resolved policy/trigger engine, logs/resources/probes/external triggers, all-replica observation, correlation, storm controls and fair incident dispatch. |
@@ -80,15 +80,21 @@ synthetic setup roots. Regional context collection now runs hub-driven under
 ADR-171: the hub runs the runner with its own SQL/authority ports and the region
 answers only cluster-local operations. The native public journey passes this way.
 ADR-172 removes hub SQL from regional owner discovery and authentication at
-component level. The product regional collector still depends on the
-connector-Deployment executor's local-start timing, which has not passed natively
-yet. Current critical work is installation-wide SQL connection
-admission (the fixture runs within one or two of its 45 ordinary slots),
-protected runtime provisioning (including the federation/regional installer
-steps), capacity/audit source production, reliable native
-transfer, actual regional routing and the combined
-installation-to-investigation test. Most collector, recording, analysis and sharing
-work follows or reuses these foundations; it has not been declared complete.
+component level. The connector executor's private context setup now has a
+passing targeted real-Kubernetes test with one startup input and synthetic
+connector source/issuer/registry facts. It does not include the complete
+installed TLS opening and both delegated owner authentications.
+
+[Installed native44](implementation-progress.md#installed-native-44-preview-still-unavailable-2026-10-18)
+failed four preview requests at target resolution, before capture. The context
+standby repeatedly refused opening while the separate capacity observation
+channel remained active. Exact tested source hashes matched and fixture cleanup
+completed. Current work is to identify the failing opening stage while preserving
+original authority deadlines, then qualify the complete installed capture,
+publication, native download and revocation/expiry/deletion path. Neither the
+component pass nor a healthy capacity channel establishes this workflow.
+Most collector, recording, analysis and sharing work follows or reuses these
+foundations; it has not been declared complete.
 
 Future forecasts must use bounded deliverables with explicit implementation,
 integration and qualification work; account for dependencies and shared foundations;
