@@ -38,12 +38,17 @@ func ValidateConfigurationProviderSelection(installation string, p contracts.Con
 	if w := p.WorkerConfigurationAudit; w != (contracts.OwnerPublicTransit{}) && (!providerName.MatchString(w.Mount) || w.Mount == "sys" || w.Mount == "auth" || !providerName.MatchString(w.Key)) {
 		return cfg.ErrInvalid
 	}
+	// ADR-205: the context deletion signing key has its fixed name; the recipe
+	// separately requires the configuration audit mount.
+	if d := p.ContextDeletionSigning; d != (contracts.OwnerPublicTransit{}) && (!providerName.MatchString(d.Mount) || d.Mount == "sys" || d.Mount == "auth" || d.Key != contracts.ContextDeletionSigningKeyName(installation)) {
+		return cfg.ErrInvalid
+	}
 	return nil
 }
 
 // configurationProviderSelectionOf is the selection a profile was derived from.
 func configurationProviderSelectionOf(p contracts.ConfigurationProviderAuthentication) contracts.ConfigurationProviderSelection {
-	return contracts.ConfigurationProviderSelection{AuthMount: p.AuthMount, AuthMountAccessor: p.AuthMountAccessor, AuditCredentials: p.AuditCredentials, WorkerConfigurationAudit: p.WorkerConfigurationAudit}
+	return contracts.ConfigurationProviderSelection{AuthMount: p.AuthMount, AuthMountAccessor: p.AuthMountAccessor, AuditCredentials: p.AuditCredentials, WorkerConfigurationAudit: p.WorkerConfigurationAudit, ContextDeletionSigning: p.ContextDeletionSigning}
 }
 
 func ConfigurationProviderRecipeFor(in contracts.HubWorkerDeployment, selection contracts.ConfigurationProviderSelection, account contracts.WorkerObjectReference, now time.Time) (ConfigurationProviderRecipe, error) {
@@ -68,9 +73,15 @@ func ConfigurationProviderRecipeFor(in contracts.HubWorkerDeployment, selection 
 	if in.FleetSource.Name == in.OwnerSource.Name || worker.Mount == in.KeyService.AuditMount && worker.Key == in.KeyService.AuditKey {
 		return out, cfg.ErrInvalid
 	}
+	// ADR-205: the context deletion signing key lives on the configuration
+	// audit mount and is neither audit key.
+	signing := selection.ContextDeletionSigning
+	if signing != (contracts.OwnerPublicTransit{}) && (signing.Mount != in.KeyService.AuditMount || signing.Key == in.KeyService.AuditKey || signing == worker) {
+		return out, cfg.ErrInvalid
+	}
 	out.Profile = contracts.ConfigurationProviderAuthentication{Format: contracts.ConfigurationProviderAuthenticationFormat,
 		AuthMount: selection.AuthMount, AuthMountAccessor: selection.AuthMountAccessor,
-		ServiceAccount: account, AuditCredentials: selection.AuditCredentials, WorkerConfigurationAudit: worker}
+		ServiceAccount: account, AuditCredentials: selection.AuditCredentials, WorkerConfigurationAudit: worker, ContextDeletionSigning: signing}
 	scope, err := ownerProviderCanonical(struct {
 		Format         string                          `json:"format"`
 		InstallationID string                          `json:"installationID"`
@@ -105,6 +116,10 @@ func ConfigurationProviderRecipeFor(in contracts.HubWorkerDeployment, selection 
 		}}
 		if workerPaths[i] != "" {
 			acl.Path[workerPaths[i]] = ownerProviderACLRule{Capabilities: []string{"update"}}
+		}
+		// ADR-205 decision 6: only audit-wrap signs deletion records.
+		if purpose == "audit-wrap" && signing != (contracts.OwnerPublicTransit{}) {
+			acl.Path[signing.Mount+"/sign/"+signing.Key] = ownerProviderACLRule{Capabilities: []string{"update"}}
 		}
 		r, e := ownerProviderCanonical(role)
 		if e != nil {

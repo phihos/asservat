@@ -21,6 +21,8 @@ func ConfigurationProviderAudience(installationID, clusterID string) string {
 // WorkerConfigurationAudit is the selection's optional worker configuration
 // audit Transit key (ADR-204), carried so that the recipe can be recomputed
 // from the profile alone; zero for a hub-worker without one.
+// ContextDeletionSigning is likewise the selection's optional context
+// deletion signing key (ADR-205).
 type ConfigurationProviderAuthentication struct {
 	Format                   string                `json:"format"`
 	AuthMount                string                `json:"authMount"`
@@ -28,6 +30,7 @@ type ConfigurationProviderAuthentication struct {
 	ServiceAccount           WorkerObjectReference `json:"serviceAccount"`
 	AuditCredentials         WorkerObjectReference `json:"auditCredentials"`
 	WorkerConfigurationAudit OwnerPublicTransit    `json:"workerConfigurationAudit,omitzero"`
+	ContextDeletionSigning   OwnerPublicTransit    `json:"contextDeletionSigning,omitzero"`
 	RecipeSHA256             string                `json:"recipeSHA256"`
 }
 

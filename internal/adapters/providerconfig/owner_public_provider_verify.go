@@ -113,6 +113,29 @@ func verifySigningKey(data map[string]json.RawMessage, name string) (int, []byte
 	return int(latest), key, nil
 }
 
+// verifySigningKeyVersions is verifySigningKey that also returns the public
+// key of every version Transit lists (at most 32, the verifiers' bound), so
+// records signed before a rotation still verify against pinned keys.
+func verifySigningKeyVersions(data map[string]json.RawMessage, name string) (int, map[int]ed25519.PublicKey, error) {
+	latest, _, err := verifySigningKey(data, name)
+	var keys map[string]struct {
+		PublicKey string `json:"public_key"`
+	}
+	if err != nil || json.Unmarshal(data["keys"], &keys) != nil || len(keys) < 1 || len(keys) > 32 {
+		return 0, nil, ErrSetupUnavailable
+	}
+	out := make(map[int]ed25519.PublicKey, len(keys))
+	for v, k := range keys {
+		version, e := strconv.Atoi(v)
+		key, d := base64.StdEncoding.Strict().DecodeString(k.PublicKey)
+		if e != nil || strconv.Itoa(version) != v || version < 1 || version > latest || d != nil || len(key) != ed25519.PublicKeySize {
+			return 0, nil, ErrSetupUnavailable
+		}
+		out[version] = key
+	}
+	return latest, out, nil
+}
+
 // setupIssuerRoot accepts exactly one current CA certificate as the issuer's
 // trust root and returns its DER and expiry.
 func setupIssuerRoot(data map[string]json.RawMessage, now time.Time) ([]byte, time.Time, error) {
