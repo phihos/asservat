@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 )
 
@@ -37,24 +38,24 @@ func (s OperationAuditor) configured() bool {
 }
 func (s OperationAuditor) Begin(ctx context.Context, in value.OperationIntent) error {
 	if !s.configured() || ctx == nil || ctx.Err() != nil || !in.Valid() || !s.Now().Before(in.RequestUntil) {
-		return ErrUnavailable
+		return operationStep("start")
 	}
 	snap, err := s.Journal.ReserveOperation(ctx, in)
 	if err != nil {
-		return ErrUnavailable
+		return operationStep("reserve")
 	}
 	if !sameOperationRecord(snap.Intent, in) || snap.Outcome != nil {
-		return ErrUnavailable
+		return operationStep("record")
 	}
 	if snap.IntentReceipt != nil {
 		if !snap.IntentReceipt.ValidOperation(in.RootID, in.ID, "intent") {
-			return ErrUnavailable
+			return operationStep("receipt")
 		}
 		return s.current(ctx, in.RequestUntil)
 	}
 	fresh, err := s.Journal.ClaimOperationWrite(ctx, in, "intent")
 	if err != nil {
-		return ErrUnavailable
+		return operationStep("claim")
 	}
 	var receipt value.Receipt
 	if fresh {
@@ -63,30 +64,30 @@ func (s OperationAuditor) Begin(ctx context.Context, in value.OperationIntent) e
 		receipt, err = s.Objects.FindOperationIntent(ctx, in)
 	}
 	if err != nil || !receipt.ValidOperation(in.RootID, in.ID, "intent") {
-		return ErrUnavailable
+		return operationStep("object", err)
 	}
 	if err = s.Acknowledgements.AcknowledgeOperation(ctx, in, "intent", receipt); err != nil {
-		return ErrUnavailable
+		return operationStep("acknowledge")
 	}
 	return s.current(ctx, in.RequestUntil)
 }
 func (s OperationAuditor) Finish(ctx context.Context, out value.OperationOutcome) error {
 	if !s.configured() || ctx == nil || ctx.Err() != nil || !out.Valid() || !s.Now().Before(out.Intent.WriteUntil) {
-		return ErrUnavailable
+		return operationStep("start")
 	}
 	snap, err := s.Journal.FreezeOperationOutcome(ctx, out)
 	if err != nil || snap.Outcome == nil || snap.IntentReceipt == nil || !sameOperationRecord(snap.Intent, out.Intent) || !sameOperationRecord(*snap.Outcome, out) {
-		return ErrUnavailable
+		return operationStep("freeze")
 	}
 	if snap.OutcomeReceipt != nil {
 		if !snap.OutcomeReceipt.ValidOperation(out.Intent.RootID, out.Intent.ID, "outcome") {
-			return ErrUnavailable
+			return operationStep("receipt")
 		}
 		return s.current(ctx, out.Intent.WriteUntil)
 	}
 	fresh, err := s.Journal.ClaimOperationWrite(ctx, out.Intent, "outcome")
 	if err != nil {
-		return ErrUnavailable
+		return operationStep("claim")
 	}
 	var receipt value.Receipt
 	if fresh {
@@ -95,18 +96,43 @@ func (s OperationAuditor) Finish(ctx context.Context, out value.OperationOutcome
 		receipt, err = s.Objects.FindOperationOutcome(ctx, *snap.Outcome)
 	}
 	if err != nil || !receipt.ValidOperation(out.Intent.RootID, out.Intent.ID, "outcome") {
-		return ErrUnavailable
+		return operationStep("object", err)
 	}
 	if err = s.Acknowledgements.AcknowledgeOperation(ctx, out.Intent, "outcome", receipt); err != nil {
-		return ErrUnavailable
+		return operationStep("acknowledge")
 	}
 	return s.current(ctx, out.Intent.WriteUntil)
 }
 func (s OperationAuditor) current(ctx context.Context, until time.Time) error {
 	if ctx.Err() != nil || !s.Now().Before(until) {
-		return ErrUnavailable
+		return operationStep("expired")
 	}
 	return nil
+}
+
+// operationStepError is ErrUnavailable with the closed step where an
+// operation audit stopped, and the inner error's own step when it has one
+// (for example the object store's seal or put).
+type operationStepError struct {
+	step  string
+	inner error
+}
+
+func operationStep(step string, inner ...error) error {
+	e := &operationStepError{step: step}
+	if len(inner) == 1 {
+		e.inner = inner[0]
+	}
+	return e
+}
+func (e *operationStepError) Error() string { return ErrUnavailable.Error() }
+func (e *operationStepError) Unwrap() error { return ErrUnavailable }
+func (e *operationStepError) FixedStep() string {
+	var nested interface{ FixedStep() string }
+	if e.inner != nil && errors.As(e.inner, &nested) {
+		return e.step + "/" + nested.FixedStep()
+	}
+	return e.step
 }
 
 func sameOperationRecord(a, b any) bool {

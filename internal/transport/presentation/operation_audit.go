@@ -272,8 +272,8 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	}
 	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
-	if s.audit[audit.OperationLane(op)].Begin(ctx, intent) != nil {
-		return OperationReply{}, stopped("audit-begin", auditapp.ErrUnavailable)
+	if e := s.audit[audit.OperationLane(op)].Begin(ctx, intent); e != nil {
+		return OperationReply{}, stoppedAt("audit-begin", e, auditapp.ErrUnavailable)
 	}
 	var reply OperationReply
 	var callErr error
@@ -312,7 +312,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	finishCancel()
 	if e != nil {
 		clear(reply.Body)
-		return OperationReply{}, stopped("audit-finish", auditapp.ErrUnavailable)
+		return OperationReply{}, stoppedAt("audit-finish", e, auditapp.ErrUnavailable)
 	}
 	final, e := current.ResolveIdentity(ctx)
 	if e != nil || ctx.Err() != nil || !sameAuditIdentity(initial, final, s.config.Now()) || !s.config.Now().Before(until) {
@@ -479,14 +479,25 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 }
 
 // callStop names where an audited call stopped without a reply, for the
-// transport's closed 503 report. It wraps the returned sentinel unchanged.
+// transport's closed 503 report. It wraps the returned sentinel unchanged and
+// appends the cause's own closed step, when it has one.
 type callStop struct {
-	step string
-	err  error
+	step  string
+	err   error
+	cause error
 }
 
-func (e *callStop) Error() string     { return e.err.Error() }
-func (e *callStop) Unwrap() error     { return e.err }
-func (e *callStop) FixedStep() string { return e.step }
+func (e *callStop) Error() string { return e.err.Error() }
+func (e *callStop) Unwrap() error { return e.err }
+func (e *callStop) FixedStep() string {
+	var nested interface{ FixedStep() string }
+	if e.cause != nil && errors.As(e.cause, &nested) {
+		return e.step + "/" + nested.FixedStep()
+	}
+	return e.step
+}
 
-func stopped(step string, err error) error { return &callStop{step, err} }
+func stopped(step string, err error) error { return &callStop{step: step, err: err} }
+func stoppedAt(step string, cause, err error) error {
+	return &callStop{step: step, err: err, cause: cause}
+}
