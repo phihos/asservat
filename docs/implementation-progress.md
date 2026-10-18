@@ -1,5 +1,30 @@
 # Sustained implementation progress
 
+## Installed native 44: preview still unavailable (2026-10-18)
+
+The [full continuation run](https://github.com/phihos/asservat/actions/runs/39152191972)
+on frozen `fab45036f3cda153d06ea56898d92cae535e7d72` failed. Four independent
+preview requests returned unavailable after 3.339–3.445 seconds; private
+stage diagnostics again identify target resolution. The regional context
+standby repeatedly refused opening with unavailable/denied outcomes, while
+separate regional capacity observations succeeded. This does not establish
+which context setup, owner or source boundary failed. The selected one-input
+native setup pass above did not qualify this installed graph.
+
+[The retained log](../test/results/installed-journey-ci-44/context-storage.log)
+records the top-level failure after 1,346.49 seconds and the continuation failure
+after 1,023.35 seconds (package 1,346.583 seconds). Passive command and final
+administrator-removal subcases passed. Capture, publication, native download,
+expiry/deletion and faulted-cleanup continuation were not reached. PR40/41
+remain held; no complete installed user workflow is claimed.
+
+[Independent archive verification](../test/results/installed-journey-ci-44/verification.json)
+matched all 2,695 hashes to the frozen commit. Sources remained unchanged,
+test exit was 1 and owned cleanup completed without failures. The environment
+report SHA-256 is `8fe6447c666c2ad55f7ee06d4392a69587896897b79d097c57bd287508e615e5`.
+The next step is to reproduce or instrument the failing installed context-open
+boundary without changing original deadlines, permissions or retry ceilings.
+
 ## Context setup native 2: selected fixture passed (2026-10-18)
 
 The [corrected owned run](../test/results/context-setup-native-2/context-storage-environment.json)
