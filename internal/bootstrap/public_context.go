@@ -1,11 +1,9 @@
 package bootstrap
 
 import (
-	"fmt"
 	"io/fs"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -79,7 +77,7 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 	if e != nil {
 		return nil, e
 	}
-	mcpHandler.Report = mcpUnavailableReporter()
+	mcpHandler.Report = eventLog(os.Stderr, "mcp unavailable")
 	// ADR-194 D1: a nil Native (no configured worker) serves no content; its
 	// paths answer 503 rather than falling through to the console.
 	var content http.Handler
@@ -105,19 +103,4 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 		contentPrefix:   browser.DownloadContentPrefix,
 		contentMetadata: browser.DownloadContentMetadataPath,
 	}, nil
-}
-
-// mcpUnavailableReporter logs the closed reason of an MCP 503 once per change:
-// requests run concurrently and a refused client may retry quickly.
-func mcpUnavailableReporter() func(string) {
-	var mu sync.Mutex
-	last := ""
-	return func(reason string) {
-		mu.Lock()
-		defer mu.Unlock()
-		if reason != last {
-			last = reason
-			fmt.Fprintln(os.Stderr, "mcp unavailable: "+reason)
-		}
-	}
 }
