@@ -129,6 +129,7 @@ func (w *contextDeletionWorker) prepare(v contracts.ContextDeletionDeployment, s
 // the previous sweep's.
 func (w *contextDeletionWorker) run(ctx context.Context) {
 	last := map[artifact.Location]string{}
+	var cursor postgres.ContextDeletionCursor
 	for ctx.Err() == nil {
 		outcomes := map[artifact.Location]string{}
 		if w.cleaner == nil {
@@ -139,18 +140,7 @@ func (w *contextDeletionWorker) run(ctx context.Context) {
 			}
 		}
 		if w.cleaner != nil {
-			list, end := context.WithTimeout(ctx, 5*time.Second)
-			due, err := w.facets[0].DueContextDeletions(list)
-			end()
-			if err != nil {
-				outcomes[artifact.Location{}] = "list " + regionalOutcome(err)
-			}
-			for _, loc := range due {
-				if ctx.Err() != nil {
-					return
-				}
-				outcomes[loc] = regionalOutcome(w.cleaner.Clean(ctx, loc))
-			}
+			cursor, outcomes = sweepContextDeletionPage(ctx, cursor, w.facets[0].DueContextDeletionPage, w.cleaner.Clean)
 		}
 		for loc, outcome := range outcomes {
 			if last[loc] != outcome && ctx.Err() == nil {
@@ -162,6 +152,34 @@ func (w *contextDeletionWorker) run(ctx context.Context) {
 			return
 		}
 	}
+}
+
+// Sweep exactly one bounded page. Listing advances the scheduling cursor even
+// when every cleanup fails, so those rows cannot starve later due work. SQL's
+// fixed pass cutoff makes the cursor wrap and retry failures despite arrivals.
+// A failed/expired list keeps the original cursor; no cleanup effect follows it.
+func sweepContextDeletionPage(ctx context.Context, cursor postgres.ContextDeletionCursor, list func(context.Context, postgres.ContextDeletionCursor) (postgres.ContextDeletionPage, error), clean func(context.Context, artifact.Location) error) (postgres.ContextDeletionCursor, map[artifact.Location]string) {
+	outcomes := map[artifact.Location]string{}
+	if ctx.Err() != nil {
+		return cursor, outcomes
+	}
+	read, end := context.WithTimeout(ctx, 5*time.Second)
+	page, err := list(read, cursor)
+	if err == nil {
+		err = read.Err()
+	}
+	end()
+	if err != nil {
+		outcomes[artifact.Location{}] = "list " + regionalOutcome(err)
+		return cursor, outcomes
+	}
+	for _, loc := range page.Locations {
+		if ctx.Err() != nil {
+			break
+		}
+		outcomes[loc] = regionalOutcome(clean(ctx, loc))
+	}
+	return page.Next, outcomes
 }
 
 // evidenceDeleteStorage reads the operator's evidence delete credential for

@@ -38,7 +38,7 @@ and its storage charge is never released.
    permission stream under the hub-worker's scheduling lease, and exists only
    when the permission projection carries the optional `ContextDeletion`
    section. Each sweep advances each due attempt with `privacy.ContextCleaner`;
-   a failed or unknown step stays pending for the next sweep, as ADR-111
+   a failed or unknown step stays pending for a later sweep, as ADR-111
    requires. A sweep runs every thirty seconds.
 2. **Three SQL purposes.** `context-cleanup` (89), `context-cleanup-audit` (90)
    and `context-cleanup-finalize` (91), in the hub-worker compartment, with the
