@@ -5,8 +5,15 @@ package contracts
 // actual worker ServiceAccount UID and exact two-purpose recipe derive later
 // from its original receipt. This value grants no provider/runtime authority.
 // AuditCredentials names the dedicated one-key configuration audit Secret.
+//
+// WorkerConfigurationAudit (ADR-204 decision 7) is optional: the download
+// worker configuration observer's own audit Transit key, which the two audit
+// purposes may then also encrypt and decrypt with. It must equal the
+// permission projection's WorkerConfiguration.AuditTransit. The zero value
+// leaves the recipe, its digest and the setup artifact unchanged.
 type ConfigurationProviderSelection struct {
-	AuthMount         string                `json:"authMount"`
-	AuthMountAccessor string                `json:"authMountAccessor"`
-	AuditCredentials  WorkerObjectReference `json:"auditCredentials"`
+	AuthMount                string                `json:"authMount"`
+	AuthMountAccessor        string                `json:"authMountAccessor"`
+	AuditCredentials         WorkerObjectReference `json:"auditCredentials"`
+	WorkerConfigurationAudit OwnerPublicTransit    `json:"workerConfigurationAudit,omitzero"`
 }

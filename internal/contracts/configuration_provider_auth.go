@@ -17,13 +17,18 @@ func ConfigurationProviderAudience(installationID, clusterID string) string {
 // ConfigurationProviderAuthentication is public original input. The actual
 // protected producer, native workload, SQL recovery and finite provider leases
 // remain separate; neither a decoded profile nor its digest grants authority.
+//
+// WorkerConfigurationAudit is the selection's optional worker configuration
+// audit Transit key (ADR-204), carried so that the recipe can be recomputed
+// from the profile alone; zero for a hub-worker without one.
 type ConfigurationProviderAuthentication struct {
-	Format            string                `json:"format"`
-	AuthMount         string                `json:"authMount"`
-	AuthMountAccessor string                `json:"authMountAccessor"`
-	ServiceAccount    WorkerObjectReference `json:"serviceAccount"`
-	AuditCredentials  WorkerObjectReference `json:"auditCredentials"`
-	RecipeSHA256      string                `json:"recipeSHA256"`
+	Format                   string                `json:"format"`
+	AuthMount                string                `json:"authMount"`
+	AuthMountAccessor        string                `json:"authMountAccessor"`
+	ServiceAccount           WorkerObjectReference `json:"serviceAccount"`
+	AuditCredentials         WorkerObjectReference `json:"auditCredentials"`
+	WorkerConfigurationAudit OwnerPublicTransit    `json:"workerConfigurationAudit,omitzero"`
+	RecipeSHA256             string                `json:"recipeSHA256"`
 }
 
 func DecodeConfigurationProviderAuthentication(r io.Reader) (ConfigurationProviderAuthentication, error) {
