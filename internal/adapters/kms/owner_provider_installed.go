@@ -257,6 +257,15 @@ func (s *InstalledOwnerProviderEffects) Current(ctx context.Context) (time.Time,
 
 // Prime is a finite startup step before owner enrollment begins. Each purpose
 // still owns its own original at-most-five-second proof/control interval.
+// reportRefresh reports a failed refresh's closed step, except a refresh that
+// was only blocked by its own backoff or an active attempt.
+func (s *InstalledOwnerProviderEffects) reportRefresh(slot *ownerProviderLifetime, err error) {
+	var step interface{ FixedStep() string }
+	if s.Report != nil && errors.As(err, &step) && step.FixedStep() != "blocked" {
+		s.Report(slot.control.purpose + " " + step.FixedStep())
+	}
+}
+
 func (s *InstalledOwnerProviderEffects) Prime(ctx context.Context) error {
 	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil {
 		return ErrKeyService
@@ -271,7 +280,12 @@ func (s *InstalledOwnerProviderEffects) Prime(ctx context.Context) error {
 		// (1 s, 2 s, 4 s, ...). Wait for it inside the original bound rather
 		// than ending the process on one transient failure. A refusal without
 		// new backoff (closed, already active) is final.
-		for slot.refresh(call) != nil {
+		for {
+			err := slot.refresh(call)
+			if err == nil {
+				break
+			}
+			s.reportRefresh(slot, err)
 			retry, now := slot.retryAt()
 			if !retry.After(now) || !waitUntil(call, retry) {
 				return ErrKeyService
@@ -332,9 +346,8 @@ func (s *InstalledOwnerProviderEffects) Run(ctx context.Context) error {
 				}
 				// A failed refresh leaves the slot uncertain, so every borrow is
 				// refused until a later one succeeds: report it (closed words).
-				var step interface{ FixedStep() string }
-				if err := slot.refresh(call); err != nil && s.Report != nil && errors.As(err, &step) && step.FixedStep() != "blocked" {
-					s.Report(slot.control.purpose + " " + step.FixedStep())
+				if err := slot.refresh(call); err != nil {
+					s.reportRefresh(slot, err)
 				}
 			}
 		}
