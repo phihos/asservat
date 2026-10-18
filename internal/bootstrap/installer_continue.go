@@ -796,7 +796,7 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		transit, signing, pki := promotedKeyNames(input.InstallationID, k.record.Scope.IssuerEpoch, *promotion)
 		named.Public = &contracts.OwnerPublicDeployment{SessionTransit: transit, WorkSigning: signing, WorkerPKI: pki}
 	}
-	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation, nil)
+	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation, k.publisherSetup())
 	if err != nil {
 		return err
 	}
@@ -854,13 +854,13 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 			return err
 		}
 	}
-	if err = k.PublisherCredentials(ctx, inventory, inbox, inspector); err != nil {
-		return err
-	}
 	if promotion != nil {
 		if input, err = k.promote(ctx, inventory, input, named, profile, inspector, inbox.Public); err != nil {
 			return err
 		}
+	}
+	if err = k.PublisherCredentials(ctx, inventory, inbox, inspector, input); err != nil {
+		return err
 	}
 	k.at("owner/projection")
 	projection, err := kube.NewProviderOwnerProjection(root, sql, input, inspector)

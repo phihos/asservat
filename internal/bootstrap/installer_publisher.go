@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"bytes"
 	"context"
-	"strings"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
@@ -57,10 +56,9 @@ func (k *InstallerContinuation) PublisherIdentity(ctx context.Context, inventory
 	}
 	sql := owner.Postgres
 	sql.MaxConnections = int32(len(contracts.PublicRuntimePublisherPurposes()))
-	prefix := "asservat-" + strings.ReplaceAll(installation, "-", "")
 	d := contracts.PublisherDeployment{Format: contracts.PublisherDeploymentFormat, InstallationID: installation, ClusterID: k.record.Scope.ClusterID, PermissionRootID: owner.PermissionRootID,
-		Namespace: inventory.Namespace, Kubernetes: owner.Kubernetes, Postgres: sql, RetentionTopologies: []contracts.OwnerNativeTopology{}, Owner: owner.Guard(), AuditStore: owner.AuditStore,
-		AuditKeys: contracts.PublisherTransit{Endpoint: owner.KeyService.Endpoint, Roots: owner.KeyService.Roots, Mount: owner.KeyService.AuditMount, Key: prefix + "-publisher-audit"},
+		Namespace: inventory.Namespace, Kubernetes: owner.Kubernetes, Postgres: sql, RetentionTopologies: []contracts.OwnerNativeTopology{}, Owner: owner.Guard(), OwnerWorkload: inventory.OwnerDeployment, AuditStore: owner.AuditStore,
+		AuditKeys: contracts.PublisherTransit{Endpoint: owner.KeyService.Endpoint, Roots: owner.KeyService.Roots, Mount: owner.KeyService.AuditMount, Key: providerconfig.PublisherAuditKey(installation)},
 		Evidence:  contracts.PublisherEvidence{Endpoint: e.Endpoint, Roots: roots, Region: e.Region, Bucket: e.Bucket, StoreID: k.capacity.qualification.Backends[0].EvidenceStoreID},
 		Verifier: contracts.PublisherVerifier{Endpoint: owner.KeyService.Endpoint, Roots: owner.KeyService.Roots, PKIMount: k.input.Public.Promotion.WorkerPKIMount,
 			Role: contracts.PublisherVerifierRole(installation)},
@@ -76,11 +74,16 @@ func (k *InstallerContinuation) PublisherIdentity(ctx context.Context, inventory
 }
 
 // PublisherCredentials fills the publisher's Secrets from the phase-3 inbox and
-// reads back its applied provider setup through the inspection token.
-func (k *InstallerContinuation) PublisherCredentials(ctx context.Context, inventory kube.InitialRuntimeResourceInventory, inbox kube.InstallerInbox, inspector *providerconfig.SetupReader) error {
+// reads back its applied provider setup through the inspection token. It runs
+// after promotion: the verifier chain must verify under the worker PKI roots
+// that the promoted owner's readback returned.
+func (k *InstallerContinuation) PublisherCredentials(ctx context.Context, inventory kube.InitialRuntimeResourceInventory, inbox kube.InstallerInbox, inspector *providerconfig.SetupReader, owner contracts.OwnerDeployment) error {
 	p := k.publisher
 	if p == nil {
 		return nil
+	}
+	if owner.Public == nil || len(owner.Public.WorkerPKI.Roots) == 0 {
+		return mounts.ErrUnavailable
 	}
 	defer clear(inbox.PublisherAuditCredential)
 	defer clear(inbox.EvidenceReadCredential)
@@ -99,7 +102,17 @@ func (k *InstallerContinuation) PublisherCredentials(ctx context.Context, invent
 		}
 	}
 	k.at("publisher/verify")
-	return inspector.VerifyPublisher(ctx, p.deployment)
+	p.deployment.Verifier.IssuerRoots = owner.Public.WorkerPKI.Roots
+	_, err := inspector.VerifyPublisher(ctx, p.deployment, owner.Public.WorkerPKI.Roots)
+	return err
+}
+
+// publisherSetup is the publisher input the phase-3 artifact carries, or nil.
+func (k *InstallerContinuation) publisherSetup() *contracts.PublisherDeployment {
+	if k.publisher == nil {
+		return nil
+	}
+	return &k.publisher.deployment
 }
 
 // PublisherWorkload launches the publisher after the key service: its SQL

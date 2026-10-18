@@ -116,8 +116,10 @@ func TestPublisherTopologyPinsUnionCatalogSlots(t *testing.T) {
 		t.Fatal("union", pins, err)
 	}
 	for name, mutate := range map[string]func(*contracts.OwnerPublicCluster){
-		"other cluster":  func(s *contracts.OwnerPublicCluster) { s.Topology.TargetClusterID = runtimeID },
-		"other slot":     func(s *contracts.OwnerPublicCluster) { s.Topology.Name = contracts.OwnerClusterSourceName(runtimeID, 2, "topology") },
+		"other cluster": func(s *contracts.OwnerPublicCluster) { s.Topology.TargetClusterID = runtimeID },
+		"other slot": func(s *contracts.OwnerPublicCluster) {
+			s.Topology.Name = contracts.OwnerClusterSourceName(runtimeID, 2, "topology")
+		},
 		"empty digest":   func(s *contracts.OwnerPublicCluster) { s.Topology.SHA256 = strings.Repeat("0", 64) },
 		"fixed cluster":  func(s *contracts.OwnerPublicCluster) { s.ClusterID, s.Topology.TargetClusterID = runtimeID, runtimeID },
 		"fixed topology": func(s *contracts.OwnerPublicCluster) { s.Topology.Name = fixed.Name },

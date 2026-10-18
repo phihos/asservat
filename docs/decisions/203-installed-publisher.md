@@ -52,21 +52,27 @@ that the installed layout cannot supply:
    federation's.
 
    Logins and renewals are gated by the owner workload guard's current proof
-   and the recovery state, as the federation's are. The static token files are
+   and the recovery state, as the federation's are. The input names the
+   hub-api Deployment the guard proof probes, because the publisher's SQL
+   logins cannot read the owner configuration. The static token files are
    removed.
 4. **Verifier certificate.** The worker PKI mount gains the role
    `asservat-<id>-verifier`, which allows only the URI SAN
    `spiffe://asservat.<inst>/key-client/verifier/*` and a 20-minute TTL. The
    publisher creates a P-256 key in process, uses a fresh UUID peer ID per
-   process, signs its CSR through `verifier-sign` and renews at half the
-   period. The key never leaves the process; the certificate files are
+   process, signs an identity-free CSR through `verifier-sign` with the URI in
+   the sign request (as worker certificates are), checks the leaf names
+   exactly that URI and chains to the worker PKI roots, and renews at half
+   the period. The key never leaves the process; the certificate files are
    removed. A compromised publisher can mint only verifier certificates, which
    carry no authority beyond its own: every unwrap still needs ADR-181's
    per-attempt SQL grant.
 5. **Operator credentials.** `installer-provider-apply` gains
-   `--evidence-read-credential` (GetObject on the evidence bucket) and
-   `--publisher-audit-credential` (PutObject and GetObject on
-   `context-verification/v1/<root>/` of the audit bucket). Both arrive through
+   `--evidence-read-credential` (GetObject and GetObjectVersion on the
+   evidence bucket; no list, write or delete) and
+   `--publisher-audit-credential` (PutObject, GetObject and GetObjectVersion
+   on `context-verification/v1/<root>/` of the audit bucket). Both reads name
+   object versions. Both arrive through
    the inbox and are copied into the publisher's own Secrets. The provider
    setup artifact lists both credentials and their permissions. Separate
    credentials keep evidence reads out of every other hub workload and give
@@ -105,4 +111,12 @@ that the installed layout cannot supply:
 
 ## Progress
 
-- Decision recorded; implementation in progress.
+- **Implementation** (unit tests pass): the publisher's projection claim and
+  Secret, account and credential Secrets, Service-less workload and RBAC,
+  inbox keys and `installer-provider-apply` flags, the continuation steps
+  `publisher/identity`, `credentials`, `verify`, `projection`, `workload` and
+  `settle`; the provider recipe, setup, artifact section and readback
+  (`VerifyPublisher`); the provider effects for the audit Transit key and
+  verifier signing; the in-process verifier credential; and the process
+  composition with the guard proof, catalog pins and restart on catalog
+  change. Native qualification is pending.
