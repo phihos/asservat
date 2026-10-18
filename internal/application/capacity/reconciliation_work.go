@@ -36,6 +36,15 @@ type CapacityClusterReaders struct {
 	// Report, when set, receives each workload reconciliation's outcome and
 	// elapsed time. A refusal names its fixed stage (FixedStep).
 	Report func(error, time.Duration)
+	// Progress observes cursor position at most once every thirty seconds.
+	// Only bounded counts and kind ordinals leave discovery, never names/UIDs.
+	Progress func(CapacityDiscoveryProgress)
+}
+
+type CapacityDiscoveryProgress struct {
+	Steps, Candidates                         int64
+	NamespaceIndex, NamespaceCount, KindIndex int
+	WorkloadIndex, WorkloadCount              int
 }
 
 // capacityStageError names the fixed ReconcileWorkload stage that refused.

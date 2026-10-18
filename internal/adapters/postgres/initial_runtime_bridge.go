@@ -100,6 +100,15 @@ func (s *InitialRuntimeBridgeSQL) WithInitialRuntimeBridge(ctx context.Context, 
 }
 
 func (s *InitialRuntimeBridgeSQL) withInitialRuntimeBridge(ctx context.Context, source *initialRuntimeOwnerFleet, effect func(context.Context) error) error {
+	if effect == nil {
+		return cfg.ErrInvalid
+	}
+	return s.withInitialRuntimeBridgeQuery(ctx, source, func(call context.Context, _ publicRoleQuery) error { return effect(call) })
+}
+
+// The query facet stays private to installer reads. Native effects keep the
+// original callback, without access to an administrator transaction.
+func (s *InitialRuntimeBridgeSQL) withInitialRuntimeBridgeQuery(ctx context.Context, source *initialRuntimeOwnerFleet, effect func(context.Context, publicRoleQuery) error) error {
 	if s == nil || ctx == nil || ctx.Err() != nil || effect == nil {
 		return cfg.ErrInvalid
 	}
@@ -182,7 +191,7 @@ func (s *InitialRuntimeBridgeSQL) withInitialRuntimeBridge(ctx context.Context, 
 			return err
 		}
 	}
-	if err = effect(call); err != nil {
+	if err = effect(call, tx); err != nil {
 		return err
 	}
 	// A late/unknown native outcome stays unknown. SQL does not copy a receipt

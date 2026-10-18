@@ -109,9 +109,13 @@ and its storage charge is never released.
   access ends, with an acknowledged deletion record, and its storage charge
   is released.
 - The operator supplies one more storage credential.
-- The worst-case SQL connection plan for one hub (two retained hub-worker
-  processes during a rollout) rises by six connections, from 101 to 107. An
-  installation with deletion needs `max_connections` of at least 110.
+- The deletion purposes add six connections for two retained hub-worker
+  processes during a rollout. The [complete installed SQL inventory](../research/installed-sql-budget.md)
+  also counts five concurrent installer pools: one hub requires 112 ordinary
+  connections, or `max_connections` of at least 115 with three superuser-reserved
+  slots and no other reserved slots. The earlier 107/110 estimate omitted those
+  installer pools. The installer checks the actual available ordinary capacity;
+  these are configured upper bounds, not measured simultaneous use.
 - Copies a user downloaded are outside managed deletion, as before.
 - Capture operation audit cleanup is still not installed; it remains a
   separate gap.

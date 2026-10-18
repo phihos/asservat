@@ -211,6 +211,8 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 		defer owners.Done()
 		cursors := make([]capacityDiscoveryCursor, len(s.Clusters))
 		ended := make([]time.Time, len(s.Clusters))
+		reported := make([]time.Time, len(s.Clusters))
+		steps, candidates := make([]int64, len(s.Clusters)), make([]int64, len(s.Clusters))
 		next := 0
 		var stage atomic.Pointer[string]
 		mark := func(v string) { stage.Store(&v) }
@@ -230,6 +232,15 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 				defer t.Stop()
 			}
 			ns, candidate, found, err := cursors[i].next(call, s.Clusters[i].Workloads)
+			steps[i]++
+			if found {
+				candidates[i]++
+			}
+			if report := s.Clusters[i].Progress; report != nil && (reported[i].IsZero() || !s.Work.Now().Before(reported[i].Add(30*time.Second))) {
+				reported[i] = s.Work.Now()
+				c := cursors[i]
+				report(CapacityDiscoveryProgress{Steps: steps[i], Candidates: candidates[i], NamespaceIndex: c.namespaceIndex, NamespaceCount: len(c.namespaces), KindIndex: c.kindIndex, WorkloadIndex: c.workloadIndex, WorkloadCount: len(c.workloads)})
+			}
 			if err != nil || !found || call.Err() != nil {
 				return
 			}
