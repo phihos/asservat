@@ -64,6 +64,17 @@ Given two crashes with the same workload/name but different binary builds, when 
 
 ## REQ-EVD-005 — Analysis isolation and output classes
 
+The exact [ADR-206 pod-status projection](../docs/decisions/206-bounded-context-projection.md)
+reads already committed, independently verified `asservat-pod-status/v1` metadata
+through a fixed bounded formatter. It runs no general analyzer, creates no stored
+derivative and uses no cross-Job scratch handoff. A purpose-scoped acquisition
+worker performs verification/decryption; the hub receives only the approved DTO
+and never an unwrap key. Query-specific current authority, finite charged read
+batches, original deadlines, copy ownership and pre-disclosure audit are mandatory.
+This narrow profile does not relax the following isolation and encrypted-scratch
+requirements for offline analysis or other evidence formats. Its implementation
+and native qualification remain pending.
+
 Use separate acquisition, analysis and publication Jobs because network policy applies at pod scope. The acquisition Job receives one short-lived artifact-scoped decryption authorization, downloads the exact ciphertext and approved symbols/rootfs, verifies digests and writes bounded scratch. The analyzer has no credentials/token/network, runs non-root with read-only root filesystem, dropped capabilities, seccomp and resource/time/PID limits. Its input mount is read-only; output is separate and bounded.
 
 Separate Jobs cannot share emptyDir, including memory-backed emptyDir: it belongs to one Pod. For the separate-Job design, the currently specified feasible handoff is per-analysis qualified encrypted input/output PVCs; ordinary plaintext PVCs are disallowed. Job-private bounded tmpfs is permitted only within one phase, with pages charged separately from tool working memory. ADR-036 is accepted: a qualified encrypted scratch StorageClass is a required deployment prerequisite for first-release offline analysis. Installation can provide collection while that capability is unavailable; it must report the missing prerequisite explicitly. No storage-free cross-Job handoff is supported. [Kubernetes emptyDir](https://kubernetes.io/docs/concepts/storage/volumes/#emptydir).

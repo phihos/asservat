@@ -77,9 +77,33 @@ Long work returns `status=pending` with a server-minted query handle in `data`. 
 
 For `get_query_result`, validate the nested result against the original tool's output schema, identified by the server-owned handle. The caller cannot choose a weaker schema through `tool_name`. Byte ceilings apply to the entire wrapped response.
 
+The initial [approved pod-status read profile](../docs/architecture/context-projection.md)
+uses the existing `get_file_excerpt` input and a fixed `pod-status.txt` projection.
+Ordinary reads require no extra caller idempotency key (SC-AUT-005). A pending
+handle binds the original tool, principal/client, exact committed source/display
+version, line selection, finite budgets and query deadline. `get_query_result`
+MUST NOT start another query, capture, analyzer or replacement worker. Delivering
+the already bound result may consume a fresh separately charged source-read batch
+under current ordinary read authority; a pending poll cannot dispatch work.
+Prior spend and uncertainty remain charged. All operations preserve the original
+query lifetime and each request's original at-most-five-second identity and
+authority bounds. This profile is specified, not yet runtime-qualified.
+
 ### SC-MCP-002
 
 Given a query with more output than the byte cap, when it completes, then truncation is explicit and the result remains valid JSON. Reusing its cursor under another principal, a revoked share or modified filter is rejected.
+
+### SC-MCP-006
+
+Given an authorized browser or MCP reader and a committed pod-status artifact,
+when `get_file_excerpt` reads the selected lines, then both return the same fixed
+approved projection without download scope, new collection or extra consent.
+Given a known query handle and an outward reply lost after a positively joined
+private read, a later `get_query_result` may use only a new paid batch within the
+same source, selection, budget and original deadline. Unknown private closure,
+changed actor/client, current denial, expiry or exhaustion cannot cause reuse,
+replacement, refund or automatic successor admission. Audit failure before
+outcome acknowledgement prevents disclosure.
 
 ## REQ-MCP-003 — Typed raw operations
 

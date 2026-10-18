@@ -616,6 +616,7 @@ components:
   package_roots:
   - internal/application/analysis
   allowed_dependencies:
+  - C-02
   - C-03
   - C-07
   - C-08
@@ -626,6 +627,9 @@ components:
   responsibility: Bounded query planning, exact inputs, staged Jobs, tool policy and result validation.
   provided_ports:
   - AnalysisService
+  - ContextProjectionService
+  - ContextQueryAdmission
+  - ContextQueryBatches
   - StageCoordinator
   - AnalyzerRegistry
 - id: C-19
