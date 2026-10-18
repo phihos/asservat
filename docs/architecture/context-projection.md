@@ -3,8 +3,9 @@
 [ADR-206](../decisions/206-bounded-context-projection.md) defines the next narrow
 S-02 implementation: inspect existing approved pod status through the canonical
 browser/MCP `get_file_excerpt` and `get_query_result` contracts. This is an
-accepted implementation contract. Application composition, installed wiring and qualification are
-pending; no tool availability is established by this document.
+accepted implementation contract. Pure values, strict decoding/formatting and
+the C-18 coordinator component are implemented. Protected adapters, installed
+wiring and qualification remain pending; no tool availability is established.
 
 ## Exact result
 
@@ -76,15 +77,16 @@ These are implementation interfaces, not new public wire fields:
 | C-03 | `ContextProjectionAuthority.ResolveProjectionCurrent(ctx, CurrentIdentity, ContextProjectionCandidate)` | Initial path: checks ordinary target rights before the protected source lookup, then constructs the exact version-bound scope and returns current authority. No fabricated source version or C-18 policy duplication. |
 | C-03 | `ContextProjectionCatalog.ContextProjectionEvidence(ctx, artifactID)` | Verified published source/retained-policy projection. No native fields, native hash or filename. The authorizer checks ordinary target rights before this read. |
 | C-03 | `ContextProjectionEnvironmentReader.ProjectionEnvironment(ctx, evidence, principal)` | Independently accepts current processing/recovery/client/region/query path; no static region or download-permit fallback. |
-| C-18 | `ContextProjectionRoutes.ResolveContextProjection(ctx, caseID, artifactID, currentIdentity, recovery)` | Internal content-minimized route candidate binding case/artifact/target. Never returns evidence or authority to the caller; current ordinary rights precede protected source lookup. |
-| C-18 | `ContextProjectionService.BeginExcerpt(ctx, CurrentIdentity, ContextExcerptSelection)` | Admits one server-owned query and at most its one worker, then returns pending or a bounded result. It preserves original request cancellation. |
-| C-18 | `ContextProjectionService.GetQueryResult(ctx, CurrentIdentity, queryHandle)` | Observes the exact existing query; may deliver its bound result using a new paid batch. It cannot dispatch, replace or repair a worker. |
-| C-18 | `ContextQueryAdmission.AdmitQuery(ctx, authority, plan)` | Atomically fixes query ID, source/selection, principal/client, immutable limits and original deadline; reserves query, worker/control/history/cleanup obligations under current transaction guards. Unknown commit retains spend. |
-| C-18 | `ContextQueryReader.LookupQuery(ctx, principal, queryHandle)` | Bounded exact lookup, never a resume authority or a plaintext result cache. |
-| C-18 | `ContextQueryBatches.BeginReadBatch(ctx, queryID, authority, batchID)` | Checks original plan/current guards under locks, charges the next generation and three one-use key roles before I/O, and refuses concurrent, exhausted, uncertain or expired work. |
-| C-14 | `ContextProjectionWorkerAdmission.AdmitProjectionWorker(ctx, admittedQuery, authority)` | Separate creation capability, available only to initial admission. Exact Job/Pod/configuration, original signing intervals, independently audited enrollment and capacity remain mandatory. |
-| C-14 | `ContextProjectionReader.ReadProjection(ctx, admittedBatch, currentRequestOwner)` | Uses only the already admitted exact worker and typed query authority; verifies/decrypts the pinned source, emits the fixed bounded DTO and reports positive joined completion or uncertainty. No launch fallback. |
-| C-18/C-20 | `ContextProjectionDelivery.CheckDisclosure(ctx)` and `Close(ctx)` | Opaque request-owned result guard and joined cleanup, bound to the serialized result/query/batch. Recheck after outcome audit and through the final write; no reusable authority-shaped JSON. |
+| C-18 | `ContextProjectionRoutes.ResolveContextProjection(ctx, ContextExcerptSelection, identity.Identity, recovery)` | Internal content-minimized route candidate binding case/artifact/target. Never returns evidence or authority to the caller; current ordinary rights precede protected source lookup. |
+| C-18 | `ContextProjectionService.BeginExcerpt(ctx, CurrentIdentity, ContextQueryInvocation, ContextExcerptSelection)` | Admits one server-owned query and at most its one worker, then returns a process-owned pending/result delivery. It preserves original request cancellation and acknowledged C-08 lineage. |
+| C-18 | `ContextProjectionResults.GetQueryResult(ctx, CurrentIdentity, ContextQueryInvocation, queryHandle)` | Observes the exact existing query; may deliver its bound result using a new paid batch. This type has no worker-admission port. |
+| C-18 | `ContextQueryLedger.AdmitQuery(ctx, query, request, authority)` | Atomically fixes query ID, source/selection, principal/client, immutable plan and original bounds; independently consumes current accepted backing and exact acknowledged C-08 intent. Only the first acknowledged insertion returns `Fresh`. Unknown commit retains spend. |
+| C-18 | `ContextQueryLedger.LookupQuery(ctx, principal, queryHandle)` | Private bounded exact routing lookup, never sufficient for status/disclosure or a plaintext result cache. `AdmitQueryPoll` charges each new audited invocation; `PermitQuery` is a repeatable current fence. |
+| C-18 | `ContextQueryLedger.BeginReadBatch(ctx, query, request, worker, batchID, authority)` | Charges the next generation and three one-use key roles before I/O; refuses concurrent, exhausted, uncertain or expired work. `Fresh` requires the first acknowledged insert. |
+| C-18 | `ContextQueryLedger.ClaimReadBatch(ctx, batch, authority)` | Separately consumes a one-use start for the exact generation/worker/live request owner. Unknown or repeated claims never start again; `PermitReadBatch` is only a repeatable current fence. |
+| C-14 | `ContextProjectionWorkerAdmission.AdmitProjectionWorker(ctx, admittedQuery, currentRequestOwner)` | Separate creation capability, available only to initial admission. Exact Job/Pod/configuration, original signing intervals, independently audited enrollment and capacity remain mandatory. |
+| C-14 | `ContextProjectionReader.ReadProjection(ctx, ContextReadStart, currentRequestOwner)` | Independently verifies the one-use claim, existing exact worker and current typed query authority; decrypts/verifies the pinned source and returns an opaque DTO/closure handle. No launch fallback. |
+| C-18/C-20 | `ContextProjectionDelivery.CheckDisclosure(ctx)` and `Close(cleanupCtx)` | Process-owned result guard and joined cleanup, bound to the exact prepared association/query/batch. Recheck after outcome audit and through the final write. The transport supplies its separate original prepaid cleanup context after joining writes. |
 
 `ContextProjectionScope` is constructed by C-03 from the minimal route candidate
 and, only after ordinary target rights pass, the protected source record. C-18
@@ -138,6 +140,12 @@ query/evidence deadline. It cannot revive an old request, renew the query,
 restore spent keys or bypass current group/deny checks. The five-second
 `CurrentIdentity` observation is never extended into a longer query permit.
 
+The C-18 component bounds the first identity read before calling its resolver,
+copies retained groups/scopes, and cancels the single request context at every
+monotonically earlier dependency cutoff. All subsequent ports observe that same
+shortened deadline. It checks current authority again after the one-use SQL
+start claim, before any private read; a late acknowledged claim stays spent.
+
 Initial admission may create one exact worker under the live request. Its
 acknowledged Job can start afterward as a consequence of that admission, but no
 background plaintext read may proceed without a live authorized result request.
@@ -159,6 +167,25 @@ The original plan must separately cover bounded worker memory, transient buffer
 copies, authentication/key/audit requests, polling/control writes, retained SQL
 history and cleanup. A missing qualified resource dimension denies admission.
 Principal/workload/installation limits apply across query IDs and OAuth clients.
+
+`ContextQueryResourceProfile` is a typed snapshot of accepted configuration and
+qualification, not caller options. `ContextQueryPlan` pins its accepted source,
+qualification, path, backing/account/allocation revisions and workload/principal.
+Its exact aggregate `ContextQueryCost` covers provider/auth/signing/audit work and
+qualified SQL rows/bytes/WAL/backups. The current protected C-07 producer must
+derive actual per-poll/control costs, parent-envelope ownership and aggregate
+concurrency ceilings; structural validation does not establish that backing.
+No producer or permissive default is supplied by this component.
+
+Worker CPU/memory, worker and hub transient copies, provider/auth concurrency,
+worker runtime, credential lifetime, provider-effect lifetime and cleanup are
+explicit independent dimensions. Each query fixes original worker, credential,
+provider and cleanup dates from that profile. Plan `HardUntil` bounds disclosure;
+`EffectsUntil`, `CleanupUntil` and `RetireBy` cover later obligations. Neither
+query expiry nor passing those funding dates proves quiescence or refunds work.
+Overdue uncertainty must remain represented under bounded protected recovery
+and cleanup; time alone never authorizes deleting its ledger rows. The download
+worker's twenty-minute signing period is not a query-purpose default.
 
 Each admitted batch has a unique ID, increasing generation and three one-use
 data/index/manifest unwrap slots. SQL/key facets bind query, batch, exact source,
@@ -192,6 +219,24 @@ terminal. Cleanup remains an independently bounded obligation. The native
 download service's separate [interruption rules](native-download-retry.md) remain
 unchanged.
 
+`ContextProjectionRead` and `ContextProjectionClosed` are opaque C-14 process
+handles. `WithProjectionClosed` holds independently verified exact batch,
+worker, peer, process and generation closure while its callback performs only
+the restrictive SQL transition. No caller-set Boolean, EOF or pure completion
+DTO grants reuse. The batch remains active through outcome acknowledgement and
+the final outward write. After transport-owned copies/writes are joined,
+`ContextProjectionDelivery.Close` clears its retained lines, joins private
+cleanup and asks SQL to consume that guarded closure. An unknown completion
+does not refund read/key/audit spend or permit a replacement.
+
+The caller supplies a separate cleanup context bounded by its original prepaid
+allowance. C-18 additionally caps synchronous cleanup by the earlier original
+query cleanup and invocation audit-write bounds. It never renews an expired
+cleanup context. The C-20 reply owner must derive that cleanup context from the
+retained original write bound, rather than forwarding the expired public-read
+context. Failed close remains uncertain for protected cleanup; a second call
+does not issue another SQL completion or invent a later cleanup interval.
+
 ## Audit and transport boundary
 
 SC-AUT-005 gives every invocation a new server audit request ID, including polls
@@ -216,6 +261,18 @@ write/flush cancellation to that guard and joins cleanup before releasing the
 slot. Do not return a free-standing byte slice with only an expiry field and
 assume the earlier authorizer still applies. Audit records prepared output and
 delivery unknown when necessary, not proof of receipt.
+
+C-18 owns no second audit journal. `ContextQueryInvocation` is the process-owned
+handoff from the existing C-20/C-08 wrapper after intent acknowledgement. It
+checks the exact normalized input and carries the original server request ID,
+principal/client and keyed input/principal lineage into query/batch admission.
+SQL independently requires that same acknowledged invocation. A
+`ContextProjectionDelivery` exposes immutable association values and bounded
+copies of its typed excerpt; C-20 serializes/validates once and binds the exact
+delivery pointer to its existing keyed output digest and acknowledged outcome.
+`CheckDisclosure` refuses that pointer before acknowledgement, including pending
+handles. Admission, paid polling and paid reading have explicit effect
+dispositions; an uncertain service error never proves no effect.
 
 The browser renders the same fixed projection as text, with no provider token
 or HTML interpretation. Its managed view has a finite original cutoff, clears
@@ -255,6 +312,27 @@ inner Pod/namespace/source-profile bindings; it does not establish the ciphertex
 version, envelope, manifest or publication provenance. Those still require
 independent C-14 verification before the decoder is called. These functions alone
 provide no public route, worker, query storage, key authority or disclosure.
+
+The separate C-18 coordinator component now implements `BeginExcerpt` and
+existing-worker-only `GetQueryResult` against mandatory consumer ports. Pure
+query/plan/batch values pin independent effect horizons, immutable backing and
+source identity. Component fakes cover intent/input mismatch, unknown admission
+and one-use claims, active delivery ownership, exact outcome acknowledgement,
+paid repeat delivery after lost replies, uncertain closure, exhausted batches,
+pending polls, final current restrictions and identity slice reuse. Real bounded
+blocking route/plan/claim tests establish cancellation at an earlier original
+dependency deadline. A regression first reproduced starting a private read after
+a late SQL claim; the coordinator now rechecks before provider work.
+
+`go test -race -count=1 ./internal/domain/analysis ./internal/application/analysis`,
+`go vet ./internal/domain/analysis ./internal/application/analysis` and
+`make go-architecture-check` passed for this component. These tests supply
+explicit synthetic ports. Current C-07 accepted backing, SQL implementation and
+native transaction qualification, query-purpose worker admission/enrollment,
+one-use key binding, private DTO delivery/positive closure, C-20 audit ownership,
+protected installer/runtime composition and installed qualification remain
+separate work. No constructor substitutes a synthetic production resolver or
+advertises a public operation when one of those capabilities is absent.
 
 1. Browser and MCP with ordinary evidence-read rights return exactly the fourteen
    approved fields and matching line selections from the already committed

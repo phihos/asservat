@@ -104,6 +104,10 @@ same source, selection, budget and original deadline. Unknown private closure,
 changed actor/client, current denial, expiry or exhaustion cannot cause reuse,
 replacement, refund or automatic successor admission. Audit failure before
 outcome acknowledgement prevents disclosure.
+Given a late or repeated read-start acknowledgement, no second private read
+starts. The previous batch remains active through its exact outcome audit,
+outward write and positively joined cleanup; neither a pending poll nor expiry
+proves remote quiescence or releases uncertain worker, key or provider spend.
 
 ## REQ-MCP-003 — Typed raw operations
 
