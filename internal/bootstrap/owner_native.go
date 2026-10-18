@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"net"
+	"os"
 	"strconv"
 	"time"
 
@@ -93,11 +94,13 @@ func newOwnerNativeRuntime(r *OwnerRuntime, c OwnerNativeRuntimeConfig, auth *ap
 			router.Close()
 			return nil, e
 		}
+		ingress.Refused = eventLog(os.Stderr, "context start ingress refused")
 		h, e := contextstart.NewHandler(net.JoinHostPort(name, strconv.Itoa(r.pool.NativePort)), start.Router, ingress, start.Preflight)
 		if e != nil {
 			router.Close()
 			return nil, e
 		}
+		h.Refused = eventLog(os.Stderr, "context start refused")
 		out.starts, out.startRouter, out.startConnections = h, start.Router, start.Connections
 	}
 	return out, nil
