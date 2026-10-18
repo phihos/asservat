@@ -17,8 +17,9 @@ const installedIdentityGroup = "synthetic-group"
 
 // installedIdentity is the owned Keycloak realm of the installed journey
 // (scripts/test-context-storage.py --installer-continuation): a confidential
-// console client, a public MCP client whose access tokens carry exactly the
-// MCP resource audience, and one user in the synthetic group. All values are
+// console client, a public MCP client whose access tokens carry exactly one
+// resource audience (MCP or download content), and one user in the synthetic
+// group. All values are
 // synthetic; the realm exists only on the run's private network.
 type installedIdentity struct {
 	kc      *kcFixture
@@ -58,7 +59,13 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	}
 	scopes := []string{"basic", "evidence:read", "evidence:download", "evidence:capture"}
 	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "console", "protocol": "openid-connect", "publicClient": false, "secret": consoleSecret, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{strings.TrimSuffix(origin, "/") + "/auth/callback"}, "defaultClientScopes": scopes, "optionalClientScopes": []string{}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{audience("asservat-api"), groups}})
-	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "mcp", "protocol": "openid-connect", "publicClient": true, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{"http://127.0.0.1:1/callback"}, "defaultClientScopes": scopes, "optionalClientScopes": []string{}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{audience(strings.TrimSuffix(origin, "/") + "/mcp"), groups}})
+	// Each MCP token names exactly one resource: the MCP endpoint, or the
+	// download content route (ADR-204 decision 10). The client requests one
+	// of two optional scopes, each carrying one audience.
+	for name, resource := range map[string]string{installedMCPScope: "/mcp", installedDownloadsScope: "/api/v1/downloads"} {
+		kc.json("POST", prefix+"/client-scopes", map[string]any{"name": name, "protocol": "openid-connect", "attributes": map[string]string{"include.in.token.scope": "false"}, "protocolMappers": []any{audience(strings.TrimSuffix(origin, "/") + resource)}})
+	}
+	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "mcp", "protocol": "openid-connect", "publicClient": true, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{"http://127.0.0.1:1/callback"}, "defaultClientScopes": scopes, "optionalClientScopes": []string{installedMCPScope, installedDownloadsScope}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{groups}})
 	created := func(path string, value any) string {
 		t.Helper()
 		body, _ := json.Marshal(value)
@@ -76,6 +83,16 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	return &installedIdentity{kc: kc, Issuer: kc.Issuer, RootPEM: id.RootCA}
 }
 
+const installedMCPScope, installedDownloadsScope = "resource-mcp", "resource-downloads"
+
 // mcpToken logs the synthetic user in to the MCP client with authorization
-// code and S256 PKCE and returns its access token.
-func (i *installedIdentity) mcpToken() string { return i.kc.login("mcp").Access }
+// code and S256 PKCE and returns its access token for the MCP endpoint.
+func (i *installedIdentity) mcpToken() string {
+	return i.kc.loginScope("mcp", installedMCPScope).Access
+}
+
+// downloadToken returns the same client's access token for the download
+// content route: a download is bound to the client that prepared it.
+func (i *installedIdentity) downloadToken() string {
+	return i.kc.loginScope("mcp", installedDownloadsScope).Access
+}

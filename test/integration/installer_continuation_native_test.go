@@ -483,7 +483,10 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	publicAddress := net.JoinHostPort(nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID), "31450")
 	journey := func(cluster, namespace, workload string) {
 		installedJourney(t, ctx, identity, publicRoot, publicAddress, origin, func() {
-			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-owner", prefix+"-worker")
+			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-owner", prefix+"-worker", contracts.PublisherName(installation))
+			c, end := context.WithTimeout(ctx, 20*time.Second)
+			defer end()
+			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		})(cluster, namespace, workload)
 	}
 	qualifyRegionalInstall(t, ctx, f, admin, api, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
@@ -853,23 +856,31 @@ func installedProcessDiagnostics(t *testing.T, ctx context.Context, api kubernet
 			t.Log("diagnostics: deployment", name, e)
 			continue
 		}
-		pods, e := api.CoreV1().Pods(namespace).List(c, meta.ListOptions{LabelSelector: meta.FormatLabelSelector(d.Spec.Selector)})
-		if e != nil {
-			t.Log("diagnostics: pods", name, e)
-			continue
-		}
-		for _, pod := range pods.Items {
-			for _, s := range pod.Status.ContainerStatuses {
-				reason, exit := "", int32(0)
-				if x := s.LastTerminationState.Terminated; x != nil {
-					reason, exit = x.Reason, x.ExitCode
-				}
-				t.Logf("diagnostics: %s pod %s container %s ready %v restarts %d last %q exit %d", name, pod.Name, s.Name, s.Ready, s.RestartCount, reason, exit)
-				for _, previous := range []bool{true, false} {
-					logs, e := api.CoreV1().Pods(namespace).GetLogs(pod.Name, &core.PodLogOptions{Container: s.Name, Previous: previous, TailLines: ptr.To(int64(100)), LimitBytes: ptr.To(int64(16384))}).DoRaw(c)
-					if e == nil && len(logs) > 0 {
-						t.Logf("diagnostics: %s previous=%v log:\n%s", pod.Name, previous, logs)
-					}
+		installedPodDiagnostics(t, c, api, namespace, name, meta.FormatLabelSelector(d.Spec.Selector))
+	}
+}
+
+// installedPodDiagnostics logs the status and recent logs of every Pod that
+// selector matches in namespace (an empty selector matches all of them).
+func installedPodDiagnostics(t *testing.T, c context.Context, api kubernetes.Interface, namespace, name, selector string) {
+	t.Helper()
+	pods, e := api.CoreV1().Pods(namespace).List(c, meta.ListOptions{LabelSelector: selector})
+	if e != nil {
+		t.Log("diagnostics: pods", name, e)
+		return
+	}
+	for _, pod := range pods.Items {
+		t.Logf("diagnostics: %s pod %s phase %s", name, pod.Name, pod.Status.Phase)
+		for _, s := range pod.Status.ContainerStatuses {
+			reason, exit := "", int32(0)
+			if x := s.LastTerminationState.Terminated; x != nil {
+				reason, exit = x.Reason, x.ExitCode
+			}
+			t.Logf("diagnostics: %s pod %s container %s ready %v restarts %d last %q exit %d", name, pod.Name, s.Name, s.Ready, s.RestartCount, reason, exit)
+			for _, previous := range []bool{true, false} {
+				logs, e := api.CoreV1().Pods(namespace).GetLogs(pod.Name, &core.PodLogOptions{Container: s.Name, Previous: previous, TailLines: ptr.To(int64(100)), LimitBytes: ptr.To(int64(16384))}).DoRaw(c)
+				if e == nil && len(logs) > 0 {
+					t.Logf("diagnostics: %s previous=%v log:\n%s", pod.Name, previous, logs)
 				}
 			}
 		}
