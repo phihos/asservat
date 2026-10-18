@@ -54,35 +54,75 @@ func TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution(t *testin
 	}
 }
 
-// ADR-205 decision 3: the due list is a bounded page of distinct valid
-// locations; anything else is unavailable rather than partially scheduled.
-func TestDueContextDeletionsAcceptOnlyBoundedDistinctLocations(t *testing.T) {
-	row := func(n int) custodydb.ListDueContextDeletionsRow {
+// ADR-205: only a bounded, ordered page may advance a scheduling cursor.
+func TestContextDeletionPageAcceptsOnlyBoundedOrderedLocations(t *testing.T) {
+	through := time.Now().UTC().Truncate(time.Microsecond)
+	cursor := ContextDeletionCursor{Through: through}
+	row := func(n int) custodydb.ListDueContextDeletionPageRow {
 		key := func(prefix int) pgtype.UUID {
 			return id(fmt.Sprintf("%08x-0000-4000-8000-%012x", prefix, n))
 		}
-		return custodydb.ListDueContextDeletionsRow{ClusterID: key(1), ArtifactID: key(2), ID: key(3)}
+		return custodydb.ListDueContextDeletionPageRow{ClusterID: key(1), ArtifactID: key(2), ID: key(3), EffectiveExpiresAt: ts(through.Add(-time.Minute))}
 	}
-	var rows []custodydb.ListDueContextDeletionsRow
+	var rows []custodydb.ListDueContextDeletionPageRow
 	for n := range 16 {
 		rows = append(rows, row(n))
 	}
-	got, err := dueContextDeletions(rows)
-	if err != nil || len(got) != 16 || got[3] != (artifact.Location{ClusterID: "00000001-0000-4000-8000-000000000003", ArtifactID: "00000002-0000-4000-8000-000000000003", AttemptID: "00000003-0000-4000-8000-000000000003"}) {
+	got, err := contextDeletionPage(rows, cursor)
+	if err != nil || len(got.Locations) != 16 || got.Locations[3] != (artifact.Location{ClusterID: "00000001-0000-4000-8000-000000000003", ArtifactID: "00000002-0000-4000-8000-000000000003", AttemptID: "00000003-0000-4000-8000-000000000003"}) ||
+		got.Next.Through != through || got.Next.AfterAttemptID != uid(row(15).ID) || !got.Next.AfterExpiresAt.Equal(row(15).EffectiveExpiresAt.Time) || !got.Next.valid() {
 		t.Fatal("bounded due page changed", got, err)
 	}
-	if got, err = dueContextDeletions(nil); err != nil || got == nil || len(got) != 0 {
+	if next, e := contextDeletionPage([]custodydb.ListDueContextDeletionPageRow{row(16)}, got.Next); e != nil || len(next.Locations) != 1 || next.Next != (ContextDeletionCursor{}) {
+		t.Fatal("short final page did not wrap for retries", next, e)
+	}
+	if _, e := contextDeletionPage(rows, got.Next); !errors.Is(e, app.ErrUnavailable) {
+		t.Fatal("old failing prefix accepted after the cursor", e)
+	}
+	if got, err = contextDeletionPage(nil, got.Next); err != nil || got.Locations == nil || len(got.Locations) != 0 || got.Next != (ContextDeletionCursor{}) {
 		t.Fatal("empty due page", got, err)
 	}
 	invalid := row(0)
 	invalid.ArtifactID = pgtype.UUID{}
-	for name, bad := range map[string][]custodydb.ListDueContextDeletionsRow{
-		"oversized": append(slices.Clone(rows), row(16)),
-		"duplicate": {row(1), row(1)},
-		"invalid":   {invalid},
+	future, missing, infinity := row(0), row(0), row(0)
+	future.EffectiveExpiresAt = ts(through.Add(time.Microsecond))
+	missing.EffectiveExpiresAt.Valid = false
+	infinity.EffectiveExpiresAt.InfinityModifier = pgtype.Infinity
+	for name, bad := range map[string][]custodydb.ListDueContextDeletionPageRow{
+		"oversized":                      append(slices.Clone(rows), row(16)),
+		"duplicate":                      {row(1), row(1)},
+		"invalid":                        {invalid},
+		"unordered":                      {row(1), row(0)},
+		"new arrival beyond pass cutoff": {future},
+		"missing cutoff":                 {missing},
+		"infinite cutoff":                {infinity},
 	} {
-		if _, err = dueContextDeletions(bad); !errors.Is(err, app.ErrUnavailable) {
+		if _, err = contextDeletionPage(bad, cursor); !errors.Is(err, app.ErrUnavailable) {
 			t.Fatal("unbounded or invalid due page accepted", name, err)
+		}
+	}
+}
+
+func TestContextDeletionCursorRejectsPartialOrUnboundedPosition(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	id := "10000000-0000-4000-8000-000000000001"
+	for _, c := range []ContextDeletionCursor{{}, {Through: now, AfterExpiresAt: now, AfterAttemptID: id}} {
+		if !c.valid() {
+			t.Fatal("valid scheduling cursor rejected", c)
+		}
+	}
+	for _, c := range []ContextDeletionCursor{
+		{Through: now},
+		{AfterExpiresAt: now, AfterAttemptID: id},
+		{Through: now, AfterAttemptID: id},
+		{Through: now, AfterExpiresAt: now},
+		{Through: now, AfterExpiresAt: now, AfterAttemptID: "invalid"},
+		{Through: now, AfterExpiresAt: now.Add(time.Microsecond), AfterAttemptID: id},
+		{Through: now.Add(time.Nanosecond), AfterExpiresAt: now, AfterAttemptID: id},
+		{Through: now, AfterExpiresAt: now.Add(-time.Nanosecond), AfterAttemptID: id},
+	} {
+		if c.valid() {
+			t.Fatal("invalid scheduling cursor accepted", c)
 		}
 	}
 }

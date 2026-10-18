@@ -54,7 +54,13 @@ func BuildInstalledHubWorkerWorkload(p HubWorkerWorkloadPlan, installationID str
 		// ADR-204: the worker configuration acceptance logins, present only
 		// with the projection's worker configuration section.
 		"sql-worker-config-observe.json", "sql-worker-config-audit.json",
+		// ADR-205: the context deletion logins, present only with the
+		// projection's context deletion section.
+		"sql-context-cleanup.json", "sql-context-cleanup-audit.json", "sql-context-cleanup-finalize.json",
 	})
+	// ADR-205 decision 4: the operator's evidence delete credential, in its
+	// own immutable Secret; absent without a context deletion section.
+	add(contracts.EvidenceDeleteCredentialName(installationID), contracts.EvidenceDeleteDirectory, []string{contracts.EvidenceDeleteCredentialFile})
 	// Only this Pod's rotating token is projected. It has the fixed local-hop
 	// audience and carries no remote Kubernetes credential. The UID hint is
 	// independently checked by the actual receiver's online TokenReview.

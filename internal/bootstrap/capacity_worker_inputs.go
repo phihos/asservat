@@ -12,6 +12,7 @@ import (
 	"slices"
 	"time"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/postgres"
@@ -189,6 +190,9 @@ func readCapacityWorkerInputs(ctx context.Context, files *os.Root) (contracts.Ca
 	}
 	q, err = capacityRuntimeQualification(c.Qualification)
 	if err != nil || q.RootBacking.RootID != c.PermissionRootID || q.RootBacking.InstallationID != c.InstallationID || q.RootBacking.AccountVersion != c.AccountVersion {
+		return fail()
+	}
+	if !kube.ContextDeletionSectionValid(c.ContextDeletion, time.Now()) || c.ContextDeletion != nil && len(q.Backends) != 1 {
 		return fail()
 	}
 	control := c.Control

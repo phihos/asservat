@@ -34,6 +34,11 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 		return v
 	}
 	cleanup, ack, finalize := facet(cleanupPool), facet(auditPool), facet(finalPool)
+	if !t.Run("due-pages-pass-persistent-failures-and-wrap", func(t *testing.T) {
+		qualifyContextDeletionPaging(t, ctx, cleanupPool, s.a.RootID, s.a.Recovery.InstallationID)
+	}) {
+		t.FailNow()
+	}
 	recovery := func() artifact.RecoveryProof {
 		p, err := s.recovery.reader.RecoveryState(ctx)
 		if err != nil {
@@ -175,6 +180,19 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	}
 	if again, found, err := cleanup.ReadContextDeletion(ctx, loc, recovery()); err != nil || !found || again != result {
 		t.Fatal("durable purge result changed", err)
+	}
+	// A successfully purged checkpoint still needs its independent audit. Once
+	// its original lease has ended, fair paging must keep that obligation due.
+	// The fixture administrator shortens only this lease to avoid a wall wait.
+	if _, err = admin.Exec(ctx, "UPDATE custody_attempt SET lease_until=clock_timestamp()-interval '1 microsecond' WHERE id=$1", loc.AttemptID); err != nil {
+		t.Fatal(err)
+	}
+	if !listed() {
+		t.Fatal("purged checkpoint disappeared before audit/finalization")
+	}
+	page, err := cleanup.DueContextDeletionPage(ctx, postgres.ContextDeletionCursor{})
+	if err != nil || !slices.Contains(page.Locations, loc) {
+		t.Fatal("fair page lost the retryable purged checkpoint", err)
 	}
 	// A purged attempt whose audit or release has not finished stays due once
 	// its lease ends: Clean reads the checkpoint, skips Begin and resumes the

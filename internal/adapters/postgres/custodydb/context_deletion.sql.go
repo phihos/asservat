@@ -141,30 +141,52 @@ func (q *Queries) InsertContextWriterCompletion(ctx context.Context, arg InsertC
 	return err
 }
 
-const listDueContextDeletions = `-- name: ListDueContextDeletions :many
-SELECT a.cluster_id,a.artifact_id,a.id FROM custody_attempt AS a JOIN context_writer_completion AS w ON w.attempt_id=a.id
-WHERE w.root_id=$1 AND a.state<>'deleted' AND a.effective_expires_at<=clock_timestamp() AND (a.lease_until IS NULL OR a.lease_until<=clock_timestamp())
+const listDueContextDeletionPage = `-- name: ListDueContextDeletionPage :many
+SELECT a.cluster_id,a.artifact_id,a.id,a.effective_expires_at FROM custody_attempt AS a JOIN context_writer_completion AS w ON w.attempt_id=a.id
+WHERE w.root_id=$1 AND a.state<>'deleted'
+AND a.effective_expires_at<=LEAST($2::timestamptz,clock_timestamp())
+AND (a.lease_until IS NULL OR a.lease_until<=clock_timestamp())
+AND ($3::uuid IS NULL OR (a.effective_expires_at,a.id)>($4::timestamptz,$3::uuid))
 ORDER BY a.effective_expires_at,a.id LIMIT 16
 `
 
-type ListDueContextDeletionsRow struct {
-	ClusterID  pgtype.UUID
-	ArtifactID pgtype.UUID
-	ID         pgtype.UUID
+type ListDueContextDeletionPageParams struct {
+	RootID         pgtype.UUID
+	Through        pgtype.Timestamptz
+	AfterAttemptID pgtype.UUID
+	AfterExpiresAt pgtype.Timestamptz
 }
 
-// ADR-205 decision 3: a bounded scheduling page, oldest effective cutoff first.
-// It confers nothing; BeginContextDeletion rechecks cutoff, lease and recovery.
-func (q *Queries) ListDueContextDeletions(ctx context.Context, rootID pgtype.UUID) ([]ListDueContextDeletionsRow, error) {
-	rows, err := q.db.Query(ctx, listDueContextDeletions, rootID)
+type ListDueContextDeletionPageRow struct {
+	ClusterID          pgtype.UUID
+	ArtifactID         pgtype.UUID
+	ID                 pgtype.UUID
+	EffectiveExpiresAt pgtype.Timestamptz
+}
+
+// ADR-205: one bounded oldest-first page in a finite scheduling pass. Failed
+// rows remain eligible on the next pass without hiding later due attempts.
+// This cursor confers nothing; BeginContextDeletion rechecks all authority.
+func (q *Queries) ListDueContextDeletionPage(ctx context.Context, arg ListDueContextDeletionPageParams) ([]ListDueContextDeletionPageRow, error) {
+	rows, err := q.db.Query(ctx, listDueContextDeletionPage,
+		arg.RootID,
+		arg.Through,
+		arg.AfterAttemptID,
+		arg.AfterExpiresAt,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []ListDueContextDeletionsRow{}
+	items := []ListDueContextDeletionPageRow{}
 	for rows.Next() {
-		var i ListDueContextDeletionsRow
-		if err := rows.Scan(&i.ClusterID, &i.ArtifactID, &i.ID); err != nil {
+		var i ListDueContextDeletionPageRow
+		if err := rows.Scan(
+			&i.ClusterID,
+			&i.ArtifactID,
+			&i.ID,
+			&i.EffectiveExpiresAt,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

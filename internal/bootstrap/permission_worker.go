@@ -37,7 +37,10 @@ type permissionWorker struct {
 	// workerConfiguration is the download worker configuration acceptance
 	// (ADR-204 decision 7); nil without its section.
 	workerConfiguration *workerConfigurationWorker
-	closers             []func()
+	// contextDeletion deletes expired context evidence (ADR-205); nil
+	// without its section.
+	contextDeletion *contextDeletionWorker
+	closers         []func()
 }
 
 func (p *permissionWorker) Close() {
@@ -136,7 +139,7 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 	sql := &providerInputs{files: b.mounts, dir: contracts.PermissionWorkerProjectionDirectory, postgresEndpoint: c.Postgres}
 	w.closers = append(w.closers, sql.closeHTTP)
 	pools := map[string]*pgxpool.Pool{}
-	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil, c.WorkerConfiguration != nil) {
+	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil, c.WorkerConfiguration != nil, c.ContextDeletion) {
 		p, e := sql.sqlConfig(startup, "sql-"+purpose+".json")
 		if e != nil {
 			return nil, mounts.ErrUnavailable
@@ -207,6 +210,12 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 	if w.workerConfiguration != nil {
 		w.closers = append(w.closers, w.workerConfiguration.Close)
 	}
+	if w.contextDeletion, err = openContextDeletion(startup, c, pools, b.mounts, writer, b.admission, b.ContextDeletion); err != nil {
+		return nil, &fixedStepError{"context-deletion/open", err}
+	}
+	if w.contextDeletion != nil {
+		w.closers = append(w.closers, w.contextDeletion.Close)
+	}
 	if err = op.Finish(op.Context()); err != nil || ctx.Err() != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -264,6 +273,15 @@ func (p *permissionWorker) run(ctx context.Context) error {
 			p.workerConfiguration.run(ctx)
 		}()
 		defer func() { <-worker }()
+	}
+	// ADR-205: absent without its section; joined like retention.
+	if p.contextDeletion != nil {
+		deletion := make(chan struct{})
+		go func() {
+			defer close(deletion)
+			p.contextDeletion.run(ctx)
+		}()
+		defer func() { <-deletion }()
 	}
 	// A failed epoch retries after the 30-second SQL controller lease, so a
 	// new epoch is not refused while the old lease is still live.

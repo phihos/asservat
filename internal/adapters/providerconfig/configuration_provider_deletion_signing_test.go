@@ -370,3 +370,22 @@ func TestConfigurationSetupRecordsDeletionSigningPublicKeys(t *testing.T) {
 		})
 	}
 }
+
+func TestPhaseThreeReadsDeletionSigningPublicKeys(t *testing.T) {
+	first, _, _ := ed25519.GenerateKey(nil)
+	second, _, _ := ed25519.GenerateKey(nil)
+	f, in, recipe := configurationDeletionSigningSetupFixture(t, contracts.OwnerPublicTransit{}, map[int]ed25519.PublicKey{1: first, 2: second}, 2)
+	endpoint := contracts.OwnerProviderEndpoint{Endpoint: in.KeyService.Endpoint, Roots: in.KeyService.Roots}
+	signing := recipe.Profile.ContextDeletionSigning
+	got, err := f.reader.ReadContextDeletionSigning(context.Background(), endpoint, signing.Mount, signing.Key)
+	if err != nil || f.requests.Load() != 1 || got.Version != 2 || len(got.PublicKeys) != 2 || !bytes.Equal(got.PublicKeys[1], first) || !bytes.Equal(got.PublicKeys[2], second) {
+		t.Fatal("phase-3 readback of the deletion signing key", err, f.requests.Load(), got)
+	}
+	f.responses[signing.Mount+"/keys/"+signing.Key]["exportable"] = json.RawMessage(`true`)
+	if _, err = f.reader.ReadContextDeletionSigning(context.Background(), endpoint, signing.Mount, signing.Key); err != error(setupComponentError("context deletion signing key")) {
+		t.Fatal("exportable deletion signing key accepted", err)
+	}
+	if _, err = f.reader.ReadContextDeletionSigning(context.Background(), endpoint, "audit/x", signing.Key); !errors.Is(err, ErrSetupUnavailable) {
+		t.Fatal("malformed mount accepted", err)
+	}
+}

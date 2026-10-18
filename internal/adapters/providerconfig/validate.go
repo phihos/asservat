@@ -63,3 +63,15 @@ func Validate(k contracts.OwnerProviderEndpoint, p contracts.OwnerPostgresEndpoi
 	}
 	return nil
 }
+
+// ValidateStore checks one object store's endpoint, current DER CA anchors,
+// region and bucket, as Validate checks the audit store.
+func ValidateStore(a contracts.OwnerAuditStore, now time.Time) error {
+	if !validEndpoint(a.Endpoint) || !identity.Text(a.Region, 128) || !identity.Text(a.Bucket, 63) {
+		return cfg.ErrInvalid
+	}
+	if _, _, e := mtls.OwnerTrustRoots(a.Roots, now); e != nil {
+		return cfg.ErrInvalid
+	}
+	return nil
+}

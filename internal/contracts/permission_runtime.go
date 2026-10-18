@@ -49,7 +49,39 @@ type PermissionDeployment struct {
 	// two logins follow the retention logins. Without it no worker
 	// configuration child runs.
 	WorkerConfiguration *WorkerConfigurationDeployment `json:"workerConfiguration,omitempty"`
+	// ContextDeletion adds the positive deletion logins (ADR-205) after the
+	// worker configuration logins. The store and signing pins they need are
+	// known only later and ride in the capacity projection; without both no
+	// deletion child runs.
+	ContextDeletion bool `json:"contextDeletion,omitempty"`
 }
+
+// ContextDeletionDeployment names the evidence store the deletion child
+// purges (the endpoint, roots, region and bucket, in the audit store's
+// shape) and the pinned deletion signing key from the provider setup
+// readback. It rides in the capacity projection, whose qualification names
+// the evidence store ID the attempts carry. The store credential is the fixed
+// file EvidenceDeleteCredentialFile of the Secret
+// EvidenceDeleteCredentialName; no input names a file.
+type ContextDeletionDeployment struct {
+	EvidenceStore OwnerAuditStore        `json:"evidenceStore"`
+	Signing       ContextDeletionSigning `json:"signing"`
+}
+
+// ContextDeletionSigning is the Ed25519 Transit key that signs deletion
+// records, the version it signs with, that version's key ID and every
+// version's public key from the provider setup readback.
+type ContextDeletionSigning struct {
+	Mount      string            `json:"mount"`
+	Key        string            `json:"key"`
+	Version    int               `json:"version"`
+	KeyID      string            `json:"keyID"`
+	PublicKeys map[string][]byte `json:"publicKeys"`
+}
+
+// EvidenceDeleteDirectory is where the hub-worker Pod projects the Secret
+// EvidenceDeleteCredentialName (ADR-205 decision 4).
+const EvidenceDeleteDirectory = "evidence-delete"
 
 // WorkerConfigurationDeployment pins the guarded worker profile source
 // (ADR-070) in the hub cluster's worker namespace: the source ConfigMap, its

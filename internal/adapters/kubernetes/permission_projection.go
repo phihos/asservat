@@ -3,10 +3,12 @@ package kubernetes
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"slices"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -77,6 +79,27 @@ func WorkerConfigurationSectionValid(c contracts.PermissionDeployment) bool {
 	return true
 }
 
+// ContextDeletionSectionValid checks the optional ADR-205 section's syntax:
+// the evidence store and the pinned deletion signing key. It
+// grants nothing; each purge, record and release is still checked in SQL.
+func ContextDeletionSectionValid(v *contracts.ContextDeletionDeployment, now time.Time) bool {
+	if v == nil {
+		return true
+	}
+	s := v.Signing
+	if providerconfig.ValidateStore(v.EvidenceStore, now) != nil ||
+		!ownerBootstrapProviderName.MatchString(s.Mount) || !ownerBootstrapProviderName.MatchString(s.Key) || s.Version < 1 || s.Version > 2147483647 ||
+		!identity.Text(s.KeyID, 128) || len(s.PublicKeys) < 1 || len(s.PublicKeys) > 16 || len(s.PublicKeys[s.KeyID]) != ed25519.PublicKeySize {
+		return false
+	}
+	for id, key := range s.PublicKeys {
+		if !identity.Text(id, 128) || len(key) != ed25519.PublicKeySize {
+			return false
+		}
+	}
+	return true
+}
+
 // projectionStop names the fixed publication stage that stopped, with the
 // elapsed time and the remaining deadline, for the operator stop message.
 type projectionStop struct {
@@ -111,7 +134,7 @@ func permissionProjectionMaterial(c contracts.PermissionDeployment, original con
 			clearRuntimeProjection(data)
 		}
 	}()
-	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil, c.WorkerConfiguration != nil) {
+	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil, c.WorkerConfiguration != nil, c.ContextDeletion) {
 		i := slices.IndexFunc(v.Roles, func(r contracts.PublicRuntimeRoleMaterial) bool { return r.Purpose == purpose })
 		if i < 0 || slices.IndexFunc(v.Roles[i+1:], func(r contracts.PublicRuntimeRoleMaterial) bool { return r.Purpose == purpose }) >= 0 {
 			return nil, "", cfg.ErrChanged
