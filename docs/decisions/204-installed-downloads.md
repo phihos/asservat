@@ -36,9 +36,12 @@ first profile's workers in the hub region instead.
 
 1. **A hub-cluster worker namespace.** `installer-continue` creates
    `asservat-<id>-downloads` in the hub cluster with Pod Security `restricted`,
-   its own workload guard, the worker account, the zero-priority
-   non-preempting PriorityClass, the immutable worker control ConfigMap and the
-   immutable store Secret. Workers never run in the hub namespace.
+   the worker account, the zero-priority non-preempting PriorityClass, the
+   immutable worker control ConfigMap and the immutable store Secret. Workers
+   never run in the hub namespace. RBAC limits Job creation there to the
+   hub-api's worker API account; a namespace-wide admission guard like the hub
+   namespace's is deferred (*amended during implementation*: no reader
+   consumes one yet, and the profile source keeps its own guard).
 2. **The profile source lives with the workers.** The guarded worker profile
    source moves into the worker namespace, and the hub-api reads it with its
    pinned worker API client. The profile reader's same-namespace check stays
@@ -47,10 +50,23 @@ first profile's workers in the hub region instead.
    acquisition and connector cluster (the hub-api serves the worker's native
    path itself) and each joined cluster as a target. No connector runs in the
    hub cluster.
-4. **Pinned at installation.** The worker API client, its projected token and
-   the path are pinned in the owner input when the owner is promoted. A later
-   change needs a new owner input; runtime path acceptance (ADR-192's other
-   option) is deferred until a second path exists.
+4. **A pinned path template; targets from the catalog.** The worker API
+   client and its projected tokens are pinned in the owner input when the
+   owner is promoted, with one download path *template*: every path field
+   except its ID and target cluster (store and regions, the hub as
+   acquisition, connector and hub cluster, and the worker and hub
+   configuration revisions). Regional clusters join after installation, so
+   the hub-api derives one path per joined cluster from the guarded cluster
+   catalog at startup, with an ID derived from the installation and the
+   target cluster, exactly as it unions the catalog's topology pins
+   (ADR-196 decision 7) and restarts when the catalog changes. The capacity
+   hub-worker derives the same paths for its processing source, and
+   `installer-cluster-join` adds the joined cluster's path to the guarded
+   download environment and processing sources it already administers. A
+   source path is still accepted only when it equals a derived path. *Amended
+   during implementation:* the first draft pinned complete paths at
+   installation, which cannot name a cluster that joins later; runtime
+   acceptance of arbitrary paths (ADR-192's other option) is still deferred.
 5. **Its own read credential.** `installer-provider-apply` gains
    `--download-evidence-credential` (GetObject and GetObjectVersion on the
    evidence bucket), stored only in the worker namespace's store Secret. It is
