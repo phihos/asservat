@@ -175,3 +175,10 @@ and its storage charge is never released.
     the deletion child would have waited indefinitely. Unit regressions
     also cover immutable returned pins and cleanup after failed preparation;
     they do not establish installed deletion success.
+
+The pinned SeaweedFS fixture initially denied multipart abort because its policy
+engine aliases that action to `PutObject`, including explicit Deny statements.
+The [permission research and focused native qualification](../research/installed-evidence-deletion-permissions.md)
+record the fixture-specific method condition, successful abort/version removal
+and denied reads/writes/foreign-prefix access. This passing test does not
+substitute for the installed expiry, failed-cleanup and charge-release journey.
