@@ -48,3 +48,10 @@ Remaining protected producers include the connector's process-owned client enrol
 The staged actual Go HTTP/2 listener regression passes with joined cancellation and TLS1.3/server-purpose checks. An initial test reproduced HTTP/1-only ClientHello acceptance before the completed-handshake callback rejected it; the listener now rejects a ClientHello that does not offer h2 before server Finished and still verifies the final negotiated protocol. Seven affected package race suites and integration-test compilation passed. This uses synthetic serving/operation facts and is not deployed owner identity qualification.
 
 The strict real SQL/S3 native-exchange fixture uses this listener and a separately credentialed NativeReaders adapter, requires all three worker conversations to return Joined, preserves exact native bytes/hash and SQL Completed checks, and explicitly denies operation retirement/key-slot consumption through the read credential. The [parent-owned run](../../test/results/native-owner-listener-qualified.log) passes, with 1,090 unchanged source hashes and complete cleanup in its [terminal report](../../test/results/native-owner-listener-qualified-check.log). Integrated vet/race, SQL generation, architecture and specification gates also pass; see [implementation progress](../implementation-progress.md). Human/Pod/issuer/bootstrap inputs remain synthetic. This result does not qualify deployed connector identity or the installed public workflow.
+
+The context-start ingress resolves a presented connector leaf through the same
+`native-read` pool. That role therefore also holds EXECUTE on the read-only
+SECURITY DEFINER `read_connector_activated_leaf`, and on no other function.
+Installed native run 47 recorded the missing grant as `permission denied` on
+every `registration` refusal. The grant reads current registration only; it
+writes nothing and confers no capture authority.

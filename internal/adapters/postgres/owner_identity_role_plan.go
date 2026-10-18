@@ -21,6 +21,10 @@ func OwnerIdentityRoleName(installation, purpose string) (string, bool) {
 	return "as_" + strings.ReplaceAll(installation, "-", "") + "_own_0" + strconv.Itoa(n), true
 }
 
+// The context-start ingress reads a connector's activated leaf on the hub's
+// native-read pool. The function is a read-only SECURITY DEFINER check.
+const nativeReadConnectorLeaf = "read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb)"
+
 func ownerIdentityRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	if _, ok := contracts.OwnerIdentityRoleOrdinal(purpose); !ok {
 		return nil, false
@@ -58,6 +62,7 @@ func ownerIdentityRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("retention_source", "UPDATE", "root_id")
 		add("download_worker_configuration", "UPDATE", "source_uid")
 		add("download_native_owner", "UPDATE", "worker_id")
+		out = append(out, publicRuntimeGrant{"function", nativeReadConnectorLeaf, "", "EXECUTE"})
 		return ownerIdentityGrantSet(out), true
 	}
 	// Derived from OwnerEnrollments and its current/historical transaction

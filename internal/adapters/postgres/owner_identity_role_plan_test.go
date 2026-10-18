@@ -30,6 +30,9 @@ func TestOwnerIdentityRolesKeepSeparateAuthority(t *testing.T) {
 		if !ok || len(grants) == 0 {
 			t.Fatal("missing role inventory")
 		}
+		if want := purpose == "native-read"; slices.Contains(grants, publicRuntimeGrant{"function", nativeReadConnectorLeaf, "", "EXECUTE"}) != want {
+			t.Fatal("connector activated-leaf read must belong to native-read only", purpose)
+		}
 		for i, g := range grants {
 			if i > 0 && strings.Compare(grants[i-1].key(), g.key()) >= 0 {
 				t.Fatal("noncanonical or duplicate grant")
@@ -38,6 +41,11 @@ func TestOwnerIdentityRolesKeepSeparateAuthority(t *testing.T) {
 				if g.object != "public" || g.privilege != "USAGE" {
 					t.Fatal("unexpected schema authority", g)
 				}
+				continue
+			}
+			// The context-start ingress reads the connector's activated leaf
+			// through this read-only SECURITY DEFINER function on native-read.
+			if purpose == "native-read" && g == (publicRuntimeGrant{"function", nativeReadConnectorLeaf, "", "EXECUTE"}) {
 				continue
 			}
 			// ADR-184 backend pools read their own subsystems; they may only
