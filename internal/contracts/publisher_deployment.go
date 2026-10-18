@@ -64,8 +64,12 @@ type PublisherDeployment struct {
 	RetentionTopologies []OwnerNativeTopology    `json:"retentionTopologies"`
 	ClusterCatalog      OwnerPublicGuardedSource `json:"clusterCatalog"`
 	// Owner is the hub namespace's workload guard; its current proof and the
-	// recovery state gate every provider login and renewal.
-	Owner OwnerGuardInputs `json:"owner"`
+	// recovery state gate every provider login and renewal. OwnerWorkload is
+	// the hub-api Deployment that guard plan names, as the accepted owner
+	// configuration's pool records it: the publisher has no SQL read of that
+	// configuration, and a replaced Deployment fails the proof closed.
+	Owner         OwnerGuardInputs      `json:"owner"`
+	OwnerWorkload WorkerObjectReference `json:"ownerWorkload"`
 	// Verification audit: the owner audit store and audit Transit key.
 	AuditStore OwnerAuditStore    `json:"auditStore"`
 	AuditKeys  PublisherTransit   `json:"auditKeys"`
@@ -93,11 +97,14 @@ type PublisherProviderAuthentication struct {
 }
 
 // PublisherVerifier names the OpenBao PKI that signs verifier certificates.
+// Roots authenticate the provider endpoint; IssuerRoots are the worker PKI
+// issuer the returned verifier chain must verify against.
 type PublisherVerifier struct {
-	Endpoint string   `json:"endpoint"`
-	Roots    [][]byte `json:"roots"`
-	PKIMount string   `json:"pkiMount"`
-	Role     string   `json:"role"`
+	Endpoint    string   `json:"endpoint"`
+	Roots       [][]byte `json:"roots"`
+	PKIMount    string   `json:"pkiMount"`
+	Role        string   `json:"role"`
+	IssuerRoots [][]byte `json:"issuerRoots"`
 }
 type PublisherTransit struct {
 	Endpoint string   `json:"endpoint"`
