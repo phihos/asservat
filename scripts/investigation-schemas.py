@@ -2,7 +2,8 @@
 """Generate the implemented pod-status subset of canonical public contracts.
 
 This does not advertise the full planned capture surface. All references in the
-nine tool descriptions are local, and runtime validation never uses the network.
+tool descriptions are local, and runtime validation never uses the network.
+Schemas alone never register or advertise an application service.
 """
 import argparse
 import copy
@@ -13,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download"]
+NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result"]
 
 
 def main():
@@ -67,6 +68,31 @@ def main():
     result = {}
     for name in NAMES:
         tool = catalog[name]
+        if name in ("get_file_excerpt", "get_query_result"):
+            # Canonical get_query_result remains extensible to other specified
+            # tools. Only this runtime subset pins the implemented projection.
+            description = copy.deepcopy(tool)
+            description.pop("enabledByDefault", None)
+            output = copy.deepcopy(common)
+            output.pop("$id", None)
+            output["properties"]["data_class"] = {"const": "metadata"}
+            output["properties"]["provenance"] = {"type": "array", "maxItems": 0}
+            for key, fixed in (("truncated", False), ("next_cursor", None), ("narrowing_hint", None)):
+                output["properties"][key] = {"const": fixed}
+            branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
+            data = branches[0]["properties"]["data"]
+            if name == "get_file_excerpt":
+                data["properties"]["logical_path"] = {"const": "pod-status.txt"}
+                data["properties"]["lines"]["maxItems"] = 14
+            else:
+                data["properties"]["tool_name"] = {"const": "get_file_excerpt"}
+                # The Go validator additionally applies the original output
+                # schema and relational request/timing checks to this object.
+            output["allOf"] = [{"oneOf": branches}]
+            description["inputSchema"] = localize(description["inputSchema"])
+            description["outputSchema"] = localize(output)
+            result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
+            continue
         keys = {
             "list_diagnostics": ["target_ref"],
             "preview_capture": ["target_ref", "preset_ref", "requested_retention_seconds"],
@@ -169,7 +195,7 @@ def main():
     actual = {p.name: p.read_bytes() for p in DEST.glob("*.json")}
     if result != actual:
         raise SystemExit("Investigation schema drift; run scripts/investigation-schemas.py --write and review")
-    print("Investigation schemas OK: nine bounded implemented subsets; all references local")
+    print("Investigation schemas OK: bounded runtime subsets; all references local; registration remains explicit")
 
 
 if __name__ == "__main__":

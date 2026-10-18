@@ -1,0 +1,8 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/context-query-ledger-current-audit-bounds-and-uncertainty
+    context_query_test.go:519: verified real SQL/S3 query accounting and healthy invocation lineage; C07/C14 inputs remain synthetic; original query=10000000-0000-4000-8000-00000000003f, uncertain generation=2, charged queries=2
+    native_exchange_test.go:469: native fixture observation longest-refresh=36.273502ms widest-completion-gap=1.026377994s
+--- PASS: TestContextAdmissionWithRealServices (7.69s)
+    --- PASS: TestContextAdmissionWithRealServices/context-query-ledger-current-audit-bounds-and-uncertainty (7.33s)
+PASS
+ok  	asservat.local/asservat/test/integration	8.752s

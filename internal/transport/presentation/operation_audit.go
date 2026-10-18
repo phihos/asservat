@@ -223,6 +223,9 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	// Determine rejection BEFORE choosing a lane. Invalid schemas and missing
 	// read scope must not spend the protected resolution allowance.
 	format := "context-input/v1"
+	if queryOperation(name) {
+		format = "context-query-input/v1"
+	}
 	var normalized []byte
 	if rejection == 0 {
 		if len(name) > 128 || !utf8.ValidString(name) {
@@ -254,7 +257,12 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	if !ok {
 		return OperationReply{}, stopped("busy", auditapp.ErrUnavailable)
 	}
-	defer release()
+	transferred := false
+	defer func() {
+		if !transferred {
+			release()
+		}
+	}()
 	inputDigest, err := s.mac.Digest(format, normalized)
 	clear(normalized)
 	if err != nil {
@@ -271,11 +279,24 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		return OperationReply{}, auditapp.ErrUnavailable
 	}
 	ctx, cancel := context.WithDeadline(ctx, until)
-	defer cancel()
+	defer func() {
+		if !transferred {
+			cancel()
+		}
+	}()
 	if e := s.audit[audit.OperationLane(op)].Begin(ctx, intent); e != nil {
 		return OperationReply{}, stoppedAt("audit-begin", e, auditapp.ErrUnavailable)
 	}
 	var reply OperationReply
+	clearReply := func() {
+		if reply.owner != nil {
+			cleanup, stop := context.WithDeadline(context.WithoutCancel(ctx), intent.WriteUntil)
+			_ = reply.Close(cleanup)
+			stop()
+		} else {
+			clear(reply.Body)
+		}
+	}
 	var callErr error
 	effectPossible := false
 	if rejection == IngressInvalid {
@@ -288,7 +309,15 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		if e != nil || !sameAuditIdentity(initial, fresh, s.config.Now()) || ctx.Err() != nil {
 			callErr = identity.ErrDenied
 		} else {
-			reply, callErr = s.inner.CallWithContext(ctx, current, OperationCall{requestID: requestID, downloadAttachment: attachment}, name, raw)
+			call := OperationCall{requestID: requestID, downloadAttachment: attachment}
+			if queryOperation(name) {
+				// The private owner exists only after this invocation's existing
+				// Begin acknowledgement. Neither a DTO nor a public context value
+				// can manufacture it; SQL still checks the acknowledged row.
+				call.queryInvocation = newContextQueryInvocation(ctx, intent, s.mac, s.config.Now)
+			}
+			reply, callErr = s.inner.CallWithContext(ctx, current, call, name, raw)
+			reply.boundCleanup(intent.WriteUntil)
 			// Only a private, proven pre-dispatch rejection can rule out an
 			// effect from this invocation. A service error or response timeout
 			// cannot establish the original logical request's disposition.
@@ -297,7 +326,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	}
 	out, e := s.result(intent, reply, callErr, effectPossible)
 	if e != nil {
-		clear(reply.Body)
+		clearReply()
 		reply = OperationReply{}
 		callErr = auditapp.ErrUnavailable
 		out, e = s.result(intent, reply, callErr, effectPossible)
@@ -311,12 +340,16 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	e = s.audit[audit.OperationLane(op)].Finish(auditCtx, out)
 	finishCancel()
 	if e != nil {
-		clear(reply.Body)
+		clearReply()
 		return OperationReply{}, stoppedAt("audit-finish", e, auditapp.ErrUnavailable)
+	}
+	if e = reply.acknowledge(ctx, out); e != nil {
+		clearReply()
+		return OperationReply{}, stopped("result-acknowledgement", auditapp.ErrUnavailable)
 	}
 	final, e := current.ResolveIdentity(ctx)
 	if e != nil || ctx.Err() != nil || !sameAuditIdentity(initial, final, s.config.Now()) || !s.config.Now().Before(until) {
-		clear(reply.Body)
+		clearReply()
 		if ctx.Err() != nil || !s.config.Now().Before(until) {
 			return OperationReply{}, stopped("request-expired", identity.ErrDenied)
 		}
@@ -325,7 +358,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	if callErr != nil {
 		// Acknowledged errors carry only the original delivery bound, no body or
 		// evidence grant. Strict transports must preserve it through the write.
-		clear(reply.Body)
+		clearReply()
 		bound := OperationReply{ValidUntil: identity.Earlier(until, final.ValidUntil)}
 		if errors.Is(callErr, identity.ErrDenied) {
 			return bound, identity.ErrDenied
@@ -336,10 +369,18 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		return bound, auditapp.ErrUnavailable
 	}
 	if !s.config.Now().Before(reply.ValidUntil) {
-		clear(reply.Body)
+		clearReply()
 		return OperationReply{}, stopped("reply-expired", auditapp.ErrUnavailable)
 	}
 	reply.ValidUntil = identity.Earlier(reply.ValidUntil, identity.Earlier(until, final.ValidUntil))
+	if e = reply.CheckDisclosure(ctx); e != nil {
+		clearReply()
+		return OperationReply{}, stopped("final-disclosure", auditapp.ErrUnavailable)
+	}
+	if reply.owner != nil {
+		reply.transfer(cancel, release, intent.WriteUntil)
+		transferred = true
+	}
 	return reply, nil
 }
 func sameAuditIdentity(a, b identity.Identity, now time.Time) bool {
@@ -359,6 +400,9 @@ func sameAuditSet(a, b []string) bool {
 func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 	if s.contracts.ValidateInput(name, raw) != nil {
 		return nil, contracts.ErrInvestigationWire
+	}
+	if queryOperation(name) {
+		return normalizeQueryInput(name, raw)
 	}
 	if name == "prepare_artifact_download" || name == "get_artifact_download" {
 		var in ContextDownloadInput
@@ -387,8 +431,18 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 }
 func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationReply, callErr error, effectPossible bool) (audit.OperationOutcome, error) {
 	out := audit.OperationOutcome{Intent: in, Status: "unavailable", Reason: "authority_unavailable", Effect: "none", ClientReceipt: "unknown", MetadataUntil: in.RequestUntil, RecordedAt: s.config.Now().UTC().Truncate(time.Microsecond)}
-	if effectPossible && (in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download") {
+	if effectPossible && (in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download" || queryOperation(in.Name)) {
 		out.Effect = "unknown"
+	}
+	if queryOperation(in.Name) {
+		switch reply.auditEffect {
+		case operationEffectNone:
+			out.Effect = "none"
+		case operationEffectAccepted:
+			out.Effect = "accepted"
+		case operationEffectUnknown:
+			out.Effect = "unknown"
+		}
 	}
 	domain := "operation-error/v1"
 	body := []byte("unavailable")
@@ -407,6 +461,9 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 		if len(reply.Body) > audit.OperationOutputLimit || len(reply.Body) == 0 {
 			return out, auditapp.ErrUnavailable
 		}
+		if queryOperation(in.Name) && s.contracts.ValidateOutput(in.Name, reply.Body) != nil {
+			return out, auditapp.ErrUnavailable
+		}
 		var envelope struct {
 			RequestID string          `json:"request_id"`
 			Status    string          `json:"status"`
@@ -414,6 +471,12 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 		}
 		if json.Unmarshal(reply.Body, &envelope) != nil || envelope.RequestID != in.ID {
 			return out, auditapp.ErrUnavailable
+		}
+		if queryOperation(in.Name) && (envelope.Status == "ok" || envelope.Status == "pending") {
+			if reply.owner == nil || reply.auditEffect == operationEffectUnspecified {
+				return out, auditapp.ErrUnavailable
+			}
+			out.Status, out.Reason = "success", "prepared"
 		}
 		domain = "mcp-result/v1"
 		body = reply.Body

@@ -1,7 +1,7 @@
 # ADR-206 — Bounded approved pod-status projection reads
 
-Date: 2026-10-18. Status: accepted implementation decision; implementation and
-native qualification pending.
+Date: 2026-10-18. Status: accepted implementation decision; component foundations
+implemented, production composition and native qualification pending.
 Requirements: REQ-MCP-002/004, REQ-AUT-002/005, REQ-EVD-005/008,
 REQ-PRV-003/004; S-02; TASK-03/07/08.
 
@@ -79,6 +79,9 @@ feature or permission to advertise an unqualified capability.
    the result-poll wrapper. Worker, buffers, control, signing, SQL history and
    cleanup need their own finite protected backing before enablement. No
    download-session, owner-window or key-slot quota is borrowed or reset.
+   Accepted query backing separately covers worker/credential/provider effect
+   horizons and later cleanup/history, not just the result lifetime. Passing a
+   funding date is no proof of retirement and cannot erase uncertain charges.
 7. **Accounted repeat delivery, conservative uncertainty.** A lost outward reply
    after a positively joined private read can be delivered again by a fresh
    charged batch under the same query. Repeated batch IDs cannot reexecute or
@@ -86,6 +89,10 @@ feature or permission to advertise an unqualified capability.
    blocks reuse; local EOF, SQL fencing or expiry alone is not positive remote
    completion. The first implementation fails closed rather than replacing that
    worker. Exhaustion or expiry does not silently create a successor query.
+   Initial insert and one-use read-start acknowledgement are distinct; a
+   repeatable current fence cannot authorize another start. The active batch
+   remains held through outcome audit, outward write and joined cleanup. Only
+   a C-14 process-owned closure guard permits SQL's restrictive completion.
 8. **Audit and final disclosure checks.** Durable intent precedes sensitive work.
    A bounded result is validated against the original canonical tool schema and
    its outcome is durably acknowledged before disclosure. Recheck current
@@ -111,7 +118,12 @@ not relax isolation for ELF, packet, log, memory or other untrusted parsers.
 New query-specific SQL facets, key consumption, worker/protocol purpose, audit
 normalization, installer projections and current path acceptance are required.
 Sharing lower-level verification, TLS or framing code does not establish those
-authorities. Installed proof/read/audit latency must fit the unchanged five-second
+authorities. The regional local read/verification component deliberately cannot
+implement the remote closure capability: local proof checks and known execution
+handles must join, but only independently authenticated remote completion can
+release the active SQL batch. An uncertain opening still closes any known local
+handle under its original cleanup horizon without claiming remote completion.
+Installed proof/read/audit latency must fit the unchanged five-second
 request intervals and original query lifetime at production resource limits.
 
 The [architecture acceptance cases](../architecture/context-projection.md#acceptance)

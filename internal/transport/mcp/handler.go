@@ -121,6 +121,58 @@ type operationDeadline struct {
 	// failure names a failed operation call for the 503 report: the tool
 	// name and a closed class, never request content.
 	failure string
+	reply   *presentation.OperationReply
+	closed  bool
+}
+
+func (d *operationDeadline) retain(reply presentation.OperationReply) bool {
+	d.mu.Lock()
+	if d.closed || d.reply != nil {
+		d.mu.Unlock()
+		_ = reply.Close(context.Background())
+		clear(reply.Body)
+		return false
+	}
+	d.reply = &reply
+	d.mu.Unlock()
+	return true
+}
+func (d *operationDeadline) check(ctx context.Context) error {
+	d.mu.Lock()
+	reply, closed := d.reply, d.closed
+	d.mu.Unlock()
+	if closed {
+		return presentation.ErrOperationDelivery
+	}
+	if reply == nil {
+		return nil
+	}
+	return reply.CheckDisclosure(ctx)
+}
+func (d *operationDeadline) close(ctx context.Context) {
+	d.mu.Lock()
+	d.closed = true
+	reply := d.reply
+	d.mu.Unlock()
+	if reply != nil {
+		_ = reply.Close(ctx)
+		clear(reply.Body)
+	}
+}
+
+func (d *operationDeadline) responseContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	d.mu.Lock()
+	reply, closed := d.reply, d.closed
+	d.mu.Unlock()
+	if closed {
+		canceled, cancel := context.WithCancel(ctx)
+		cancel()
+		return canceled, cancel
+	}
+	if reply == nil {
+		return ctx, func() {}
+	}
+	return reply.ResponseContext(ctx)
 }
 
 func (d *operationDeadline) fail(reason string) {
@@ -214,6 +266,9 @@ func registerContextTools(server *sdk.Server, operations presentation.Operations
 				ctx = context.WithValue(attempt.owner, operationAttemptKey{}, attempt)
 			}
 			reply, err := operations.Call(ctx, current, name, request.Params.Arguments)
+			if !delivery.retain(reply) {
+				return nil, errors.New("investigation response unavailable")
+			}
 			if err != nil {
 				class := "unavailable"
 				var stop interface{ FixedStep() string }
@@ -523,6 +578,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// agreement. Do not emulate future protocol fields or retain transport state.
 	response := newBoundedResponse()
 	defer func() { clear(response.body) }()
+	defer delivery.close(ctx)
 	r.Body = io.NopCloser(bytes.NewReader(body))
 	h.protocol.ServeHTTP(response, r)
 	if attempt != nil && attempt.claim(attemptRejected) {
@@ -564,10 +620,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.unavailable(w, "deadline-passed")
 		return
 	}
-	if control.SetWriteDeadline(deadline) != nil {
-		h.unavailable(w, "write-deadline")
-		return
-	}
 	// Copy only protocol headers; the SDK cannot relax our cache/privacy headers
 	// or write a session identifier through a compatibility environment flag.
 	if kind := response.header.Get("Content-Type"); kind != "" {
@@ -579,8 +631,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if response.status == http.StatusServiceUnavailable && h.Report != nil {
 		h.Report("protocol")
 	}
-	w.WriteHeader(response.status)
-	_, _ = w.Write(response.body)
+	writeCtx, finishWrite := delivery.responseContext(ctx)
+	defer finishWrite()
+	if sent, err := presentation.WriteOperationResponse(writeCtx, w, response.status, response.body, deadline, delivery.check); err != nil && !sent {
+		h.unavailable(w, "final-disclosure")
+	}
 }
 
 // SDK v1.8 validates standard routing headers only for the new protocol.

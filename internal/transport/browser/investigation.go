@@ -259,7 +259,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	} else {
 		out, err = h.operations.Call(ctx, current, name, body)
 	}
-	defer clear(out.Body)
+	defer func() { _ = out.Close(ctx); clear(out.Body) }()
 	if err != nil {
 		if h.audited != nil {
 			if out.ValidUntil.IsZero() {
@@ -293,11 +293,14 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		deadline = view.Identity.ValidUntil
 	}
 	deadline = identity.Earlier(deadline, identity.Earlier(out.ValidUntil, finalIdentity.ValidUntil))
-	if !time.Now().Before(deadline) || controller.SetWriteDeadline(deadline) != nil {
+	if !time.Now().Before(deadline) {
 		sessionProblem(w, 503)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(out.Body)
+	writeCtx, finishWrite := out.ResponseContext(ctx)
+	defer finishWrite()
+	if sent, err := presentation.WriteOperationResponse(writeCtx, w, http.StatusOK, out.Body, deadline, out.CheckDisclosure); err != nil && !sent {
+		sessionProblem(w, 503)
+	}
 }

@@ -1,6 +1,84 @@
 # Sustained implementation progress
 
-## Approved pod-status projection foundations (ADR-206)
+## Query ledger and catalog native qualification (ADR-206)
+
+[Native run 39136964591](https://github.com/phihos/asservat/actions/runs/39136964591)
+passed on `89eb9b7cc62a51a814389d757d6294ff2b353b77`: all six selected children
+actually ran, covering the purpose-specific query ledger, ordinary private case
+routing and missing/NULL capture and verification audit receipts. The parent
+finished in 12.44 seconds; the query ledger child passed in 6.88 seconds.
+PostgreSQL/S3 accounting, current healthy invocation lineage, scoped-role denials,
+one-use starts, uncertain active generation and retained aggregate charges are
+qualified for this component. C-07 resource qualification, C-14 worker/closure
+proofs and human identity remain explicit synthetic inputs.
+
+All 2,637 recorded source hashes independently match the frozen commit archive;
+terminal exit is zero, sources stayed unchanged and cleanup failures are empty.
+Report: [`test/results/context-query-ci-2/custody-environment.json`](../test/results/context-query-ci-2/custody-environment.json),
+SHA-256 `9ea012bbf23fd60b34451adb83212d183f3a980c77399f5bf14963bddf90e8bd`.
+This resolves the earlier migration syntax/fixture blockers and qualifies the
+combined catalog changes. It does not qualify installed queries, worker dispatch,
+key-service authority, positive remote closure or public runtime availability.
+The protected query-capacity and worker continuation remain in progress.
+
+## Query composition qualification in progress (ADR-206)
+
+The coordinator, SQL ledger, verified regional reader and audited browser/MCP
+reply boundary are assembled in PR #44. At frozen
+`d37e2fa2fe7f1ae52bd64f618403992b667087e1`, combined race tests passed for eleven
+domain/application/provider/transport packages; affected vet including integration,
+Go architecture (58 packages, 337 edges), pinned SQL generation (53 files),
+specification (11,346 assertions) and architecture gates passed.
+
+The first owned native SQL/S3 run
+[39129322393](https://github.com/phihos/asservat/actions/runs/39129322393) failed
+while applying migration 00068 with PostgreSQL syntax error `42601`, before any
+Go test ran. All 2,637 recorded source hashes independently match that frozen
+commit's archive; the harness reports unchanged sources, terminal exit 1 and no
+cleanup failures. The retained report is
+[`test/results/context-query-ci-1/custody-environment.json`](../test/results/context-query-ci-1/custody-environment.json),
+SHA-256 `f62f17dbbcd4c9dc2ff6953732f2a5934c7906a6660980fab737fd6c0ea9ffcc`.
+This is a migration failure, not native query qualification. The subsequent
+correction and passing combined run are recorded above.
+Protected capacity, query worker/key producers and installed composition remain
+in progress; neither public query operation is enabled.
+
+## Approved context query SQL component (ADR-206)
+
+Migration 00068 and `postgres.ContextQueries` add independent bounded query,
+invocation, batch and key-slot accounting against accepted query-purpose backing.
+SQL compares immutable profile/qualification/source/account/horizon facts under
+recovery and permission locks; every effect requires the same current healthy
+C-08 intent, and batch closure requires its acknowledged outcome plus the opaque
+C-14 closure callback. Replays, unknown replies, expired leases and failed guard
+returns retain spend. No installed query role, backing producer, worker/key
+producer, retirement/refund facet or public query tool is enabled by this change.
+
+Pinned SQL generation, focused PostgreSQL query/initial-schema race tests,
+integration-package compilation, touched-package vet and Go architecture checks
+passed. Two failing regressions reproduced loss of an earlier guard deadline and
+success after that deadline expired; the guarded callback now preserves both.
+The [selected native SQL/S3 ledger test](../test/results/adr206-context-query-local-2/custody.log)
+passes in 7.33 seconds, including acknowledged audit lineage, actual SQL lock
+synchronization, one-use starts, unknown closure and retained aggregate charges.
+Its [report](../test/results/adr206-context-query-local-2/custody-environment.json)
+records exit 0, all 2,615 source hashes independently matching its frozen
+component revision `b959360e6c4055541750e1761b609c22b500d719`, and empty cleanup
+failures. That branch differs from the combined implementation in 21 recorded
+files; this local report qualifies that component revision only. The later
+combined run `context-query-ci-2`, recorded above, separately verifies all 2,637
+files against `89eb9b7cc62a51a814389d757d6294ff2b353b77` and passes the ledger
+plus five catalog/case checks. The first combined native attempt stopped before tests at a PL/pgSQL
+CASE parsing error; the next local attempt exposed the fixture's attempt to
+replace its existing normal audit account. The correction parenthesizes CASE
+and preserves the acknowledged processing audit policy/account and retained
+spend while increasing explicitly synthetic capacity through the existing CAS
+API. Its C-07 qualification and C-14 ownership inputs remain synthetic. The
+constructor floors query timestamps conservatively to PostgreSQL microseconds;
+the passing native fixture deliberately supplies a nanosecond clock. Installed
+query composition and native public transport qualification remain separate.
+
+## Initial approved pod-status projection foundations (ADR-206)
 
 [ADR-206](decisions/206-bounded-context-projection.md) fixes the narrow approved
 `get_file_excerpt`/`get_query_result` path over an existing committed pod-status
@@ -13,9 +91,9 @@ request retains its original five-second and earlier dependency deadlines.
 
 Focused domain/application/authorization race tests, decoder regressions, vet
 and specification/architecture gates pass. These are component results, not an
-installed query read. Query/batch accounting, separate worker/key authority,
-protected resource-profile acceptance, audit plus final disclosure, browser/MCP
-composition and installed qualification remain pending. No public tool is enabled
+installed query read. Subsequent query accounting, regional reading and audited transport components
+are recorded in the architecture contract. Protected resource-profile and
+worker/key acceptance, runtime composition and installed qualification remain pending. No public tool is enabled
 by these foundations; the canonical wire schemas and native artifact remain
 unchanged.
 

@@ -951,6 +951,105 @@ type ContextProcessing struct {
 	Parents      []byte
 }
 
+type ContextQuery struct {
+	ID             pgtype.UUID
+	RootID         pgtype.UUID
+	AllocationID   pgtype.UUID
+	AccountID      pgtype.UUID
+	PrincipalKey   []byte
+	Actor          []byte
+	Query          []byte
+	InitialRequest []byte
+	OperationID    pgtype.UUID
+	WorkerID       pgtype.UUID
+	CreatedAt      pgtype.Timestamptz
+	Deadline       pgtype.Timestamptz
+	CleanupUntil   pgtype.Timestamptz
+	RetireBy       pgtype.Timestamptz
+	IssuerEpoch    pgtype.UUID
+	PostmasterAt   pgtype.Timestamptz
+	DatabaseOid    pgtype.Uint32
+	Generation     int16
+	ActiveBatch    pgtype.UUID
+	Polls          int64
+	Controls       int64
+	Uncertain      bool
+}
+
+type ContextQueryAllocation struct {
+	ID           pgtype.UUID
+	RootID       pgtype.UUID
+	ClusterID    pgtype.UUID
+	NamespaceUid string
+	WorkloadUid  string
+	Revision     int64
+	PoolSource   []byte
+	PolicySource []byte
+	QueryLimit   int64
+	Allocated    int64
+}
+
+type ContextQueryBacking struct {
+	RootID                pgtype.UUID
+	InstallationID        pgtype.UUID
+	AcceptanceID          pgtype.UUID
+	Profile               []byte
+	Qualification         []byte
+	Envelope              []byte
+	QueryLimit            int64
+	PrincipalQueryLimit   int64
+	PrincipalAccountLimit int64
+	AllocationLimit       int64
+	Allocated             int64
+	Principals            int64
+	Allocations           int64
+	ObservedAt            pgtype.Timestamptz
+	FreshUntil            pgtype.Timestamptz
+	HardUntil             pgtype.Timestamptz
+	EffectsUntil          pgtype.Timestamptz
+	CleanupUntil          pgtype.Timestamptz
+	RetireBy              pgtype.Timestamptz
+	Suspended             bool
+}
+
+type ContextQueryBatch struct {
+	ID          pgtype.UUID
+	QueryID     pgtype.UUID
+	OperationID pgtype.UUID
+	Generation  int16
+	Batch       []byte
+	ClaimID     pgtype.UUID
+	Closed      bool
+}
+
+type ContextQueryCall struct {
+	OperationID pgtype.UUID
+	QueryID     pgtype.UUID
+	Request     []byte
+	IsPoll      bool
+}
+
+type ContextQueryKeyBinding struct {
+	BatchID   pgtype.UUID
+	QueryID   pgtype.UUID
+	Binding   []byte
+	UsedRoles int16
+}
+
+type ContextQueryPrincipal struct {
+	ID           pgtype.UUID
+	RootID       pgtype.UUID
+	PrincipalKey []byte
+	Allocated    int64
+}
+
+type ContextQueryWorker struct {
+	QueryID  pgtype.UUID
+	WorkerID pgtype.UUID
+	Binding  []byte
+	Proof    []byte
+}
+
 type ContextStorageBinding struct {
 	RootID           pgtype.UUID
 	ClusterID        pgtype.UUID

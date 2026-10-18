@@ -76,6 +76,8 @@ func (r OperationOutcome) credentialValid() bool {
 // this branch explicit prevents a private peer operation accepting human data.
 func humanOperationInputValid(name, format string) bool {
 	switch name {
+	case "get_file_excerpt", "get_query_result":
+		return format == "context-query-input/v1"
 	case "download_artifact_content":
 		return format == "native-content-input/v1"
 	case "persist_capture_intent":

@@ -607,3 +607,27 @@ GRANT EXECUTE ON FUNCTION finish_capture_operation_retirement(uuid,uuid,uuid),fi
 GRANT EXECUTE ON FUNCTION capture_audit_role_ok(uuid,text) TO capture_operation_read_runtime;
 GRANT SELECT ON capture_operation_intents TO capture_operation_read_runtime;
 CREATE ROLE cluster_credential_runtime LOGIN PASSWORD 'synthetic-cluster-credential'; GRANT CONNECT ON DATABASE custody_test TO cluster_credential_runtime; GRANT USAGE ON SCHEMA public TO cluster_credential_runtime; GRANT SELECT ON goose_db_version TO cluster_credential_runtime; GRANT SELECT(root_id,peer_id,installation_id,cluster_id) ON connector_identity_profile TO cluster_credential_runtime; GRANT SELECT,UPDATE ON cluster_enrollment_lineage,cluster_enrollment_credential TO cluster_credential_runtime; GRANT INSERT ON cluster_enrollment_credential TO cluster_credential_runtime; GRANT EXECUTE ON FUNCTION reserve_cluster_bootstrap(uuid,uuid,uuid,bytea,uuid,bigint,bytea,bigint,bigint),acknowledge_cluster_bootstrap(uuid,uuid,text,text,text,bigint,bytea),activate_cluster_bootstrap(uuid,uuid,bytea,bytea) TO cluster_credential_runtime;
+
+-- ADR-206 SQL component fixture only. These are not installed runtime grants.
+-- Protected backing and C-14 worker/key bindings are seeded by the owned fixture
+-- administrator; query admission cannot provision or replace any of them.
+CREATE ROLE context_query_runtime LOGIN NOINHERIT PASSWORD 'synthetic-context-query';
+GRANT CONNECT ON DATABASE custody_test TO context_query_runtime;
+GRANT USAGE ON SCHEMA public TO context_query_runtime;
+GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust,permission_stream,authority_audit,
+ retention_source,retention_source_epoch,retention_checkpoint,retention_catchup,retention_catchup_effect,retention_decision,
+ context_catalog,context_capture,context_verification,custody_attempt,context_case_locator,
+ processing_root,context_processing,processing_rule,operation_audit,operation_audit_lifecycle,
+ context_query_backing,context_query_allocation,context_query_principal,context_query,context_query_call,context_query_worker,context_query_batch
+ TO context_query_runtime;
+GRANT UPDATE(installation_id) ON fleet_trust,fleet_current_trust TO context_query_runtime;
+GRANT UPDATE(id) ON permission_stream,operation_audit,context_query_allocation,context_query_principal,context_query TO context_query_runtime;
+GRANT UPDATE(root_id) ON retention_source,context_query_backing TO context_query_runtime;
+GRANT UPDATE(operation_id) ON operation_audit_lifecycle TO context_query_runtime;
+GRANT INSERT ON context_query_principal,context_query,context_query_call,context_query_batch TO context_query_runtime;
+GRANT UPDATE(claim_id,closed) ON context_query_batch TO context_query_runtime;
+CREATE ROLE context_query_key_fixture LOGIN NOINHERIT PASSWORD 'synthetic-context-query-key';
+GRANT CONNECT ON DATABASE custody_test TO context_query_key_fixture;
+GRANT USAGE ON SCHEMA public TO context_query_key_fixture;
+GRANT SELECT ON context_query_key_binding TO context_query_key_fixture;
+GRANT UPDATE(used_roles) ON context_query_key_binding TO context_query_key_fixture;

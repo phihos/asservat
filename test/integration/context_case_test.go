@@ -11,6 +11,7 @@ import (
 	catalogapp "asservat.local/asservat/internal/application/catalog"
 	identities "asservat.local/asservat/internal/application/identity"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
+	"asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/catalog"
 	"asservat.local/asservat/internal/domain/identity"
@@ -69,6 +70,11 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if got, err := routes.ResolveContextCase(ctx, query()); err != value.ErrUnavailable || len(got.Routes) != 0 {
 		t.Fatal("unpublished route disclosed", got, err)
 	}
+	excerptSelection := analysis.ContextExcerptSelection{CaseID: e.CaseID, ArtifactID: e.Registration.Location.ArtifactID, Selection: analysis.LineSelection{LineStart: 2, MaxLines: 3}}
+	initialQuery := query()
+	if _, err := routes.ResolveContextProjection(ctx, excerptSelection, initialQuery.Identity, initialQuery.Recovery); err == nil {
+		t.Fatal("unpublished route became an approved projection candidate")
+	}
 	for _, sql := range []string{
 		"INSERT INTO context_case_locator SELECT * FROM context_case_locator LIMIT 0",
 		"UPDATE context_case_locator SET case_id=case_id",
@@ -99,6 +105,29 @@ func qualifyContextCase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	verified, err := reader.ContextDownloadEvidence(ctx, e.Registration.Location.ArtifactID)
 	if err != nil || got.Artifacts[0].Version != verified.Version {
 		t.Fatal("case version is not verified artifact version", err)
+	}
+	projectionQuery := query()
+	candidate, err := routes.ResolveContextProjection(ctx, excerptSelection, projectionQuery.Identity, projectionQuery.Recovery)
+	if err != nil || candidate.RootID != s.a.RootID || candidate.CaseID != e.CaseID || candidate.ArtifactID != e.Registration.Location.ArtifactID ||
+		candidate.CaptureID != e.CaptureUID || candidate.ClusterID != e.Registration.Location.ClusterID || candidate.NamespaceUID != e.NamespaceUID ||
+		candidate.WorkloadUID != e.WorkloadUID || candidate.PodUID != e.PodUID || candidate.Selection != excerptSelection.Selection || candidate.Principal != projectionQuery.Identity.Principal {
+		t.Fatal("projection route changed exact selected case, artifact or target", err)
+	}
+	for _, changedCase := range []bool{false, true} {
+		selection := excerptSelection
+		if changedCase {
+			selection.CaseID = custodyID()
+		} else {
+			selection.ArtifactID = custodyID()
+		}
+		if route, err := routes.ResolveContextProjection(ctx, selection, projectionQuery.Identity, projectionQuery.Recovery); err == nil || route != (analysis.ContextProjectionCandidate{}) {
+			t.Fatal("projection silently replaced an unknown selection", err)
+		}
+	}
+	withoutRead := projectionQuery.Identity
+	withoutRead.Scopes = []string{"evidence:download"}
+	if _, err := routes.ResolveContextProjection(ctx, excerptSelection, withoutRead, projectionQuery.Recovery); err == nil {
+		t.Fatal("projection route accepted download scope without ordinary read scope")
 	}
 	if err = publish(); err != nil {
 		t.Fatal(err)

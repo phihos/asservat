@@ -7,6 +7,7 @@ import (
 	"encoding/json/jsontext"
 	"errors"
 	"io"
+	"time"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -44,7 +45,7 @@ func (investigationOfflineLoader) Load(string) (any, error) { return nil, ErrInv
 
 func NewInvestigationContracts() (*InvestigationContracts, error) {
 	v := &InvestigationContracts{tools: make(map[string]investigationSchema)}
-	for _, name := range []string{"list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download"} {
+	for _, name := range []string{"list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result"} {
 		b, err := investigationSchemas.ReadFile("investigation-schemas/" + name + ".json")
 		var d InvestigationTool
 		if err != nil || json.Unmarshal(b, &d) != nil || d.Name != name {
@@ -128,5 +129,49 @@ func (v *InvestigationContracts) ValidateInput(name string, b []byte) error {
 	return v.validate(name, b, false)
 }
 func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
-	return v.validate(name, b, true)
+	if err := v.validate(name, b, true); err != nil {
+		return err
+	}
+	if name != "get_file_excerpt" && name != "get_query_result" {
+		return nil
+	}
+	var out struct {
+		RequestID string `json:"request_id"`
+		Status    string `json:"status"`
+		Data      struct {
+			ObservedAt time.Time       `json:"query_observed_at"`
+			ExpiresAt  time.Time       `json:"query_expires_at"`
+			Tool       string          `json:"tool_name"`
+			Result     json.RawMessage `json:"result"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(b, &out) != nil {
+		return ErrInvestigationWire
+	}
+	if out.Status == "error" {
+		return nil
+	}
+	if out.Data.ObservedAt.IsZero() || !out.Data.ExpiresAt.After(out.Data.ObservedAt) || out.Data.ExpiresAt.Sub(out.Data.ObservedAt) > time.Minute {
+		return ErrInvestigationWire
+	}
+	if name != "get_query_result" || out.Status != "ok" {
+		return nil
+	}
+	// The server-selected original tool is closed at this implementation
+	// boundary. A future catalog entry cannot choose a weaker nested schema.
+	if out.Data.Tool != "get_file_excerpt" || v.ValidateOutput(out.Data.Tool, out.Data.Result) != nil {
+		return ErrInvestigationWire
+	}
+	var nested struct {
+		RequestID string `json:"request_id"`
+		Status    string `json:"status"`
+		Data      struct {
+			ObservedAt time.Time `json:"query_observed_at"`
+			ExpiresAt  time.Time `json:"query_expires_at"`
+		} `json:"data"`
+	}
+	if json.Unmarshal(out.Data.Result, &nested) != nil || nested.Status != "ok" || nested.RequestID != out.RequestID || !nested.Data.ObservedAt.Equal(out.Data.ObservedAt) || !nested.Data.ExpiresAt.Equal(out.Data.ExpiresAt) {
+		return ErrInvestigationWire
+	}
+	return nil
 }

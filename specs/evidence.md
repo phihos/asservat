@@ -71,6 +71,10 @@ derivative and uses no cross-Job scratch handoff. A purpose-scoped acquisition
 worker performs verification/decryption; the hub receives only the approved DTO
 and never an unwrap key. Query-specific current authority, finite charged read
 batches, original deadlines, copy ownership and pre-disclosure audit are mandatory.
+The exact query batch consumes its own data/index/manifest key roles under current
+worker and live-request proof. Download grants and serialized worker proofs cannot
+supply that authority. Local verification/buffer closure is distinct from positive
+remote operation completion; uncertainty retains charges and blocks worker reuse.
 This narrow profile does not relax the following isolation and encrypted-scratch
 requirements for offline analysis or other evidence formats. Its implementation
 and native qualification remain pending.

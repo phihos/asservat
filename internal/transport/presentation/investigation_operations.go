@@ -103,6 +103,7 @@ func (s *InvestigationOperations) Call(ctx context.Context, current identities.C
 type OperationCall struct {
 	requestID          string
 	downloadAttachment func(context.Context, string) (time.Time, error)
+	queryInvocation    *contextQueryInvocation
 }
 
 func (s *InvestigationOperations) CallWithContext(ctx context.Context, current identities.CurrentIdentity, call OperationCall, name string, raw json.RawMessage) (OperationReply, error) {

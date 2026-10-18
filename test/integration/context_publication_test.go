@@ -5,6 +5,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"context"
 	"encoding/json"
@@ -176,6 +177,9 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 			}
 			t.Run("publication-audit-history-"+kind+"-"+label, func(t *testing.T) {
 				f := setup(t)
+				if _, err := f.reader.ContextProjectionEvidence(ctx, f.e.Registration.Location.ArtifactID); err == nil {
+					t.Fatal("unpublished custody became an approved projection source")
+				}
 				original, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
 				if err != nil {
 					t.Fatal("original published fixture", err)
@@ -191,6 +195,13 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 					}
 					if _, err := f.reader.ContextDownloadEvidence(ctx, f.e.Registration.Location.ArtifactID); err != nil {
 						t.Fatal("positive download catalog", err)
+					}
+					projection, err := f.reader.ContextProjectionEvidence(ctx, f.e.Registration.Location.ArtifactID)
+					if err != nil || projection.CaseID != f.e.CaseID || projection.CaptureID != f.e.CaptureUID || projection.Version != evidence.ContextCopiesDigest(f.copies) ||
+						projection.SourceFormat != artifact.ContextFormat || projection.SourceProjectionDigest != analysis.ContextSourceProjectionDigest() || projection.DataClass != "metadata" ||
+						projection.Retained.Registration.Location != f.e.Registration.Location || !projection.Retained.Effective.ExpiresAt.Equal(f.e.Registration.ExpiresAt) ||
+						!projection.ValidUntil.After(projection.ObservedAt) || projection.ValidUntil.After(projection.ObservedAt.Add(5*time.Second)) {
+						t.Fatal("approved projection lost protected source identity or original bounds", err)
 					}
 					replay, err := f.publish.PublishContext(ctx, f.e, f.copies, authority)
 					if err != nil || !replay.PublishedAt.Equal(original.PublishedAt) {
@@ -212,6 +223,9 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 					}
 					if _, err := f.reader.ContextDownloadEvidence(ctx, f.e.Registration.Location.ArtifactID); err == nil {
 						t.Fatal("historical audit became download catalog authority")
+					}
+					if _, err := f.reader.ContextProjectionEvidence(ctx, f.e.Registration.Location.ArtifactID); err == nil {
+						t.Fatal("historical audit became approved projection source authority")
 					}
 					if !authority.Valid(f.e, evidence.ContextExpectationDigest(f.e), time.Now()) {
 						t.Fatal("receipt denial crossed original authority deadline")
@@ -608,6 +622,15 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 	})
 	releaseBurstConnections()
 	qualifyDownloadStopLifecycle(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, artifact.PublishedContext) {
+		f := setup(t)
+		p, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return f.scenario, p
+	})
+	releaseBurstConnections()
+	qualifyContextQueries(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, artifact.PublishedContext) {
 		f := setup(t)
 		p, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
 		if err != nil {
