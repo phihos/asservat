@@ -1,5 +1,34 @@
 # Sustained implementation progress
 
+## Installed native 45: first owner-authentication refusal (2026-10-18)
+
+The [diagnostic continuation](https://github.com/phihos/asservat/actions/runs/39157052161)
+on frozen `73316a3618a88635350c7169959936efdbc1e746` failed before capture.
+Four preview requests returned unavailable after 3.328–3.437 seconds, again at
+target resolution. The new regional opening diagnostics distinguish repeated
+`owner-first` refusals after 3.30–3.31 seconds, with 0.66–1.46 seconds remaining
+on the original bound, from separate setup, dial and TLS failures. Some setup
+and TLS attempts exhausted their bound. The first-owner stage includes the
+delegated authentication call and validation of its returned owner; it does
+not establish the underlying refusal cause. No successful owner-authentication
+conversation timing was recorded. The independent capacity channel continued
+to complete observations.
+
+The [retained log](../test/results/installed-journey-ci-45/context-storage.log)
+records a 1,281.73-second top-level failure and a 958.17-second continuation
+failure (package 1,281.826 seconds). Passive-command and administrator-removal
+subcases passed. Capture, publication, native download, expiry/deletion and
+faulted cleanup were not reached. PR40/41 remain held.
+
+[Independent archive verification](../test/results/installed-journey-ci-45/verification.json)
+matched all 2,699 source hashes to the frozen commit. Sources remained unchanged,
+test exit was 1 and owned cleanup completed with no failures. The environment
+report SHA-256 is `cd7178b984c94ec75dd92d86177085166d20eadd4f6c2be1059a34b7836ced00`.
+All fifteen ordinary CI jobs passed for that same source; they do not replace
+the failed installed acceptance test. The next task is to reproduce the
+delegated owner-authentication refusal with concrete composition before another
+full run. Original deadlines, permissions and resource ceilings remain binding.
+
 ## Context opening diagnostic candidate (2026-10-18)
 
 The installed client passes the concrete setup producer directly; its capability

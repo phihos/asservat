@@ -41,7 +41,7 @@ the features that depend on them.
 | --- | --- | --- |
 | Bootstrap with Helm | Packaged native reference test passes, including replay, managed setup cleanup and uninstall preservation. The separate full bootstrap-to-runtime guard handover also passes with nineteen inert resources and lost-response recovery. | Deploy the actual hub/console/MCP/collector services with qualified protected inputs. The chart still rejects runtime enablement. |
 | Sign in through browser/MCP | Keycloak, session/refresh/logout and browser/MCP components have real integration evidence. | Installed identity/source/provider composition, reviewer step-up and the internal-user alternative. |
-| Request and browse workload context | The bounded pod-status diagnostic, shared UI/MCP controls, SQL admission and encrypted publication have component/native evidence. The regional real-service fixture journey now completes collection, publication, case lookup, native download, Stop and revocation (native36/37). | Complete installed two-cluster request-to-case flow. Native44 still fails at preview target resolution before capture; the targeted native setup pass does not qualify the installed composition. The current diagnostic is limited to 4,096 native bytes and is not generic file/log/command collection. |
+| Request and browse workload context | The bounded pod-status diagnostic, shared UI/MCP controls, SQL admission and encrypted publication have component/native evidence. The regional real-service fixture journey now completes collection, publication, case lookup, native download, Stop and revocation (native36/37). | Complete installed two-cluster request-to-case flow. Native45 still fails at preview target resolution before capture, with repeated first owner-authentication refusals; the targeted native setup pass does not qualify the installed composition. The current diagnostic is limited to 4,096 native bytes and is not generic file/log/command collection. |
 | Download, Stop and deliberately retry | The corrected combined real-service run passes ordinary content, range resume, interrupted original/new sessions, control negatives, exactly-one-winner admission, native exchange and real retention-observation expiry. Authenticated ranges reconstruct a 352-byte artifact without budget refill. Browser restart and cancellation/denial boundaries also pass. | Installed identity/provider composition, sustained availability and large-artifact qualification remain pending. The native fixture uses explicit synthetic identity/bootstrap facts; earlier failures and the correction of its write-on-read retention source remain in the chronological tracker. |
 | Download every evidence type for local tools | Persistent framed format and bounded decoder exist; a separate earlier feasibility lab transferred 2 GiB. | Generic large-object publication, full native transfer/window lifecycle, interruption, throughput/memory and local-tool qualification for product cores, PCAPs and derivatives. |
 | Automatic suspicious-event collection | Policy source, automation identity and acceptance components exist. | Resolved policy/trigger engine, logs/resources/probes/external triggers, all-replica observation, correlation, storm controls and fair incident dispatch. |
@@ -85,12 +85,13 @@ passing targeted real-Kubernetes test with one startup input and synthetic
 connector source/issuer/registry facts. It does not include the complete
 installed TLS opening and both delegated owner authentications.
 
-[Installed native44](implementation-progress.md#installed-native-44-preview-still-unavailable-2026-10-18)
-failed four preview requests at target resolution, before capture. The context
-standby repeatedly refused opening while the separate capacity observation
-channel remained active. Exact tested source hashes matched and fixture cleanup
-completed. Current work is to identify the failing opening stage while preserving
-original authority deadlines, then qualify the complete installed capture,
+[Installed native45](implementation-progress.md#installed-native-45-first-owner-authentication-refusal-2026-10-18)
+failed four preview requests at target resolution, before capture. New context
+opening diagnostics identify repeated first owner-authentication refusals with
+time still remaining, alongside separate setup/TLS failures. The separate capacity
+observation channel remained active. Exact tested source hashes matched and fixture
+cleanup completed. Current work is to reproduce the owner-authentication refusal
+while preserving original authority deadlines, then qualify the complete installed capture,
 publication, native download and revocation/expiry/deletion path. Neither the
 component pass nor a healthy capacity channel establishes this workflow.
 Most collector, recording, analysis and sharing work follows or reuses these
