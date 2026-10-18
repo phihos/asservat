@@ -44,10 +44,17 @@ guards. Separate scoped runtime credentials prove missing anchor/allocation
 denial, exact accepted positives and suspended-backing denial. Replay preserves
 the original plan; finite observations exhaust without replenishment and the
 terminal negative retains charges. SQL68 consumes the mandatory anchor lock and
-checks current workload allocation at both final transaction fences. Its full
-positive ledger fixture still needs actual shaped/root-reserved SQL69 acceptance;
-the native69 fence-function probes do not qualify all query-ledger effects. No
-hook bypass or skipped positive qualification is supplied.
+checks current workload allocation at both final transaction fences. The full
+ledger regression now uses `TestContextQueryLedgerWithRealPostgres`, a separate
+pristine-installation selection with actual root/workload/query acceptance and
+managed context publication. C-03 consumes the accepted query policy through
+`CurrentProjectionEnvironment`; the normal audit pool and finite source budget
+are reserved in the original setup. It retains every earlier ledger assertion,
+including lock synchronization, unknown replies, original lease expiry and
+cross-client aggregate charges. Its integration compilation, original
+qualification race test and integration vet pass; the new native selection has
+not yet run. The native69 fence-function probes do not qualify these ledger
+effects. No hook bypass or skipped positive qualification is supplied.
 Production report acceptance, native guards, role provisioning, complete query
 worker/key delivery, installed qualification and retirement remain unfinished.
 

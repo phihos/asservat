@@ -140,6 +140,18 @@ fixture uses actual original setup receipts, scoped roles, permission audit,
 phase-three root and workload activation. Its query reports and native guards
 are explicitly synthetic; the run status is recorded in implementation progress.
 
+The separate `TestContextQueryLedgerWithRealPostgres` selection starts with its
+own pristine installation and uses that producer for the full SQL68 ledger
+regression. Managed capture admission and independent publication provide the
+source artifact; current query policy, processing, retention and ordinary rights
+provide C-03 authority. The original setup reserves the complete normal audit
+pool and finite source observations. No administrator inserts a query anchor,
+backing or workload allocation. The synchronized negative case only suspends
+backing; a fresh protected producer observation must restore it. Worker/closure
+proofs and measured native capacity remain explicit synthetic inputs. This
+selection runs separately from other pristine-installation cases, and closes
+its helper pools before the fixture ends.
+
 Production measured report acceptance, all four protected native guard
 compositions, installer-selected query configuration and narrow role provisioning,
 query worker/key delivery, sustained installed
