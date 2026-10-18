@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Installed native 49: closing hub check runs out of time (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39168966828)
+on frozen `b2d443b3328ac1c1405aa821d4739219656ac377` failed before capture at
+the same preview point. Remaining-time buckets separate two refusals. Every
+closing `final-local` refusal had under 0.5 seconds or no time left (mostly at
+`route`), so the closing hub self-authentication exhausts the original bound.
+Opening `local` refusals had at least 2 seconds left (`route`, protection and
+registration reads), so they are not time exhaustion and remain unexplained.
+The connector bound cannot grow: it follows the lent source's original
+interval, about 3 seconds of which setup already used. The ingress now runs
+the hub's opening self-authentication alongside the connector source,
+certificate and registration reads, and the closing source and hub rechecks
+together, after both opening results. Every read and check remains and every
+result still narrows the bound.
+
+[Archive verification](../test/results/installed-journey-ci-49/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 48: leaf read passes, hub self-authentication refuses (2026-10-18)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39166806580)
