@@ -175,5 +175,10 @@ and [run log](../../test/results/context-query-capacity-native-run.log) retain t
 exact selection. The first run exposed an ambiguous PL/pgSQL digest-index alias;
 its correction changes no limit or authority rule. Query resource measurements,
 history measurements and independent native deployment guards remain synthetic
-in this component fixture. The full SQL68 ledger workflow, real accepted
-resource proof and installed query composition require their own qualification.
+in this component fixture. The subsequent assembled selection at
+`446eeb5e9ccb083b1919dee4f0cdd835df7e31e5` independently qualifies this producer
+and the full SQL68 ledger in separate fresh owned fixtures. Both reports match
+all 2,651 source hashes and record exit zero with complete cleanup:
+[capacity](../../test/results/context-query-capacity-assembled-1/fleet-environment.json)
+and [ledger](../../test/results/context-query-ledger-assembled-1/fleet-environment.json).
+Real accepted resource proof and installed query composition remain separate.

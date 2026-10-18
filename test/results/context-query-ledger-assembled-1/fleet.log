@@ -1,0 +1,24 @@
+=== RUN   TestContextQueryLedgerWithRealPostgres
+=== RUN   TestContextQueryLedgerWithRealPostgres/actual-postgres-function-type-alias
+    capacity_sql_fixture_test.go:133: same_function_oid=true display_uses_timestamp_with_time_zone=true
+=== NAME  TestContextQueryLedgerWithRealPostgres
+    context_query_ledger_fixture_test.go:105: fixed_role_production_ms=5726
+    context_query_ledger_fixture_test.go:171: managed_policy_roundtrip exact=true non_time_fields=true same_cutoff=true
+=== RUN   TestContextQueryLedgerWithRealPostgres/processing-read-rejects-uncovered-retention
+=== RUN   TestContextQueryLedgerWithRealPostgres/managed-admission-rejects-uncovered-retention-without-charge
+=== RUN   TestContextQueryLedgerWithRealPostgres/managed-admission-original-expiry-after-permission-wait
+=== NAME  TestContextQueryLedgerWithRealPostgres
+    context_query_ledger_fixture_test.go:171: managed_admission_pair_ms=266 original_request_remaining_ms=4194
+=== RUN   TestContextQueryLedgerWithRealPostgres/context-query-ledger-current-audit-bounds-and-uncertainty
+    context_query_test.go:223: original_evidence_seconds=60 original_query_remaining_ms=53623
+    context_query_test.go:467: verified real SQL/S3 query accounting and healthy invocation lineage; C07 acceptance and C03 environment are actual; resource report/native guards and C14 ownership remain synthetic; original query=10000000-0000-4000-8000-0000000000e1, uncertain generation=2, charged queries=2
+=== NAME  TestContextQueryLedgerWithRealPostgres
+    capacity_producer_test.go:164: actual initial activation and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer
+--- PASS: TestContextQueryLedgerWithRealPostgres (29.14s)
+    --- PASS: TestContextQueryLedgerWithRealPostgres/actual-postgres-function-type-alias (0.00s)
+    --- PASS: TestContextQueryLedgerWithRealPostgres/processing-read-rejects-uncovered-retention (0.00s)
+    --- PASS: TestContextQueryLedgerWithRealPostgres/managed-admission-rejects-uncovered-retention-without-charge (0.05s)
+    --- PASS: TestContextQueryLedgerWithRealPostgres/managed-admission-original-expiry-after-permission-wait (0.40s)
+    --- PASS: TestContextQueryLedgerWithRealPostgres/context-query-ledger-current-audit-bounds-and-uncertainty (19.86s)
+PASS
+ok  	asservat.local/asservat/test/integration	30.203s

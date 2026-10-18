@@ -1,5 +1,37 @@
 # Sustained implementation progress
 
+## Combined protected query capacity and ledger qualification (ADR-206)
+
+Two separate owned PostgreSQL/S3 fixtures passed at frozen
+`446eeb5e9ccb083b1919dee4f0cdd835df7e31e5`. The exact
+`TestContextQueryCapacityWithRealPostgres` selection passed in 9.15 seconds;
+`TestContextQueryLedgerWithRealPostgres` passed in 29.14 seconds, including the
+19.86-second ledger child and the actual managed-context retention checks.
+These runs compose original installation/root/workload acceptance, finite
+query reservations, current C-03 environment and query accounting with encrypted
+C-08 audit. The ledger includes one-use starts, uncertain closure, original
+expiry after blocking locks, scoped-role denials and retained aggregate spend.
+The final-bound regression fix is included in this frozen tree.
+
+Each report independently matches all 2,651 recorded source hashes to the frozen
+archive, records unchanged sources and exit zero, and has no cleanup failures.
+The [capacity report](../test/results/context-query-capacity-assembled-1/fleet-environment.json)
+has SHA-256 `66b1793afd9f6d37d89889274a1d2c898b75e6021ec86f4cc046352c6fb79608`;
+the [ledger report](../test/results/context-query-ledger-assembled-1/fleet-environment.json)
+has SHA-256 `b0d1002c6c2518d62b8adc09ee5c2918806e1cb5800d5bc125f4cd7bb4e11935`.
+Combined capacity, authorization, analysis/domain and PostgreSQL package race
+tests passed, along with scoped vet, SQL generation, Go architecture, specification
+and architecture gates.
+
+The earlier fixture lifetime failure remains recorded below; this run selects
+the evidence lifetime and its covering base backing before original preparation.
+It does not change query limits or renew any persisted deadline.
+
+Measured resource/history qualification, native deployment guards, human
+identity and C-14 worker/closure inputs remain synthetic in these component
+fixtures. Query issuer/key/runtime composition and installed disclosure remain
+pending; no public query or Helm capability is enabled.
+
 ## Protected approved-query backing component (ADR-206)
 
 C-07 now has an optional original-installation query qualification, independent
