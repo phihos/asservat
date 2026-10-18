@@ -414,7 +414,14 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		if err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
-		parts.providers, err = kms.NewInstalledOwnerProviderEffects(root, c, files, providerReader, configs, current.Configuration)
+		// Each audit object write reads its storage credential under a full
+		// native proof too. Behind a refresh's proofs on one client it ran out
+		// of its five seconds (credentials-verify/identity), so it gets its own.
+		credentialReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.credentialStats)
+		if err != nil {
+			return parts, errors.Join(mounts.ErrUnavailable, err)
+		}
+		parts.providers, err = kms.NewInstalledOwnerProviderEffects(root, c, files, providerReader, credentialReader, configs, current.Configuration)
 		if err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}

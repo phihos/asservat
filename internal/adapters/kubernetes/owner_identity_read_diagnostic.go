@@ -171,6 +171,16 @@ func (e *OwnerIdentityReadFailure) Error() string {
 	return "owner identity unavailable: check=" + e.Check().String() + " detail=" + e.Detail().String()
 }
 func (e *OwnerIdentityReadFailure) Unwrap() error { return e.cause }
+
+// FixedStep names the failed check and any nested closed step, e.g.
+// initial-guard or projections/credentials-content.
+func (e *OwnerIdentityReadFailure) FixedStep() string {
+	var nested interface{ FixedStep() string }
+	if errors.As(e.cause, &nested) {
+		return e.Check().String() + "/" + nested.FixedStep()
+	}
+	return e.Check().String()
+}
 func ownerReadAnnotate(check *OwnerIdentityReadCheck, result *error) {
 	if *result != nil {
 		*result = &OwnerIdentityReadFailure{check: *check, cause: *result}

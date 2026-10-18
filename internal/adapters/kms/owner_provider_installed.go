@@ -31,6 +31,7 @@ type InstalledOwnerProviderEffects struct {
 	input           contracts.OwnerDeployment
 	files           *os.Root
 	reader          *kubernetes.InstalledOwnerIdentityReader
+	credentials     *kubernetes.InstalledOwnerIdentityReader
 	configuration   *postgres.OwnerConfigurations
 	original        fleet.OwnerConfiguration
 	effects         *ownerProviderEffects
@@ -43,8 +44,11 @@ type InstalledOwnerProviderEffects struct {
 	closeDone       chan struct{}
 }
 
-func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeployment, files *os.Root, reader *kubernetes.InstalledOwnerIdentityReader, configuration *postgres.OwnerConfigurations, accepted fleet.OwnerConfiguration) (*InstalledOwnerProviderEffects, error) {
-	if ctx == nil || ctx.Err() != nil || files == nil || reader == nil || configuration == nil || input.Observation == nil || input.Observation.Activation == nil || input.Observation.Activation.Input.OwnerLayout != contracts.OwnerProviderInstalledLayout || input.ProviderAuthentication == nil || !reader.MatchesProviderInput(input) || !accepted.Valid() || accepted.Suspended || accepted.Revision.UID != input.ConfigurationUID || accepted.Pool.NativeCandidateLimit != fleet.OwnerRegistrationsPerPool || ValidateOwnerProviderAuthentication(input, *input.ProviderAuthentication, time.Now()) != nil {
+// reader proves the identity around provider logins and renewals; credentials
+// proves it for audit credential reads. Separate readers on separate clients
+// keep a refresh's proofs from starving an audit write's (ADR-173).
+func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.OwnerDeployment, files *os.Root, reader, credentials *kubernetes.InstalledOwnerIdentityReader, configuration *postgres.OwnerConfigurations, accepted fleet.OwnerConfiguration) (*InstalledOwnerProviderEffects, error) {
+	if ctx == nil || ctx.Err() != nil || files == nil || reader == nil || credentials == nil || !credentials.MatchesProviderInput(input) || configuration == nil || input.Observation == nil || input.Observation.Activation == nil || input.Observation.Activation.Input.OwnerLayout != contracts.OwnerProviderInstalledLayout || input.ProviderAuthentication == nil || !reader.MatchesProviderInput(input) || !accepted.Valid() || accepted.Suspended || accepted.Revision.UID != input.ConfigurationUID || accepted.Pool.NativeCandidateLimit != fleet.OwnerRegistrationsPerPool || ValidateOwnerProviderAuthentication(input, *input.ProviderAuthentication, time.Now()) != nil {
 		return nil, ErrKeyService
 	}
 	raw, err := json.Marshal(input)
@@ -58,7 +62,7 @@ func NewInstalledOwnerProviderEffects(ctx context.Context, input contracts.Owner
 		return nil, ErrKeyService
 	}
 	root, cancel := context.WithCancel(ctx)
-	s := &InstalledOwnerProviderEffects{input: input, files: files, reader: reader, configuration: configuration, original: accepted.Clone(), root: root, cancel: cancel, closeDone: make(chan struct{})}
+	s := &InstalledOwnerProviderEffects{input: input, files: files, reader: reader, credentials: credentials, configuration: configuration, original: accepted.Clone(), root: root, cancel: cancel, closeDone: make(chan struct{})}
 	// The private control constructor discards ambient/custom transport hooks
 	// and pins this endpoint's roots. No installed caller supplies a client.
 	base := &http.Client{Transport: (&http.Transport{}), Timeout: 5 * time.Second}
@@ -425,7 +429,7 @@ func (s *InstalledOwnerProviderEffects) ReadAuditCredentials(ctx context.Context
 	if err != nil {
 		return zero, time.Time{}, auditCredentialStep("file", ErrKeyService)
 	}
-	credential, until, err := s.reader.ReadProviderAuditCredential(call, manifest, mounted, raw)
+	credential, until, err := s.credentials.ReadProviderAuditCredential(call, manifest, mounted, raw)
 	until = identity.Earlier(until, first.FreshUntil)
 	if err != nil {
 		return zero, time.Time{}, auditCredentialStepFrom("verify", err)
