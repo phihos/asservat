@@ -39,9 +39,12 @@ passed [native run 39119394822](https://github.com/phihos/asservat/actions/runs/
 exit 0, unchanged sources and no cleanup failures. All 2,602 hashes in the
 [retained report](../test/results/adr205-context-sql-ci-2/context-storage-environment.json)
 match that candidate; the [test log](../test/results/adr205-context-sql-ci-2/context-storage.log)
-records the selected execution. This includes the regression keeping a purged
-attempt due while its audit/finalization is unfinished. It qualifies the
-component with fixture authority, not installed deletion scheduling.
+records the selected execution. That context-harness branch does not run the
+SQL deletion regression. The separate custody run 39122322616 on
+`25c7195900dd2d323c6a848cdb0e19bc19d0016a` passes the actual
+execution/publication/deletion case and its bounded paging regression, with
+exit 0, all 2,593 source hashes matching and no cleanup failures. These are
+component checks with fixture authority, not installed deletion scheduling.
 
 The saved deletion-child composition had omitted its settings handoff from
 the installed provider capacity path. That handoff is being repaired and
