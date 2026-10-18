@@ -40,6 +40,9 @@ func (s *operationCredentialFixture) ReadAuditCredentials(ctx context.Context) (
 type operationAuditKeys struct {
 	a              tink.AEAD
 	wraps, unwraps int
+	waitOpen       bool
+	enteredOpen    chan struct{}
+	releaseOpen    <-chan struct{}
 }
 
 func (s *operationAuditKeys) Seal(ctx context.Context, b, ad []byte) (artifact.SealedKey, error) {
@@ -49,6 +52,13 @@ func (s *operationAuditKeys) Seal(ctx context.Context, b, ad []byte) (artifact.S
 }
 func (s *operationAuditKeys) Open(ctx context.Context, k artifact.SealedKey, ad []byte) ([]byte, error) {
 	s.unwraps++
+	if s.enteredOpen != nil {
+		close(s.enteredOpen)
+		<-s.releaseOpen
+	}
+	if s.waitOpen {
+		<-ctx.Done()
+	}
 	c, e := hex.DecodeString(k.Ciphertext)
 	if e != nil {
 		return nil, e
@@ -142,7 +152,7 @@ func TestInstalledOperationAuditOwnsOriginalCredentialDeadline(t *testing.T) {
 			input.AuditStore.Endpoint = srv.URL
 			input.AuditStore.Region = "us-east-1"
 			input.AuditStore.Bucket = "synthetic"
-			s := &installedOperationAudit{input: input, providers: creds, http: srv.Client(), seal: keys, open: keys, storeID: in.RootID}
+			s := &installedOperationAudit{input: input, providers: creds, http: srv.Client(), seal: keys, open: keys, storeID: in.RootID, slots: make(chan struct{}, 1)}
 			call, cancel := context.WithTimeout(context.Background(), 700*time.Millisecond)
 			defer cancel()
 			if mode == "cancelled" {

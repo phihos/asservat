@@ -27,7 +27,6 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	configuration "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -618,23 +617,6 @@ func (d *OwnerDeployment) projectionInputs(path string) (*providerInputs, error)
 	return in, nil
 }
 
-// providerAuditCredentials reads the installed audit store credential from
-// the provider effects on each use; nothing is cached across reads.
-type providerAuditCredentials struct {
-	providers installedAuditCredentialReader
-}
-
-func (s providerAuditCredentials) Retrieve(ctx context.Context) (aws.Credentials, error) {
-	c, until, err := s.providers.ReadAuditCredentials(ctx)
-	if err != nil {
-		return aws.Credentials{}, auditCredentialFailure(err)
-	}
-	if !time.Now().Before(until) {
-		return aws.Credentials{}, &fixedStepError{"credentials-expired", mounts.ErrUnavailable}
-	}
-	return aws.Credentials{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey, SessionToken: c.SessionToken, Source: "installed-owner-provider"}, nil
-}
-
 func auditCredentialFailure(err error) error {
 	var named interface{ FixedStep() string }
 	if errors.As(err, &named) {
@@ -647,7 +629,7 @@ func auditCredentialFailure(err error) error {
 // layout: provider-held credentials and the provider audit Transit keys.
 func (d *OwnerDeployment) installedAuditStore(providers *kms.InstalledOwnerProviderEffects) (publicAuditStore, error) {
 	c := d.inputs.config
-	if providers == nil || providers.Sealer() == nil || providers.Opener() == nil {
+	if providers == nil || providers.Sealer() == nil || providers.Opener() == nil || c.Concurrency < 1 || c.Concurrency > 16 {
 		return publicAuditStore{}, mounts.ErrUnavailable
 	}
 	h, err := ownerHTTP(c.AuditStore.Endpoint, c.AuditStore.Roots)
@@ -660,12 +642,7 @@ func (d *OwnerDeployment) installedAuditStore(providers *kms.InstalledOwnerProvi
 		return publicAuditStore{}, err
 	}
 	d.closers = append(d.closers, keys.CloseIdleConnections)
-	store, err := objectstore.NewVersionedAudit(c.AuditStore.Endpoint, c.AuditStore.Region, c.AuditStore.Bucket, providerAuditCredentials{providers}, h)
-	if err != nil {
-		return publicAuditStore{}, mounts.ErrUnavailable
-	}
-	d.closers = append(d.closers, store.Close)
-	return publicAuditStore{store: store, seal: providers.Sealer(), open: providers.Opener(), keys: keys, operation: &installedOperationAudit{input: c, providers: providers, http: h, seal: providers.Sealer(), open: providers.Opener()}}, nil
+	return publicAuditStore{seal: providers.Sealer(), open: providers.Opener(), keys: keys, operation: &installedOperationAudit{input: c, providers: providers, http: h, seal: providers.Sealer(), open: providers.Opener(), slots: make(chan struct{}, c.Concurrency)}}, nil
 }
 
 // backendInputs is the backend root: the installed observation projection

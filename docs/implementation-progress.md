@@ -31,11 +31,23 @@ bytes and API authority. It excludes real SQL, key-service, application and
 identity latency and does not qualify installed preview availability or identify
 the exact cause of native41's coarse final-Pod diagnostic.
 
-Focused bootstrap/Kubernetes race tests and both-package vet pass. The remaining
-shared credential users are bootstrap issue audit and download stop, dispatch,
-enrollment, window and session audit in `public_fleet.go` and
-`public_downloads.go`; their equivalent operation ownership remains required.
-No full installed journey or S-02 acceptance follows from this component fix.
+Focused bootstrap/Kubernetes race tests and both-package vet pass. A subsequent
+follow-up covers all remaining shared consumers: bootstrap issue audit and
+download dispatch, enrollment/certificate, batch, window and stop audit. The
+unsafe dynamic SDK credential store is removed from the installed layout;
+legacy static-material layouts keep their original adapters. Stop/window original
+cutoffs and the distinction between lookup and positive completion are preserved.
+
+The follow-up uses one shared semaphore bounded by the installed owner concurrency
+(one through sixteen), retaining each slot until actual verification/body/transport
+closure even after expiry. This prevents private transport clones multiplying
+the old shared connection ceiling. Focused tests cover ten writer paths with
+success, blocked PUT/GET/body, late key verification, original write expiry,
+lookup without another PUT/closure and historical stop lookup after its write
+cutoff. A blocked verification regression confirms that expiry alone does not
+release the slot. The full bootstrap race suite and vet pass; per-operation TLS
+setup and the complete installed journey still need native qualification. No
+S-02 acceptance follows from these component results.
 
 ## Installed journey native 41: public preview remains unavailable
 

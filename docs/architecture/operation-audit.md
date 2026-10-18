@@ -98,16 +98,29 @@ deadline bounds sealing, signed PUT, pinned GET, response-body closure and
 verification. SDK credential expiry alone cannot cancel an already signed
 request. No credential cache crosses operations; a later outcome or replay gets
 its own current observation without replacing the original operation dates.
-Normal public audit and capture-intent publication share this composition.
+Normal public audit, capture-intent publication, bootstrap issue audit and every
+installed download audit writer share this composition.
 Their SQL claims, acknowledgement, recovery and final request-identity checks
 remain independent and mandatory. Completed object receipts are historical
 facts, never authority for later SQL work or evidence disclosure.
 
-Other installed audit families still use the shared per-SDK credential adapter:
-bootstrap issue objects (`bootstrap/public_fleet.go`), and download stop,
-dispatch, enrollment, window and session objects (`bootstrap/public_downloads.go`).
-Equivalent operation-owned deadline composition remains required there; this
-change does not qualify those families or the whole installed investigation.
+Bootstrap issue, download dispatch/enrollment/certificate and batch audit retain
+the invoking coordinator's original context. Download window creates and lookups
+also retain the immutable window `WriteUntil`; stop creation retains its original
+`WriteUntil`, while historical stop lookup may continue until `RetainUntil` under
+a new current bounded credential observation. Lookup never recreates an object
+or manufactures a writer-completion fact. The original typed object adapters
+still own format checks, encrypted verification and positive completion.
+
+All private stores share one finite operation semaphore bounded by the installed
+owner concurrency (one through sixteen). A slot remains held through proof,
+signed I/O, body close, verification and transport teardown; expiry alone cannot
+release a blocked provider operation. This preserves the previous shared HTTP
+connection ceiling when each operation owns its own transport. New operations
+perform their own TLS setup rather than reusing another operation's idle store.
+That cost still needs installed qualification. Legacy non-provider layouts keep
+their existing adapters; the installed layout exposes no shared dynamic SDK
+credential store.
 
 Known scope/target denials and unsupported inputs retain their private typed
 classification through the nondisclosing public error envelope. The audit does

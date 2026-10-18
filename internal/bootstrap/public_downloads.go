@@ -11,7 +11,6 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
@@ -119,11 +118,11 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	closedStops, err := objectstore.NewClosedDownloadStopObjects(a.store, p.AuditStoreID, a.seal, a.open)
+	legacyStops, closedStops, err := a.stopObjects(p.AuditStoreID)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	stopObjects, err := evidence.NewHealthyDownloadStopObjects(&objectstore.DownloadStopObjects{Store: a.store, Seal: a.seal, Open: a.open, StoreID: p.AuditStoreID}, closedStops, completions)
+	stopObjects, err := evidence.NewHealthyDownloadStopObjects(legacyStops, closedStops, completions)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -194,7 +193,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	dispatch := &evidence.DownloadDispatcher{Ledger: workers, Jobs: jobs, Audit: &objectstore.DownloadWorkerAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}, Acknowledgements: workerAcks, Authority: gate, CurrentAuthority: gate, Profile: profile, Now: time.Now}
+	dispatch := &evidence.DownloadDispatcher{Ledger: workers, Jobs: jobs, Audit: a.workerObjects(), Acknowledgements: workerAcks, Authority: gate, CurrentAuthority: gate, Profile: profile, Now: time.Now}
 
 	enrollment := func(purpose string) (*postgres.WorkerEnrollments, error) {
 		return postgres.NewWorkerEnrollments(ctx, sql[purpose], root, profile, g, ownerRandomID)
@@ -224,7 +223,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	} else if issuer, err = newPublicWorkerIssuer(ctx, d.publicFiles, in.config.KeyService.Endpoint, in.config.InstallationID, pki, roots, a); err != nil {
 		return nil, err
 	}
-	enroll := evidence.WorkerEnrollmentCoordinator{CSR: mtls.EnrollmentProof{}, Ledger: ledger, Activation: activation, Audit: &objectstore.WorkerEnrollmentAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}, Acknowledgements: enrollmentAcks, Issuer: issuer, Authority: gate, CurrentAuthority: gate, Now: time.Now}
+	enroll := evidence.WorkerEnrollmentCoordinator{CSR: mtls.EnrollmentProof{}, Ledger: ledger, Activation: activation, Audit: a.enrollmentObjects(), Acknowledgements: enrollmentAcks, Issuer: issuer, Authority: gate, CurrentAuthority: gate, Now: time.Now}
 	proofs := func(token evidence.DownloadPeerToken) (evidence.WorkerEnrollmentProofReader, error) {
 		return kube.NewWorkerEnrollmentAttester(jobsClient, bindings, token)
 	}
@@ -260,13 +259,13 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	windows, err := objectstore.NewDownloadWindowAuditObjects(a.store, p.AuditStoreID, a.seal, a.open)
+	windows, err := a.windowObjects(p.AuditStoreID)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	services, err := NewContextNativeDownloadRuntime(d.Runtime, workers, preparations, configuration, first, responses, evidence.ContextNativeRuntimeConfig{
 		Profile: profile, Dispatcher: dispatch, Enrollments: enroll, Proofs: proofs, Requests: requests, Sources: downloads, Authority: gate,
-		Audit: &objectstore.DownloadAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}, Acknowledgements: audits,
+		Audit: a.downloadObjects(), Acknowledgements: audits,
 		Native: evidence.NativeAttachmentConfig{KeyScope: scope, Fences: native, Origins: d.shared.origins, PreparationKeys: prepKeys, WindowKeys: windowKeys, Authority: gate, Now: time.Now, NewID: ownerRandomID},
 		Now:    time.Now, NewID: ownerRandomID},
 		evidence.DownloadResponseTransfer{Objects: windows, Audit: audits}, stop)
