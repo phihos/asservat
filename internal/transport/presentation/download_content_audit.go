@@ -55,7 +55,19 @@ func NewNativeContentAuditor(shared *AuditedOperations, input NativeContentInput
 	if shared == nil {
 		return nil, auditapp.ErrUnavailable
 	}
-	if healthy, ok := shared.audit["normal"].(*auditapp.HealthyOperationAuditor); !ok || !healthy.Configured() {
+	// The normal lane must be certificate-verification backed: one healthy
+	// auditor, or the installed per-profile selection (ADR-190), which builds
+	// only configured healthy auditors.
+	switch lane := shared.audit["normal"].(type) {
+	case *auditapp.HealthyOperationAuditor:
+		if !lane.Configured() {
+			return nil, auditapp.ErrUnavailable
+		}
+	case *auditapp.SelectedOperationAuditor:
+		if !lane.Configured() {
+			return nil, auditapp.ErrUnavailable
+		}
+	default:
 		return nil, auditapp.ErrUnavailable
 	}
 	return newNativeContentAuditor(shared, input, until)
