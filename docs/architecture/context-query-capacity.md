@@ -100,10 +100,13 @@ Positive SQL uses recovery, permission, capacity source, immutable query anchor,
 query backing, allocation, principal/query/batch/key lock order. The query ledger
 must call `LockContextQueryCapacity(root, acceptance)` after permission and
 `ContextQueryCapacityAllocationCurrent(root, allocation)` at its final fences.
-These mandatory generated checks reject a missing anchor even when a component
-fixture supplies an otherwise successful external guard. Migration68's consumer
-hook is a separately coordinated follow-up; this component does not silently
-claim that integration is complete.
+`ContextQueries.current` calls the mandatory source/anchor lock after recovery
+and permission and before query backing/allocation locks. Its fence checks the
+exact current protected workload allocation after blocking reads, both before
+and after each effect, then rechecks original bounds using database time. A
+successful external callback cannot substitute for a missing or changed SQL
+anchor. Passive lookup and restrictive historical batch closure grant no new
+effect authority and retain their separate original bounds.
 
 External guards surround the SQL callback and run outside SQL locks. Parent
 cancellation and every earlier guard deadline survive context replacement.
@@ -138,7 +141,7 @@ are explicitly synthetic; the run status is recorded in implementation progress.
 
 Production measured report acceptance, all four protected native guard
 compositions, installer-selected query configuration and narrow role provisioning,
-the mandatory ledger hooks, query worker/key delivery, sustained installed
+query worker/key delivery, sustained installed
 qualification and bounded retirement remain separate requirements. Missing
 qualification stays unavailable. Neither Helm nor browser/MCP availability
 changes here.

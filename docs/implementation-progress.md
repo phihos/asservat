@@ -28,8 +28,13 @@ fleet fixture, actual original setup/role/audit/root/workload activation, explic
 synthetic query measurements and narrow fixture-only grants. It has **not run**.
 Run `scripts/test-custody.py --fleet --run '^TestContextQueryCapacityWithRealPostgres$'`
 only with coordinated source freeze and the sole native slot, then verify exact
-selection, source hashes and cleanup. Follow with the mandatory SQL68 anchor and
-allocation-current hooks; missing69 acceptance must deny after that integration.
+selection, source hashes and cleanup. SQL68 now consumes the mandatory anchor
+lock and checks current workload allocation at both final transaction fences;
+missing69 acceptance denies even with a successful external callback. The older
+SQL68 positive ledger fixture still needs actual shaped/root-reserved SQL69
+acceptance before its positive cases can run against this schema; its earlier
+SQL68-only pass does not qualify these new hooks. No hook bypass or skipped
+positive qualification is supplied.
 Production report acceptance, native guards, role provisioning, complete query
 worker/key delivery, installed qualification and retirement remain unfinished.
 
