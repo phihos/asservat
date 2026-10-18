@@ -45,6 +45,18 @@ query policy with current recovery and durable processing independently of
 ordinary approved-read authorization. No query role, installer setting or
 public tool is enabled. See [the contract](architecture/context-query-capacity.md).
 
+Independent review found native source guards ran before their finite allowance
+was charged. The follow-up reserves each attempt before guard I/O and holds its
+exact claim until separate joined completion. Unknown/replay/exhaustion cannot
+enter guards; expiry cannot release unfinished work. Declared WAL accounting now
+covers all three source transactions without increasing the original limit.
+The original guard-entry regression failed before the change. Full capacity and
+PostgreSQL race tests, focused source-history/join regressions, integration
+compilation, vet, SQL generation and design gates passed. The new native fixture
+is compiled but has not run; older native reports predate this protocol and do
+not qualify it. [Component evidence](../test/results/context-query-source-spend-component.json)
+records the exact commands and scope.
+
 Full capacity/authorization/PostgreSQL race tests passed before the final history
 and consumer-deadline tightening; the final capacity/authorization race, five-
 package vet, integration compilation, SQL generation and Go architecture checks

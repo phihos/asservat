@@ -15,7 +15,13 @@ CREATE TABLE context_query_capacity (
  postmaster_at timestamptz NOT NULL,
  database_oid oid NOT NULL,
  accepted_at timestamptz NOT NULL CHECK(isfinite(accepted_at)),
- observations bigint NOT NULL DEFAULT 0 CHECK(observations BETWEEN 0 AND 1000001)
+ observations bigint NOT NULL DEFAULT 0 CHECK(observations BETWEEN 0 AND 1000001),
+ observation_id uuid, observation_ordinal bigint, observation_started_at timestamptz, observation_until timestamptz,
+ observation_accepted boolean NOT NULL DEFAULT false, observation_completed boolean NOT NULL DEFAULT false,
+ negative_observed_at timestamptz CHECK (negative_observed_at IS NULL OR isfinite(negative_observed_at)),
+ CHECK ((observation_id IS NULL AND observation_ordinal IS NULL AND observation_started_at IS NULL AND observation_until IS NULL AND NOT observation_accepted AND NOT observation_completed) OR
+  (observation_id IS NOT NULL AND observation_ordinal IS NOT NULL AND observation_started_at IS NOT NULL AND observation_until IS NOT NULL AND observation_ordinal BETWEEN 1 AND observations AND isfinite(observation_started_at) AND isfinite(observation_until) AND
+   observation_started_at<observation_until AND observation_until<=observation_started_at+interval '5 seconds'))
 );
 REVOKE ALL ON context_query_capacity FROM PUBLIC;
 
@@ -105,7 +111,7 @@ BEGIN
  extra:=(h->>'FixedBytes')::numeric+(h->>'PrincipalBytes')::numeric*(q->>'PrincipalAccounts')::numeric+(h->>'AllocationBytes')::numeric*(q->>'WorkloadAccounts')::numeric;
  FOREACH k IN ARRAY ARRAY['Workers','ReadBatches','ReadBytes','StructuredBytes','WireBytes','UnwrapAttempts','ProviderRequests','AuthenticationRequests','SigningAttempts','AuditObjects','SQLRows','SQLBytes','WALBytes','BackupBytes'] LOOP
   need:=(p->'Cost'->>k)::numeric*(q->>'RootQueries')::numeric;
-  IF k='AuthenticationRequests' THEN need:=need+(1+(q->>'SourceTransitionLimit')::numeric)*(h->>'AuthenticationPerSource')::numeric;ELSIF k='ProviderRequests' THEN need:=need+(1+(q->>'SourceTransitionLimit')::numeric)*(h->>'ProviderPerSource')::numeric;ELSIF k='SQLBytes' THEN need:=need+extra;ELSIF k='BackupBytes' THEN need:=need+extra*(h->>'BackupCopies')::numeric;ELSIF k='WALBytes' THEN need:=need+(2+(q->>'PrincipalAccounts')::numeric+(q->>'WorkloadAccounts')::numeric+(q->>'SourceTransitionLimit')::numeric)*(h->>'TransitionWALBytes')::numeric*(h->>'WALCopies')::numeric;END IF;
+  IF k='AuthenticationRequests' THEN need:=need+(1+(q->>'SourceTransitionLimit')::numeric)*(h->>'AuthenticationPerSource')::numeric;ELSIF k='ProviderRequests' THEN need:=need+(1+(q->>'SourceTransitionLimit')::numeric)*(h->>'ProviderPerSource')::numeric;ELSIF k='SQLBytes' THEN need:=need+extra;ELSIF k='BackupBytes' THEN need:=need+extra*(h->>'BackupCopies')::numeric;ELSIF k='WALBytes' THEN need:=need+(2+(q->>'PrincipalAccounts')::numeric+(q->>'WorkloadAccounts')::numeric+3*(q->>'SourceTransitionLimit')::numeric)*(h->>'TransitionWALBytes')::numeric*(h->>'WALCopies')::numeric;END IF;
   IF NOT public.capacity_json_integer(q->'Envelope'->k,1,1152921504606846976) OR (q->'Envelope'->>k)::numeric<need THEN RETURN false;END IF;
  END LOOP;
  FOREACH k IN ARRAY ARRAY['CPUMilli','MemoryBytes','EphemeralStorageBytes','WorkerTransientBytes','HubTransientBytes','ProviderConcurrency','AuthenticationConcurrency'] LOOP
@@ -202,9 +208,30 @@ CREATE FUNCTION guard_context_query_capacity() RETURNS trigger LANGUAGE plpgsql 
 BEGIN
  IF TG_OP='DELETE' THEN RAISE EXCEPTION 'query capacity remains reserved' USING ERRCODE='23514';END IF;
  IF TG_OP='INSERT' THEN
-  IF NEW.observations<>0 THEN RAISE EXCEPTION 'query observation starts spent' USING ERRCODE='23514';END IF;
- ELSIF NOT public.capacity_role_ok(OLD.root_id,'capacity') OR (to_jsonb(NEW)-'observations') IS DISTINCT FROM (to_jsonb(OLD)-'observations') OR NEW.observations<>OLD.observations+1 OR NEW.observations>(OLD.plan->'Qualification'->>'SourceTransitionLimit')::bigint+1 THEN
+  IF NEW.observations<>0 OR NEW.observation_id IS NOT NULL OR NEW.observation_accepted OR NEW.observation_completed THEN RAISE EXCEPTION 'query observation starts spent' USING ERRCODE='23514';END IF;
+ ELSIF NOT public.capacity_role_ok(OLD.root_id,'capacity') OR
+  (to_jsonb(NEW)-ARRAY['observations','observation_id','observation_ordinal','observation_started_at','observation_until','observation_accepted','observation_completed','negative_observed_at']) IS DISTINCT FROM
+  (to_jsonb(OLD)-ARRAY['observations','observation_id','observation_ordinal','observation_started_at','observation_until','observation_accepted','observation_completed','negative_observed_at']) THEN
   RAISE EXCEPTION 'query capacity immutable charge changed' USING ERRCODE='23514';
+ ELSIF NEW.observations=OLD.observations THEN
+  IF NEW.observation_ordinal<>NEW.observations OR
+   (to_jsonb(NEW)-ARRAY['observation_accepted','observation_completed']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['observation_accepted','observation_completed']) OR
+   NOT ((NOT OLD.observation_accepted AND NEW.observation_accepted AND NOT OLD.observation_completed AND NOT NEW.observation_completed) OR
+    (OLD.observation_accepted=NEW.observation_accepted AND NOT OLD.observation_completed AND NEW.observation_completed)) THEN
+   RAISE EXCEPTION 'query observation finalization changed' USING ERRCODE='23514';END IF;
+ ELSIF NEW.observations<>OLD.observations+1 OR NEW.observations>(OLD.plan->'Qualification'->>'SourceTransitionLimit')::bigint+1 THEN
+  RAISE EXCEPTION 'query source allowance exhausted' USING ERRCODE='23514';
+ ELSIF (to_jsonb(NEW)-ARRAY['observations','negative_observed_at']) IS NOT DISTINCT FROM (to_jsonb(OLD)-ARRAY['observations','negative_observed_at']) THEN
+  IF NEW.negative_observed_at IS NULL OR NEW.negative_observed_at<COALESCE(OLD.negative_observed_at,OLD.observation_started_at) OR
+   NEW.negative_observed_at>clock_timestamp() THEN RAISE EXCEPTION 'query negative watermark regressed' USING ERRCODE='23514';END IF;
+ ELSE
+  -- A new paid interval requires a joined predecessor. Expiry never proves
+  -- quiescence. Negative transitions preserve the unresolved claim above.
+  IF NEW.observations>(OLD.plan->'Qualification'->>'SourceTransitionLimit')::bigint OR NEW.observation_id IS NULL OR NEW.observation_id IS NOT DISTINCT FROM OLD.observation_id OR
+   NEW.observation_ordinal<>NEW.observations OR NEW.observation_accepted OR NEW.observation_completed OR NEW.observation_started_at>clock_timestamp() OR NEW.observation_until<=clock_timestamp() OR
+   NEW.negative_observed_at IS DISTINCT FROM OLD.negative_observed_at OR NEW.observation_started_at<=OLD.negative_observed_at OR
+   (OLD.observation_id IS NOT NULL AND NOT OLD.observation_completed) THEN
+   RAISE EXCEPTION 'query source claim unavailable' USING ERRCODE='23514';END IF;
  END IF;
  RETURN NEW;
 END $$;
@@ -227,6 +254,7 @@ BEGIN
  n:=clock_timestamp();until_at:=public.capacity_managed_root_until(r,n);expected:=public.context_query_capacity_plan(s,acceptance);
  RETURN COALESCE(until_at IS NOT NULL AND n<until_at AND NOT s.suspended AND s.negative_snapshot IS NULL AND
   public.capacity_setup_original_valid(s) AND expected IS NOT NULL AND a.plan=expected AND a.source_digest=s.accepted_digest AND
+  EXISTS(SELECT 1 FROM public.context_query_backing b WHERE b.root_id=r AND b.acceptance_id=acceptance) AND
   a.capacity_id=(expected->'Qualification'->>'CapacityID')::uuid AND a.observations<=(expected->'Qualification'->>'SourceTransitionLimit')::bigint AND a.issuer_epoch=t.issuer_epoch AND
   a.postmaster_at=pg_postmaster_start_time() AND a.database_oid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND
   n<(a.plan->>'HardUntil')::timestamptz AND clock_timestamp()<until_at,false);
@@ -252,18 +280,20 @@ BEGIN
  SELECT acceptance_id INTO acceptance FROM public.context_query_capacity WHERE root_id=r FOR SHARE;
  IF clock_timestamp()>=until_at THEN RAISE EXCEPTION 'query capacity source expired' USING ERRCODE='23514';END IF;
  RETURN jsonb_build_object('Qualification',s.qualification,'Root',s.root_configuration,'System',pool.plan,'AcceptanceID',COALESCE(acceptance::text,''),'Ready',COALESCE(acceptance IS NOT NULL AND public.lock_context_query_capacity(r,acceptance) AND EXISTS(SELECT 1 FROM public.context_query_backing b WHERE b.root_id=r AND NOT b.suspended AND b.observed_at<=n AND n<b.fresh_until),false),
+  'ObservationCount',COALESCE((SELECT a.observations FROM public.context_query_capacity a WHERE a.root_id=r),0),
   'BackingUntil',public.capacity_json_timestamp(COALESCE((SELECT b.fresh_until FROM public.context_query_backing b WHERE b.root_id=r),n)),
   'SetupInputDigest',to_jsonb(ARRAY(SELECT get_byte(decode(s.setup_receipt->>'inputDigest','hex'),byte_index.value) FROM generate_series(0,31) AS byte_index(value))),
   'SourceRevision',s.accepted_revision,'SourceDigest',to_jsonb(ARRAY(SELECT get_byte(s.accepted_digest,byte_index.value) FROM generate_series(0,31) AS byte_index(value))),
   'Recovery',recovery,'ObservedAt',public.capacity_json_timestamp(n),'FreshUntil',public.capacity_json_timestamp(until_at));
 END $$;
 
-CREATE FUNCTION accept_context_query_capacity(r uuid,proposal jsonb,o jsonb) RETURNS jsonb
+CREATE FUNCTION begin_context_query_capacity_observation(r uuid,proposal jsonb,o jsonb,claim uuid,prior bigint) RETURNS jsonb
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
-DECLARE s public.capacity_source;t public.fleet_current_trust;a public.context_query_capacity;b public.context_query_backing;n timestamptz;until_at timestamptz;expected jsonb;q jsonb;acceptance uuid;observed timestamptz;
+DECLARE s public.capacity_source;t public.fleet_current_trust;a public.context_query_capacity;n timestamptz;until_at timestamptz;expected jsonb;q jsonb;acceptance uuid;observed timestamptz;
 BEGIN
- IF NOT public.capacity_role_ok(r,'capacity') OR NOT public.capacity_json_fields(o,ARRAY['SourceRevision','SourceDigest','Recovery','ObservedAt','FreshUntil']) OR octet_length(proposal::text)>131072 THEN
-  RAISE EXCEPTION 'query capacity producer unavailable' USING ERRCODE='23514';END IF;
+ IF NOT public.capacity_role_ok(r,'capacity') OR claim IS NULL OR prior IS NULL OR prior<0 OR
+  NOT public.capacity_json_fields(o,ARRAY['SourceRevision','SourceDigest','Recovery','ObservedAt','FreshUntil']) OR octet_length(proposal::text)>131072 THEN
+  RAISE EXCEPTION 'query capacity claim unavailable' USING ERRCODE='23514';END IF;
  SELECT * INTO STRICT s FROM public.capacity_source WHERE root_id=r;
  SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=s.installation_id FOR SHARE;
  PERFORM 1 FROM public.permission_stream WHERE id=r FOR UPDATE;
@@ -279,26 +309,80 @@ BEGIN
   IF a.plan IS DISTINCT FROM expected OR a.source_digest IS DISTINCT FROM s.accepted_digest OR a.issuer_epoch<>t.issuer_epoch OR a.postmaster_at<>pg_postmaster_start_time() OR a.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) THEN
    RAISE EXCEPTION 'query capacity immutable replay mismatch' USING ERRCODE='23514';END IF;
  ELSE
-  -- Parent residual was independently checked while its immutable source/root
-  -- and pool identity remain locked. No existing query row is adopted.
-  IF EXISTS(SELECT 1 FROM public.context_query_backing WHERE root_id=r) THEN RAISE EXCEPTION 'query capacity cannot adopt backing' USING ERRCODE='23514';END IF;
+  IF prior<>0 OR EXISTS(SELECT 1 FROM public.context_query_backing WHERE root_id=r) THEN RAISE EXCEPTION 'query capacity cannot adopt backing' USING ERRCODE='23514';END IF;
+  -- Reserve the original residual before external work; this row alone cannot
+  -- make a readable backing or satisfy the accepted consumer anchor.
   INSERT INTO public.context_query_capacity(root_id,acceptance_id,capacity_id,plan,source_digest,issuer_epoch,postmaster_at,database_oid,accepted_at)
    VALUES(r,acceptance,(q->>'CapacityID')::uuid,expected,s.accepted_digest,t.issuer_epoch,pg_postmaster_start_time(),(SELECT oid FROM pg_database WHERE datname=current_database()),n);
+  SELECT * INTO STRICT a FROM public.context_query_capacity WHERE root_id=r FOR UPDATE;
+ END IF;
+ IF a.observations<>prior OR observed<=a.negative_observed_at OR a.observations>=(q->>'SourceTransitionLimit')::bigint OR a.observation_id=claim OR
+  (a.observation_id IS NOT NULL AND NOT a.observation_completed) THEN RAISE EXCEPTION 'query source claim exhausted or already owned' USING ERRCODE='23514';END IF;
+ UPDATE public.context_query_capacity SET observations=observations+1,observation_id=claim,observation_ordinal=observations+1,
+  observation_started_at=observed,observation_until=until_at,observation_accepted=false,observation_completed=false WHERE root_id=r;
+ IF clock_timestamp()>=until_at THEN RAISE EXCEPTION 'query source claim expired' USING ERRCODE='23514';END IF;
+ RETURN jsonb_build_object('ID',claim,'AcceptanceID',acceptance,'Ordinal',prior+1,'ObservedAt',public.capacity_json_timestamp(observed),'ValidUntil',public.capacity_json_timestamp(until_at));
+END $$;
+
+CREATE FUNCTION accept_context_query_capacity(r uuid,proposal jsonb,o jsonb,claim jsonb) RETURNS jsonb
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE s public.capacity_source;t public.fleet_current_trust;a public.context_query_capacity;b public.context_query_backing;n timestamptz;until_at timestamptz;expected jsonb;q jsonb;acceptance uuid;observed timestamptz;
+BEGIN
+ IF NOT public.capacity_role_ok(r,'capacity') OR NOT public.capacity_json_fields(o,ARRAY['SourceRevision','SourceDigest','Recovery','ObservedAt','FreshUntil']) OR octet_length(proposal::text)>131072 OR
+  NOT public.capacity_json_fields(claim,ARRAY['ID','AcceptanceID','Ordinal','ObservedAt','ValidUntil']) THEN RAISE EXCEPTION 'query capacity producer unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT s FROM public.capacity_source WHERE root_id=r;
+ SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=s.installation_id FOR SHARE;
+ PERFORM 1 FROM public.permission_stream WHERE id=r FOR UPDATE;
+ SELECT * INTO STRICT s FROM public.capacity_source WHERE root_id=r FOR UPDATE;
+ acceptance:=(proposal->>'AcceptanceID')::uuid;expected:=public.context_query_capacity_plan(s,acceptance);q:=expected->'Qualification';n:=clock_timestamp();observed:=(o->>'ObservedAt')::timestamptz;
+ until_at:=LEAST((o->>'FreshUntil')::timestamptz,public.capacity_managed_root_until(r,n),(o->'Recovery'->>'FreshUntil')::timestamptz);
+ IF NOT public.capacity_setup_original_valid(s) OR NOT public.capacity_recovery_current(s,t,o->'Recovery',n) OR s.suspended OR s.negative_snapshot IS NOT NULL OR
+  expected IS NULL OR proposal IS DISTINCT FROM expected OR (o->>'SourceRevision')::bigint<>s.accepted_revision OR public.connector_digest(o->'SourceDigest') IS DISTINCT FROM s.accepted_digest OR
+  public.capacity_managed_root_until(r,n) IS NULL OR NOT COALESCE(observed<=n AND until_at>observed AND until_at<=observed+interval '5 seconds' AND n<until_at AND n<(expected->>'HardUntil')::timestamptz,false) THEN
+  RAISE EXCEPTION 'query capacity current original proof unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT a FROM public.context_query_capacity WHERE root_id=r FOR UPDATE;
+ IF a.plan IS DISTINCT FROM expected OR a.source_digest IS DISTINCT FROM s.accepted_digest OR a.issuer_epoch<>t.issuer_epoch OR a.postmaster_at<>pg_postmaster_start_time() OR a.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR
+  a.observation_id IS DISTINCT FROM (claim->>'ID')::uuid OR a.acceptance_id IS DISTINCT FROM (claim->>'AcceptanceID')::uuid OR
+  a.observations IS DISTINCT FROM (claim->>'Ordinal')::bigint OR a.observation_ordinal IS DISTINCT FROM a.observations OR a.observation_accepted OR a.observation_completed OR
+  a.observation_started_at IS DISTINCT FROM (claim->>'ObservedAt')::timestamptz OR a.observation_until IS DISTINCT FROM (claim->>'ValidUntil')::timestamptz OR
+  observed<>a.observation_started_at OR until_at>a.observation_until OR clock_timestamp()>=a.observation_until THEN
+  RAISE EXCEPTION 'query source claim mismatch or already finalized' USING ERRCODE='23514';END IF;
+ SELECT * INTO b FROM public.context_query_backing WHERE root_id=r FOR UPDATE;
+ IF NOT FOUND THEN
   INSERT INTO public.context_query_backing(root_id,installation_id,acceptance_id,profile,qualification,envelope,query_limit,principal_query_limit,principal_account_limit,allocation_limit,
    observed_at,fresh_until,hard_until,effects_until,cleanup_until,retire_by,suspended)
    VALUES(r,s.installation_id,acceptance,q->'Profile',q->'Profile'->'Qualification',q->'Envelope',(q->>'RootQueries')::bigint,(q->>'PrincipalQueries')::bigint,(q->>'PrincipalAccounts')::bigint,(q->>'WorkloadAccounts')::bigint,
    observed,until_at,(expected->>'HardUntil')::timestamptz,(expected->>'EffectsUntil')::timestamptz,(expected->>'CleanupUntil')::timestamptz,(expected->>'RetireBy')::timestamptz,false);
+  SELECT * INTO STRICT b FROM public.context_query_backing WHERE root_id=r FOR UPDATE;
  END IF;
- SELECT * INTO STRICT a FROM public.context_query_capacity WHERE root_id=r FOR UPDATE;
- IF a.observations>=(q->>'SourceTransitionLimit')::bigint THEN RAISE EXCEPTION 'query source observation allowance exhausted' USING ERRCODE='23514';END IF;
- UPDATE public.context_query_capacity SET observations=observations+1 WHERE root_id=r;
- SELECT * INTO STRICT b FROM public.context_query_backing WHERE root_id=r FOR UPDATE;
  IF b.acceptance_id<>acceptance OR b.profile IS DISTINCT FROM q->'Profile' OR b.envelope IS DISTINCT FROM q->'Envelope' OR b.hard_until<>(expected->>'HardUntil')::timestamptz OR b.effects_until<>(expected->>'EffectsUntil')::timestamptz OR b.cleanup_until<>(expected->>'CleanupUntil')::timestamptz OR b.retire_by<>(expected->>'RetireBy')::timestamptz THEN RAISE EXCEPTION 'query backing differs' USING ERRCODE='23514';END IF;
- -- An old proof can neither renew freshness nor erase a newer negative.
  IF observed<b.observed_at OR observed=b.observed_at AND (until_at>b.fresh_until OR b.suspended) THEN RAISE EXCEPTION 'query source observation regressed' USING ERRCODE='23514';END IF;
  UPDATE public.context_query_backing SET observed_at=observed,fresh_until=until_at,suspended=false WHERE root_id=r;
+ UPDATE public.context_query_capacity SET observation_accepted=true WHERE root_id=r;
  IF clock_timestamp()>=until_at THEN RAISE EXCEPTION 'query capacity source expired' USING ERRCODE='23514';END IF;
  RETURN expected;
+END $$;
+
+-- Positive acceptance does not release the in-flight owner before the outer
+-- native guard callbacks and final source checks have actually returned.
+CREATE FUNCTION complete_context_query_capacity_observation(r uuid,claim jsonb,until_at timestamptz) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE s public.capacity_source;a public.context_query_capacity;t public.fleet_current_trust;
+BEGIN
+ IF NOT public.capacity_role_ok(r,'capacity') OR until_at IS NULL OR NOT isfinite(until_at) OR clock_timestamp()>=until_at OR
+  NOT public.capacity_json_fields(claim,ARRAY['ID','AcceptanceID','Ordinal','ObservedAt','ValidUntil']) THEN RAISE EXCEPTION 'query source completion unavailable' USING ERRCODE='23514';END IF;
+ SELECT * INTO STRICT s FROM public.capacity_source WHERE root_id=r;
+ SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=s.installation_id FOR SHARE;
+ PERFORM 1 FROM public.permission_stream WHERE id=r FOR UPDATE;
+ PERFORM 1 FROM public.capacity_source WHERE root_id=r FOR UPDATE;
+ SELECT * INTO STRICT a FROM public.context_query_capacity WHERE root_id=r FOR UPDATE;
+ IF a.observation_completed OR a.observations IS DISTINCT FROM (claim->>'Ordinal')::bigint OR a.observation_ordinal IS DISTINCT FROM a.observations OR
+  a.observation_id IS DISTINCT FROM (claim->>'ID')::uuid OR a.acceptance_id IS DISTINCT FROM (claim->>'AcceptanceID')::uuid OR
+  a.observation_started_at IS DISTINCT FROM (claim->>'ObservedAt')::timestamptz OR a.observation_until IS DISTINCT FROM (claim->>'ValidUntil')::timestamptz OR
+  a.issuer_epoch<>t.issuer_epoch OR a.postmaster_at<>pg_postmaster_start_time() OR a.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR
+  until_at>a.observation_until OR clock_timestamp()>=until_at THEN RAISE EXCEPTION 'query source completion mismatched or expired' USING ERRCODE='23514';END IF;
+ UPDATE public.context_query_capacity SET observation_completed=true WHERE root_id=r;
+ IF clock_timestamp()>=until_at THEN RAISE EXCEPTION 'query source completion expired' USING ERRCODE='23514';END IF;
 END $$;
 
 CREATE FUNCTION suspend_context_query_capacity(r uuid,observed timestamptz) RETURNS void
@@ -312,14 +396,14 @@ BEGIN
  PERFORM 1 FROM public.capacity_source WHERE root_id=r FOR UPDATE;
  SELECT * INTO a FROM public.context_query_capacity WHERE root_id=r FOR UPDATE;
  SELECT * INTO b FROM public.context_query_backing WHERE root_id=r FOR UPDATE;
- IF FOUND AND observed>=b.observed_at AND a.observations<(a.plan->'Qualification'->>'SourceTransitionLimit')::bigint+1 THEN
-  UPDATE public.context_query_capacity SET observations=observations+1 WHERE root_id=r;
+ IF a.root_id IS NOT NULL AND observed>=GREATEST(b.observed_at,a.observation_started_at,a.negative_observed_at) AND a.observations<(a.plan->'Qualification'->>'SourceTransitionLimit')::bigint+1 THEN
+  UPDATE public.context_query_capacity SET observations=observations+1,negative_observed_at=observed WHERE root_id=r;
   UPDATE public.context_query_backing SET suspended=true,observed_at=observed,fresh_until=observed+interval '1 microsecond' WHERE root_id=r;
  END IF;
 END $$;
 -- +goose StatementEnd
 
-REVOKE ALL ON FUNCTION context_query_qualification_valid(jsonb,jsonb),context_query_capacity_plan(capacity_source,uuid),guard_context_query_capacity(),lock_context_query_capacity(uuid,uuid),read_context_query_capacity_source(uuid,jsonb),accept_context_query_capacity(uuid,jsonb,jsonb),suspend_context_query_capacity(uuid,timestamptz) FROM PUBLIC;
+REVOKE ALL ON FUNCTION context_query_qualification_valid(jsonb,jsonb),context_query_capacity_plan(capacity_source,uuid),guard_context_query_capacity(),lock_context_query_capacity(uuid,uuid),read_context_query_capacity_source(uuid,jsonb),begin_context_query_capacity_observation(uuid,jsonb,jsonb,uuid,bigint),accept_context_query_capacity(uuid,jsonb,jsonb,jsonb),complete_context_query_capacity_observation(uuid,jsonb,timestamptz),suspend_context_query_capacity(uuid,timestamptz) FROM PUBLIC;
 
 -- +goose StatementBegin
 CREATE FUNCTION context_query_capacity_allocation_current(r uuid,allocation uuid) RETURNS boolean

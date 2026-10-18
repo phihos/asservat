@@ -5,7 +5,9 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -31,6 +34,48 @@ type queryCapacitySyntheticGuard struct{}
 
 func (queryCapacitySyntheticGuard) WithCurrentQueryDeployment(ctx context.Context, _ app.ContextQueryQualification, _ app.QueryDeploymentPin, next func(context.Context) error) error {
 	return next(ctx)
+}
+
+type queryCapacityCountingGuard struct {
+	calls   *atomic.Int64
+	after   chan struct{}
+	release <-chan struct{}
+	fail    bool
+}
+
+func (g queryCapacityCountingGuard) WithCurrentQueryDeployment(ctx context.Context, _ app.ContextQueryQualification, _ app.QueryDeploymentPin, next func(context.Context) error) error {
+	g.calls.Add(1)
+	if g.fail {
+		return value.ErrUnavailable
+	}
+	err := next(ctx)
+	if g.after != nil {
+		close(g.after)
+		select {
+		case <-g.release:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return err
+}
+
+// The real SQL commit succeeds; the test discards its acknowledgement before
+// returning to the producer. This models unknown begin without forging state.
+type queryCapacityLostClaim struct {
+	app.QueryCapacityWriter
+	source app.QueryCapacitySource
+	plan   app.QueryBackingPlan
+	claim  app.QueryCapacityObservation
+}
+
+func (w *queryCapacityLostClaim) BeginQueryCapacityObservation(ctx context.Context, s app.QueryCapacitySource, p app.QueryBackingPlan, id string) (app.QueryCapacityObservation, error) {
+	c, e := w.QueryCapacityWriter.BeginQueryCapacityObservation(ctx, s, p, id)
+	w.source, w.plan, w.claim = s, p, c
+	if e != nil {
+		return app.QueryCapacityObservation{}, e
+	}
+	return app.QueryCapacityObservation{}, value.ErrUnavailable
 }
 
 func syntheticQueryCapacityQualification(t *testing.T, f *capacitySQLFixture) {
@@ -134,7 +179,7 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 	// deliberately unchanged by the inert query-capacity component.
 	writerName := pgx.Identifier{f.roles["capacity"].Config().ConnConfig.User}.Sanitize()
 	readerName := pgx.Identifier{f.roles["capacity-profile-read"].Config().ConnConfig.User}.Sanitize()
-	if _, e = admin.Exec(ctx, "GRANT EXECUTE ON FUNCTION read_context_query_capacity_source(uuid,jsonb),read_context_query_capacity_plan(uuid,uuid,uuid,text,text,jsonb,bytea,uuid) TO "+readerName+"; GRANT EXECUTE ON FUNCTION accept_context_query_capacity(uuid,jsonb,jsonb),allocate_context_query_capacity(uuid,uuid,uuid,text,text,uuid),suspend_context_query_capacity(uuid,timestamptz) TO "+writerName); e != nil {
+	if _, e = admin.Exec(ctx, "GRANT EXECUTE ON FUNCTION read_context_query_capacity_source(uuid,jsonb),read_context_query_capacity_plan(uuid,uuid,uuid,text,text,jsonb,bytea,uuid) TO "+readerName+"; GRANT EXECUTE ON FUNCTION begin_context_query_capacity_observation(uuid,jsonb,jsonb,uuid,bigint),accept_context_query_capacity(uuid,jsonb,jsonb,jsonb),complete_context_query_capacity_observation(uuid,jsonb,timestamptz),allocate_context_query_capacity(uuid,uuid,uuid,text,text,uuid),suspend_context_query_capacity(uuid,timestamptz) TO "+writerName); e != nil {
 		t.Fatal("fixture purpose grants", e)
 	}
 	reads, e := postgres.NewContextQueryCapacityReads(ctx, f.roles["capacity-profile-read"], f.input.PermissionRootID, f.input.InstallationID)
@@ -144,6 +189,17 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 	writes, e := postgres.NewContextQueryCapacityProducer(ctx, f.roles["capacity"], f.input.PermissionRootID, f.input.InstallationID)
 	if e != nil {
 		t.Fatal(e)
+	}
+	expectBeginDenied := func(source app.QueryCapacitySource, plan app.QueryBackingPlan, claimID string, prior int64) {
+		t.Helper()
+		proposal, _ := json.Marshal(plan)
+		observation, _ := json.Marshal(map[string]any{"SourceRevision": source.SourceRevision, "SourceDigest": source.SourceDigest, "Recovery": source.Recovery, "ObservedAt": source.ObservedAt, "FreshUntil": source.FreshUntil})
+		var raw []byte
+		err := f.roles["capacity"].QueryRow(ctx, "SELECT begin_context_query_capacity_observation($1,$2,$3,$4,$5)", f.input.PermissionRootID, proposal, observation, claimID, prior).Scan(&raw)
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "23514" {
+			t.Fatalf("SQL source claim denial: %v", err)
+		}
 	}
 	guard := queryCapacitySyntheticGuard{}
 	current := app.ProtectedContextQueryCapacity{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, Store: reads, Recovery: f.source, Deployments: app.QueryDeploymentGuards{Worker: guard, Hub: guard, KeyService: guard, Provider: guard}, Now: time.Now, NewID: custodyID}
@@ -183,7 +239,53 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 	probe(anchorProbe, custodyID(), false)
 	refresh()
 	key := app.WorkloadCapacityKey{RootID: current.RootID, ClusterID: scope.ClusterID, NamespaceUID: f.namespace.UID, WorkloadUID: f.workloads[0].UID}
-	if e = producer.Reconcile(ctx, &key); e != nil {
+	var guardCalls atomic.Int64
+	// A first failed guard reserves the root and its attempt before native work,
+	// but cannot produce positive backing. Its synchronous return is joined.
+	failed := producer
+	failed.Current.Deployments.Worker = queryCapacityCountingGuard{calls: &guardCalls, fail: true}
+	if e = failed.Reconcile(ctx, nil); e == nil {
+		t.Fatal("failed guard accepted source")
+	}
+	var same bool
+	if e = admin.QueryRow(ctx, `SELECT observations=1 AND NOT observation_accepted AND observation_completed AND NOT EXISTS(SELECT 1 FROM context_query_backing WHERE root_id=$1) FROM context_query_capacity WHERE root_id=$1`, current.RootID).Scan(&same); e != nil || !same {
+		t.Fatal("failed native guard lost charge or supplied positive backing", e)
+	}
+	var reservedAcceptance string
+	if e = admin.QueryRow(ctx, `SELECT acceptance_id::text FROM context_query_capacity WHERE root_id=$1`, current.RootID).Scan(&reservedAcceptance); e != nil {
+		t.Fatal(e)
+	}
+	probe(anchorProbe, reservedAcceptance, false)
+	if _, e = current.ContextProjectionPolicy(ctx); e == nil {
+		t.Fatal("reserved-only anchor supplied policy")
+	}
+	refresh()
+	// Hold the outer guard after SQL acceptance. A competing invocation cannot
+	// enter native checks until that actual callback has joined.
+	after, release := make(chan struct{}), make(chan struct{})
+	first := producer
+	first.Current.Deployments.Worker = queryCapacityCountingGuard{calls: &guardCalls, after: after, release: release}
+	finished := make(chan error, 1)
+	go func() { finished <- first.Reconcile(ctx, &key) }()
+	select {
+	case <-after:
+	case err := <-finished:
+		close(release)
+		t.Fatal("source guard did not reach final checks", err)
+	case <-time.After(3 * time.Second):
+		close(release)
+		<-finished
+		t.Fatal("source guard did not enter")
+	}
+	competing := producer
+	competing.Current.Deployments.Worker = queryCapacityCountingGuard{calls: &guardCalls}
+	if e = competing.Reconcile(ctx, nil); e == nil || guardCalls.Load() != 2 {
+		close(release)
+		<-finished
+		t.Fatal("competing source callback entered before joined completion", e)
+	}
+	close(release)
+	if e = <-finished; e != nil {
 		t.Fatal("query original acceptance", e)
 	}
 	policy, e := current.ContextProjectionPolicy(ctx)
@@ -193,12 +295,12 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 	var original []byte
 	var accepted string
 	var observations int64
-	if e = admin.QueryRow(ctx, `SELECT plan,acceptance_id::text,observations FROM context_query_capacity WHERE root_id=$1`, current.RootID).Scan(&original, &accepted, &observations); e != nil || observations != 1 {
+	if e = admin.QueryRow(ctx, `SELECT plan,acceptance_id::text,observations FROM context_query_capacity WHERE root_id=$1`, current.RootID).Scan(&original, &accepted, &observations); e != nil || observations != 2 {
 		t.Fatal("accepted query reservation missing", e)
 	}
 	var allocationID string
 	if e = admin.QueryRow(ctx, "SELECT id::text FROM context_query_allocation WHERE root_id=$1", current.RootID).Scan(&allocationID); e != nil {
-		t.Fatal("accepted allocation missing", e)
+		t.Fatal(e)
 	}
 	probe(anchorProbe, accepted, true)
 	probe(anchorProbe, custodyID(), false)
@@ -210,20 +312,10 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 	}
 	refresh()
 	if e = producer.Reconcile(ctx, &key); e != nil {
-		t.Fatal("exact acceptance replay", e)
+		t.Fatal("new paid observation after acknowledged join", e)
 	}
-	var same bool
-	if e = admin.QueryRow(ctx, `SELECT plan=$2::jsonb AND acceptance_id=$3::uuid AND observations=2 FROM context_query_capacity WHERE root_id=$1`, current.RootID, original, accepted).Scan(&same); e != nil || !same {
-		t.Fatal("replay renewed original reservation", e)
-	}
-	// Missing independent deployment guard cannot write another observation.
-	broken := producer
-	broken.Current.Deployments.Provider = nil
-	if e = broken.Reconcile(ctx, nil); e == nil {
-		t.Fatal("worker guard implied provider qualification")
-	}
-	if e = admin.QueryRow(ctx, `SELECT observations=2 FROM context_query_capacity WHERE root_id=$1`, current.RootID).Scan(&same); e != nil || !same {
-		t.Fatal("failed guard spent or accepted backing", e)
+	if e = admin.QueryRow(ctx, `SELECT plan=$2::jsonb AND acceptance_id=$3::uuid AND observations=3 AND observation_completed FROM context_query_capacity WHERE root_id=$1`, current.RootID, original, accepted).Scan(&same); e != nil || !same {
+		t.Fatal("original reservation changed or final guard never joined", e)
 	}
 	if e = writes.SuspendQueryCapacity(ctx, time.Now().UTC().Truncate(time.Microsecond)); e != nil {
 		t.Fatal("persist negative", e)
@@ -233,23 +325,57 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 	}
 	probe(allocationProbe, allocationID, false)
 	refresh()
-	if e = producer.Reconcile(ctx, nil); e != nil {
-		t.Fatal("new current proof after negative", e)
+	unknown := producer
+	lost := &queryCapacityLostClaim{QueryCapacityWriter: writes}
+	unknown.Writer = lost
+	unknown.Current.Deployments.Worker = queryCapacityCountingGuard{calls: &guardCalls}
+	before := guardCalls.Load()
+	short, stop := context.WithTimeout(ctx, 250*time.Millisecond)
+	if e = unknown.Reconcile(short, nil); e == nil || lost.claim.ID == "" || guardCalls.Load() != before {
+		stop()
+		t.Fatal("unknown committed claim entered native work or lost spend", e)
 	}
-	for i := 0; i < 2; i++ {
-		refresh()
-		if e = producer.Reconcile(ctx, nil); e != nil {
-			t.Fatal("finite observation", e)
-		}
+	stop()
+	if e = admin.QueryRow(ctx, `SELECT observations=5 AND NOT observation_accepted AND NOT observation_completed FROM context_query_capacity WHERE root_id=$1`, current.RootID).Scan(&same); e != nil || !same {
+		t.Fatal("unknown claim disappeared", e)
+	}
+	expectBeginDenied(lost.source, lost.plan, lost.claim.ID, lost.source.ObservationCount)
+	// Original expiry cannot prove that unknown work joined. It supplies neither
+	// an acceptance nor a new execution capability, even with a fresh source.
+	time.Sleep(time.Until(lost.claim.ValidUntil) + time.Millisecond)
+	staleSource := lost.source
+	staleSource.ObservationCount = lost.claim.Ordinal
+	if _, e = writes.AcceptQueryCapacity(ctx, staleSource, lost.plan, lost.claim); e == nil {
+		t.Fatal("expired unknown claim finalized")
 	}
 	refresh()
-	if e = producer.Reconcile(ctx, nil); e == nil {
-		t.Fatal("observation allowance replenished")
+	// The fifth claim is below the six-attempt ceiling. Its expiry still cannot
+	// release ownership or permit a new source guard.
+	if e = competing.Reconcile(ctx, nil); e == nil || guardCalls.Load() != before {
+		t.Fatal("expired unknown claim released unfinished work", e)
+	}
+	if e = writes.SuspendQueryCapacity(ctx, time.Now().UTC().Truncate(time.Microsecond)); e != nil {
+		t.Fatal("negative after unknown source", e)
+	}
+	refresh()
+	recovery, err := f.source.RecoveryState(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exhaustedSource, err := reads.ReadQueryCapacitySource(ctx, recovery)
+	if err != nil || exhaustedSource.ObservationCount != 6 {
+		t.Fatal("source count after negative", err)
+	}
+	expectBeginDenied(exhaustedSource, lost.plan, custodyID(), exhaustedSource.ObservationCount)
+	exhausted := producer
+	exhausted.Current.Deployments.Worker = queryCapacityCountingGuard{calls: &guardCalls}
+	if e = exhausted.Reconcile(ctx, nil); e == nil || guardCalls.Load() != before {
+		t.Fatal("exhausted allowance entered external guard", e)
 	}
 	if e = writes.SuspendQueryCapacity(ctx, time.Now().UTC().Truncate(time.Microsecond)); e != nil {
 		t.Fatal("prepaid terminal negative unavailable", e)
 	}
-	if e = admin.QueryRow(ctx, `SELECT a.plan=$2::jsonb AND a.observations=7 AND b.suspended AND b.allocations=1 AND b.allocated=0 FROM context_query_capacity a JOIN context_query_backing b USING(root_id) WHERE a.root_id=$1`, current.RootID, original).Scan(&same); e != nil || !same {
+	if e = admin.QueryRow(ctx, `SELECT a.plan=$2::jsonb AND a.observations=7 AND NOT a.observation_completed AND b.suspended AND b.allocations=1 AND b.allocated=0 FROM context_query_capacity a JOIN context_query_backing b USING(root_id) WHERE a.root_id=$1`, current.RootID, original).Scan(&same); e != nil || !same {
 		t.Fatal("terminal source state lost original obligations", e)
 	}
 	var bytesAfter, objectsAfter int64

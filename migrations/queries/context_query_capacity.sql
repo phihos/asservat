@@ -1,7 +1,9 @@
 -- name: ReadContextQueryCapacitySource :one
 SELECT read_context_query_capacity_source(sqlc.arg(root_id)::uuid,sqlc.arg(recovery)::jsonb)::jsonb;
+-- name: BeginContextQueryCapacityObservation :one
+SELECT begin_context_query_capacity_observation(sqlc.arg(root_id)::uuid,sqlc.arg(proposal)::jsonb,sqlc.arg(observation)::jsonb,sqlc.arg(claim_id)::uuid,sqlc.arg(prior_count)::bigint)::jsonb;
 -- name: AcceptContextQueryCapacity :one
-SELECT accept_context_query_capacity(sqlc.arg(root_id)::uuid,sqlc.arg(proposal)::jsonb,sqlc.arg(observation)::jsonb)::jsonb;
+SELECT accept_context_query_capacity(sqlc.arg(root_id)::uuid,sqlc.arg(proposal)::jsonb,sqlc.arg(observation)::jsonb,sqlc.arg(claim)::jsonb)::jsonb;
 -- name: SuspendContextQueryCapacity :exec
 SELECT suspend_context_query_capacity(sqlc.arg(root_id)::uuid,sqlc.arg(observed)::timestamptz);
 -- name: AllocateContextQueryCapacity :one
@@ -12,3 +14,6 @@ SELECT read_context_query_capacity_plan(sqlc.arg(root_id)::uuid,sqlc.arg(accepta
 SELECT lock_context_query_capacity(sqlc.arg(root_id)::uuid,sqlc.arg(acceptance_id)::uuid)::boolean;
 -- name: ContextQueryCapacityAllocationCurrent :one
 SELECT context_query_capacity_allocation_current(sqlc.arg(root_id)::uuid,sqlc.arg(allocation_id)::uuid)::boolean;
+
+-- name: CompleteContextQueryCapacityObservation :exec
+SELECT complete_context_query_capacity_observation(sqlc.arg(root_id)::uuid,sqlc.arg(claim)::jsonb,sqlc.arg(until_at)::timestamptz);

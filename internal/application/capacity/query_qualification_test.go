@@ -186,3 +186,20 @@ func TestQueryCapacityOmittedExtensionPreservesOriginalBytes(t *testing.T) {
 		t.Fatal("legacy root lost validity")
 	}
 }
+
+func TestQueryCapacitySourceHistoryPrepaysClaimAcceptanceAndJoin(t *testing.T) {
+	q, _, _, _ := queryCapacityFixture(t)
+	original, err := q.ContextQuery.required()
+	if err != nil {
+		t.Fatal(err)
+	}
+	q.ContextQuery.SourceTransitionLimit--
+	smaller, err := q.ContextQuery.required()
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := q.ContextQuery.History
+	if original.WALBytes-smaller.WALBytes != 3*h.TransitionWALBytes*h.WALCopies {
+		t.Fatal("source work did not reserve all three full transactions")
+	}
+}

@@ -1030,16 +1030,23 @@ type ContextQueryCall struct {
 }
 
 type ContextQueryCapacity struct {
-	RootID       pgtype.UUID
-	AcceptanceID pgtype.UUID
-	CapacityID   pgtype.UUID
-	Plan         []byte
-	SourceDigest []byte
-	IssuerEpoch  pgtype.UUID
-	PostmasterAt pgtype.Timestamptz
-	DatabaseOid  pgtype.Uint32
-	AcceptedAt   pgtype.Timestamptz
-	Observations int64
+	RootID               pgtype.UUID
+	AcceptanceID         pgtype.UUID
+	CapacityID           pgtype.UUID
+	Plan                 []byte
+	SourceDigest         []byte
+	IssuerEpoch          pgtype.UUID
+	PostmasterAt         pgtype.Timestamptz
+	DatabaseOid          pgtype.Uint32
+	AcceptedAt           pgtype.Timestamptz
+	Observations         int64
+	ObservationID        pgtype.UUID
+	ObservationOrdinal   pgtype.Int8
+	ObservationStartedAt pgtype.Timestamptz
+	ObservationUntil     pgtype.Timestamptz
+	ObservationAccepted  bool
+	ObservationCompleted bool
+	NegativeObservedAt   pgtype.Timestamptz
 }
 
 type ContextQueryKeyBinding struct {

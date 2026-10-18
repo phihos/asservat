@@ -79,11 +79,27 @@ qualify this worker composition. Encrypted object slots include
 `2 * (1 + PollLimit) + 1 + SigningAttempts`: each invocation's intent/outcome,
 one immutable enrollment object and at most one certificate object per signing
 attempt. These child audits also need their actual qualified key/provider work.
-The source
-producer also has a finite observation allowance, with its authentication,
-provider and WAL work prepaid separately. One terminal negative transition is
-reserved after positive observations are exhausted. Unknown or failed work never
-replenishes these allowances.
+The source producer also has a finite observation allowance. Before entering
+any of the four native guards, an acknowledged committed Begin consumes one
+original ordinal and pins its exact original interval. Unknown or replayed
+Begins permit no native work. The bounded latest claim is held across acceptance,
+all outer guard checks and final source reads; only a separate restrictive
+joined completion allows another attempt. A synchronous failed guard may record
+that joined completion under the original prepaid cutoff, without accepting a
+source. Expiry never proves that unknown work joined. Missing stored completion remains held; this component has no recovery bypass.
+If the completion commit succeeds but its reply is lost, that invocation still
+fails, while the durable joined record can support a later fresh paid attempt.
+An uncertain Begin has no corresponding joined record and never grants work.
+
+Three complete SQL transactions per source attempt (Begin, acceptance and joined
+completion) are included in the WAL floor, alongside the separately prepaid
+native authentication/provider work. Failed or unknown work never refunds these
+allowances. The first Begin reserves the original additive root charge; its
+anchor alone cannot supply positive backing. One terminal negative transition
+remains reserved even when the source never reached positive acceptance. A
+negative invalidates older acceptance claims without releasing unresolved work.
+Current source observation never creates a rolling interval or replenishes the
+original installation budget.
 
 The query-backing hard cutoff derives from the root's original observation plus
 its accepted admission duration. Compatible base-root renewal cannot move it.
@@ -182,3 +198,8 @@ all 2,651 source hashes and record exit zero with complete cleanup:
 [capacity](../../test/results/context-query-capacity-assembled-1/fleet-environment.json)
 and [ledger](../../test/results/context-query-ledger-assembled-1/fleet-environment.json).
 Real accepted resource proof and installed query composition remain separate.
+
+The source pre-I/O accounting correction is later than the native report above.
+Its unit regressions cover guard-entry order, exhaustion and joined completion;
+that historical report does not qualify the new SQL claim/completion protocol.
+A fresh frozen native selection is required before integration.

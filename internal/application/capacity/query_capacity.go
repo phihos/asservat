@@ -19,6 +19,7 @@ type QueryCapacitySource struct {
 	Root                   RootConfiguration
 	System                 ProtectedPoolPlan
 	AcceptanceID           string
+	ObservationCount       int64
 	Ready                  bool
 	BackingUntil           time.Time
 	SetupInputDigest       artifact.Digest
@@ -30,6 +31,7 @@ type QueryCapacitySource struct {
 
 func (s QueryCapacitySource) Valid(now time.Time) bool {
 	return s.Qualification.Valid() && s.Qualification.ContextQuery != nil && s.Root.AdmissionReady(now) &&
+		s.ObservationCount >= 0 && s.ObservationCount <= s.Qualification.ContextQuery.SourceTransitionLimit+1 &&
 		s.Root.RootID == s.Qualification.RootBacking.RootID && (s.AcceptanceID == "" || authorization.UUID(s.AcceptanceID)) &&
 		s.SetupInputDigest != (artifact.Digest{}) && s.SourceRevision > 0 && s.SourceDigest != (artifact.Digest{}) &&
 		s.Recovery.Valid(now) && s.Recovery.InstallationID == s.Qualification.RootBacking.InstallationID &&
@@ -41,10 +43,26 @@ type QueryCapacityReader interface {
 	ReadQueryCapacityPlan(context.Context, QueryCapacitySource, value.ContextProjectionAuthority, string) (value.ContextQueryPlan, error)
 }
 type QueryCapacityWriter interface {
-	AcceptQueryCapacity(context.Context, QueryCapacitySource, QueryBackingPlan) (QueryBackingPlan, error)
+	BeginQueryCapacityObservation(context.Context, QueryCapacitySource, QueryBackingPlan, string) (QueryCapacityObservation, error)
+	AcceptQueryCapacity(context.Context, QueryCapacitySource, QueryBackingPlan, QueryCapacityObservation) (QueryBackingPlan, error)
+	CompleteQueryCapacityObservation(context.Context, QueryCapacityObservation) error
 	AllocateQueryCapacity(context.Context, QueryBackingPlan, WorkloadCapacityKey, string) (string, error)
 	SuspendQueryCapacity(context.Context, time.Time) error
 }
+
+// Acknowledged pre-I/O source work, not a positive accepted source. Unknown
+// reservations remain spent. Only the exact original interval may be finalized.
+type QueryCapacityObservation struct {
+	ID, AcceptanceID       string
+	Ordinal                int64
+	ObservedAt, ValidUntil time.Time
+}
+
+func (o QueryCapacityObservation) Valid(source QueryCapacitySource, plan QueryBackingPlan, now time.Time) bool {
+	return authorization.UUID(o.ID) && o.AcceptanceID == plan.AcceptanceID && o.Ordinal > 0 && o.Ordinal <= plan.Qualification.SourceTransitionLimit &&
+		identity.Fresh(o.ObservedAt, o.ValidUntil, now, 5*time.Second) && !o.ObservedAt.Before(source.ObservedAt) && !o.ValidUntil.After(source.FreshUntil)
+}
+
 type QueryRecoveryReader interface {
 	RecoveryState(context.Context) (artifact.RecoveryProof, error)
 }
@@ -54,7 +72,8 @@ type QueryRecoveryReader interface {
 // It must reject known changes/negative watermarks, suspension, recovery, and
 // unqualified limits. It holds the original <=5s context through one callback
 // and final checks. A configuration struct, report digest or worker proof alone
-// cannot implement this contract for another deployment.
+// cannot implement this contract for another deployment. Return only after all
+// owned native I/O and callback work have joined, including failure paths.
 type QueryDeploymentGuard interface {
 	WithCurrentQueryDeployment(context.Context, ContextQueryQualification, QueryDeploymentPin, func(context.Context) error) error
 }
@@ -72,8 +91,9 @@ func (g QueryDeploymentGuards) with(ctx context.Context, q ContextQueryQualifica
 		if i == len(guards) {
 			return fn(parent)
 		}
-		// Serialize callback ownership. A guard that omits, repeats, invokes
-		// asynchronously after return or swaps contexts cannot create a success.
+		// Serialize and join callback ownership. Omitted/repeated callbacks,
+		// callbacks observed after guard return, and replaced contexts cannot
+		// create a success. Guards separately own joining their native I/O.
 		var mu sync.Mutex
 		called, returned := false, false
 		var originalUntil time.Time
@@ -141,6 +161,10 @@ type ProtectedContextQueryCapacity struct {
 }
 
 func (s ProtectedContextQueryCapacity) current(ctx context.Context, requireBacking bool, fn func(context.Context, QueryCapacitySource) error) error {
+	return s.currentWithStart(ctx, requireBacking, nil, fn)
+}
+
+func (s ProtectedContextQueryCapacity) currentWithStart(ctx context.Context, requireBacking bool, begin func(context.Context, QueryCapacitySource) (QueryCapacitySource, error), fn func(context.Context, QueryCapacitySource) error) error {
 	if ctx == nil || ctx.Err() != nil || s.Store == nil || s.Recovery == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(s.InstallationID) {
 		return value.ErrUnavailable
 	}
@@ -170,12 +194,26 @@ func (s ProtectedContextQueryCapacity) current(ctx context.Context, requireBacki
 	}
 	original, c2 := context.WithDeadline(original, source.FreshUntil)
 	defer c2()
+	if d, ok := original.Deadline(); ok {
+		source.FreshUntil = identity.Earlier(source.FreshUntil, d)
+	}
 	// Snapshot before any external guard. The accepted source and profile are
 	// immutable during this operation even if a port retains its input slices.
 	encoded, e := json.Marshal(source)
 	source = QueryCapacitySource{}
 	if e != nil || json.Unmarshal(encoded, &source) != nil {
 		return value.ErrUnavailable
+	}
+	if begin != nil {
+		// The irreversible claim must be acknowledged before any native guard.
+		// A failed/unknown begin grants no work; its durable spend is retained.
+		source, e = begin(original, source)
+		if e != nil || !source.Valid(s.Now()) || original.Err() != nil {
+			return value.ErrUnavailable
+		}
+		var stop context.CancelFunc
+		original, stop = context.WithDeadline(original, source.FreshUntil)
+		defer stop()
 	}
 	e = s.Deployments.with(original, *source.Qualification.ContextQuery, func(bound context.Context) error {
 		if d, ok := bound.Deadline(); ok {
@@ -206,7 +244,7 @@ func (s ProtectedContextQueryCapacity) current(ctx context.Context, requireBacki
 }
 
 func sameQuerySource(a, b QueryCapacitySource) bool {
-	if a.Root.AttemptID != b.Root.AttemptID || a.Root.PlanDigest != b.Root.PlanDigest || a.SetupInputDigest != b.SetupInputDigest || a.SourceDigest != b.SourceDigest || a.SourceRevision != b.SourceRevision || a.Recovery.InstallationID != b.Recovery.InstallationID || a.Recovery.IssuerEpoch != b.Recovery.IssuerEpoch || a.Recovery.Revision != b.Recovery.Revision || a.AcceptanceID != "" && a.AcceptanceID != b.AcceptanceID {
+	if a.ObservationCount != b.ObservationCount || a.Root.AttemptID != b.Root.AttemptID || a.Root.PlanDigest != b.Root.PlanDigest || a.SetupInputDigest != b.SetupInputDigest || a.SourceDigest != b.SourceDigest || a.SourceRevision != b.SourceRevision || a.Recovery.InstallationID != b.Recovery.InstallationID || a.Recovery.IssuerEpoch != b.Recovery.IssuerEpoch || a.Recovery.Revision != b.Recovery.Revision || a.AcceptanceID != "" && a.AcceptanceID != b.AcceptanceID {
 		return false
 	}
 	x, _ := json.Marshal(a.Qualification)
@@ -217,7 +255,7 @@ func sameQuerySource(a, b QueryCapacitySource) bool {
 // Reconcile accepts the one original reservation and, optionally, an exact
 // already protected workload slot. It never discovers/replaces a workload or
 // authorizes collection. Unknown writes retain their original identity/charge;
-// the next read resolves the immutable acceptance instead of minting an epoch.
+// an unresolved claim stays held instead of minting a replacement epoch.
 type ProtectedContextQueryProducer struct {
 	Current ProtectedContextQueryCapacity
 	Writer  QueryCapacityWriter
@@ -228,20 +266,38 @@ func (p ProtectedContextQueryProducer) Reconcile(ctx context.Context, key *Workl
 	if s.NewID == nil || p.Writer == nil {
 		return value.ErrUnavailable
 	}
-	return s.current(ctx, false, func(bound context.Context, source QueryCapacitySource) error {
+	var plan QueryBackingPlan
+	var attempt QueryCapacityObservation
+	var finalUntil time.Time
+	owned := false
+	err := s.currentWithStart(ctx, false, func(bound context.Context, source QueryCapacitySource) (QueryCapacitySource, error) {
+		if source.ObservationCount >= source.Qualification.ContextQuery.SourceTransitionLimit {
+			return QueryCapacitySource{}, value.ErrUnavailable
+		}
 		acceptance := source.AcceptanceID
 		if acceptance == "" {
 			acceptance = s.NewID()
 		}
 		base, e := CompileQualifiedRootBacking(source.Qualification, source.System)
 		if e != nil {
-			return e
+			return QueryCapacitySource{}, e
 		}
-		plan, e := CompileQueryBacking(source.Qualification, source.Root, base, source.System, source.SetupInputDigest, acceptance)
+		plan, e = CompileQueryBacking(source.Qualification, source.Root, base, source.System, source.SetupInputDigest, acceptance)
 		if e != nil {
-			return e
+			return QueryCapacitySource{}, e
 		}
-		accepted, e := p.Writer.AcceptQueryCapacity(bound, source, plan)
+		attemptID := s.NewID()
+		attempt, e = p.Writer.BeginQueryCapacityObservation(bound, source, plan, attemptID)
+		if e != nil || !attempt.Valid(source, plan, s.Now()) || attempt.ID != attemptID || attempt.Ordinal != source.ObservationCount+1 || bound.Err() != nil {
+			return QueryCapacitySource{}, value.ErrUnavailable
+		}
+		owned = true
+		source.AcceptanceID, source.ObservationCount = acceptance, attempt.Ordinal
+		source.ObservedAt, source.FreshUntil = attempt.ObservedAt, attempt.ValidUntil
+		return source, nil
+	}, func(bound context.Context, source QueryCapacitySource) error {
+		finalUntil = source.FreshUntil
+		accepted, e := p.Writer.AcceptQueryCapacity(bound, source, plan, attempt)
 		if e != nil {
 			return e
 		}
@@ -261,6 +317,29 @@ func (p ProtectedContextQueryProducer) Reconcile(ctx context.Context, key *Workl
 		}
 		return nil
 	})
+	if !owned {
+		return value.ErrUnavailable
+	}
+	// All native guards have now returned and joined their work. A known failed
+	// guard may release only this private claim, never accept or renew authority.
+	// Cleanup retains the original prepaid claim cutoff when caller cancellation
+	// caused the failure. Unknown Begin never yields this completion capability.
+	until := attempt.ValidUntil
+	if err == nil {
+		until = identity.Earlier(until, finalUntil)
+	}
+	if until.IsZero() || !s.Now().Before(until) {
+		return value.ErrUnavailable
+	}
+	end, cancel := context.WithDeadline(context.WithoutCancel(ctx), until)
+	defer cancel()
+	if e := p.Writer.CompleteQueryCapacityObservation(end, attempt); e != nil || end.Err() != nil || !s.Now().Before(until) {
+		return value.ErrUnavailable
+	}
+	if err != nil || ctx.Err() != nil {
+		return value.ErrUnavailable
+	}
+	return nil
 }
 
 func (s ProtectedContextQueryCapacity) ContextQueryPlan(ctx context.Context, a value.ContextProjectionAuthority) (value.ContextQueryPlan, error) {

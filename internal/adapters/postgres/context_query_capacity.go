@@ -101,31 +101,68 @@ func (s *ContextQueryCapacityReads) ReadQueryCapacitySource(ctx context.Context,
 	return out, nil
 }
 
-func (s *ContextQueryCapacityProducer) AcceptQueryCapacity(ctx context.Context, source app.QueryCapacitySource, plan app.QueryBackingPlan) (app.QueryBackingPlan, error) {
+func queryCapacityObservationJSON(source app.QueryCapacitySource) ([]byte, error) {
+	return json.Marshal(struct {
+		SourceRevision         int64
+		SourceDigest           artifact.Digest
+		Recovery               artifact.RecoveryProof
+		ObservedAt, FreshUntil time.Time
+	}{source.SourceRevision, source.SourceDigest, source.Recovery, capacityObservedMicro(source.ObservedAt), source.FreshUntil.UTC().Truncate(time.Microsecond)})
+}
+
+func (s *ContextQueryCapacityProducer) BeginQueryCapacityObservation(ctx context.Context, source app.QueryCapacitySource, plan app.QueryBackingPlan, claimID string) (app.QueryCapacityObservation, error) {
+	var out app.QueryCapacityObservation
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || !source.Valid(time.Now()) || source.Root.RootID != s.root || plan.RootID != s.root || plan.InstallationID != s.installation || !authorization.UUID(claimID) || source.ObservationCount >= plan.Qualification.SourceTransitionLimit {
+		return out, value.ErrUnavailable
+	}
+	ctx, cancel := context.WithDeadline(ctx, source.FreshUntil)
+	defer cancel()
+	b, e := json.Marshal(plan)
+	if e != nil {
+		return out, value.ErrUnavailable
+	}
+	o, e := queryCapacityObservationJSON(source)
+	if e != nil {
+		return out, value.ErrUnavailable
+	}
+	e = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		raw, e := q.BeginContextQueryCapacityObservation(ctx, custodydb.BeginContextQueryCapacityObservationParams{RootID: id(s.root), Proposal: b, Observation: o, ClaimID: id(claimID), PriorCount: source.ObservationCount})
+		if e != nil {
+			return e
+		}
+		return decodeQueryCapacity(raw, &out)
+	})
+	// transaction returns success only after COMMIT acknowledgement. A lost
+	// reply leaves the attempt spent and never exposes a usable result.
+	if e != nil || ctx.Err() != nil || !out.Valid(source, plan, time.Now()) || out.ID != claimID || out.Ordinal != source.ObservationCount+1 {
+		return app.QueryCapacityObservation{}, value.ErrUnavailable
+	}
+	return out, nil
+}
+
+func (s *ContextQueryCapacityProducer) AcceptQueryCapacity(ctx context.Context, source app.QueryCapacitySource, plan app.QueryBackingPlan, claim app.QueryCapacityObservation) (app.QueryBackingPlan, error) {
 	var out app.QueryBackingPlan
-	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || !source.Valid(time.Now()) || source.Root.RootID != s.root || plan.RootID != s.root || plan.InstallationID != s.installation {
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || !source.Valid(time.Now()) || source.Root.RootID != s.root || plan.RootID != s.root || plan.InstallationID != s.installation || claim.AcceptanceID != plan.AcceptanceID || claim.Ordinal != source.ObservationCount || !time.Now().Before(claim.ValidUntil) {
 		return out, value.ErrUnavailable
 	}
 	ctx, cancel := context.WithDeadline(ctx, source.FreshUntil)
 	defer cancel()
 	// Normalize only in the restrictive direction before PostgreSQL parses
 	// timestamps. No future source observation replaces the original context.
-	observation := struct {
-		SourceRevision         int64
-		SourceDigest           artifact.Digest
-		Recovery               artifact.RecoveryProof
-		ObservedAt, FreshUntil time.Time
-	}{source.SourceRevision, source.SourceDigest, source.Recovery, capacityObservedMicro(source.ObservedAt), source.FreshUntil.UTC().Truncate(time.Microsecond)}
 	b, e := json.Marshal(plan)
 	if e != nil {
 		return out, value.ErrUnavailable
 	}
-	o, e := json.Marshal(observation)
+	o, e := queryCapacityObservationJSON(source)
+	if e != nil {
+		return out, value.ErrUnavailable
+	}
+	c, e := json.Marshal(claim)
 	if e != nil {
 		return out, value.ErrUnavailable
 	}
 	e = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		raw, e := q.AcceptContextQueryCapacity(ctx, custodydb.AcceptContextQueryCapacityParams{RootID: id(s.root), Proposal: b, Observation: o})
+		raw, e := q.AcceptContextQueryCapacity(ctx, custodydb.AcceptContextQueryCapacityParams{RootID: id(s.root), Proposal: b, Observation: o, Claim: c})
 		if e != nil {
 			return e
 		}
@@ -153,6 +190,29 @@ func (s *ContextQueryCapacityProducer) AllocateQueryCapacity(ctx context.Context
 		return "", value.ErrUnavailable
 	}
 	return out, nil
+}
+
+func (s *ContextQueryCapacityProducer) CompleteQueryCapacityObservation(ctx context.Context, claim app.QueryCapacityObservation) error {
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(claim.ID) || !authorization.UUID(claim.AcceptanceID) || !time.Now().Before(claim.ValidUntil) {
+		return value.ErrUnavailable
+	}
+	until := claim.ValidUntil
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	ctx, cancel := context.WithDeadline(ctx, until)
+	defer cancel()
+	b, e := json.Marshal(claim)
+	if e != nil {
+		return value.ErrUnavailable
+	}
+	e = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		return q.CompleteContextQueryCapacityObservation(ctx, custodydb.CompleteContextQueryCapacityObservationParams{RootID: id(s.root), Claim: b, UntilAt: ts(until.UTC().Truncate(time.Microsecond))})
+	})
+	if e != nil || ctx.Err() != nil || !time.Now().Before(until) {
+		return value.ErrUnavailable
+	}
+	return nil
 }
 
 func (s *ContextQueryCapacityReads) ReadQueryCapacityPlan(ctx context.Context, source app.QueryCapacitySource, a value.ContextProjectionAuthority, account string) (value.ContextQueryPlan, error) {

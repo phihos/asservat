@@ -332,7 +332,9 @@ func (q ContextQueryQualification) required() (QueryEnvelope, error) {
 	// Source observations, fixed acceptance and principal/workload insertion
 	// are separate transactions. One terminal negative is reserved even when
 	// the positive observation allowance is exhausted.
-	transitions, ok := capacitySum(2, q.PrincipalAccounts, q.WorkloadAccounts, q.SourceTransitionLimit)
+	// Each source attempt prepays Begin, optional acceptance, and joined completion.
+	// Failure/unknown work cannot recover any of this original transaction budget.
+	transitions, ok := capacitySum(2, q.PrincipalAccounts, q.WorkloadAccounts, q.SourceTransitionLimit, q.SourceTransitionLimit, q.SourceTransitionLimit)
 	if !ok {
 		return out, ErrBudgetInvalid
 	}

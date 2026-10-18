@@ -124,7 +124,12 @@ and independently enforced numeric worker, hub, key-service and provider limits.
 A report digest, administrator struct, unique capacity ID or existing download
 qualification alone is insufficient. Bound root queries, aggregate principals,
 workload allocations, polls, control and source-observation work, including
-uncertain workers and history. Retain original hard/effect/cleanup/retirement
+uncertain workers and history. Source work requires an acknowledged irreversible
+claim before native guards, with separate prepaid joined completion after all
+outer checks. Unknown replies/replay authorize no work; expiry alone never frees
+an unresolved claim. Exhaustion denies before guard I/O and retains one terminal
+negative, including a reserved root that never acquired positive backing.
+Retain original hard/effect/cleanup/retirement
 dates; no poll, root renewal or expiry replenishes the finite allocation. An
 installation without the original extension remains unavailable until a separate
 audited upgrade protocol exists. See the

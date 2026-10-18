@@ -12,17 +12,23 @@ import (
 )
 
 const acceptContextQueryCapacity = `-- name: AcceptContextQueryCapacity :one
-SELECT accept_context_query_capacity($1::uuid,$2::jsonb,$3::jsonb)::jsonb
+SELECT accept_context_query_capacity($1::uuid,$2::jsonb,$3::jsonb,$4::jsonb)::jsonb
 `
 
 type AcceptContextQueryCapacityParams struct {
 	RootID      pgtype.UUID
 	Proposal    []byte
 	Observation []byte
+	Claim       []byte
 }
 
 func (q *Queries) AcceptContextQueryCapacity(ctx context.Context, arg AcceptContextQueryCapacityParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, acceptContextQueryCapacity, arg.RootID, arg.Proposal, arg.Observation)
+	row := q.db.QueryRow(ctx, acceptContextQueryCapacity,
+		arg.RootID,
+		arg.Proposal,
+		arg.Observation,
+		arg.Claim,
+	)
 	var column_1 []byte
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -53,6 +59,46 @@ func (q *Queries) AllocateContextQueryCapacity(ctx context.Context, arg Allocate
 	var column_1 pgtype.UUID
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const beginContextQueryCapacityObservation = `-- name: BeginContextQueryCapacityObservation :one
+SELECT begin_context_query_capacity_observation($1::uuid,$2::jsonb,$3::jsonb,$4::uuid,$5::bigint)::jsonb
+`
+
+type BeginContextQueryCapacityObservationParams struct {
+	RootID      pgtype.UUID
+	Proposal    []byte
+	Observation []byte
+	ClaimID     pgtype.UUID
+	PriorCount  int64
+}
+
+func (q *Queries) BeginContextQueryCapacityObservation(ctx context.Context, arg BeginContextQueryCapacityObservationParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, beginContextQueryCapacityObservation,
+		arg.RootID,
+		arg.Proposal,
+		arg.Observation,
+		arg.ClaimID,
+		arg.PriorCount,
+	)
+	var column_1 []byte
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const completeContextQueryCapacityObservation = `-- name: CompleteContextQueryCapacityObservation :exec
+SELECT complete_context_query_capacity_observation($1::uuid,$2::jsonb,$3::timestamptz)
+`
+
+type CompleteContextQueryCapacityObservationParams struct {
+	RootID  pgtype.UUID
+	Claim   []byte
+	UntilAt pgtype.Timestamptz
+}
+
+func (q *Queries) CompleteContextQueryCapacityObservation(ctx context.Context, arg CompleteContextQueryCapacityObservationParams) error {
+	_, err := q.db.Exec(ctx, completeContextQueryCapacityObservation, arg.RootID, arg.Claim, arg.UntilAt)
+	return err
 }
 
 const contextQueryCapacityAllocationCurrent = `-- name: ContextQueryCapacityAllocationCurrent :one
