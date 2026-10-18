@@ -1,5 +1,27 @@
 # Sustained implementation progress
 
+## Query composition qualification in progress (ADR-206)
+
+The coordinator, SQL ledger, verified regional reader and audited browser/MCP
+reply boundary are assembled in PR #44. At frozen
+`d37e2fa2fe7f1ae52bd64f618403992b667087e1`, combined race tests passed for eleven
+domain/application/provider/transport packages; affected vet including integration,
+Go architecture (58 packages, 337 edges), pinned SQL generation (53 files),
+specification (11,346 assertions) and architecture gates passed.
+
+The first owned native SQL/S3 run
+[39129322393](https://github.com/phihos/asservat/actions/runs/39129322393) failed
+while applying migration 00068 with PostgreSQL syntax error `42601`, before any
+Go test ran. All 2,637 recorded source hashes independently match that frozen
+commit's archive; the harness reports unchanged sources, terminal exit 1 and no
+cleanup failures. The retained report is
+[`test/results/context-query-ci-1/custody-environment.json`](../test/results/context-query-ci-1/custody-environment.json),
+SHA-256 `f62f17dbbcd4c9dc2ff6953732f2a5934c7906a6660980fab737fd6c0ea9ffcc`.
+This is a migration failure, not native query qualification. Correcting the SQL
+syntax and rerunning the selected query/catalog/case checks is required.
+Protected capacity, query worker/key producers and installed composition remain
+in progress; neither public query operation is enabled.
+
 ## Approved context query SQL component (ADR-206)
 
 Migration 00068 and `postgres.ContextQueries` add independent bounded query,
