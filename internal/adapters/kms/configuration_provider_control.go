@@ -19,7 +19,7 @@ func newConfigurationProviderControl(in contracts.HubWorkerDeployment, profile c
 		providerconfig.ValidateConfigurationProviderAuthentication(in, profile, now()) != nil {
 		return nil, ErrKeyService
 	}
-	recipe, err := providerconfig.ConfigurationProviderRecipeFor(in, contracts.ConfigurationProviderSelection{AuthMount: profile.AuthMount, AuthMountAccessor: profile.AuthMountAccessor, AuditCredentials: profile.AuditCredentials}, profile.ServiceAccount, now())
+	recipe, err := providerconfig.ConfigurationProviderRecipeFor(in, contracts.ConfigurationProviderSelection{AuthMount: profile.AuthMount, AuthMountAccessor: profile.AuthMountAccessor, AuditCredentials: profile.AuditCredentials, WorkerConfigurationAudit: profile.WorkerConfigurationAudit}, profile.ServiceAccount, now())
 	if err != nil {
 		return nil, ErrKeyService
 	}

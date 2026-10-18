@@ -2,6 +2,13 @@ package postgres
 
 // Code generated from the qualified fixture role grants (ADR-177); the
 // role producer provisions and verifies exactly these privileges.
+//
+// ADR-204: every purpose here whose adapter runs Downloads.downloadFence
+// (download-session, download-worker, worker-enrollment and -activate,
+// worker-owner, download-key-bind, native-owner, native-key-bind) also
+// reads processing_root, context_processing and processing_rule
+// (readProcessingSnapshot) and the five retention source tables
+// (RetentionTransactionGuard.check). The fixture grants these separately.
 
 var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 	"api-execution-read": {
@@ -229,6 +236,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "context_capture", "", "SELECT"},
 		{"table", "context_case_locator", "", "SELECT"},
 		{"table", "context_catalog", "", "SELECT"},
+		{"table", "context_processing", "", "SELECT"},
 		{"table", "context_verification", "", "SELECT"},
 		{"table", "custody_attempt", "", "SELECT"},
 		{"table", "custody_copy", "", "SELECT"},
@@ -261,6 +269,13 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "goose_db_version", "", "SELECT"},
 		{"table", "permission_stream", "", "SELECT"},
 		{"table", "permission_stream", "id", "UPDATE"},
+		{"table", "processing_root", "", "SELECT"},
+		{"table", "processing_rule", "", "SELECT"},
+		{"table", "retention_catchup", "", "SELECT"},
+		{"table", "retention_catchup_effect", "", "SELECT"},
+		{"table", "retention_checkpoint", "", "SELECT"},
+		{"table", "retention_decision", "", "SELECT"},
+		{"table", "retention_source", "", "SELECT"},
 		{"table", "retention_source", "root_id", "UPDATE"},
 	},
 	"download-audit": {
@@ -289,6 +304,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
 		{"table", "context_catalog", "", "SELECT"},
+		{"table", "context_processing", "", "SELECT"},
 		{"table", "context_verification", "", "SELECT"},
 		{"table", "custody_attempt", "", "SELECT"},
 		{"table", "download_batch", "", "SELECT"},
@@ -324,6 +340,8 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "goose_db_version", "", "SELECT"},
 		{"table", "permission_stream", "", "SELECT"},
 		{"table", "permission_stream", "id", "UPDATE"},
+		{"table", "processing_root", "", "SELECT"},
+		{"table", "processing_rule", "", "SELECT"},
 		{"table", "retention_catchup", "", "SELECT"},
 		{"table", "retention_catchup_effect", "", "SELECT"},
 		{"table", "retention_checkpoint", "", "SELECT"},
@@ -357,6 +375,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
 		{"table", "context_catalog", "", "SELECT"},
+		{"table", "context_processing", "", "SELECT"},
 		{"table", "context_verification", "", "SELECT"},
 		{"table", "custody_attempt", "", "SELECT"},
 		{"table", "download_batch", "", "SELECT"},
@@ -383,6 +402,8 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "goose_db_version", "", "SELECT"},
 		{"table", "permission_stream", "", "SELECT"},
 		{"table", "permission_stream", "id", "UPDATE"},
+		{"table", "processing_root", "", "SELECT"},
+		{"table", "processing_rule", "", "SELECT"},
 		{"table", "retention_catchup", "", "SELECT"},
 		{"table", "retention_catchup_effect", "", "SELECT"},
 		{"table", "retention_checkpoint", "", "SELECT"},
@@ -407,6 +428,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
 		{"table", "context_catalog", "", "SELECT"},
+		{"table", "context_processing", "", "SELECT"},
 		{"table", "context_verification", "", "SELECT"},
 		{"table", "custody_attempt", "", "SELECT"},
 		{"table", "download_batch", "", "SELECT"},
@@ -425,6 +447,8 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "goose_db_version", "", "SELECT"},
 		{"table", "permission_stream", "", "SELECT"},
 		{"table", "permission_stream", "id", "UPDATE"},
+		{"table", "processing_root", "", "SELECT"},
+		{"table", "processing_rule", "", "SELECT"},
 		{"table", "retention_catchup", "", "SELECT"},
 		{"table", "retention_catchup_effect", "", "SELECT"},
 		{"table", "retention_checkpoint", "", "SELECT"},
@@ -439,6 +463,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
 		{"table", "context_catalog", "", "SELECT"},
+		{"table", "context_processing", "", "SELECT"},
 		{"table", "context_verification", "", "SELECT"},
 		{"table", "custody_attempt", "", "SELECT"},
 		{"table", "download_batch", "", "SELECT"},
@@ -463,6 +488,8 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "goose_db_version", "", "SELECT"},
 		{"table", "permission_stream", "", "SELECT"},
 		{"table", "permission_stream", "id", "UPDATE"},
+		{"table", "processing_root", "", "SELECT"},
+		{"table", "processing_rule", "", "SELECT"},
 		{"table", "retention_catchup", "", "SELECT"},
 		{"table", "retention_catchup_effect", "", "SELECT"},
 		{"table", "retention_checkpoint", "", "SELECT"},
@@ -530,6 +557,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
 		{"table", "context_catalog", "", "SELECT"},
+		{"table", "context_processing", "", "SELECT"},
 		{"table", "context_verification", "", "SELECT"},
 		{"table", "custody_attempt", "", "SELECT"},
 		{"table", "download_batch", "", "SELECT"},
@@ -551,6 +579,8 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "goose_db_version", "", "SELECT"},
 		{"table", "permission_stream", "", "SELECT"},
 		{"table", "permission_stream", "id", "UPDATE"},
+		{"table", "processing_root", "", "SELECT"},
+		{"table", "processing_rule", "", "SELECT"},
 		{"table", "retention_catchup", "", "SELECT"},
 		{"table", "retention_catchup_effect", "", "SELECT"},
 		{"table", "retention_checkpoint", "", "SELECT"},

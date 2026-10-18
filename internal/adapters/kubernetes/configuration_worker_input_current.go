@@ -16,6 +16,7 @@ func (s *InstalledWorkerProjectionReader) currentProviderInput(ctx context.Conte
 	p, profile := state.WorkerInputs, s.input.ProviderAuthentication
 	if profile == nil || state.WorkerProvider == nil || p == nil || p.Receipt == nil ||
 		profile.AuthMount != state.WorkerProvider.AuthMount || profile.AuthMountAccessor != state.WorkerProvider.AuthMountAccessor || profile.AuditCredentials != state.WorkerProvider.AuditCredentials ||
+		!equalJSON(profile.WorkerConfigurationAudit, state.WorkerProvider.WorkerConfigurationAudit) ||
 		!equalJSON(s.input.ProviderInputs, configurationWorkerInputProvenance(p)) || !configurationWorkerInputsStateValid(s.input.InstallationID, state, s.client.now()) {
 		return cfg.ErrChanged
 	}

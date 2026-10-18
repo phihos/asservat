@@ -2,7 +2,10 @@ package postgres
 
 import (
 	"slices"
+	"strings"
 	"testing"
+
+	"asservat.local/asservat/internal/contracts"
 )
 
 // ADR-204 decisions 7 and 8: closed allow-lists, including lock columns,
@@ -82,6 +85,53 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 		got, _ := publicRuntimeRoleGrants(purpose)
 		if slices.ContainsFunc(got, func(g publicRuntimeGrant) bool { return g.column == "used_roles" && g.privilege == "UPDATE" }) {
 			t.Fatal("binding or verifier role can spend download key slots", purpose)
+		}
+	}
+}
+
+// ADR-204: Downloads.downloadFence reads the current processing snapshot
+// (readProcessingSnapshot) and checks the accepted retention sources
+// (RetentionTransactionGuard.check). Every purpose whose adapter runs that
+// fence needs exactly these reads; the audit, identity, stop and plan
+// purposes run no fence and must not gain them.
+func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
+	var fence []publicRuntimeGrant
+	for _, table := range []string{"processing_root", "context_processing", "processing_rule", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision"} {
+		fence = append(fence, publicRuntimeGrant{"table", table, "", "SELECT"})
+	}
+	// Downloads (download-session, download-source), DownloadWorkers.withSession
+	// (download-worker, and through it worker-enrollment/-activate, worker-owner,
+	// native-owner, native-key-bind), Downloads.withKeyBatch (download-key-bind)
+	// and the browser refresh effects (refresh-admit, refresh-owner).
+	for _, purpose := range []string{"download-session", "download-source", "download-worker", "worker-enrollment", "worker-enrollment-activate", "worker-owner", "native-owner", "download-key-bind", "native-key-bind", "refresh-admit", "refresh-owner"} {
+		got, ok := publicRuntimeRoleGrants(purpose)
+		if !ok {
+			t.Fatal("missing purpose", purpose)
+		}
+		for _, g := range fence {
+			if !slices.Contains(got, g) {
+				t.Errorf("%s runs the download fence without %s", purpose, g.key())
+			}
+		}
+	}
+	// download-worker-identity serves only readWorkerIdentity (no fence).
+	for _, purpose := range []string{"download-audit", "download-worker-audit", "download-worker-identity", "worker-enrollment-audit", "download-stop", "download-stop-writer", "download-stop-ack", "download-plan", "worker-config-read"} {
+		got, _ := publicRuntimeRoleGrants(purpose)
+		for _, g := range fence {
+			if slices.Contains(got, g) {
+				t.Errorf("%s runs no download fence but reads %s", purpose, g.key())
+			}
+		}
+	}
+	// The additions are reads only: no hub extension purpose writes a
+	// processing table or a retention table beyond the root_id lock column.
+	for _, purpose := range contracts.PublicRuntimeHubExtensionPurposes() {
+		got, _ := publicRuntimeRoleGrants(purpose)
+		for _, g := range got {
+			lock := g.object == "retention_source" && g.column == "root_id" && g.privilege == "UPDATE"
+			if g.privilege != "SELECT" && !lock && (strings.Contains(g.object, "processing") || strings.HasPrefix(g.object, "retention_")) {
+				t.Errorf("%s gained %s", purpose, g.key())
+			}
 		}
 	}
 }
