@@ -115,6 +115,17 @@ There is no conversion from `DownloadAuthority`, `DownloadEnvironment` or
 binds case, source format/class and native projection digest, rather than
 weakening or overloading the existing download record.
 
+The SQL source adapter uses the separate SELECT-only `ContextProjectionEvidence`
+facet. It checks the current published capture and verification audit receipts,
+exact custody copies digest, fixed metadata profile and every retained policy
+origin. It returns a bounded source observation, never native bytes or a read
+permit. The private case adapter selects the exact requested artifact from the
+recovery-bound case locator and preserves the original whole-pod target and line
+selection; missing or duplicate matches fail rather than choosing another source.
+Native regressions cover unpublished and malformed-audit denial plus exact source
+and route bindings. Their implementation is present; the combined SQL-native
+qualification result must be recorded separately before claiming they passed.
+
 ## Query and request lifetime
 
 At admission fix an original query start and deadline: start plus the protected
