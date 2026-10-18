@@ -201,6 +201,8 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "retention_source", "root_id", "UPDATE"},
 	},
 	"download-session": {
+		// ADR-200: re-arm the demand behind a download allocation; no authority.
+		{"function", "demand_capacity_refresh_for_download(uuid,uuid)", "", "EXECUTE"},
 		{"table", "artifact_download", "", "SELECT"},
 		{"table", "artifact_download", "active_batch", "UPDATE"},
 		{"table", "artifact_download", "actor_key", "INSERT"},

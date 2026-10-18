@@ -89,6 +89,20 @@ func (q *Queries) ChargeDownloadAllocation(ctx context.Context, arg ChargeDownlo
 	return result.RowsAffected(), nil
 }
 
+const demandDownloadCapacityRefresh = `-- name: DemandDownloadCapacityRefresh :exec
+SELECT demand_capacity_refresh_for_download($1::uuid,$2::uuid)
+`
+
+type DemandDownloadCapacityRefreshParams struct {
+	RootID       pgtype.UUID
+	AllocationID pgtype.UUID
+}
+
+func (q *Queries) DemandDownloadCapacityRefresh(ctx context.Context, arg DemandDownloadCapacityRefreshParams) error {
+	_, err := q.db.Exec(ctx, demandDownloadCapacityRefresh, arg.RootID, arg.AllocationID)
+	return err
+}
+
 const downloadStreams = `-- name: DownloadStreams :one
 SELECT count(*)::bigint AS total,count(*) FILTER(WHERE s.principal_key=$2)::bigint AS principal
 FROM artifact_download s
