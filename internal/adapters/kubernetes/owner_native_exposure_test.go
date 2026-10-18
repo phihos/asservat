@@ -72,3 +72,54 @@ func TestOwnerNativeServiceCreateAndExactReopen(t *testing.T) {
 		t.Fatal("internal-only service type accepted", err)
 	}
 }
+
+// ADR-202: the public API's own L4 Service on the public port; an exact rerun
+// is accepted and a changed node port or selector is refused.
+func TestOwnerPublicServiceCreateAndExactReopen(t *testing.T) {
+	var stored *core.Service
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/deployments/owner"):
+			_ = json.NewEncoder(w).Encode(apps.Deployment{TypeMeta: meta.TypeMeta{Kind: "Deployment", APIVersion: "apps/v1"}, Spec: apps.DeploymentSpec{Selector: &meta.LabelSelector{MatchLabels: map[string]string{"app": "owner"}}}})
+		case strings.Contains(r.URL.Path, "/services"):
+			if r.Method == http.MethodPost {
+				if stored != nil {
+					w.WriteHeader(409)
+					_ = json.NewEncoder(w).Encode(meta.Status{TypeMeta: meta.TypeMeta{Kind: "Status", APIVersion: "v1"}, Status: meta.StatusFailure, Reason: meta.StatusReasonAlreadyExists, Code: 409})
+					return
+				}
+				stored = &core.Service{}
+				_ = json.NewDecoder(r.Body).Decode(stored)
+				stored.TypeMeta = meta.TypeMeta{Kind: "Service", APIVersion: "v1"}
+			}
+			_ = json.NewEncoder(w).Encode(stored)
+		default:
+			w.WriteHeader(404)
+		}
+	}))
+	defer server.Close()
+	config := &rest.Config{Host: server.URL, BearerToken: "synthetic-only", TLSClientConfig: rest.TLSClientConfig{CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})}}
+	if err := EnsureOwnerPublicService(context.Background(), config, "hub", ownerID(1), "owner", "NodePort", 31450); err != nil {
+		t.Fatal(err)
+	}
+	p := stored.Spec.Ports[0]
+	if stored.Name != OwnerPublicServiceName(ownerID(1)) || stored.Spec.Selector["app"] != "owner" || len(stored.Spec.Ports) != 1 || p.Name != "public" || p.Port != contracts.OwnerInstalledPublicPort || p.TargetPort.IntVal != contracts.OwnerInstalledPublicPort || p.NodePort != 31450 {
+		t.Fatal("owner public service", stored.Spec)
+	}
+	if err := EnsureOwnerPublicService(context.Background(), config, "hub", ownerID(1), "owner", "NodePort", 31450); err != nil {
+		t.Fatal("exact rerun refused", err)
+	}
+	if err := EnsureOwnerPublicService(context.Background(), config, "hub", ownerID(1), "owner", "LoadBalancer", 31450); !errors.Is(err, cfg.ErrInvalid) {
+		t.Fatal("node port with a load balancer accepted", err)
+	}
+	stored.Spec.Ports[0].NodePort = 31451
+	if err := EnsureOwnerPublicService(context.Background(), config, "hub", ownerID(1), "owner", "NodePort", 31450); !errors.Is(err, cfg.ErrChanged) {
+		t.Fatal("changed node port accepted", err)
+	}
+	stored.Spec.Ports[0].NodePort = 31450
+	stored.Spec.Selector = map[string]string{"app": "other"}
+	if err := EnsureOwnerPublicService(context.Background(), config, "hub", ownerID(1), "owner", "NodePort", 31450); !errors.Is(err, cfg.ErrChanged) {
+		t.Fatal("changed selector accepted", err)
+	}
+}

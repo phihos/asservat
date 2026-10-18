@@ -1,5 +1,9 @@
 # Decision records
 
+[ADR-202 — Public API exposure](202-public-api-exposure.md)
+lets the operator expose the promoted hub-api's public port on its own NodePort or LoadBalancer Service,
+TLS passthrough only, so installed browsers and MCP clients can reach it.
+
 [ADR-201 — eBPF CPU profiles for every runtime](201-ebpf-cpu-profiles.md)
 takes CPU profiles for Java, Python, Node.js, .NET, Ruby, PHP and native code from one pinned
 OpenTelemetry eBPF profiler in the node collector, keeps only the selected pod's samples before any

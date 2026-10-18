@@ -85,3 +85,45 @@ func ReadOwnerSourceConfiguration(ctx context.Context, config *rest.Config, name
 	}
 	return out, nil
 }
+
+// OwnerPublicServiceName is the public API's L4 Service (ADR-202).
+func OwnerPublicServiceName(installation string) string {
+	return "asservat-" + strings.ReplaceAll(installation, "-", "") + "-owner-public"
+}
+
+// EnsureOwnerPublicService creates the public API's L4 Service on the owner's
+// public port, selecting the owner Deployment's Pods, or reopens it when its
+// type, selector and port are unchanged. It is a plain TCP path: the hub-api
+// terminates TLS and trusts no forwarded headers, so it must not sit behind a
+// TLS-terminating proxy.
+func EnsureOwnerPublicService(ctx context.Context, config *rest.Config, namespace, installation, deployment, serviceTypeName string, nodePort int32) error {
+	serviceType := core.ServiceType(serviceTypeName)
+	if ctx == nil || config == nil || namespace == "" || deployment == "" || !authorization.UUID(installation) || (serviceType != core.ServiceTypeNodePort && serviceType != core.ServiceTypeLoadBalancer) ||
+		nodePort != 0 && (serviceType != core.ServiceTypeNodePort || nodePort < 30000 || nodePort > 32767) {
+		return cfg.ErrInvalid
+	}
+	api, err := installerAPI(config)
+	if err != nil {
+		return cfg.ErrInvalid
+	}
+	call, end := context.WithTimeout(ctx, 10*time.Second)
+	defer end()
+	d, err := api.AppsV1().Deployments(namespace).Get(call, deployment, meta.GetOptions{})
+	if err != nil || d.Spec.Selector == nil || len(d.Spec.Selector.MatchLabels) == 0 || len(d.Spec.Selector.MatchExpressions) != 0 {
+		return cfg.ErrUnavailable
+	}
+	want := core.ServicePort{Name: "public", Port: contracts.OwnerInstalledPublicPort, TargetPort: intstr.FromInt32(contracts.OwnerInstalledPublicPort), NodePort: nodePort, Protocol: core.ProtocolTCP}
+	services := api.CoreV1().Services(namespace)
+	s, err := services.Create(call, &core.Service{ObjectMeta: meta.ObjectMeta{Name: OwnerPublicServiceName(installation)}, Spec: core.ServiceSpec{Type: serviceType, Selector: d.Spec.Selector.MatchLabels, Ports: []core.ServicePort{want}}}, meta.CreateOptions{})
+	if apierrors.IsAlreadyExists(err) {
+		s, err = services.Get(call, OwnerPublicServiceName(installation), meta.GetOptions{})
+	}
+	if err != nil || len(s.Spec.Ports) != 1 {
+		return cfg.ErrUnavailable
+	}
+	p := s.Spec.Ports[0]
+	if s.Spec.Type != serviceType || !equalJSON(s.Spec.Selector, d.Spec.Selector.MatchLabels) || p.Name != want.Name || p.Port != want.Port || p.TargetPort != want.TargetPort || p.Protocol != core.ProtocolTCP || nodePort != 0 && p.NodePort != nodePort {
+		return cfg.ErrChanged
+	}
+	return nil
+}

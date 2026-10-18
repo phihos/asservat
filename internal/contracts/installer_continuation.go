@@ -101,6 +101,16 @@ type InstallerOwnerPromotion struct {
 	// Version is reported by the hub-api; a chart-driven install sets the
 	// chart version.
 	Version string `json:"version"`
+	// Exposure, when set, publishes the public API on its own L4 Service
+	// (ADR-202). TLS ends in the hub-api, so no proxy may terminate it.
+	Exposure *InstallerPublicExposure `json:"exposure,omitempty"`
+}
+
+// InstallerPublicExposure selects the public API Service: NodePort, with an
+// optional fixed node port, or LoadBalancer.
+type InstallerPublicExposure struct {
+	ServiceType string `json:"serviceType"`
+	NodePort    int32  `json:"nodePort,omitempty"`
 }
 
 // InstallerFederationSettings are the operator's federation choices.

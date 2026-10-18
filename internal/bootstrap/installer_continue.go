@@ -113,6 +113,10 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 	if p := k.input.Public; p != nil && p.Promotion != nil && (p.Capacity == nil || p.Federation == nil || len(p.ProcessingOperators) == 0) {
 		return nil, mounts.ErrUnavailable
 	}
+	// ADR-202: promotion implies federation (checked above).
+	if p := k.input.Public; p != nil && p.Promotion != nil && p.Promotion.Exposure != nil && !validPublicExposure(*p.Promotion.Exposure, *p.Federation) {
+		return nil, mounts.ErrUnavailable
+	}
 	// ADR-198 decision 6: the key service's key clients are the promoted
 	// owner's worker PKI.
 	if p := k.input.Public; p != nil && p.Federation != nil && p.Federation.KeyServiceEndpoint != "" && p.Promotion == nil {
@@ -867,6 +871,14 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		// and SQL causes stay out of the message.
 		return &fixedStepError{result.Phase + "/" + string(result.Stop), errors.Join(mounts.ErrUnavailable, e)}
 	}
+	if p := k.input.Public; p != nil && p.Promotion != nil && p.Promotion.Exposure != nil {
+		// ADR-202: the public API's own L4 Service; TLS ends in the hub-api.
+		k.at("public/exposure")
+		e := p.Promotion.Exposure
+		if err = kube.EnsureOwnerPublicService(ctx, k.in.kubernetes("administrator-token"), inventory.Namespace.Name, k.record.Scope.InstallationID, inventory.OwnerDeployment.Name, e.ServiceType, e.NodePort); err != nil {
+			return err
+		}
+	}
 	if err = k.CapacityProjection(ctx, resources, bridge, inventory, input); err != nil {
 		return err
 	}
@@ -1505,4 +1517,19 @@ func (k *InstallerContinuation) FederationWorkload(ctx context.Context, inventor
 		ConnectorServerSuffix: contracts.ConnectorServerSuffix(installation), ConnectorIssuerRoots: connectorRoots,
 		Roles:            contracts.ConnectorIdentityRoles{Source: names[0], Journal: names[1], Acknowledgement: names[2], Cleanup: names[3], Verifier: names[4], Finalizer: names[5]},
 		ConnectorBacking: f.Connector.Backing, Image: k.plan.Plan.Workload.Image})
+}
+
+// validPublicExposure accepts NodePort, with an optional fixed port in the
+// node-port range that no federation Service pins, or LoadBalancer (ADR-202).
+// A duplicate port would otherwise fail only after the owner is installed.
+func validPublicExposure(e contracts.InstallerPublicExposure, f contracts.InstallerFederationSettings) bool {
+	switch {
+	case e.ServiceType == "LoadBalancer":
+		return e.NodePort == 0
+	case e.ServiceType != "NodePort":
+		return false
+	case e.NodePort == 0:
+		return true
+	}
+	return e.NodePort >= 30000 && e.NodePort <= 32767 && !slices.Contains([]int32{f.NodePort, f.KeyServiceNodePort, f.OwnerNodePort, f.OwnerOperationNodePort}, e.NodePort)
 }
