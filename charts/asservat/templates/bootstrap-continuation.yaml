@@ -51,6 +51,14 @@ rules:
   - apiGroups: [apps]
     resources: [deployments, statefulsets]
     verbs: [get, list]
+  # ADR-204: the download workers' PriorityClass, and the hub-api's Job
+  # dispatch and retirement Role in the workers' namespace.
+  - apiGroups: [scheduling.k8s.io]
+    resources: [priorityclasses]
+    verbs: [get, create]
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, create, delete]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
