@@ -92,6 +92,7 @@ async function operationBundle(names, bundle) {
 }
 await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture', 'resolve_capture_request', 'get_capture'], 'capture');
 await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
+await operationBundle(['get_file_excerpt', 'get_query_result'], 'projection');
 
 // AJV's standalone ESM source references a small fixed set of CommonJS helpers.
 // Explicit ESM imports let Vite bundle them; no browser require/eval is allowed.
@@ -115,6 +116,7 @@ function browserModules(source) {
 outputs['validate-auth.js'] = browserModules(outputs['validate-auth.js']);
 outputs['validate-capture.js'] = browserModules(outputs['validate-capture.js']);
 outputs['validate-evidence.js'] = browserModules(outputs['validate-evidence.js']);
+outputs['validate-projection.js'] = browserModules(outputs['validate-projection.js']);
 const output = resolve(root, 'web/src/generated');
 await mkdir(output, { recursive: true });
 for (const [name, body] of Object.entries(outputs)) {

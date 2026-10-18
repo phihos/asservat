@@ -26,3 +26,11 @@ dependency lifecycle scripts. Source maps are not included in the build.
 
 See [the runtime contract](../docs/architecture/console-runtime.md) for request,
 cache, cancellation, CSP and qualification boundaries.
+
+The ADR-206 `projection` component implements the fixed saved pod-status view.
+It records request-start monotonic time, keeps the earliest original cutoff
+through pending polls, clears on scope loss/closure and renders strings as text.
+Its generated client uses the canonical browser/MCP schemas with CSRF and finite
+responses. The existing evidence page does not register this component yet:
+protected query capacity, worker/key composition and installed qualification must
+precede availability. Component tests do not establish that native qualification.

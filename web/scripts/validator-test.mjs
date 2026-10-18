@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { validCSRF, validSession } from '../src/generated/validate-auth.js';
 import * as capture from '../src/generated/validate-capture.js';
+import * as projection from '../src/generated/validate-projection.js';
 
 assert.equal(validCSRF({ csrf_token: 'C'.repeat(43) }), true);
 assert.equal(validCSRF({ csrf_token: '😀'.repeat(257) }), false);
@@ -96,3 +97,16 @@ for (const name of ['prepare_artifact_download', 'get_artifact_download', 'cance
   }
 }
 console.log('Native ESM download terminal-only status and complete native metadata guards passed for all three operations.');
+for (const [file, validator] of [
+  ['mcp-context-excerpt-pending', 'validOutput_get_file_excerpt'],
+  ['mcp-context-excerpt-result', 'validOutput_get_file_excerpt'],
+  ['mcp-context-query-pending', 'validOutput_get_query_result'],
+  ['mcp-context-query-result', 'validOutput_get_query_result'],
+]) {
+  const example = JSON.parse(await readFile(new URL('../../examples/' + file + '.json', import.meta.url), 'utf8'));
+  assert.equal(projection[validator](example), true, file);
+  example.data.query_expires_at = 'not-a-date';
+  assert.equal(projection[validator](example), false, file + ' invalid query expiry');
+}
+assert.equal(projection.validInput_get_query_result({ query_handle: 'original', idempotency_key: 'extra' }), false);
+console.log('Native ESM approved projection and pending query validators passed canonical examples and invalid timing checks.');

@@ -1,5 +1,37 @@
 # Sustained implementation progress
 
+## Approved pod-status console component (ADR-206)
+
+The optional `web/src/projection` view now uses the canonical browser/MCP
+contracts for fixed fourteen-line saved pod status. It performs no work before
+an explicit inspection, and pending-result checks require a separate click.
+Unknown replies never trigger a retry or invent a query handle. Request-start
+monotonic timing conservatively preserves the earliest original cutoff through
+network delay and subsequent checks; scope loss, closure and expiry clear the
+managed result. The HTTP client enforces same-origin CSRF, a five-second request
+bound and the 64 KiB complete-response limit; React renders evidence as text.
+
+`make console-check console-browser-check` passed initially; after local review,
+`npm run check` and `make console-browser-check` passed all 157 tests across eleven
+files, canonical generation/native-ESM validation, production build, nineteen
+existing browser journeys with fifteen accessibility scans, and four native
+download restart boundaries with two accessibility scans. The scoped cleanup
+regression failed before fixing an old effect cleanup that could erase a newly
+attached scope. Local review also caught a replacement render showing the old
+excerpt before passive effects. A failing-first layout observation reproduces
+that commit; rendering and actions now require an exact active attachment to
+the current session, scope, case and artifact. Build output retains the existing
+large-bundle warning.
+The [component report](../test/results/adr206-console-component/report.json)
+records the exercised source hashes; the [gate log](../test/results/adr206-console-component/console.log)
+retains the actual test output.
+
+The new view is deliberately unregistered pending protected query runtime
+composition and installed qualification. Its component fixtures are synthetic;
+the actual Go HTTPS/built-console browser gate covers the existing registered
+flows, not installed query disclosure. This does not complete S-02.
+
+
 ## Query ledger and catalog native qualification (ADR-206)
 
 [Native run 39136964591](https://github.com/phihos/asservat/actions/runs/39136964591)
