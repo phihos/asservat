@@ -1,0 +1,14 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/native-api-runner
+    context_continuation_native_test.go:137: native continuation stage=lookup elapsed=5.972172ms found=false accepted=false error=<nil>
+    context_continuation_native_test.go:143: native continuation stage=reviewed-admission elapsed=217.798895ms accepted=true error=<nil>
+    context_continuation_native_test.go:155: native continuation stage=intent-publication elapsed=320.595178ms acknowledged=true error=<nil>
+    api_execution_native_test.go:535: native continuation initial request elapsed=594.469863ms accepted=true start-calls=1 error=context admission unavailable
+    context_continuation_native_test.go:137: native continuation stage=lookup elapsed=6.255443ms found=true accepted=true error=<nil>
+    context_continuation_native_test.go:137: native continuation stage=lookup elapsed=5.796918ms found=true accepted=true error=<nil>
+    context_continuation_native_test.go:155: native continuation stage=intent-publication elapsed=2.172743ms acknowledged=true error=<nil>
+    api_execution_native_test.go:684: regional-mode=; actual C09 preview/request, passive replay and explicit fresh-current same-key continuation; current52 acknowledged encrypted intent pair; actual Pod-bound API identity/protection; Nodes/exec/Secrets/token mint denied; one local CAS and one SQL execution; 362 native bytes verified/published/read after actual target/executor deletion; human/bootstrap/retention providers remain fixture authority
+--- PASS: TestContextAdmissionWithRealServices (11.75s)
+    --- PASS: TestContextAdmissionWithRealServices/native-api-runner (11.67s)
+PASS
+ok  	asservat.local/asservat/test/integration	12.824s
