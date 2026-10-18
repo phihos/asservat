@@ -18,12 +18,22 @@ func installedProcessingSource(installationID string) string {
 // account proves each source's own denial with a dry-run UPDATE. The publisher
 // reads the catalog with the same proof (ADR-203 decision 6), so its account
 // gets the one catalog pair; without it the namespace guard, not the catalog's
-// own guard, would deny its probe.
+// own guard, would deny its probe. The key service reads the catalog the same
+// way when it authorizes acquisition unwraps (ADR-204 decision 8).
 func ownerPublicSourceProbes(installationID, ownerAccount string) []cfg.OwnerConfigurationProbe {
 	names := contracts.OwnerPublicGuardedSources(installationID)
-	out := make([]cfg.OwnerConfigurationProbe, 0, len(names)+1)
+	out := make([]cfg.OwnerConfigurationProbe, 0, len(names)+2)
 	for _, name := range names {
 		out = append(out, cfg.OwnerConfigurationProbe{ConfigMap: name, ServiceAccount: ownerAccount})
 	}
-	return append(out, cfg.OwnerConfigurationProbe{ConfigMap: contracts.OwnerClusterCatalogName(installationID), ServiceAccount: contracts.PublisherName(installationID)})
+	catalog := contracts.OwnerClusterCatalogName(installationID)
+	return append(out, cfg.OwnerConfigurationProbe{ConfigMap: catalog, ServiceAccount: contracts.PublisherName(installationID)},
+		cfg.OwnerConfigurationProbe{ConfigMap: catalog, ServiceAccount: contracts.KeyServiceName(installationID)})
+}
+
+// ownerRuntimeProbeAccounts are the promoted runtime accounts besides the
+// owner's whose catalog pairs ownerPublicSourceProbes adds; each proves the
+// catalog's own denial at read time, so the bridge proves none of them.
+func ownerRuntimeProbeAccounts(installationID string) []string {
+	return []string{contracts.PublisherName(installationID), contracts.KeyServiceName(installationID)}
 }

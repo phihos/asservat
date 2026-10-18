@@ -153,8 +153,13 @@ first profile's workers in the hub region instead.
     only); absent, documents and digests are unchanged.
   - With exactly one pinned worker API in its own namespace, the hub-api
     reads the guarded profile source with that API's client and proves its
-    guard with `native-kube-probe-<cluster>-<namespace UID>.token`. More than
+    guard with `native-kube-probe-<cluster>-<namespace name>.token`. More than
     one worker API is refused; none keeps the hub namespace source.
+    *Amended by the installer step:* both worker API token files are named by
+    cluster UUID and namespace **name**, not UID: the installed owner template
+    is pinned in the resource journal before the worker namespace exists.
+    Each client still checks the pinned namespace UID on every read, and two
+    pins sharing one file name are refused.
 - **Download purposes' reads** (unit-test results only): the download fence
   reads the processing tables and, for `download-session`, the retention
   source tables; the test fixture granted them, the product role plan did
@@ -175,3 +180,49 @@ first profile's workers in the hub region instead.
   processing source when the joined entry has a capacity section, once, and
   adds its ID to every client's `PathIDs`. `PermittedRegions` and the clients
   stay the installer's choice.
+- **Installer steps** (unit-test results only; native runs and
+  qualification are pending). Downloads are enabled exactly when the
+  publisher is (promotion, evidence store and key service):
+  - `resources/producer`: the provider selection, which binds the journal,
+    names the audit key `asservat-<id>-worker-configuration-audit` on the
+    original configuration audit mount; `worker/outbox` repeats it.
+  - The provider-installed owner template (in the journal, so for fresh
+    installations) projects the owner account's two default-audience
+    600-second tokens `native-kube[-probe]-<hub cluster>-asservat-<id>-downloads.token`
+    into its observation root, with or without downloads; they carry only
+    the rights the downloads step binds.
+  - The hub namespace guard admits the key service's catalog pair (ten of
+    twelve pairs); the bridge proves neither runtime pair.
+  - `downloads/workers`, before `permission/guard`: the restricted
+    namespace `asservat-<id>-downloads`, the worker account, the PriorityClass
+    `asservat-<id>-download-worker` (value 0, not default, `Never`), the empty
+    store Secret, the guarded unconfigured profile source and its guard
+    (the installation administrators), and named RBAC there for the hub-api
+    account (Jobs create/get/delete, Pods get/list, the source, control,
+    store Secret and worker account by name, update on the source for its
+    probe; cluster-wide the namespace, guard, PriorityClass and TokenReviews)
+    and the hub-worker account (source get/update, store Secret, namespace,
+    guard). The permission projection names the source, guard and audit key;
+    the public sources skip the hub namespace marker.
+  - The download environment and processing sources permit the evidence
+    store's region (the hub's only region) and list one client per human
+    identity client for context captures under the retention baseline's
+    purpose, with no path; without a baseline, no client.
+  - The phase-3 artifact lists `downloadEvidenceReadStorage`;
+    `installer-provider-apply --download-evidence-credential` is then
+    required (inbox key `download-evidence-read.json`; a session token is
+    refused, as the store Secret is immutable).
+  - In `promote`, after the readback: `downloads/store` (the immutable store
+    Secret), `downloads/control` (immutable `worker.json` v2: the owner
+    Service address with the pool's fixed serving name, owner issuer roots,
+    worker PKI roots, evidence store, key service and artifact scope) and
+    `downloads/profile` (the administrator update to the configured
+    revision-1 profile). The owner input pins the worker API, the worker
+    namespace source and the path template; the worker trust catalog holds
+    the control document; `downloads/accepted` waits for the hub-worker's
+    acknowledged revision before the owner launch. The capacity input pins
+    the same template, and the key service its `Downloads` section.
+  - The chart's continuation role gains get/create on PriorityClasses and
+    get/create/delete on Jobs: RBAC admits a Role only when its creator holds
+    every rule, and the hub-api's dispatch Role needs them. Jobs are the only
+    delete it holds (`helm-check` pins that rule).

@@ -28,6 +28,10 @@ const (
 	// inbox (ADR-203).
 	InstallerInboxPublisherAuditCredential = "publisher-audit-storage.json"
 	InstallerInboxEvidenceReadCredential   = "evidence-read.json"
+	// InstallerInboxDownloadEvidenceCredential is the download workers'
+	// separate read-only evidence principal in the phase-3 inbox (ADR-204
+	// decision 5); it is copied only into the worker namespace's store Secret.
+	InstallerInboxDownloadEvidenceCredential = "download-evidence-read.json"
 )
 
 // InstallerInboxPublicFiles are the operator's public material in a promoted

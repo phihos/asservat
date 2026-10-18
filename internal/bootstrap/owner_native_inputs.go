@@ -23,15 +23,19 @@ import (
 
 type ownerNativeAPIKey struct{ cluster, namespace string }
 
+// nativeKubernetesTokenName is keyed by cluster UUID and namespace name
+// (ADR-204): the installed owner template is pinned before the worker
+// namespace exists, so it can project only names known then. The client
+// still checks the pinned namespace UID on every read.
 func nativeKubernetesTokenName(c contracts.OwnerNativeWorkerAPI) string {
-	return "native-kube-" + c.ClusterID + "-" + c.Namespace.UID + ".token"
+	return contracts.NativeKubernetesTokenFile(c.ClusterID, c.Namespace.Name)
 }
 
 // nativeKubernetesProbeTokenName is the worker namespace's separate probe
 // credential (ADR-204 decision 2): it proves the worker profile source's guard
 // by a denied dry-run update, as kube-probe.token does in the hub namespace.
 func nativeKubernetesProbeTokenName(c contracts.OwnerNativeWorkerAPI) string {
-	return "native-kube-probe-" + c.ClusterID + "-" + c.Namespace.UID + ".token"
+	return contracts.NativeKubernetesProbeTokenFile(c.ClusterID, c.Namespace.Name)
 }
 
 // workerAPIClient is one pinned worker API's client for one fixed token file
@@ -65,12 +69,14 @@ func validateOwnerNativeInputs(c *contracts.OwnerNativeDeployment, hub string, i
 	if _, _, err := mtls.OwnerTrustRoots(c.ConnectorRoots, time.Now()); err != nil {
 		return mounts.ErrUnavailable
 	}
-	seen := map[ownerNativeAPIKey]bool{}
+	seen, files := map[ownerNativeAPIKey]bool{}, map[string]bool{}
 	for _, a := range c.WorkerAPIs {
 		key := ownerNativeAPIKey{a.ClusterID, a.Namespace.UID}
-		if !value.UUID(a.ClusterID) || a.ClusterID != hub || !value.UUID(a.Namespace.UID) || len(validation.IsDNS1123Label(a.Namespace.Name)) != 0 || seen[key] || !ownerEndpoint(a.Kubernetes.Endpoint) {
+		// Token files are keyed by namespace name: two pins may not share one.
+		if !value.UUID(a.ClusterID) || a.ClusterID != hub || !value.UUID(a.Namespace.UID) || len(validation.IsDNS1123Label(a.Namespace.Name)) != 0 || seen[key] || files[nativeKubernetesTokenName(a)] || !ownerEndpoint(a.Kubernetes.Endpoint) {
 			return mounts.ErrUnavailable
 		}
+		files[nativeKubernetesTokenName(a)] = true
 		if _, _, err := mtls.OwnerTrustRoots(a.Kubernetes.Roots, time.Now()); err != nil {
 			return mounts.ErrUnavailable
 		}

@@ -141,7 +141,11 @@ def check_bootstrap(directory):
     assert [p["command"] for p in cpod["spec"]["initContainers"] + cpod["spec"]["containers"]] == [["/asservat", "initial-bootstrap"], ["/asservat", "installer-continue"]]
     assert "token" not in cinput["data"]["continuation.json"].lower()
     crole, = [r for r in cdocs if r["kind"] == "ClusterRole" and r["metadata"]["name"].endswith("-bootstrap-continuation")]
-    cverbs = {v for rule in crole["rules"] for v in rule["verbs"]}
+    # ADR-204: the only delete is on Jobs, which the runner must hold to grant
+    # the hub-api's worker dispatch Role (RBAC admits only rules it holds).
+    jobs, = [rule for rule in crole["rules"] if "jobs" in rule["resources"]]
+    assert jobs == {"apiGroups": ["batch"], "resources": ["jobs"], "verbs": ["get", "create", "delete"]}
+    cverbs = {v for rule in crole["rules"] if rule is not jobs for v in rule["verbs"]}
     assert "*" not in json.dumps(crole["rules"]) and not cverbs & {"escalate", "bind", "impersonate", "delete", "patch"}
     cbinding, = [r for r in cdocs if r["kind"] == "ClusterRoleBinding" and r["roleRef"]["name"] == crole["metadata"]["name"]]
     assert cbinding["subjects"] == [{"kind": "ServiceAccount", "namespace": "trusted-bootstrap", "name": b["name"] + "-bootstrap-runner"}]

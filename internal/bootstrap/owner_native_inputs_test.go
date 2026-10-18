@@ -19,7 +19,7 @@ func nativeInputFixture(t *testing.T) (*ownerInputs, string, contracts.OwnerDepl
 	return in, dir, c
 }
 func TestOwnerNativeInputsAreClosedPinnedAndOptional(t *testing.T) {
-	for _, mode := range []string{"valid", "absent", "duplicate-api", "missing-api", "empty-api", "empty-topologies", "foreign-namespace", "http-api", "api-credentials", "nil-roots", "duplicate-topology", "zero-topology-digest", "alias-digest", "excess-concurrency", "workload-cluster-api", "unknown-field"} {
+	for _, mode := range []string{"valid", "absent", "duplicate-api", "same-name-api", "missing-api", "empty-api", "empty-topologies", "foreign-namespace", "http-api", "api-credentials", "nil-roots", "duplicate-topology", "zero-topology-digest", "alias-digest", "excess-concurrency", "workload-cluster-api", "unknown-field"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := nativeInputFixture(t)
 			switch mode {
@@ -27,6 +27,11 @@ func TestOwnerNativeInputsAreClosedPinnedAndOptional(t *testing.T) {
 				c.Native = nil
 			case "duplicate-api":
 				c.Native.WorkerAPIs = append(c.Native.WorkerAPIs, c.Native.WorkerAPIs[0])
+			case "same-name-api":
+				// Token files are keyed by namespace name (ADR-204).
+				other := c.Native.WorkerAPIs[0]
+				other.Namespace.UID = "10000000-0000-4000-8000-0000000000ab"
+				c.Native.WorkerAPIs = append(c.Native.WorkerAPIs, other)
 			case "missing-api":
 				c.Native.WorkerAPIs = nil
 			case "empty-api":
@@ -69,7 +74,7 @@ func TestOwnerNativeInputsAreClosedPinnedAndOptional(t *testing.T) {
 				if e != nil || got == nil {
 					t.Fatal("supported protected projection", e)
 				}
-				if mode == "valid" && nativeKubernetesTokenName(got.config.Native.WorkerAPIs[0]) != "native-kube-"+runtimeID+"-"+runtimeID+".token" {
+				if mode == "valid" && nativeKubernetesTokenName(got.config.Native.WorkerAPIs[0]) != "native-kube-"+runtimeID+"-workers.token" {
 					t.Fatal("token path is not fixed from pinned identities")
 				}
 			} else if e == nil {

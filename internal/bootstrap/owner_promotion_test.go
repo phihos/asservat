@@ -3,6 +3,8 @@ package bootstrap
 import (
 	"context"
 	"encoding/pem"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +15,7 @@ import (
 // ADR-194 step 4: the derived promoted input passes the owner's own reader,
 // pins the read-back key and projection, and refuses inconsistent parts.
 func TestDerivePromotedOwner(t *testing.T) {
-	for _, mode := range []string{"valid", "unprojected", "no-promotion", "already-native", "audit-mount", "other-signing-key", "no-worker-source", "foreign-capacity"} {
+	for _, mode := range []string{"valid", "unprojected", "no-promotion", "already-native", "audit-mount", "other-signing-key", "no-worker-source", "foreign-capacity", "downloads", "downloads-other-source", "downloads-hub-namespace"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := ownerProviderInputFixture(t)
 			d := capacityDerivedFixture()
@@ -55,9 +57,20 @@ func TestDerivePromotedOwner(t *testing.T) {
 				x.Sources.WorkerConfiguration = contracts.OwnerPublicGuardedSource{}
 			case "foreign-capacity":
 				x.Qualification.RootBacking.Capture.Policy.RootID = "10000000-0000-4000-8000-0000000000ff"
+			case "downloads", "downloads-other-source", "downloads-hub-namespace":
+				// ADR-204: the worker namespace's API, source and path template.
+				revision := contracts.DownloadEnvironmentRevision{UID: runtimeID, Generation: 1, SHA256: strings.Repeat("c", 64)}
+				x.Downloads = &promotedDownloads{API: contracts.OwnerNativeWorkerAPI{ClusterID: c.ClusterID, Namespace: contracts.WorkerObjectReference{Name: contracts.DownloadWorkerNamespaceName(c.InstallationID), UID: "20000000-0000-4000-8000-000000000001"}, Kubernetes: c.Kubernetes},
+					Source: x.Sources.WorkerConfiguration, Template: contracts.DownloadEnvironmentPathTemplate{StoreID: runtimeID, StorageRegion: "r", AcquisitionClusterID: c.ClusterID, AcquisitionRegion: "r", ConnectorClusterID: c.ClusterID, ConnectorRegion: "r", HubClusterID: c.ClusterID, HubRegion: "r", WorkerConfiguration: revision, HubConfiguration: revision}}
+				if mode == "downloads-other-source" {
+					x.Downloads.Source = guarded("other")
+				}
+				if mode == "downloads-hub-namespace" {
+					x.Downloads.API.Namespace = c.Namespace
+				}
 			}
 			out, err := derivePromotedOwner(c, x, time.Now())
-			if (err == nil) != (mode == "valid" || mode == "unprojected") {
+			if (err == nil) != (mode == "valid" || mode == "unprojected" || mode == "downloads") {
 				t.Fatal(mode, err)
 			}
 			if err != nil {
@@ -65,8 +78,12 @@ func TestDerivePromotedOwner(t *testing.T) {
 			}
 			p := out.Public
 			if p.WorkSigning.KeyID != signing.Name+"-v1" || p.ProviderRecipeSHA256 == "" || p.AuditStoreID != q.RootBacking.Capture.Policy.StoreID || p.RuntimeProjection != x.Projection ||
-				out.Native.WorkerAPIs == nil || len(out.Native.WorkerAPIs) != 0 || out.Native.RetentionTopologies == nil || p.WorkerConfiguration.Source != x.Sources.WorkerConfiguration.Source {
+				out.Native.WorkerAPIs == nil || out.Native.RetentionTopologies == nil || p.WorkerConfiguration.Source != x.Sources.WorkerConfiguration.Source {
 				t.Fatal("derived input", p)
+			}
+			if d := x.Downloads; d == nil && (len(out.Native.WorkerAPIs) != 0 || p.DownloadEnvironment.PathTemplate != nil) ||
+				d != nil && (len(out.Native.WorkerAPIs) != 1 || !reflect.DeepEqual(out.Native.WorkerAPIs[0], d.API) || p.DownloadEnvironment.PathTemplate == nil || *p.DownloadEnvironment.PathTemplate != d.Template || len(p.DownloadEnvironment.Paths) != 0) {
+				t.Fatal("download pins", out.Native.WorkerAPIs, p.DownloadEnvironment)
 			}
 			if mode == "unprojected" {
 				if validateOwnerDeployment(out) == nil {

@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"encoding/hex"
 	"encoding/json"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -41,6 +42,9 @@ type promotedOwnerParts struct {
 	Signing        contracts.OwnerPublicSigning
 	WorkerRoots    [][]byte
 	Projection     contracts.WorkerObjectReference
+	// Downloads are the configured hub-local download workers (ADR-204),
+	// or nil: the worker API, its profile source and the path template.
+	Downloads *promotedDownloads
 }
 
 // derivePromotedOwner adds Native and Public to the selected installed owner
@@ -89,6 +93,16 @@ func derivePromotedOwner(in contracts.OwnerDeployment, x promotedOwnerParts, now
 		OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4, DownloadsPerIdentity: 2, DownloadMaxSeconds: 3600,
 		OperationAudit:    contracts.OwnerPublicOperationAudit{RetentionSeconds: int(retention), NormalConcurrency: 8, ResolutionConcurrency: 2, PerPrincipalConcurrency: 2, NormalPerSecond: 50, ResolutionPerSecond: 10},
 		RuntimeProjection: x.Projection}
+	if d := x.Downloads; d != nil {
+		// ADR-204 decisions 2 and 4: the one pinned worker API owns the
+		// profile source's namespace, and one path template per installation.
+		if !reflect.DeepEqual(d.Source, x.Sources.WorkerConfiguration) || d.API.ClusterID != in.ClusterID || d.API.Namespace.UID == in.Namespace.UID {
+			return in, &fixedStepError{"downloads", mounts.ErrUnavailable}
+		}
+		template := d.Template
+		out.Native.WorkerAPIs = []contracts.OwnerNativeWorkerAPI{d.API}
+		out.Public.DownloadEnvironment.PathTemplate = &template
+	}
 	// The recipe digest covers the read-back key and roots, so it comes last.
 	if _, out.Public.ProviderRecipeSHA256, err = providerconfig.OwnerPublicProviderRecipeFor(out, *in.ProviderAuthentication, now); err != nil {
 		return in, &fixedStepError{"recipe", err}
