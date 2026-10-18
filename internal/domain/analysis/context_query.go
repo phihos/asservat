@@ -38,13 +38,13 @@ func (c ContextQueryCost) Valid() bool {
 // separate from the result lifetime. In particular no download certificate
 // period is inherited and query expiry proves no remote retirement.
 type ContextQueryWorkerLimits struct {
-	CPUMilli, MemoryBytes, WorkerTransientBytes, HubTransientBytes int64
-	ProviderConcurrency, AuthenticationConcurrency                 int64
-	Runtime, CredentialLifetime, ProviderEffectLifetime, Cleanup   time.Duration
+	CPUMilli, MemoryBytes, EphemeralStorageBytes, WorkerTransientBytes, HubTransientBytes int64
+	ProviderConcurrency, AuthenticationConcurrency                                        int64
+	Runtime, CredentialLifetime, ProviderEffectLifetime, Cleanup                          time.Duration
 }
 
 func (w ContextQueryWorkerLimits) Valid() bool {
-	for _, n := range []int64{w.CPUMilli, w.MemoryBytes, w.WorkerTransientBytes, w.HubTransientBytes, w.ProviderConcurrency, w.AuthenticationConcurrency} {
+	for _, n := range []int64{w.CPUMilli, w.MemoryBytes, w.EphemeralStorageBytes, w.WorkerTransientBytes, w.HubTransientBytes, w.ProviderConcurrency, w.AuthenticationConcurrency} {
 		if n <= 0 || n > 1<<60 {
 			return false
 		}
