@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"errors"
+	"sync/atomic"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
@@ -224,12 +225,19 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 	// closing pair below starts only after both have returned. Each result is
 	// still checked and narrows the bound, so no interval is extended.
 	opening, cancelOpening := context.WithCancel(call)
+	var abandoned atomic.Bool
 	var local value.AuthenticatedOwner
 	var localErr error
 	localDone := make(chan struct{})
 	go func() {
 		defer close(localDone)
-		local, localErr = s.owners.ObserveOwnerServing(app.WithRefusalSteps(opening, s.refuseStep("local/")), s.local)
+		// After a deliberate cancellation its step reports would blame the hub.
+		report := s.refuseStep("local/")
+		local, localErr = s.owners.ObserveOwnerServing(app.WithRefusalSteps(opening, func(step string) {
+			if !abandoned.Load() {
+				report(step)
+			}
+		}), s.local)
 	}()
 	joined := false
 	joinLocal := func() bool {
@@ -245,6 +253,7 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 	}
 	defer func() {
 		if !joined {
+			abandoned.Store(true)
 			cancelOpening() // An earlier refusal needs no opening result.
 			<-localDone
 		}
@@ -294,8 +303,15 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		defer close(finalDone)
 		finalLocal, finalLocalErr = s.owners.ObserveOwnerServing(app.WithRefusalSteps(closing, s.refuseStep("final-local/")), s.local)
 	}()
+	finalJoined := false
+	defer func() {
+		if !finalJoined {
+			<-finalDone
+		}
+	}()
 	finalSource, e := sources.ReadConnectorIdentitySource(closing)
 	<-finalDone
+	finalJoined = true
 	if e != nil || !finalSource.Valid(s.now()) || !finalSource.Observation.SameSource(source.Observation) || finalSource.Roles != source.Roles {
 		s.refuse("final-source")
 		return zero, value.ErrDenied
