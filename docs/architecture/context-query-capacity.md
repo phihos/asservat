@@ -141,6 +141,11 @@ accept, suspend or allocate capacity. The producer's separate restrictive
 suspension operation records a monotonic negative without refunding capacity;
 a current positive observation can clear it only within the original finite
 allowance and after all independent guards succeed.
+Delayed negatives retain their original observation time even after its
+five-second interval has expired. Their restrictive SQL write gets at most five
+seconds from the current call, further bounded by the caller's original deadline
+and cancellation. This does not create a fresh source interval: SQL retains the
+old watermark and expired freshness, and older negative replays change neither.
 
 `ProtectedContextQueryCapacity` supplies the accepted policy to C-03's
 `CurrentProjectionEnvironment`. That environment independently checks current

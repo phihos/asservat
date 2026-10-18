@@ -244,7 +244,10 @@ func (s *ContextQueryCapacityProducer) SuspendQueryCapacity(ctx context.Context,
 	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil || observed.IsZero() || observed.After(time.Now()) {
 		return value.ErrUnavailable
 	}
-	ctx, cancel := context.WithDeadline(ctx, observed.Add(5*time.Second))
+	// Persisting an older negative only restricts authority. Bound this write
+	// from the current call while retaining caller cancellation/deadlines; the
+	// original observation remains the SQL watermark and never gains freshness.
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	e := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		return q.SuspendContextQueryCapacity(ctx, custodydb.SuspendContextQueryCapacityParams{RootID: id(s.root), Observed: ts(capacityObservedMicro(observed))})

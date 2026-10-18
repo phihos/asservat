@@ -129,6 +129,9 @@ claim before native guards, with separate prepaid joined completion after all
 outer checks. Unknown replies/replay authorize no work; expiry alone never frees
 an unresolved claim. Exhaustion denies before guard I/O and retains one terminal
 negative, including a reserved root that never acquired positive backing.
+Delayed restrictive negatives retain their original watermark; persisting them
+uses a separate at-most-five-second write interval that preserves caller
+cancellation and any earlier deadline, never renewed positive freshness.
 Retain original hard/effect/cleanup/retirement
 dates; no poll, root renewal or expiry replenishes the finite allocation. An
 installation without the original extension remains unavailable until a separate
