@@ -63,6 +63,11 @@ class RegionalContextSelection(unittest.TestCase):
             "-c", "log_error_verbosity=terse",
             "-c", "log_parameter_max_length=0", "-c", "log_parameter_max_length_on_error=0",
         ])
+        locks = fixture.postgres_fixture_options(None, lock_waits=True)
+        self.assertEqual(locks[:len(original)], original)
+        self.assertIn("log_lock_waits=on", locks)
+        self.assertNotIn("log_statement=all", locks)
+        self.assertEqual(fixture.postgres_fixture_options(None), original)
         journey.append("must-not-retain-mutable-options")
         self.assertNotIn("must-not-retain-mutable-options", fixture.postgres_fixture_options("journey"))
         with self.assertRaises(ValueError):
