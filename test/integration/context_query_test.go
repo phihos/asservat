@@ -220,6 +220,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		request, intent := invocation("get_file_excerpt", plan.Principal, true)
 		a = authority(plan.Principal)
 		query := makeQuery(request, a)
+		t.Logf("original_evidence_seconds=%.0f original_query_remaining_ms=%d", e.Registration.ExpiresAt.Sub(e.Registration.AnchorAt).Seconds(), time.Until(query.Deadline).Milliseconds())
 		accepted, err := ledger.AdmitQuery(ctx, query, request, a)
 		if err != nil || !accepted.Fresh {
 			t.Fatal("first query", err)
@@ -456,7 +457,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 			a := authority(plan.Principal)
 			err := ledger.AdmitQueryPoll(ctx, query, poll, a)
 			if (i < 2 && err != nil) || (i == 2 && err == nil) {
-				t.Fatal("finite paid poll allowance", i, err)
+				t.Fatalf("finite paid poll allowance %d: %v (original query remaining %s, original evidence remaining %s)", i, err, time.Until(query.Deadline), time.Until(e.Registration.ExpiresAt))
 			}
 		}
 		for _, statement := range []string{"UPDATE context_query SET generation=0 WHERE id=$1", "UPDATE context_query SET active_batch=NULL WHERE id=$1", "UPDATE context_query SET deadline=deadline+interval '1 second' WHERE id=$1", "DELETE FROM context_query WHERE id=$1"} {

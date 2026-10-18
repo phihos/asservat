@@ -52,9 +52,20 @@ managed context publication. C-03 consumes the accepted query policy through
 are reserved in the original setup. It retains every earlier ledger assertion,
 including lock synchronization, unknown replies, original lease expiry and
 cross-client aggregate charges. Its integration compilation, original
-qualification race test and integration vet pass; the new native selection has
-not yet run. The native69 fence-function probes do not qualify these ledger
-effects. No hook bypass or skipped positive qualification is supplied.
+qualification race test and integration vet pass. The
+[first native ledger run](../test/results/context-query-ledger-first-run.log)
+on `1ca69f2592d40cb20b468e6097fa3569db0c34d2` reached the late poll assertions
+but failed: the inherited 20-second evidence lifetime did not cover preparation
+plus the 18.54-second ledger subtest. Its
+[report](../test/results/context-query-ledger-first-environment.json) records
+all 2,662 source hashes independently matched and empty cleanup failures.
+The dedicated fixture now selects 60-second evidence retention and a covering
+120-second base backing interval before original installation/submission;
+existing callers retain 20 seconds. Query admission/maximum lifetime remain
+60 seconds, current request authority remains at most five seconds, and no
+persisted dates change. The corrected native selection is pending. The native69
+fence-function probes do not qualify these ledger effects. No hook bypass or
+skipped positive qualification is supplied.
 Production report acceptance, native guards, role provisioning, complete query
 worker/key delivery, installed qualification and retirement remain unfinished.
 

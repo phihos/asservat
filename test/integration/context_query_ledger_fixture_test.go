@@ -85,6 +85,9 @@ func queryLedgerQualification(t *testing.T, f *capacitySQLFixture) {
 		t.Fatal(err)
 	}
 	q.Native.ProfileDigest = sha256.Sum256(body)
+	// Cover the original 60-second evidence and its deletion allowance from
+	// before capture preparation. Query admission remains its original 60s.
+	f.qualification.RootBacking.AdmissionSeconds = 120
 	// Reserve every audit slot before original installation; no post-install
 	// configuration CAS or synthetic replacement of the accepted normal pool.
 	normal := &f.qualification.RootBacking.Normal
@@ -175,7 +178,7 @@ func qualifyProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin
 // session, download policy or download authority supplies query admission.
 func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.RootConfiguration, enrollment app.Enrollment) (captureAdmissionScenario, artifact.PublishedContext) {
 	t.Helper()
-	s, accepted := f.admitManagedContext(t, root, enrollment)
+	s, accepted := f.admitManagedContextRetention(t, root, enrollment, 60)
 	e := accepted.Expectation
 	bound, err := f.store.ForCustody(e.Registration.StoreID)
 	if err != nil {
