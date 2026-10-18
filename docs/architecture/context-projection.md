@@ -433,6 +433,72 @@ key routing, private DTO/remote closure protocol and runtime/installer acceptanc
 remain required. These missing ports keep this component unavailable in production;
 no default authority, public route or native qualification is implied.
 
+## SQL query ledger component
+
+Migration 00068 adds eight purpose-specific tables for accepted backing,
+workload allocations, principal accounts, queries, bounded invocation
+associations, workers, read batches and key slots. The schema inventory is 114
+of the existing 128-table ceiling. These tables do not reuse download state or
+confer evidence authority. There are no installed query-role grants, backing
+producer, worker-binding producer or key-consume API in this component.
+
+The independently configured C-07 guard must establish the complete current
+protected source, native resource/history qualification, exact purpose path and
+parent envelope, including original disclosure, possible worker/certificate/
+provider effects, cleanup and history horizons. A profile, revision or JSON
+object supplied by a request is insufficient. Inside the guarded callback, SQL
+locks recovery, permissions and the accepted backing/allocation before query
+state. It compares the complete profile and qualification revision, account and
+workload identity, source revisions and all four accepted horizons. Runtime
+admission cannot provision or replace these facts. Principal accounting excludes
+OAuth client identity; each query's exact actor and invocation still include the
+client. Account creation itself consumes the finite accepted account allowance.
+
+Each admitted query reserves its full finite cost vector against installation,
+workload and principal limits. This includes one worker, two batches, six unwrap
+attempts, provider/authentication/signing work, CPU/memory/private copies and
+qualified SQL/WAL/backup history. Poll and control allowances are explicit;
+bounded invocation rows cannot grow independently of them. The accepted
+qualification must establish actual row, index, audit and effect backing; shape
+validation and the synthetic fixture's arithmetic are not a native capacity
+qualification. Every row and charge survives failure, expiry and unknown
+results. This component has no history-retirement or capacity-refund path.
+
+Every admission, poll and paid batch binds a different current C-08 invocation
+where appropriate: exact operation/root/actor/client, principal and input MACs,
+format, tool and original request/write times. The intent must have both its
+separate acknowledged receipt and positively joined writer completion in the
+current database incarnation. The Go facet verifies the canonical typed record
+digest; PostgreSQL JSONB text is never used as its substitute. The two query
+operation names use the existing normal audit lane and only
+`context-query-input/v1`. C-20 remains the sole prepared-response digest and
+outcome owner.
+
+An acknowledged first admission alone returns `Fresh`. Lost commit replies,
+failed guard returns and repeated, omitted or late callbacks cannot do so; any
+committed obligations remain. A read batch consumes one generation and has one
+irreversible start claim. Its active slot remains occupied after its request
+lease expires. The mandatory independent C-14 guard and stored exact worker
+binding precede every start; an empty proof or download worker is unavailable.
+The key table has three monotonic role bits, but no product key effect can use
+it until its separate qualified binding/consume producer exists.
+
+Only the process-owned C-14 closure callback can request completion. SQL requires
+the same acknowledged, positively closed C-08 outcome and original incarnation
+before clearing the active slot; read/key/audit spend remains. Lookup, SQL lock
+waits, guard callbacks and return paths preserve original request, proof, query,
+write and cleanup bounds. A guard cannot extend the caller's deadline by passing
+a background context. Local EOF, buffer clearing, missing objects or expiry do
+not establish remote closure. Public read permission and expired-artifact
+access are not gained by this restrictive transition.
+
+The native fixture supplies explicit synthetic C-07 qualification, human
+identity and C-14 worker/closure guards while using the actual publication,
+current C-03/retention/processing/recovery readers, scoped SQL credentials and
+healthy encrypted C-08 audit. It owns and closes its helper pools before later
+suites. Its source is present but native execution is pending; unit tests and
+integration-package compilation are not a native SQL/S3 pass.
+
 ## Acceptance
 
 The first component foundation is deliberately limited: pure scope/candidate,

@@ -1,6 +1,28 @@
 # Sustained implementation progress
 
-## Approved pod-status projection foundations (ADR-206)
+## Approved context query SQL component (ADR-206)
+
+Migration 00068 and `postgres.ContextQueries` add independent bounded query,
+invocation, batch and key-slot accounting against accepted query-purpose backing.
+SQL compares immutable profile/qualification/source/account/horizon facts under
+recovery and permission locks; every effect requires the same current healthy
+C-08 intent, and batch closure requires its acknowledged outcome plus the opaque
+C-14 closure callback. Replays, unknown replies, expired leases and failed guard
+returns retain spend. No installed query role, backing producer, worker/key
+producer, retirement/refund facet or public query tool is enabled by this change.
+
+Pinned SQL generation, focused PostgreSQL query/initial-schema race tests,
+integration-package compilation, touched-package vet and Go architecture checks
+passed. Two failing regressions reproduced loss of an earlier guard deadline and
+success after that deadline expired; the guarded callback now preserves both.
+The native SQL/S3 fixture is written, including acknowledged audit lineage,
+actual SQL lock synchronization, one-use starts, unknown closure and retained
+aggregate charges, but has not run. Its C-07 qualification and C-14 ownership
+inputs are explicitly synthetic. The constructor now floors query timestamps conservatively to PostgreSQL
+microseconds; the native fixture deliberately supplies a nanosecond clock.
+Combined frozen native qualification remains the next checkpoint.
+
+## Initial approved pod-status projection foundations (ADR-206)
 
 [ADR-206](decisions/206-bounded-context-projection.md) fixes the narrow approved
 `get_file_excerpt`/`get_query_result` path over an existing committed pod-status
@@ -13,9 +35,9 @@ request retains its original five-second and earlier dependency deadlines.
 
 Focused domain/application/authorization race tests, decoder regressions, vet
 and specification/architecture gates pass. These are component results, not an
-installed query read. Query/batch accounting, separate worker/key authority,
-protected resource-profile acceptance, audit plus final disclosure, browser/MCP
-composition and installed qualification remain pending. No public tool is enabled
+installed query read. Subsequent query accounting, regional reading and audited transport components
+are recorded in the architecture contract. Protected resource-profile and
+worker/key acceptance, runtime composition and installed qualification remain pending. No public tool is enabled
 by these foundations; the canonical wire schemas and native artifact remain
 unchanged.
 

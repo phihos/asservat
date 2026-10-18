@@ -2,7 +2,7 @@ package postgres
 
 // Exact permanent-table inventory, including five SQL54 managed-capacity tables
 // migration 00065's two regional capacity tables (ADR-197) and migration
-// 00066's refresh demands (ADR-200).
+// 00066's refresh demands (ADR-200), 00067 deletion and 00068 queries.
 // Missing or unknown relations reject first activation.
 var initialInstallationTables = []string{
 	"artifact_download",
@@ -47,6 +47,14 @@ var initialInstallationTables = []string{
 	"context_preview",
 	"context_preview_fence",
 	"context_processing",
+	"context_query",
+	"context_query_allocation",
+	"context_query_backing",
+	"context_query_batch",
+	"context_query_call",
+	"context_query_key_binding",
+	"context_query_principal",
+	"context_query_worker",
 	"context_storage_binding",
 	"context_verification",
 	"context_writer_completion",
