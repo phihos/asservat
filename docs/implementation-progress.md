@@ -1,5 +1,32 @@
 # Sustained implementation progress
 
+## Context setup native 2: selected fixture passed (2026-10-18)
+
+The [corrected owned run](../test/results/context-setup-native-2/context-storage-environment.json)
+on frozen `0099e2295d3fdd63cb2892170a6152872e2e56b8` passed the selected
+`TestConnectorAPIProcessWithRealKubernetes` and all five children: named whole
+Secret/foreign denial, original setup bracket, actual start status under both
+guards, capacity-token admission and changed-input metadata. Top-level time was
+22.11 seconds; race-enabled package time was 23.174 seconds.
+
+Cold setup took 1.804 seconds and current native close 0.699 seconds. Local
+source/read reuse issued no API requests. The independent work, opened after CRD
+readiness and the previous phase's original end, completed its native read,
+CREATE, Ready and StartCommitted in 2.572 seconds within its original five
+seconds. Changed-input refusal was checked before the opening proof expired.
+There is no wait or renewed observation within an operation. These are actual
+Kubernetes API/admission results with one startup input and synthetic connector
+source, issuer and registry facts; they do not qualify the complete installed
+source graph, owner authentication or investigation journey.
+
+[Independent archive verification](../test/results/context-setup-native-2/verification.json)
+matched all 2,695 source hashes, unchanged throughout the test. Test exit was
+zero and cleanup reported no failures. Environment report SHA-256 is
+`4fb2b6d2890ff4d7ff2448498b18be0f47deb5f1904c1d68432c0e747d07cc6e`.
+The failed first run remains below. Installed native43 still failed before
+collection; the context changes must be assembled and the full installed
+journey qualified before PR40/41 can merge.
+
 ## Context setup native 1: setup passed, selected fixture failed (2026-10-18)
 
 The [owned native run](../test/results/context-setup-native-1/context-storage-environment.json)
@@ -24,8 +51,8 @@ reported no failures. The fixture now waits for the preceding independent
 phase's recorded original end before opening a new operation, after CRD
 readiness where applicable. It does not wait, refresh or retry within a work,
 and changes no production deadline, limiter or guard. Input-change refusal must
-occur before that new operation's original expiry. Corrected native qualification
-remains pending.
+occur before that new operation's original expiry. The corrected selected run
+is recorded above.
 
 ## Context-start private setup bracket (ADR-207, component, 2026-10-18)
 
@@ -58,8 +85,8 @@ The actual loopback HTTP/2 limiter model uses synthetic authority and counts 114
 observer / 24 probe requests plus two owner checks. Its measured 4.706-second
 opening at 20 QPS/burst 20 does not establish native or installed availability.
 The added native fixture checks the complete setup close and an intervening
-input metadata change, but has not run. Native setup and installed journey
-qualification remain pending; no collection result is claimed. Exact failure,
+input metadata change; its selected passing run is recorded above. Installed
+journey qualification remains pending; no collection result is claimed. Exact failure,
 mutation, race/vet/compile logs and source hashes are retained in the session
 cache under `context-start-combined-proof/`.
 

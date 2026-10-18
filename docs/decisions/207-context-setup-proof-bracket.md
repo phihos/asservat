@@ -1,7 +1,8 @@
 # ADR-207 — One native proof bracket for context-start setup
 
 Date: 2026-10-18. Status: registration source handoff and private setup operation
-implemented with component tests; native qualification remains pending.
+implemented with component and selected native tests; installed qualification
+remains pending.
 Requirements: REQ-EXE-002, REQ-FED-001/003, S-02; TASK-03 / TASK-11.
 
 ## Context
@@ -73,7 +74,8 @@ within one original observation interval; no instantaneous revocation is claimed
 The combined-reader regression has failing-before limiter evidence and passing
 component races, including exact credential ownership, copy isolation, original
 cutoffs, cancellation and expiry. The setup operation and whole-opening
-component tests now exist; native setup and an installed rerun remain pending.
+component tests now exist; selected native setup passes as recorded below, while
+an installed rerun remains pending.
 The registration dispatch regression fails on unchanged dispatch. Its corrected
 selection passes nine top-level / 19 named race tests, including real
 TLS1.3/HTTP2/exporter-bound presentation with synthetic registry/source authority.
@@ -113,6 +115,13 @@ an original cold setup, no-I/O local reads, current closing API/source checks,
 and a changed-input refusal. The first selected native run passed the cold setup
 case, but failed a later independent work that reused the setup's nearly expired
 proof after CRD readiness; the input-change case did not reach its mutation.
-The complete selected fixture remains failed. Its corrected independent-phase
-separation and another frozen native run are tracked in
+That complete first fixture failed. The corrected independent-phase separation
+passed all five selected native cases on frozen
+`0099e2295d3fdd63cb2892170a6152872e2e56b8`: cold setup 1.804 seconds, closing
+checks 0.699 seconds, and actual work admission/start 2.572 seconds within its
+original five seconds. Changed-input refusal occurred before original expiry.
+All 2,695 source hashes matched, source stayed unchanged and cleanup had no
+failures. This one-input fixture retains synthetic connector source, issuer and
+registry facts; full installed source and owner composition remain unqualified.
+Both runs are retained in
 [implementation progress](../implementation-progress.md).
