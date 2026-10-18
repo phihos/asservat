@@ -10,16 +10,21 @@ func TestInstalledSQLConnectionBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The hub-worker holds 16 logins per retained process, and the key
+	// The hub-worker holds 19 logins per retained process, and the key
 	// service 4: ADR-204 added two worker configuration logins and the
-	// acquisition login, so one hub now needs 101 ordinary connections.
-	required := 32 + 16*PublicRuntimeRetainedWorkerProcesses + len(PublicRuntimeFederationPurposes())*PublicRuntimeRetainedFederationProcesses + len(PublicRuntimePublisherPurposes())*PublicRuntimeRetainedPublisherProcesses + len(PublicRuntimeKeyServicePurposes())*PublicRuntimeRetainedKeyServiceProcesses + 1 + SQLMaintenanceReserve
+	// acquisition login (101), and ADR-205 the three context deletion logins,
+	// so one hub now needs 107 ordinary connections.
+	required := 32 + 19*PublicRuntimeRetainedWorkerProcesses + len(PublicRuntimeFederationPurposes())*PublicRuntimeRetainedFederationProcesses + len(PublicRuntimePublisherPurposes())*PublicRuntimeRetainedPublisherProcesses + len(PublicRuntimeKeyServicePurposes())*PublicRuntimeRetainedKeyServiceProcesses + 1 + SQLMaintenanceReserve
 	// PostgreSQL defaults (100 connections, three superuser slots) no longer
 	// hold that worst case; the error names the exact counts.
 	_, err = one.Validate(0, SQLServerCapacity{MaxConnections: 100, SuperuserReserved: 3})
 	var budget *SQLConnectionBudgetError
-	if required != 101 || !errors.As(err, &budget) || budget.Rule != "installation-allocation" || budget.Required != required || budget.Configured != 97 {
+	if required != 107 || !errors.As(err, &budget) || budget.Rule != "installation-allocation" || budget.Required != required || budget.Configured != 97 {
 		t.Fatal("single-hub worst case accepted or misreported at the defaults", err)
+	}
+	// ADR-205: an installation with deletion needs max_connections of at least 110.
+	if _, err = one.Validate(0, SQLServerCapacity{MaxConnections: 109, SuperuserReserved: 3}); !errors.As(err, &budget) || budget.Required != 107 || budget.Configured != 106 {
+		t.Fatal("single-hub worst case accepted below 110 connections", err)
 	}
 	got, err := one.Validate(0, SQLServerCapacity{MaxConnections: 110, SuperuserReserved: 3})
 	if err != nil || got.PerHubProcess != SQLConnectionsPerHubReplica || got.Required != required || got.Allocation != 107 || got.Available != 107 {

@@ -1,7 +1,9 @@
 package providerconfig
 
 import (
+	"bytes"
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/json"
 	"encoding/json/jsontext"
@@ -19,10 +21,35 @@ import (
 type ConfigurationSetupCheck struct {
 	binding           [32]byte
 	observedAt, until time.Time
+	signing           *ContextDeletionSigningReadback
 }
 
 func (o ConfigurationSetupCheck) ObservedAt() time.Time { return o.observedAt }
 func (o ConfigurationSetupCheck) FreshUntil() time.Time { return o.until }
+
+// ContextDeletionSigningReadback is the context deletion signing key as the
+// configuration readback observed it (ADR-205 decision 6): its latest
+// version and the public key of each version Transit returned, for the
+// installer to pin. It is an observation, never signing authority.
+type ContextDeletionSigningReadback struct {
+	Mount, Key string
+	Version    int
+	PublicKeys map[int]ed25519.PublicKey
+}
+
+// ContextDeletionSigning returns a copy of the observed signing key, or false
+// for a profile without one.
+func (o ConfigurationSetupCheck) ContextDeletionSigning() (ContextDeletionSigningReadback, bool) {
+	if o.signing == nil {
+		return ContextDeletionSigningReadback{}, false
+	}
+	out := *o.signing
+	out.PublicKeys = make(map[int]ed25519.PublicKey, len(o.signing.PublicKeys))
+	for v, k := range o.signing.PublicKeys {
+		out.PublicKeys[v] = bytes.Clone(k)
+	}
+	return out, true
+}
 func (o ConfigurationSetupCheck) Matches(in contracts.HubWorkerDeployment, profile contracts.ConfigurationProviderAuthentication, now time.Time) bool {
 	if o.binding == ([32]byte{}) || ValidateConfigurationProviderAuthentication(in, profile, now) != nil || o.observedAt.IsZero() || now.Before(o.observedAt) || !now.Before(o.until) || o.until.Sub(o.observedAt) > 5*time.Second {
 		return false
@@ -81,6 +108,12 @@ func (r *SetupReader) VerifyConfiguration(ctx context.Context, in contracts.HubW
 		workerReads = configurationWorkerAuditReads(in, worker)
 		paths = append(paths, workerReads...)
 	}
+	// ADR-205: the context deletion signing key, on the configuration audit
+	// mount already read.
+	signing := profile.ContextDeletionSigning
+	if signing != (contracts.OwnerPublicTransit{}) {
+		paths = append(paths, signing.Mount+"/keys/"+signing.Key)
+	}
 	o, err := r.begin(ctx, contracts.OwnerProviderEndpoint{Endpoint: in.KeyService.Endpoint, Roots: in.KeyService.Roots}, paths)
 	if err != nil {
 		return zero, err
@@ -124,6 +157,18 @@ func (r *SetupReader) VerifyConfiguration(ctx context.Context, in contracts.HubW
 			return zero, setupComponentError("worker configuration Transit key")
 		}
 	}
+	var observed *ContextDeletionSigningReadback
+	if signing != (contracts.OwnerPublicTransit{}) {
+		data, err = o.get(paths[len(paths)-1])
+		if err != nil {
+			return zero, setupComponentError("context deletion signing key")
+		}
+		version, keys, e := verifySigningKeyVersions(data, signing.Key)
+		if e != nil {
+			return zero, setupComponentError("context deletion signing key")
+		}
+		observed = &ContextDeletionSigningReadback{Mount: signing.Mount, Key: signing.Key, Version: version, PublicKeys: keys}
+	}
 	if !o.valid() {
 		return zero, ErrSetupUnavailable
 	}
@@ -135,7 +180,7 @@ func (r *SetupReader) VerifyConfiguration(ctx context.Context, in contracts.HubW
 		}
 		until = identity.Earlier(until, end)
 	}
-	out := ConfigurationSetupCheck{binding: binding, observedAt: o.observedAt, until: until}
+	out := ConfigurationSetupCheck{binding: binding, observedAt: o.observedAt, until: until, signing: observed}
 	if !out.Matches(in, profile, time.Now()) {
 		return zero, ErrSetupUnavailable
 	}

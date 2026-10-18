@@ -264,7 +264,7 @@ func TestInstallerInboxCarriesDownloadEvidenceCredential(t *testing.T) {
 	api, config := newDownloadWorkerAPI(t)
 	ctx, installation := context.Background(), ownerID(1)
 	downloads := []byte(`{"accessKeyID":"synthetic","secretAccessKey":"synthetic-secret","sessionToken":""}`)
-	if err := WriteInstallerInbox(ctx, config, "release", installation, 3, []byte("inspection"), []byte("audit"), nil, nil, nil, downloads); err != nil {
+	if err := WriteInstallerInbox(ctx, config, "release", installation, 3, []byte("inspection"), []byte("audit"), nil, nil, nil, downloads, nil); err != nil {
 		t.Fatal(err)
 	}
 	stored := api.object("/api/v1/namespaces/release/secrets/" + contracts.InstallerInboxName(installation))["data"].(map[string]any)
@@ -275,7 +275,7 @@ func TestInstallerInboxCarriesDownloadEvidenceCredential(t *testing.T) {
 	if err != nil || string(inbox.DownloadEvidenceCredential) != string(downloads) || inbox.EvidenceReadCredential != nil {
 		t.Fatal("inbox read", err)
 	}
-	if err = WriteInstallerInbox(ctx, config, "release", installation, 3, []byte("inspection"), []byte("audit"), nil, nil, nil, nil); err != nil {
+	if err = WriteInstallerInbox(ctx, config, "release", installation, 3, []byte("inspection"), []byte("audit"), nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if inbox, err = ReadInstallerInbox(ctx, config, "release", installation, 3); err != nil || inbox.DownloadEvidenceCredential != nil {

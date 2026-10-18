@@ -28,8 +28,10 @@ type ownerProviderSetupRequest struct {
 // deployment adds its roles, verifier PKI role and audit transit key and
 // describes its two operator storage credentials (ADR-203). A download
 // evidence store describes the download workers' own read-only evidence
-// credential (ADR-204 decision 5); it adds no provider request.
-func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time, federation *contracts.FederationDeployment, publisher *contracts.PublisherDeployment, downloads *contracts.InstallerEvidenceStore) ([]byte, error) {
+// credential (ADR-204 decision 5); it adds no provider request. A deletion
+// evidence store likewise describes the context deletion child's own
+// list-and-delete evidence credential (ADR-205 decision 4).
+func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time, federation *contracts.FederationDeployment, publisher *contracts.PublisherDeployment, downloads, deletion *contracts.InstallerEvidenceStore) ([]byte, error) {
 	if !authorization.UUID(in.ConfigurationUID) {
 		return nil, ErrSetupUnavailable
 	}
@@ -140,6 +142,13 @@ func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.
 		downloadStorage = &publisherStorage{Endpoint: downloads.Endpoint, Region: downloads.Region, Bucket: downloads.Bucket, SecretKey: "credentials.json", CredentialSchema: "https://asservat.io/spec/v1/owner-credentials.schema.json",
 			Prefixes: []string{}, Operations: []string{"GetObject", "GetObjectVersion"}, Semantics: "read-only/no-list-write-or-delete", BackendQualification: "required"}
 	}
+	var deletionStorage *evidenceDeleteStorage
+	if deletion != nil {
+		if !public || !validEndpoint(deletion.Endpoint) || deletion.Region == "" || len(deletion.Region) > 128 || deletion.Bucket == "" || len(deletion.Bucket) > 63 {
+			return nil, ErrSetupUnavailable
+		}
+		deletionStorage = evidenceDeleteStorageFor(*deletion)
+	}
 	return ownerProviderCanonical(struct {
 		Format                      string                      `json:"format"`
 		ConfigurationUID            string                      `json:"configurationUID"`
@@ -152,8 +161,37 @@ func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.
 		AuditStorage                any                         `json:"auditStorage"`
 		FederationAuditStorage      any                         `json:"federationAuditStorage,omitempty"`
 		DownloadEvidenceReadStorage *publisherStorage           `json:"downloadEvidenceReadStorage,omitempty"`
+		EvidenceDeleteStorage       *evidenceDeleteStorage      `json:"evidenceDeleteStorage,omitempty"`
 		ExternalAdministration      bool                        `json:"externalAdministration"`
-	}{"asservat-owner-provider-setup/v1", in.ConfigurationUID, setup, federationSetup, publisherSection, public, requests, inspect, storage, federationStorage, downloadStorage, true})
+	}{"asservat-owner-provider-setup/v1", in.ConfigurationUID, setup, federationSetup, publisherSection, public, requests, inspect, storage, federationStorage, downloadStorage, deletionStorage, true})
+}
+
+// evidenceDeleteStorage is the context deletion child's evidence credential
+// (ADR-205 decision 4): the purge lists one attempt's versions, uploads and
+// keys below v1/ and deletes or aborts them. The bucket operations are
+// confined to the v1/ prefix, the object operations to v1/*; it never reads
+// or writes evidence.
+type evidenceDeleteStorage struct {
+	Endpoint             string   `json:"endpoint"`
+	Region               string   `json:"region"`
+	Bucket               string   `json:"bucket"`
+	SecretKey            string   `json:"secretKey"`
+	CredentialSchema     string   `json:"credentialSchema"`
+	Prefixes             []string `json:"prefixes"`
+	BucketOperations     []string `json:"bucketOperations"`
+	ObjectOperations     []string `json:"objectOperations"`
+	DeniedOperations     []string `json:"deniedOperations"`
+	Semantics            string   `json:"semantics"`
+	BackendQualification string   `json:"backendQualification"`
+}
+
+func evidenceDeleteStorageFor(e contracts.InstallerEvidenceStore) *evidenceDeleteStorage {
+	return &evidenceDeleteStorage{Endpoint: e.Endpoint, Region: e.Region, Bucket: e.Bucket, SecretKey: contracts.EvidenceDeleteCredentialFile, CredentialSchema: "https://asservat.io/spec/v1/owner-credentials.schema.json",
+		Prefixes:         []string{"v1/"},
+		BucketOperations: []string{"ListBucket", "ListBucketVersions", "ListBucketMultipartUploads"},
+		ObjectOperations: []string{"DeleteObject", "DeleteObjectVersion", "AbortMultipartUpload"},
+		DeniedOperations: []string{"GetObject", "GetObjectVersion", "PutObject", "PutBucketVersioning", "PutBucketPolicy", "PutLifecycleConfiguration"},
+		Semantics:        "list-and-delete-only/static-credential/no-read-or-write", BackendQualification: "required"}
 }
 
 // publisherArtifact is the publisher's section of the phase-3 artifact
