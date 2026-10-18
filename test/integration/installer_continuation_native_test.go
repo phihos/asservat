@@ -37,6 +37,7 @@ import (
 	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -394,13 +395,18 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		time.Sleep(time.Second)
 	}
-	// ADR-194: the owner launched promoted. Its download sources exist (the
-	// worker one unconfigured), the operator public Secret was written, and the
-	// owner Pod is Ready: capacity readiness above already reached its
-	// observation handler through the server-name split on 9444.
-	worker, e := api.CoreV1().ConfigMaps(desired.TargetNamespace).Get(ctx, contracts.OwnerWorkerConfigurationName(installation), meta.GetOptions{})
-	if e != nil || worker.Data["worker-profile.json"] != contracts.UnconfiguredWorkerConfiguration(installation) {
-		t.Fatal("worker configuration source not unconfigured", e)
+	// ADR-194: the owner launched promoted. Its download sources exist, the
+	// operator public Secret was written, and the owner Pod is Ready: capacity
+	// readiness above already reached its observation handler through the
+	// server-name split on 9444. ADR-204 decision 2: the worker profile source
+	// lives beside the workers, configured by the installer; the hub
+	// namespace has no worker marker.
+	if _, e := api.CoreV1().ConfigMaps(desired.TargetNamespace).Get(ctx, contracts.OwnerWorkerConfigurationName(installation), meta.GetOptions{}); !apierrors.IsNotFound(e) {
+		t.Fatal("hub namespace still holds a worker configuration marker", e)
+	}
+	worker, e := api.CoreV1().ConfigMaps(contracts.DownloadWorkerNamespaceName(installation)).Get(ctx, contracts.DownloadWorkerProfileName(installation), meta.GetOptions{})
+	if e != nil || worker.Data["worker-profile.json"] == "" || worker.Data["worker-profile.json"] == contracts.UnconfiguredWorkerConfiguration(installation) {
+		t.Fatal("worker profile source not configured", e)
 	}
 	if _, e = api.CoreV1().ConfigMaps(desired.TargetNamespace).Get(ctx, contracts.OwnerDownloadEnvironmentName(installation), meta.GetOptions{}); e != nil {
 		t.Fatal("owner download environment missing", e)
