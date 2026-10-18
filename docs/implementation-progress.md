@@ -1,5 +1,24 @@
 # Sustained implementation progress
 
+## Installed native 48: leaf read passes, hub self-authentication refuses (2026-10-18)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39166806580)
+on frozen `b2a5ddd40e315e40855817248134d5a99d6b458e` (native47 plus the
+native-read leaf grant) failed before capture at the same preview point. The
+`registration` refusals and the function permission errors no longer occur.
+Remaining ingress refusals are the hub's own serving-identity authentication:
+the closing `final-local` check (at least 16), and the opening check at
+`protection-before`, `route` and `protection-after`, all `unavailable`. The
+capacity standby, which uses the same pair of owner checks with less work in
+between, still completed. A remaining-time shortage after narrowing to the
+connector's lent source is a hypothesis, not established; refusals now carry a
+coarse remaining-time bucket and closing-step detail for the next run.
+
+[Archive verification](../test/results/installed-journey-ci-48/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. Capture and later steps were
+not reached. PR40/41 remain held.
+
 ## Installed native 47: hub refusals named, native-read lacked the leaf read (2026-10-18)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39164409930)
