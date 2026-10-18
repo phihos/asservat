@@ -31,7 +31,8 @@ func (b installedJourneyBearer) RoundTrip(r *http.Request) (*http.Response, erro
 // regional workload. Every authority input is the installed product's own:
 // the operator's AccessBinding, the permission stream, the regional capacity
 // binding refreshed on demand (ADR-200) and the federation; nothing is seeded.
-func installedJourney(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin string) func(cluster, namespace, workload string) {
+// diagnose prints the hub processes' logs before a failure ends the test.
+func installedJourney(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func()) func(cluster, namespace, workload string) {
 	return func(cluster, namespace, workload string) {
 		t.Helper()
 		if identity == nil {
@@ -56,21 +57,35 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			t.Fatal("installed MCP session", err)
 		}
 		defer session.Close()
+		// A client retries a refused call: the first preview of a regional
+		// workload records the refresh demand (ADR-200) and may outlast the
+		// request's five-second bound; later attempts find the binding fresh.
 		call := func(name string, arguments any, data any) {
 			t.Helper()
-			result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: name, Arguments: arguments})
-			if err != nil {
-				t.Fatalf("installed %s: %v", name, err)
+			var failure string
+			for attempt := 1; attempt <= 4; attempt++ {
+				result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: name, Arguments: arguments})
+				if err != nil {
+					failure = err.Error()
+				} else {
+					raw, _ := json.Marshal(result.StructuredContent)
+					var envelope struct {
+						Status string          `json:"status"`
+						Data   json.RawMessage `json:"data"`
+					}
+					if json.Unmarshal(raw, &envelope) == nil && envelope.Status == "ok" && json.Unmarshal(envelope.Data, data) == nil {
+						if attempt > 1 {
+							t.Logf("installed %s succeeded on attempt %d", name, attempt)
+						}
+						return
+					}
+					failure = string(raw)
+				}
+				t.Logf("installed %s attempt %d: %s", name, attempt, failure)
+				time.Sleep(2 * time.Second)
 			}
-			raw, _ := json.Marshal(result.StructuredContent)
-			var envelope struct {
-				Status string          `json:"status"`
-				Data   json.RawMessage `json:"data"`
-				Error  json.RawMessage `json:"error"`
-			}
-			if json.Unmarshal(raw, &envelope) != nil || envelope.Status != "ok" || json.Unmarshal(envelope.Data, data) != nil {
-				t.Fatalf("installed %s: %s", name, raw)
-			}
+			diagnose()
+			t.Fatalf("installed %s: %s", name, failure)
 		}
 		var preview struct {
 			PreviewID      string `json:"preview_id"`

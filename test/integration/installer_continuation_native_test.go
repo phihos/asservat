@@ -482,7 +482,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	// fresh binding; it reads the public root generated during provider apply.
 	publicAddress := net.JoinHostPort(nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID), "31450")
 	journey := func(cluster, namespace, workload string) {
-		installedJourney(t, ctx, identity, publicRoot, publicAddress, origin)(cluster, namespace, workload)
+		installedJourney(t, ctx, identity, publicRoot, publicAddress, origin, func() {
+			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-owner", prefix+"-worker")
+		})(cluster, namespace, workload)
 	}
 	qualifyRegionalInstall(t, ctx, f, admin, api, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
 	// ADR-187: after the guard bridge the bootstrap hook replays (as on helm
