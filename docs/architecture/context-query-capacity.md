@@ -112,7 +112,14 @@ effect authority and retain their separate original bounds.
 External guards surround the SQL callback and run outside SQL locks. Parent
 cancellation and every earlier guard deadline survive context replacement.
 Omitted/repeated/late callbacks cannot report success, and final checks cannot
-turn a late completed callback into a current permit. SQL checks database time
+turn a late completed callback into a current permit. A plan newly shorter than
+the already combined caller/authority/source/guard bound is rejected before
+effects or an outer source read. Final source or plan observations that shorten
+that used bound also reject the operation, so outer guard completion cannot
+report success after the new cutoff. An earlier caller bound remains usable:
+comparison is against that effective bound, not an unbounded source lifetime.
+Prepared effects are never rewritten or repeated to recover from such denial.
+SQL checks database time
 after locks and compares the exact original installed plan. Read facets cannot
 accept, suspend or allocate capacity. The producer's separate restrictive
 suspension operation records a monotonic negative without refunding capacity;

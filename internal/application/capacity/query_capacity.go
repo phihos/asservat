@@ -188,7 +188,13 @@ func (s ProtectedContextQueryCapacity) current(ctx context.Context, requireBacki
 			return e
 		}
 		last, e := s.Store.ReadQueryCapacitySource(bound, recovery)
-		if e != nil || !last.Valid(s.Now()) || !sameQuerySource(source, last) || source.Ready && !last.Ready || !source.Valid(s.Now()) || bound.Err() != nil {
+		// This operation has already used source.FreshUntil, narrowed to the
+		// caller, first backing and all guard bounds. A later shorter source
+		// cannot leave that result live while outer guards finish. Reject it;
+		// do not rewrite prepared effects or extend any original observation.
+		if e != nil || !last.Valid(s.Now()) || !sameQuerySource(source, last) || source.Ready && !last.Ready ||
+			last.FreshUntil.Before(source.FreshUntil) || requireBacking && last.BackingUntil.Before(source.FreshUntil) ||
+			!source.Valid(s.Now()) || bound.Err() != nil {
 			return value.ErrUnavailable
 		}
 		return nil
@@ -270,7 +276,9 @@ func (s ProtectedContextQueryCapacity) ContextQueryPlan(ctx context.Context, a v
 		}
 		var e error
 		out, e = s.Store.ReadQueryCapacityPlan(bound, source, a, s.NewID())
-		if e != nil || !out.Valid(a.Scope, s.Now()) || out.Profile != source.Qualification.ContextQuery.Profile {
+		// The final source read and outer guards retain this effective bound.
+		// Reject a newly shorter plan before either can block under it.
+		if e != nil || !out.Valid(a.Scope, s.Now()) || out.ValidUntil.Before(source.FreshUntil) || out.Profile != source.Qualification.ContextQuery.Profile {
 			return value.ErrUnavailable
 		}
 		out.ValidUntil = identity.Earlier(out.ValidUntil, identity.Earlier(source.FreshUntil, source.BackingUntil))
@@ -297,17 +305,20 @@ func (s ProtectedContextQueryCapacity) WithCurrentQueryBacking(ctx context.Conte
 			return value.ErrUnavailable
 		}
 		current, e := s.Store.ReadQueryCapacityPlan(bound, source, a, p.AccountID)
-		if e != nil || !current.Valid(a.Scope, s.Now()) || !sameQueryPlan(p, current) {
+		// source.FreshUntil already includes caller/authority/guard cutoffs.
+		// A newly earlier plan cannot safely flow into effects followed by the
+		// outer source read under the previously longer effective bound.
+		if e != nil || !current.Valid(a.Scope, s.Now()) || current.ValidUntil.Before(source.FreshUntil) || !sameQueryPlan(p, current) {
 			return value.ErrUnavailable
 		}
-		originalUntil = identity.Earlier(current.ValidUntil, source.BackingUntil)
+		originalUntil = identity.Earlier(current.ValidUntil, source.FreshUntil)
 		bound, cancel := context.WithDeadline(bound, originalUntil)
 		defer cancel()
 		if e = callback(bound); e != nil {
 			return e
 		}
 		last, e := s.Store.ReadQueryCapacityPlan(bound, source, a, p.AccountID)
-		if e != nil || !last.Valid(a.Scope, s.Now()) || !sameQueryPlan(p, last) || bound.Err() != nil {
+		if e != nil || !last.Valid(a.Scope, s.Now()) || last.ValidUntil.Before(originalUntil) || !sameQueryPlan(p, last) || bound.Err() != nil {
 			return value.ErrUnavailable
 		}
 		return nil

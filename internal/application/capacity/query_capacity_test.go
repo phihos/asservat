@@ -23,6 +23,7 @@ type queryCapacityReadFake struct {
 	reads     int
 	final     func(*QueryCapacitySource)
 	waitFinal bool
+	plan      func() (value.ContextQueryPlan, error)
 }
 
 func (f *queryCapacityReadFake) ReadQueryCapacitySource(ctx context.Context, _ artifact.RecoveryProof) (QueryCapacitySource, error) {
@@ -37,7 +38,10 @@ func (f *queryCapacityReadFake) ReadQueryCapacitySource(ctx context.Context, _ a
 	}
 	return s, nil
 }
-func (*queryCapacityReadFake) ReadQueryCapacityPlan(context.Context, QueryCapacitySource, value.ContextProjectionAuthority, string) (value.ContextQueryPlan, error) {
+func (f *queryCapacityReadFake) ReadQueryCapacityPlan(context.Context, QueryCapacitySource, value.ContextProjectionAuthority, string) (value.ContextQueryPlan, error) {
+	if f.plan != nil {
+		return f.plan()
+	}
 	return value.ContextQueryPlan{}, value.ErrUnavailable
 }
 func (f *queryCapacityReadFake) RecoveryState(context.Context) (artifact.RecoveryProof, error) {

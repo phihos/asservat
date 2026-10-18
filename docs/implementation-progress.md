@@ -66,6 +66,17 @@ existing callers retain 20 seconds. Query admission/maximum lifetime remain
 persisted dates change. The corrected native selection is pending. The native69
 fence-function probes do not qualify these ledger effects. No hook bypass or
 skipped positive qualification is supplied.
+
+Assembly review then found shorter final source/plan bounds were only checked
+when read: outer guards could finish after those cutoffs and still report
+success. Five regression cases failed before the correction, including an outer
+source read retaining a longer deadline than a newly returned plan. The fix
+rejects those shortened observations before effects/further reads or final
+success. Full capacity race tests and vet pass; positive tests preserve a plan
+when the caller already imposes an earlier bound. These followup checks are
+unit evidence; the native report above remains tied to its original frozen
+commit and does not qualify the later assembled candidate.
+
 Production report acceptance, native guards, role provisioning, complete query
 worker/key delivery, installed qualification and retirement remain unfinished.
 
