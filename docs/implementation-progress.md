@@ -1,5 +1,28 @@
 # Sustained implementation progress
 
+## Installed native 47: hub refusals named, native-read lacked the leaf read (2026-10-18)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39164409930)
+on frozen `173961a4c0e97b4277a3b96030c816765ef539b6` (native46 plus hub
+refusal stages) failed before capture at the same preview point. The hub now
+names its refusals: every `authenticate` refusal came from the ingress at
+either `local` (the hub's own serving-identity authentication) or
+`registration` (the connector's activated-leaf read), interleaved from the
+first attempt. PostgreSQL recorded 25 `permission denied for function
+read_connector_activated_leaf` for the owner `native-read` role, the pool the
+ingress registry uses. That role now holds EXECUTE on that one read-only
+function, with a regression requiring it for native-read only. The `local`
+refusals remain unexplained; the owner authenticator now reports its failing
+step for the next run. A separate `permission denied for table
+permission_stream` on one publisher login is not yet explained.
+
+The [retained log](../test/results/installed-journey-ci-47/context-storage.log)
+shows the passive-command and administrator-removal subcases passing; capture
+and later steps were not reached. PR40/41 remain held.
+[Archive verification](../test/results/installed-journey-ci-47/verification.json)
+matched all 2,701 source hashes to the frozen commit; sources were unchanged,
+test exit was 1 and owned cleanup reported no failures.
+
 ## Installed native 46: owner authentication passes, hub refuses the opening (2026-10-18)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39162007897)
