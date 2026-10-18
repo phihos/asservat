@@ -387,3 +387,15 @@ examples:
 - file: examples/mcp-resolve-capture-closed.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: resolve_capture_request
+- file: examples/mcp-context-excerpt-result.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: get_file_excerpt
+- file: examples/mcp-context-excerpt-pending.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: get_file_excerpt
+- file: examples/mcp-context-query-result.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: get_query_result
+- file: examples/mcp-context-query-pending.json
+  schema: https://asservat.io/spec/v1/mcp-result.schema.json
+  tool: get_query_result

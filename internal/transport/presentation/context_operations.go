@@ -252,6 +252,8 @@ type OperationReply struct {
 	// not establish the disposition of an earlier same-key request.
 	auditDecision   operationAuditDecision
 	auditNoDispatch bool
+	auditEffect     operationAuditEffect
+	owner           *operationReplyOwner
 }
 
 type operationAuditDecision uint8

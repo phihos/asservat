@@ -293,6 +293,37 @@ presentation contract; implementation must not invent an unvalidated browser-onl
 evidence shape. Canonical ordinary-read request schemas need no idempotency or
 continuation extension. Native-download actions remain separate.
 
+The two query operations carry `query_observed_at` and `query_expires_at` in
+successful/pending `data` only. C-18 fixes the observation timestamp when it
+prepares the immutable result. Expiry is the stored original query deadline,
+monotonically shortened by effective evidence access, and is distinct from the
+private at-most-five-second `OperationReply.ValidUntil`. A successful
+`get_query_result` wrapper and its nested original result must have equal timing
+and request IDs. The canonical catalog still permits other specified original
+tools; the current runtime validator accepts only `get_file_excerpt` and applies
+its complete nested output schema. No schema entry activates a service.
+
+The browser records monotonic time at the start of a query request. Its local
+clearing bound is that start plus the server's expiry-minus-observation interval,
+so time spent making the request is not added to the view lifetime. Reject an
+invalid, nonpositive or greater-than-sixty-second interval; retain the earliest
+known bound for the same handle. Clear on scope loss, closure and suspension.
+This avoids assuming synchronized client wall clocks and does not promise
+revocation of external copies. The existing metadata console has no clock-offset
+facility; the approved projection view remains pending implementation.
+
+C-20's private reply owner is shared across `OperationReply` value copies. It
+binds the serialized body to the exact application delivery, requires the
+existing acknowledged C-08 outcome before disclosure and retains cancellation
+through transport serialization/write/flush. The wrapper transfers its cancel
+and in-flight slot only on a successful owned reply; failure closes locally.
+`OperationReply.Close` creates a separate cleanup context from its original
+finite cutoff, capped by the invocation's original thirty-second write allowance,
+even when passed an expired public request. It joins the application close before
+clearing owned bytes and releasing the slot. A failed close retains uncertainty;
+it never produces a positive remote-completion receipt. HTTP transport slots
+remain held until this cleanup returns.
+
 ## Native reuse boundary
 
 Reuse exact immutable source verification, framing/TLS primitives, protected

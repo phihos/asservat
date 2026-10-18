@@ -1,0 +1,17 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000080",
+  "data_class": "metadata",
+  "status": "pending",
+  "data": {
+    "query_handle": "synthetic-query-handle",
+    "retry_after_seconds": 1,
+    "query_observed_at": "2026-10-18T12:00:00Z",
+    "query_expires_at": "2026-10-18T12:00:10Z"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}

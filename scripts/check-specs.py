@@ -844,6 +844,11 @@ def main() -> None:
         require(tool["inputSchema"].get("additionalProperties") is False, "MCP input allows unknown arguments")
     require(not tools["request_capture"]["enabledByDefault"], "Capture tool must default disabled")
     browser_contract = read(ROOT / "docs/interfaces/browser-openapi.yaml")
+    for name in ("get_file_excerpt", "get_query_result"):
+        require(browser_contract["components"]["schemas"]["McpOutput_" + name] == tools[name]["outputSchema"], "Query browser/MCP output contracts differ")
+        require(tools[name]["annotations"]["readOnlyHint"], "Approved query semantics changed")
+    query_success = tools["get_query_result"]["outputSchema"]["allOf"][1]["oneOf"][0]["properties"]["data"]
+    require("const" not in query_success["properties"]["tool_name"], "Canonical query catalog excludes future specified tools")
     for name in ("request_capture", "resolve_capture_request"):
         operation = browser_contract["paths"]["/api/v1/operations/" + name]["post"]
         header = next(parameter for parameter in operation["parameters"] if parameter["name"] == "Idempotency-Key")

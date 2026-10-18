@@ -89,6 +89,15 @@ Prior spend and uncertainty remain charged. All operations preserve the original
 query lifetime and each request's original at-most-five-second identity and
 authority bounds. This profile is specified, not yet runtime-qualified.
 
+For these two query operations, successful and pending `data` includes
+`query_observed_at` and `query_expires_at`. The first timestamps the prepared
+server snapshot; the second is the original total query cutoff, irreversibly
+shortened by effective evidence access. Neither field extends the current
+request's disclosure authority. A successful poll repeats the same timing and
+request ID in its original-tool result. Browser and MCP use the same contract;
+errors carry no query timing. Managed views clear on that cutoff, scope loss,
+closure or suspension. Already delivered external copies cannot be recalled.
+
 ### SC-MCP-002
 
 Given a query with more output than the byte cap, when it completes, then truncation is explicit and the result remains valid JSON. Reusing its cursor under another principal, a revoked share or modified filter is rejected.

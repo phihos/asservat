@@ -1,0 +1,38 @@
+{
+  "schema_version": "mcp-result/v1",
+  "request_id": "00000000-0000-4000-8000-000000000080",
+  "data_class": "metadata",
+  "status": "ok",
+  "data": {
+    "query_handle": "synthetic-query-handle",
+    "tool_name": "get_file_excerpt",
+    "result": {
+      "schema_version": "mcp-result/v1",
+      "request_id": "00000000-0000-4000-8000-000000000080",
+      "data_class": "metadata",
+      "status": "ok",
+      "data": {
+        "logical_path": "pod-status.txt",
+        "line_start": 6,
+        "lines": [
+          "phase: \"Running\"",
+          "ready: \"True\""
+        ],
+        "query_observed_at": "2026-10-18T12:00:00Z",
+        "query_expires_at": "2026-10-18T12:00:10Z"
+      },
+      "truncated": false,
+      "next_cursor": null,
+      "narrowing_hint": null,
+      "warnings": [],
+      "provenance": []
+    },
+    "query_observed_at": "2026-10-18T12:00:00Z",
+    "query_expires_at": "2026-10-18T12:00:10Z"
+  },
+  "truncated": false,
+  "next_cursor": null,
+  "narrowing_hint": null,
+  "warnings": [],
+  "provenance": []
+}
