@@ -1,5 +1,38 @@
 # Sustained implementation progress
 
+## Context-start duplicate local proof regression (2026-10-18)
+
+The installed native43 failure remains before target selection/collection:
+context-start opening is unavailable despite the distinct capacity lane being
+active. The whole opening invokes three local process proofs and two owner
+authentications within the original discovery/setup deadlines. Each local read
+previously observed the owned connector separately before invoking the concrete
+executor, whose complete proof already observes that same connector.
+
+The concrete combined reader removes that outer duplicate, requires the exact
+credentials instance, preserves the native proof and original intervals, and
+copies public CSR/profile buffers. The existing full/current proof, invalidation,
+owner authentication and source frame checks remain. No setup lease or new
+authority is introduced.
+
+An explicit 20-QPS/burst-20 limiter model with synthetic authority reproduced
+the duplicate-read failure inside a two-second caller interval. The unchanged
+production path failed; the combined path passes with the same two source reads
+already made inside the executor. The initial focused race selection passed
+14 top-level / 20 named tests across mTLS and Kubernetes, followed by both
+package vets and Go architecture (58 packages / 338 internal edges). Independent
+local review found no blocker in the narrow change. The final focused race run
+passed 15 top-level / 21 named tests, including concrete-reader credential-owner
+rejection before proof access, copied public buffers, original caller cutoff,
+cancellation and expired-proof refusal. Both vets and Go architecture passed
+again. Spec check passed 11,367 assertions; architecture passed 1,306 positive /
+120 negative checks. These are component/design results, not a native API or
+whole-opening qualification; no installed rerun has been made for this change.
+
+Next: account for and reproduce the remaining whole-opening call graph under
+the original five seconds. No QPS,
+freshness interval, admission proof or current effect check is relaxed.
+
 ## Installed journey native 43: target and context-start opening refusal (2026-10-18)
 
 [Run 39143620577](https://github.com/phihos/asservat/actions/runs/39143620577)

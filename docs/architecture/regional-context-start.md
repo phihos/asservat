@@ -59,6 +59,18 @@ The bare-Pod native fixture's original identity-frame graph required seventeen f
 
 One concrete protection instance coalesces a single positively completed process proof. Reuse retains the original observation start and earliest end, including the original TokenReview and independent admission-denial intervals. It performs current process credential/source/registration, SSR account/Pod identity, namespace/account, exact guard policy/binding, immutable settings, full workload digest and approved input metadata checks before returning. These later reads can shorten the interval; they cannot create a new denial proof or renew it. An error or known change invalidates the snapshot and any in-flight publication generation. A cancelled waiter cannot detach the original producer; cancellation, expiry or invalidation prevents a late positive producer from entering the cache. There is no background refresh or general Kubernetes client cache.
 
+The concrete executor also implements `mtls.ContextStartProcessReader`. Its
+combined read returns the connector observation already checked inside that
+complete native proof, only for the identical process-owned credentials
+instance. The transport need not make a second outer connector observation
+before the same proof. Both results retain their original starts and earliest
+expiry; returned CSR/profile buffers are copies. The transport validates both
+identities and the exact expected channel after the read. Other process readers
+keep the separate connector/process checks. This removes one duplicate per
+local read; it neither caches a whole connection setup nor removes its later
+owner, source or executor checks. Whole installed opening timing remains
+unqualified.
+
 After expiry, a new independent invocation may perform the full proof again under its own original caller bound. Existing preparation, binding and request deadlines remain fixed. [ADR-163](../decisions/163-original-work-transport-observation-lease.md) separately selects an exchange-owned transport observation lease, described below. Source-reader reuse remains unimplemented; neither mechanism qualifies the installed HTTP/2 path or removes current effect checks inside the production credential source.
 
 The accepted template is the API-returned defaulted Deployment template. Comparison retains every PodSpec/security/mount/token field and template label/annotation. It normalizes only the deprecated service-account alias and Pod-only zero priority/default preemption/default service-links scalars. It removes exactly the qualified ReplicaSet controller hash and actual node assignment for comparison. Both 300-second not-ready/unreachable tolerations are explicit. Automount is false; the projected service-account token is explicit and dynamic, with its entire specification pinned. Init/ephemeral/sidecar injection, different mounts, privilege, image or arguments fail closed.

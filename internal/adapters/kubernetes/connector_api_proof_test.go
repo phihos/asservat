@@ -10,9 +10,61 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	execution "asservat.local/asservat/internal/domain/execution"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
+
+func TestConnectorAPIProofCombinedReaderOwnsCredentialsAndOriginalInterval(t *testing.T) {
+	// This completed flight is a synthetic native proof, not native authority
+	// qualification. Exercise the concrete reader's ownership, expiry and copy
+	// boundary without repeating the separate native producer fixture.
+	now := time.Now().UTC()
+	proof := connectorCachedProof(t, now)
+	proof.owned.Request.ClientCSRDER = []byte{11}
+	proof.owned.Request.ServerCSRDER = []byte{12}
+	proof.owned.Configuration = proof.proof.Configuration
+	credentials := &mtls.ConnectorProcessCredentials{}
+	finished := make(chan struct{})
+	close(finished)
+	clockCalls := 0
+	guard := &ConnectorAPIExecutionProtection{
+		credentials: credentials,
+		attester: &ConnectorProcessAttester{client: &PermissionClient{now: func() time.Time {
+			clockCalls++
+			return now
+		}}},
+		reuse: connectorAPIProofState{flight: &connectorAPIProofFlight{done: finished, result: proof}},
+	}
+	p := &ConnectorAPIExecutionProcess{guard: guard, parent: context.Background(), connector: proof.proof.Process,
+		binding: execution.APIProcessBinding{InstallationID: ownerID(1), ClusterID: ownerID(2), IssuerEpoch: ownerID(3), NamespaceUID: ownerID(9), AccountUID: ownerID(10), PodUID: ownerID(5), ProcessEpoch: ownerID(99), StartupDigest: artifact.Digest{1}, ImageDigest: artifact.Digest{2}}}
+	for _, other := range []*mtls.ConnectorProcessCredentials{nil, {}} {
+		if _, _, err := p.ReadAPIProcessConnector(context.Background(), other); err == nil || clockCalls != 0 {
+			t.Fatal("foreign credentials reached native proof", err, clockCalls)
+		}
+	}
+	ctx, cancel := context.WithDeadline(context.Background(), now.Add(time.Second))
+	defer cancel()
+	process, owned, err := p.ReadAPIProcessConnector(ctx, credentials)
+	if err != nil || process.CheckedAt != proof.observedAt || process.ValidUntil != now.Add(time.Second) || owned.ValidUntil != process.ValidUntil || owned.Request.Process != proof.proof.Process {
+		t.Fatal("combined reader changed the original proof or caller interval", err)
+	}
+	owned.Request.ClientCSRDER[0] = 21
+	owned.Request.ServerCSRDER[0] = 22
+	owned.Configuration.Profile.ClientIssuerRoots[0][0] = 23
+	owned.Configuration.Profile.ServerIssuerRoots[0][0] = 24
+	if proof.owned.Request.ClientCSRDER[0] != 11 || proof.owned.Request.ServerCSRDER[0] != 12 || proof.owned.Configuration.Profile.ClientIssuerRoots[0][0] != 1 || proof.owned.Configuration.Profile.ServerIssuerRoots[0][0] != 2 {
+		t.Fatal("caller mutated the retained native proof")
+	}
+	cancel()
+	if _, _, err = p.ReadAPIProcessConnector(ctx, credentials); err == nil {
+		t.Fatal("cancelled combined read returned retained proof")
+	}
+	now = proof.validUntil
+	if _, _, err = p.ReadAPIProcessConnector(context.Background(), credentials); err == nil {
+		t.Fatal("combined reader renewed an expired original proof")
+	}
+}
 
 // Only the bounded coalescing state is under test here. This synthetic positive
 // input stands for a separately completed full proof; native tests exercise the

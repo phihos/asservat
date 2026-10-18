@@ -72,6 +72,15 @@ both admission guards enforce every start write. Unobserved changes to the
 executor workload can therefore remain unknown for at most five seconds after
 that observation began.
 
+A concrete executor may return the connector observation already checked by
+its complete native proof to the context-start transport. It must require the
+same process-owned credentials instance, retain both original intervals and
+return independently owned public buffers. This avoids a duplicate outer
+connector observation without replacing any proof, extending freshness or
+changing the later setup/work checks. A different credentials owner cannot
+borrow the result; process readers without that concrete composition retain
+independent observations.
+
 For the initial regional Kubernetes API snapshot, `apiContextStart/v1` binds the
 protected executor Pod/account/process and exact collector image, without target
 node/boot claims. One immutable SQL execution row and the original Kubernetes

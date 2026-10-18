@@ -20,6 +20,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	executionvalue "asservat.local/asservat/internal/domain/execution"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/google/uuid"
@@ -210,21 +211,31 @@ func (c *ContextStartClient) local(ctx context.Context, expected *value.APIConte
 	call, stop := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer stop()
 	until, _ := call.Deadline()
-	observed, e := c.connector.ObserveConnectorProcess(call)
+	var observed ConnectorProcessObservation
+	var process executionvalue.APIProcessObservation
+	var e error
+	if combined, ok := c.process.(ContextStartProcessReader); ok {
+		process, observed, e = combined.ReadAPIProcessConnector(call, c.connector)
+	} else {
+		observed, e = c.connector.ObserveConnectorProcess(call)
+		if e == nil {
+			local, stop := context.WithDeadline(call, observed.ValidUntil)
+			process, e = c.process.ReadAPIProcess(local)
+			stop()
+		}
+	}
 	if e != nil {
 		return zero, value.APIContextExecutor{}, time.Time{}, e
 	}
-	until = identity.Earlier(until, observed.ValidUntil)
-	call, stopLocal := context.WithDeadline(call, until)
-	defer stopLocal()
-	process, e := c.process.ReadAPIProcess(call)
-	if e != nil || !process.Valid(c.now()) {
+	if !process.Valid(c.now()) {
 		return zero, value.APIContextExecutor{}, time.Time{}, value.ErrUnavailable
 	}
+	until = identity.Earlier(until, observed.ValidUntil)
 	b := process.Binding
 	p := observed.Registration.Process
 	executor := value.APIContextExecutor{NamespaceUID: b.NamespaceUID, AccountUID: b.AccountUID, PodUID: b.PodUID, ProcessEpoch: b.ProcessEpoch, StartupDigest: b.StartupDigest, ImageDigest: b.ImageDigest}
-	if !executor.Valid() || b.InstallationID != p.Binding.InstallationID || b.ClusterID != p.Binding.ClusterID || b.IssuerEpoch != p.Binding.IssuerEpoch || b.PodUID != p.PodUID || b.ProcessEpoch == p.ProcessEpoch || observed.Configuration.Profile.RootID != c.rootID {
+	if !identity.Fresh(observed.ObservedAt, observed.ValidUntil, c.now(), 5*time.Second) || !observed.Registration.Valid(c.now()) || !observed.Configuration.Valid(c.now()) || observed.Request.Process != p ||
+		!executor.Valid() || b.InstallationID != p.Binding.InstallationID || b.ClusterID != p.Binding.ClusterID || b.IssuerEpoch != p.Binding.IssuerEpoch || b.PodUID != p.PodUID || b.ProcessEpoch == p.ProcessEpoch || observed.Configuration.Profile.RootID != c.rootID {
 		return zero, value.APIContextExecutor{}, time.Time{}, value.ErrDenied
 	}
 	until = identity.Earlier(until, process.ValidUntil)

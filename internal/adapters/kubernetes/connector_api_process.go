@@ -429,9 +429,24 @@ func NewConnectorAPIExecutionProcess(ctx context.Context, g *ConnectorAPIExecuti
 	return &ConnectorAPIExecutionProcess{g, ctx, b, value.APIProcessBinding{InstallationID: s.InstallationID, ClusterID: s.ClusterID, IssuerEpoch: s.IssuerEpoch, NamespaceUID: s.NamespaceUID, AccountUID: s.AccountUID, PodUID: b.PodUID, ProcessEpoch: epoch, StartupDigest: g.startup, ImageDigest: g.image}}, nil
 }
 func (p *ConnectorAPIExecutionProcess) ReadAPIProcess(ctx context.Context) (value.APIProcessObservation, error) {
+	out, _, err := p.readAPIProcess(ctx)
+	return out, err
+}
+
+// ReadAPIProcessConnector exposes only the owned connector observation that
+// this same concrete native proof already checked. It cannot borrow another
+// credentials instance or renew the underlying cached proof's original bounds.
+func (p *ConnectorAPIExecutionProcess) ReadAPIProcessConnector(ctx context.Context, credentials *mtls.ConnectorProcessCredentials) (value.APIProcessObservation, mtls.ConnectorProcessObservation, error) {
+	if p == nil || p.guard == nil || credentials == nil || credentials != p.guard.credentials {
+		return value.APIProcessObservation{}, mtls.ConnectorProcessObservation{}, value.ErrUnavailable
+	}
+	return p.readAPIProcess(ctx)
+}
+
+func (p *ConnectorAPIExecutionProcess) readAPIProcess(ctx context.Context) (value.APIProcessObservation, mtls.ConnectorProcessObservation, error) {
 	var zero value.APIProcessObservation
 	if p == nil || ctx == nil || p.parent.Err() != nil {
-		return zero, value.ErrUnavailable
+		return zero, mtls.ConnectorProcessObservation{}, value.ErrUnavailable
 	}
 	// The enclosing observation owns its original five-second interval. The
 	// guard starts later and must not return a deadline beyond CheckedAt + 5s.
@@ -448,11 +463,16 @@ func (p *ConnectorAPIExecutionProcess) ReadAPIProcess(ctx context.Context) (valu
 	proof, e := p.guard.current(call)
 	b, until := proof.proof.Process, proof.validUntil
 	if e != nil || b != p.connector {
-		return zero, value.ErrUnavailable
+		return zero, mtls.ConnectorProcessObservation{}, value.ErrUnavailable
 	}
 	out := value.APIProcessObservation{Binding: p.binding, CheckedAt: proof.observedAt, ValidUntil: until}
 	if call.Err() != nil || p.parent.Err() != nil || !out.Valid(p.guard.attester.client.now()) {
-		return zero, value.ErrUnavailable
+		return zero, mtls.ConnectorProcessObservation{}, value.ErrUnavailable
 	}
-	return out, nil
+	owned := proof.owned
+	owned.Request.ClientCSRDER = bytes.Clone(owned.Request.ClientCSRDER)
+	owned.Request.ServerCSRDER = bytes.Clone(owned.Request.ServerCSRDER)
+	owned.Configuration.Profile = owned.Configuration.Profile.Clone()
+	owned.ValidUntil = identity.Earlier(owned.ValidUntil, until)
+	return out, owned, nil
 }
