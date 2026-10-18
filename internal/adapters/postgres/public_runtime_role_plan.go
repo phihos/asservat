@@ -280,6 +280,40 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		read("download_worker_configuration", "download_worker_configuration_revision")
 		add("download_worker_configuration", "UPDATE", "source_uid")
 		add("download_worker_configuration_revision", "UPDATE", "audit_receipt_json")
+	case "context-cleanup", "context-cleanup-audit", "context-cleanup-finalize":
+		// ADR-205 decision 2: exactly the ADR-111 ContextDeletions facets'
+		// grants. Every facet locks recovery and the permission stream and reads
+		// the joined writer completion and its execution and checkpoint.
+		read("permission_stream", "fleet_current_trust", "context_execution", "context_writer_completion", "context_deletion_checkpoint")
+		add("fleet_trust", "SELECT", "installation_id", "activated_postmaster_at", "activated_database_oid")
+		add("fleet_current_trust", "UPDATE", "installation_id")
+		add("permission_stream", "UPDATE", "id")
+		if purpose != "context-cleanup-audit" {
+			// The attempt, its copies and the charged allocation, locked in
+			// pool, allocation, attempt order.
+			read("custody_pool", "custody_allocation", "custody_attempt", "custody_copy")
+			for _, table := range []string{"custody_pool", "custody_allocation", "custody_attempt"} {
+				add(table, "UPDATE", "id")
+			}
+		}
+		switch purpose {
+		case "context-cleanup":
+			// Claim the deletion lease and record the fenced purge only.
+			add("custody_attempt", "UPDATE", "state", "deletion_fence", "lease_until")
+			add("context_deletion_checkpoint", "INSERT")
+		case "context-cleanup-audit":
+			// One receipt on an unacknowledged checkpoint; the identity column
+			// admits its FOR UPDATE lock, and the guard trigger refuses changes.
+			add("context_deletion_checkpoint", "UPDATE", "attempt_id", "audit_receipt_json", "audit_acknowledged_at")
+		case "context-cleanup-finalize":
+			// The one-use finalization claim, charge release, receipt clearing,
+			// tombstone and outbox event; triggers require the acknowledged audit.
+			add("context_deletion_checkpoint", "UPDATE", "attempt_id", "finalization_xid")
+			add("custody_allocation", "UPDATE", "charged_bytes", "charged_objects")
+			add("custody_attempt", "UPDATE", "state", "deleted_at", "lease_until")
+			add("custody_copy", "UPDATE", "ciphertext_bytes", "ciphertext_sha256", "etag", "version_id")
+			add("custody_event", "INSERT")
+		}
 	case "retention-read":
 		read("permission_stream", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
 		add("permission_stream", "UPDATE", "id")

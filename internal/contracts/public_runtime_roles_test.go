@@ -7,9 +7,21 @@ import (
 
 func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
-	// ADR-204 added three logins outside the hub projection (80 to 83).
-	if len(all) != 83 || len(hub) != 51 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
+	// ADR-204 added three logins outside the hub projection (80 to 83), and
+	// ADR-205 three more (86).
+	if len(all) != 86 || len(hub) != 51 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
 		t.Fatal("unreviewed compartment expansion")
+	}
+	// ADR-205 decision 2: the hub-worker's deletion logins, in this order.
+	if !slices.Equal(PublicRuntimeContextDeletionPurposes(), []string{"context-cleanup", "context-cleanup-audit", "context-cleanup-finalize"}) {
+		t.Fatal("context deletion logins changed")
+	}
+	for n, purpose := range PublicRuntimeContextDeletionPurposes() {
+		id, ok := PublicRuntimeRoleOrdinal(purpose)
+		limit, bounded := PublicRuntimeRoleConnectionLimit(purpose)
+		if !ok || id != 89+n || !bounded || limit != 3 || !slices.Contains(all, purpose) || slices.Contains(hub, purpose) {
+			t.Fatal("context deletion compartment changed", purpose)
+		}
 	}
 	for purpose, want := range map[string]int{"worker-config-observe": 86, "worker-config-audit": 87, "key-acquisition": 88} {
 		id, ok := PublicRuntimeRoleOrdinal(purpose)

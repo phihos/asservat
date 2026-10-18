@@ -15,6 +15,13 @@ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14);
 -- name: AcknowledgeContextDeletion :execrows
 UPDATE context_deletion_checkpoint SET audit_receipt_json=$3,audit_acknowledged_at=clock_timestamp() WHERE root_id=$1 AND attempt_id=$2 AND audit_acknowledged_at IS NULL;
 
+-- ADR-205 decision 3: a bounded scheduling page, oldest effective cutoff first.
+-- It confers nothing; BeginContextDeletion rechecks cutoff, lease and recovery.
+-- name: ListDueContextDeletions :many
+SELECT a.cluster_id,a.artifact_id,a.id FROM custody_attempt AS a JOIN context_writer_completion AS w ON w.attempt_id=a.id
+WHERE w.root_id=$1 AND a.state<>'deleted' AND a.effective_expires_at<=clock_timestamp() AND (a.lease_until IS NULL OR a.lease_until<=clock_timestamp())
+ORDER BY a.effective_expires_at,a.id LIMIT 16;
+
 -- name: ContextRequiresPositiveDeletion :one
 SELECT EXISTS(SELECT 1 FROM context_execution WHERE attempt_id=$1 AND writer_protocol='closed-small-context/v1');
 -- name: ClaimContextFinalization :execrows

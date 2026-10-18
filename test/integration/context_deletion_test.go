@@ -12,6 +12,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -42,8 +43,23 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	}
 	registration := accepted.Expectation.Registration
 	loc := registration.Location
+	// ADR-205 decision 3: the due list is read with the cleaner's grants only.
+	listed := func() bool {
+		t.Helper()
+		due, err := cleanup.DueContextDeletions(ctx)
+		if err != nil || len(due) > 16 {
+			t.Fatal("due context deletions", len(due), err)
+		}
+		return slices.Contains(due, loc)
+	}
 	if _, err := cleanup.BeginContextDeletion(ctx, loc, recovery()); err == nil {
 		t.Fatal("cleanup began before read cutoff")
+	}
+	if listed() {
+		t.Fatal("attempt listed before its effective cutoff")
+	}
+	if _, err := ack.DueContextDeletions(ctx); err == nil {
+		t.Fatal("audit acknowledgement login read custody attempts")
 	}
 	var writerRows int
 	if err := admin.QueryRow(ctx, "SELECT count(*) FROM context_writer_completion WHERE attempt_id=$1", loc.AttemptID).Scan(&writerRows); err != nil || writerRows != 1 {
@@ -80,9 +96,15 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	if err = retention.TightenRetention(ctx, decision); err != nil {
 		t.Fatal(err)
 	}
+	if !listed() {
+		t.Fatal("attempt past its effective cutoff without a lease not listed")
+	}
 	work, err := cleanup.BeginContextDeletion(ctx, loc, recovery())
 	if err != nil {
 		t.Fatal(err)
+	}
+	if listed() {
+		t.Fatal("attempt listed under a live deletion lease")
 	}
 	genericPool := newPool("custody_runtime", "synthetic-runtime")
 	generic, err := postgres.New(ctx, genericPool)
@@ -133,6 +155,9 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	var positiveRows int
 	if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_deletion_checkpoint WHERE attempt_id=$1", loc.AttemptID).Scan(&positiveRows); err != nil || positiveRows != 0 {
 		t.Fatal("expired purge committed", positiveRows, err)
+	}
+	if !listed() {
+		t.Fatal("attempt with an ended deletion lease not listed")
 	}
 	work, err = cleanup.BeginContextDeletion(ctx, loc, recovery())
 	if err != nil {
@@ -238,6 +263,9 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	var full, replay int64
 	if err = admin.QueryRow(ctx, "SELECT ca.charged_objects,cc.charged_full,cc.charged_replay FROM custody_allocation ca JOIN context_control_account cc ON cc.allocation_id=ca.id WHERE ca.id=$1", registration.AllocationID).Scan(&charged, &full, &replay); err != nil || charged != 0 || full != 1 || replay != 1 {
 		t.Fatal("wrong release scope", charged, full, replay, err)
+	}
+	if listed() {
+		t.Fatal("finalized attempt still listed")
 	}
 	denied(admin, "DELETE FROM context_deletion_checkpoint WHERE attempt_id=$1", "23514")
 }

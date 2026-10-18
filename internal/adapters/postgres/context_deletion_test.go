@@ -3,6 +3,9 @@ package postgres
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -48,5 +51,38 @@ func TestContextDeletionRecordRejectsRelationalOrCanonicalSubstitution(t *testin
 	row.FinalizationXid = pgtype.Uint64{Uint64: 987654, Valid: true}
 	if got, err := deletionRecord(row); err != nil || got != expected {
 		t.Fatal("transaction bookkeeping changed immutable audit", err)
+	}
+}
+
+// ADR-205 decision 3: the due list is a bounded page of distinct valid
+// locations; anything else is unavailable rather than partially scheduled.
+func TestDueContextDeletionsAcceptOnlyBoundedDistinctLocations(t *testing.T) {
+	row := func(n int) custodydb.ListDueContextDeletionsRow {
+		key := func(prefix int) pgtype.UUID {
+			return id(fmt.Sprintf("%08x-0000-4000-8000-%012x", prefix, n))
+		}
+		return custodydb.ListDueContextDeletionsRow{ClusterID: key(1), ArtifactID: key(2), ID: key(3)}
+	}
+	var rows []custodydb.ListDueContextDeletionsRow
+	for n := range 16 {
+		rows = append(rows, row(n))
+	}
+	got, err := dueContextDeletions(rows)
+	if err != nil || len(got) != 16 || got[3] != (artifact.Location{ClusterID: "00000001-0000-4000-8000-000000000003", ArtifactID: "00000002-0000-4000-8000-000000000003", AttemptID: "00000003-0000-4000-8000-000000000003"}) {
+		t.Fatal("bounded due page changed", got, err)
+	}
+	if got, err = dueContextDeletions(nil); err != nil || got == nil || len(got) != 0 {
+		t.Fatal("empty due page", got, err)
+	}
+	invalid := row(0)
+	invalid.ArtifactID = pgtype.UUID{}
+	for name, bad := range map[string][]custodydb.ListDueContextDeletionsRow{
+		"oversized": append(slices.Clone(rows), row(16)),
+		"duplicate": {row(1), row(1)},
+		"invalid":   {invalid},
+	} {
+		if _, err = dueContextDeletions(bad); !errors.Is(err, app.ErrUnavailable) {
+			t.Fatal("unbounded or invalid due page accepted", name, err)
+		}
 	}
 }

@@ -30,6 +30,7 @@ func PublicRuntimeRolePurposes() []string {
 	out = append(out, PublicRuntimePermissionPurposes()...)
 	out = append(out, PublicRuntimeRetentionPurposes()...)
 	out = append(out, PublicRuntimeWorkerConfigurationPurposes()...)
+	out = append(out, PublicRuntimeContextDeletionPurposes()...)
 	return append(out, PublicRuntimeKeyServicePurposes()...)
 }
 
@@ -54,6 +55,15 @@ func PermissionProjectionPurposes(retention, workerConfiguration bool) []string 
 // Like the permission logins, they never enter the hub projection.
 func PublicRuntimeWorkerConfigurationPurposes() []string {
 	return []string{"worker-config-observe", "worker-config-audit"}
+}
+
+// PublicRuntimeContextDeletionPurposes are the hub-worker's positive context
+// deletion logins (ADR-205 decision 2, ADR-111), in order: the cleaner, which
+// claims and records the purge, the separate audit acknowledgement and the
+// finalizer, which releases the storage charge. Like the permission logins,
+// they never enter the hub projection.
+func PublicRuntimeContextDeletionPurposes() []string {
+	return []string{"context-cleanup", "context-cleanup-audit", "context-cleanup-finalize"}
 }
 
 // PublicRuntimeRetentionPurposes are the hub-worker's retention source logins
@@ -266,6 +276,13 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 87, true
 	case "key-acquisition":
 		return 88, true
+	// ADR-205: the hub-worker's positive context deletion.
+	case "context-cleanup":
+		return 89, true
+	case "context-cleanup-audit":
+		return 90, true
+	case "context-cleanup-finalize":
+		return 91, true
 	default:
 		return 0, false
 	}

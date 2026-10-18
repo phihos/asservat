@@ -141,6 +141,40 @@ func (q *Queries) InsertContextWriterCompletion(ctx context.Context, arg InsertC
 	return err
 }
 
+const listDueContextDeletions = `-- name: ListDueContextDeletions :many
+SELECT a.cluster_id,a.artifact_id,a.id FROM custody_attempt AS a JOIN context_writer_completion AS w ON w.attempt_id=a.id
+WHERE w.root_id=$1 AND a.state<>'deleted' AND a.effective_expires_at<=clock_timestamp() AND (a.lease_until IS NULL OR a.lease_until<=clock_timestamp())
+ORDER BY a.effective_expires_at,a.id LIMIT 16
+`
+
+type ListDueContextDeletionsRow struct {
+	ClusterID  pgtype.UUID
+	ArtifactID pgtype.UUID
+	ID         pgtype.UUID
+}
+
+// ADR-205 decision 3: a bounded scheduling page, oldest effective cutoff first.
+// It confers nothing; BeginContextDeletion rechecks cutoff, lease and recovery.
+func (q *Queries) ListDueContextDeletions(ctx context.Context, rootID pgtype.UUID) ([]ListDueContextDeletionsRow, error) {
+	rows, err := q.db.Query(ctx, listDueContextDeletions, rootID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListDueContextDeletionsRow{}
+	for rows.Next() {
+		var i ListDueContextDeletionsRow
+		if err := rows.Scan(&i.ClusterID, &i.ArtifactID, &i.ID); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockContextDeletion = `-- name: LockContextDeletion :one
 SELECT attempt_id, root_id, capture_id, store_id, registration_digest, writer_digest, record_digest, record_json, installation_id, issuer_epoch, postmaster_at, database_oid, purge_fence, purged_at, recorded_at, audit_receipt_json, audit_acknowledged_at, finalization_xid FROM context_deletion_checkpoint WHERE root_id=$1 AND attempt_id=$2 FOR UPDATE
 `
