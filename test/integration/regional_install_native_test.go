@@ -50,7 +50,7 @@ import (
 // non-administrator source write is denied. The issuance logins are the
 // product fleet-bootstrap purposes the continuation provisioned; only the
 // fleet operator authority is fixture setup.
-func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin *pgxpool.Pool, hub kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string), providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
+func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin *pgxpool.Pool, hub kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
 	t.Helper()
 	var offer contracts.RegionalOffer
 	if json.Unmarshal([]byte(offerJSON), &offer) != nil {
@@ -515,7 +515,7 @@ func nodeInternalIP(t *testing.T, ctx context.Context, api kubernetes.Interface,
 // the owner's operation port, and after the operator adds a regional budget
 // policy, a labeled regional workload and its maintainer binding, the
 // hub-worker enrolls that workload through v2 to ready_at with a fresh binding.
-func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation) {
+func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation) {
 	t.Helper()
 	j := installed.Join
 	if j == nil || j.Capacity == nil || !slices.Equal(j.Capacity.Keys, slices.Sorted(slices.Values(offer.Capacity.Keys))) {
@@ -663,7 +663,25 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	}
 	t.Log("regional workload enrolled through v2 to ready_at; a refresh demand kept refreshing its binding; the pool extended once")
 	if journey != nil {
-		journey(cluster, ns.Name, app.Name)
+		// The journey's revocation: a Deny binding for the same group, role
+		// and scope, then its removal. The original Allow assignment stays.
+		deny := func(on bool) {
+			t.Helper()
+			path := base + "accessbindings/regional-maintainers-revoked"
+			if !on {
+				if err := client.Delete().AbsPath(path).Do(ctx).Error(); err != nil {
+					t.Fatal("operator removes the revoking binding", err)
+				}
+				return
+			}
+			revoke := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "regional-maintainers-revoked"}, "spec": map[string]any{"effect": "Deny",
+				"subjects": binding["spec"].(map[string]any)["subjects"], "roles": []any{"workload-maintainer"}, "scope": binding["spec"].(map[string]any)["scope"], "reason": "installed journey revocation"}}
+			body, _ := json.Marshal(revoke)
+			if err := client.Post().AbsPath(base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
+				t.Fatal("operator revokes the maintainer binding", err)
+			}
+		}
+		journey(cluster, ns.Name, app.Name, deny)
 	}
 }
 

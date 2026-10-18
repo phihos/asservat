@@ -294,7 +294,8 @@ def qualify_direct_helper_issuer(env, report):
 
 def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False, installer_continuation=False):
     if installer_continuation:
-        return "38m"
+        # The installed journey waits for its capture's ten-minute expiry.
+        return "50m"
     # Aggregate test envelope only. Product authority/root/token dates are unchanged.
     return "14m" if runtime_provider_owner else ("12m" if helm_bootstrap else None)
 

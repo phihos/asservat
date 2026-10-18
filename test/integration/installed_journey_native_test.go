@@ -31,12 +31,20 @@ func (b installedJourneyBearer) RoundTrip(r *http.Request) (*http.Response, erro
 // installedJourney returns the first installed S-02 slice: as the owned
 // Keycloak user, over MCP through the public API's NodePort Service
 // (ADR-202), preview, request and resolve a pod-status capture of the
-// regional workload. Every authority input is the installed product's own:
+// regional workload, download it, then see access end when the operator
+// revokes it and again when the capture expires. deny adds (true) or removes
+// (false) the operator's Deny binding for the user's group. Every authority
+// input is the installed product's own:
 // the operator's AccessBinding, the permission stream, the regional capacity
 // binding refreshed on demand (ADR-200) and the federation; nothing is seeded.
 // diagnose prints the hub processes' logs before a failure ends the test.
-func installedJourney(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func()) func(cluster, namespace, workload string) {
-	return func(cluster, namespace, workload string) {
+// installedJourneyRetention is the requested evidence access lifetime in
+// seconds: long enough to collect, publish and download, short enough to
+// wait for expiry.
+const installedJourneyRetention = 600
+
+func installedJourney(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func()) func(cluster, namespace, workload string, deny func(bool)) {
+	return func(cluster, namespace, workload string, deny func(bool)) {
 		t.Helper()
 		if identity == nil {
 			t.Log("installed journey skipped: the harness started no identity provider")
@@ -98,7 +106,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			} `json:"selected_pods"`
 		}
 		call("preview_capture", map[string]any{"target_ref": map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload},
-			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": 3600}, &preview)
+			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": installedJourneyRetention}, &preview)
 		if !preview.CaptureEnabled || len(preview.SelectedPods) != 1 || preview.PreviewID == "" {
 			t.Fatal("installed preview did not pin the regional Pod", preview)
 		}
@@ -194,5 +202,75 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			t.Fatal("installed download content differs from its prepared metadata", response.StatusCode, size, err)
 		}
 		t.Logf("installed journey: the Keycloak user downloaded the native pod-status file (%d bytes) through the hub-local worker", size)
+		// Revocation: with the Deny binding the case is no longer available;
+		// without it, it is again. Expiry: once the artifact's access ends,
+		// the case no longer offers it and a new preparation is refused.
+		available := func() (bool, time.Time) {
+			t.Helper()
+			result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "get_case", Arguments: map[string]string{"case_id": progress.CaseID}})
+			if err != nil {
+				t.Fatal("installed get_case", err)
+			}
+			raw, _ := json.Marshal(result.StructuredContent)
+			var envelope struct {
+				Status string `json:"status"`
+				Data   struct {
+					Artifacts []struct {
+						ExpiresAt time.Time `json:"expires_at"`
+					} `json:"artifacts"`
+				} `json:"data"`
+			}
+			if json.Unmarshal(raw, &envelope) != nil || envelope.Status != "ok" && envelope.Status != "error" {
+				t.Fatal("installed get_case reply", string(raw))
+			}
+			if envelope.Status != "ok" || len(envelope.Data.Artifacts) == 0 {
+				return false, time.Time{}
+			}
+			return true, envelope.Data.Artifacts[0].ExpiresAt
+		}
+		until := func(what string, limit time.Duration, want bool) time.Time {
+			t.Helper()
+			end := time.Now().Add(limit)
+			for {
+				got, expires := available()
+				if got == want {
+					return expires
+				}
+				if time.Now().After(end) {
+					diagnose()
+					t.Fatal("installed journey: timed out waiting for", what)
+				}
+				time.Sleep(5 * time.Second)
+			}
+		}
+		refused := func(key string) {
+			t.Helper()
+			result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "prepare_artifact_download", Arguments: map[string]string{"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": key}})
+			raw, _ := json.Marshal(result)
+			var envelope struct {
+				StructuredContent struct {
+					Status string `json:"status"`
+				} `json:"structuredContent"`
+			}
+			if err != nil || json.Unmarshal(raw, &envelope) != nil || envelope.StructuredContent.Status != "error" {
+				t.Fatal("installed journey: a new download preparation was not refused", key, err, string(raw))
+			}
+		}
+		deny(true)
+		until("the revocation", 2*time.Minute, false)
+		refused("installed-journey-revoked")
+		t.Log("installed journey: after the operator's Deny binding the case and a new download preparation are refused")
+		deny(false)
+		expires := until("the restored access", 2*time.Minute, true)
+		t.Logf("installed journey: removing the Deny binding restored access; access ends at %s", expires.Format(time.RFC3339))
+		if wait := time.Until(expires); wait > 0 {
+			if wait > installedJourneyRetention*time.Second {
+				t.Fatal("installed artifact access outlasts the requested retention", expires)
+			}
+			time.Sleep(wait)
+		}
+		until("the expiry", 2*time.Minute, false)
+		refused("installed-journey-expired")
+		t.Log("installed journey: after expiry the case no longer offers the artifact and a new preparation is refused")
 	}
 }
