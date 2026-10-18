@@ -120,13 +120,17 @@ func TestQueryCapacityEveryResidualDimensionIsIndependent(t *testing.T) {
 }
 
 func TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile(t *testing.T) {
-	for _, name := range []string{"missing", "worker-proof-only", "deployment-image", "profile-measurement", "enforced-limits", "aggregate-memory", "worker-resource-borrowing", "copies-outside-memory", "workload-overcommit", "principal-overcommit", "poll-work", "control-work", "history", "legacy-history", "worker-history-rows", "fractional-duration"} {
+	for _, name := range []string{"missing", "worker-proof-only", "duplicate-deployment", "deployment-image", "profile-measurement", "enforced-limits", "aggregate-memory", "worker-resource-borrowing", "copies-outside-memory", "workload-overcommit", "principal-overcommit", "poll-work", "control-work", "history", "legacy-history", "worker-history-rows", "fractional-duration"} {
 		t.Run(name, func(t *testing.T) {
 			q, pool, base, root := queryCapacityFixture(t)
 			x := q.ContextQuery
 			switch name {
 			case "missing":
 				q.ContextQuery = nil
+			case "duplicate-deployment":
+				x.Native.Provider.ClusterID = x.Native.KeyService.ClusterID
+				x.Native.Provider.NamespaceUID = x.Native.KeyService.NamespaceUID
+				x.Native.Provider.WorkloadUID = x.Native.KeyService.WorkloadUID
 			case "worker-proof-only":
 				x.Native.Hub = QueryDeploymentPin{}
 			case "deployment-image":

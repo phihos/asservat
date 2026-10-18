@@ -84,6 +84,11 @@ BEGIN
   END LOOP;
   IF (v->'Limits'->>'WorkerTransientBytes')::numeric+(v->'Limits'->>'HubTransientBytes')::numeric>(v->'Limits'->>'MemoryBytes')::numeric OR (v->'Limits'->>'AuthenticationConcurrency')::numeric<(p->'Worker'->>'AuthenticationConcurrency')::numeric*(q->>'RootQueries')::numeric THEN RETURN false;END IF;
  END LOOP;
+ -- This layout reserves distinct complete deployments. Sharing a physical
+ -- deployment requires an independently accepted partition contract; it cannot
+ -- multiply one enforced limit by assigning it four role names.
+ IF EXISTS(SELECT 1 FROM jsonb_each(n) e WHERE e.key IN ('Worker','Hub','KeyService','Provider')
+  GROUP BY e.value->>'ClusterID',e.value->>'NamespaceUID',e.value->>'WorkloadUID' HAVING count(*)>1) THEN RETURN false;END IF;
  IF n->'Worker'->'Configuration' IS DISTINCT FROM p->'Path'->'WorkerConfiguration' OR n->'Hub'->'Configuration' IS DISTINCT FROM p->'Path'->'HubConfiguration' OR
   n->'Worker'->'ClusterID' IS DISTINCT FROM p->'Path'->'AcquisitionClusterID' OR n->'Hub'->'ClusterID' IS DISTINCT FROM p->'Path'->'HubClusterID' THEN RETURN false;END IF;
  FOREACH k IN ARRAY ARRAY['FixedBytes','PrincipalBytes','AllocationBytes','RowBytes','FixedQueryRows','InvocationRows','ControlRows','TransitionWALBytes','AuditCipherBytes','AuthenticationPerCall','ProviderPerCall','AuthenticationPerControl','ProviderPerControl','AuthenticationPerSource','ProviderPerSource'] LOOP

@@ -89,10 +89,16 @@ func (q QueryNativeQualification) valid(p value.ContextQueryResourceProfile) boo
 		return false
 	}
 	var totals [7]int64
+	deployments := map[[3]string]bool{}
 	for i, pin := range []QueryDeploymentPin{q.Worker, q.Hub, q.KeyService, q.Provider} {
 		if pin.Role != []string{"query-worker", "hub", "query-key-service", "query-provider"}[i] || !authorization.UUID(pin.ClusterID) || !identity.Text(pin.NamespaceUID, 64) || !identity.Text(pin.WorkloadUID, 64) || !identity.Text(pin.Image, 512) || !pinnedImage(pin.Image) || !pin.Configuration.Valid() || pin.ProtectionDigest == (artifact.Digest{}) || pin.EnforcedLimitsDigest == (artifact.Digest{}) {
 			return false
 		}
+		physical := [3]string{pin.ClusterID, pin.NamespaceUID, pin.WorkloadUID}
+		if deployments[physical] {
+			return false
+		}
+		deployments[physical] = true
 		for j, n := range pin.Limits.values() {
 			var ok bool
 			if !queryPositive(n) {

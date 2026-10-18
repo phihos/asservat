@@ -62,7 +62,7 @@ func syntheticQueryCapacityQualification(t *testing.T, f *capacitySQLFixture) {
 	}
 	q.Envelope.QueryProcessEnvelope = app.QueryProcessEnvelope{CPUMilli: 200, MemoryBytes: 128 << 20, EphemeralStorageBytes: 8 << 20, WorkerTransientBytes: 16 << 20, HubTransientBytes: 256 << 10, ProviderConcurrency: 2, AuthenticationConcurrency: 2}
 	pin := func(role string) app.QueryDeploymentPin {
-		return app.QueryDeploymentPin{Role: role, ClusterID: cluster, NamespaceUID: f.template.ControlNamespace.UID, WorkloadUID: root, Image: "synthetic-only@sha256:" + strings.Repeat("a", 64), Configuration: rev, ProtectionDigest: artifact.Digest{42}, EnforcedLimitsDigest: artifact.Digest{43}, Limits: q.Envelope.QueryProcessEnvelope}
+		return app.QueryDeploymentPin{Role: role, ClusterID: cluster, NamespaceUID: f.template.ControlNamespace.UID, WorkloadUID: role + "-" + root, Image: "synthetic-only@sha256:" + strings.Repeat("a", 64), Configuration: rev, ProtectionDigest: artifact.Digest{42}, EnforcedLimitsDigest: artifact.Digest{43}, Limits: q.Envelope.QueryProcessEnvelope}
 	}
 	b, _ = json.Marshal(p)
 	q.Native = app.QueryNativeQualification{Revision: rev, Format: "context-query-native-qualification/v1", RunID: "synthetic-sql-component-only", ReportDigest: artifact.Digest{44}, SourceTree: artifact.Digest{45}, ProfileDigest: sha256.Sum256(b), Worker: pin("query-worker"), Hub: pin("hub"), KeyService: pin("query-key-service"), Provider: pin("query-provider"), Combined: q.Envelope.QueryProcessEnvelope}
@@ -78,7 +78,7 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) { syntheticQueryCapacityQualification(t, f) })
 	qualificationBody, _ := json.Marshal(f.qualification.ContextQuery)
 	baseBody, _ := json.Marshal(f.qualification.RootBacking)
-	for _, mode := range []string{"original", "legacy-history", "missing-limits", "short-worker", "short-rows", "short-audits", "unknown-profile-field"} {
+	for _, mode := range []string{"original", "legacy-history", "missing-limits", "duplicate-deployment", "short-worker", "short-rows", "short-audits", "unknown-profile-field"} {
 		var candidate map[string]any
 		if e := json.Unmarshal(qualificationBody, &candidate); e != nil {
 			t.Fatal(e)
@@ -89,6 +89,9 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 			candidate["History"].(map[string]any)["Layout"] = "context-query-history/v1"
 		case "missing-limits":
 			delete(candidate["Native"].(map[string]any)["Provider"].(map[string]any), "Limits")
+		case "duplicate-deployment":
+			native := candidate["Native"].(map[string]any)
+			native["Provider"].(map[string]any)["WorkloadUID"] = native["KeyService"].(map[string]any)["WorkloadUID"]
 		case "short-worker":
 			candidate["Native"].(map[string]any)["Worker"].(map[string]any)["Limits"].(map[string]any)["CPUMilli"] = 1
 		case "short-rows":
@@ -152,6 +155,32 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 			t.Fatal("original workload observation", e)
 		}
 	}
+	// Consumer probes run through the separate runtime credential. The fixture
+	// administrator supplies neither a query anchor nor a positive guard result.
+	runtimeConfig, e := pgxpool.ParseConfig("postgres://context_query_runtime:synthetic-context-query@" + address + "/custody_test?sslmode=disable")
+	if e != nil {
+		t.Fatal(e)
+	}
+	runtimeConfig.ConnConfig.TLSConfig = tlsConfig
+	runtimeConfig.ConnConfig.Fallbacks = nil
+	runtimeConfig.MaxConns = 1
+	runtime, e := pgxpool.NewWithConfig(ctx, runtimeConfig)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer runtime.Close()
+	probe := func(statement, argument string, want bool) {
+		t.Helper()
+		bounded, cancel := context.WithTimeout(ctx, 5*time.Second)
+		defer cancel()
+		var got bool
+		if err := runtime.QueryRow(bounded, statement, current.RootID, argument).Scan(&got); err != nil || got != want {
+			t.Fatalf("scoped capacity consumer: got %v, want %v: %v", got, want, err)
+		}
+	}
+	const anchorProbe = "SELECT lock_context_query_capacity($1,$2)"
+	const allocationProbe = "SELECT context_query_capacity_allocation_current($1,$2)"
+	probe(anchorProbe, custodyID(), false)
 	refresh()
 	key := app.WorkloadCapacityKey{RootID: current.RootID, ClusterID: scope.ClusterID, NamespaceUID: f.namespace.UID, WorkloadUID: f.workloads[0].UID}
 	if e = producer.Reconcile(ctx, &key); e != nil {
@@ -167,6 +196,14 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 	if e = admin.QueryRow(ctx, `SELECT plan,acceptance_id::text,observations FROM context_query_capacity WHERE root_id=$1`, current.RootID).Scan(&original, &accepted, &observations); e != nil || observations != 1 {
 		t.Fatal("accepted query reservation missing", e)
 	}
+	var allocationID string
+	if e = admin.QueryRow(ctx, "SELECT id::text FROM context_query_allocation WHERE root_id=$1", current.RootID).Scan(&allocationID); e != nil {
+		t.Fatal("accepted allocation missing", e)
+	}
+	probe(anchorProbe, accepted, true)
+	probe(anchorProbe, custodyID(), false)
+	probe(allocationProbe, allocationID, true)
+	probe(allocationProbe, custodyID(), false)
 	var baseObjects, baseBytes int64
 	if e = admin.QueryRow(ctx, `SELECT backed_system_bytes,backed_system_objects FROM capacity_pool WHERE root_id=$1 AND source_uid=$2`, current.RootID, f.qualification.RootBacking.SystemPoolUID).Scan(&baseBytes, &baseObjects); e != nil {
 		t.Fatal(e)
@@ -194,6 +231,7 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 	if _, e = current.ContextProjectionPolicy(ctx); e == nil {
 		t.Fatal("suspended capacity disclosed a policy")
 	}
+	probe(allocationProbe, allocationID, false)
 	refresh()
 	if e = producer.Reconcile(ctx, nil); e != nil {
 		t.Fatal("new current proof after negative", e)

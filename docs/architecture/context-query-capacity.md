@@ -35,7 +35,10 @@ and concurrency limits. Their exact sum is the dedicated combined reservation.
 The worker must independently cover all root query slots' worker requirements;
 the hub covers hub copies, the provider covers provider concurrency, and each
 role's authentication concurrency is separately bounded. A large hub cannot
-compensate for an undersized worker. `CapacityID` prevents reusing the same
+compensate for an undersized worker. This layout requires distinct physical
+cluster/namespace/workload identities for those deployments; four role names
+cannot multiply one deployment limit. Shared physical processes require a
+separately accepted partition contract before they are supported. `CapacityID` prevents reusing the same
 reservation identity; independent protected native acceptance must also prove
 that the actual capacity is exclusively assigned and not pledged under another
 identifier or installation. No download profile or default twenty-minute
