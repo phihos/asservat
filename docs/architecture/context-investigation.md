@@ -31,6 +31,15 @@ The original five-second identity and observation intervals bound all reads and
 the final response, including time spent writing the draft. A request cannot
 detach from the originating browser/MCP request by supplying another context.
 
+Installed preview refusals emit a bounded private stage diagnostic for initial
+identity/recovery/target resolution, each facts dependency, processing coverage,
+compilation, passive draft persistence and final checks. Dependency errors remain
+wrapped for `errors.Is` classification; their text and arbitrary nested stage
+strings are never logged. Only fixed stage labels reach the existing exponentially
+suppressed process logger. This adds no public result field, authority, retry or
+freshness interval. An acknowledged `NotAvailable` envelope remains distinct from
+an audit or transport failure that prevented any valid response.
+
 The passive `ContextPreview` holds server-generated preview, capture, case,
 occurrence, artifact, attempt and assessment IDs; original actor/client; exact
 authored intent; target pin; selected storage revisions; relative retention;

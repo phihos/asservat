@@ -33,6 +33,14 @@ Work and independently current peer/trust observations may overlap without havin
 
 Standby and capture reservations count closing owners until joined completion. Each discovered owner has an independent thirty-second conversation with at least one second before a fresh empty standby. A retry never carries a capture or signed work from a prior connection. SQL52/ADR134 determine whether an explicit current continuation can proceed; transport failure is not proof of non-admission or no effect.
 
+The installed regional supervisor reports failed candidate observation, an empty
+candidate set, failed connection setup and failed exchange service using fixed
+private labels and the existing exponentially suppressed logger. Optional nested
+steps are explicitly allowlisted; error text, target identity and credentials are
+excluded. Omitting the reporter preserves the same operation, retry and deadline
+behavior. A capacity standby is a separate protocol and does not establish that
+a context-start standby is available for preview target resolution.
+
 ## Work transport observation
 
 [ADR-163](../decisions/163-original-work-transport-observation-lease.md) bounds repeated frame traffic with one complete receiver observation owned by the actual stream. The hub obtains it at work Send; the region obtains it only after the passive work frame arrives. Setup and standby observations cannot supply this lease. Its original start, earliest observation/caller expiry and exact root/exchange/challenge/leaf/process channel remain fixed. There is no renewal or replacement lease for that accepted work.

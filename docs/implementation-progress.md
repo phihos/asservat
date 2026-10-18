@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Installed preview private diagnostics (2026-10-18)
+
+Native42's schema-valid `NotAvailable` replies establish that those error
+envelopes passed the public audit and final delivery boundary; they do not
+identify which preview dependency refused. The installed C09 service now reports
+one fixed private failure stage, preserving `errors.Is`, public response bytes,
+audit classification and original deadlines. No provider/SQL error text, target
+identity, credential or arbitrary nested diagnostic enters the log. The regional
+context-start supervisor separately reports candidate/open/exchange failures
+through the existing exponentially suppressed logger. Its channel is independent
+of the capacity standby already observed by the fixture.
+
+The fixture retains the original request ID, elapsed time and public retryable
+flag on a refused preview, plus bounded regional process logs on journey failure.
+Those observations change neither attempts nor current checks. Inspection found
+no owner permission-read reconnection during the native42 preview interval;
+refusal before that read is an inference, not a confirmed cause or a product fix.
+
+The focused capture/presentation/bootstrap race selection passes (31 top-level,
+142 named cases); the full capture race suite passes (39 top-level, 130 named
+cases), including shared Request/replay callers of the wrapped facts/processing
+helpers. Integration compilation selects no external tests and passes. Tests
+cover closed labels, preserved causes, public wire parity, post-draft expiry,
+foreign diagnostic suppression and missing optional reporters. Affected-package
+vet and Go architecture checks pass; specification/architecture gates pass.
+Installed
+qualification of these diagnostics remains pending; preview, collection and
+the later S-02 journey remain unqualified. The next native run is for diagnosis,
+without a claimed fix, increased limit or freshness extension.
+
 ## Installed journey native 42: structured preview refusal (2026-10-18)
 
 [Run 39139924613](https://github.com/phihos/asservat/actions/runs/39139924613)

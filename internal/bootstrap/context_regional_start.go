@@ -164,6 +164,8 @@ type RegionalContextStartConnections struct {
 	Client     *mtls.ContextStartClient
 	Verifier   fleetapp.APIContextWorkVerifier
 	Local      contextstart.RegionalLocal
+	// Report receives closed diagnostic labels only and must not block.
+	Report func(string)
 }
 
 func (s RegionalContextStartConnections) Run(ctx context.Context) error {
@@ -188,7 +190,11 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 	poll := func() {
 		observed, e := s.Candidates.ReadContextStartOwners(ctx)
 		if e != nil || !observed.Valid(s.Local.Now()) || ctx.Err() != nil {
+			s.reportFailure("candidates", e)
 			return
+		}
+		if len(observed.Owners) == 0 {
+			s.reportFailure("candidates-empty", nil)
 		}
 		contains := func(b fleetvalue.OwnerBinding) bool {
 			for _, candidate := range observed.Owners {
@@ -220,7 +226,11 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 				defer func() { ended <- owner }()
 				exchange, e := s.Client.OpenDiscovered(call, owner, observed)
 				if e == nil {
-					_ = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local)
+					if e = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local); e != nil {
+						s.reportFailure("exchange", e)
+					}
+				} else {
+					s.reportFailure("open", e)
 				}
 			}()
 		}

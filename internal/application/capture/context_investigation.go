@@ -88,6 +88,9 @@ type ContextInvestigation struct {
 	Lifetime               time.Duration
 	Now                    func() time.Time
 	NewID                  func() string
+	// ReportPreviewFailure receives only fixed private stage labels. It is
+	// diagnostic, synchronous and must not perform blocking work or grant authority.
+	ReportPreviewFailure func(string)
 }
 
 // ContextPreviewResult includes a transient assessment of the same reviewed
@@ -137,42 +140,42 @@ func (s ContextInvestigation) currentIdentity(ctx context.Context, source identi
 func (s ContextInvestigation) facts(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, intent value.ContextIntent, target targets.PodResolution, anchor time.Time) (contextFacts, error) {
 	f := contextFacts{target: target}
 	if !target.Valid(s.Now()) {
-		return f, value.ErrChanged
+		return f, previewFailure("facts/target", value.ErrChanged)
 	}
 	t := target.Target()
 	s.awaitStorage(ctx, target)
 	f.eligibility = s.Eligibility.ContextEligibilityCurrent(ctx, source, t)
 	if !f.eligibility.Eligible || f.eligibility.Target != t || f.eligibility.Principal != actor || f.eligibility.VerifiedIdentity.Principal != actor || !f.eligibility.VerifiedIdentity.Valid(s.Now()) || !s.Now().Before(f.eligibility.ValidUntil) {
-		return f, value.ErrDenied
+		return f, previewFailure(previewEligibilityFailure(f.eligibility.Reason), value.ErrDenied)
 	}
 	var err error
 	f.capability, err = s.Capabilities.ContextCapability(ctx, t)
 	if err != nil {
-		return f, err
+		return f, previewFailure("facts/capability", err)
 	}
 	f.retention, err = s.Retention.Resolve(ctx, privacy.Input{Target: t, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: intent.RequestedSeconds, AnchorAt: anchor})
 	if err != nil {
-		return f, err
+		return f, previewFailure("facts/retention", err)
 	}
 	f.storage, err = s.Storage.ContextStorage(ctx, t)
 	if err != nil {
-		return f, err
+		return f, previewFailure("facts/storage", err)
 	}
 	if intent.Reason != nil {
 		if s.Reasons == nil {
-			return f, value.ErrUnavailable
+			return f, previewFailure("facts/reason", value.ErrUnavailable)
 		}
 		r, err := s.Reasons.ContextReason(ctx, source, t, *intent.Reason)
 		if err != nil {
-			return f, err
+			return f, previewFailure("facts/reason", err)
 		}
 		if r.Reference != *intent.Reason || r.Actor != actor || r.Target != t || !identity.Fresh(r.ObservedAt, r.ValidUntil, s.Now(), 5*time.Second) || r.ValidUntil.After(r.Reference.ExpiresAt) {
-			return f, value.ErrDenied
+			return f, previewFailure("facts/reason", value.ErrDenied)
 		}
 		f.reasonUntil = r.ValidUntil
 	}
 	if !s.factsCurrent(f, s.Now()) || ctx.Err() != nil {
-		return f, value.ErrChanged
+		return f, previewFailure("facts/current", value.ErrChanged)
 	}
 	return f, nil
 }
@@ -202,35 +205,36 @@ func (s ContextInvestigation) plan(p value.ContextPreview, f contextFacts) (plan
 
 // Preview observes authorized metadata and writes only a bounded draft. It does
 // not reserve custody/storage, write acquisition intent or start a collector.
-func (s ContextInvestigation) Preview(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent) (ContextPreviewResult, error) {
+func (s ContextInvestigation) Preview(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent) (result ContextPreviewResult, failure error) {
+	defer func() { s.reportPreviewFailure(failure) }()
 	var zero ContextPreviewResult
 	if !s.configured() || ctx == nil || source == nil || ctx.Err() != nil {
-		return zero, value.ErrUnavailable
+		return zero, previewFailure("configuration", value.ErrUnavailable)
 	}
 	if intent.Diagnostic != value.ContextDiagnosticName {
-		return zero, value.ErrDiagnosticUnavailable
+		return zero, previewFailure("diagnostic", value.ErrDiagnosticUnavailable)
 	}
 	if !intent.Valid() {
-		return zero, value.ErrInvalid
+		return zero, previewFailure("intent", value.ErrInvalid)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	created := s.Now().UTC().Truncate(time.Microsecond)
 	i, err := source.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) {
-		return zero, value.ErrDenied
+		return zero, previewFailure("identity", value.ErrDenied)
 	}
 	recovery, err := s.currentRecovery(ctx)
 	if err != nil {
-		return zero, err
+		return zero, previewFailure("recovery", err)
 	}
 	target, err := s.Targets.ResolveWorkload(ctx, intent.Target)
 	if err != nil {
-		return zero, err
+		return zero, previewFailure("target", err)
 	}
 	f, err := s.facts(ctx, source, i.Principal, intent, target, created)
 	if err != nil {
-		return zero, err
+		return zero, previewFailure("facts", err)
 	}
 	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
 	p.ExecutionClass = target.ExecutionClass
@@ -240,33 +244,33 @@ func (s ContextInvestigation) Preview(ctx context.Context, source identities.Cur
 	}
 	coverage, err := s.processingCoverage(ctx, p, f, recovery, i.ValidUntil)
 	if err != nil {
-		return zero, err
+		return zero, previewFailure("processing", err)
 	}
 	ctx, coverageEnd := context.WithDeadline(ctx, coverage.FreshUntil)
 	defer coverageEnd()
 	plan, err := s.plan(p, f)
 	if err != nil {
-		return zero, err
+		return zero, previewFailure("compile", err)
 	}
 	p.CanonicalScope, p.ScopeDigest = slices.Clone(plan.CanonicalScope), plan.ScopeDigest
 	assessment, err := compiler.AssessContext(plan, p.AssessmentID, s.Now())
 	if err != nil {
-		return zero, err
+		return zero, previewFailure("assessment", err)
 	}
 	if !ValidContextPreview(p) || !p.Current(s.Now()) {
-		return zero, value.ErrInvalid
+		return zero, previewFailure("blueprint", value.ErrInvalid)
 	}
 	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) {
-		return zero, value.ErrChanged
+		return zero, previewFailure("before-store/current", value.ErrChanged)
 	}
 	if err = s.Previews.CreateContextPreview(ctx, p.Clone()); err != nil {
-		return zero, err
+		return zero, previewFailure("store", err)
 	}
 	// An uncertain draft write may consume one passive slot, never execution.
 	// Current rights and every original observation also bound the response.
 	current := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
 	if !current.Eligible || current.Target != target.Target() || current.Principal != i.Principal || !current.VerifiedIdentity.Valid(s.Now()) || !i.Valid(s.Now()) || !slices.Equal(current.DefaultAudience, p.Audience) || !s.Now().Before(current.ValidUntil) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) || ctx.Err() != nil || s.Now().Before(created) {
-		return zero, value.ErrChanged
+		return zero, previewFailure("after-store/current", value.ErrChanged)
 	}
 	until := identity.Earlier(i.ValidUntil, recovery.FreshUntil)
 	until = identity.Earlier(until, current.ValidUntil)
@@ -280,7 +284,7 @@ func (s ContextInvestigation) Preview(ctx context.Context, source identities.Cur
 		until = identity.Earlier(until, f.reasonUntil)
 	}
 	if !s.Now().Before(until) || ctx.Err() != nil {
-		return zero, value.ErrUnavailable
+		return zero, previewFailure("response/current", value.ErrUnavailable)
 	}
 	return ContextPreviewResult{Preview: p.Clone(), Assessment: assessment, ValidUntil: until}, nil
 }
