@@ -82,7 +82,10 @@ func (l *Ledger) transaction(ctx context.Context, f func(*custodydb.Queries) err
 	for attempt := 0; attempt < 3; attempt++ {
 		tx, err := l.pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.ReadCommitted})
 		if err != nil {
-			return privacy.ErrUnavailable
+			if ctx.Err() != nil {
+				return unavailableCause("begin-deadline")
+			}
+			return unavailableCause("begin")
 		}
 		_, err = tx.Exec(ctx, "SET LOCAL statement_timeout='5s'; SET LOCAL lock_timeout='1s'; SET LOCAL idle_in_transaction_session_timeout='5s'; SET LOCAL synchronous_commit=on")
 		if err == nil {
@@ -123,10 +126,28 @@ func (l *Ledger) transaction(ctx context.Context, f func(*custodydb.Queries) err
 				return sentinel
 			}
 		}
-		return privacy.ErrUnavailable // never leak SQL, identities or connection details
+		// Never leak SQL, identities or connection details: only a closed cause
+		// word (a SQLSTATE is a fixed five-character class) for diagnostics.
+		switch {
+		case errors.As(err, &pe) && len(pe.Code) == 5:
+			return unavailableCause("sql-" + pe.Code)
+		case ctx.Err() != nil:
+			return unavailableCause("deadline")
+		}
+		return unavailableCause("client")
 	}
-	return privacy.ErrUnavailable
+	return unavailableCause("retries")
 }
+
+// ledgerCause is privacy.ErrUnavailable with a closed cause word; callers keep
+// matching the sentinel, and step labels can name the cause (FixedStep).
+type ledgerCause struct{ cause string }
+
+func (e ledgerCause) Error() string     { return privacy.ErrUnavailable.Error() }
+func (e ledgerCause) Unwrap() error     { return privacy.ErrUnavailable }
+func (e ledgerCause) FixedStep() string { return e.cause }
+
+func unavailableCause(cause string) error { return ledgerCause{cause} }
 
 // Lock root, allocation, then attempt. The unlocked root lookup is only a hint;
 // allocation moves are forbidden and are checked again under its row lock.
