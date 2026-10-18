@@ -81,6 +81,17 @@ func (d *ContextProjectionDelivery) Pending() bool                             {
 func (d *ContextProjectionDelivery) ObservedAt() time.Time    { return d.observedAt }
 func (d *ContextProjectionDelivery) QueryDeadline() time.Time { return d.queryDeadline }
 func (d *ContextProjectionDelivery) CleanupUntil() time.Time  { return d.cleanupUntil }
+
+// Done exposes only loss of the existing request owner. Transport links it to
+// final writes; it conveys neither authority nor a new request lifetime.
+func (d *ContextProjectionDelivery) Done() <-chan struct{} {
+	if d != nil && d.owner != nil {
+		return d.owner.ctx.Done()
+	}
+	closed := make(chan struct{})
+	close(closed)
+	return closed
+}
 func (d *ContextProjectionDelivery) Excerpt() (value.ContextExcerpt, bool) {
 	if d == nil || d.pending {
 		return value.ContextExcerpt{}, false

@@ -656,3 +656,27 @@ func TestQueryDeliveryTimingDoesNotRenewLatePollOrPreparedCutoff(t *testing.T) {
 	}
 	_ = d.Close(context.Background())
 }
+
+func TestQueryDeliveryDoneTracksOriginalOwner(t *testing.T) {
+	f := newProjectionFixture(t)
+	d, _ := f.begin(t)
+	select {
+	case <-d.Done():
+		t.Fatal("live owner already canceled")
+	default:
+	}
+	if err := d.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-d.Done():
+	default:
+		t.Fatal("owner closure did not cancel transport observation")
+	}
+	var missing *ContextProjectionDelivery
+	select {
+	case <-missing.Done():
+	default:
+		t.Fatal("missing owner appears live")
+	}
+}
