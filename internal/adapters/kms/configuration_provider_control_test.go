@@ -10,7 +10,9 @@ import (
 	"asservat.local/asservat/internal/contracts"
 )
 
-func configurationControlFixture(t *testing.T, purpose string) (*ownerProviderControlFixture, contracts.HubWorkerDeployment, contracts.ConfigurationProviderAuthentication) {
+// change optionally extends the selection (for example with ADR-205's
+// context deletion signing key) before the recipe is derived.
+func configurationControlFixture(t *testing.T, purpose string, change ...func(contracts.HubWorkerDeployment, *contracts.ConfigurationProviderSelection)) (*ownerProviderControlFixture, contracts.HubWorkerDeployment, contracts.ConfigurationProviderAuthentication) {
 	t.Helper()
 	f := newOwnerProviderControlFixture(t)
 	owner, account, secret, now := ownerProviderRecipeInput(t)
@@ -22,7 +24,11 @@ func configurationControlFixture(t *testing.T, purpose string) (*ownerProviderCo
 		KeyService: contracts.ConfigurationKeyService{Endpoint: f.server.URL, Roots: [][]byte{f.server.Certificate().Raw}, AuditMount: "audit", AuditKey: "configuration"}}
 	// The fixture serves a fixed auth path. The worker still derives its own two
 	// role names/account/audience; no owner role or production setup is reused.
-	recipe, err := providerconfig.ConfigurationProviderRecipeFor(in, contracts.ConfigurationProviderSelection{AuthMount: "owner-auth", AuthMountAccessor: "auth_kubernetes_original", AuditCredentials: secret}, account, now)
+	selection := contracts.ConfigurationProviderSelection{AuthMount: "owner-auth", AuthMountAccessor: "auth_kubernetes_original", AuditCredentials: secret}
+	for _, c := range change {
+		c(in, &selection)
+	}
+	recipe, err := providerconfig.ConfigurationProviderRecipeFor(in, selection, account, now)
 	if err != nil {
 		t.Fatal(err)
 	}

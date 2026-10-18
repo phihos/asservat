@@ -3,6 +3,7 @@ package kms
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
 	"encoding/json"
 	"net/http"
 	"os"
@@ -92,6 +93,28 @@ func (s *InstalledConfigurationProviderEffects) AuditKeys(mount, key string) (*S
 		return nil, nil, err
 	}
 	return seal, &Opener{client: unwrap, mount: mount, key: key, reference: mount + "/" + key}, nil
+}
+
+// ContextDeletionSigningKey signs through the audit-wrap lifetime with the
+// profile's context deletion signing key (ADR-205 decision 6) at the pinned
+// version, and accepts only signatures that verify under the pinned public
+// key. Its client reaches only <mount>/sign/<key>: it cannot create, rotate,
+// read or export a key. It refuses the configuration audit key, malformed
+// names and any key the profile did not select (the recipe already keeps that
+// key apart from both audit keys). Every call borrows audit-wrap's current
+// token; the caller closes the key.
+func (s *InstalledConfigurationProviderEffects) ContextDeletionSigningKey(mount, key string, version int, public ed25519.PublicKey) (*SigningKey, error) {
+	if s == nil || s.effects == nil || s.effects.wrap == nil || s.input.ProviderAuthentication == nil || !keyName.MatchString(mount) || !keyName.MatchString(key) ||
+		version < 1 || version > 2147483647 || len(public) != ed25519.PublicKeySize ||
+		mount == s.input.KeyService.AuditMount && key == s.input.KeyService.AuditKey ||
+		s.input.ProviderAuthentication.ContextDeletionSigning != (contracts.OwnerPublicTransit{Mount: mount, Key: key}) {
+		return nil, ErrKeyService
+	}
+	sign, err := newOwnerProviderEffectClient(s.effects.wrap, mount+"/sign/"+key)
+	if err != nil {
+		return nil, err
+	}
+	return &SigningKey{client: sign, mount: mount, name: key, version: version, public: bytes.Clone(public)}, nil
 }
 
 func (s *InstalledConfigurationProviderEffects) borrow(ctx context.Context) (context.Context, func(), error) {
