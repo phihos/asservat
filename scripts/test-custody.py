@@ -24,6 +24,20 @@ SCOPED_AUDIT_BUCKET = "synthetic-scoped-audit"
 OWNER_AUDIT_INVENTORY_ENV = "ASSERVAT_OWNER_AUDIT_INVENTORY"
 OWNER_AUDIT_INVENTORY_TEST = "TestOwnerAuditInventoryWithRealServices"
 OWNER_AUDIT_INVENTORY_BUCKET = "synthetic-owner-inventory"
+INSTALLED_EVIDENCE_DELETE_TEST = "TestInstalledEvidenceDeleteCredentialWithRealServices"
+INSTALLED_EVIDENCE_DELETE_BUCKET = "synthetic-installed-evidence-delete"
+
+def installed_evidence_delete_selection(test_pattern):
+    """Only the exact focused selection receives the deletion IAM fixture."""
+    return test_pattern == "^" + INSTALLED_EVIDENCE_DELETE_TEST + "$"
+
+def installed_evidence_delete_configuration():
+    """Same List-only cleaner as the installer; policy grants cleanup separately."""
+    roles = [
+        ("administrator", "synthetic-only", "synthetic-only-secret", ["Admin", "Read", "Write", "List"]),
+        ("evidence-delete", "evidence-delete-continuation", "evidence-delete-continuation-secret", ["List:" + INSTALLED_EVIDENCE_DELETE_BUCKET]),
+    ]
+    return {"identities": [{"name": role, "credentials": [{"accessKey": key, "secretKey": secret}], "actions": actions} for role, key, secret, actions in roles]}
 
 def scoped_audit_configuration():
     """Fixture-only fixed credentials, never installer or runtime provisioning."""
@@ -76,6 +90,9 @@ def passed_test_elapsed(output, name):
     return float(matches[0]) if len(matches) == 1 else None
 
 def main(fleet=False, test_pattern=None, database_recovery=False, initial_installation=False, connector_retirement=False, scoped_audit=False, owner_audit_inventory=False):
+    installed_evidence_delete = installed_evidence_delete_selection(test_pattern)
+    if installed_evidence_delete and (fleet or database_recovery or initial_installation or connector_retirement or scoped_audit or owner_audit_inventory):
+        raise ValueError("Installed evidence deletion owns its exact fixture/test selection")
     if owner_audit_inventory and (fleet or test_pattern or database_recovery or initial_installation or connector_retirement or scoped_audit):
         raise ValueError("Owner audit inventory owns its exact fixture/test selection")
     if scoped_audit and (fleet or test_pattern or database_recovery or initial_installation or connector_retirement):
@@ -91,7 +108,7 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
         containers = []
         created_network = False
         pgname = None
-        result_name="owner-audit-inventory" if owner_audit_inventory else "scoped-audit-storage" if scoped_audit else "initial-installation" if initial_installation else ("database-recovery" if database_recovery else ("fleet" if fleet else "custody"))
+        result_name="installed-evidence-delete" if installed_evidence_delete else "owner-audit-inventory" if owner_audit_inventory else "scoped-audit-storage" if scoped_audit else "initial-installation" if initial_installation else ("database-recovery" if database_recovery else ("fleet" if fleet else "custody"))
         log_path = ROOT/("test/results/"+result_name+".log")
         log_path.write_text("")
         report = {"scope": "storage custody, permission acceptance and bounded context admission components; synthetic control provenance only; no public acquisition or disclosure", "images": {}, "sourceHashes": hashes(), "passedTestNames": []}
@@ -111,11 +128,11 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
                 return info["NetworkSettings"]["Networks"][network]["IPAddress"], name
             pgip, pgname = service("postgres", POSTGRES, ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"], ["-c", "max_connections=48", "-c", "shared_buffers=128MB", "-c", "fsync=on", "-c", "synchronous_commit=on"])
             s3_extra, s3_command = [], []
-            if scoped_audit or owner_audit_inventory:
+            if scoped_audit or owner_audit_inventory or installed_evidence_delete:
                 # Exact read-only bind; these public synthetic test credentials
                 # are deliberately not copied into the retained result report.
                 s3_configuration = work/"s3.json"
-                s3_configuration.write_text(json.dumps(owner_audit_inventory_configuration() if owner_audit_inventory else scoped_audit_configuration()))
+                s3_configuration.write_text(json.dumps(installed_evidence_delete_configuration() if installed_evidence_delete else owner_audit_inventory_configuration() if owner_audit_inventory else scoped_audit_configuration()))
                 s3_configuration.chmod(0o444)
                 s3_extra = ["-v", str(s3_configuration) + ":/config/s3.json:ro"]
                 s3_command = ["-s3.config=/config/s3.json"]
@@ -172,7 +189,10 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
             run(["docker", "exec", pgname, "psql", "-U", "postgres", "-d", "custody_test", "-v", "ON_ERROR_STOP=1", "-c", (ROOT/"test/fixtures/sql/runtime-roles.sql").read_text()])
             path = work/"fixtures.json"
             path.touch(mode=0o600)
-            path.write_text(json.dumps({"postgres": dsn, "s3": "http://"+s3ip+":8333", "kms":bao_endpoint}))
+            descriptor = {"postgres": dsn, "s3": "http://"+s3ip+":8333", "kms":bao_endpoint}
+            if installed_evidence_delete:
+                descriptor["installedEvidenceDelete"] = True
+            path.write_text(json.dumps(descriptor))
             env["ASSERVAT_CUSTODY_FIXTURES"] = str(path)
             if fleet: env["ASSERVAT_FLEET_FIXTURES"] = str(path)
             if initial_installation:
@@ -186,6 +206,8 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
             if owner_audit_inventory:
                 pattern = "^" + OWNER_AUDIT_INVENTORY_TEST + "$"
                 report["scope"] = "read-only exact historical owner audit physical inventory with LIST-only scoped credentials and independent exact byte/count checks; no installed reserve, retirement, release or complete pagination qualification"
+            if installed_evidence_delete:
+                report["scope"] = "actual pinned S3 List-only evidence cleaner permissions: scoped inventory, administrator-upload abort and version/marker deletion, with read/write/configuration and foreign-prefix denial; synthetic fixture provisioning, no installed lifecycle, accounting or capacity qualification"
             if connector_retirement:
                 pattern = "^TestContextAdmissionWithRealServices$/^connector-identity-real-time-retirement$"
                 report["scope"] = "connector identity retirement with configured 30-second ordinary admission, original 30-minute process/certificate lifetime and 2100-second retention; synthetic protected source/proof setup, no maximum admission-window, installed connector or provider migration qualification"
@@ -251,6 +273,9 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
                         exit_code = 1
                 if owner_audit_inventory and exit_code == 0 and OWNER_AUDIT_INVENTORY_TEST not in passed:
                     print("Missing exact owner inventory top-level pass", flush=True)
+                    exit_code = 1
+                if installed_evidence_delete and exit_code == 0 and INSTALLED_EVIDENCE_DELETE_TEST not in passed:
+                    print("Missing exact installed evidence deletion top-level pass", flush=True)
                     exit_code = 1
                 phase_report["qualificationExit"] = exit_code
                 if exit_code: break
