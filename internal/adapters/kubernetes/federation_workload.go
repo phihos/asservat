@@ -51,11 +51,11 @@ func FederationWorkloadName(installationID string) string {
 // Deployment must be denied by that guard.
 // nodePort, when nonzero, pins the NodePort so the operator's endpoint is
 // known before the Service exists (ADR-193).
-func BuildFederationWorkload(namespace, image, ownerDeployment string, d contracts.FederationDeployment, serviceTypeName string, nodePort int32) (*FederationWorkload, error) {
+func BuildFederationWorkload(namespace, image, ownerDeployment, ownerServiceAccount string, d contracts.FederationDeployment, serviceTypeName string, nodePort int32) (*FederationWorkload, error) {
 	serviceType := core.ServiceType(serviceTypeName)
 	a, o := d.ProviderAuthentication, d.Owner
 	if a == nil || o == nil || !authorization.UUID(d.InstallationID) || len(validation.IsDNS1123Label(namespace)) != 0 || a.Namespace.Name != namespace || o.Namespace.Name != namespace ||
-		a.ServiceAccount.Name != contracts.FederationServiceAccountName(d.InstallationID) || len(validation.IsDNS1123Subdomain(ownerDeployment)) != 0 || (serviceType != core.ServiceTypeNodePort && serviceType != core.ServiceTypeLoadBalancer) || d.Port != contracts.FederationPort ||
+		a.ServiceAccount.Name != contracts.FederationServiceAccountName(d.InstallationID) || len(validation.IsDNS1123Subdomain(ownerDeployment)) != 0 || len(validation.IsDNS1123Subdomain(ownerServiceAccount)) != 0 || (serviceType != core.ServiceTypeNodePort && serviceType != core.ServiceTypeLoadBalancer) || d.Port != contracts.FederationPort ||
 		nodePort != 0 && (serviceType != core.ServiceTypeNodePort || nodePort < 30000 || nodePort > 32767) {
 		return nil, cfg.ErrInvalid
 	}
@@ -106,6 +106,8 @@ func BuildFederationWorkload(namespace, image, ownerDeployment string, d contrac
 	// The owner guard proof (ADR-172 owner reads) and owner discovery only.
 	role := &rbac.Role{TypeMeta: meta.TypeMeta{APIVersion: rbac.SchemeGroupVersion.String(), Kind: "Role"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: namespace}, Rules: []rbac.PolicyRule{
 		{APIGroups: []string{""}, Resources: []string{"pods", "services"}, Verbs: []string{"get"}},
+		// OwnerEndpoints independently checks the original owner account UID.
+		{APIGroups: []string{""}, Resources: []string{"serviceaccounts"}, ResourceNames: []string{ownerServiceAccount}, Verbs: []string{"get"}},
 		{APIGroups: []string{"apps"}, Resources: []string{"replicasets", "deployments"}, Verbs: []string{"get"}},
 		// A dry-run probe target only: the owner guard denies every real write.
 		{APIGroups: []string{"apps"}, Resources: []string{"deployments"}, ResourceNames: []string{ownerDeployment}, Verbs: []string{"update"}},

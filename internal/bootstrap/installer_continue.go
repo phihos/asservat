@@ -1558,7 +1558,7 @@ func (k *InstallerContinuation) FederationWorkload(ctx context.Context, inventor
 		return err
 	}
 	k.at("federation/workload")
-	w, err := kube.BuildFederationWorkload(namespace, k.plan.Plan.Workload.Image, inventory.OwnerDeployment.Name, *f, settings.ServiceType, settings.NodePort)
+	w, err := kube.BuildFederationWorkload(namespace, k.plan.Plan.Workload.Image, inventory.OwnerDeployment.Name, inventory.OwnerAccount.Name, *f, settings.ServiceType, settings.NodePort)
 	if err != nil {
 		return err
 	}
