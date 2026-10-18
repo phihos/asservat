@@ -127,10 +127,19 @@ and its storage charge is never released.
 
 ## Progress
 
-- **SQL** (#35, unit tests and `sql-check`; the context suite's deletion
-  fixture passed on CI run 39113937237): purposes 89–91 with the fixture
+- **SQL** (#35, unit tests and `sql-check`): purposes 89–91 with the fixture
   grants, the worst-case plan at 107 connections, and
   `ContextDeletions.DueContextDeletions`.
+  The earlier claim that a context-harness run qualified the deletion fixture
+  was incorrect: that harness selects the native API branch. The dedicated
+  [custody run 39122322616](https://github.com/phihos/asservat/actions/runs/39122322616)
+  on `25c7195900dd2d323c6a848cdb0e19bc19d0016a` now passes the actual SQL
+  execution/publication/deletion case, including
+  `due-pages-pass-persistent-failures-and-wrap`. It exits 0, preserves all
+  2,593 recorded source hashes and reports no cleanup failures. The separate
+  [native API run 39121784318](https://github.com/phihos/asservat/actions/runs/39121784318)
+  also passes with 2,620 matching source hashes and clean teardown; it supplies
+  API regression evidence, not installed deletion qualification.
 - **Provider, signing and credential** (#36, unit tests): the optional
   `ContextDeletionSigning` key in the hub-worker's provider selection, the
   audit-wrap `sign` path, the setup readback of every version's public key,
