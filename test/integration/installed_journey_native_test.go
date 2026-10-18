@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -103,6 +104,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			}
 			var failure error
 			for attempt := 1; attempt <= tries; attempt++ {
+				started := time.Now()
 				reply, err := readReply(callCtx, name, arguments)
 				if err == nil && reply.Status == "ok" {
 					if err = installedJourneyDecode(reply.Data, data); err != nil {
@@ -112,9 +114,18 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 				}
 				failure = err
 				if failure == nil {
-					failure = errors.New("acknowledged operation unavailable")
+					// The validated public error deliberately exposes no private
+					// dependency stage. Retain its existing retryability distinction
+					// and request correlation without logging inputs or credentials.
+					var unavailable struct {
+						Retryable bool `json:"retryable"`
+					}
+					if json.Unmarshal(reply.Data, &unavailable) != nil {
+						t.Fatal("installed unavailable response")
+					}
+					failure = fmt.Errorf("acknowledged operation unavailable (retryable=%t)", unavailable.Retryable)
 				}
-				t.Logf("installed %s attempt %d: %v", name, attempt, failure)
+				t.Logf("installed %s attempt %d after %s request %s: %v", name, attempt, time.Since(started).Round(time.Millisecond), reply.RequestID, failure)
 				if attempt < tries && installedJourneyPause(callCtx, 2*time.Second) != nil {
 					break
 				}
@@ -348,8 +359,9 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 }
 
 type installedJourneyEnvelope struct {
-	Status string          `json:"status"`
-	Data   json.RawMessage `json:"data"`
+	RequestID string          `json:"request_id"`
+	Status    string          `json:"status"`
+	Data      json.RawMessage `json:"data"`
 }
 
 func installedJourneyReply(wire *contracts.InvestigationContracts, name string, result *sdk.CallToolResult) (installedJourneyEnvelope, error) {
