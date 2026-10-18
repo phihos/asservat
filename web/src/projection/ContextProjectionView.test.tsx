@@ -1,0 +1,22 @@
+import React from 'react';
+import { afterEach, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { ContextProjectionView } from './ContextProjectionView';
+import { ContextProjection } from './projection';
+import { SyntheticProjection, excerpt, id, session } from './test-fixtures';
+afterEach(cleanup);
+it('renders saved untrusted strings as text and clears the view on close and scope loss', async () => {
+  const client = new SyntheticProjection(); const value = excerpt();
+  value.data.lines[0] = '<img src="https://outside.invalid" onerror="alert(1)">'; client.responder = () => value;
+  const controller = new ContextProjection(client); const scope = new AbortController();
+  const { container } = render(<ContextProjectionView controller={controller} session={session} scope={scope.signal} caseID={id(2)} artifactID={id(3)}/>);
+  expect(client.calls).toHaveLength(0);
+  fireEvent.click(screen.getByRole('button', { name: 'Inspect saved status' }));
+  await screen.findByLabelText('Approved pod status');
+  expect(container.querySelector('img')).toBeNull(); expect(container.querySelector('pre')?.textContent).toContain('<img');
+  fireEvent.click(screen.getByRole('button', { name: 'Close view' }));
+  expect(screen.queryByLabelText('Approved pod status')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Inspect saved status' }));
+  await screen.findByLabelText('Approved pod status'); scope.abort();
+  await waitFor(() => expect(screen.queryByLabelText('Approved pod status')).toBeNull());
+});
