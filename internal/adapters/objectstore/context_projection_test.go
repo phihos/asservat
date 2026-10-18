@@ -124,3 +124,33 @@ func TestContextDisplayRejectsMalformedNative(t *testing.T) {
 		}
 	}
 }
+
+func TestContextProjectionLiteralUnicodeEscapeText(t *testing.T) {
+	for name, raw := range map[string]string{
+		"literal-high-surrogate":  `"\\ud800"`,
+		"literal-low-surrogate":   `"\\udc00"`,
+		"literal-short-escape":    `"\\u12"`,
+		"literal-nonhex-escape":   `"\\uzzzz"`,
+		"two-literal-backslashes": `"\\\\ud800"`,
+		"literal-and-real-pair":   `"\\ud800 \ud83d\ude00"`,
+		"escaped-quote":           `"\"\\u12"`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			var want string
+			if err := json.Unmarshal([]byte(raw), &want); err != nil {
+				t.Fatal("invalid test JSON", err)
+			}
+			native := strings.Replace(testNative, `"123"`, raw, 1)
+			got, err := ParseContextProjection([]byte(native), testProjectionScope())
+			if err != nil || got.ResourceVersion != want {
+				t.Fatalf("literal escape changed: raw=%s got=%q want=%q error=%v", raw, got.ResourceVersion, want, err)
+			}
+		})
+	}
+	for _, raw := range []string{`"\ud800"`, `"\udc00"`, `"\\\ud800"`, `"\\\udc00"`} {
+		native := strings.Replace(testNative, `"123"`, raw, 1)
+		if _, err := ParseContextProjection([]byte(native), testProjectionScope()); !errors.Is(err, analysis.ErrInvalid) {
+			t.Fatalf("unpaired real surrogate accepted: %s", raw)
+		}
+	}
+}
