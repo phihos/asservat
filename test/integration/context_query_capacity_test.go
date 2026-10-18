@@ -317,9 +317,51 @@ func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pg
 	if e = admin.QueryRow(ctx, `SELECT plan=$2::jsonb AND acceptance_id=$3::uuid AND observations=3 AND observation_completed FROM context_query_capacity WHERE root_id=$1`, current.RootID, original, accepted).Scan(&same); e != nil || !same {
 		t.Fatal("original reservation changed or final guard never joined", e)
 	}
-	if e = writes.SuspendQueryCapacity(ctx, time.Now().UTC().Truncate(time.Microsecond)); e != nil {
-		t.Fatal("persist negative", e)
+	// A delayed restrictive observation still has to invalidate the accepted
+	// backing. Its original timestamp must not become a new freshness interval.
+	negativeAt := time.Now().UTC().Truncate(time.Microsecond)
+	delayed := time.NewTimer(time.Until(negativeAt.Add(5*time.Second + 100*time.Millisecond)))
+	defer delayed.Stop()
+	select {
+	case <-delayed.C:
+	case <-ctx.Done():
+		t.Fatal("waiting for delayed negative", ctx.Err())
 	}
+	if e = writes.SuspendQueryCapacity(ctx, negativeAt); e != nil {
+		t.Fatal("persist negative older than five seconds", e)
+	}
+	checkNegative := func() {
+		t.Helper()
+		if e = admin.QueryRow(ctx, `SELECT a.observations=4 AND a.negative_observed_at=$2 AND b.suspended AND b.observed_at=$2 AND b.fresh_until=$2::timestamptz+interval '1 microsecond' AND b.fresh_until<clock_timestamp() FROM context_query_capacity a JOIN context_query_backing b USING(root_id) WHERE a.root_id=$1`, current.RootID, negativeAt).Scan(&same); e != nil || !same {
+			t.Fatal("negative observation was renewed, replayed or lost", e)
+		}
+	}
+	checkNegative()
+	if e = writes.SuspendQueryCapacity(ctx, negativeAt.Add(-time.Microsecond)); e != nil {
+		t.Fatal("older negative replay", e)
+	}
+	checkNegative()
+	// The restrictive write has its own finite work interval but must retain
+	// the caller's earlier deadline while waiting for the original SQL locks.
+	locked, e := admin.Begin(ctx)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer locked.Rollback(context.Background())
+	if _, e = locked.Exec(ctx, `SELECT 1 FROM context_query_capacity WHERE root_id=$1 FOR UPDATE`, current.RootID); e != nil {
+		t.Fatal(e)
+	}
+	limited, stopNegative := context.WithTimeout(ctx, 50*time.Millisecond)
+	started := time.Now()
+	e = writes.SuspendQueryCapacity(limited, negativeAt.Add(time.Microsecond))
+	stopNegative()
+	if e == nil || time.Since(started) > time.Second {
+		t.Fatal("restrictive write escaped original caller deadline", e)
+	}
+	if e = locked.Rollback(ctx); e != nil {
+		t.Fatal(e)
+	}
+	checkNegative()
 	if _, e = current.ContextProjectionPolicy(ctx); e == nil {
 		t.Fatal("suspended capacity disclosed a policy")
 	}
