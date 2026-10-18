@@ -124,6 +124,13 @@ Descriptor fields include immutable mechanism/schema/projection versions, suppor
 
 ### I-13 — Native artifact byte relay
 
+[ADR-206 context projection](context-projection.md) permits reuse of bounded
+verification/TLS/framing primitives for an explicitly distinct query operation.
+Its approved DTO, query admission, worker/key ledgers and original five-second
+request authority must remain separate from native-download sessions and ranges.
+No existing download command/profile is implicitly query-capable. This extension
+is an implementation contract with native qualification pending.
+
 [ADR-122](../decisions/122-private-native-owner-listener.md) composes an optional
 separate native HTTP/2 port on the exact accepted owner Pod/process, with protected
 worker API/topology pins and a distinct read/lock SQL credential. Its bounded

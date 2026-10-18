@@ -190,6 +190,7 @@ requirements:
   spec: specs/evidence.md
   scenarios:
   - SC-EVD-005
+  - SC-MCP-006
   tasks:
   - TASK-08
 - requirement: REQ-EVD-006
@@ -239,6 +240,7 @@ requirements:
   spec: specs/mcp.md
   scenarios:
   - SC-MCP-002
+  - SC-MCP-006
   tasks:
   - TASK-08
 - requirement: REQ-MCP-003

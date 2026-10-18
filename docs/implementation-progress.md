@@ -1,5 +1,24 @@
 # Sustained implementation progress
 
+## Approved pod-status projection foundations (ADR-206)
+
+[ADR-206](decisions/206-bounded-context-projection.md) fixes the narrow approved
+`get_file_excerpt`/`get_query_result` path over an existing committed pod-status
+artifact. Typed scope and current-authority values, the strict native decoder,
+deterministic fourteen-line `pod-status.txt` formatter and C-03 authorization
+now exist. Ordinary `evidence:read` eligibility and complete denies precede the
+protected catalog lookup; source version, original audience, retained policies,
+recovery, processing and the query-purpose path remain binding. Every current
+request retains its original five-second and earlier dependency deadlines.
+
+Focused domain/application/authorization race tests, decoder regressions, vet
+and specification/architecture gates pass. These are component results, not an
+installed query read. Query/batch accounting, separate worker/key authority,
+protected resource-profile acceptance, audit plus final disclosure, browser/MCP
+composition and installed qualification remain pending. No public tool is enabled
+by these foundations; the canonical wire schemas and native artifact remain
+unchanged.
+
 ## Regional capacity on demand (ADR-197, ADR-200)
 
 The installed two-cluster continuation now enrolls a regional workload through

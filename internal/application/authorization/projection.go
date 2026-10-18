@@ -1,0 +1,255 @@
+package authorization
+
+import (
+	"context"
+	"crypto/sha256"
+	"encoding/json"
+	"slices"
+	"time"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
+)
+
+// ContextProjectionEvidence comes from independently verified publication. It
+// contains no native content, filename or checksum and is not a writer manifest.
+type ContextProjectionEvidence struct {
+	CaseID, CaptureID, PurposeRef   string
+	Version, SourceProjectionDigest artifact.Digest
+	SourceFormat, DataClass         string
+	Audience                        []artifact.AudienceAssignment
+	Retained                        privacy.RetainedArtifact
+	ObservedAt, ValidUntil          time.Time
+}
+
+type ContextProjectionCatalog interface {
+	ContextProjectionEvidence(context.Context, string) (ContextProjectionEvidence, error)
+}
+
+type ProjectionRetentionResolver interface {
+	ResolveRetained(context.Context, privacy.Input, privacy.Deadlines, []artifact.RetentionRule) (privacy.RetainedResolution, error)
+}
+
+// ContextProjectionEnvironmentReader must independently accept the query's
+// current recovery, processing and protected delivery path. Download policy or
+// successful storage access alone cannot implement this port.
+type ContextProjectionEnvironmentReader interface {
+	ProjectionEnvironment(context.Context, ContextProjectionEvidence, identity.Principal) (analysis.ContextProjectionEnvironment, error)
+}
+
+// ContextProjectionAuthority produces a current internal decision only. Query
+// admission, keys and disclosure still need their own transaction guards,
+// prepaid budgets, audit and final current checks. It has no token fallback.
+type ContextProjectionAuthority struct {
+	RootID      string
+	Permissions ProjectionReader
+	Catalog     ContextProjectionCatalog
+	Retention   ProjectionRetentionResolver
+	Environment ContextProjectionEnvironmentReader
+	Now         func() time.Time
+}
+
+func (s ContextProjectionAuthority) CheckProjectionCurrent(ctx context.Context, source identities.CurrentIdentity, scope analysis.ContextProjectionScope) (analysis.ContextProjectionAuthority, error) {
+	if !scope.Valid() {
+		return analysis.ContextProjectionAuthority{}, analysis.ErrInvalid
+	}
+	return s.checkProjection(ctx, source, scope.Candidate(), &scope)
+}
+
+// ResolveProjectionCurrent resolves the first scope only after current ordinary
+// target eligibility. The route candidate contains no asserted source version;
+// C-18 does not need a protected catalog read to construct this input.
+func (s ContextProjectionAuthority) ResolveProjectionCurrent(ctx context.Context, source identities.CurrentIdentity, candidate analysis.ContextProjectionCandidate) (analysis.ContextProjectionAuthority, error) {
+	return s.checkProjection(ctx, source, candidate, nil)
+}
+
+func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source identities.CurrentIdentity, candidate analysis.ContextProjectionCandidate, expected *analysis.ContextProjectionScope) (analysis.ContextProjectionAuthority, error) {
+	var zero analysis.ContextProjectionAuthority
+	if ctx == nil || ctx.Err() != nil || source == nil || !value.UUID(s.RootID) || s.Permissions == nil || s.Catalog == nil || s.Retention == nil || s.Environment == nil || s.Now == nil {
+		return zero, analysis.ErrUnavailable
+	}
+	if !candidate.Valid() || candidate.RootID != s.RootID {
+		return zero, analysis.ErrInvalid
+	}
+	started := s.Now()
+	until := started.Add(5 * time.Second)
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	call, stop := context.WithDeadline(ctx, until)
+	defer stop()
+	// Every child context retains all earlier intervals, including the initial
+	// caller and empty-deny observations. Fresh reads can only shorten them.
+	shorten := func(bounds ...time.Time) context.CancelFunc {
+		for _, at := range bounds {
+			until = identity.Earlier(until, at)
+		}
+		var cancel context.CancelFunc
+		call, cancel = context.WithDeadline(call, until)
+		return cancel
+	}
+	i, err := source.ResolveIdentity(call)
+	i = cloneProjectionIdentity(i)
+	if err != nil || !i.Valid(s.Now()) || i.Principal != candidate.Principal || call.Err() != nil {
+		return zero, analysis.ErrUnavailable
+	}
+	defer shorten(i.ValidUntil)()
+	target := value.Target{ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID}
+	p, err := s.Permissions.Permissions(call, target)
+	p = cloneProjectionPermissions(p)
+	preliminary := value.ScopeEligibility(i, p, value.ReadApproved, target, s.Now())
+	if err != nil || !preliminary.Eligible || call.Err() != nil {
+		return zero, analysis.ErrUnavailable
+	}
+	defer shorten(preliminary.ValidUntil)()
+	// The protected source lookup follows current ordinary target eligibility.
+	record, err := s.Catalog.ContextProjectionEvidence(call, candidate.ArtifactID)
+	record = cloneProjectionEvidence(record)
+	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat, DisplayVersion: analysis.ContextDisplayVersion}
+	if err != nil || !scope.Valid() || expected != nil && scope != *expected || !projectionEvidenceMatches(record, scope, s.Now()) || call.Err() != nil {
+		return zero, analysis.ErrUnavailable
+	}
+	r := record.Retained
+	retained := value.Retained{ArtifactID: scope.ArtifactID, Target: target, DataClass: record.DataClass, ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
+	initial := value.Evaluate(i, p, value.ReadApproved, target, &retained, s.Now())
+	if !initial.Eligible {
+		return zero, analysis.ErrUnavailable
+	}
+	defer shorten(initial.ValidUntil, record.ValidUntil, r.Effective.ExpiresAt)()
+	resolve := func() (privacy.RetainedResolution, error) {
+		input := r.Input
+		input.Parents = slices.Clone(input.Parents)
+		v, e := s.Retention.ResolveRetained(call, input, r.Effective, slices.Clone(r.OriginPolicies))
+		v.Policies = slices.Clone(v.Policies)
+		if e != nil || !projectionRetentionMatches(v, record, scope, s.Now()) || call.Err() != nil {
+			return privacy.RetainedResolution{}, analysis.ErrUnavailable
+		}
+		return v, nil
+	}
+	resolved, err := resolve()
+	if err != nil {
+		return zero, err
+	}
+	defer shorten(resolved.ValidUntil, resolved.ExpiresAt)()
+	environment, err := s.Environment.ProjectionEnvironment(call, cloneProjectionEvidence(record), i.Principal)
+	if err != nil || !projectionEnvironmentMatches(environment, record, scope, s.Now()) || call.Err() != nil {
+		return zero, analysis.ErrUnavailable
+	}
+	defer shorten(environment.ValidUntil)()
+
+	// Recheck the request-owned identity and ordinary permissions after blocking
+	// reads. Same principal/policy without the original groups/scopes is not the
+	// same request authority. Retention and environment are checked afterwards.
+	current, err := source.ResolveIdentity(call)
+	current = cloneProjectionIdentity(current)
+	if err != nil || !sameProjectionIdentity(i, current, s.Now()) || call.Err() != nil {
+		return zero, analysis.ErrUnavailable
+	}
+	defer shorten(current.ValidUntil)()
+	latest, err := s.Permissions.Permissions(call, target)
+	latest = cloneProjectionPermissions(latest)
+	retained.ExpiresAt = resolved.ExpiresAt
+	final := value.Evaluate(current, latest, value.ReadApproved, target, &retained, s.Now())
+	if err != nil || latest.Revision != p.Revision || !final.Eligible || call.Err() != nil {
+		return zero, analysis.ErrUnavailable
+	}
+	defer shorten(final.ValidUntil)()
+	lastRetention, err := resolve()
+	if err != nil || !sameProjectionRetention(resolved, lastRetention) {
+		return zero, analysis.ErrUnavailable
+	}
+	defer shorten(lastRetention.ValidUntil, lastRetention.ExpiresAt)()
+	lastEnvironment, err := s.Environment.ProjectionEnvironment(call, cloneProjectionEvidence(record), i.Principal)
+	if err != nil || !projectionEnvironmentMatches(lastEnvironment, record, scope, s.Now()) || !sameProjectionEnvironment(environment, lastEnvironment) || call.Err() != nil {
+		return zero, analysis.ErrUnavailable
+	}
+	defer shorten(lastEnvironment.ValidUntil)()
+	lastIdentity, err := source.ResolveIdentity(call)
+	lastIdentity = cloneProjectionIdentity(lastIdentity)
+	if err != nil || !sameProjectionIdentity(i, lastIdentity, s.Now()) || !sameProjectionIdentity(current, lastIdentity, s.Now()) || call.Err() != nil {
+		return zero, analysis.ErrUnavailable
+	}
+	defer shorten(lastIdentity.ValidUntil)()
+	now := s.Now()
+	// Returning the original proofs keeps their observation identities and
+	// freshness intact. Final readers cannot replace an expired initial proof.
+	if !now.Before(until) || !resolved.Proof.Valid(now) || !environment.Valid(now) || !value.Evaluate(i, p, value.ReadApproved, target, &retained, now).Eligible || !value.Evaluate(lastIdentity, latest, value.ReadApproved, target, &retained, now).Eligible {
+		return zero, analysis.ErrExpired
+	}
+	out := analysis.ContextProjectionAuthority{Scope: scope, Environment: environment, Retention: resolved.Proof, PermissionRevision: p.Revision, IdentityRevision: i.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy}
+	encoded, err := json.Marshal(struct {
+		Authority   analysis.ContextProjectionAuthority
+		Assignments []artifact.AudienceAssignment
+	}{out, final.ContributingAssignments})
+	if err != nil {
+		return zero, analysis.ErrUnavailable
+	}
+	out.DecisionDigest = sha256.Sum256(encoded)
+	if call.Err() != nil || !out.Valid(s.Now()) {
+		return zero, analysis.ErrExpired
+	}
+	return out, nil
+}
+
+func projectionEvidenceMatches(r ContextProjectionEvidence, scope analysis.ContextProjectionScope, now time.Time) bool {
+	target := value.Target{ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID}
+	return r.Retained.Valid() && r.Retained.RootID == scope.RootID && r.CaseID == scope.CaseID && r.CaptureID == scope.CaptureID &&
+		r.Version == scope.Version && r.SourceFormat == artifact.ContextFormat && r.SourceFormat == scope.SourceFormat && r.SourceProjectionDigest == scope.SourceProjectionDigest &&
+		r.SourceProjectionDigest == analysis.ContextSourceProjectionDigest() && r.DataClass == "metadata" && identity.Text(r.PurposeRef, 128) &&
+		r.Retained.Registration.Location.ArtifactID == scope.ArtifactID && r.Retained.Registration.NativeLimit == artifact.MaxContextBytes && r.Retained.Input.Target == target &&
+		r.Retained.Input.EvidenceType == "context" && r.Retained.Input.PrivacyClass == "potentialPersonalData" && identity.Fresh(r.ObservedAt, r.ValidUntil, now, 5*time.Second)
+}
+
+func projectionRetentionMatches(v privacy.RetainedResolution, r ContextProjectionEvidence, scope analysis.ContextProjectionScope, now time.Time) bool {
+	return v.Target == r.Retained.Input.Target && v.PurposeRef == r.PurposeRef && v.Deadlines.ValidRetained() && v.AnchorAt.Equal(r.Retained.Effective.AnchorAt) &&
+		!v.ExpiresAt.After(r.Retained.Effective.ExpiresAt) && !v.DeleteBy.After(r.Retained.Effective.DeleteBy) && now.Before(v.ExpiresAt) && privacy.ValidPolicyOrigins(v.Policies) &&
+		v.PolicyRevision.Valid() && v.Proof.Policy == v.PolicyRevision && v.Proof.Matches(scope.RootID, scope.ClusterID, scope.NamespaceUID, scope.WorkloadUID, scope.PodUID) &&
+		v.Proof.Valid(now) && !v.ValidUntil.After(v.Proof.ValidUntil) && now.Before(v.ValidUntil)
+}
+
+func projectionEnvironmentMatches(v analysis.ContextProjectionEnvironment, r ContextProjectionEvidence, scope analysis.ContextProjectionScope, now time.Time) bool {
+	return v.Valid(now) && v.RootID == scope.RootID && v.Location == r.Retained.Registration.Location && v.StoreID == r.Retained.Registration.StoreID &&
+		v.Principal == scope.Principal && v.Processing.CaptureID == scope.CaptureID
+}
+
+func cloneProjectionIdentity(v identity.Identity) identity.Identity {
+	v.Groups, v.Scopes = slices.Clone(v.Groups), slices.Clone(v.Scopes)
+	slices.Sort(v.Groups)
+	slices.Sort(v.Scopes)
+	return v
+}
+
+func sameProjectionIdentity(a, b identity.Identity, now time.Time) bool {
+	b = cloneProjectionIdentity(b)
+	return a.Valid(now) && b.Valid(now) && a.Principal == b.Principal && a.Policy == b.Policy && slices.Equal(a.Groups, b.Groups) && slices.Equal(a.Scopes, b.Scopes)
+}
+
+func cloneProjectionPermissions(v value.Projection) value.Projection {
+	v.Allows, v.Denies = slices.Clone(v.Allows), slices.Clone(v.Denies)
+	return v
+}
+
+func cloneProjectionEvidence(v ContextProjectionEvidence) ContextProjectionEvidence {
+	v.Audience = slices.Clone(v.Audience)
+	v.Retained.OriginPolicies = slices.Clone(v.Retained.OriginPolicies)
+	v.Retained.Input.Parents = slices.Clone(v.Retained.Input.Parents)
+	return v
+}
+
+func sameProjectionRetention(a, b privacy.RetainedResolution) bool {
+	x, y := a.Proof, b.Proof
+	x.ObservedAt, y.ObservedAt, x.ValidUntil, y.ValidUntil = time.Time{}, time.Time{}, time.Time{}, time.Time{}
+	return a.Target == b.Target && a.PolicyRevision == b.PolicyRevision && a.PurposeRef == b.PurposeRef && a.AnchorAt.Equal(b.AnchorAt) &&
+		a.ExpiresAt.Equal(b.ExpiresAt) && a.DeleteBy.Equal(b.DeleteBy) && slices.Equal(a.Policies, b.Policies) && x == y
+}
+
+func sameProjectionEnvironment(a, b analysis.ContextProjectionEnvironment) bool {
+	a.ObservedAt, b.ObservedAt, a.ValidUntil, b.ValidUntil = time.Time{}, time.Time{}, time.Time{}, time.Time{}
+	a.Recovery.ObservedAt, b.Recovery.ObservedAt, a.Recovery.FreshUntil, b.Recovery.FreshUntil = time.Time{}, time.Time{}, time.Time{}, time.Time{}
+	a.Processing.ObservedAt, b.Processing.ObservedAt, a.Processing.ValidUntil, b.Processing.ValidUntil = time.Time{}, time.Time{}, time.Time{}, time.Time{}
+	return a == b
+}

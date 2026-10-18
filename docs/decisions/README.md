@@ -1,5 +1,11 @@
 # Decision records
 
+[ADR-206 — Bounded approved pod-status projection reads](206-bounded-context-projection.md)
+defines the accepted implementation contract for ordinary browser/MCP reads of
+captured status: fixed text projection, independent read authority, original query
+deadlines and separately charged acquisition batches. Implementation and native
+qualification remain pending.
+
 [ADR-205 — Installed context deletion](205-installed-context-deletion.md)
 deletes expired context evidence from the hub-worker: three SQL logins, a due list, the operator's
 own evidence delete credential, a deletion signing key in Transit and the acknowledged deletion record.

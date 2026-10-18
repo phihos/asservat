@@ -1,5 +1,10 @@
 # Implementation architecture
 
+[Bounded approved context projection](context-projection.md) specifies the next
+browser/MCP content-read slice under ADR-206. Its fixed pod-status text result,
+query authority and acquisition accounting are an accepted implementation contract;
+code and installed qualification remain pending.
+
 [Shared public context assembly](public-context-composition.md#shared-application-assembly)
 connects the existing submission, case and native-download use cases with
 separate preview/resolution credentials. Installed qualification remains pending.
