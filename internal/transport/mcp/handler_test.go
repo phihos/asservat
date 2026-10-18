@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -180,7 +181,7 @@ func TestOfficialClientNegotiatesExactVersions(t *testing.T) {
 func TestResourceMetadataAndOAuthChallenges(t *testing.T) {
 	var count atomic.Int64
 	var mode atomic.Int64
-	_, s := newTestServer(t, func(context.Context, string) (identity.Identity, error) {
+	h, s := newTestServer(t, func(context.Context, string) (identity.Identity, error) {
 		count.Add(1)
 		switch mode.Load() {
 		case 1:
@@ -221,6 +222,8 @@ func TestResourceMetadataAndOAuthChallenges(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			mode.Store(tc.mode)
+			var reasons []string
+			h.Report = func(reason string) { reasons = append(reasons, reason) }
 			r := rpcRequest(t, s, "2025-11-25", "tools/list", nil)
 			if tc.alter != nil {
 				tc.alter(r)
@@ -228,6 +231,9 @@ func TestResourceMetadataAndOAuthChallenges(t *testing.T) {
 			resp, b := send(t, s, r)
 			if resp.StatusCode != tc.status || bytes.Contains(b, []byte("synthetic-secret")) {
 				t.Fatalf("%d %s", resp.StatusCode, b)
+			}
+			if want := map[bool][]string{true: {"identity"}}[tc.status == 503]; !slices.Equal(reasons, want) {
+				t.Fatalf("reported %q, want %q", reasons, want)
 			}
 			if tc.status == 401 || tc.status == 403 {
 				c := resp.Header.Get("WWW-Authenticate")

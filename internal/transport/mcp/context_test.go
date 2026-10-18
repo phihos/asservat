@@ -196,12 +196,17 @@ func TestMCPRetainsOperationDeadlineThroughFinalIdentityCheck(t *testing.T) {
 				t.Fatal(err)
 			}
 			h.now = now
+			var reasons []string
+			h.Report = func(reason string) { reasons = append(reasons, reason) }
 			response, b := send(t, server, rpcRequest(t, server, version, "tools/call", map[string]any{"name": "get_capture", "arguments": map[string]any{"capture_id": "00000000-0000-4000-8000-000000000030"}}))
 			if checks.Load() != 4 {
 				t.Fatal("test did not reach final identity check", checks.Load())
 			}
 			if response.StatusCode != 503 || response.Header.Get("WWW-Authenticate") != "" || strings.Contains(string(b), "00000000-0000-4000-8000-000000000030") || strings.Contains(string(b), "structuredContent") {
 				t.Fatalf("expired operation authority disclosed metadata or invalidated identity: %d %s", response.StatusCode, b)
+			}
+			if len(reasons) != 1 || reasons[0] != "deadline-passed" {
+				t.Fatalf("reported %q", reasons)
 			}
 		})
 	}
