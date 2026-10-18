@@ -125,3 +125,37 @@ failures. This one-input fixture retains synthetic connector source, issuer and
 registry facts; full installed source and owner composition remain unqualified.
 Both runs are retained in
 [implementation progress](../implementation-progress.md).
+
+## Installed opening diagnostics
+
+Installed native44 on `fab45036f3cda153d06ea56898d92cae535e7d72` still fails
+preview target resolution; all 2,695 source hashes match and cleanup is complete.
+The installed regional constructor passes the concrete executor directly to the
+client, so the setup capability is present. The hub logs both rejected old names
+and native-listener handoffs after its process restart. Neither those events nor
+the former coarse `open (denied)` label identifies the failed opening boundary.
+No successful delegated owner-authentication timing is recorded. The cause stays
+unresolved; the prior source-close failure is not assigned to this new run.
+
+The private opening diagnostic now records a closed failing stage, elapsed wall
+time including joined cleanup, and time remaining to the earliest original bound
+already learned by that point. Cold setup errors carry only a separate fixed
+producer code and original cutoff, not the older free-form trace or dependency
+text. TLS rejection, first owner authentication, headers, Hello completion,
+native Finish, closing owner/local checks and joined close are distinct. The
+reported stage locates the refusal; it is not proof of a particular remote wire
+error. Existing error chains and all authority reads/checks remain unchanged.
+Timing values are formatted outside the finite event counter key and do not
+drive any authority decision. The final installed diagnostic run is pending.
+
+A smaller complete-opening native reproducer would need the actual protected
+`ConnectorIdentitySource`, the exporter-bound `RegionalLifecycle` conversation
+and scoped SQL registration, then the native executor and complete
+`ContextStartClient.Open`. The existing one-input native setup fixture has real
+Kubernetes workload proof but synthetic connector source, issuer and registry;
+it never calls `Open`. The older exchange fixture has actual TLS/HTTP2 and owner
+SQL/S3 but synthetic connector source/registration and owner route/protection.
+Combining only their existing synthetic adapters would still omit the installed
+source/registration cost and delegated owner path. Neither fixture is reported
+as whole installed setup qualification. No extra native campaign is inferred
+from this reproducer design.

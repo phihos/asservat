@@ -101,6 +101,17 @@ returns. The setup handle is never reused by later exchange checks, target
 queries or accepted work. Any failure, known change, cancellation or expiry
 refuses the opening without a stale fallback or renewed interval.
 
+Private context-start opening diagnostics distinguish discovery, initial setup
+and local process, TLS/peer, first owner, source frame, headers/Hello, native
+Finish, closing owner/local process and joined close. A failed cold setup may
+also identify its fixed source/proof/settings/workload stage. Only closed codes,
+elapsed wall time and time remaining to the earliest already learned original
+cutoff are reported after existing cleanup joins. These values are diagnostics,
+never authority; cancellation and original error classification are unchanged.
+Dependency text, identities, credentials and payloads are excluded. Numeric
+timings are outside the finite exponentially suppressed event-count key. This
+adds no read, retry, timeout renewal, result field or acceptance capability.
+
 For the initial regional Kubernetes API snapshot, `apiContextStart/v1` binds the
 protected executor Pod/account/process and exact collector image, without target
 node/boot claims. One immutable SQL execution row and the original Kubernetes

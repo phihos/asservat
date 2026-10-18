@@ -1,5 +1,31 @@
 # Sustained implementation progress
 
+## Context opening diagnostic candidate (2026-10-18)
+
+The installed client passes the concrete setup producer directly; its capability
+is not lost through a wrapper. Native44 still does not identify the failed
+opening boundary. The candidate now reports closed discovery/setup/process,
+TLS/peer, first-owner, source, headers/Hello, native Finish, closing-owner/process
+and joined-close stages. A cold setup can report its exact fixed source/proof or
+settings/workload check. Numeric elapsed and remaining original time are separate
+from the finite event-count key. No authority read, deadline, retry, public field
+or error classification changes. Dependency text and identities are excluded.
+
+Before instrumentation, all 14 actual TLS/HTTP2 refusal-stage cases failed for
+missing diagnostic metadata. Corrected races passed 32 top-level / 78 named
+tests across mTLS, Kubernetes and bootstrap, including exact owner/process/source
+call counts, original cutoff, cancellation, joined-close timing and exponential
+suppression across different timings. Independent review found the cold proof's
+final freshness code missing from the closed list; its added source-bound and
+logger regression passed a further two top-level / six named races.
+Touched-package vet and Go architecture (58 packages / 338 edges) passed.
+Spec check passed 11,379 assertions and design architecture passed 1,306 positive
+/ 120 negative checks. These component tests use synthetic current authority; they do not
+resolve native44 or qualify a complete installed opening. The next external
+qualification remains one reviewed, frozen complete installed continuation.
+The smaller-reproducer requirements and existing fixture limits are documented
+in [ADR-207](decisions/207-context-setup-proof-bracket.md#installed-opening-diagnostics).
+
 ## Installed native 44: preview still unavailable (2026-10-18)
 
 The [full continuation run](https://github.com/phihos/asservat/actions/runs/39152191972)

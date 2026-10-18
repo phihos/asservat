@@ -166,6 +166,9 @@ type RegionalContextStartConnections struct {
 	Local      contextstart.RegionalLocal
 	// Report receives closed diagnostic labels only and must not block.
 	Report func(string)
+	// ReportOpening keeps numeric timing outside the finite event-count key.
+	// It observes a joined refusal, never changes the opening's authority.
+	ReportOpening func(string, time.Duration, time.Duration)
 }
 
 func (s RegionalContextStartConnections) Run(ctx context.Context) error {

@@ -217,7 +217,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	}
 	local := contextstart.RegionalLocal{Process: process, Targets: r.targets, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
 	fmt.Fprintln(os.Stderr, "regional context start active")
-	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Verifier: r.verifier, Local: local, Report: eventLog(os.Stderr, "regional context standby refused")}.Run(ctx)
+	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Verifier: r.verifier, Local: local, Report: eventLog(os.Stderr, "regional context standby refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
 }
 
 // regionalArtifactOutput prepares each attempt's output with a key sealer

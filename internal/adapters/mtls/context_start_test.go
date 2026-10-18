@@ -43,6 +43,7 @@ type contextStartTLSFixture struct {
 	router          *contextstart.Router
 	owner           value.OwnerBinding
 	requests, dials atomic.Int32
+	intercept       func(http.ResponseWriter, *http.Request) bool
 	rootID          string
 	api             contextStartAPIProcess
 	// Retained for the fixed-endpoint regional client (ADR-172).
@@ -72,6 +73,9 @@ func newContextStartTLSFixture(t *testing.T) *contextStartTLSFixture {
 	var handler *contextstart.Handler
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fixture.requests.Add(1)
+		if fixture.intercept != nil && fixture.intercept(w, r) {
+			return
+		}
 		if r.ProtoMajor != 2 {
 			t.Error("not actual H2")
 		}

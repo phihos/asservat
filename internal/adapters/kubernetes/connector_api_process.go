@@ -256,13 +256,18 @@ func connectorAPIStage(step string, err error) error {
 	if err == nil {
 		return nil
 	}
-	return &connectorAPIStepError{step, err}
+	return &connectorAPIStepError{step: step, err: err}
 }
 
 type connectorAPIStepError struct {
-	step string
-	err  error
+	phase string    // closed cold-proof code, separate from the older elapsed trace
+	until time.Time // diagnostic only: earliest original bound already learned
+	step  string
+	err   error
 }
+
+func (e *connectorAPIStepError) ContextStartSetupStep() string     { return e.phase }
+func (e *connectorAPIStepError) ContextStartSetupUntil() time.Time { return e.until }
 
 func (e *connectorAPIStepError) Error() string { return "connector API " + e.step }
 func (e *connectorAPIStepError) Unwrap() error { return e.err }
@@ -300,6 +305,10 @@ func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (con
 		return connectorAPIProof{}, cfg.ErrUnavailable
 	}
 	start := g.attester.client.now()
+	until := start.Add(5 * time.Second)
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
 	// Each failed check names itself and the elapsed share of the original
 	// five seconds, for the regional process's diagnostic line.
 	// The completed checks' marks profile where the five seconds went.
@@ -309,11 +318,7 @@ func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (con
 	}
 	mark := func(name string) { marks = append(marks, at(name)) }
 	stage := func(name string, err error) error {
-		return connectorAPIStage(at(name)+" after ["+strings.Join(marks, " ")+"]", err)
-	}
-	until := start.Add(5 * time.Second)
-	if d, ok := ctx.Deadline(); ok {
-		until = identity.Earlier(until, d)
+		return &connectorAPIStepError{phase: name, until: until, step: at(name) + " after [" + strings.Join(marks, " ") + "]", err: err}
 	}
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()

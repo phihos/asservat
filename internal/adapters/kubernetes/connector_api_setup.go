@@ -29,7 +29,7 @@ func (p *ConnectorAPIExecutionProcess) BeginAPIContextSetup(ctx context.Context,
 	}()
 	proof, err := p.guard.current(call)
 	if err != nil || proof.proof.Process != p.connector || !proof.source.Valid(p.guard.attester.client.now()) {
-		return nil, cfg.ErrUnavailable
+		return nil, connectorAPISetupDiagnostic(err)
 	}
 	root, cancel := context.WithDeadline(ctx, proof.validUntil)
 	op := &connectorAPISetup{process: p, credentials: credentials, root: root, cancel: cancel, proof: proof, finishNative: p.guard.finishSetup, parentDone: make(chan struct{})}
