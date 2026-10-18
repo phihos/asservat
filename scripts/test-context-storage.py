@@ -36,10 +36,19 @@ def run(args, *, data=None):
 
 
 
-def postgres_fixture_options(regional_context_start=None):
+def postgres_fixture_options(regional_context_start=None, lock_waits=False):
     if regional_context_start not in (None, "first", "continuation", "journey"):
         raise ValueError("unknown regional context qualification")
     options = ["-c", "max_connections=48", "-c", "shared_buffers=128MB", "-c", "fsync=on", "-c", "synchronous_commit=on"]
+    if lock_waits:
+        # Owned synthetic fixture only. The installer continuation's
+        # reconcilers fail together on lock_timeout; log each wait longer than
+        # 300 ms with its holder's PID, and each connection's role so the PID
+        # names its purpose. No statements or parameters are logged.
+        options += ["-c", "log_line_prefix=%m [%p] role=%u sqlstate=%e ",
+                    "-c", "log_lock_waits=on", "-c", "deadlock_timeout=300ms", "-c", "log_connections=on",
+                    "-c", "log_statement=none", "-c", "log_min_error_statement=panic",
+                    "-c", "log_parameter_max_length=0", "-c", "log_parameter_max_length_on_error=0"]
     if regional_context_start == "journey":
         # Owned synthetic fixture only. Diagnose the actual refused connection
         # without adding a pgx tracer (forbidden by product SQL constructors).
@@ -330,7 +339,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 return info["NetworkSettings"]["Networks"][network]["IPAddress"]
             s3ip = service("s3", SEAWEED, ["mini", "-dir=/data", "-ip.bind=0.0.0.0", "-admin.ui=false", "-s3.port=8333"], ["--user", "1000:1000", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-v", "/data", "-e", "AWS_ACCESS_KEY_ID=synthetic-only", "-e", "AWS_SECRET_ACCESS_KEY=synthetic-only-secret", "--entrypoint", "/usr/bin/weed"])
             baoip = service("kms", BAO, ["server", "-dev", "-dev-no-store-token", "-dev-root-token-id=synthetic-root", "-dev-listen-address=0.0.0.0:8200"], ["--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-e", "SKIP_SETCAP=true", "-e", "BAO_DISABLE_MLOCK=true", "--entrypoint", "/usr/bin/bao"])
-            pgip = service("postgres", POSTGRES, postgres_fixture_options(regional_context_start), ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"])
+            pgip = service("postgres", POSTGRES, postgres_fixture_options(regional_context_start, lock_waits=installer_continuation), ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"])
             proxy_ip = service("tls", worker_tag, ["http://"+s3ip+":8333", "http://"+baoip+":8200", pgip+":5432"], ["--user", "65532:65532", "--read-only", "--entrypoint", "/provider-proxy"])
             for _ in range(50):
                 try:
@@ -585,7 +594,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 try:
                     info = json.loads(run(["docker", "inspect", pgname]))[0]
                     assert info["Config"]["Labels"]["asservat.test"] == run_id
-                    provider = subprocess.run(["docker", "logs", "--tail", "200", pgname], text=True, capture_output=True, timeout=10)
+                    provider = subprocess.run(["docker", "logs", "--tail", "4000" if installer_continuation else "200", pgname], text=True, capture_output=True, timeout=10)
                     (ROOT/"test/results/context-storage-postgres.log").write_text(provider.stdout+provider.stderr)
                     report["providerLogExit"] = provider.returncode
                 except (OSError, subprocess.TimeoutExpired, subprocess.CalledProcessError, ValueError, KeyError, IndexError, AssertionError) as exc:
