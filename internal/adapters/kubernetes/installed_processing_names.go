@@ -15,12 +15,15 @@ func installedProcessingSource(installationID string) string {
 // ownerPublicSourceProbes are the provider-installed hub-api's guarded public
 // sources (ADR-185): the cluster catalog, each regional slot's capability and
 // work trust, the worker configuration and the download environment. The owner
-// account proves each source's own denial with a dry-run UPDATE.
+// account proves each source's own denial with a dry-run UPDATE. The publisher
+// reads the catalog with the same proof (ADR-203 decision 6), so its account
+// gets the one catalog pair; without it the namespace guard, not the catalog's
+// own guard, would deny its probe.
 func ownerPublicSourceProbes(installationID, ownerAccount string) []cfg.OwnerConfigurationProbe {
 	names := contracts.OwnerPublicGuardedSources(installationID)
-	out := make([]cfg.OwnerConfigurationProbe, 0, len(names))
+	out := make([]cfg.OwnerConfigurationProbe, 0, len(names)+1)
 	for _, name := range names {
 		out = append(out, cfg.OwnerConfigurationProbe{ConfigMap: name, ServiceAccount: ownerAccount})
 	}
-	return out
+	return append(out, cfg.OwnerConfigurationProbe{ConfigMap: contracts.OwnerClusterCatalogName(installationID), ServiceAccount: contracts.PublisherName(installationID)})
 }

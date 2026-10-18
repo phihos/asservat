@@ -83,6 +83,12 @@ that the installed layout cannot supply:
    When the catalog digest changes it exits and the kubelet restarts it, as
    the hub-api does. A regional capture is therefore published once its
    region has joined.
+   The catalog proof's dry-run UPDATE must be denied by the catalog's own
+   guard, so the hub namespace guard admits one more exact pair (the catalog
+   and the publisher's account). The guard's pair bound rises from eight to
+   twelve; each pair stays one named dry-run UPDATE. The initial runtime
+   bridge treats the publisher's pair like the hub-api's: its source does not
+   exist at bridge time and the publisher proves it at read time.
 7. **No readiness route.** The publisher serves nothing. The installer waits
    for the Deployment to settle; the native test qualifies the publisher by
    publishing the installed journey's capture.
@@ -120,3 +126,10 @@ that the installed layout cannot supply:
   verifier signing; the in-process verifier credential; and the process
   composition with the guard proof, catalog pins and restart on catalog
   change. Native qualification is pending.
+- [CI run 39091781828](../../test/results/ci-publisher-1/native-continuation-1/context-storage-environment.json)
+  installed every publisher step, including the readback of the
+  operator-applied OpenBao setup, but the process stopped with a generic
+  message; the next run, with startup phases, stopped at `publisher/catalog`:
+  the hub namespace guard denied the publisher's catalog probe because no
+  pair named its account. The pair, the larger bound and the bridge
+  exemption above fix that.
