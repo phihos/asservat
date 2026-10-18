@@ -131,7 +131,7 @@ func (d *InstalledHubWorkerDeployment) openCleanup(ctx context.Context, claim co
 	// The constructor freshly rechecks this exact receipt and workload before
 	// any credential opens, then bounds all startup work by that observation.
 	// The earlier read only selects the fixed mount; it confers no SQL effect.
-	child, err := NewCaptureCleanupWorkerDeployment(ctx, files, b.input, b.activation, claim)
+	child, err := NewCaptureCleanupWorkerDeployment(ctx, b.mounts, files, b.input, b.activation, claim)
 	if err != nil {
 		return err
 	}

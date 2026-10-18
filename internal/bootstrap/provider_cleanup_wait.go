@@ -82,7 +82,7 @@ func (d *InstalledHubWorkerDeployment) openProviderCleanup(ctx context.Context) 
 			files.Close()
 		}
 	}()
-	child, err := newCaptureCleanupWorkerDeployment(ctx, files, b.input, b.activation, claim, &providerCleanupStartup{op, b.admission})
+	child, err := newCaptureCleanupWorkerDeployment(ctx, b.mounts, files, b.input, b.activation, claim, &providerCleanupStartup{op, b.admission})
 	if err != nil {
 		return nil, nil, err
 	}

@@ -78,7 +78,7 @@ func (s captureCleanupStorage) Retrieve(ctx context.Context) (aws.Credentials, e
 	if s.verifier {
 		name = "verify-storage.json"
 	}
-	b, err := mounts.Read(ctx, s.inputs.files, name, 32<<10)
+	b, err := s.inputs.read(ctx, name, 32<<10)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}

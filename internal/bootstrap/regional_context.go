@@ -94,7 +94,7 @@ func regionalOwnerPool(c contracts.RegionalDeployment, w contracts.OwnerConfigur
 func storageCredentials(in *providerInputs, name string) aws.CredentialsProviderFunc {
 	return func(ctx context.Context) (aws.Credentials, error) {
 		var zero aws.Credentials
-		b, err := mounts.Read(ctx, in.files, name, 32<<10)
+		b, err := in.read(ctx, name, 32<<10)
 		if err != nil {
 			return zero, mounts.ErrUnavailable
 		}

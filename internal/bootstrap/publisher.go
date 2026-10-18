@@ -489,7 +489,7 @@ func RunPublisher(ctx context.Context) error {
 
 func (s mountedEvidence) Retrieve(ctx context.Context) (aws.Credentials, error) {
 	var zero aws.Credentials
-	b, err := mounts.Read(ctx, s.inputs.files, contracts.PublisherEvidenceCredential, 32<<10)
+	b, err := s.inputs.read(ctx, contracts.PublisherEvidenceCredential, 32<<10)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}

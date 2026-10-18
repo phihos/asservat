@@ -15,7 +15,7 @@ func newPublicOperationMAC(ctx context.Context, in *providerInputs, installation
 	if ctx == nil || ctx.Err() != nil || in == nil || in.files == nil || original.Input.InstallationID != installation || !authorization.UUID(original.RootUID) || !authorization.UUID(original.SetupID) {
 		return nil, mounts.ErrUnavailable
 	}
-	b, e := mounts.Read(ctx, in.files, contracts.PublicAuditKeysFile, contracts.PublicAuditKeysMaxBytes)
+	b, e := in.read(ctx, contracts.PublicAuditKeysFile, contracts.PublicAuditKeysMaxBytes)
 	if e != nil {
 		return nil, mounts.ErrUnavailable
 	}
