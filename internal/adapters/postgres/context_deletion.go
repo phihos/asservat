@@ -147,6 +147,49 @@ func (s *ContextDeletions) ReadContextDeletion(ctx context.Context, loc artifact
 	}
 	return out, found, nil
 }
+
+// DueContextDeletions lists, for this facet's permission root, at most sixteen
+// attempts with a positive writer completion that are not deleted, whose
+// effective cutoff has passed and whose deletion lease is absent or ended,
+// oldest cutoff first (ADR-205 decision 3). It is a scheduling hint only and
+// confers no authority: BeginContextDeletion rechecks the cutoff, the lease and
+// recovery under its own locks. It needs only the cleaner's reads.
+func (s *ContextDeletions) DueContextDeletions(ctx context.Context) ([]artifact.Location, error) {
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil {
+		return nil, app.ErrUnavailable
+	}
+	var out []artifact.Location
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		rows, err := q.ListDueContextDeletions(ctx, id(s.root))
+		if err != nil {
+			return err
+		}
+		out, err = dueContextDeletions(rows)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// dueContextDeletions accepts only a bounded page of distinct valid locations.
+func dueContextDeletions(rows []custodydb.ListDueContextDeletionsRow) ([]artifact.Location, error) {
+	if len(rows) > 16 {
+		return nil, app.ErrUnavailable
+	}
+	out := make([]artifact.Location, 0, len(rows))
+	seen := make(map[string]bool, len(rows))
+	for _, r := range rows {
+		loc := artifact.Location{ClusterID: uid(r.ClusterID), ArtifactID: uid(r.ArtifactID), AttemptID: uid(r.ID)}
+		if loc.Validate() != nil || seen[loc.AttemptID] {
+			return nil, app.ErrUnavailable
+		}
+		seen[loc.AttemptID] = true
+		out = append(out, loc)
+	}
+	return out, nil
+}
 func lockDeletionAttempt(ctx context.Context, q *custodydb.Queries, loc artifact.Location) (custodydb.CustodyAttempt, custodydb.CustodyPool, custodydb.CustodyAllocation, error) {
 	hint, err := q.ReadAttempt(ctx, id(loc.AttemptID))
 	if err != nil {
