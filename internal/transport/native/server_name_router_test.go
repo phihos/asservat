@@ -84,7 +84,7 @@ func TestServerNameRouterSplitsByClientHello(t *testing.T) {
 	plain.Close()
 	for until := time.Now().Add(3 * time.Second); ; time.Sleep(20 * time.Millisecond) {
 		mu.Lock()
-		reported := events["unknown-name"] && events["peek-failed"]
+		reported := events["unknown-name"] && events["peek-failed"] && events["started"] && events["handoff native.synthetic.invalid"]
 		mu.Unlock()
 		if reported {
 			break
@@ -129,12 +129,18 @@ func TestServerNameRouterReportsSlowHandoff(t *testing.T) {
 		t.Fatal(err)
 	}
 	conn.Close()
-	select {
-	case e := <-reported:
-		if e != "slow-handoff observation.synthetic.invalid" {
-			t.Fatal("event", e)
+	for {
+		select {
+		case e := <-reported:
+			if e == "started" {
+				continue
+			}
+			if e != "slow-handoff observation.synthetic.invalid" {
+				t.Fatal("event", e)
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("slow hand-off not reported")
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("slow hand-off not reported")
+		break
 	}
 }

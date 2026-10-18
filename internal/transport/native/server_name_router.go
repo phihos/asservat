@@ -24,10 +24,10 @@ type ServerNameRouter struct {
 	ctx      context.Context
 	children map[string]*routedListener
 	peeks    chan struct{}
-	// Report, when set before Run, receives a closed event for each dropped
-	// connection and each hand-off that waited over a second for the child
-	// server: a full child makes external handshakes time out (ADR-197 runs
-	// 25b/26b). Diagnostics only; it must not block.
+	// Report, when set before Run, receives closed events: started, each
+	// dropped connection, and each hand-off, marked slow when it waited over a
+	// second for the child server; a full child makes external handshakes time
+	// out (ADR-197 runs 25b/26b). Diagnostics only; it must not block.
 	Report func(event string)
 }
 
@@ -69,6 +69,9 @@ func (r *ServerNameRouter) Run() error {
 	}()
 	stop := context.AfterFunc(r.ctx, func() { r.listener.Close() })
 	defer stop()
+	if r.Report != nil {
+		r.Report("started")
+	}
 	for {
 		select {
 		case r.peeks <- struct{}{}:
@@ -109,8 +112,12 @@ func (r *ServerNameRouter) route(conn net.Conn) {
 	started := time.Now()
 	select {
 	case child.conns <- replay:
-		if r.Report != nil && time.Since(started) > time.Second {
-			r.Report("slow-handoff " + name)
+		if r.Report != nil {
+			if time.Since(started) > time.Second {
+				r.Report("slow-handoff " + name)
+			} else {
+				r.Report("handoff " + name)
+			}
 		}
 	case <-child.done:
 		conn.Close()
