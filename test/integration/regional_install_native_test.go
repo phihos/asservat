@@ -743,7 +743,18 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 			denyUID = created.Metadata.UID
 			observeDeny(true)
 		}
-		journey(cluster, ns.Name, app.Name, deny)
+		func() {
+			// Context-start has its own standby, separate from capacity. Retain
+			// its existing closed diagnostics if the installed journey fails.
+			defer func() {
+				if t.Failed() {
+					diagnostic, cancel := context.WithTimeout(ctx, 10*time.Second)
+					defer cancel()
+					regionalLogs(t, diagnostic, region)
+				}
+			}()
+			journey(cluster, ns.Name, app.Name, deny)
+		}()
 	}
 }
 
