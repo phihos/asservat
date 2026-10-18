@@ -47,8 +47,16 @@ type WorkerCredentials struct {
 // Server and issuer trust pools are separate and cloned. There is no system-CA,
 // insecure-TLS, proxy, cookie, redirect, filesystem-key or provider fallback.
 func NewWorkerCredentials(endpoint string, target value.WorkerCredentialTarget, serverRoots, issuerRoots *x509.CertPool, tokens evidence.DownloadPeerToken, now func() time.Time) (*WorkerCredentials, error) {
+	return NewWorkerCredentialsVia(endpoint, "", target, serverRoots, issuerRoots, tokens, now)
+}
+
+// NewWorkerCredentialsVia is NewWorkerCredentials with the control document's
+// optional connectivity-only address: TCP goes to address while TLS still
+// verifies endpoint's host and the request names endpoint's authority. An
+// empty address is NewWorkerCredentials.
+func NewWorkerCredentialsVia(endpoint, address string, target value.WorkerCredentialTarget, serverRoots, issuerRoots *x509.CertPool, tokens evidence.DownloadPeerToken, now func() time.Time) (*WorkerCredentials, error) {
 	u, err := workerEndpoint(endpoint)
-	if err != nil || !target.Valid() || serverRoots == nil || len(serverRoots.Subjects()) == 0 || tokens == nil || now == nil {
+	if err != nil || workerAddress(address) != nil || !target.Valid() || serverRoots == nil || len(serverRoots.Subjects()) == 0 || tokens == nil || now == nil {
 		return nil, artifact.ErrInvalid
 	}
 	if _, _, err = target.CertificateEpoch(now()); err != nil {
@@ -69,9 +77,13 @@ func NewWorkerCredentials(endpoint string, target value.WorkerCredentialTarget, 
 	if _, err = EnrollmentKey(csr); err != nil {
 		return nil, artifact.ErrDownloadUnavailable
 	}
+	dial := (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext
+	if via := workerDial(u, address, dial); via != nil {
+		dial = via
+	}
 	t := &http.Transport{
 		TLSClientConfig:     &tls.Config{RootCAs: serverRoots.Clone(), MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, Time: now},
-		DialContext:         (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		DialContext:         dial,
 		TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: 30 * time.Second,
 		IdleConnTimeout: 30 * time.Second, MaxConnsPerHost: 1, MaxIdleConns: 1, MaxIdleConnsPerHost: 1,
 		MaxResponseHeaderBytes: 4096, DisableCompression: true,

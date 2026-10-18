@@ -202,7 +202,7 @@ func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.Worke
 		return err
 	}
 	defer func() { result.Close(); _ = result.Wait(context.Background()) }()
-	client, err := mtls.NewNativeClient(pins.ExchangeEndpoint, &tls.Config{RootCAs: exchangeRoots, GetClientCertificate: credentials.GetClientCertificate, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13})
+	client, err := mtls.NewNativeClientVia(pins.ExchangeEndpoint, pins.ExchangeAddress, &tls.Config{RootCAs: exchangeRoots, GetClientCertificate: credentials.GetClientCertificate, MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13})
 	if err != nil {
 		return err
 	}

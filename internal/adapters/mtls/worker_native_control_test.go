@@ -1,7 +1,10 @@
 package mtls
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"net"
 	"testing"
 	"time"
 )
@@ -81,5 +84,65 @@ func TestNativeWorkerControlVersionAndBoundaries(t *testing.T) {
 				t.Fatal("unsafe native startup accepted", kind)
 			}
 		})
+	}
+}
+
+// ADR-204 decision 9: optional connectivity-only dial addresses for both
+// endpoints; the verified names stay the endpoints' own.
+func TestWorkerControlDialAddresses(t *testing.T) {
+	for _, address := range []string{"owner.hub.svc:9443", "10.0.0.7:9443", "[fd00::7]:9443", "", "owner.hub.svc", "owner.hub.svc:0", "owner.hub.svc:65536", "owner.hub.svc:09443", "owner/hub:9443", "user@owner:9443", ":9443", "owner.hub.svc:9443 "} {
+		for _, field := range []string{"address", "exchangeAddress"} {
+			wire := nativeControlFixture(t)
+			if field == "address" {
+				wire["address"] = address
+			} else {
+				wire["native"].(map[string]any)["exchangeAddress"] = address
+			}
+			raw, _ := json.Marshal(wire)
+			trust, err := ParseWorkerControl(raw)
+			valid := address == "owner.hub.svc:9443" || address == "10.0.0.7:9443" || address == "[fd00::7]:9443"
+			if valid != (err == nil) {
+				t.Fatal("dial address", field, address, err)
+			}
+			if !valid {
+				continue
+			}
+			if field == "address" && (trust.Address != address || trust.Endpoint != "https://enroll.invalid") || field == "exchangeAddress" && (trust.Native().Settings().ExchangeAddress != address || trust.Native().Settings().ExchangeEndpoint != "https://exchange.invalid/internal/download-native/v1/worker") {
+				t.Fatal("dial address replaced a verified endpoint", field)
+			}
+		}
+	}
+	// Omitted addresses keep the original bytes and meaning.
+	raw, _ := json.Marshal(nativeControlFixture(t))
+	trust, err := ParseWorkerControl(raw)
+	if err != nil || trust.Address != "" || trust.Native().Settings().ExchangeAddress != "" {
+		t.Fatal("documents without dial addresses changed", err)
+	}
+}
+
+func TestWorkerDialUsesAddressOnlyForTheEndpointAuthority(t *testing.T) {
+	u, _ := workerEndpoint("https://fixed.synthetic.invalid:9443")
+	var dialed []string
+	dial := workerDial(u, "owner.hub.svc:9443", func(_ context.Context, network, address string) (net.Conn, error) {
+		dialed = append(dialed, network+" "+address)
+		return nil, errors.New("synthetic dial")
+	})
+	for _, authority := range []string{"fixed.synthetic.invalid:9443", "other.synthetic.invalid:9443", "fixed.synthetic.invalid:443"} {
+		_, _ = dial(context.Background(), "tcp", authority)
+	}
+	if len(dialed) != 1 || dialed[0] != "tcp owner.hub.svc:9443" {
+		t.Fatal("address dialed for another authority", dialed)
+	}
+	if workerDial(u, "", nil) != nil {
+		t.Fatal("empty address replaced the transport dialer")
+	}
+	defaultPort, _ := workerEndpoint("https://fixed.synthetic.invalid")
+	dialed = nil
+	_, _ = workerDial(defaultPort, "owner.hub.svc:9443", func(_ context.Context, network, address string) (net.Conn, error) {
+		dialed = append(dialed, address)
+		return nil, errors.New("synthetic dial")
+	})(context.Background(), "tcp", "fixed.synthetic.invalid:443")
+	if len(dialed) != 1 {
+		t.Fatal("default HTTPS authority not matched")
 	}
 }

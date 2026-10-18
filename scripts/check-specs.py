@@ -1263,8 +1263,16 @@ def main() -> None:
                      lambda d: d.update(issuerRoots=["AQ==", "AQ=="]),
                      lambda d: d.update(serverRoots=["AQ==", "Ag==", "Aw==", "BA==", "BQ=="]),
                      lambda d: d.update(privateKey="forbidden"), lambda d: d.update(token="forbidden"),
-                     lambda d: d.update(command=["sh"]), lambda d: d.pop("clusterID")]:
+                     lambda d: d.update(command=["sh"]), lambda d: d.pop("clusterID"),
+                     lambda d: d.update(address=""), lambda d: d.update(address="owner.hub.svc"),
+                     lambda d: d.update(address="owner.hub.svc:09443"),
+                     lambda d: d.update(address="token@owner.hub.svc:9443"),
+                     lambda d: d.update(address="owner.hub.svc:9443/path")]:
         rejects(worker_control, "worker-control", mutation)
+    # ADR-204 decision 9: optional connectivity-only dial address.
+    addressed_control = copy.deepcopy(worker_control)
+    addressed_control["address"] = "owner.hub.svc:9443"
+    validate(addressed_control, schemas[BASE + "worker-control.schema.json"])
 
     owner_deployment = {
         "format": "asservat-owner-deployment/v1", "installationID": local_key["installationID"],

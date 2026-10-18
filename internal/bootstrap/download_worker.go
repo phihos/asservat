@@ -143,7 +143,7 @@ func RunDownloadWorker(ctx context.Context, args []string, podUID string, status
 			return err
 		}
 	}
-	client, err := mtls.NewWorkerCredentials(trust.Endpoint, input.Target, server, issuer, mtls.NewProjectedWorkerToken(), time.Now)
+	client, err := mtls.NewWorkerCredentialsVia(trust.Endpoint, trust.Address, input.Target, server, issuer, mtls.NewProjectedWorkerToken(), time.Now)
 	if err != nil {
 		return err
 	}

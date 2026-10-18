@@ -109,6 +109,10 @@ const (
 	startupRunNative
 	startupRunOperation
 	startupRunReadiness
+	// The optional ADR-204 worker serving on the owner port.
+	startupRunWorkerRouter
+	startupRunWorkerEnrollment
+	startupRunWorkerNative
 )
 
 func (v ownerStartupPhase) String() string {
@@ -267,6 +271,12 @@ func (v ownerStartupPhase) String() string {
 		return "run-operation"
 	case startupRunReadiness:
 		return "run-readiness"
+	case startupRunWorkerRouter:
+		return "run-worker-router"
+	case startupRunWorkerEnrollment:
+		return "run-worker-enrollment"
+	case startupRunWorkerNative:
+		return "run-worker-native"
 	case startupOwnerRuntime:
 		return "owner-runtime"
 	case startupPublicDownloads:
