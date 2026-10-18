@@ -1,5 +1,28 @@
 # Sustained implementation progress
 
+## Installed journey native 41: public preview remains unavailable
+
+[Run 39128220426](https://github.com/phihos/asservat/actions/runs/39128220426)
+qualified frozen source `fa1080d73dfc3e71051306e5f82abe501d64ac37` only as far as
+regional enrollment and current capacity binding. It observed six distinct
+binding revisions and eleven samples with at least one second remaining during
+fifteen seconds. The scoped permission observer constructed successfully.
+All four installed `preview_capture` attempts then failed with HTTP/2 stream
+errors or service unavailable. Owner diagnostics recorded
+`audit-begin/object/closed/read/credentials-verify/identity/final-pod`; the exact
+cause is under investigation. Collection, publication, native transfer, revocation,
+expiry and faulted cleanup assertions were not reached.
+
+The parent test failed after 1,344.97 seconds (continuation: 1,023.51 seconds).
+The harness reports terminal exit 1, unchanged sources and no cleanup failures;
+all 2,630 recorded hashes independently match the frozen commit archive.
+Report: [`test/results/installed-journey-ci-41/context-storage-environment.json`](../test/results/installed-journey-ci-41/context-storage-environment.json),
+SHA-256 `7b708a3ef8f7e45438b88fcc98f19a51cbc0c9eea9d62c0418701649f287e4ae`.
+This supersedes native40's immediate permission-constructor blocker, not its
+unqualified lifecycle outcome. Preserve the original five-second proof/request
+intervals while diagnosing the public audit credential path; no automatic full
+campaign retry or relaxed gate is justified by this failure.
+
 ## Installed investigation continuation (ADR-202–205, 2026-10-18)
 
 The installer now provisions the public listener, publisher and hub-local
