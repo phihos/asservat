@@ -96,13 +96,13 @@ func TestOperationAuditorUnknownRepliesNeverRecreate(t *testing.T) {
 			in := auditIntent()
 			f := &operationFixture{lostCreate: mode == "lost-create", lostClaim: mode == "lost-claim", failAck: mode == "lost-ack"}
 			s := OperationAuditor{Journal: f, Acknowledgements: f, Objects: f, Now: func() time.Time { return in.CreatedAt }}
-			if e := s.Begin(context.Background(), in); e != ErrUnavailable {
+			if e := s.Begin(context.Background(), in); !errors.Is(e, ErrUnavailable) {
 				t.Fatal("unknown first reply accepted", e)
 			}
 			f.failAck = false
 			err := s.Begin(context.Background(), in)
 			if mode == "lost-claim" {
-				if err != ErrUnavailable || f.creates != 0 || f.finds != 1 {
+				if !errors.Is(err, ErrUnavailable) || f.creates != 0 || f.finds != 1 {
 					t.Fatal("unknown claim created later", err, f)
 				}
 			} else if err != nil || f.creates != 1 || f.finds != 1 {
@@ -117,7 +117,7 @@ func TestOperationAuditorPreservesOriginalDeadlineAfterAcknowledgement(t *testin
 	f := &operationFixture{}
 	s := OperationAuditor{Journal: f, Acknowledgements: f, Objects: f, Now: func() time.Time { return now }}
 	f.after = func() { now = in.RequestUntil }
-	if s.Begin(context.Background(), in) != ErrUnavailable || f.snap.IntentReceipt == nil {
+	if !errors.Is(s.Begin(context.Background(), in), ErrUnavailable) || f.snap.IntentReceipt == nil {
 		t.Fatal("late acknowledgement revived authority")
 	}
 }
@@ -139,7 +139,7 @@ func TestOperationAuditDoesNotAssertDelivery(t *testing.T) {
 		t.Fatal("completion replay created", err)
 	}
 	out.ClientReceipt = "received"
-	if s.Finish(context.Background(), out) != ErrUnavailable {
+	if !errors.Is(s.Finish(context.Background(), out), ErrUnavailable) {
 		t.Fatal("asserted client receipt")
 	}
 }
@@ -179,5 +179,18 @@ func TestOperationMACRotationKeepsAccountSpendIdentity(t *testing.T) {
 	}
 	if _, e = NewOperationMAC("same", account, "accounts", account); e == nil {
 		t.Fatal("same purpose keys accepted")
+	}
+}
+
+// A failed Begin names its closed step and still matches ErrUnavailable
+// (installed journey runs stopped at an unnamed audit-begin).
+func TestOperationAuditorNamesTheStepThatStopped(t *testing.T) {
+	in := auditIntent()
+	f := &operationFixture{lostCreate: true}
+	s := OperationAuditor{Journal: f, Acknowledgements: f, Objects: f, Now: func() time.Time { return in.CreatedAt }}
+	err := s.Begin(context.Background(), in)
+	var step interface{ FixedStep() string }
+	if !errors.Is(err, ErrUnavailable) || !errors.As(err, &step) || step.FixedStep() != "object" {
+		t.Fatal("step", err)
 	}
 }

@@ -5,6 +5,7 @@ import (
 	value "asservat.local/asservat/internal/domain/audit"
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -66,7 +67,7 @@ func TestHealthyAuditFindNeverManufacturesClosure(t *testing.T) {
 			if e != nil {
 				t.Fatal(e)
 			}
-			if e = gate.Begin(context.Background(), in); e != ErrUnavailable {
+			if e = gate.Begin(context.Background(), in); !errors.Is(e, ErrUnavailable) {
 				t.Fatal("unknown write succeeded", e)
 			}
 			f.lose = false
@@ -76,7 +77,7 @@ func TestHealthyAuditFindNeverManufacturesClosure(t *testing.T) {
 				if e != nil || f.writes != 1 || f.finds != 1 {
 					t.Fatal("exact durable completion did not recover", e, f)
 				}
-			} else if e != ErrUnavailable || f.finds != 0 || f.writes > 1 || f.acks != 0 {
+			} else if !errors.Is(e, ErrUnavailable) || f.finds != 0 || f.writes > 1 || f.acks != 0 {
 				t.Fatal("historical GET invented quiescence", e, f)
 			}
 		})
@@ -108,7 +109,7 @@ func TestHealthyAuditBindingDoesNotReanchorFinish(t *testing.T) {
 	other := frozen
 	other.Policy.ProofWindowSeconds++
 	changed.Intent.Lifecycle = &other
-	if gate.Finish(context.Background(), changed) != ErrUnavailable {
+	if !errors.Is(gate.Finish(context.Background(), changed), ErrUnavailable) {
 		t.Fatal("caller replaced the accepted binding")
 	}
 }
@@ -191,7 +192,7 @@ func TestHealthyAuditorZeroValueIsUnavailable(t *testing.T) {
 		if s.Configured() {
 			t.Fatal("empty composition configured")
 		}
-		if s.Begin(context.Background(), auditIntent()) != ErrUnavailable || s.Finish(context.Background(), auditOutcome(auditIntent())) != ErrUnavailable {
+		if !errors.Is(s.Begin(context.Background(), auditIntent()), ErrUnavailable) || !errors.Is(s.Finish(context.Background(), auditOutcome(auditIntent())), ErrUnavailable) {
 			t.Fatal("empty composition enabled")
 		}
 	}

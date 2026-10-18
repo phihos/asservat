@@ -3,6 +3,7 @@ package integration
 import (
 	"asservat.local/asservat/internal/domain/identity"
 	"context"
+	"errors"
 	"reflect"
 	"sync"
 	"testing"
@@ -503,7 +504,9 @@ func TestPublicJourneyDiagnosticsOriginalAuditDispatch(t *testing.T) {
 			} else {
 				err = auditor.Begin(c, in)
 			}
-			if err != auditapp.ErrUnavailable {
+			// Normalized to the sentinel (a closed step may name where it
+			// stopped); the private cause is never reachable.
+			if !errors.Is(err, auditapp.ErrUnavailable) || errors.Is(err, private) {
 				t.Fatal("audit normalization changed")
 			}
 			expected := []string{phase}

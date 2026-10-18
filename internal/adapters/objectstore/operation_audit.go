@@ -57,23 +57,35 @@ func (a *OperationAuditObjects) write(ctx context.Context, in audit.OperationInt
 	if create {
 		ciphertext, sealErr := seal(ctx)
 		if sealErr != nil || len(ciphertext) > audit.OperationCipherLimit {
-			return audit.Receipt{}, app.ErrUnavailable
+			return audit.Receipt{}, objectStep("seal")
 		}
 		defer clear(ciphertext)
 		o, b, err = a.Store.putControlAudit(ctx, key, ciphertext, audit.OperationCipherLimit)
+		if err != nil {
+			return audit.Receipt{}, objectStep("put")
+		}
 	} else {
 		o, b, err = a.Store.readControlAudit(ctx, key, audit.OperationCipherLimit)
-	}
-	if err != nil {
-		return audit.Receipt{}, app.ErrUnavailable
+		if err != nil {
+			return audit.Receipt{}, objectStep("read")
+		}
 	}
 	defer clear(b)
 	if err = verify(ctx, b); err != nil || ctx.Err() != nil {
-		return audit.Receipt{}, app.ErrUnavailable
+		return audit.Receipt{}, objectStep("verify")
 	}
 	receipt := audit.Receipt{Key: key, Version: o.VersionID, ETag: o.ETag, Bytes: o.Bytes, SHA256: o.SHA256}
 	if !receipt.ValidOperation(in.RootID, in.ID, phase) {
-		return audit.Receipt{}, app.ErrUnavailable
+		return audit.Receipt{}, objectStep("receipt")
 	}
 	return receipt, nil
 }
+
+// objectStepError is ErrUnavailable with the closed step where an operation
+// audit object write stopped: seal (Transit), put, read, verify or receipt.
+type objectStepError struct{ step string }
+
+func objectStep(step string) error          { return objectStepError{step} }
+func (e objectStepError) Error() string     { return app.ErrUnavailable.Error() }
+func (e objectStepError) Unwrap() error     { return app.ErrUnavailable }
+func (e objectStepError) FixedStep() string { return e.step }

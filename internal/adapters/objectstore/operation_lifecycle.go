@@ -93,35 +93,35 @@ func (s *OperationAuditCleanupObjects) CreateOperationCertificate(ctx context.Co
 // even when subsequent GET would find a perfectly valid existing object.
 func (s *ClosedOperationAuditObjects) write(ctx context.Context, root, id, phase string, since, until time.Time, record any, seal func(context.Context) ([]byte, error), verify func(context.Context, []byte) error) (value.OperationWriteCompletion, error) {
 	if ctx == nil || ctx.Err() != nil || !time.Now().Before(until) {
-		return value.OperationWriteCompletion{}, app.ErrUnavailable
+		return value.OperationWriteCompletion{}, objectStep("expired")
 	}
 	live, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	b, e := seal(live)
 	if e != nil || len(b) == 0 || len(b) > value.OperationCipherLimit {
-		return value.OperationWriteCompletion{}, app.ErrUnavailable
+		return value.OperationWriteCompletion{}, objectStep("seal")
 	}
 	defer clear(b)
 	key := value.OperationAuditKey(root, id, phase)
 	put, e := s.store.PutSmall(live, key, b)
 	if e != nil {
-		return value.OperationWriteCompletion{}, app.ErrUnavailable
+		return value.OperationWriteCompletion{}, objectStep("put")
 	}
 	stored := time.Now().UTC().Truncate(time.Microsecond)
 	obj, got, e := s.store.readAcknowledgedControlAudit(live, put, value.OperationCipherLimit)
 	if e != nil {
-		return value.OperationWriteCompletion{}, app.ErrUnavailable
+		return value.OperationWriteCompletion{}, objectStep("read")
 	}
 	defer clear(got)
 	if put != obj || verify(live, got) != nil || live.Err() != nil || ctx.Err() != nil {
-		return value.OperationWriteCompletion{}, app.ErrUnavailable
+		return value.OperationWriteCompletion{}, objectStep("verify")
 	}
 	// All owned synchronous I/O is joined before cancel closes the one-use handle.
 	closed := time.Now().UTC().Truncate(time.Microsecond)
 	cancel()
 	c := value.OperationWriteCompletion{Protocol: value.OperationWriterProtocol, RootID: root, OperationID: id, StoreID: s.storeID, Phase: phase, RecordDigest: app.OperationLifecycleDigest(record), Receipt: value.Receipt{Key: key, Version: obj.VersionID, ETag: obj.ETag, Bytes: obj.Bytes, SHA256: obj.SHA256}, StoredAt: stored, ClosedAt: closed}
 	if ctx.Err() != nil || !time.Now().Before(until) || !c.Valid(root, id, s.storeID, phase, since, until) {
-		return value.OperationWriteCompletion{}, app.ErrUnavailable
+		return value.OperationWriteCompletion{}, objectStep("completion")
 	}
 	return c, nil
 }

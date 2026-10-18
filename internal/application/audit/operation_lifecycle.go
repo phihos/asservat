@@ -71,7 +71,7 @@ func (s *HealthyOperationAuditor) Begin(ctx context.Context, in value.OperationI
 	}
 	bound, e := BindOperationLifecycle(in, s.policy)
 	if e != nil {
-		return e
+		return operationStep("lifecycle")
 	}
 	return s.auditor.Begin(ctx, bound)
 }
@@ -81,7 +81,7 @@ func (s *HealthyOperationAuditor) Finish(ctx context.Context, out value.Operatio
 	}
 	bound, e := BindOperationLifecycle(out.Intent, s.policy)
 	if e != nil {
-		return e
+		return operationStep("lifecycle")
 	}
 	out.Intent = bound
 	return s.auditor.Finish(ctx, out)
@@ -94,12 +94,15 @@ type healthyOperationObjects struct {
 }
 
 func (s healthyOperationObjects) receipt(ctx context.Context, in value.OperationIntent, phase string, record any, c value.OperationWriteCompletion, err error, recordCompletion bool) (value.Receipt, error) {
-	if err != nil || in.Lifecycle == nil || !c.Valid(in.RootID, in.ID, in.Lifecycle.Policy.StoreID, phase, in.CreatedAt, in.WriteUntil) || c.RecordDigest != OperationLifecycleDigest(record) {
-		return value.Receipt{}, ErrUnavailable
+	if err != nil {
+		return value.Receipt{}, operationStep("closed", err)
+	}
+	if in.Lifecycle == nil || !c.Valid(in.RootID, in.ID, in.Lifecycle.Policy.StoreID, phase, in.CreatedAt, in.WriteUntil) || c.RecordDigest != OperationLifecycleDigest(record) {
+		return value.Receipt{}, operationStep("completion-invalid")
 	}
 	if recordCompletion {
 		if err = s.completions.RecordOperationCompletion(ctx, in, phase, c); err != nil {
-			return value.Receipt{}, ErrUnavailable
+			return value.Receipt{}, operationStep("completion-record")
 		}
 	}
 	return c.Receipt, nil
