@@ -30,6 +30,18 @@ permission reconciliation stopping, hub-worker restarts and unsuccessful
 regional capacity composition; the root cause remains under investigation.
 Neither run reached the MCP capture/download/expiry checks.
 
+[Run 39](https://github.com/phihos/asservat/actions/runs/39122326430), at
+`9ef1103f83fd8377d007de89cedbb4aef5855c6d`, stopped at the deletion credential's
+positive multipart-abort probe: the owned S3 backend returned `AccessDenied`.
+It did not reach regional collection or the user journey. The
+[report](../test/results/installed-journey-ci-39/context-storage-environment.json)
+records exit 1, unchanged sources, no cleanup failures, and the earlier
+107-ordinary/110-total SQL profile. All 2,627 source hashes match that commit.
+The subsequent complete inventory counts five additional installer pools;
+neither its 112-ordinary plan nor the failed-deletion assertion is qualified by
+this run. The abort-permission failure is under investigation; no broader
+runtime storage permission has been granted.
+
 ADR-205's SQL purposes/due list and provider signing/delete-credential
 components merged in [#35](https://github.com/phihos/asservat/pull/35) and
 [#36](https://github.com/phihos/asservat/pull/36), after passing CI and current
@@ -46,13 +58,15 @@ execution/publication/deletion case and its bounded paging regression, with
 exit 0, all 2,593 source hashes matching and no cleanup failures. These are
 component checks with fixture authority, not installed deletion scheduling.
 
-The saved deletion-child composition had omitted its settings handoff from
-the installed provider capacity path. That handoff is being repaired and
-qualified before the composition PR. The journey also needs fresh real-user
-tokens across its ten-minute evidence lifetime, request-owned preparation
-continuations rather than read-only status polling, and independent checks of
+The deletion-child composition now receives its settings through the installed
+provider capacity path. The journey assertions use fresh real-user tokens,
+request-owned preparation continuations, and independent checks of
 object/version/upload absence, the exact retained audit ciphertext and the
-storage refund. None of these pending checks is recorded as a pass.
+storage refund. The new failed-cleanup branch denies only one attempt's cleaner
+inventory, requires an unsuccessful installed lease with unchanged receipts,
+deadlines and charges, restores the original policy, and requires a later purge
+before the original deletion deadline. Focused race checks pass; the installed
+journey, including that failure/recovery branch, remains unqualified.
 
 ## Query ledger and catalog native qualification (ADR-206)
 
