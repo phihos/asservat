@@ -25,6 +25,9 @@ import (
 // The caller retains files and SQL/native adapters until Close succeeds or
 // CloseAndJoin returns after actual completion, including on a bounded error.
 type InstalledOwnerProviderEffects struct {
+	// Report, when set before Run, receives "<purpose> <step>" for each failed
+	// credential refresh (closed words only). Diagnostics; it must not block.
+	Report          func(string)
 	input           contracts.OwnerDeployment
 	files           *os.Root
 	reader          *kubernetes.InstalledOwnerIdentityReader
@@ -254,6 +257,15 @@ func (s *InstalledOwnerProviderEffects) Current(ctx context.Context) (time.Time,
 
 // Prime is a finite startup step before owner enrollment begins. Each purpose
 // still owns its own original at-most-five-second proof/control interval.
+// reportRefresh reports a failed refresh's closed step, except a refresh that
+// was only blocked by its own backoff or an active attempt.
+func (s *InstalledOwnerProviderEffects) reportRefresh(slot *ownerProviderLifetime, err error) {
+	var step interface{ FixedStep() string }
+	if s.Report != nil && errors.As(err, &step) && step.FixedStep() != "blocked" {
+		s.Report(slot.control.purpose + " " + step.FixedStep())
+	}
+}
+
 func (s *InstalledOwnerProviderEffects) Prime(ctx context.Context) error {
 	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil {
 		return ErrKeyService
@@ -268,7 +280,12 @@ func (s *InstalledOwnerProviderEffects) Prime(ctx context.Context) error {
 		// (1 s, 2 s, 4 s, ...). Wait for it inside the original bound rather
 		// than ending the process on one transient failure. A refusal without
 		// new backoff (closed, already active) is final.
-		for slot.refresh(call) != nil {
+		for {
+			err := slot.refresh(call)
+			if err == nil {
+				break
+			}
+			s.reportRefresh(slot, err)
 			retry, now := slot.retryAt()
 			if !retry.After(now) || !waitUntil(call, retry) {
 				return ErrKeyService
@@ -327,7 +344,11 @@ func (s *InstalledOwnerProviderEffects) Run(ctx context.Context) error {
 				if call.Err() != nil {
 					return ErrKeyService
 				}
-				_ = slot.refresh(call)
+				// A failed refresh leaves the slot uncertain, so every borrow is
+				// refused until a later one succeeds: report it (closed words).
+				if err := slot.refresh(call); err != nil {
+					s.reportRefresh(slot, err)
+				}
 			}
 		}
 	}
@@ -407,7 +428,7 @@ func (s *InstalledOwnerProviderEffects) ReadAuditCredentials(ctx context.Context
 	credential, until, err := s.reader.ReadProviderAuditCredential(call, manifest, mounted, raw)
 	until = identity.Earlier(until, first.FreshUntil)
 	if err != nil {
-		return zero, time.Time{}, auditCredentialStep("verify", ErrKeyService)
+		return zero, time.Time{}, auditCredentialStepFrom("verify", err)
 	}
 	call, narrow := context.WithDeadline(call, until)
 	defer narrow()
@@ -428,6 +449,16 @@ type auditCredentialStepError struct {
 
 func auditCredentialStep(step string, err error) error {
 	return &auditCredentialStepError{step, err}
+}
+
+// auditCredentialStepFrom returns ErrKeyService and appends the reader's own
+// closed step, when it has one: e.g. credentials-verify/guard-digest.
+func auditCredentialStepFrom(step string, cause error) error {
+	var nested interface{ FixedStep() string }
+	if errors.As(cause, &nested) {
+		step += "/" + nested.FixedStep()
+	}
+	return &auditCredentialStepError{step, ErrKeyService}
 }
 func (e *auditCredentialStepError) Error() string     { return e.err.Error() }
 func (e *auditCredentialStepError) Unwrap() error     { return e.err }
