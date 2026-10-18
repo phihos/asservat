@@ -21,20 +21,33 @@ changed the original accepted policy, and blocking guards/final source reads
 outlived the first backing deadline. Their corrected race runs passed. Recorded
 commands, exits and counts are in
 [test/results/context-query-capacity-component.json](../test/results/context-query-capacity-component.json).
-These are component checks, not execution of PL/pgSQL bodies or native proof.
+The duplicate-deployment regression also failed with its protection removed and
+passed restored: four role names cannot pledge the same physical deployment
+limits four times.
 
-`TestContextQueryCapacityWithRealPostgres` is prepared using the existing owned
-fleet fixture, actual original setup/role/audit/root/workload activation, explicit
-synthetic query measurements and narrow fixture-only grants. It has **not run**.
-Run `scripts/test-custody.py --fleet --run '^TestContextQueryCapacityWithRealPostgres$'`
-only with coordinated source freeze and the sole native slot, then verify exact
-selection, source hashes and cleanup. SQL68 now consumes the mandatory anchor
-lock and checks current workload allocation at both final transaction fences;
-missing69 acceptance denies even with a successful external callback. The older
-SQL68 positive ledger fixture still needs actual shaped/root-reserved SQL69
-acceptance before its positive cases can run against this schema; its earlier
-SQL68-only pass does not qualify these new hooks. No hook bypass or skipped
-positive qualification is supplied.
+The selected owned fleet test
+`TestContextQueryCapacityWithRealPostgres` passed on frozen commit
+`896e491a3e7ceb610a3ce3a4fb228c9f34628933` (9.37 seconds). The
+[first run](../test/results/context-query-capacity-first-run.log) reached original
+acceptance but failed because a PL/pgSQL variable and digest byte-index alias
+were ambiguous. The corrected explicit aliases passed the same bounded
+[selection](../test/results/context-query-capacity-native-run.log). Both runs
+preserved all 2,642 source hashes against their exact committed blobs and had
+empty cleanup failures; see the
+[first environment](../test/results/context-query-capacity-first-environment.json)
+and [passing environment](../test/results/context-query-capacity-native-environment.json).
+The fixture used the unchanged 48-connection component profile.
+
+This composes actual original setup, role/audit/root/workload activation and
+SQL69 reservation with explicitly synthetic query measurements and deployment
+guards. Separate scoped runtime credentials prove missing anchor/allocation
+denial, exact accepted positives and suspended-backing denial. Replay preserves
+the original plan; finite observations exhaust without replenishment and the
+terminal negative retains charges. SQL68 consumes the mandatory anchor lock and
+checks current workload allocation at both final transaction fences. Its full
+positive ledger fixture still needs actual shaped/root-reserved SQL69 acceptance;
+the native69 fence-function probes do not qualify all query-ledger effects. No
+hook bypass or skipped positive qualification is supplied.
 Production report acceptance, native guards, role provisioning, complete query
 worker/key delivery, installed qualification and retirement remain unfinished.
 

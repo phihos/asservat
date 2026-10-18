@@ -38,7 +38,8 @@ role's authentication concurrency is separately bounded. A large hub cannot
 compensate for an undersized worker. This layout requires distinct physical
 cluster/namespace/workload identities for those deployments; four role names
 cannot multiply one deployment limit. Shared physical processes require a
-separately accepted partition contract before they are supported. `CapacityID` prevents reusing the same
+separately accepted partition contract before they are supported. `CapacityID`
+prevents reusing the same
 reservation identity; independent protected native acceptance must also prove
 that the actual capacity is exclusively assigned and not pledged under another
 identifier or installation. No download profile or default twenty-minute
@@ -145,3 +146,15 @@ query worker/key delivery, sustained installed
 qualification and bounded retirement remain separate requirements. Missing
 qualification stays unavailable. Neither Helm nor browser/MCP availability
 changes here.
+
+The owned `TestContextQueryCapacityWithRealPostgres` selection passed at
+`896e491a3e7ceb610a3ce3a4fb228c9f34628933`, including actual original installation,
+capacity root/workload setup, positive/replay/negative reservation and scoped
+consumer-fence calls. All 2,642 source hashes matched the frozen commit and
+cleanup completed; the [environment report](../../test/results/context-query-capacity-native-environment.json)
+and [run log](../../test/results/context-query-capacity-native-run.log) retain the
+exact selection. The first run exposed an ambiguous PL/pgSQL digest-index alias;
+its correction changes no limit or authority rule. Query resource measurements,
+history measurements and independent native deployment guards remain synthetic
+in this component fixture. The full SQL68 ledger workflow, real accepted
+resource proof and installed query composition require their own qualification.

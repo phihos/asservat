@@ -1,0 +1,11 @@
+=== RUN   TestContextQueryCapacityWithRealPostgres
+=== RUN   TestContextQueryCapacityWithRealPostgres/actual-postgres-function-type-alias
+    capacity_sql_fixture_test.go:133: same_function_oid=true display_uses_timestamp_with_time_zone=true
+=== NAME  TestContextQueryCapacityWithRealPostgres
+    context_query_capacity_test.go:78: fixed_role_production_ms=5703
+    context_query_capacity_test.go:259: actual protected root and additive finite query reservation passed; report, resource measurements and native deployment guards are synthetic; runtime grants unchanged
+    capacity_producer_test.go:164: actual initial activation and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer
+--- PASS: TestContextQueryCapacityWithRealPostgres (9.37s)
+    --- PASS: TestContextQueryCapacityWithRealPostgres/actual-postgres-function-type-alias (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	10.432s
