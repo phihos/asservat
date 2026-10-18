@@ -97,3 +97,23 @@ first profile's workers in the hub region instead.
 ## Progress
 
 - Decision recorded; implementation pending.
+- **Decisions 7 and 8, SQL and composition** (unit tests only; no installer
+  step, native run or qualification yet):
+  - Purposes `worker-config-observe` (86) and `worker-config-audit` (87) in
+    the hub-worker compartment, `key-acquisition` (88) in the key service's.
+    Their grants are the exact statements of `WorkerConfigurations` and of
+    both `NativeKeyAuthority` resolvers. The role layout digest changes
+    (fresh installations only), and the worst-case connection plan for one
+    hub rises from 95 to 101, above PostgreSQL's default 97.
+  - `PermissionDeployment.WorkerConfiguration` (optional): the worker
+    namespace, source, guard and audit Transit key. Its two logins ride in
+    the permission projection after the retention logins, and the child runs
+    beside the permission stream, like retention, because the section
+    arrives with that projection after the hub-worker starts. Without the
+    section there is no child and no login.
+  - `KeyServiceDeployment.Downloads` (optional): a pinned copy of the
+    worker profile document, parsed like the guarded source. It only selects
+    the profile; every spend still needs SQL's current audited revision to
+    equal it. Topology pins come from the guarded cluster catalog, and a
+    catalog change restarts the service, as for the publisher. Without the
+    section the authority map is unchanged.

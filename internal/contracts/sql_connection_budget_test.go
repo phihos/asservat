@@ -10,16 +10,25 @@ func TestInstalledSQLConnectionBudget(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// PostgreSQL defaults: 100 connections, three superuser slots.
-	got, err := one.Validate(0, SQLServerCapacity{MaxConnections: 100, SuperuserReserved: 3})
-	if err != nil || got.PerHubProcess != SQLConnectionsPerHubReplica || got.Required != 32+14*PublicRuntimeRetainedWorkerProcesses+len(PublicRuntimeFederationPurposes())*PublicRuntimeRetainedFederationProcesses+len(PublicRuntimePublisherPurposes())*PublicRuntimeRetainedPublisherProcesses+len(PublicRuntimeKeyServicePurposes())*PublicRuntimeRetainedKeyServiceProcesses+1+SQLMaintenanceReserve || got.Allocation != 97 || got.Available != 97 {
+	// The hub-worker holds 16 logins per retained process, and the key
+	// service 4: ADR-204 added two worker configuration logins and the
+	// acquisition login, so one hub now needs 101 ordinary connections.
+	required := 32 + 16*PublicRuntimeRetainedWorkerProcesses + len(PublicRuntimeFederationPurposes())*PublicRuntimeRetainedFederationProcesses + len(PublicRuntimePublisherPurposes())*PublicRuntimeRetainedPublisherProcesses + len(PublicRuntimeKeyServicePurposes())*PublicRuntimeRetainedKeyServiceProcesses + 1 + SQLMaintenanceReserve
+	// PostgreSQL defaults (100 connections, three superuser slots) no longer
+	// hold that worst case; the error names the exact counts.
+	_, err = one.Validate(0, SQLServerCapacity{MaxConnections: 100, SuperuserReserved: 3})
+	var budget *SQLConnectionBudgetError
+	if required != 101 || !errors.As(err, &budget) || budget.Rule != "installation-allocation" || budget.Required != required || budget.Configured != 97 {
+		t.Fatal("single-hub worst case accepted or misreported at the defaults", err)
+	}
+	got, err := one.Validate(0, SQLServerCapacity{MaxConnections: 110, SuperuserReserved: 3})
+	if err != nil || got.PerHubProcess != SQLConnectionsPerHubReplica || got.Required != required || got.Allocation != 107 || got.Available != 107 {
 		t.Fatal("single-hub installed budget", got, err)
 	}
 	// Four retained hub processes (two replicas with surge) do not fit the defaults.
 	four, _ := InstalledSQLConnectionPlan(PublicRuntimeRetainedHubProcesses)
 	_, err = four.Validate(0, SQLServerCapacity{MaxConnections: 100, SuperuserReserved: 3})
-	var budget *SQLConnectionBudgetError
-	if !errors.As(err, &budget) || budget.Rule != "installation-allocation" || budget.Required != 4*32+28+len(PublicRuntimeFederationPurposes())*PublicRuntimeRetainedFederationProcesses+len(PublicRuntimePublisherPurposes())*PublicRuntimeRetainedPublisherProcesses+len(PublicRuntimeKeyServicePurposes())*PublicRuntimeRetainedKeyServiceProcesses+5 || budget.Configured != 97 || !errors.Is(err, ErrSQLConnectionBudget) {
+	if !errors.As(err, &budget) || budget.Rule != "installation-allocation" || budget.Required != required+3*32 || budget.Configured != 97 || !errors.Is(err, ErrSQLConnectionBudget) {
 		t.Fatal("rollout worst case accepted or misreported", err)
 	}
 	// A declared allocation cannot exceed the server's ordinary capacity.

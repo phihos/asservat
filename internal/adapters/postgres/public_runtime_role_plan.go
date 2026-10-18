@@ -239,6 +239,47 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("context_catalog", "SELECT", "capture_id")
 		add("context_key_unwrap", "INSERT", "attempt_id", "root_id", "last_certificate_sha256", "unwraps")
 		add("context_key_unwrap", "UPDATE", "unwraps", "last_certificate_sha256")
+	case "key-acquisition":
+		// ADR-204: NativeKeyAuthority's two resolvers, DownloadKeys for the
+		// prepaid metadata batch and NativeKeys for a response window. These
+		// are their recovery, permission, session, processing, retention,
+		// catalog and worker configuration reads and locks, and the spend of
+		// one slot of either key record. No binding, session, audit or worker
+		// write; the lock columns are the ones the hub's binders lock with.
+		read("fleet_current_trust", "permission_stream", "authority_audit", "artifact_download", "download_batch",
+			"processing_root", "context_processing", "processing_rule",
+			"retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision",
+			"context_capture", "context_verification", "download_key_binding", "download_native_key", "download_native_owner",
+			"download_response", "download_window", "download_worker", "download_worker_enrollment", "download_worker_certificate",
+			"download_worker_configuration", "download_worker_configuration_revision")
+		// ReadPublishedContext reads only these catalog and attempt columns.
+		add("context_catalog", "SELECT", "artifact_id", "root_id", "capture_id", "published_at")
+		add("custody_attempt", "SELECT", "id", "artifact_id", "state", "copies_digest", "effective_expires_at", "effective_delete_by")
+		add("fleet_current_trust", "UPDATE", "installation_id")
+		for _, table := range []string{"permission_stream", "artifact_download", "download_response", "download_window", "download_worker"} {
+			add(table, "UPDATE", "id")
+		}
+		add("retention_source", "UPDATE", "root_id")
+		add("download_worker_configuration", "UPDATE", "source_uid")
+		add("download_native_owner", "UPDATE", "worker_id")
+		add("download_key_binding", "UPDATE", "used_roles")
+		add("download_native_key", "UPDATE", "used_roles")
+	case "worker-config-observe":
+		// ADR-204 decision 7: the WorkerConfigurations observer statements
+		// (ADR-070): stage a revision, refresh or fence the head. It cannot
+		// acknowledge audit; the revision insert names no receipt column.
+		read("fleet_current_trust", "download_worker_configuration", "download_worker_configuration_revision")
+		add("fleet_current_trust", "UPDATE", "installation_id")
+		add("download_worker_configuration", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "observed_at", "fresh_until")
+		add("download_worker_configuration", "UPDATE", "generation", "observed_at", "fresh_until")
+		add("download_worker_configuration_revision", "INSERT", "installation_id", "cluster_id", "source_uid", "generation", "snapshot_json")
+	case "worker-config-audit":
+		// The acknowledgement only: one receipt on an unacknowledged revision.
+		// The head's identity column admits its FOR UPDATE lock; the head
+		// trigger refuses any identity change.
+		read("download_worker_configuration", "download_worker_configuration_revision")
+		add("download_worker_configuration", "UPDATE", "source_uid")
+		add("download_worker_configuration_revision", "UPDATE", "audit_receipt_json")
 	case "retention-read":
 		read("permission_stream", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
 		add("permission_stream", "UPDATE", "id")

@@ -29,18 +29,31 @@ func PublicRuntimeRolePurposes() []string {
 	out = append(out, "capacity", "capacity-capture")
 	out = append(out, PublicRuntimePermissionPurposes()...)
 	out = append(out, PublicRuntimeRetentionPurposes()...)
+	out = append(out, PublicRuntimeWorkerConfigurationPurposes()...)
 	return append(out, PublicRuntimeKeyServicePurposes()...)
 }
 
 // PermissionProjectionPurposes are the logins of the permission projection,
 // in order: the permission stream's, then, with a retention section
-// (ADR-195), the retention source's.
-func PermissionProjectionPurposes(retention bool) []string {
+// (ADR-195), the retention source's, then, with a worker configuration
+// section (ADR-204), the worker configuration acceptance logins.
+func PermissionProjectionPurposes(retention, workerConfiguration bool) []string {
 	out := PublicRuntimePermissionPurposes()
 	if retention {
 		out = append(out, PublicRuntimeRetentionPurposes()...)
 	}
+	if workerConfiguration {
+		out = append(out, PublicRuntimeWorkerConfigurationPurposes()...)
+	}
 	return out
+}
+
+// PublicRuntimeWorkerConfigurationPurposes are the hub-worker's download
+// worker configuration logins (ADR-204 decision 7, ADR-070): the observer,
+// which stages accepted revisions, and the separate audit acknowledgement.
+// Like the permission logins, they never enter the hub projection.
+func PublicRuntimeWorkerConfigurationPurposes() []string {
+	return []string{"worker-config-observe", "worker-config-audit"}
 }
 
 // PublicRuntimeRetentionPurposes are the hub-worker's retention source logins
@@ -245,6 +258,14 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 84, true
 	case "regional-capacity":
 		return 85, true
+	// ADR-204: the hub-worker's worker configuration acceptance and the key
+	// service's acquisition unwraps.
+	case "worker-config-observe":
+		return 86, true
+	case "worker-config-audit":
+		return 87, true
+	case "key-acquisition":
+		return 88, true
 	default:
 		return 0, false
 	}

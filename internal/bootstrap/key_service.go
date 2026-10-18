@@ -5,11 +5,13 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"errors"
 	"net"
 	"net/http"
 	"net/netip"
 	"os"
+	"slices"
 	"strconv"
 	"time"
 
@@ -34,6 +36,10 @@ type KeyService struct {
 	handler *keyservice.Handler
 	tls     *tls.Config
 	port    int
+	// catalog is the guarded cluster catalog as read at start, only with
+	// downloads; a changed digest restarts the process (ADR-204, as the
+	// publisher does under ADR-203 decision 6).
+	catalog publicCatalog
 	closers []func()
 }
 
@@ -77,7 +83,118 @@ func readKeyServiceDeployment(ctx context.Context, files *os.Root) (contracts.Ke
 	if _, _, err = mtls.OwnerTrustRoots(c.ConnectorClientRoots, time.Now()); err != nil {
 		return contracts.KeyServiceDeployment{}, mounts.ErrUnavailable
 	}
+	if d := c.Downloads; d != nil {
+		if _, err = keyServiceWorkerProfile(c); err != nil || !capacityRuntimeReference(d.ClusterCatalog.Source) || !capacityRuntimeGuard(d.ClusterCatalog.Guard) || d.RetentionTopologies == nil {
+			return contracts.KeyServiceDeployment{}, mounts.ErrUnavailable
+		}
+		if _, err = keyServiceTopologyPins(c, nil); err != nil {
+			return contracts.KeyServiceDeployment{}, mounts.ErrUnavailable
+		}
+	}
 	return c, nil
+}
+
+// keyServiceWorkerProfile derives the profile of the pinned worker document
+// with the guarded source reader's own parse. The pin only selects the
+// profile: the native key authority spends a slot only while SQL's current
+// audited revision equals it (ADR-070), so a stale pin denies. The workers'
+// namespace is never the key service's (ADR-204 decision 1).
+func keyServiceWorkerProfile(c contracts.KeyServiceDeployment) (authorization.DownloadWorkerProfile, error) {
+	d := c.Downloads
+	if d == nil || !capacityRuntimeReference(d.WorkerSource) {
+		return authorization.DownloadWorkerProfile{}, mounts.ErrUnavailable
+	}
+	w, err := kube.PinnedWorkerConfiguration(d.WorkerProfile, d.WorkerSource.UID, c.InstallationID, c.ClusterID)
+	if err != nil || w.Profile.NamespaceUID == c.Namespace.UID || w.Profile.Namespace == c.Namespace.Name {
+		return authorization.DownloadWorkerProfile{}, mounts.ErrUnavailable
+	}
+	return w.Profile, nil
+}
+
+// keyServiceTopologyPins unions the fixed pins with each joined catalog
+// slot's pin as the hub-api and the publisher do (ADR-196 decision 7): a
+// slot's pin must name its own cluster and fixed slot topology, and a cluster
+// or topology named twice is refused. Both sets may be empty.
+func keyServiceTopologyPins(c contracts.KeyServiceDeployment, catalog []contracts.OwnerPublicCluster) ([]kube.RetentionTopologyPin, error) {
+	if c.Downloads == nil {
+		return nil, mounts.ErrUnavailable
+	}
+	all := slices.Clone(c.Downloads.RetentionTopologies)
+	for i, v := range catalog {
+		t := v.Topology
+		if t.TargetClusterID != v.ClusterID || t.Name != contracts.OwnerClusterSourceName(c.InstallationID, i+1, "topology") {
+			return nil, mounts.ErrUnavailable
+		}
+		all = append(all, t)
+	}
+	if len(all) > 1024 {
+		return nil, mounts.ErrUnavailable
+	}
+	pins := make([]kube.RetentionTopologyPin, len(all))
+	clusters, names := map[string]bool{}, map[string]bool{}
+	for i, p := range all {
+		b, err := hex.DecodeString(p.SHA256)
+		if !validOwnerNativeTopology(p) || err != nil || clusters[p.TargetClusterID] || names[p.Name] {
+			return nil, mounts.ErrUnavailable
+		}
+		clusters[p.TargetClusterID], names[p.Name] = true, true
+		pins[i] = kube.RetentionTopologyPin{TargetClusterID: p.TargetClusterID, Name: p.Name, UID: p.UID}
+		copy(pins[i].ContentDigest[:], b)
+	}
+	return pins, nil
+}
+
+// keyServiceAuthorities is the artifact scope's authority map: wraps,
+// verifier unwraps and, only with downloads, acquisition unwraps through the
+// native download key authority (ADR-204 decision 8). A role without an
+// entry is denied; there is no bare "unwrap" entry to fall back to.
+func keyServiceAuthorities(wraps, verifier authapp.KeyOperationAuthorizer, acquisition *postgres.NativeKeyAuthority) authapp.KeyOperationAuthorizers {
+	out := authapp.KeyOperationAuthorizers{"wrap": wraps, "unwrap/verifier": verifier}
+	if acquisition != nil {
+		out["unwrap/acquisition"] = acquisition
+	}
+	return out
+}
+
+// keyServiceAcquisition composes the native download key authority from the
+// key-acquisition login, the pinned worker profile and the retention and
+// recovery transaction guards it needs. Topology pins come from the guarded
+// cluster catalog, proved with the probe account like the hub-api's reads.
+func keyServiceAcquisition(ctx context.Context, c contracts.KeyServiceDeployment, in *providerInputs, observer *kube.PermissionClient, pool *pgxpool.Pool, scope authorization.KeyScope) (*postgres.NativeKeyAuthority, publicCatalog, error) {
+	var none publicCatalog
+	profile, err := keyServiceWorkerProfile(c)
+	if err != nil || pool == nil {
+		return nil, none, mounts.ErrUnavailable
+	}
+	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}, time.Now)
+	if err != nil {
+		return nil, none, mounts.ErrUnavailable
+	}
+	catalog, err := readPublicClusterCatalog(ctx, contracts.OwnerDeployment{Namespace: c.Namespace, Public: &contracts.OwnerPublicDeployment{ClusterCatalog: c.Downloads.ClusterCatalog}}, observer, probe)
+	if err != nil {
+		return nil, none, &fixedStepError{"key-service/catalog", err}
+	}
+	pins, err := keyServiceTopologyPins(c, catalog.catalog.Clusters)
+	if err != nil {
+		return nil, none, &fixedStepError{"key-service/topology", err}
+	}
+	topologies, err := kube.NewRetentionTopologies(observer, c.PermissionRootID, pins)
+	if err != nil {
+		return nil, none, mounts.ErrUnavailable
+	}
+	retention, err := postgres.NewRetentionTransactionGuard(c.PermissionRootID, topologies)
+	if err != nil {
+		return nil, none, mounts.ErrUnavailable
+	}
+	recovery, err := postgres.NewRecoveryTransactionGuard(c.PermissionRootID, c.InstallationID)
+	if err != nil {
+		return nil, none, mounts.ErrUnavailable
+	}
+	native, err := postgres.NewNativeKeyAuthority(ctx, pool, c.PermissionRootID, profile, scope, postgres.DownloadTransactionGuards{Retention: retention, Recovery: recovery})
+	if err != nil {
+		return nil, none, mounts.ErrUnavailable
+	}
+	return native, catalog, nil
 }
 
 func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err error) {
@@ -101,7 +218,12 @@ func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err erro
 	k.closers = append(k.closers, in.closeHTTP)
 	pools := map[string]*pgxpool.Pool{}
 	users := map[string]bool{}
-	for _, purpose := range []string{"key-configuration", "key-wrap", "key-verify"} {
+	purposes := []string{"key-configuration", "key-wrap", "key-verify"}
+	if c.Downloads != nil {
+		// ADR-204: the acquisition login exists only with downloads.
+		purposes = append(purposes, "key-acquisition")
+	}
+	for _, purpose := range purposes {
 		config, err := in.sqlConfig(startup, "sql-"+purpose+".json")
 		if err != nil || users[config.ConnConfig.User] {
 			return k, mounts.ErrUnavailable
@@ -158,9 +280,16 @@ func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err erro
 	if err != nil {
 		return k, mounts.ErrUnavailable
 	}
-	// ADR-181: verification unwraps for the publisher's verifier role. Download
-	// unwrap joins with the native download key authority (ADR-176).
-	authority := authapp.KeyOperationAuthorizers{"wrap": wraps, "unwrap/verifier": unwraps}
+	// ADR-181: verification unwraps for the publisher's verifier role.
+	// ADR-204: acquisition unwraps through the native download key authority,
+	// only with a Downloads section.
+	var acquisition *postgres.NativeKeyAuthority
+	if c.Downloads != nil {
+		if acquisition, k.catalog, err = keyServiceAcquisition(startup, c, in, observer, pools["key-acquisition"], scope); err != nil {
+			return k, err
+		}
+	}
+	authority := keyServiceAuthorities(wraps, unwraps, acquisition)
 	if k.handler, err = keyservice.NewHandler([]authapp.KeyService{{Scope: scope, Authority: authority, Backend: backend, Now: time.Now}}, mtls.KeyPeerUnion{KeyClients: keyClients, Connectors: connectors}, time.Now, c.Concurrency); err != nil {
 		return k, mounts.ErrUnavailable
 	}
@@ -202,16 +331,44 @@ func (k *KeyService) Serve(ctx context.Context, listener net.Listener) error {
 	server := &http.Server{Handler: mux, TLSConfig: k.tls, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8 << 10}
 	done := make(chan error, 1)
 	go func() { done <- server.ServeTLS(listener, "", "") }()
-	select {
-	case err := <-done:
-		return errors.Join(mounts.ErrUnavailable, err)
-	case <-ctx.Done():
+	// With downloads, a changed cluster catalog restarts the process, which
+	// reads the joined slots' topology pins only at start.
+	var changed <-chan time.Time
+	if k.catalog.source != nil {
+		ticker := time.NewTicker(15 * time.Second)
+		defer ticker.Stop()
+		changed = ticker.C
+	}
+	var result error
+	for stopped := false; !stopped; {
+		select {
+		case err := <-done:
+			return errors.Join(mounts.ErrUnavailable, err)
+		case <-ctx.Done():
+			stopped = true
+		case <-changed:
+			// A failed read is not a change.
+			if k.clusterCatalogChanged(ctx) {
+				stopped, result = true, errClusterCatalogChanged
+			}
+		}
 	}
 	stop, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 	defer cancel()
 	_ = server.Shutdown(stop)
 	<-done
-	return nil
+	return result
+}
+
+func (k *KeyService) clusterCatalogChanged(ctx context.Context) bool {
+	call, end := context.WithTimeout(ctx, 10*time.Second)
+	defer end()
+	catalog, err := k.catalog.source.ReadClusterCatalog(call)
+	if err != nil {
+		return false
+	}
+	digest, err := clusterCatalogDigest(catalog)
+	return err == nil && digest != k.catalog.digest
 }
 
 func (k *KeyService) Close() {

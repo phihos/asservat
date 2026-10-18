@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
@@ -76,7 +77,14 @@ func VerifyPermissionRuntimeCredential(ctx context.Context, pool *pgxpool.Pool, 
 	if m.Format != contracts.PermissionCredentialManifestFormat {
 		return cfg.ErrInvalid
 	}
-	// The ordered list is exact; a retention section adds its four logins.
-	purposes := contracts.PermissionProjectionPurposes(len(m.Roles) > len(contracts.PublicRuntimePermissionPurposes()))
+	// The ordered list is exact; a retention section adds its four logins and
+	// a worker configuration section its two (ADR-204). A manifest naming any
+	// of a section's logins must carry exactly that section's ordered list.
+	var retention, worker bool
+	for _, r := range m.Roles {
+		retention = retention || slices.Contains(contracts.PublicRuntimeRetentionPurposes(), r.Purpose)
+		worker = worker || slices.Contains(contracts.PublicRuntimeWorkerConfigurationPurposes(), r.Purpose)
+	}
+	purposes := contracts.PermissionProjectionPurposes(retention, worker)
 	return verifyRuntimeCredential(ctx, pool, contracts.PublicRuntimeCredentialManifest{Format: contracts.PublicRuntimeCredentialManifestFormat, Input: m.Input, RootUID: m.RootUID, SetupID: m.SetupID, Roles: m.Roles}, purpose, purposes)
 }
