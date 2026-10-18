@@ -100,7 +100,7 @@ WHERE c.root_id=$1 AND c.artifact_id=$2 AND a.state='stored_unpublished'`, root,
 		cleaner := s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: aws.String(p.desired.AuditStore.Endpoint), UsePathStyle: true,
 			Credentials: credentials.NewStaticCredentialsProvider("evidence-delete-continuation", "evidence-delete-continuation-secret", ""), HTTPClient: p.client, RetryMaxAttempts: 1})
 		prefix, controlPrefix := loc.Prefix(), "v1/deletion-permission-probe/"+loc.AttemptID+"/"
-		if err = installedDeletionWaitAccess(before, cleaner, evidenceBucket, prefix, false); err != nil {
+		if ok, err := installedDeletionInventoryAccess(before, cleaner, evidenceBucket, prefix, false); err != nil || !ok {
 			t.Fatal("installed deletion: original cleaner inventory unavailable", err)
 		}
 		fault := &installedDeletionFault{store: store, bucket: evidenceBucket}
@@ -129,7 +129,7 @@ WHERE c.root_id=$1 AND c.artifact_id=$2 AND a.state='stored_unpublished'`, root,
 		if err = installedDeletionWaitAccess(arm, cleaner, evidenceBucket, prefix, true); err != nil {
 			t.Fatal("installed deletion: exact cleaner inventory was not denied", err)
 		}
-		if err = installedDeletionWaitAccess(arm, cleaner, evidenceBucket, controlPrefix, false); err != nil {
+		if ok, err := installedDeletionInventoryAccess(arm, cleaner, evidenceBucket, controlPrefix, false); err != nil || !ok {
 			t.Fatal("installed deletion: fault affected the independent prefix", err)
 		}
 		armed, err := readInstalledDeletionState(arm, admin, root, loc)
@@ -166,10 +166,12 @@ WHERE c.root_id=$1 AND c.artifact_id=$2 AND a.state='stored_unpublished'`, root,
 					t.Fatal("installed deletion: no unsuccessful installed lease observed", err)
 				}
 			}
-			if err := installedDeletionWaitAccess(wait, cleaner, evidenceBucket, prefix, true); err != nil {
+			// Policy propagation was established before expiry. This checkpoint
+			// must reject any unexpected permission result, not retry it away.
+			if ok, err := installedDeletionInventoryAccess(wait, cleaner, evidenceBucket, prefix, true); err != nil || !ok {
 				t.Fatal("installed deletion: denial disappeared before failed-lease verification", err)
 			}
-			if err := installedDeletionWaitAccess(wait, cleaner, evidenceBucket, controlPrefix, false); err != nil {
+			if ok, err := installedDeletionInventoryAccess(wait, cleaner, evidenceBucket, controlPrefix, false); err != nil || !ok {
 				t.Fatal("installed deletion: independent inventory control failed", err)
 			}
 			if _, _, _, _, identity := inventory(wait); identity != originalInventory {
