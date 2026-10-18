@@ -11,12 +11,17 @@ network delay and subsequent checks; scope loss, closure and expiry clear the
 managed result. The HTTP client enforces same-origin CSRF, a five-second request
 bound and the 64 KiB complete-response limit; React renders evidence as text.
 
-`make console-check console-browser-check` passed: all 156 tests across eleven
+`make console-check console-browser-check` passed initially; after local review,
+`npm run check` and `make console-browser-check` passed all 157 tests across eleven
 files, canonical generation/native-ESM validation, production build, nineteen
 existing browser journeys with fifteen accessibility scans, and four native
 download restart boundaries with two accessibility scans. The scoped cleanup
 regression failed before fixing an old effect cleanup that could erase a newly
-attached scope. Build output retains the existing large-bundle warning.
+attached scope. Local review also caught a replacement render showing the old
+excerpt before passive effects. A failing-first layout observation reproduces
+that commit; rendering and actions now require an exact active attachment to
+the current session, scope, case and artifact. Build output retains the existing
+large-bundle warning.
 The [component report](../test/results/adr206-console-component/report.json)
 records the exercised source hashes; the [gate log](../test/results/adr206-console-component/console.log)
 retains the actual test output.

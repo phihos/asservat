@@ -31,6 +31,10 @@ export class ContextProjection {
     this.publish({ phase });
   }
   close = () => this.clear('idle');
+  isAttachedTo(session: Session, scope: AbortSignal, caseID: string, artifactID: string) {
+    return this.session === session && this.scope === scope && !scope.aborted &&
+      this.target?.case_id === caseID && this.target.artifact_id === artifactID;
+  }
   attach(session: Session, scope: AbortSignal, caseID: string, artifactID: string) {
     this.detach?.(); this.close();
     this.session = session; this.scope = scope;
