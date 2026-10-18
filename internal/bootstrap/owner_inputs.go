@@ -36,11 +36,25 @@ var ownerDNSName = regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9.-]{0,251}[a-zA-
 // providerInputs is shared only by protected installation bootstraps. It
 // carries provider connections, never accepted configuration or user authority.
 type providerInputs struct {
-	mu                 sync.Mutex
-	transports         []http.RoundTripper
-	files              *os.Root
+	mu         sync.Mutex
+	transports []http.RoundTripper
+	files      *os.Root
+	// dir, when set, is a subdirectory of a kubelet projected volume mounted
+	// at files. The kubelet replaces the volume's data directory whenever it
+	// refreshes any item (projected tokens every few minutes) and deletes the
+	// old one, so a root opened on the subdirectory would keep pointing at
+	// deleted files. Every read resolves dir again through the stable root.
+	dir                string
 	kubernetesEndpoint contracts.OwnerProviderEndpoint
 	postgresEndpoint   contracts.OwnerPostgresEndpoint
+}
+
+// read reads one projected file, resolving dir on every call.
+func (s *providerInputs) read(ctx context.Context, name string, limit int64) ([]byte, error) {
+	if s.dir != "" {
+		name = s.dir + "/" + name
+	}
+	return mounts.Read(ctx, s.files, name, limit)
 }
 type ownerInputs struct {
 	*providerInputs
@@ -174,7 +188,7 @@ func validateOwnerInput(c contracts.OwnerDeployment, projected bool) error {
 
 func (s *providerInputs) token(name string) kms.TokenSource {
 	return func(ctx context.Context) ([]byte, error) {
-		b, err := mounts.Read(ctx, s.files, name, 16384)
+		b, err := s.read(ctx, name, 16384)
 		if err != nil || !kms.ValidProviderToken(b) {
 			clear(b)
 			return nil, mounts.ErrUnavailable
@@ -231,7 +245,7 @@ func (s *providerInputs) kubernetesToken(source kms.TokenSource) *rest.Config {
 
 func (s *providerInputs) sqlCredential(ctx context.Context, name string) (contracts.OwnerSQLCredential, error) {
 	var zero contracts.OwnerSQLCredential
-	b, err := mounts.Read(ctx, s.files, name, 16<<10)
+	b, err := s.read(ctx, name, 16<<10)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}
@@ -291,7 +305,7 @@ type mountedStorage struct{ inputs *providerInputs }
 
 func (s mountedStorage) Retrieve(ctx context.Context) (aws.Credentials, error) {
 	var zero aws.Credentials
-	b, err := mounts.Read(ctx, s.inputs.files, "audit-storage.json", 32<<10)
+	b, err := s.inputs.read(ctx, "audit-storage.json", 32<<10)
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}

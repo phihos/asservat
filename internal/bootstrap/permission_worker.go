@@ -130,7 +130,10 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 		c.InstallationID != b.input.InstallationID || c.Control.ClusterID != b.input.ClusterID || c.Control.Namespace != b.input.Namespace {
 		return nil, mounts.ErrUnavailable
 	}
-	sql := &providerInputs{files: files, postgresEndpoint: c.Postgres}
+	// Long-lived pools re-read their logins through the stable mount root:
+	// files pins today's projected data directory, which the kubelet deletes
+	// on its next refresh.
+	sql := &providerInputs{files: b.mounts, dir: contracts.PermissionWorkerProjectionDirectory, postgresEndpoint: c.Postgres}
 	w.closers = append(w.closers, sql.closeHTTP)
 	pools := map[string]*pgxpool.Pool{}
 	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil, c.WorkerConfiguration != nil) {

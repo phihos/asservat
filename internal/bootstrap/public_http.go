@@ -136,7 +136,7 @@ type publicCertificate struct {
 func (c *publicCertificate) get(*tls.ClientHelloInfo) (*tls.Certificate, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	crt, err := mounts.Read(ctx, c.inputs.files, contracts.OwnerPublicTLSCertificate, 64<<10)
+	crt, err := c.inputs.read(ctx, contracts.OwnerPublicTLSCertificate, 64<<10)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -145,7 +145,7 @@ func (c *publicCertificate) get(*tls.ClientHelloInfo) (*tls.Certificate, error) 
 	if c.cert != nil && string(crt) == string(c.raw) {
 		return c.cert, nil
 	}
-	key, err := mounts.Read(ctx, c.inputs.files, contracts.OwnerPublicTLSKey, 64<<10)
+	key, err := c.inputs.read(ctx, contracts.OwnerPublicTLSKey, 64<<10)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

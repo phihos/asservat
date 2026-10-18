@@ -159,6 +159,12 @@ func newCapacityWorkerDeployment(ctx context.Context, files *os.Root, installed 
 	startup, end := context.WithDeadline(startupParent, startupUntil)
 	defer end()
 	controlInputs := &providerInputs{files: files, kubernetesEndpoint: c.Control.Kubernetes, postgresEndpoint: c.Postgres}
+	if installed != nil {
+		// Installed: the projection is a subdirectory of the hub-worker's
+		// projected volume; long-lived pools re-read logins through its stable
+		// root, never through files, which the kubelet's next refresh deletes.
+		controlInputs.files, controlInputs.dir = installed.files, contracts.CapacityWorkerProjectionDirectory
+	}
 	d.closers = append(d.closers, controlInputs.closeHTTP)
 	localInputs := controlInputs
 	observerToken, probeToken, processingToken := "kube-capacity-observer.token", "kube-capacity-probe.token", "kube-capacity-processing-probe.token"

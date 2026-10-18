@@ -44,11 +44,11 @@ type CaptureCleanupWorkerDeployment struct {
 	history                      app.OperationHistoryCleanup
 }
 
-func NewCaptureCleanupWorkerDeployment(ctx context.Context, files *os.Root, worker contracts.HubWorkerDeployment, reader *kube.InstalledWorkerProjectionReader, expected contracts.CaptureCleanupProjectionClaim) (*CaptureCleanupWorkerDeployment, error) {
-	return newCaptureCleanupWorkerDeployment(ctx, files, worker, reader, expected, nil)
+func NewCaptureCleanupWorkerDeployment(ctx context.Context, base, files *os.Root, worker contracts.HubWorkerDeployment, reader *kube.InstalledWorkerProjectionReader, expected contracts.CaptureCleanupProjectionClaim) (*CaptureCleanupWorkerDeployment, error) {
+	return newCaptureCleanupWorkerDeployment(ctx, base, files, worker, reader, expected, nil)
 }
 
-func newCaptureCleanupWorkerDeployment(ctx context.Context, files *os.Root, worker contracts.HubWorkerDeployment, reader *kube.InstalledWorkerProjectionReader, expected contracts.CaptureCleanupProjectionClaim, selected *providerCleanupStartup) (*CaptureCleanupWorkerDeployment, error) {
+func newCaptureCleanupWorkerDeployment(ctx context.Context, base, files *os.Root, worker contracts.HubWorkerDeployment, reader *kube.InstalledWorkerProjectionReader, expected contracts.CaptureCleanupProjectionClaim, selected *providerCleanupStartup) (*CaptureCleanupWorkerDeployment, error) {
 	if ctx == nil || ctx.Err() != nil || files == nil || reader == nil || expected.Receipt == nil || disableWorkerCoreDumps() != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -96,7 +96,10 @@ func newCaptureCleanupWorkerDeployment(ctx context.Context, files *os.Root, work
 	}()
 	startup, end := context.WithDeadline(startupParent, identity.Earlier(time.Now().Add(30*time.Second), until))
 	defer end()
-	in := &providerInputs{files: files, postgresEndpoint: c.Postgres}
+	// files is a subdirectory root of the hub-worker's projected volume, read
+	// once here; long-lived pools re-read logins through base instead, since
+	// the kubelet's next refresh deletes the directory files points at.
+	in := &providerInputs{files: base, dir: contracts.HubWorkerCleanupProjectionDirectory, postgresEndpoint: c.Postgres}
 	d.closers = append(d.closers, in.closeHTTP)
 	recovery, err := postgres.NewRecoveryTransactionGuard(c.RootID, c.InstallationID)
 	if err != nil {
