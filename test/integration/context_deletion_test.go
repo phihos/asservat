@@ -176,6 +176,15 @@ func qualifyPositiveContextDeletion(t *testing.T, ctx context.Context, admin *pg
 	if again, found, err := cleanup.ReadContextDeletion(ctx, loc, recovery()); err != nil || !found || again != result {
 		t.Fatal("durable purge result changed", err)
 	}
+	// A purged attempt whose audit or release has not finished stays due once
+	// its lease ends: Clean reads the checkpoint, skips Begin and resumes the
+	// record, acknowledgement and release. Ending the lease is a fixture input.
+	if _, err = admin.Exec(ctx, "UPDATE custody_attempt SET lease_until=clock_timestamp()-interval '1 second' WHERE id=$1", loc.AttemptID); err != nil {
+		t.Fatal(err)
+	}
+	if !listed() {
+		t.Fatal("purged attempt awaiting its audit not listed for resumption")
+	}
 	changed := result
 	changed.DatabaseOID++
 	if err = finalize.FinalizeContextDeletion(ctx, changed, recovery()); err == nil {
