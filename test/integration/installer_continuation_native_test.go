@@ -768,7 +768,7 @@ func installedProcessDiagnostics(t *testing.T, ctx context.Context, api kubernet
 				}
 				t.Logf("diagnostics: %s pod %s container %s ready %v restarts %d last %q exit %d", name, pod.Name, s.Name, s.Ready, s.RestartCount, reason, exit)
 				for _, previous := range []bool{true, false} {
-					logs, e := api.CoreV1().Pods(namespace).GetLogs(pod.Name, &core.PodLogOptions{Container: s.Name, Previous: previous, LimitBytes: ptr.To(int64(4096))}).DoRaw(c)
+					logs, e := api.CoreV1().Pods(namespace).GetLogs(pod.Name, &core.PodLogOptions{Container: s.Name, Previous: previous, TailLines: ptr.To(int64(100)), LimitBytes: ptr.To(int64(16384))}).DoRaw(c)
 					if e == nil && len(logs) > 0 {
 						t.Logf("diagnostics: %s previous=%v log:\n%s", pod.Name, previous, logs)
 					}

@@ -1,0 +1,91 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:264: original activation 69eec6b2-f491-4e5f-9cf8-8ce2cae2dd8d image docker.io/library/asservat-context-worker@sha256:5f81be99a04d3a0305b80ec93508ed1fcd2fdcdf6b32d2c24ca9c46734268d7b exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/installer-continuation
+    initial_bootstrap_chain_test.go:343: applied phase 1 worker-provider:
+        Kubernetes context "kind-asservat-context-2uekgl63-0", namespace "bootstrap-chain-10000000", installation "993aa6ce-231d-40b6-b874-d5e38fa7e887": applying phase 1 worker-provider recipe.
+        created: sys/policies/acl/asservat-configuration-9040b8538638f358dfaade265cfc09167be299a846d00c9d95ee9dbc3d6d1433-audit-wrap
+        created: auth/configuration-auth/role/asservat-configuration-9040b8538638f358dfaade265cfc09167be299a846d00c9d95ee9dbc3d6d1433-audit-wrap
+        created: sys/policies/acl/asservat-configuration-9040b8538638f358dfaade265cfc09167be299a846d00c9d95ee9dbc3d6d1433-audit-unwrap
+        created: auth/configuration-auth/role/asservat-configuration-9040b8538638f358dfaade265cfc09167be299a846d00c9d95ee9dbc3d6d1433-audit-unwrap
+        created: sys/policies/acl/asservat-993aa6ce231d40b6b874d5e38fa7e887-worker-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: applied phase 3 owner-provider:
+        Kubernetes context "kind-asservat-context-2uekgl63-0", namespace "bootstrap-chain-10000000", installation "993aa6ce-231d-40b6-b874-d5e38fa7e887": applying phase 3 owner-provider recipe.
+        created: sys/policies/acl/asservat-owner-cfbf3bc5a0e8961cea1100dc2cab628cda77909fb7eb25c9f27fe0af0ca0a521-audit-wrap
+        created: auth/owner-auth/role/asservat-owner-cfbf3bc5a0e8961cea1100dc2cab628cda77909fb7eb25c9f27fe0af0ca0a521-audit-wrap
+        created: sys/policies/acl/asservat-owner-cfbf3bc5a0e8961cea1100dc2cab628cda77909fb7eb25c9f27fe0af0ca0a521-audit-unwrap
+        created: auth/owner-auth/role/asservat-owner-cfbf3bc5a0e8961cea1100dc2cab628cda77909fb7eb25c9f27fe0af0ca0a521-audit-unwrap
+        created: sys/policies/acl/asservat-owner-cfbf3bc5a0e8961cea1100dc2cab628cda77909fb7eb25c9f27fe0af0ca0a521-server-sign
+        created: auth/owner-auth/role/asservat-owner-cfbf3bc5a0e8961cea1100dc2cab628cda77909fb7eb25c9f27fe0af0ca0a521-server-sign
+        created: sys/policies/acl/asservat-owner-cfbf3bc5a0e8961cea1100dc2cab628cda77909fb7eb25c9f27fe0af0ca0a521-client-sign
+        created: auth/owner-auth/role/asservat-owner-cfbf3bc5a0e8961cea1100dc2cab628cda77909fb7eb25c9f27fe0af0ca0a521-client-sign
+        created: owner-pki/roles/asservat-owner-pki-4a5bb76a13848887e0c945d8f60da83c0a628825115c75a4bed5434964e324bb-server
+        created: owner-pki/roles/asservat-owner-pki-4a5bb76a13848887e0c945d8f60da83c0a628825115c75a4bed5434964e324bb-client
+        created: sys/policies/acl/asservat-owner-public-ad257be9384bf43c-browser-seal
+        created: auth/owner-auth/role/asservat-owner-public-ad257be9384bf43c-browser-seal
+        created: sys/policies/acl/asservat-owner-public-ad257be9384bf43c-browser-open
+        created: auth/owner-auth/role/asservat-owner-public-ad257be9384bf43c-browser-open
+        created: sys/policies/acl/asservat-owner-public-ad257be9384bf43c-work-sign
+        created: auth/owner-auth/role/asservat-owner-public-ad257be9384bf43c-work-sign
+        created: sys/policies/acl/asservat-owner-public-ad257be9384bf43c-worker-issue
+        created: auth/owner-auth/role/asservat-owner-public-ad257be9384bf43c-worker-issue
+        created: public-transit-993aa6ce/keys/asservat-993aa6ce231d40b6b874d5e38fa7e887-browser-sessions
+        created: public-transit-993aa6ce/keys/asservat-993aa6ce231d40b6b874d5e38fa7e887-work-signing
+        created: worker-pki-993aa6ce/roles/asservat-993aa6ce231d40b6b874d5e38fa7e887-download-worker
+        created: sys/policies/acl/asservat-federation-45f57fa82b547c733f2dd8619737319b53d5d23fe0a0b19cbfbf7ae254ecd6bf-audit-wrap
+        created: auth/owner-auth/role/asservat-federation-45f57fa82b547c733f2dd8619737319b53d5d23fe0a0b19cbfbf7ae254ecd6bf-audit-wrap
+        created: sys/policies/acl/asservat-federation-45f57fa82b547c733f2dd8619737319b53d5d23fe0a0b19cbfbf7ae254ecd6bf-audit-unwrap
+        created: auth/owner-auth/role/asservat-federation-45f57fa82b547c733f2dd8619737319b53d5d23fe0a0b19cbfbf7ae254ecd6bf-audit-unwrap
+        created: sys/policies/acl/asservat-federation-45f57fa82b547c733f2dd8619737319b53d5d23fe0a0b19cbfbf7ae254ecd6bf-client-sign
+        created: auth/owner-auth/role/asservat-federation-45f57fa82b547c733f2dd8619737319b53d5d23fe0a0b19cbfbf7ae254ecd6bf-client-sign
+        created: sys/policies/acl/asservat-federation-45f57fa82b547c733f2dd8619737319b53d5d23fe0a0b19cbfbf7ae254ecd6bf-server-sign
+        created: auth/owner-auth/role/asservat-federation-45f57fa82b547c733f2dd8619737319b53d5d23fe0a0b19cbfbf7ae254ecd6bf-server-sign
+        created: connector-pki-993aa6ce/roles/asservat-993aa6ce231d40b6b874d5e38fa7e887-connector-client
+        created: connector-pki-993aa6ce/roles/asservat-993aa6ce231d40b6b874d5e38fa7e887-connector-server
+        created: bootstrap-chain-transit/keys/asservat-993aa6ce231d40b6b874d5e38fa7e887-federation-audit
+        created: sys/policies/acl/asservat-993aa6ce231d40b6b874d5e38fa7e887-owner-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:343: permission stream 32a4b4d9-87b7-498e-ace5-8726a249d7cd fresh with 2 acknowledged authority audits
+    initial_bootstrap_chain_test.go:343: capacity source initialized for the permission root
+    initial_bootstrap_chain_test.go:343: federation projection published for the permission root
+    initial_bootstrap_chain_test.go:343: federation provider roles applied and verified
+    initial_bootstrap_chain_test.go:343: federation available with zero peers; regional offer published
+    initial_bootstrap_chain_test.go:343: owner native port reachable from outside under its bootstrap name
+    initial_bootstrap_chain_test.go:343: key service available; its configuration accepted at revision 1
+    initial_bootstrap_chain_test.go:343: key service serves the offered roots and refuses an unknown client chain: remote error: tls: unknown certificate authority
+    initial_bootstrap_chain_test.go:343: no Pod mounts the root key; only the key service mounts its logins
+    initial_bootstrap_chain_test.go:343: capacity root ReadyAt set for the permission root
+    initial_bootstrap_chain_test.go:343: hub retention source Ready at sequence 2 with the baseline policy
+    initial_bootstrap_chain_test.go:343: hub retention source Ready at sequence 3 with the baseline policy
+    initial_bootstrap_chain_test.go:343: hub retention source Ready at sequence 3 with the baseline policy
+    initial_bootstrap_chain_test.go:343: baseline edit accepted and hub-worker restart Ready under a new epoch
+    initial_bootstrap_chain_test.go:343: promoted owner Ready with download sources, operator public Secret and observation on 9444
+    initial_bootstrap_chain_test.go:343: installer-cluster connector enrolled generation 1 and both leaves
+    initial_bootstrap_chain_test.go:343: join record printed and stored; its connector protection is the staged generation 1
+    initial_bootstrap_chain_test.go:343: regional executor composed from the settings it read by name
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle enroll took 4.06s, observer 82 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle client-sign took 3.4s, observer 68 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle server-sign took 3.4s, observer 68 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle registration took 1.4s, observer 28 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle owner-observation-candidates took 20ms, observer 1 calls
+    initial_bootstrap_chain_test.go:343: regional: connector lifecycle owner-candidates took 10ms, observer 0 calls
+    initial_bootstrap_chain_test.go:343: installer-cluster-join wrote the slot's sources, topology and catalog entry; the rerun was exact
+    initial_bootstrap_chain_test.go:343: hub-api restarted its process on the catalog change and is Ready with the joined entry
+    initial_bootstrap_chain_test.go:343: hub-api recorded the join's write-once capacity qualification
+    initial_bootstrap_chain_test.go:343: regional capacity standby composed
+    initial_bootstrap_chain_test.go:343: operator added the regional budget policy, pool slot, workload and maintainer binding
+    initial_bootstrap_chain_test.go:343: demand lane: 6 distinct binding observations and 6 samples with at least 1 s left in 15 s
+    initial_bootstrap_chain_test.go:343: regional workload enrolled through v2 to ready_at; a refresh demand kept refreshing its binding; the pool extended once
+    initial_bootstrap_chain_test.go:343: restarted connector Pod readmitted without an administrator
+    initial_bootstrap_chain_test.go:343: non-administrator source write denied by the source guard
+    initial_bootstrap_chain_test.go:343: actual installer-continue Pod under the runner account and chart continuation rules, two actual applier waits; worker inputs/launch and owner identity/launch acknowledged with running worker and owner processes; bootstrap hook and continuation replay after the guard bridge without changes; no public workflow claim
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:376: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- PASS: TestInitialBootstrapChainWithRealServices (1371.49s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (22.80s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/installer-continuation (1051.39s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.82s)
+PASS
+ok  	asservat.local/asservat/test/integration	1372.565s

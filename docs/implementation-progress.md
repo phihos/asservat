@@ -23,6 +23,14 @@ now labelled for the next failure. Hub-cluster capacity observation was
 throttled past its window on a shared client (PR #8 gives it its own). Downloads
 still rely on discovery refreshes; the installed S-02 journey is not complete.
 
+Runs 26a–28b (eight, [26a](../test/results/adr200-continuation-ci-26a/native-continuation-1/context-storage-environment.json)
+to [28b](../test/results/adr200-continuation-ci-28b/native-continuation-1/context-storage-environment.json)):
+26a, 26c, 27c, 28a and 28b pass. 26b and 27a stop at "owner native port not
+reachable"; 27b's regional workload never reached `ready_at` while the
+connector's local source failed at `source-snapshot`. The owner diagnostics
+printed only the first 4 KiB of each log, so the router events added for the
+unreachable port never appeared; they now print the last 100 lines.
+
 ## Rotating cluster credential (ADR-168) and bounded streaming custody (ADR-166)
 
 ADR-168 components are implemented: domain decision, Ed25519
