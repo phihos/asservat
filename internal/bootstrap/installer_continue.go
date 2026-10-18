@@ -177,6 +177,19 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 		return nil, mounts.ErrUnavailable
 	}
 	k.closers = append(k.closers, k.sql.Close)
+	// The promoted continuation composes the complete fixed process graph.
+	// Check its installed allowance before creating any runtime resource or
+	// role. An observation-only continuation does not select this graph.
+	if k.input.Public != nil && k.input.Public.Promotion != nil {
+		*step = "open/sql-budget"
+		plan, e := contracts.InstalledSQLConnectionPlan(1)
+		if e != nil {
+			return nil, e
+		}
+		if _, e = k.sql.VerifySQLConnectionBudget(ctx, plan, 0); e != nil {
+			return nil, e
+		}
+	}
 	complete = true
 	return k, nil
 }
@@ -1144,6 +1157,12 @@ type InstallerContinuationStop struct {
 
 func (e *InstallerContinuationStop) Unwrap() error { return e.Err }
 func (e *InstallerContinuationStop) Error() string {
+	var budget *contracts.SQLConnectionBudgetError
+	if errors.As(e.Err, &budget) {
+		// This typed error contains only fixed rules and connection counts.
+		// Never include the surrounding SQL/provider error text.
+		return "installer continuation stopped at " + e.Step + ": " + budget.Error()
+	}
 	class := errorClass(e.Err)
 	step := e.Step
 	var inner interface{ FixedStep() string }

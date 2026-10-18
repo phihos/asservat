@@ -67,7 +67,11 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
-	admin, err := pgxpool.New(ctx, f.Postgres)
+	adminConfig, err := initialBootstrapAdminPoolConfig(f.Postgres)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admin, err := pgxpool.NewWithConfig(ctx, adminConfig)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,6 +378,44 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 		initialBootstrapCopyAdministratorBoundary(t, ctx, directAPI, direct, desired)
 	})
 	t.Log("actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim")
+}
+
+func initialBootstrapAdminPoolConfig(dsn string) (*pgxpool.Config, error) {
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return nil, err
+	}
+	// Only the installed continuation's sequential observer uses one reserved
+	// superuser slot. Other bootstrap modes deliberately hold an admin lock
+	// while observing through another connection and retain their old pool.
+	if os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") == "1" {
+		config.MaxConns, config.MinConns = 1, 0
+	}
+	return config, nil
+}
+
+func TestInitialBootstrapAdminPoolKeepsBlockingModes(t *testing.T) {
+	const dsn = "postgres://fixture@127.0.0.1/fixture?sslmode=disable"
+	original, err := pgxpool.ParseConfig(dsn)
+	if err != nil || original.MaxConns < 2 {
+		t.Fatal("original component pool must support blocking lock tests", err)
+	}
+	for _, mode := range []string{"", "1"} {
+		t.Run("installed="+mode, func(t *testing.T) {
+			t.Setenv("ASSERVAT_INSTALLER_CONTINUATION", mode)
+			got, err := initialBootstrapAdminPoolConfig(dsn)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := original.MaxConns
+			if mode == "1" {
+				want = 1
+			}
+			if got.MaxConns != want || got.MinConns != original.MinConns {
+				t.Fatal("component and installed observer pool profiles differ", got.MaxConns, got.MinConns)
+			}
+		})
+	}
 }
 
 func initialBootstrapChainProvider(t *testing.T, ctx context.Context, f fixture, d contracts.InitialBootstrap) string {

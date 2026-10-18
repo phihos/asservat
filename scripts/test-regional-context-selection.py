@@ -73,6 +73,23 @@ class RegionalContextSelection(unittest.TestCase):
         with self.assertRaises(ValueError):
             fixture.postgres_fixture_options("unexpected")
 
+    def test_installed_budget_is_explicit_and_does_not_change_components(self):
+        # The runner receives this from the Go plan helper, not a Python copy
+        # of the growing product purpose inventory.
+        budget = {"requiredOrdinary": 107, "superuserReserved": 3,
+                  "reserved": 0, "fixtureAdminConnections": 1,
+                  "maxConnections": 110}
+        options = fixture.postgres_fixture_options(installed_budget=budget, lock_waits=True)
+        self.assertIn("max_connections=110", options)
+        self.assertIn("superuser_reserved_connections=3", options)
+        self.assertIn("reserved_connections=0", options)
+        self.assertIn("log_disconnections=on", options)
+        self.assertIn("max_connections=48", fixture.postgres_fixture_options())
+        for field, value in (("maxConnections", 109), ("requiredOrdinary", 0),
+                             ("fixtureAdminConnections", 4), ("reserved", -1)):
+            with self.subTest(field=field), self.assertRaises(ValueError):
+                fixture.postgres_fixture_options(installed_budget=dict(budget, **{field: value}))
+
 
 if __name__ == "__main__":
     unittest.main()

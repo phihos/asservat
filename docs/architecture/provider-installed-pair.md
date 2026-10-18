@@ -20,6 +20,15 @@ commit. Closure joins admitted operations. The launch and owner projection
 components now have finite original-root phase drivers and joined-shutdown
 tests; their actual installed composition remains a separate qualification.
 
+The promoted continuation's SQL preflight reads actual server capacity through
+the already verified bridge, in the original five-second transaction. It uses
+the compiled one-hub connection plan, including retained worker processes,
+separate verifier and maintenance headroom, before creating runtime resources.
+The helper never exposes the administrator transaction to native callbacks and
+never changes pool limits or SQL settings. With ADR-204 the plan needs 101
+ordinary slots; ADR-205 adds six for the three deletion purposes in two retained
+hub-worker processes, bringing it to 107 (110 total with three superuser slots).
+
 The runtime profile uses standard Kubernetes authentication with two worker and
 four owner token purposes. Explicit scoped storage credentials retain their
 original Secret identities. Required versioned audit constructors reject missing
