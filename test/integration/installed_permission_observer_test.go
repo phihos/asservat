@@ -3,6 +3,7 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/url"
 	"os"
@@ -12,6 +13,7 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/contracts"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -57,8 +59,10 @@ func installedPermissionObserver(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("installed permission observer", err)
 	}
 	// The observation role cannot turn a fixture check into authority mutation.
-	if _, err = reader.Exec(ctx, "UPDATE permission_stream SET suspended=suspended WHERE false"); err == nil {
-		t.Fatal("installed permission reader can mutate authority")
+	_, err = reader.Exec(ctx, "UPDATE permission_stream SET suspended=suspended WHERE false")
+	var denied *pgconn.PgError
+	if !errors.As(err, &denied) || denied.Code != "42501" {
+		t.Fatal("installed permission reader did not establish SQL privilege denial")
 	}
 	retained = true
 	return permissions, reader.Close

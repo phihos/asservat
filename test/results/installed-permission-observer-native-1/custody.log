@@ -1,0 +1,5 @@
+=== RUN   TestInstalledPermissionObserverWithRealServices
+    installed_permission_observer_test.go:135: plaintext and TLS administrator pools rejected; scoped permission-read observer constructed, authority mutation denied and its pool closed
+--- PASS: TestInstalledPermissionObserverWithRealServices (0.10s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.211s
