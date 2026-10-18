@@ -27,6 +27,7 @@ import (
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -663,6 +664,49 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	}
 	t.Log("regional workload enrolled through v2 to ready_at; a refresh demand kept refreshing its binding; the pool extended once")
 	if journey != nil {
+		// Read the installed projection through its real adapter. The fixture
+		// administrator supplies only read access, never accepted assignments.
+		permissions, err := postgres.NewPermissions(ctx, admin, root)
+		if err != nil {
+			t.Fatal("installed permission observer", err)
+		}
+		pods, err := region.CoreV1().Pods(ns.Name).List(ctx, meta.ListOptions{LabelSelector: "app=regional-app"})
+		if err != nil || len(pods.Items) != 1 {
+			t.Fatal("installed regional Pod observation", err)
+		}
+		target := authorization.Target{ClusterID: cluster, NamespaceUID: string(ns.UID), WorkloadUID: string(app.UID), PodUID: string(pods.Items[0].UID)}
+		denyUID := ""
+		observeDeny := func(on bool) {
+			t.Helper()
+			bounded, stop := context.WithTimeout(ctx, 2*time.Minute)
+			defer stop()
+			for bounded.Err() == nil {
+				projection, err := permissions.Permissions(bounded, target)
+				if err == nil && projection.DeniesComplete && time.Now().Before(projection.DeniesFreshUntil) {
+					found, allowed := false, false
+					for _, row := range projection.Denies {
+						a := row.Audience
+						if a.BasisUID == denyUID && a.Kind == "Group" && a.Issuer == issuer && a.SubjectID == installedIdentityGroup && a.Role == "workload-maintainer" {
+							found = true
+						}
+					}
+					for _, row := range projection.Allows {
+						a := row.Audience
+						if a.Kind == "Group" && a.Issuer == issuer && a.SubjectID == installedIdentityGroup && a.Role == "workload-maintainer" {
+							allowed = true
+						}
+					}
+					if found == on && allowed {
+						return
+					}
+				}
+				if installedJourneyPause(bounded, time.Second) != nil {
+					break
+				}
+			}
+			diagnose()
+			t.Fatal("installed Deny change never reached a fresh accepted projection", on)
+		}
 		// The journey's revocation: a Deny binding for the same group, role
 		// and scope, then its removal. The original Allow assignment stays.
 		deny := func(on bool) {
@@ -672,14 +716,23 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 				if err := client.Delete().AbsPath(path).Do(ctx).Error(); err != nil {
 					t.Fatal("operator removes the revoking binding", err)
 				}
+				observeDeny(false)
 				return
 			}
 			revoke := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "regional-maintainers-revoked"}, "spec": map[string]any{"effect": "Deny",
 				"subjects": binding["spec"].(map[string]any)["subjects"], "roles": []any{"workload-maintainer"}, "scope": binding["spec"].(map[string]any)["scope"], "reason": "installed journey revocation"}}
 			body, _ := json.Marshal(revoke)
-			if err := client.Post().AbsPath(base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
+			raw, err := client.Post().AbsPath(base + "accessbindings").Body(body).DoRaw(ctx)
+			var created struct {
+				Metadata struct {
+					UID string `json:"uid"`
+				} `json:"metadata"`
+			}
+			if err != nil || json.Unmarshal(raw, &created) != nil || created.Metadata.UID == "" {
 				t.Fatal("operator revokes the maintainer binding", err)
 			}
+			denyUID = created.Metadata.UID
+			observeDeny(true)
 		}
 		journey(cluster, ns.Name, app.Name, deny)
 	}
