@@ -502,8 +502,15 @@ PL/pgSQL CASE expression and retaining the publication fixture's existing audit
 account/history identity during its revisioned capacity increase. The
 [report](../../test/results/adr206-context-query-local-2/custody-environment.json)
 records unchanged source, the exact selected test and complete owned-fixture
-cleanup. This qualifies the component ledger with synthetic C-07/C-14 inputs,
-not installed resource acceptance, worker/key authority or public query delivery.
+cleanup at component revision `b959360e6c4055541750e1761b609c22b500d719`; all
+2,615 recorded hashes match that archive. It differs from the combined
+implementation in 21 recorded files and does not qualify that combined tree.
+The subsequent [combined report](../../test/results/context-query-ci-2/custody-environment.json)
+independently matches all 2,637 source hashes to
+`89eb9b7cc62a51a814389d757d6294ff2b353b77` and passes the ledger plus five
+catalog/case checks with complete cleanup. These qualify the component ledger
+with synthetic C-07/C-14 inputs; installed resource acceptance, worker/key
+authority and native public query delivery remain separate.
 
 ## Acceptance
 

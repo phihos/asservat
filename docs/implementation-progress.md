@@ -38,8 +38,8 @@ commit's archive; the harness reports unchanged sources, terminal exit 1 and no
 cleanup failures. The retained report is
 [`test/results/context-query-ci-1/custody-environment.json`](../test/results/context-query-ci-1/custody-environment.json),
 SHA-256 `f62f17dbbcd4c9dc2ff6953732f2a5934c7906a6660980fab737fd6c0ea9ffcc`.
-This is a migration failure, not native query qualification. Correcting the SQL
-syntax and rerunning the selected query/catalog/case checks is required.
+This is a migration failure, not native query qualification. The subsequent
+correction and passing combined run are recorded above.
 Protected capacity, query worker/key producers and installed composition remain
 in progress; neither public query operation is enabled.
 
@@ -62,16 +62,21 @@ The [selected native SQL/S3 ledger test](../test/results/adr206-context-query-lo
 passes in 7.33 seconds, including acknowledged audit lineage, actual SQL lock
 synchronization, one-use starts, unknown closure and retained aggregate charges.
 Its [report](../test/results/adr206-context-query-local-2/custody-environment.json)
-records exit 0, all 2615 source hashes independently matched and empty cleanup
-failures. The first combined native attempt stopped before tests at a PL/pgSQL
+records exit 0, all 2,615 source hashes independently matching its frozen
+component revision `b959360e6c4055541750e1761b609c22b500d719`, and empty cleanup
+failures. That branch differs from the combined implementation in 21 recorded
+files; this local report qualifies that component revision only. The later
+combined run `context-query-ci-2`, recorded above, separately verifies all 2,637
+files against `89eb9b7cc62a51a814389d757d6294ff2b353b77` and passes the ledger
+plus five catalog/case checks. The first combined native attempt stopped before tests at a PL/pgSQL
 CASE parsing error; the next local attempt exposed the fixture's attempt to
 replace its existing normal audit account. The correction parenthesizes CASE
 and preserves the acknowledged processing audit policy/account and retained
 spend while increasing explicitly synthetic capacity through the existing CAS
 API. Its C-07 qualification and C-14 ownership inputs remain synthetic. The
 constructor floors query timestamps conservatively to PostgreSQL microseconds;
-the passing native fixture deliberately supplies a nanosecond clock. Combined
-catalog/transport qualification and installed query composition remain separate.
+the passing native fixture deliberately supplies a nanosecond clock. Installed
+query composition and native public transport qualification remain separate.
 
 ## Initial approved pod-status projection foundations (ADR-206)
 
