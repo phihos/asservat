@@ -59,8 +59,20 @@ func permissionError(err error) error {
 			return e
 		}
 	}
+	// Keep the ledger's closed cause word for the reconciler's step label.
+	var cause ledgerCause
+	if errors.As(err, &cause) {
+		return permissionCause{cause.cause}
+	}
 	return cfg.ErrUnavailable
 }
+
+// permissionCause is cfg.ErrUnavailable with the ledger's closed cause word.
+type permissionCause struct{ cause string }
+
+func (e permissionCause) Error() string     { return cfg.ErrUnavailable.Error() }
+func (e permissionCause) Unwrap() error     { return cfg.ErrUnavailable }
+func (e permissionCause) FixedStep() string { return e.cause }
 func fence(s custodydb.PermissionStream) cfg.PermissionFence {
 	f := cfg.PermissionFence{RootID: uid(s.ID), Epoch: uid(s.Epoch), Sequence: s.Sequence, LeaseUntil: s.LeaseUntil.Time, Initialized: s.InitialAuditID.Valid}
 	copy(f.TrustDigest[:], s.TrustDigest)
