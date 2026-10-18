@@ -114,17 +114,17 @@ func (h *Handler) rejectIngress(w http.ResponseWriter, r *http.Request, current 
 	}
 	a := &operationAttempt{owner: r.Context(), current: current, audited: h.audited, delivery: delivery, security: &h.security}
 	if !a.claim(attemptRejected) || !a.reject(name, raw, kind) {
-		problem(w, 503)
+		h.unavailable(w, "ingress-audit")
 		return false
 	}
 	final, err := current.ResolveIdentity(r.Context())
 	if err != nil || r.Context().Err() != nil || !delivery.restrict(final.ValidUntil) {
-		problem(w, 503)
+		h.unavailable(w, "ingress-identity")
 		return false
 	}
 	deadline, valid := delivery.current(h.now())
 	if !valid || http.NewResponseController(w).SetWriteDeadline(deadline) != nil {
-		problem(w, 503)
+		h.unavailable(w, "ingress-deadline")
 		return false
 	}
 	return true

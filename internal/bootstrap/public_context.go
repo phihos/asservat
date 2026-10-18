@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"io/fs"
 	"net/http"
+	"os"
 	"time"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -76,6 +77,7 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 	if e != nil {
 		return nil, e
 	}
+	mcpHandler.Report = eventLog(os.Stderr, "mcp unavailable")
 	// ADR-194 D1: a nil Native (no configured worker) serves no content; its
 	// paths answer 503 rather than falling through to the console.
 	var content http.Handler

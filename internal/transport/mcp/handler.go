@@ -67,6 +67,18 @@ type Handler struct {
 	operations   presentation.Operations
 	audited      *presentation.AuditedOperations
 	security     presentation.IngressCounters
+	// Report, when set before serving, receives a closed reason for each 503;
+	// it carries no request content. The
+	// installed journey's first MCP call ended in a bare 503. Diagnostics only.
+	Report func(reason string)
+}
+
+// unavailable answers 503 and reports its closed reason.
+func (h *Handler) unavailable(w http.ResponseWriter, reason string) {
+	if h.Report != nil {
+		h.Report(reason)
+	}
+	problem(w, http.StatusServiceUnavailable)
 }
 
 func NewHandler(c Config, resolver identities.Resolver) (*Handler, error) {
@@ -254,12 +266,12 @@ func (h *Handler) resolve(ctx context.Context, token string) (identity.Identity,
 	}
 	return i, nil
 }
-func (h *Handler) authFailure(w http.ResponseWriter, err error) {
+func (h *Handler) authFailure(w http.ResponseWriter, err error, reason string) {
 	if errors.Is(err, identity.ErrInvalid) || errors.Is(err, identity.ErrDenied) {
 		h.challenge(w, 401, "invalid_token")
 		return
 	}
-	problem(w, 503)
+	h.unavailable(w, reason)
 }
 func (h *Handler) acquireIdentity(p identity.Principal) bool {
 	h.mu.Lock()
@@ -352,7 +364,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	current, i, err := identities.NewBearerRequest(ctx, pinnedResolver{h}, fields[1], h.now)
 	if err != nil {
 		h.security.Add(presentation.IngressPreAdmission)
-		h.authFailure(w, err)
+		h.authFailure(w, err, "identity")
 		return
 	}
 	if h.audited == nil && !h.stopSupported() && !slices.Contains(i.Scopes, "evidence:read") {
@@ -368,7 +380,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r = r.WithContext(ctx)
 	control := http.NewResponseController(w)
 	if control.SetReadDeadline(deadline) != nil || control.SetWriteDeadline(deadline) != nil {
-		problem(w, 503)
+		h.unavailable(w, "deadline-setup")
 		return
 	}
 	// Header rejection is deferred until bounded routing classification so
@@ -493,7 +505,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// SDK request/header/parameter decoding can reject before middleware.
 		// Claim once before auditing; a delayed SDK callback cannot dispatch.
 		if !attempt.reject(route.Name, body, presentation.IngressInvalid) {
-			problem(w, 503)
+			h.unavailable(w, "audit-reject")
 			return
 		}
 		// Never forward decoder diagnostics: they may quote raw arguments.
@@ -502,7 +514,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		rpcRejected(response, body)
 	}
 	if response.overflow {
-		problem(w, 503)
+		h.unavailable(w, "response-overflow")
 		return
 	}
 	// Even discovery/list output cannot survive identity/policy revocation while
@@ -511,20 +523,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// while this final identity check blocks; preserve both independent bounds.
 	finalIdentity, err := current.ResolveIdentity(ctx)
 	if err != nil {
-		h.authFailure(w, err)
+		h.authFailure(w, err, "final-identity")
 		return
 	}
 	if !delivery.restrict(finalIdentity.ValidUntil) {
-		problem(w, http.StatusServiceUnavailable)
+		h.unavailable(w, "final-identity-expired")
 		return
 	}
 	deadline, valid := delivery.current(h.now())
 	if !valid || ctx.Err() != nil {
-		problem(w, http.StatusServiceUnavailable)
+		h.unavailable(w, "deadline-passed")
 		return
 	}
 	if control.SetWriteDeadline(deadline) != nil {
-		problem(w, http.StatusServiceUnavailable)
+		h.unavailable(w, "write-deadline")
 		return
 	}
 	// Copy only protocol headers; the SDK cannot relax our cache/privacy headers
@@ -534,6 +546,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if allow := response.header.Get("Allow"); allow != "" {
 		w.Header().Set("Allow", allow)
+	}
+	if response.status == http.StatusServiceUnavailable && h.Report != nil {
+		h.Report("protocol")
 	}
 	w.WriteHeader(response.status)
 	_, _ = w.Write(response.body)
