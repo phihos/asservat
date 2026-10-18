@@ -111,7 +111,7 @@ func (s *ownerProviderLifetime) refreshOwned(ctx context.Context, worker *Instal
 	now := s.control.now()
 	if s.closed || s.root.Err() != nil || s.active || now.Before(s.next) {
 		s.mu.Unlock()
-		return ErrKeyService
+		return lifetimeStep("blocked")
 	}
 	old := s.current
 	login := old == nil || !now.Before(old.value.reauthenticateAt()) || !now.Before(old.value.until)
@@ -122,7 +122,7 @@ func (s *ownerProviderLifetime) refreshOwned(ctx context.Context, worker *Instal
 	// A stalled old response cannot be discarded or allow a third token slot.
 	if login && s.draining != nil && s.draining.borrows != 0 {
 		s.mu.Unlock()
-		return ErrKeyService
+		return lifetimeStep("draining")
 	}
 	s.active = true
 	reconcile := s.uncertain && !login
@@ -147,7 +147,9 @@ func (s *ownerProviderLifetime) refreshOwned(ctx context.Context, worker *Instal
 		}
 	}
 	finalUntil := bound
+	cause := "" // the closed step a failed refresh reports
 	if proofErr != nil || bound.IsZero() || !s.control.now().Before(bound) || call.Err() != nil {
+		cause = "proof"
 		cancel()
 	} else {
 		var boundCancel context.CancelFunc
@@ -169,21 +171,34 @@ func (s *ownerProviderLifetime) refreshOwned(ctx context.Context, worker *Instal
 	var err error
 	if call.Err() != nil {
 		err = ErrKeyService
+		if cause == "" {
+			cause = "deadline"
+		}
 	} else if login {
 		var jwt []byte
 		jwt, err = s.jwt(call)
-		if err == nil && call.Err() == nil {
+		if err != nil {
+			cause = "jwt"
+		} else if call.Err() == nil {
 			next, err = s.control.login(call, jwt)
+			if err != nil {
+				cause = "login"
+			}
 		}
 		clear(jwt)
 	} else if reconcile {
-		next, err = s.control.reconcile(call, old.value)
+		if next, err = s.control.reconcile(call, old.value); err != nil {
+			cause = "reconcile"
+		}
 	} else {
-		next, err = s.control.renew(call, old.value)
+		if next, err = s.control.renew(call, old.value); err != nil {
+			cause = "renew"
+		}
 	}
 
 	if login && next != nil && old != nil && (next.accessor == old.value.accessor || bytes.Equal(next.token, old.value.token)) {
 		err = ErrKeyService // Fresh login cannot adopt the still-owned token.
+		cause = "adopted"
 	}
 	if err == nil && next != nil && call.Err() == nil {
 		var final time.Time
@@ -198,6 +213,7 @@ func (s *ownerProviderLifetime) refreshOwned(ctx context.Context, worker *Instal
 		}
 		if e != nil || final.IsZero() || !s.control.now().Before(final) || call.Err() != nil {
 			err = ErrKeyService
+			cause = "final-proof"
 		}
 	}
 	if login && next != nil && err != nil && (old == nil || !bytes.Equal(next.token, old.value.token)) {
@@ -222,7 +238,10 @@ func (s *ownerProviderLifetime) refreshOwned(ctx context.Context, worker *Instal
 		}
 		delay := []time.Duration{time.Second, 2 * time.Second, 4 * time.Second, 8 * time.Second, 16 * time.Second, 30 * time.Second}[s.failures-1]
 		s.next = now.Add(delay)
-		return ErrKeyService
+		if cause == "" {
+			cause = "expired"
+		}
+		return lifetimeStep(cause)
 	}
 	if login {
 		if old != nil {
@@ -361,3 +380,12 @@ func (s *ownerProviderLifetime) joinClosed() {
 	s.signalLocked()
 	s.mu.Unlock()
 }
+
+// lifetimeStepError is ErrKeyService naming the closed step where a provider
+// credential refresh stopped, for the effects' diagnostic report.
+type lifetimeStepError struct{ step string }
+
+func lifetimeStep(step string) error          { return lifetimeStepError{step} }
+func (e lifetimeStepError) Error() string     { return ErrKeyService.Error() }
+func (e lifetimeStepError) Unwrap() error     { return ErrKeyService }
+func (e lifetimeStepError) FixedStep() string { return e.step }

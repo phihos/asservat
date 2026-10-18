@@ -20,9 +20,11 @@ import (
 // it together with current native/source/recovery checks and the fixed token
 // owner. No constructor, receipt or provider token grants those authorities.
 type ownerProviderControl struct {
-	http                *http.Client
-	endpoint, mount     string
-	role, namespace     string
+	http            *http.Client
+	endpoint, mount string
+	role, namespace string
+	// purpose is the closed provider purpose, for diagnostics only.
+	purpose             string
 	account, accountUID string
 	now                 func() time.Time
 }
@@ -120,7 +122,7 @@ func newOwnerProviderControl(in contracts.OwnerDeployment, profile contracts.Own
 	h := *client
 	h.Transport, h.Timeout = transport, 5*time.Second
 	h.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &ownerProviderControl{http: &h, endpoint: u.String(), mount: profile.AuthMount, role: name, namespace: in.Namespace.Name, account: profile.ServiceAccount.Name, accountUID: profile.ServiceAccount.UID, now: now}, nil
+	return &ownerProviderControl{http: &h, endpoint: u.String(), mount: profile.AuthMount, role: name, purpose: purpose, namespace: in.Namespace.Name, account: profile.ServiceAccount.Name, accountUID: profile.ServiceAccount.UID, now: now}, nil
 }
 
 func (c *ownerProviderControl) close() {

@@ -382,3 +382,32 @@ func TestOwnerProviderLifetimesCancelAllPurposesBeforeJoining(t *testing.T) {
 		t.Fatal("canceled JWT read continued to provider")
 	}
 }
+
+// A failed refresh names its closed step and still matches ErrKeyService.
+func TestOwnerProviderLifetimeNamesTheFailedRefreshStep(t *testing.T) {
+	for _, c := range []struct {
+		name  string
+		proof ownerProviderCurrent
+		want  string
+	}{
+		{"proof", func(context.Context) (time.Time, error) { return time.Time{}, errors.New("synthetic proof unavailable") }, "proof"},
+		{"final-proof", func() ownerProviderCurrent {
+			var checks atomic.Int32
+			return func(ctx context.Context) (time.Time, error) {
+				if checks.Add(1) == 2 {
+					return time.Time{}, errors.New("synthetic current source changed")
+				}
+				return time.Now().Add(5 * time.Second), ctx.Err()
+			}
+		}(), "final-proof"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			s := newOwnerProviderLifetimeFixture(t, newOwnerProviderControlFixture(t), nil, c.proof, 1)
+			err := s.refresh(context.Background())
+			var step interface{ FixedStep() string }
+			if !errors.Is(err, ErrKeyService) || !errors.As(err, &step) || step.FixedStep() != c.want {
+				t.Fatal(err)
+			}
+		})
+	}
+}

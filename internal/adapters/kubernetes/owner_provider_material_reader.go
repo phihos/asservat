@@ -29,23 +29,31 @@ func (s *InstalledOwnerIdentityReader) ReadProviderAuditCredential(ctx context.C
 	}
 	until, err := s.Verify(ctx, manifest, mounted)
 	if err != nil {
-		return zero, time.Time{}, err
+		return zero, time.Time{}, materialStep("identity", err)
 	}
 	call, end := context.WithDeadline(ctx, until)
 	defer end()
 	p := s.input.ProviderAuthentication
 	var object core.Secret
 	if err = s.get(call, "/api/v1/namespaces/"+s.input.Namespace.Name+"/secrets/"+p.AuditCredentials.Name, &object); err != nil {
-		return zero, time.Time{}, err
+		return zero, time.Time{}, materialStep("secret", err)
 	}
 	defer clearRuntimeProjection(object.Data)
-	if !initialProviderSecretIdentity(object, s.input.Namespace.Name, p.AuditCredentials, contracts.OwnerProviderAuditCredentialFile) || len(object.Data) != 1 || !bytes.Equal(object.Data[contracts.OwnerProviderAuditCredentialFile], credential) {
-		return zero, time.Time{}, cfg.ErrChanged
+	if !initialProviderSecretIdentity(object, s.input.Namespace.Name, p.AuditCredentials, contracts.OwnerProviderAuditCredentialFile) {
+		return zero, time.Time{}, materialStep("secret-identity", cfg.ErrChanged)
+	}
+	if len(object.Data) != 1 || !bytes.Equal(object.Data[contracts.OwnerProviderAuditCredentialFile], credential) {
+		return zero, time.Time{}, materialStep("secret-content", cfg.ErrChanged)
 	}
 	guard, observed, err := s.protection.Current(call)
 	until = identity.Earlier(until, observed)
-	if err != nil || s.input.Observation == nil || hex.EncodeToString(guard[:]) != s.input.Observation.ProtectionDigest || initialHandoverDeadline(call, s.client.now, until) != nil {
-		return zero, time.Time{}, cfg.ErrUnavailable
+	switch {
+	case err != nil:
+		return zero, time.Time{}, materialStep("guard", cfg.ErrUnavailable)
+	case s.input.Observation == nil || hex.EncodeToString(guard[:]) != s.input.Observation.ProtectionDigest:
+		return zero, time.Time{}, materialStep("guard-digest", cfg.ErrUnavailable)
+	case initialHandoverDeadline(call, s.client.now, until) != nil:
+		return zero, time.Time{}, materialStep("deadline", cfg.ErrUnavailable)
 	}
 	out, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(credential))
 	if err != nil {
@@ -53,3 +61,15 @@ func (s *InstalledOwnerIdentityReader) ReadProviderAuditCredential(ctx context.C
 	}
 	return out, until, nil
 }
+
+// materialStepError keeps the returned error and names the closed step where
+// a provider material read stopped, for diagnostics.
+type materialStepError struct {
+	step string
+	err  error
+}
+
+func materialStep(step string, err error) error { return &materialStepError{step, err} }
+func (e *materialStepError) Error() string      { return e.err.Error() }
+func (e *materialStepError) Unwrap() error      { return e.err }
+func (e *materialStepError) FixedStep() string  { return e.step }

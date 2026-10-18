@@ -381,6 +381,7 @@ func (d *OwnerDeployment) Run(listener net.Listener, additional ...net.Listener)
 	// listener and supervised with the runtime; either ending stops both.
 	var providerDone chan error
 	if d.providers != nil {
+		d.providers.Report = eventLog(os.Stderr, "owner provider refresh")
 		if err := d.providers.Prime(d.root); err != nil {
 			_ = listener.Close()
 			for _, l := range additional {
