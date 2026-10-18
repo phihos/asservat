@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-204 — Installed native downloads](204-installed-downloads.md)
+runs download workers in their own hub-cluster namespace with the profile source beside them, pins
+one hub-local path in the owner input, gives workers their own evidence read credential, accepts
+worker configuration in the hub-worker and adds acquisition unwraps and a downloads token.
+
 [ADR-202 — Public API exposure](202-public-api-exposure.md)
 lets the operator expose the promoted hub-api's public port on its own NodePort or LoadBalancer Service,
 TLS passthrough only, so installed browsers and MCP clients can reach it.
