@@ -68,7 +68,10 @@ func TestInstalledOwnerProviderConstructorRetainsOriginalInput(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer files.Close()
-	s, err := NewInstalledOwnerProviderEffects(context.Background(), in, files, reader, &postgres.OwnerConfigurations{}, accepted)
+	if _, err = NewInstalledOwnerProviderEffects(context.Background(), in, files, reader, nil, &postgres.OwnerConfigurations{}, accepted); err == nil {
+		t.Fatal("installed provider effects accepted no audit credential reader")
+	}
+	s, err := NewInstalledOwnerProviderEffects(context.Background(), in, files, reader, reader, &postgres.OwnerConfigurations{}, accepted)
 	if err != nil {
 		t.Fatal(err)
 	}

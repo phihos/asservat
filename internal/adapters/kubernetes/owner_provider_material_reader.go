@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
@@ -72,4 +73,10 @@ type materialStepError struct {
 func materialStep(step string, err error) error { return &materialStepError{step, err} }
 func (e *materialStepError) Error() string      { return e.err.Error() }
 func (e *materialStepError) Unwrap() error      { return e.err }
-func (e *materialStepError) FixedStep() string  { return e.step }
+func (e *materialStepError) FixedStep() string {
+	var nested interface{ FixedStep() string }
+	if errors.As(e.err, &nested) {
+		return e.step + "/" + nested.FixedStep()
+	}
+	return e.step
+}

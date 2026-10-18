@@ -39,21 +39,22 @@ type OwnerDeployment struct {
 	// readinessStats and identityStats count the readiness loop's and the
 	// identity readers' own clients (ADR-173), reported beside the observer.
 	readinessStats, identityStats regionalAPIStats
-	// providerStats counts the provider proofs' own clients (ADR-173).
-	providerStats regionalAPIStats
-	Runtime       *OwnerRuntime
-	Router        *evidence.WorkerEnrollmentRouter
-	inputs        *ownerInputs
-	trust         *mtls.WorkerTrustCatalog
-	root          context.Context
-	cancel        context.CancelFunc
-	closers       []func()
-	mu            sync.Mutex
-	closed        bool
-	running       bool
-	owners        sync.WaitGroup
-	once          sync.Once
-	catalogDigest [32]byte
+	// providerStats and credentialStats count the provider proofs' and the
+	// audit credential reads' own clients (ADR-173).
+	providerStats, credentialStats regionalAPIStats
+	Runtime                        *OwnerRuntime
+	Router                         *evidence.WorkerEnrollmentRouter
+	inputs                         *ownerInputs
+	trust                          *mtls.WorkerTrustCatalog
+	root                           context.Context
+	cancel                         context.CancelFunc
+	closers                        []func()
+	mu                             sync.Mutex
+	closed                         bool
+	running                        bool
+	owners                         sync.WaitGroup
+	once                           sync.Once
+	catalogDigest                  [32]byte
 	// public holds the ADR-180 public purpose pools, identity and context
 	// services; all nil without Public. shared is the native composition's
 	// retention topology and effect guards, reused by the public layer.
@@ -430,8 +431,9 @@ func (d *OwnerDeployment) Run(listener net.Listener, additional ...net.Listener)
 					readiness, readinessSpent := d.readinessStats.load()
 					identity, identitySpent := d.identityStats.load()
 					provider, providerSpent := d.providerStats.load()
-					fmt.Fprintf(os.Stderr, "owner observer %d calls %s, operation %d calls %s, readiness %d calls %s, identity %d calls %s, provider %d calls %s total\n", calls, spent.Round(10*time.Millisecond), operation, operationSpent.Round(10*time.Millisecond),
-						readiness, readinessSpent.Round(10*time.Millisecond), identity, identitySpent.Round(10*time.Millisecond), provider, providerSpent.Round(10*time.Millisecond))
+					credential, credentialSpent := d.credentialStats.load()
+					fmt.Fprintf(os.Stderr, "owner observer %d calls %s, operation %d calls %s, readiness %d calls %s, identity %d calls %s, provider %d calls %s, credentials %d calls %s total\n", calls, spent.Round(10*time.Millisecond), operation, operationSpent.Round(10*time.Millisecond),
+						readiness, readinessSpent.Round(10*time.Millisecond), identity, identitySpent.Round(10*time.Millisecond), provider, providerSpent.Round(10*time.Millisecond), credential, credentialSpent.Round(10*time.Millisecond))
 				}
 			}
 			if _, err := d.refreshWorkerTrust(d.root); err != nil {
