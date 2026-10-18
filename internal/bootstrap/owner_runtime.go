@@ -9,7 +9,6 @@ import (
 	"net"
 	"os"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -371,19 +370,10 @@ func (r *OwnerRuntime) Run(listener net.Listener, additional ...net.Listener) (r
 	}
 }
 
-// ownerRouterReporter logs one line per change of the server-name router's
-// events, naming the child as native or observation rather than by its DNS
-// name. Routes run concurrently, hence the lock.
+// ownerRouterReporter logs the server-name router's events, naming the child
+// as native or observation rather than by its DNS name.
 func ownerRouterReporter(native, observation string) func(string) {
-	var mu sync.Mutex
-	last := ""
-	return func(event string) {
-		event = strings.NewReplacer(" "+native, " native", " "+observation, " observation").Replace(event)
-		mu.Lock()
-		defer mu.Unlock()
-		if event != last {
-			last = event
-			fmt.Fprintln(os.Stderr, "owner router: "+event)
-		}
-	}
+	log := eventLog(os.Stderr, "owner router")
+	names := strings.NewReplacer(" "+native, " native", " "+observation, " observation")
+	return func(event string) { log(names.Replace(event)) }
 }

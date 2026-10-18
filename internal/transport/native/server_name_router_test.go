@@ -123,24 +123,42 @@ func TestServerNameRouterReportsSlowHandoff(t *testing.T) {
 			c.Close()
 		}
 	}()
-	time.Sleep(1200 * time.Millisecond)
+	next := func() string {
+		for {
+			select {
+			case e := <-reported:
+				if e != "started" {
+					return e
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("no event")
+			}
+		}
+	}
+	// Reported while the hand-off is still blocked, before any Accept.
+	if e := next(); e != "slow-handoff observation.synthetic.invalid" {
+		t.Fatal("event", e)
+	}
 	conn, err := router.Listener("observation.synthetic.invalid").Accept()
 	if err != nil {
 		t.Fatal(err)
 	}
 	conn.Close()
-	for {
-		select {
-		case e := <-reported:
-			if e == "started" {
-				continue
-			}
-			if e != "slow-handoff observation.synthetic.invalid" {
-				t.Fatal("event", e)
-			}
-		case <-time.After(2 * time.Second):
-			t.Fatal("slow hand-off not reported")
+	if e := next(); e != "late-handoff observation.synthetic.invalid" {
+		t.Fatal("event", e)
+	}
+	// A child that closes while a hand-off waits drops the connection.
+	go func() {
+		c, e := tls.Dial("tcp", raw.Addr().String(), &tls.Config{ServerName: "observation.synthetic.invalid", InsecureSkipVerify: true, MinVersion: tls.VersionTLS13})
+		if e == nil {
+			c.Close()
 		}
-		break
+	}()
+	if e := next(); e != "slow-handoff observation.synthetic.invalid" {
+		t.Fatal("event", e)
+	}
+	router.Listener("observation.synthetic.invalid").Close()
+	if e := next(); e != "dropped-handoff observation.synthetic.invalid" {
+		t.Fatal("event", e)
 	}
 }
