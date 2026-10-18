@@ -1,5 +1,26 @@
 # Sustained implementation progress
 
+## Installed native 46: owner authentication passes, hub refuses the opening (2026-10-18)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39162007897)
+on frozen `12c9473695c79f638db7a9ece2958c82ad9a7680` (native45 plus the exact
+federation owner-account read grant) again failed before capture: four preview
+requests returned unavailable after 3.30–3.36 seconds at target resolution.
+The native45 `owner-first (denied)` refusals no longer occur. Regional openings
+now fail later, at `headers`: four `denied` (the hub answered with its private
+404) and four `unavailable`, alongside setup, settings-guard, dial and TLS
+failures. The hub handler and ingress refuse silently, so the refusing check is
+not identified; they now report fixed stage names to the owner log for the next
+run. This does not establish the underlying cause.
+
+The [retained log](../test/results/installed-journey-ci-46/context-storage.log)
+records the continuation subtest failing after 963.46 seconds; passive-command
+and administrator-removal subcases passed. Capture, publication, native
+download, expiry/deletion and faulted cleanup were not reached. PR40/41 remain
+held. [Archive verification](../test/results/installed-journey-ci-46/verification.json)
+matched all 2,700 source hashes to the frozen commit; sources were unchanged,
+test exit was 1 and owned cleanup reported no failures.
+
 ## Installed native 45: first owner-authentication refusal (2026-10-18)
 
 The [diagnostic continuation](https://github.com/phihos/asservat/actions/runs/39157052161)
