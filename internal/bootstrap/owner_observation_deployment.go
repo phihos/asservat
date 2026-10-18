@@ -405,7 +405,16 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 	issuers := map[string]*kms.OwnerCertificateIssuer{}
 	if c.ProviderAuthentication != nil {
 		*phase = startupProviderEffects
-		parts.providers, err = kms.NewInstalledOwnerProviderEffects(root, c, files, identityReader, configs, current.Configuration)
+		// ADR-173: every provider login and renewal runs two full native proofs
+		// (before and after the OpenBao call) within the first proof's window. On
+		// the shared observer they overran it, and every refresh failed at
+		// final-proof. They get their own clients, guard and reader; the proof is
+		// unchanged.
+		providerReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.providerStats)
+		if err != nil {
+			return parts, errors.Join(mounts.ErrUnavailable, err)
+		}
+		parts.providers, err = kms.NewInstalledOwnerProviderEffects(root, c, files, providerReader, configs, current.Configuration)
 		if err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
@@ -521,4 +530,25 @@ func ownerReadinessProofs(in *ownerInputs, cluster string, control configuration
 		return nil, err
 	}
 	return kube.NewOwnerEnrollmentAttester(observer, configs, guard, mountedOwnerPodToken{in})
+}
+
+// ownerProviderProofReader is the provider effects' own identity reader, on
+// separate observer and probe clients with the same guard plan and pins.
+func ownerProviderProofReader(in *ownerInputs, c contracts.OwnerDeployment, control configuration.NamespaceRef, guard *kube.OwnerWorkloadProtection, activation contracts.OwnerIdentityActivation, podUID string, stats *regionalAPIStats) (*kube.InstalledOwnerIdentityReader, error) {
+	observerConfig, probeConfig := in.kubernetes("kube-observer.token"), in.kubernetes("kube-probe.token")
+	observerConfig.Wrap(stats.wrap)
+	probeConfig.Wrap(stats.wrap)
+	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, err
+	}
+	probe, err := kube.NewPermissionClient(probeConfig, c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, err
+	}
+	own, err := guard.WithClients(observer, probe)
+	if err != nil {
+		return nil, err
+	}
+	return kube.NewInstalledOwnerIdentityReader(observer, own, c, activation, mountedOwnerPodToken{in}, podUID)
 }
