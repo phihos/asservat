@@ -1,12 +1,16 @@
 package integration
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -95,4 +99,77 @@ func (i *installedIdentity) mcpToken() string {
 // content route: a download is bound to the client that prepared it.
 func (i *installedIdentity) downloadToken() string {
 	return i.kc.loginScope("mcp", installedDownloadsScope).Access
+}
+
+// installedJourneyTokenSource refreshes the real user's original OAuth session.
+// Decoding exp is only client scheduling: every request still receives the
+// server's full signature, current identity and authority checks. Refresh never
+// extends an evidence, download or server request deadline.
+type installedJourneyTokenSource struct {
+	mu               sync.Mutex
+	issuer, resource string
+	now              func() time.Time
+	login            func() kcTokens
+	refresh          func(string) kcTokens
+	tokens           kcTokens
+	subject          string
+	until            time.Time
+}
+
+func (i *installedIdentity) mcpTokenSource(origin string) *installedJourneyTokenSource {
+	return &installedJourneyTokenSource{issuer: i.Issuer, resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now,
+		login:   func() kcTokens { return i.kc.loginScope("mcp", installedMCPScope) },
+		refresh: func(token string) kcTokens { return i.kc.refresh("mcp", token, http.StatusOK) }}
+}
+
+func (s *installedJourneyTokenSource) Token(ctx context.Context) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	if s.tokens.Access != "" && s.now().Add(30*time.Second).Before(s.until) {
+		return s.tokens.Access, nil
+	}
+	var next kcTokens
+	if s.tokens.Access == "" {
+		next = s.login()
+	} else {
+		if s.tokens.Refresh == "" {
+			return "", errors.New("installed identity has no refresh credential")
+		}
+		next = s.refresh(s.tokens.Refresh)
+	}
+	parts := strings.Split(next.Access, ".")
+	if len(parts) != 3 {
+		return "", errors.New("installed identity token shape")
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	var claims struct {
+		Issuer   string          `json:"iss"`
+		Subject  string          `json:"sub"`
+		Client   string          `json:"azp"`
+		Audience json.RawMessage `json:"aud"`
+		Expires  int64           `json:"exp"`
+	}
+	if err != nil || json.Unmarshal(raw, &claims) != nil {
+		return "", errors.New("installed identity token claims")
+	}
+	var audiences []string
+	var single string
+	if json.Unmarshal(claims.Audience, &single) == nil {
+		audiences = []string{single}
+	} else {
+		_ = json.Unmarshal(claims.Audience, &audiences)
+	}
+	until := time.Unix(claims.Expires, 0)
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	if claims.Issuer != s.issuer || claims.Subject == "" || s.subject != "" && claims.Subject != s.subject || claims.Client != "mcp" ||
+		len(audiences) != 1 || audiences[0] != s.resource || !s.now().Add(30*time.Second).Before(until) || next.Refresh == "" {
+		return "", errors.New("installed identity refresh changed its principal/resource or returned expired credentials")
+	}
+	s.tokens, s.subject, s.until = next, claims.Subject, until
+	return next.Access, nil
 }

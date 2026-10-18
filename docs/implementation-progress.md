@@ -1,5 +1,56 @@
 # Sustained implementation progress
 
+## Installed investigation continuation (ADR-202–205, 2026-10-18)
+
+The installer now provisions the public listener, publisher and hub-local
+download workers under ADR-202–204. The installed two-cluster investigation
+remains under qualification: collection, publication, native download,
+revocation, expiry and deletion have not yet passed together. The journey test
+is being completed on its own branch; no S-02 acceptance follows from the
+component results below.
+
+Native journey runs 35 and 36 reached running owner, publisher and capacity
+processes, then failed a stale fixture check for the worker configuration
+source. [PR #39](https://github.com/phihos/asservat/pull/39) checks the actual
+download-worker namespace. Earlier installed failures exposed the download
+content auditor rejecting the installed audit lane
+([#37](https://github.com/phihos/asservat/pull/37)) and the owner startup proof
+rejecting an installer journal change
+([#38](https://github.com/phihos/asservat/pull/38)). Those fixes have merged.
+Purpose-specific Kubernetes clients also isolate owner readiness, provider
+refresh and audit credential reads; their original five-second bounds and
+20-QPS client limits remain unchanged.
+
+The subsequent [run 37](../test/results/installed-journey-ci-37/context-storage-environment.json)
+and [run 38](../test/results/installed-journey-ci-38/context-storage-environment.json)
+both failed before collection: the regional workload never reached `ready_at`.
+Both exercised `179c376f752285a035de1ac8e4d939beb32cb6bc`, exited 1 with
+unchanged source hashes and no cleanup failures. The retained logs show
+permission reconciliation stopping, hub-worker restarts and unsuccessful
+regional capacity composition; the root cause remains under investigation.
+Neither run reached the MCP capture/download/expiry checks.
+
+ADR-205's SQL purposes/due list and provider signing/delete-credential
+components merged in [#35](https://github.com/phihos/asservat/pull/35) and
+[#36](https://github.com/phihos/asservat/pull/36), after passing CI and current
+Gitar review. The exact SQL candidate `22c19dae9588618545b5baf2312cb6a64235dc99`
+passed [native run 39119394822](https://github.com/phihos/asservat/actions/runs/39119394822):
+`TestContextAdmissionWithRealServices` and its `native-api-runner` subtest,
+exit 0, unchanged sources and no cleanup failures. All 2,602 hashes in the
+[retained report](../test/results/adr205-context-sql-ci-2/context-storage-environment.json)
+match that candidate; the [test log](../test/results/adr205-context-sql-ci-2/context-storage.log)
+records the selected execution. This includes the regression keeping a purged
+attempt due while its audit/finalization is unfinished. It qualifies the
+component with fixture authority, not installed deletion scheduling.
+
+The saved deletion-child composition had omitted its settings handoff from
+the installed provider capacity path. That handoff is being repaired and
+qualified before the composition PR. The journey also needs fresh real-user
+tokens across its ten-minute evidence lifetime, request-owned preparation
+continuations rather than read-only status polling, and independent checks of
+object/version/upload absence, the exact retained audit ciphertext and the
+storage refund. None of these pending checks is recorded as a pass.
+
 ## Query ledger and catalog native qualification (ADR-206)
 
 [Native run 39136964591](https://github.com/phihos/asservat/actions/runs/39136964591)
