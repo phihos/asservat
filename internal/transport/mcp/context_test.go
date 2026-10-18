@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -287,5 +288,57 @@ func TestMCPFinalIdentityShorteningReachesSocket(t *testing.T) {
 				t.Fatalf("final identity shortening lost: got=%v want=%v", final, shorter)
 			}
 		})
+	}
+}
+
+type stoppedCall struct{ step string }
+
+func (e stoppedCall) Error() string     { return "stopped" }
+func (e stoppedCall) FixedStep() string { return e.step }
+
+// failingOperations keeps the real tool catalog and fails every call without a
+// delivery bound, as an audited call does when it stops.
+type failingOperations struct {
+	presentation.Operations
+	err error
+}
+
+func (f failingOperations) Call(context.Context, identities.CurrentIdentity, string, json.RawMessage) (presentation.OperationReply, error) {
+	return presentation.OperationReply{}, f.err
+}
+
+// A failed operation call answers 503 and reports the tool and where it
+// stopped, not "final-identity-expired" (installed journey runs
+// 39091358067/39091361821).
+func TestMCPReportsAFailedOperationCall(t *testing.T) {
+	f := &mcpCaptureFixture{}
+	var h *Handler
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { h.ServeHTTP(w, r) }))
+	defer server.Close()
+	ops, err := presentation.NewContextOperations(presentation.ContextOperationsConfig{PublicOrigin: server.URL, Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000099" }}, f, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct {
+		err  error
+		want string
+	}{{stoppedCall{"audit-finish"}, "operation-failed preview_capture audit-finish"}, {errors.New("other"), "operation-failed preview_capture unavailable"}} {
+		h, err = NewContextHandler(Config{PublicOrigin: server.URL, Issuer: "https://id.example.invalid/realm", Version: "test", MaxConcurrent: 4, MaxPerIdentity: 2}, resolverFunc(func(context.Context, string) (identity.Identity, error) {
+			i := testIdentity()
+			i.VerifiedAt = time.Now()
+			i.ValidUntil = time.Now().Add(20 * time.Second)
+			return i, nil
+		}), failingOperations{ops, c.err})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var reasons []string
+		h.Report = func(reason string) { reasons = append(reasons, reason) }
+		response, _ := send(t, server, rpcRequest(t, server, "2025-11-25", "tools/call", map[string]any{"name": "preview_capture", "arguments": map[string]any{
+			"target_ref": map[string]string{"cluster_id": "00000000-0000-4000-8000-000000000001", "namespace": "payments", "kind": "Deployment", "name": "api"},
+			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": 3600}}))
+		if response.StatusCode != 503 || len(reasons) != 1 || reasons[0] != c.want {
+			t.Fatalf("%d %q, want %q", response.StatusCode, reasons, c.want)
+		}
 	}
 }

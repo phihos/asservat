@@ -36,6 +36,9 @@ import (
 // process cannot initialize them, accept profiles or clear RecoveryBlocked.
 type OwnerDeployment struct {
 	observerStats, operationStats regionalAPIStats
+	// readinessStats and identityStats count the readiness loop's and the
+	// identity readers' own clients (ADR-173), reported beside the observer.
+	readinessStats, identityStats regionalAPIStats
 	Runtime                       *OwnerRuntime
 	Router                        *evidence.WorkerEnrollmentRouter
 	inputs                        *ownerInputs
@@ -222,7 +225,16 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 	if c.Public != nil {
 		var closers []func()
 		phase = startupPublicIdentity
-		d.publicID, closers, err = newPublicIdentity(startup, in, d.publicFiles, d.providers, observer, d.public)
+		// ADR-173: identity and browser settings reads (three calls per
+		// identity resolution, about 39 per capture preview) get their own
+		// client rather than queuing behind the owner's other observers.
+		identityConfig := in.kubernetes("kube-observer.token")
+		identityConfig.Wrap(d.identityStats.wrap)
+		identityObserver, e := kube.NewPermissionClient(identityConfig, c.ClusterID, configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}, time.Now)
+		if e != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		d.publicID, closers, err = newPublicIdentity(startup, in, d.publicFiles, d.providers, identityObserver, d.public)
 		d.closers = append(d.closers, closers...)
 		if err != nil {
 			return nil, mounts.ErrUnavailable
@@ -261,7 +273,11 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		}
 	}
 	phase = startupOwnerRuntime
-	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, Routes: routes, Protection: guard, Requests: func(b value.OwnerBinding) (evidence.WorkerOwnerEnrollment, error) {
+	var readinessProofs app.OwnerEnrollmentProofReader
+	if parts.readinessProofs != nil {
+		readinessProofs = parts.readinessProofs
+	}
+	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, ReadinessProofs: readinessProofs, Routes: routes, Protection: guard, Requests: func(b value.OwnerBinding) (evidence.WorkerOwnerEnrollment, error) {
 		return &evidence.WorkerRequestOwners{Router: d.Router, PodUID: b.PodUID, ProcessEpoch: b.ProcessEpoch}, nil
 	}, WorkerTrust: d.trust, Workers: reader, Locators: reader, Connections: c.Connections, Concurrency: c.Concurrency, Native: nativeConfig, Observation: observation, Operation: operation})
 	if err != nil || startup.Err() != nil {
@@ -408,7 +424,10 @@ func (d *OwnerDeployment) Run(listener net.Listener, additional ...net.Listener)
 			if ticks%30 == 0 {
 				if calls, spent := d.observerStats.load(); calls > 0 {
 					operation, operationSpent := d.operationStats.load()
-					fmt.Fprintf(os.Stderr, "owner observer %d calls %s, operation %d calls %s total\n", calls, spent.Round(10*time.Millisecond), operation, operationSpent.Round(10*time.Millisecond))
+					readiness, readinessSpent := d.readinessStats.load()
+					identity, identitySpent := d.identityStats.load()
+					fmt.Fprintf(os.Stderr, "owner observer %d calls %s, operation %d calls %s, readiness %d calls %s, identity %d calls %s total\n", calls, spent.Round(10*time.Millisecond), operation, operationSpent.Round(10*time.Millisecond),
+						readiness, readinessSpent.Round(10*time.Millisecond), identity, identitySpent.Round(10*time.Millisecond))
 				}
 			}
 			if _, err := d.refreshWorkerTrust(d.root); err != nil {

@@ -118,6 +118,22 @@ type operationDeadline struct {
 	mu      sync.Mutex
 	until   time.Time
 	invalid bool
+	// failure names a failed operation call for the 503 report: the tool
+	// name and a closed class, never request content.
+	failure string
+}
+
+func (d *operationDeadline) fail(reason string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.failure == "" {
+		d.failure = reason
+	}
+}
+func (d *operationDeadline) failed() string {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.failure
 }
 
 func (d *operationDeadline) restrict(until time.Time) bool {
@@ -199,6 +215,14 @@ func registerContextTools(server *sdk.Server, operations presentation.Operations
 			}
 			reply, err := operations.Call(ctx, current, name, request.Params.Arguments)
 			if err != nil {
+				class := "unavailable"
+				var stop interface{ FixedStep() string }
+				if errors.As(err, &stop) {
+					class = stop.FixedStep()
+				} else if errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+					class = "deadline"
+				}
+				delivery.fail(name + " " + class)
 				if reply.ValidUntil.IsZero() {
 					if a, exists := ctx.Value(operationAttemptKey{}).(*operationAttempt); exists {
 						a.security.Add(presentation.IngressAuditUnavailable)
@@ -524,6 +548,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	finalIdentity, err := current.ResolveIdentity(ctx)
 	if err != nil {
 		h.authFailure(w, err, "final-identity")
+		return
+	}
+	if failure := delivery.failed(); failure != "" {
+		// A failed call leaves no delivery deadline; report it as what it is.
+		h.unavailable(w, "operation-failed "+failure)
 		return
 	}
 	if !delivery.restrict(finalIdentity.ValidUntil) {

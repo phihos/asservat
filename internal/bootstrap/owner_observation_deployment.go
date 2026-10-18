@@ -199,6 +199,9 @@ type ownerIdentityParts struct {
 	roots           *x509.CertPool
 	ledgers         map[string]*postgres.OwnerEnrollments
 	proofs          *kube.OwnerEnrollmentAttester
+	// readinessProofs is the readiness loop's own attester (ADR-173); nil
+	// on the legacy static layout, which uses proofs.
+	readinessProofs *kube.OwnerEnrollmentAttester
 	endpoints       *kube.OwnerEndpoints
 	routes          *app.OwnerRoutes
 	services        map[string]*app.OwnerEnrollmentCoordinator
@@ -262,7 +265,9 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
 	*phase = startupWorkloadGuard
-	guard, err := kube.NewOwnerWorkloadProtection(observer, probe, configuration.OwnerWorkloadAdministration{Name: g.Name, Deployment: activation.Input.Deployment.Name, DeploymentUID: activation.Input.Deployment.UID, ControlNamespace: control, Administrators: actors, ConfigurationProbes: configurationProbes, SchedulingLeases: schedulingLeases, InitialHistoryProbe: initialHistory, APIContextStarts: starts, CapacityProbe: capacityProbe}, kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
+	administration := configuration.OwnerWorkloadAdministration{Name: g.Name, Deployment: activation.Input.Deployment.Name, DeploymentUID: activation.Input.Deployment.UID, ControlNamespace: control, Administrators: actors, ConfigurationProbes: configurationProbes, SchedulingLeases: schedulingLeases, InitialHistoryProbe: initialHistory, APIContextStarts: starts, CapacityProbe: capacityProbe}
+	pin := kube.GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion}
+	guard, err := kube.NewOwnerWorkloadProtection(observer, probe, administration, pin)
 	if err != nil {
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
@@ -382,6 +387,14 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 	if err != nil {
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
+	// ADR-173: the readiness loop proves enrollment back to back (about 52
+	// observer and 12 probe calls a check) and alone held the shared observer
+	// at its 20 QPS limit, so request paths queued behind it and overran their
+	// five seconds. It gets its own clients, guard and attester; the proofs
+	// are unchanged.
+	if parts.readinessProofs, err = ownerReadinessProofs(in, c.ClusterID, control, administration, pin, configs, &d.readinessStats); err != nil {
+		return parts, errors.Join(mounts.ErrUnavailable, err)
+	}
 	*phase = startupEndpoints
 	endpoints, err := kube.NewOwnerEndpoints(observer, pool)
 	if err != nil {
@@ -487,4 +500,25 @@ func readPublicProjectionFiles(ctx context.Context, root *os.Root) (map[string][
 		out[name] = b
 	}
 	return out, nil
+}
+
+// ownerReadinessProofs builds the readiness loop's enrollment attester on its
+// own observer and probe clients, with the same guard administration and pin.
+func ownerReadinessProofs(in *ownerInputs, cluster string, control configuration.NamespaceRef, administration configuration.OwnerWorkloadAdministration, pin kube.GuardPin, configs *postgres.OwnerConfigurations, stats *regionalAPIStats) (*kube.OwnerEnrollmentAttester, error) {
+	observerConfig, probeConfig := in.kubernetes("kube-observer.token"), in.kubernetes("kube-probe.token")
+	observerConfig.Wrap(stats.wrap)
+	probeConfig.Wrap(stats.wrap)
+	observer, err := kube.NewPermissionClient(observerConfig, cluster, control, time.Now)
+	if err != nil {
+		return nil, err
+	}
+	probe, err := kube.NewPermissionClient(probeConfig, cluster, control, time.Now)
+	if err != nil {
+		return nil, err
+	}
+	guard, err := kube.NewOwnerWorkloadProtection(observer, probe, administration, pin)
+	if err != nil {
+		return nil, err
+	}
+	return kube.NewOwnerEnrollmentAttester(observer, configs, guard, mountedOwnerPodToken{in})
 }
