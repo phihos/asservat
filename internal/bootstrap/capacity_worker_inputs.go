@@ -74,31 +74,87 @@ func capacityRuntimeQualification(raw []byte) (app.CapacityQualification, error)
 	return out, nil
 }
 
+func downloadPathRevision(v contracts.DownloadEnvironmentRevision) (identity.Revision, error) {
+	out := identity.Revision{UID: v.UID, Generation: v.Generation}
+	b, err := hex.DecodeString(v.SHA256)
+	if err != nil || len(b) != len(out.Digest) || hex.EncodeToString(b) != v.SHA256 {
+		return out, mounts.ErrUnavailable
+	}
+	copy(out.Digest[:], b)
+	if !out.Valid() {
+		return out, mounts.ErrUnavailable
+	}
+	return out, nil
+}
+
+// downloadPathTemplate checks every field a derived path takes from the
+// template (ADR-204 decision 4). The hub is the acquisition, connector and
+// hub cluster (decision 3), so those three regions are one.
+func downloadPathTemplate(t contracts.DownloadEnvironmentPathTemplate, hub string) bool {
+	_, worker := downloadPathRevision(t.WorkerConfiguration)
+	_, configuration := downloadPathRevision(t.HubConfiguration)
+	return worker == nil && configuration == nil && authorization.UUID(t.WorkerConfiguration.UID) && authorization.UUID(t.HubConfiguration.UID) &&
+		authorization.UUID(hub) && authorization.UUID(t.StoreID) && t.AcquisitionClusterID == hub && t.ConnectorClusterID == hub && t.HubClusterID == hub &&
+		identity.Text(t.StorageRegion, 63) && identity.Text(t.HubRegion, 63) && t.AcquisitionRegion == t.HubRegion && t.ConnectorRegion == t.HubRegion
+}
+
+// downloadEnvironmentPaths are the pinned paths plus, with a template, one
+// path derived for each target cluster (ADR-204 decision 4). The hub-api
+// passes its guarded catalog's clusters and the capacity hub-worker its
+// regional qualifications, so both derive the same paths. An invalid
+// template, a repeated target or a repeated path ID refuses; without a
+// template the targets are not used.
+func downloadEnvironmentPaths(installation, hub string, pinned []contracts.DownloadEnvironmentPath, template *contracts.DownloadEnvironmentPathTemplate, targets []string) ([]privacy.DownloadPath, error) {
+	if template == nil || pinned == nil {
+		return capacityRuntimeProcessingPaths(pinned)
+	}
+	if !authorization.UUID(installation) || !downloadPathTemplate(*template, hub) || len(targets) > 32 {
+		return nil, mounts.ErrUnavailable
+	}
+	all := slices.Clone(pinned)
+	seen := map[string]bool{}
+	for _, target := range targets {
+		if !authorization.UUID(target) || seen[target] {
+			return nil, mounts.ErrUnavailable
+		}
+		seen[target] = true
+		all = append(all, contracts.DownloadPathFor(installation, *template, target))
+	}
+	return capacityRuntimeProcessingPaths(all)
+}
+
+// catalogTargets are the hub-api's derived path targets: the clusters of the
+// guarded catalog read at start.
+func catalogTargets(c contracts.OwnerClusterCatalog) []string {
+	out := make([]string, len(c.Clusters))
+	for i, v := range c.Clusters {
+		out[i] = v.ClusterID
+	}
+	return out
+}
+
+// regionalTargets are the capacity hub-worker's: its regional qualifications.
+func regionalTargets(r []app.CapacityNamespaceQualification) []string {
+	out := make([]string, len(r))
+	for i, v := range r {
+		out[i] = v.ClusterID
+	}
+	return out
+}
+
 func capacityRuntimeProcessingPaths(in []contracts.DownloadEnvironmentPath) ([]privacy.DownloadPath, error) {
 	// ADR-192: an empty set is valid; pinned paths only narrow a source.
 	if in == nil || len(in) > 32 {
 		return nil, mounts.ErrUnavailable
 	}
-	revision := func(v contracts.DownloadEnvironmentRevision) (identity.Revision, error) {
-		out := identity.Revision{UID: v.UID, Generation: v.Generation}
-		b, err := hex.DecodeString(v.SHA256)
-		if err != nil || len(b) != len(out.Digest) || hex.EncodeToString(b) != v.SHA256 {
-			return out, mounts.ErrUnavailable
-		}
-		copy(out.Digest[:], b)
-		if !out.Valid() {
-			return out, mounts.ErrUnavailable
-		}
-		return out, nil
-	}
 	seen := map[string]bool{}
 	out := make([]privacy.DownloadPath, 0, len(in))
 	for _, v := range in {
-		worker, err := revision(v.WorkerConfiguration)
+		worker, err := downloadPathRevision(v.WorkerConfiguration)
 		if err != nil {
 			return nil, err
 		}
-		hub, err := revision(v.HubConfiguration)
+		hub, err := downloadPathRevision(v.HubConfiguration)
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +218,8 @@ func readCapacityWorkerInputs(ctx context.Context, files *os.Root) (contracts.Ca
 		c.Processing.Guard.Name == control.Guard.Name {
 		return fail()
 	}
-	if _, err = capacityRuntimeProcessingPaths(c.Processing.Paths); err != nil {
+	// The regional targets are read at start; the template is checked here.
+	if _, err = downloadEnvironmentPaths(c.InstallationID, control.ClusterID, c.Processing.Paths, c.Processing.PathTemplate, nil); err != nil {
 		return fail()
 	}
 	p := c.Postgres

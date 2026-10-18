@@ -43,7 +43,7 @@ type publicDownloads struct {
 	gate        authapp.ContextDownloadAuthority
 }
 
-func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe *kube.PermissionClient, a publicAuditStore, closers *[]func()) (*publicDownloads, error) {
+func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe *kube.PermissionClient, catalog publicCatalog, a publicAuditStore, closers *[]func()) (*publicDownloads, error) {
 	in, pc := d.inputs, d.publicContext
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
@@ -67,7 +67,9 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	paths, err := capacityRuntimeProcessingPaths(p.DownloadEnvironment.Paths)
+	// ADR-204 decision 4: one derived path per cluster in the guarded catalog
+	// read at start; a catalog change restarts the process (ADR-196).
+	paths, err := downloadEnvironmentPaths(installation, c.ClusterID, p.DownloadEnvironment.Paths, p.DownloadEnvironment.PathTemplate, catalogTargets(catalog.catalog))
 	if err != nil {
 		return nil, err
 	}
