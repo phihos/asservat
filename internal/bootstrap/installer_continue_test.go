@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +21,15 @@ func TestInstallerContinuationStopIsFixed(t *testing.T) {
 	nested := &InstallerContinuationStop{Step: "worker/roles-provision", Err: &postgres.ProvisionStop{Step: "authenticate:configuration-source", Err: cfg.ErrUnavailable}}
 	if nested.Error() != "installer continuation stopped at worker/roles-provision/authenticate:configuration-source (unavailable)" {
 		t.Fatal(nested.Error())
+	}
+}
+
+func TestInstallerContinuationBudgetStopNamesSafeCounts(t *testing.T) {
+	plan, _ := contracts.InstalledSQLConnectionPlan(1)
+	_, err := plan.Validate(0, contracts.SQLServerCapacity{MaxConnections: 48, SuperuserReserved: 3})
+	stop := &InstallerContinuationStop{Step: "open/sql-budget", Err: errors.Join(err, errors.New("secret SQL detail"))}
+	if !strings.Contains(stop.Error(), "requires 107 connections, 45 configured") || strings.Contains(stop.Error(), "secret") || !errors.Is(stop, contracts.ErrSQLConnectionBudget) {
+		t.Fatal(stop.Error())
 	}
 }
 

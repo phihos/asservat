@@ -27,6 +27,14 @@ provider credentials never reach a runtime.
 
 ## Decision
 
+The promoted continuation now checks the compiled one-hub SQL connection plan
+after verifying the original activation and SQL bridge, before creating runtime
+resources or roles. The read uses the same five-second bridge transaction and
+subtracts the server's superuser and other reserved slots. Insufficient capacity
+returns fixed required/configured counts and an operator remedy. It does not
+change the server, role grants or any pool/governor cap. The observation-only
+continuation does not select the complete promoted graph.
+
 1. **An in-cluster continuation Pod.** `asservat installer-continue` runs as a
    fixed-name Restricted Pod under the chart's bootstrap runner ServiceAccount.
    That account is the only Kubernetes administrator the installed guards

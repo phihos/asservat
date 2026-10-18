@@ -632,11 +632,13 @@ configured counts and supported remedies, and never raise limits. With the
 purposes composed at that time, one hub process plus the hub worker needed 53
 ordinary connections (63 with ADR-170's federation compartment). The worst case
 of four retained hub processes needed 149 (now 159; 161 with ADR-172's owner-read role),
-which PostgreSQL's default 97 ordinary slots cannot hold. This is unit-tested
-only and **not wired** into installation: the SQL role producer does not yet
-receive the Deployment shape or a declared allocation, and a hard check there
-would reject every existing installer fixture. It belongs in the installed
-provisioning path together with those inputs.
+which PostgreSQL's default 97 ordinary slots cannot hold. That checkpoint was
+unit-tested only. The [installed SQL budget correction](research/installed-sql-budget.md)
+now wires the compiled one-hub plan into the promoted continuation before
+runtime resource creation, against actual non-reserved server capacity. The
+ADR-205 graph requires 107 ordinary slots. Only its installed fixture derives
+110 total slots from that same plan; ordinary component fixtures remain at 48.
+Native installed qualification of this correction remains pending.
 
 ## Regional investigation journey passes end to end (native36/37)
 
