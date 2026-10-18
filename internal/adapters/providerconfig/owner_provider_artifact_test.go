@@ -16,7 +16,7 @@ import (
 func TestOwnerProviderArtifactDescribesExactExistingEffectsWithoutIssuing(t *testing.T) {
 	f := newSetupFixture(t)
 	f.in.ConfigurationUID = "10000000-0000-4000-8000-000000001490"
-	b, err := OwnerProviderSetupArtifact(f.in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil)
+	b, err := OwnerProviderSetupArtifact(f.in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestOwnerProviderArtifactDescribesExactExistingEffectsWithoutIssuing(t *tes
 		}
 	}
 	f.in.ConfigurationUID = ""
-	if _, err = OwnerProviderSetupArtifact(f.in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil); err == nil {
+	if _, err = OwnerProviderSetupArtifact(f.in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil, nil); err == nil {
 		t.Fatal("artifact invented an unacknowledged future source identity")
 	}
 	if strings.Contains(string(b), "synthetic-inspection-only") {
@@ -92,7 +92,7 @@ func TestOwnerProviderArtifactCarriesFederationSetup(t *testing.T) {
 		t.Fatal(err)
 	}
 	fed.ProviderAuthentication = &recipe.Profile
-	b, err := OwnerProviderSetupArtifact(f.in, f.profile, f.pool, f.roots, time.Now(), &fed, nil, nil)
+	b, err := OwnerProviderSetupArtifact(f.in, f.profile, f.pool, f.roots, time.Now(), &fed, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestOwnerProviderArtifactCarriesFederationSetup(t *testing.T) {
 	}
 	other := fed
 	other.PermissionRootID = "10000000-0000-4000-8000-000000001499"
-	if _, err = OwnerProviderSetupArtifact(f.in, f.profile, f.pool, f.roots, time.Now(), &other, nil, nil); err == nil {
+	if _, err = OwnerProviderSetupArtifact(f.in, f.profile, f.pool, f.roots, time.Now(), &other, nil, nil, nil); err == nil {
 		t.Fatal("federation for another root accepted")
 	}
 }
@@ -142,7 +142,7 @@ func TestOwnerProviderArtifactCarriesFleetChannel(t *testing.T) {
 	f.in.ConfigurationUID = "10000000-0000-4000-8000-000000001494"
 	in := f.in
 	in.Public = &contracts.OwnerPublicDeployment{Fleet: &contracts.OwnerFleetIssuance{ChannelMount: "fleet-kv", DeliveryProfile: "regional-installer"}}
-	if _, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil); err == nil {
+	if _, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil, nil); err == nil {
 		t.Fatal("unpinned fleet recipe accepted")
 	}
 	role, digest, err := OwnerFleetProviderRecipeFor(in, f.profile, time.Now())
@@ -150,7 +150,7 @@ func TestOwnerProviderArtifactCarriesFleetChannel(t *testing.T) {
 		t.Fatal(err)
 	}
 	in.Public.Fleet.ProviderRecipeSHA256 = digest
-	b, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil)
+	b, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +183,7 @@ func TestOwnerProviderArtifactCarriesPromotedPublic(t *testing.T) {
 	in := f.in
 	in.Public = &contracts.OwnerPublicDeployment{SessionTransit: contracts.OwnerPublicTransit{Mount: "public-transit", Key: "sessions"}, WorkSigning: contracts.OwnerPublicSigning{Mount: "public-transit", Name: "work"},
 		WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: "worker-pki", Role: "worker", IssuerEpoch: "10000000-0000-4000-8000-000000001496"}}
-	b, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil)
+	b, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -215,7 +215,7 @@ func TestOwnerProviderArtifactCarriesPromotedPublic(t *testing.T) {
 		}
 	}
 	in.Public.WorkerPKI.Mount = in.KeyService.PKIMount
-	if _, err = OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil); err == nil {
+	if _, err = OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, time.Now(), nil, nil, nil, nil); err == nil {
 		t.Fatal("worker PKI on the owner PKI mount accepted")
 	}
 }
@@ -231,11 +231,11 @@ func TestOwnerProviderArtifactNamesDownloadEvidenceCredential(t *testing.T) {
 		WorkerPKI: contracts.OwnerPublicWorkerPKI{Mount: "worker-pki", Role: "worker", IssuerEpoch: "10000000-0000-4000-8000-000000001496"}}
 	store := &contracts.InstallerEvidenceStore{Endpoint: "https://store.synthetic.invalid", Region: "synthetic-region", Bucket: "evidence"}
 	now := time.Now()
-	base, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, now, nil, nil, nil)
+	base, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, now, nil, nil, nil, nil)
 	if err != nil || bytes.Contains(base, []byte("downloadEvidenceReadStorage")) {
 		t.Fatal("artifact without downloads changed", err)
 	}
-	b, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, now, nil, nil, store)
+	b, err := OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, now, nil, nil, store, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -251,7 +251,7 @@ func TestOwnerProviderArtifactNamesDownloadEvidenceCredential(t *testing.T) {
 		t.Fatal("download evidence credential", string(b))
 	}
 	in.Public = nil
-	if _, err = OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, now, nil, nil, store); err == nil {
+	if _, err = OwnerProviderSetupArtifact(in, f.profile, f.pool, f.roots, now, nil, nil, store, nil); err == nil {
 		t.Fatal("download credential without a promoted owner accepted")
 	}
 }
