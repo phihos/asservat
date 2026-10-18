@@ -30,6 +30,10 @@ type CapacityDeployment struct {
 	Clusters         []CapacityClusterDeployment  `json:"clusters"`
 	Processing       CapacityProcessingDeployment `json:"processing"`
 	Qualification    json.RawMessage              `json:"qualification"`
+	// ContextDeletion pins the evidence store and deletion signing key of
+	// the hub-worker's context deletion child (ADR-205), whose logins ride in
+	// the permission projection. Absent without deletion.
+	ContextDeletion *ContextDeletionDeployment `json:"contextDeletion,omitempty"`
 }
 
 type CapacityControlDeployment struct {

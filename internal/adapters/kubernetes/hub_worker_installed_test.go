@@ -3,11 +3,13 @@ package kubernetes
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"asservat.local/asservat/internal/contracts"
 	apps "k8s.io/api/apps/v1"
+	core "k8s.io/api/core/v1"
 )
 
 // This is synthetic original provenance, not a journal migration or API proof.
@@ -36,10 +38,14 @@ func TestInstalledWorkerOriginalTemplateSeparatesPendingProjections(t *testing.T
 		t.Fatal("builder launched worker")
 	}
 	sources := d.Spec.Template.Spec.Volumes[0].Projected.Sources
-	if len(sources) != 10 {
+	if len(sources) != 11 {
 		t.Fatalf("fixed projection count %d", len(sources))
 	}
-	token := sources[9].ServiceAccountToken
+	// ADR-205: the evidence delete Secret is optional, like the projections.
+	if deletion := sources[9].Secret; deletion == nil || deletion.Name != contracts.EvidenceDeleteCredentialName(s.initial.InstallationID) || deletion.Optional == nil || !*deletion.Optional || len(deletion.Items) != 1 {
+		t.Fatal("evidence delete credential projection", sources[9])
+	}
+	token := sources[10].ServiceAccountToken
 	if token == nil || token.Path != contracts.HubWorkerClusterObservationTokenFile || token.Audience != "https://asservat."+s.initial.InstallationID+"/cluster-observation" || token.ExpirationSeconds == nil || *token.ExpirationSeconds != 600 || len(d.Spec.Template.Spec.Containers[0].Env) != 1 || d.Spec.Template.Spec.Containers[0].Env[0].Name != contracts.OwnerPodUIDEnvironment || d.Spec.Template.Spec.Containers[0].Env[0].ValueFrom == nil || d.Spec.Template.Spec.Containers[0].Env[0].ValueFrom.FieldRef == nil || d.Spec.Template.Spec.Containers[0].Env[0].ValueFrom.FieldRef.FieldPath != "metadata.uid" {
 		t.Fatal("local observation projection changed audience or native Pod provenance")
 	}
@@ -68,6 +74,32 @@ func TestInstalledWorkerOriginalTemplateSeparatesPendingProjections(t *testing.T
 	oldBytes, _ := json.Marshal(old)
 	if strings.Contains(string(oldBytes), "workerLayout") {
 		t.Fatal("legacy omission changed")
+	}
+}
+
+func TestInstalledWorkerRejectsPreDeletionTemplateDigest(t *testing.T) {
+	s, v := installedWorkerResourceFixture(t)
+	if !s.valid(v) {
+		t.Fatal("current installed journal fixture is invalid")
+	}
+	obj, err := s.object(v, 11)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := obj.object.(*apps.Deployment).DeepCopy()
+	volume := old.Spec.Template.Spec.Volumes[0].Projected
+	volume.Sources = slices.DeleteFunc(volume.Sources, func(source core.VolumeProjection) bool {
+		return source.Secret != nil && source.Secret.Name == contracts.EvidenceDeleteCredentialName(s.initial.InstallationID)
+	})
+	for i := range volume.Sources {
+		if secret := volume.Sources[i].Secret; secret != nil && secret.Name == contracts.PermissionRuntimeProjectionName(s.initial.InstallationID) {
+			secret.Items = slices.DeleteFunc(secret.Items, func(item core.KeyToPath) bool { return strings.HasPrefix(item.Key, "sql-context-cleanup") })
+		}
+	}
+	before := v.Objects[11].TemplateDigest
+	v.Objects[11].TemplateDigest = preparationDigest(old)
+	if v.Objects[11].TemplateDigest == before || s.valid(v) {
+		t.Fatal("older installed template rebound to the current layout")
 	}
 }
 

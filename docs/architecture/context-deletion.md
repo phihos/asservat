@@ -98,9 +98,19 @@ No deletion or refund of full/replay control slots occurs. The encrypted deletio
 audit remains subject to the pending explicit control-object capacity/retention
 composition; its bounded size is not an installation-wide quota guarantee.
 
-Production scheduling, protected credentials/key sources, automatic deadline
-polling, unknown remote-write drain, other capture mechanisms, extra replicas,
-backup/WAL obligations and finite audit/tombstone retirement are not supplied by
+The installed composition in [ADR-205](../decisions/205-installed-context-deletion.md)
+adds a Lease-owned deletion child, separate SQL cleanup/audit/finalize logins,
+an evidence-delete credential and a remote Transit signer. Its optional pins
+arrive with the protected capacity projection, after both installed layouts
+complete their final current projection check. The handoff binds the original
+installation/root and exactly one qualified evidence store; it rejects changed
+pins, expired startup proof and cancellation after a blocking lock. These
+immutable configuration pins do not replace current SQL recovery and deletion
+checks. Failed cleaner preparation closes its partial resources before another
+sweep. Installed expiry-to-deletion qualification remains pending.
+
+Unknown remote-write drain, other capture mechanisms, extra replicas,
+backup/WAL obligations and finite audit/tombstone retirement remain outside
 this component. The older generic `WriterBarrier` remains necessary for writers
 outside the positively completed API protocol. This change cannot authorize
 Helm runtime enablement or claim complete managed-copy erasure.

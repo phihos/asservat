@@ -119,6 +119,10 @@ func (d *CapacityHubWorkerDeployment) openProviderCapacity(ctx context.Context) 
 		child.Close()
 		return nil, nil, &fixedStepError{"finish", errors.Join(mounts.ErrUnavailable, err)}
 	}
+	if err = d.acceptContextDeletion(ctx, child.input, child.reconciler.Work.Qualification, op.FreshUntil()); err != nil {
+		child.Close()
+		return nil, nil, &fixedStepError{"context-deletion", err}
+	}
 	complete = true
 	return child, files, nil
 }
