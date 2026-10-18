@@ -222,7 +222,14 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 	if c.Public != nil {
 		var closers []func()
 		phase = startupPublicIdentity
-		d.publicID, closers, err = newPublicIdentity(startup, in, d.publicFiles, d.providers, observer, d.public)
+		// ADR-173: identity and browser settings reads (three calls per
+		// identity resolution, about 39 per capture preview) get their own
+		// client rather than queuing behind the owner's other observers.
+		identityObserver, e := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), c.ClusterID, configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}, time.Now)
+		if e != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		d.publicID, closers, err = newPublicIdentity(startup, in, d.publicFiles, d.providers, identityObserver, d.public)
 		d.closers = append(d.closers, closers...)
 		if err != nil {
 			return nil, mounts.ErrUnavailable
@@ -261,7 +268,11 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		}
 	}
 	phase = startupOwnerRuntime
-	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, Routes: routes, Protection: guard, Requests: func(b value.OwnerBinding) (evidence.WorkerOwnerEnrollment, error) {
+	var readinessProofs app.OwnerEnrollmentProofReader
+	if parts.readinessProofs != nil {
+		readinessProofs = parts.readinessProofs
+	}
+	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, ReadinessProofs: readinessProofs, Routes: routes, Protection: guard, Requests: func(b value.OwnerBinding) (evidence.WorkerOwnerEnrollment, error) {
 		return &evidence.WorkerRequestOwners{Router: d.Router, PodUID: b.PodUID, ProcessEpoch: b.ProcessEpoch}, nil
 	}, WorkerTrust: d.trust, Workers: reader, Locators: reader, Connections: c.Connections, Concurrency: c.Concurrency, Native: nativeConfig, Observation: observation, Operation: operation})
 	if err != nil || startup.Err() != nil {

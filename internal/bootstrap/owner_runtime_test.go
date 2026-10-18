@@ -21,6 +21,7 @@ import (
 
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/application/evidence"
+	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	authorization "asservat.local/asservat/internal/domain/authorization"
@@ -391,4 +392,37 @@ func TestOwnerRuntimeStopsDuringEnrollmentAndListenerFailure(t *testing.T) {
 			}
 		})
 	}
+}
+
+type countingOwnerProofs struct {
+	inner app.OwnerEnrollmentProofReader
+	calls atomic.Int64
+}
+
+func (c *countingOwnerProofs) ReadOwnerEnrollmentProof(ctx context.Context, r value.OwnerEnrollmentRequest) (value.OwnerEnrollmentProof, error) {
+	c.calls.Add(1)
+	return c.inner.ReadOwnerEnrollmentProof(ctx, r)
+}
+
+// ADR-173: readiness reads its proofs through its own reader (and Kubernetes
+// clients) when one is configured, not through the shared Proofs.
+func TestOwnerRuntimeReadinessUsesItsOwnProofs(t *testing.T) {
+	f, c, listener := newRuntimeFixture(t)
+	own := &countingOwnerProofs{inner: f}
+	c.ReadinessProofs = own
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	r, err := NewOwnerRuntime(ctx, c)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	done := make(chan error, 1)
+	go func() { done <- r.Run(listener) }()
+	waitOwnerState(t, r.Ready)
+	if own.calls.Load() == 0 {
+		t.Fatal("readiness did not use its own proofs")
+	}
+	cancel()
+	<-done
 }

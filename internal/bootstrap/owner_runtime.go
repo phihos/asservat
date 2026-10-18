@@ -32,14 +32,17 @@ type OwnerRuntimeConfig struct {
 	ServerEnrollment, ClientEnrollment app.OwnerCredentialEnrollment
 	Registry                           app.OwnerCertificateRegistry
 	Proofs                             app.OwnerEnrollmentProofReader
-	Routes                             app.OwnerRouteReader
-	Protection                         app.OwnerProtectionReader
-	Requests                           func(value.OwnerBinding) (evidence.WorkerOwnerEnrollment, error)
-	WorkerTrust                        *mtls.WorkerTrustCatalog
-	Workers                            evidence.WorkerEnrollmentBindings
-	Locators                           evidence.WorkerOwnerLookup
-	Connections, Concurrency           int
-	Native                             *OwnerNativeRuntimeConfig
+	// ReadinessProofs, when set, serves only the readiness loop, on its own
+	// Kubernetes clients (ADR-173); otherwise readiness uses Proofs.
+	ReadinessProofs          app.OwnerEnrollmentProofReader
+	Routes                   app.OwnerRouteReader
+	Protection               app.OwnerProtectionReader
+	Requests                 func(value.OwnerBinding) (evidence.WorkerOwnerEnrollment, error)
+	WorkerTrust              *mtls.WorkerTrustCatalog
+	Workers                  evidence.WorkerEnrollmentBindings
+	Locators                 evidence.WorkerOwnerLookup
+	Connections, Concurrency int
+	Native                   *OwnerNativeRuntimeConfig
 	// Observation additionally serves the observation handler set on the
 	// native port, split by TLS server name (ADR-190 decisions 4 and 6). It
 	// requires Native and binds the same pool.
@@ -155,7 +158,11 @@ func NewOwnerRuntime(ctx context.Context, c OwnerRuntimeConfig) (*OwnerRuntime, 
 		}
 		r.operation = o
 	}
-	r.readiness = app.OwnerStartupReadiness{Binding: binding, Pool: c.Pool, Server: r.server, Client: r.client, Registry: c.Registry, Proofs: c.Proofs, Now: time.Now}
+	readiness := c.Proofs
+	if c.ReadinessProofs != nil {
+		readiness = c.ReadinessProofs
+	}
+	r.readiness = app.OwnerStartupReadiness{Binding: binding, Pool: c.Pool, Server: r.server, Client: r.client, Registry: c.Registry, Proofs: readiness, Now: time.Now}
 	if root.Err() != nil || !current.Valid(time.Now()) {
 		return nil, value.ErrUnavailable
 	}

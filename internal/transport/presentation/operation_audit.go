@@ -200,7 +200,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	// SQL precision only changes persisted boundaries. Flooring the live check
 	// can put an otherwise current nanosecond observation in its "future".
 	if err != nil || !initial.Valid(checkedAt) {
-		return OperationReply{}, identity.ErrDenied
+		return OperationReply{}, stopped("identity", identity.ErrDenied)
 	}
 	// Prepaid safe stop is its own immutable cancellation obligation. It has
 	// no normal/resolution audit admission dependency and no evidence-read gate.
@@ -252,7 +252,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	}
 	release, ok := s.acquire(audit.OperationLane(op), actorDigest)
 	if !ok {
-		return OperationReply{}, auditapp.ErrUnavailable
+		return OperationReply{}, stopped("busy", auditapp.ErrUnavailable)
 	}
 	defer release()
 	inputDigest, err := s.mac.Digest(format, normalized)
@@ -273,7 +273,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	if s.audit[audit.OperationLane(op)].Begin(ctx, intent) != nil {
-		return OperationReply{}, auditapp.ErrUnavailable
+		return OperationReply{}, stopped("audit-begin", auditapp.ErrUnavailable)
 	}
 	var reply OperationReply
 	var callErr error
@@ -302,7 +302,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		callErr = auditapp.ErrUnavailable
 		out, e = s.result(intent, reply, callErr, effectPossible)
 		if e != nil {
-			return OperationReply{}, auditapp.ErrUnavailable
+			return OperationReply{}, stopped("audit-result", auditapp.ErrUnavailable)
 		}
 	}
 	// Once an outcome exists, completing its audit is allowed without reviving
@@ -312,12 +312,15 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	finishCancel()
 	if e != nil {
 		clear(reply.Body)
-		return OperationReply{}, auditapp.ErrUnavailable
+		return OperationReply{}, stopped("audit-finish", auditapp.ErrUnavailable)
 	}
 	final, e := current.ResolveIdentity(ctx)
 	if e != nil || ctx.Err() != nil || !sameAuditIdentity(initial, final, s.config.Now()) || !s.config.Now().Before(until) {
 		clear(reply.Body)
-		return OperationReply{}, identity.ErrDenied
+		if ctx.Err() != nil || !s.config.Now().Before(until) {
+			return OperationReply{}, stopped("request-expired", identity.ErrDenied)
+		}
+		return OperationReply{}, stopped("final-identity", identity.ErrDenied)
 	}
 	if callErr != nil {
 		// Acknowledged errors carry only the original delivery bound, no body or
@@ -334,7 +337,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	}
 	if !s.config.Now().Before(reply.ValidUntil) {
 		clear(reply.Body)
-		return OperationReply{}, auditapp.ErrUnavailable
+		return OperationReply{}, stopped("reply-expired", auditapp.ErrUnavailable)
 	}
 	reply.ValidUntil = identity.Earlier(reply.ValidUntil, identity.Earlier(until, final.ValidUntil))
 	return reply, nil
@@ -474,3 +477,16 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 	}
 	return out, nil
 }
+
+// callStop names where an audited call stopped without a reply, for the
+// transport's closed 503 report. It wraps the returned sentinel unchanged.
+type callStop struct {
+	step string
+	err  error
+}
+
+func (e *callStop) Error() string     { return e.err.Error() }
+func (e *callStop) Unwrap() error     { return e.err }
+func (e *callStop) FixedStep() string { return e.step }
+
+func stopped(step string, err error) error { return &callStop{step, err} }
