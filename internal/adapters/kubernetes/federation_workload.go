@@ -199,6 +199,9 @@ func EnsureFederationWorkload(ctx context.Context, config *rest.Config, w *Feder
 			return e
 		},
 		func() error {
+			if w.Service == nil { // the publisher serves nothing (ADR-203)
+				return nil
+			}
 			if e := stamp(&w.Service.ObjectMeta, w.Service.Spec); e != nil {
 				return e
 			}

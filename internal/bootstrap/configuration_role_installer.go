@@ -40,7 +40,7 @@ const (
 
 func configurationRoleInstallerPlan(c contracts.ConfigurationRoleInstaller) (cfg.OwnerWorkloadAdministration, kube.GuardPin, error) {
 	var zero cfg.OwnerWorkloadAdministration
-	if c.Format != contracts.ConfigurationRoleInstallerFormat || c.Roles.Format != contracts.ConfigurationRuntimeRolesFormat || c.Roles.LayoutDigest != postgres.ConfigurationRuntimeRoleLayoutDigest() || !authorization.UUID(c.Roles.InstallationID) || !authorization.UUID(c.Roles.InitialClaimID) || !authorization.UUID(c.Roles.ClusterID) || !authorization.UUID(c.Roles.Namespace.UID) || len(validation.IsDNS1123Label(c.Roles.Namespace.Name)) != 0 || c.ConfigurationProbes == nil || len(c.ConfigurationProbes) > 8 || c.SchedulingLeases == nil || len(c.SchedulingLeases) > 4 {
+	if c.Format != contracts.ConfigurationRoleInstallerFormat || c.Roles.Format != contracts.ConfigurationRuntimeRolesFormat || c.Roles.LayoutDigest != postgres.ConfigurationRuntimeRoleLayoutDigest() || !authorization.UUID(c.Roles.InstallationID) || !authorization.UUID(c.Roles.InitialClaimID) || !authorization.UUID(c.Roles.ClusterID) || !authorization.UUID(c.Roles.Namespace.UID) || len(validation.IsDNS1123Label(c.Roles.Namespace.Name)) != 0 || c.ConfigurationProbes == nil || len(c.ConfigurationProbes) > cfg.MaxOwnerConfigurationProbes || c.SchedulingLeases == nil || len(c.SchedulingLeases) > 4 {
 		return zero, kube.GuardPin{}, configurationRoleInputInvalid
 	}
 	if l := c.Launch; l != nil {

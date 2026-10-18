@@ -71,7 +71,7 @@ func run() int {
 			fmt.Fprintln(os.Stderr, bootstrap.OwnerStartupDiagnostic(err))
 			return 1
 		}
-		if os.Args[1] == "hub-worker" {
+		if os.Args[1] == "hub-worker" || os.Args[1] == "publisher" {
 			fmt.Fprintln(os.Stderr, bootstrap.HubWorkerDiagnostic(err))
 			return 1
 		}

@@ -16,6 +16,11 @@ type InitialRuntimeBridgeAdministration struct {
 	Credentials  string
 	OwnerProbe   InitialRuntimeProbe
 	SourceProbes []InitialRuntimeSourceProbe
+	// RuntimeProbeAccounts are promoted runtime accounts besides the owner's
+	// whose configuration probes target sources created after the bridge;
+	// each proves its source's own denial at read time (ADR-203: the
+	// publisher's cluster catalog read). The bridge proves none of them.
+	RuntimeProbeAccounts []string
 }
 
 type InitialRuntimeProbe struct {
@@ -36,10 +41,20 @@ func (p InitialRuntimeBridgeAdministration) Valid() bool {
 	if h == nil || h.Configuration != p.Initial.Configuration || h.Namespace == p.Initial.ControlNamespace || h.ServiceAccountUID == p.Initial.WriterAccountUID || h.ServiceAccountUID == p.Initial.ProbeAccountUID || h.ServiceAccountUID == p.OwnerProbe.ServiceAccountUID || len(p.SourceProbes) != p.bridgedProbes() {
 		return false
 	}
+	runtime := map[string]bool{}
+	for _, a := range p.RuntimeProbeAccounts {
+		if !identity.Text(a, 253) || runtime[a] || a == p.Initial.WriterAccount || a == p.Initial.ProbeAccount || a == p.OwnerProbe.ServiceAccount {
+			return false
+		}
+		runtime[a] = true
+	}
 	seen := map[OwnerConfigurationProbe]bool{}
 	for _, v := range p.SourceProbes {
 		key := OwnerConfigurationProbe{ConfigMap: v.ConfigMap, ServiceAccount: v.ServiceAccount}
 		if !authorization.UUID(v.ServiceAccountUID) || seen[key] || !slices.Contains(p.Owner.ConfigurationProbes, key) || v.ConfigMap == p.Initial.Configuration || v.ConfigMap == p.Initial.Witness || v.ServiceAccount == p.Initial.WriterAccount || v.ServiceAccount == p.Initial.ProbeAccount || v.ServiceAccountUID == p.Initial.WriterAccountUID || v.ServiceAccountUID == p.Initial.ProbeAccountUID || v.ServiceAccountUID == h.ServiceAccountUID || v.ServiceAccount == p.OwnerProbe.ServiceAccount {
+			return false
+		}
+		if runtime[v.ServiceAccount] {
 			return false
 		}
 		seen[key] = true
@@ -49,12 +64,13 @@ func (p InitialRuntimeBridgeAdministration) Valid() bool {
 
 // bridgedProbes counts the configuration probes the bridge proves. Probes held
 // by the owner probe account belong to the promoted hub-api's own sources
-// (ADR-185); those sources do not exist yet at bridge time, and the hub-api
-// proves each one at read time.
+// (ADR-185), and those of RuntimeProbeAccounts to other promoted workloads';
+// those sources do not exist yet at bridge time, and each workload proves its
+// own at read time.
 func (p InitialRuntimeBridgeAdministration) bridgedProbes() int {
 	n := 0
 	for _, c := range p.Owner.ConfigurationProbes {
-		if c.ServiceAccount != p.OwnerProbe.ServiceAccount {
+		if c.ServiceAccount != p.OwnerProbe.ServiceAccount && !slices.Contains(p.RuntimeProbeAccounts, c.ServiceAccount) {
 			n++
 		}
 	}

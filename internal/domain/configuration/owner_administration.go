@@ -27,6 +27,11 @@ type OwnerInitialHistoryProbe struct {
 	ServiceAccount, ServiceAccountUID, Configuration string
 }
 
+// MaxOwnerConfigurationProbes bounds the guard's exact named dry-run UPDATE
+// pairs. Twelve since ADR-203: the hub's three base pairs, five public sources
+// and the publisher's catalog pair, with room for the download worker's.
+const MaxOwnerConfigurationProbes = 12
+
 func (p OwnerInitialHistoryProbe) Valid() bool {
 	return identity.Text(p.Namespace.Name, 63) && authorization.UUID(p.Namespace.UID) && identity.Text(p.ServiceAccount, 253) && authorization.UUID(p.ServiceAccountUID) && identity.Text(p.Configuration, 253)
 }
@@ -84,7 +89,7 @@ func (p OwnerWorkloadAdministration) Valid() bool {
 	if p.APIContextStarts != nil && !p.APIContextStarts.Valid() {
 		return false
 	}
-	if !identity.Text(p.Name, 253) || !identity.Text(p.Deployment, 253) || !authorization.UUID(p.DeploymentUID) || !identity.Text(p.ControlNamespace.Name, 63) || !authorization.UUID(p.ControlNamespace.UID) || !actorsValid(p.Administrators) || len(p.ConfigurationProbes) > 8 || len(p.SchedulingLeases) > 4 {
+	if !identity.Text(p.Name, 253) || !identity.Text(p.Deployment, 253) || !authorization.UUID(p.DeploymentUID) || !identity.Text(p.ControlNamespace.Name, 63) || !authorization.UUID(p.ControlNamespace.UID) || !actorsValid(p.Administrators) || len(p.ConfigurationProbes) > MaxOwnerConfigurationProbes || len(p.SchedulingLeases) > 4 {
 		return false
 	}
 	seen := map[OwnerConfigurationProbe]bool{}

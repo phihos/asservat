@@ -183,6 +183,14 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 				FederationAuditStorage *struct {
 					Prefixes []string `json:"prefixes"`
 				} `json:"federationAuditStorage"`
+				Publisher *struct {
+					AuditStorage struct {
+						Prefixes []string `json:"prefixes"`
+					} `json:"auditStorage"`
+					EvidenceReadStorage struct {
+						Bucket string `json:"bucket"`
+					} `json:"evidenceReadStorage"`
+				} `json:"publisher"`
 				Public bool `json:"public"`
 			}
 			if json.Unmarshal(outbox.Recipe, &artifact) != nil {
@@ -195,7 +203,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			user := strings.TrimSuffix(outbox.Purpose, "-provider")
 			users = append(users, user)
 			file := filepath.Join(work, user+"-audit.json")
-			if e = os.WriteFile(file, installerOperatorStorage(t, limit, providers, user, scope, users), 0o600); e != nil {
+			if e = os.WriteFile(file, installerOperatorStorage(t, limit, providers, user, installerAuditActions(providers, scope), users), 0o600); e != nil {
 				t.Fatal(e)
 			}
 			args := []string{"--kubeconfig", kubeconfig, "--namespace", namespace, "--installation", installation, "--audit-credential", file}
@@ -203,10 +211,28 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 				// ADR-193: the federation's separately scoped audit principal.
 				users = append(users, "federation")
 				federationFile := filepath.Join(work, "federation-audit.json")
-				if e = os.WriteFile(federationFile, installerOperatorStorage(t, limit, providers, "federation", a.Prefixes, users), 0o600); e != nil {
+				if e = os.WriteFile(federationFile, installerOperatorStorage(t, limit, providers, "federation", installerAuditActions(providers, a.Prefixes), users), 0o600); e != nil {
 					t.Fatal(e)
 				}
 				args = append(args, "--federation-audit-credential", federationFile)
+			}
+			if a := artifact.Publisher; a != nil {
+				// ADR-203: the publisher's audit writer under its own prefix and a
+				// reader of the evidence bucket only.
+				if a.EvidenceReadStorage.Bucket != evidenceBucket || len(a.AuditStorage.Prefixes) != 1 {
+					t.Fatal("publisher storage section", a.EvidenceReadStorage.Bucket, a.AuditStorage.Prefixes)
+				}
+				users = append(users, "publisher", "publisher-evidence")
+				for _, c := range []struct {
+					user, flag string
+					actions    []string
+				}{{"publisher", "--publisher-audit-credential", installerAuditActions(providers, a.AuditStorage.Prefixes)}, {"publisher-evidence", "--evidence-read-credential", []string{"Read:" + evidenceBucket + "/*"}}} {
+					file := filepath.Join(work, c.user+".json")
+					if e = os.WriteFile(file, installerOperatorStorage(t, limit, providers, c.user, c.actions, users), 0o600); e != nil {
+						t.Fatal(e)
+					}
+					args = append(args, c.flag, file)
+				}
 			}
 			if artifact.Public {
 				// ADR-194: the operator's OIDC client secret and public TLS pair.
@@ -327,6 +353,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	t.Log("federation available with zero peers; regional offer published")
 	installerOwnerExposed(t, ctx, api, desired.TargetNamespace, installation, offer)
 	installerKeyServiceInstalled(t, ctx, api, admin, desired.TargetNamespace, installation, offer, keyServingCA)
+	installerPublisherInstalled(t, ctx, api, desired.TargetNamespace, installation)
 	// ADR-190 step 7: the continuation published the capacity projection after
 	// the owner launch, and the hub-worker ran capacity to ReadyAt.
 	if c := state.CapacityProjection; c == nil || c.Receipt == nil {
@@ -542,7 +569,16 @@ func installerEvidenceCredential(t *testing.T, ctx context.Context, p *initialRu
 	return out
 }
 
-func installerOperatorStorage(t *testing.T, ctx context.Context, p *initialRuntimeNativeProviders, user string, prefixes, users []string) []byte {
+// installerAuditActions grants read and write under each audit prefix.
+func installerAuditActions(p *initialRuntimeNativeProviders, prefixes []string) []string {
+	var actions []string
+	for _, prefix := range prefixes {
+		actions = append(actions, "Read:"+p.desired.AuditStore.Bucket+"/"+prefix+"*", "Write:"+p.desired.AuditStore.Bucket+"/"+prefix+"*")
+	}
+	return actions
+}
+
+func installerOperatorStorage(t *testing.T, ctx context.Context, p *initialRuntimeNativeProviders, user string, actions, users []string) []byte {
 	t.Helper()
 	var native struct {
 		Container string `json:"runtimeProviderPairS3Container"`
@@ -555,14 +591,10 @@ func installerOperatorStorage(t *testing.T, ctx context.Context, p *initialRunti
 	clear(raw)
 	runID := strings.TrimSuffix(strings.TrimPrefix(native.Container, "asservat-"), "-s3")
 	label, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{ index .Config.Labels \"asservat.test\" }}", native.Container).Output()
-	if err != nil || strings.TrimSpace(string(label)) != runID || len(prefixes) == 0 {
+	if err != nil || strings.TrimSpace(string(label)) != runID || len(actions) == 0 {
 		t.Fatal("refuse non-owned S3 administration", err)
 	}
 	bucket := p.desired.AuditStore.Bucket
-	var actions []string
-	for _, prefix := range prefixes {
-		actions = append(actions, "Read:"+bucket+"/"+prefix+"*", "Write:"+bucket+"/"+prefix+"*")
-	}
 	key, secret := user+"-continuation", user+"-continuation-secret"
 	shell := "s3.configure -user=administrator -access_key=synthetic-only -secret_key=synthetic-only-secret -actions=Admin,Read,Write,List -apply\n" +
 		"s3.configure -user=" + user + " -access_key=" + key + " -secret_key=" + secret + " -actions=" + strings.Join(actions, ",") + " -apply\n"
@@ -970,6 +1002,26 @@ func installerCrashHubWorker(t *testing.T, ctx context.Context, api kubernetes.I
 // available, accepted its configuration in SQL, serves TLS under the offer's
 // roots at the offered endpoint and refuses an unknown client chain, and no
 // other Pod mounts the root key Secret or the key-service logins.
+// installerPublisherInstalled checks the ADR-203 publisher's Deployment is
+// available and its process has not restarted: it composed every input,
+// logged in to OpenBao and read the cluster catalog. Publishing a capture is
+// the journey's check.
+func installerPublisherInstalled(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, installation string) {
+	t.Helper()
+	name := contracts.PublisherName(installation)
+	d, err := api.AppsV1().Deployments(namespace).Get(ctx, name, meta.GetOptions{})
+	if err != nil || d.Status.AvailableReplicas != 1 {
+		installedProcessDiagnostics(t, ctx, api, namespace, name)
+		t.Fatal("publisher not available", err)
+	}
+	pods, err := api.CoreV1().Pods(namespace).List(ctx, meta.ListOptions{LabelSelector: meta.FormatLabelSelector(d.Spec.Selector)})
+	if err != nil || len(pods.Items) != 1 || len(pods.Items[0].Status.ContainerStatuses) != 1 || pods.Items[0].Status.ContainerStatuses[0].RestartCount != 0 {
+		installedProcessDiagnostics(t, ctx, api, namespace, name)
+		t.Fatal("publisher restarted or is not alone", err)
+	}
+	t.Log("publisher available without restarts")
+}
+
 func installerKeyServiceInstalled(t *testing.T, ctx context.Context, api kubernetes.Interface, admin *pgxpool.Pool, namespace, installation string, offer contracts.RegionalOffer, servingCA []byte) {
 	t.Helper()
 	k := offer.KeyService

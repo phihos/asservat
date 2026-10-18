@@ -24,6 +24,10 @@ const (
 	// InstallerInboxFederationAuditCredential is the federation's separate
 	// audit storage principal in the phase-3 inbox (ADR-193).
 	InstallerInboxFederationAuditCredential = "federation-audit-storage.json"
+	// The publisher's audit and evidence read principals in the phase-3
+	// inbox (ADR-203).
+	InstallerInboxPublisherAuditCredential = "publisher-audit-storage.json"
+	InstallerInboxEvidenceReadCredential   = "evidence-read.json"
 )
 
 // InstallerInboxPublicFiles are the operator's public material in a promoted

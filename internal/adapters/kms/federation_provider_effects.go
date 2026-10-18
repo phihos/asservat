@@ -234,8 +234,6 @@ func (s *InstalledFederationProviderEffects) CloseAndJoin(ctx context.Context) e
 
 // newFederationProviderControl reuses the fixed login/self-control wire with
 // a role name derived only from the federation recipe.
-// ponytail: the owner and configuration controls keep their own copies of the
-// transport tail; fold them into one helper when one of them changes.
 func newFederationProviderControl(in contracts.FederationDeployment, profile contracts.FederationProviderAuthentication, purpose string, client *http.Client, now func() time.Time) (*ownerProviderControl, error) {
 	if now == nil || client == nil || client.Jar != nil {
 		return nil, ErrKeyService
@@ -250,7 +248,19 @@ func newFederationProviderControl(in contracts.FederationDeployment, profile con
 			name = role.Name
 		}
 	}
-	u, err := url.Parse(in.KeyService.Endpoint)
+	return newKubernetesProviderControl(contracts.OwnerProviderEndpoint{Endpoint: in.KeyService.Endpoint, Roots: in.KeyService.Roots}, profile.AuthMount, name, profile.Namespace.Name, profile.ServiceAccount, client, now)
+}
+
+// newKubernetesProviderControl is the fixed login/self-control transport for
+// one recipe-derived role: pinned provider roots only, no proxy, custom TLS
+// hook, cookie jar or redirect.
+// ponytail: the owner and configuration controls keep their own copies of
+// this transport tail; fold them in here when one of them changes.
+func newKubernetesProviderControl(provider contracts.OwnerProviderEndpoint, mount, name, namespace string, account contracts.WorkerObjectReference, client *http.Client, now func() time.Time) (*ownerProviderControl, error) {
+	if now == nil || client == nil || client.Jar != nil {
+		return nil, ErrKeyService
+	}
+	u, err := url.Parse(provider.Endpoint)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Path != "" && u.Path != "/" || name == "" {
 		return nil, ErrKeyService
 	}
@@ -268,7 +278,7 @@ func newFederationProviderControl(in contracts.FederationDeployment, profile con
 	transport.TLSNextProto = nil
 	transport.Proxy = nil
 	roots := x509.NewCertPool()
-	for _, der := range in.KeyService.Roots {
+	for _, der := range provider.Roots {
 		certificate, e := x509.ParseCertificate(der)
 		if e != nil {
 			return nil, ErrKeyService
@@ -281,5 +291,5 @@ func newFederationProviderControl(in contracts.FederationDeployment, profile con
 	h.Transport = transport
 	h.Timeout = 5 * time.Second
 	h.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &ownerProviderControl{http: &h, endpoint: u.String(), mount: profile.AuthMount, role: name, namespace: profile.Namespace.Name, account: profile.ServiceAccount.Name, accountUID: profile.ServiceAccount.UID, now: now}, nil
+	return &ownerProviderControl{http: &h, endpoint: u.String(), mount: mount, role: name, namespace: namespace, account: account.Name, accountUID: account.UID, now: now}, nil
 }

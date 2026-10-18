@@ -41,6 +41,7 @@ type publicRoleRootFixture struct {
 	object                *core.Secret
 	projection            *core.Secret
 	federation            *core.Secret
+	publisher             *core.Secret
 	projectionWrites      atomic.Int32
 	lostProjection        atomic.Bool
 	lostProjectionClaim   atomic.Bool
@@ -152,6 +153,9 @@ func newPublicRoleRootFixtureWithWorker(t *testing.T, lostCreate, lostClaim, wor
 				if strings.HasSuffix(r.URL.Path, "/"+contracts.FederationRuntimeProjectionName(f.input.InstallationID)) {
 					target = f.federation
 				}
+				if strings.HasSuffix(r.URL.Path, "/"+contracts.PublisherRuntimeProjectionName(f.input.InstallationID)) {
+					target = f.publisher
+				}
 				if target == nil {
 					status(w, 404, meta.StatusReasonNotFound)
 				} else {
@@ -175,14 +179,15 @@ func newPublicRoleRootFixtureWithWorker(t *testing.T, lostCreate, lostClaim, wor
 			// unversioned client encoder omitted apiVersion from the request.
 			// This fixture must model that response, not echo request bytes.
 			object.TypeMeta = meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}
-			if object.Name == contracts.FederationRuntimeProjectionName(f.input.InstallationID) {
-				if r.Method != http.MethodPost || f.federation != nil {
+			if side, uid := map[string]**core.Secret{contracts.FederationRuntimeProjectionName(f.input.InstallationID): &f.federation, contracts.PublisherRuntimeProjectionName(f.input.InstallationID): &f.publisher}[object.Name],
+				map[string]int{contracts.FederationRuntimeProjectionName(f.input.InstallationID): 12, contracts.PublisherRuntimeProjectionName(f.input.InstallationID): 13}[object.Name]; side != nil {
+				if r.Method != http.MethodPost || *side != nil {
 					status(w, 409, meta.StatusReasonAlreadyExists)
 					return
 				}
-				object.UID = types.UID(ownerID(12))
+				object.UID = types.UID(ownerID(uid))
 				object.ResourceVersion = "1"
-				f.federation = object.DeepCopy()
+				*side = object.DeepCopy()
 				w.WriteHeader(http.StatusCreated)
 				permissionReply(w, &object)
 				return
@@ -670,5 +675,44 @@ func TestFederationRuntimeProjectionIsSeparateAndExact(t *testing.T) {
 	}
 	if _, err = f.root.PublishPublicRuntimeProjection(t.Context(), current); err != nil || f.projectionWrites.Load() != 1 {
 		t.Fatal("hub projection after federation", err)
+	}
+}
+
+func TestPublisherRuntimeProjectionIsSeparateAndExact(t *testing.T) {
+	f, snapshot := completedPublicRoleFixture(t)
+	ref, err := f.root.PublishPublisherRuntimeProjection(t.Context(), snapshot)
+	if err != nil || ref.UID != ownerID(13) || f.projectionWrites.Load() != 0 {
+		t.Fatal("publisher projection", err)
+	}
+	current, err := f.root.ReadPublicRuntimeRoles(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := current.State.PublisherProjection; c == nil || c.SecretUID != ref.UID || current.State.Projection != nil || current.State.FederationProjection != nil {
+		t.Fatal("claim not recorded in its own slot", c)
+	}
+	if again, err := f.root.PublishPublisherRuntimeProjection(t.Context(), current); err != nil || again != ref {
+		t.Fatal("replay was not lookup-only", err)
+	}
+	f.mu.Lock()
+	data := f.publisher.DeepCopy().Data
+	f.mu.Unlock()
+	purposes := contracts.PublicRuntimePublisherPurposes()
+	if len(data) != len(purposes)+1 {
+		t.Fatal("unexpected publisher projection files", len(data))
+	}
+	for _, purpose := range purposes {
+		if data["sql-public-"+purpose+".json"] == nil {
+			t.Fatal("missing login", purpose)
+		}
+	}
+	var m contracts.PublicRuntimeCredentialManifest
+	if json.Unmarshal(data[contracts.PublisherCredentialManifestFile], &m) != nil || len(m.Roles) != len(purposes) || m.RootUID != snapshot.UID {
+		t.Fatal("manifest", m)
+	}
+	for i, r := range m.Roles {
+		if r.Purpose != purposes[i] {
+			t.Fatal("manifest order", i, r.Purpose)
+		}
 	}
 }

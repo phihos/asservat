@@ -207,7 +207,7 @@ func runtimeRoleStateValid(input contracts.PublicRuntimeRoles, v contracts.Publi
 			oids[r.RoleOID] = true
 		}
 	}
-	for _, p := range []*contracts.PublicRuntimeProjectionClaim{v.Projection, v.FederationProjection} {
+	for _, p := range []*contracts.PublicRuntimeProjectionClaim{v.Projection, v.FederationProjection, v.KeyServiceProjection, v.PublisherProjection} {
 		if p == nil {
 			continue
 		}

@@ -5,6 +5,11 @@ runs download workers in their own hub-cluster namespace with the profile source
 one hub-local path in the owner input, gives workers their own evidence read credential, accepts
 worker configuration in the hub-worker and adds acquisition unwraps and a downloads token.
 
+[ADR-203 — Installed publisher](203-installed-publisher.md)
+deploys the publication verifier from `installer-continue`: its own OpenBao Kubernetes login for a
+private audit Transit key and a verifier PKI role, an in-process verifier certificate, operator
+evidence-read and audit credentials, and topology pins read from the guarded cluster catalog.
+
 [ADR-202 — Public API exposure](202-public-api-exposure.md)
 lets the operator expose the promoted hub-api's public port on its own NodePort or LoadBalancer Service,
 TLS passthrough only, so installed browsers and MCP clients can reach it.

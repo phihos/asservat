@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -109,5 +110,22 @@ func TestInitialConfigurationDocumentsRejectUnsupportedOriginalStartGuard(t *tes
 	got, err := BuildInitialConfigurationDocuments(original, inventory, input.Roles.InitialClaimID)
 	if err != configurationRoleInputInvalid || len(got.Worker) != 0 || len(got.Roles) != 0 {
 		t.Fatal("unsupported original start branch silently changed the generated guard", err)
+	}
+}
+
+// ADR-203: the provider-installed hub has nine probe pairs (three base, five
+// public sources and the publisher's catalog pair); the role installer plan
+// takes up to MaxOwnerConfigurationProbes and refuses more.
+func TestConfigurationRoleInstallerPlanTakesTheHubsProbePairs(t *testing.T) {
+	_, _, input := configurationDocumentsProbeFixture(t, true)
+	for len(input.ConfigurationProbes) < cfg.MaxOwnerConfigurationProbes {
+		input.ConfigurationProbes = append(input.ConfigurationProbes, contracts.OwnerConfigurationProbe{ConfigMap: fmt.Sprintf("public-source-%d", len(input.ConfigurationProbes)), ServiceAccount: "owner"})
+	}
+	if _, _, err := configurationRoleInstallerPlan(input); err != nil {
+		t.Fatal("bounded probe pairs refused", err)
+	}
+	input.ConfigurationProbes = append(input.ConfigurationProbes, contracts.OwnerConfigurationProbe{ConfigMap: "one-too-many", ServiceAccount: "owner"})
+	if _, _, err := configurationRoleInstallerPlan(input); err == nil {
+		t.Fatal("probe pairs above the bound accepted")
 	}
 }

@@ -2,6 +2,7 @@ package providerconfig
 
 import (
 	"encoding/json"
+	"slices"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
@@ -23,8 +24,10 @@ type ownerProviderSetupRequest struct {
 //
 // A federation deployment with provider authentication adds its own roles,
 // connector PKI roles and audit transit key to the same artifact (ADR-193),
-// so the operator applies both compartments in one step.
-func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time, federation *contracts.FederationDeployment) ([]byte, error) {
+// so the operator applies both compartments in one step. A publisher
+// deployment adds its roles, verifier PKI role and audit transit key and
+// describes its two operator storage credentials (ADR-203).
+func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.OwnerProviderAuthentication, pool fleet.OwnerPool, roots [][]byte, now time.Time, federation *contracts.FederationDeployment, publisher *contracts.PublisherDeployment) ([]byte, error) {
 	if !authorization.UUID(in.ConfigurationUID) {
 		return nil, ErrSetupUnavailable
 	}
@@ -114,16 +117,83 @@ func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.
 		}{federation.AuditStore, federation.ProviderAuthentication.AuditCredentials, contracts.FederationProviderAuditCredentialFile, "https://asservat.io/spec/v1/owner-credentials.schema.json",
 			[3]string{"operation-audit/v1/" + federation.PermissionRootID + "/", "enrollment-claim/v1/" + federation.InstallationID + "/", "cluster-bootstrap/v1/" + federation.InstallationID + "/"}, [3]string{"PutObject", "GetObject", "GetObjectVersion"}, "conditional-create/immutable-non-null-version/no-runtime-delete-or-versioning-change"}
 	}
+	var publisherSection *publisherArtifact
+	if publisher != nil {
+		section, more, paths, err := publisherArtifactFor(in, federation, *publisher)
+		if err != nil {
+			return nil, err
+		}
+		requests, publisherSection = append(requests, more...), &section
+		for _, path := range paths {
+			if !slices.Contains(inspect, path) {
+				inspect = append(inspect, path)
+			}
+		}
+	}
 	return ownerProviderCanonical(struct {
 		Format                 string                      `json:"format"`
 		ConfigurationUID       string                      `json:"configurationUID"`
 		Setup                  OwnerSetupRecipe            `json:"setup"`
 		Federation             *FederationProviderSetup    `json:"federation,omitempty"`
+		Publisher              *publisherArtifact          `json:"publisher,omitempty"`
 		Public                 bool                        `json:"public,omitempty"`
 		Apply                  []ownerProviderSetupRequest `json:"apply"`
 		Inspect                []string                    `json:"inspect"`
 		AuditStorage           any                         `json:"auditStorage"`
 		FederationAuditStorage any                         `json:"federationAuditStorage,omitempty"`
 		ExternalAdministration bool                        `json:"externalAdministration"`
-	}{"asservat-owner-provider-setup/v1", in.ConfigurationUID, setup, federationSetup, public, requests, inspect, storage, federationStorage, true})
+	}{"asservat-owner-provider-setup/v1", in.ConfigurationUID, setup, federationSetup, publisherSection, public, requests, inspect, storage, federationStorage, true})
+}
+
+// publisherArtifact is the publisher's section of the phase-3 artifact
+// (ADR-203): its provider setup and the two operator storage credentials it
+// needs, each with exactly the operations the publisher performs.
+type publisherArtifact struct {
+	Setup               PublisherProviderSetup `json:"setup"`
+	AuditStorage        publisherStorage       `json:"auditStorage"`
+	EvidenceReadStorage publisherStorage       `json:"evidenceReadStorage"`
+}
+type publisherStorage struct {
+	Endpoint             string   `json:"endpoint"`
+	Region               string   `json:"region"`
+	Bucket               string   `json:"bucket"`
+	SecretKey            string   `json:"secretKey"`
+	CredentialSchema     string   `json:"credentialSchema"`
+	Prefixes             []string `json:"prefixes"`
+	Operations           []string `json:"operations"`
+	Semantics            string   `json:"semantics"`
+	BackendQualification string   `json:"backendQualification"`
+}
+
+// publisherArtifactFor binds the publisher to the promoted owner it runs
+// beside: same installation, cluster, root, provider and audit store, the
+// owner's worker PKI mount and an audit key no other compartment uses.
+func publisherArtifactFor(in contracts.OwnerDeployment, federation *contracts.FederationDeployment, p contracts.PublisherDeployment) (publisherArtifact, []ownerProviderSetupRequest, []string, error) {
+	var out publisherArtifact
+	setup, err := PublisherProviderSetupFor(p)
+	endpoint, _ := publisherProviderEndpoint(p)
+	if err != nil || p.InstallationID != in.InstallationID || p.ClusterID != in.ClusterID || p.PermissionRootID != in.PermissionRootID || !authorization.UUID(p.PermissionRootID) ||
+		!sameSetupEndpoint(endpoint, contracts.OwnerProviderEndpoint{Endpoint: in.KeyService.Endpoint, Roots: in.KeyService.Roots}) ||
+		in.Public == nil || in.Public.WorkerPKI.Mount != p.Verifier.PKIMount || in.Public.WorkerPKI.Role == p.Verifier.Role ||
+		p.AuditKeys.Mount == in.KeyService.AuditMount && p.AuditKeys.Key == in.KeyService.AuditKey ||
+		federation != nil && p.AuditKeys.Mount == federation.KeyService.AuditMount && p.AuditKeys.Key == federation.KeyService.AuditKey ||
+		p.AuditStore.Endpoint != in.AuditStore.Endpoint || p.AuditStore.Region != in.AuditStore.Region || p.AuditStore.Bucket != in.AuditStore.Bucket {
+		return out, nil, nil, ErrSetupUnavailable
+	}
+	requests, err := setup.requests(p)
+	if err != nil {
+		return out, nil, nil, err
+	}
+	// The verification audit is a versioned control object under the
+	// permission root (audit.ContextVerificationKey); reads name its version.
+	// Evidence reads name the stored version too; the publisher never lists,
+	// writes or deletes evidence.
+	schema := "https://asservat.io/spec/v1/owner-credentials.schema.json"
+	out = publisherArtifact{Setup: setup,
+		AuditStorage: publisherStorage{Endpoint: p.AuditStore.Endpoint, Region: p.AuditStore.Region, Bucket: p.AuditStore.Bucket, SecretKey: contracts.PublisherAuditCredential, CredentialSchema: schema,
+			Prefixes: []string{"context-verification/v1/" + p.PermissionRootID + "/"}, Operations: []string{"PutObject", "GetObject", "GetObjectVersion"},
+			Semantics: "conditional-create/immutable-non-null-version/no-runtime-delete-or-versioning-change", BackendQualification: "required"},
+		EvidenceReadStorage: publisherStorage{Endpoint: p.Evidence.Endpoint, Region: p.Evidence.Region, Bucket: p.Evidence.Bucket, SecretKey: contracts.PublisherEvidenceCredential, CredentialSchema: schema,
+			Prefixes: []string{}, Operations: []string{"GetObject", "GetObjectVersion"}, Semantics: "read-only/no-list-write-or-delete", BackendQualification: "required"}}
+	return out, requests, publisherSetupPaths(p, setup), nil
 }

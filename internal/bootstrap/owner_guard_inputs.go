@@ -39,7 +39,7 @@ func validOwnerGuard(c contracts.OwnerGuardInputs) bool {
 		}
 		leases[lease] = true
 	}
-	if c.ConfigurationProbes == nil || len(c.ConfigurationProbes) > 8 {
+	if c.ConfigurationProbes == nil || len(c.ConfigurationProbes) > cfg.MaxOwnerConfigurationProbes {
 		return false
 	}
 	probes := map[contracts.OwnerConfigurationProbe]bool{}

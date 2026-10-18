@@ -74,6 +74,8 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	clientSecretFile := flags.String("oidc-client-secret", "", "the hub-api's OIDC client secret file (phase 3 of a promoted owner)")
 	certificateFile := flags.String("public-tls-certificate", "", "the hub-api's public TLS certificate chain PEM file (phase 3 of a promoted owner)")
 	keyFile := flags.String("public-tls-key", "", "the hub-api's public TLS private key PEM file (phase 3 of a promoted owner)")
+	evidenceFile := flags.String("evidence-read-credential", "", "the publisher's read-only evidence storage credential JSON file (phase 3 with a publisher)")
+	publisherAuditFile := flags.String("publisher-audit-credential", "", "the publisher's scoped audit storage credential JSON file (phase 3 with a publisher)")
 	if flags.Parse(args) != nil || flags.NArg() != 0 || *installation == "" || *credentialFile == "" {
 		return mounts.ErrUnavailable
 	}
@@ -93,6 +95,22 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		defer clear(federation)
 		if c, e := contracts.DecodeOwnerStorageCredential(bytes.NewReader(federation)); e != nil || c.AccessKeyID == "" || c.SecretAccessKey == "" {
 			return mounts.ErrUnavailable
+		}
+	}
+	// ADR-203: the publisher's two storage principals, both or neither.
+	var publisher map[string][]byte
+	if *evidenceFile != "" || *publisherAuditFile != "" {
+		publisher = map[string][]byte{}
+		for key, file := range map[string]string{contracts.InstallerInboxEvidenceReadCredential: *evidenceFile, contracts.InstallerInboxPublisherAuditCredential: *publisherAuditFile} {
+			b, e := os.ReadFile(file)
+			if e != nil {
+				return mounts.ErrUnavailable
+			}
+			defer clear(b)
+			if c, e := contracts.DecodeOwnerStorageCredential(bytes.NewReader(b)); e != nil || c.AccessKeyID == "" || c.SecretAccessKey == "" {
+				return mounts.ErrUnavailable
+			}
+			publisher[key] = b
 		}
 	}
 	// ADR-194: a promoted owner's public material, all three or none.
@@ -125,10 +143,15 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	// checked before any provider write.
 	var plan struct {
 		Federation json.RawMessage `json:"federation"`
+		Publisher  json.RawMessage `json:"publisher"`
 		Public     bool            `json:"public"`
 	}
 	if json.Unmarshal(outbox.Recipe, &plan) == nil && len(plan.Federation) != 0 && string(plan.Federation) != "null" && federation == nil {
 		_, _ = fmt.Fprintln(out, "This recipe provisions the federation: pass --federation-audit-credential with its separately scoped audit credential.")
+		return mounts.ErrUnavailable
+	}
+	if hasPublisher := len(plan.Publisher) != 0 && string(plan.Publisher) != "null"; hasPublisher != (publisher != nil) {
+		_, _ = fmt.Fprintln(out, "Pass --evidence-read-credential and --publisher-audit-credential exactly when this recipe provisions the publisher.")
 		return mounts.ErrUnavailable
 	}
 	if plan.Public != (public != nil) {
@@ -148,7 +171,7 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		return err
 	}
 	defer clear(token)
-	if err = kube.WriteInstallerInbox(ctx, configuration, resolved, *installation, outbox.Phase, token, credential, federation, public); err != nil {
+	if err = kube.WriteInstallerInbox(ctx, configuration, resolved, *installation, outbox.Phase, token, credential, federation, public, publisher); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintln(out, "Inbox written; the continuation verifies the provider before any use.")

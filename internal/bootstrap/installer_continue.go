@@ -65,6 +65,7 @@ type InstallerContinuation struct {
 	// federation is the ADR-193 federation input once its account and audit
 	// Secret exist; the phase-3 artifact then carries its provider roles.
 	federation *contracts.FederationDeployment
+	publisher  *installerPublisher
 	// The public role root and producer, kept open for the permission step.
 	publicRoot  *kube.PublicRuntimeRoleRoot
 	publicRoles *postgres.PublicRuntimeSQLRoles
@@ -754,6 +755,9 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		if err = k.Federation(ctx, inventory, input); err != nil {
 			return err
 		}
+		if err = k.PublisherIdentity(ctx, inventory, input); err != nil {
+			return err
+		}
 		if k.input.Public.Promotion != nil {
 			k.at("public/download-sources")
 			settings := k.processingSettings(input.PermissionRootID)
@@ -792,7 +796,7 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		transit, signing, pki := promotedKeyNames(input.InstallationID, k.record.Scope.IssuerEpoch, *promotion)
 		named.Public = &contracts.OwnerPublicDeployment{SessionTransit: transit, WorkSigning: signing, WorkerPKI: pki}
 	}
-	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation)
+	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation, k.publisherSetup())
 	if err != nil {
 		return err
 	}
@@ -854,6 +858,9 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		if input, err = k.promote(ctx, inventory, input, named, profile, inspector, inbox.Public); err != nil {
 			return err
 		}
+	}
+	if err = k.PublisherCredentials(ctx, inventory, inbox, inspector, input); err != nil {
+		return err
 	}
 	k.at("owner/projection")
 	projection, err := kube.NewProviderOwnerProjection(root, sql, input, inspector)
@@ -1489,6 +1496,9 @@ func (k *InstallerContinuation) FederationWorkload(ctx context.Context, inventor
 		if keys, err = k.KeyService(ctx, inventory, owner, connectorRoots); err != nil {
 			return err
 		}
+	}
+	if err = k.PublisherWorkload(ctx, inventory, owner, keys); err != nil {
+		return err
 	}
 	var work *contracts.APIContextWorkPublicKey
 	var evidence *contracts.RegionalEvidenceStore

@@ -124,6 +124,9 @@ type InstallerInbox struct {
 	// FederationAuditCredential is present when the phase-3 artifact carried
 	// the federation setup (ADR-193).
 	FederationAuditCredential []byte
+	// PublisherAuditCredential and EvidenceReadCredential are present when the
+	// phase-3 artifact carried the publisher setup (ADR-203).
+	PublisherAuditCredential, EvidenceReadCredential []byte
 	// Public holds exactly the InstallerInboxPublicFiles when the phase-3
 	// artifact carried a promoted owner (ADR-194); otherwise it is nil.
 	Public map[string][]byte
@@ -147,7 +150,8 @@ func ReadInstallerInbox(ctx context.Context, config *rest.Config, namespace, ins
 		return zero, cfg.ErrUnavailable
 	}
 	out := InstallerInbox{UID: string(s.UID), InspectionToken: s.Data[contracts.InstallerInboxInspectionToken], AuditCredential: s.Data[contracts.InstallerInboxAuditCredential],
-		FederationAuditCredential: s.Data[contracts.InstallerInboxFederationAuditCredential]}
+		FederationAuditCredential: s.Data[contracts.InstallerInboxFederationAuditCredential],
+		PublisherAuditCredential:  s.Data[contracts.InstallerInboxPublisherAuditCredential], EvidenceReadCredential: s.Data[contracts.InstallerInboxEvidenceReadCredential]}
 	for _, key := range contracts.InstallerInboxPublicFiles() {
 		if v := s.Data[key]; len(v) != 0 {
 			if out.Public == nil {
@@ -263,9 +267,11 @@ func ReadInstallerOutbox(ctx context.Context, config *rest.Config, namespace, in
 
 // WriteInstallerInbox writes the operator's answer for phase, replacing an
 // older answer in the operator-owned release namespace.
-// federation is the optional federation audit credential (ADR-193) and public
-// the optional promoted owner's InstallerInboxPublicFiles (ADR-194).
-func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation string, phase int, token, credential, federation []byte, public map[string][]byte) error {
+// federation is the optional federation audit credential (ADR-193), public
+// the optional promoted owner's InstallerInboxPublicFiles (ADR-194) and
+// publisher the optional publisher credentials keyed by their inbox keys
+// (ADR-203).
+func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, installation string, phase int, token, credential, federation []byte, public, publisher map[string][]byte) error {
 	api, err := installerAPI(config)
 	if err != nil || namespace == "" || !authorization.UUID(installation) || len(token) == 0 || len(credential) == 0 {
 		return cfg.ErrInvalid
@@ -276,6 +282,17 @@ func WriteInstallerInbox(ctx context.Context, config *rest.Config, namespace, in
 		contracts.InstallerInboxPhase: []byte(strconv.Itoa(phase)), contracts.InstallerInboxInspectionToken: token, contracts.InstallerInboxAuditCredential: credential}}
 	if len(federation) != 0 {
 		s.Data[contracts.InstallerInboxFederationAuditCredential] = federation
+	}
+	if publisher != nil {
+		for _, key := range []string{contracts.InstallerInboxPublisherAuditCredential, contracts.InstallerInboxEvidenceReadCredential} {
+			if len(publisher[key]) == 0 {
+				return cfg.ErrInvalid
+			}
+			s.Data[key] = publisher[key]
+		}
+		if len(publisher) != 2 {
+			return cfg.ErrInvalid
+		}
 	}
 	if public != nil {
 		if len(public) != len(contracts.InstallerInboxPublicFiles()) {
