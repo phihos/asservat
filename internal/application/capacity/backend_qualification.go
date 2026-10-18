@@ -44,6 +44,9 @@ type CapacityQualification struct {
 	RootBacking     RootBackingInput
 	NamespaceGuards []CapacityNamespaceQualification
 	Backends        []CapacityBackendQualification
+	// Optional original-install extension. Omission preserves the historical
+	// protected setup bytes; a nil value leaves query acceptance unavailable.
+	ContextQuery *ContextQueryQualification `json:",omitempty"`
 }
 
 func (v CapacityQualification) Valid() bool {
@@ -83,7 +86,7 @@ func (v CapacityQualification) Valid() bool {
 			system = true
 		}
 	}
-	return system
+	return system && (v.ContextQuery == nil || v.ContextQuery.Valid(v.RootBacking))
 }
 
 func (v CapacityQualification) BackendFor(p ProtectedPoolPlan) (CapacityBackendQualification, error) {

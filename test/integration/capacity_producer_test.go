@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"net/url"
 	"os"
@@ -27,6 +28,12 @@ import (
 // actual capacity setup. Kubernetes witness/guard/metadata and physical-history
 // qualifications remain explicitly synthetic. No history coverage is returned.
 func TestCapacityProducerWithRealPostgres(t *testing.T) {
+	withCapacityProducerFixture(t, qualifyCapacityProducerSQL)
+}
+
+type capacityProducerCheck func(*testing.T, context.Context, *pgxpool.Pool, string, *tls.Config, value.InstallationWitnessScope, string, value.Administration, *objectstore.AuthorityObjects)
+
+func withCapacityProducerFixture(t *testing.T, qualify capacityProducerCheck) {
 	var f fixture
 	path := os.Getenv("ASSERVAT_CUSTODY_FIXTURES")
 	if path == "" {
@@ -153,6 +160,6 @@ func TestCapacityProducerWithRealPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal("synthetic original administration unavailable")
 	}
-	qualifyCapacityProducerSQL(t, ctx, admin, address, tlsConfig, s.scope, record.Claim.ID, current, &objectstore.AuthorityObjects{Store: store, Seal: seal, Open: open})
+	qualify(t, ctx, admin, address, tlsConfig, s.scope, record.Claim.ID, current, &objectstore.AuthorityObjects{Store: store, Seal: seal, Open: open})
 	t.Log("actual initial activation and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer")
 }

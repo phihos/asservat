@@ -1,0 +1,11 @@
+=== RUN   TestContextQueryCapacityWithRealPostgres
+=== RUN   TestContextQueryCapacityWithRealPostgres/actual-postgres-function-type-alias
+    capacity_sql_fixture_test.go:133: same_function_oid=true display_uses_timestamp_with_time_zone=true
+=== NAME  TestContextQueryCapacityWithRealPostgres
+    context_query_capacity_test.go:123: fixed_role_production_ms=5608
+    context_query_capacity_test.go:331: persist negative older than five seconds context projection unavailable
+--- FAIL: TestContextQueryCapacityWithRealPostgres (13.47s)
+    --- PASS: TestContextQueryCapacityWithRealPostgres/actual-postgres-function-type-alias (0.00s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	13.532s
+FAIL

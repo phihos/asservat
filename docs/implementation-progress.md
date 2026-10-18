@@ -1,5 +1,199 @@
 # Sustained implementation progress
 
+## Delayed query negatives: reproduced and qualified correction (2026-10-18)
+
+Review found that `SuspendQueryCapacity` derived its SQL deadline from the
+negative observation's timestamp, preventing persistence after a five-second
+delay. The restrictive write now gets at most five seconds from the current
+call, preserving the caller's earlier deadline and cancellation. SQL receives
+the unchanged original watermark; no positive freshness, source limit or
+authority interval is renewed.
+
+The exact owned `TestContextQueryCapacityWithRealPostgres` selection failed at
+the new delayed-negative assertion on frozen
+`f8d73a8810b84f97e9a02bfc82c3a6604fae0dd4` (13.47 seconds), then passed on
+`e538a40306759cb13dec0e432ed3ea875410c589` (14.54 seconds). Each run matched all
+2,644 frozen source hashes and completed cleanup. The final assembled selection
+passed at `7fcc30fd0bd4d1896cbe843d555f37b2b211767c` (14.55 seconds; race package
+15.603 seconds), with all 2,652 hashes matching its Git archive, unchanged source,
+exit zero and no cleanup failures. The native test checks the original expired
+negative watermark, older replay without new spend/freshness and a blocked
+restrictive write under the caller's original 50 ms deadline. Existing source
+claim, unknown reply, concurrency, joined completion and exhaustion assertions
+remain selected.
+
+The [failing report](../test/results/context-query-stale-negative-failing-1/fleet-environment.json),
+[first passing report](../test/results/context-query-stale-negative-passing-1/fleet-environment.json)
+and [final assembled report](../test/results/context-query-stale-negative-assembled-1/fleet-environment.json)
+retain exact source manifests; their sibling logs and verification records
+retain outcomes and independent archive comparisons. The final report SHA-256 is
+`c535b51c280c3fdc747074d3d62caf66b2b247fca036223c8246ff1a2cebaaff`.
+
+CI on the preceding `4157b8c` candidate failed its evidence-package shard because
+one synthetic worker fixture omitted the newly mandatory ephemeral-storage
+dimension. The final freeze adds that fixture's original 4 MiB value; it changes
+no production limit. The complete evidence-package race suite then passed in
+3.857 seconds ([log](../test/results/context-query-stale-negative-assembled-1/evidence-race.log)).
+Touched PostgreSQL/integration vet and Go/specification/architecture gates also
+passed for the correction. The full ledger qualification below remains evidence
+for `51fd2e9`; it was not repeated for this restrictive adapter-only correction.
+
+Query resource/history measurements and independent native deployment guards
+remain synthetic. These component results do not qualify installed query
+authority, protected issuer/runtime composition, public disclosure or a later
+source tree. No public tool or Helm runtime capability is enabled.
+
+## Query source attempts: native pre-I/O accounting qualification (2026-10-18)
+
+Separate fresh PostgreSQL/S3 fixtures tested frozen
+`51fd2e94d41d6ce5e9105b755e7e39671df5944e` after the source-accounting review fix.
+`TestContextQueryCapacityWithRealPostgres` passed in 9.25 seconds, including
+committed-but-unknown Begin, replay, concurrent outer guard work, expiry with an
+unfinished claim, exhaustion and the reserved terminal negative transition.
+`TestContextQueryLedgerWithRealPostgres` passed in 29.77 seconds, including its
+20.54-second full ledger child. Both run the updated three-transaction source
+protocol; the older reports below qualify only their earlier source.
+
+Each report independently matches all 2,652 source hashes to the frozen commit
+archive, records unchanged source and exit zero, and has no cleanup failures.
+The [capacity report](../test/results/context-query-source-spend-capacity-1/fleet-environment.json)
+has SHA-256 `2a545c3199e09790ea11f32c21cb62b09bc456e26d219f38d27b149c3ff6a017`;
+the [ledger report](../test/results/context-query-source-spend-ledger-1/fleet-environment.json)
+has SHA-256 `64cadc8209909a990398b861d017dee1254e9d98227e676b1e47441ad64921e5`.
+Assembled gates passed: 54 generated SQL files, 58 Go packages/338 allowed edges,
+11,375 specification assertions and 1,316 architecture positive/120 invalid cases.
+Independent review cleared the exact source correction and final assembly.
+
+Resource/history measurements and independent deployment guards remain synthetic;
+the ledger also uses synthetic human authority and C-14 closure. This establishes
+component SQL behavior, not installed query authority, protected issuer/runtime
+composition or public disclosure. Missing completion and negative-raced claims
+remain conservatively held; this component supplies no recovery bypass.
+
+
+## Combined protected query capacity and ledger qualification (ADR-206)
+
+Two separate owned PostgreSQL/S3 fixtures passed at frozen
+`446eeb5e9ccb083b1919dee4f0cdd835df7e31e5`. The exact
+`TestContextQueryCapacityWithRealPostgres` selection passed in 9.15 seconds;
+`TestContextQueryLedgerWithRealPostgres` passed in 29.14 seconds, including the
+19.86-second ledger child and the actual managed-context retention checks.
+These runs compose original installation/root/workload acceptance, finite
+query reservations, current C-03 environment and query accounting with encrypted
+C-08 audit. The ledger includes one-use starts, uncertain closure, original
+expiry after blocking locks, scoped-role denials and retained aggregate spend.
+The final-bound regression fix is included in this frozen tree.
+
+Each report independently matches all 2,651 recorded source hashes to the frozen
+archive, records unchanged sources and exit zero, and has no cleanup failures.
+The [capacity report](../test/results/context-query-capacity-assembled-1/fleet-environment.json)
+has SHA-256 `66b1793afd9f6d37d89889274a1d2c898b75e6021ec86f4cc046352c6fb79608`;
+the [ledger report](../test/results/context-query-ledger-assembled-1/fleet-environment.json)
+has SHA-256 `b0d1002c6c2518d62b8adc09ee5c2918806e1cb5800d5bc125f4cd7bb4e11935`.
+Combined capacity, authorization, analysis/domain and PostgreSQL package race
+tests passed, along with scoped vet, SQL generation, Go architecture, specification
+and architecture gates.
+
+The earlier fixture lifetime failure remains recorded below; this run selects
+the evidence lifetime and its covering base backing before original preparation.
+It does not change query limits or renew any persisted deadline.
+
+Measured resource/history qualification, native deployment guards, human
+identity and C-14 worker/closure inputs remain synthetic in these component
+fixtures. Query issuer/key/runtime composition and installed disclosure remain
+pending; no public query or Helm capability is enabled.
+
+## Protected approved-query backing component (ADR-206)
+
+C-07 now has an optional original-installation query qualification, independent
+resource/history compiler, private four-guard producer and separate SQL69 read/
+write facets. The immutable reservation consumes only residual base-root and
+system-pool capacity; all original root dates, finite principal/workload/query
+allowances and uncertain charges remain fixed. Per-deployment numeric limits,
+worker lifecycle/signing/observation history, child audits and finite source
+refresh work require exact measured qualification. C-03 composes that current
+query policy with current recovery and durable processing independently of
+ordinary approved-read authorization. No query role, installer setting or
+public tool is enabled. See [the contract](architecture/context-query-capacity.md).
+
+Independent review found native source guards ran before their finite allowance
+was charged. The follow-up reserves each attempt before guard I/O and holds its
+exact claim until separate joined completion. Unknown/replay/exhaustion cannot
+enter guards; expiry cannot release unfinished work. Declared WAL accounting now
+covers all three source transactions without increasing the original limit.
+The original guard-entry regression failed before the change. Full capacity and
+PostgreSQL race tests, focused source-history/join regressions, integration
+compilation, vet, SQL generation and design gates passed. The later frozen native runs above qualify the new protocol; older native
+reports predate it and do not qualify it. [Component evidence](../test/results/context-query-source-spend-component.json)
+records the exact commands and scope.
+
+Full capacity/authorization/PostgreSQL race tests passed before the final history
+and consumer-deadline tightening; the final capacity/authorization race, five-
+package vet, integration compilation, SQL generation and Go architecture checks
+also passed. Two regressions failed before their fixes: reader buffer reuse
+changed the original accepted policy, and blocking guards/final source reads
+outlived the first backing deadline. Their corrected race runs passed. Recorded
+commands, exits and counts are in
+[test/results/context-query-capacity-component.json](../test/results/context-query-capacity-component.json).
+The duplicate-deployment regression also failed with its protection removed and
+passed restored: four role names cannot pledge the same physical deployment
+limits four times.
+
+The selected owned fleet test
+`TestContextQueryCapacityWithRealPostgres` passed on frozen commit
+`896e491a3e7ceb610a3ce3a4fb228c9f34628933` (9.37 seconds). The
+[first run](../test/results/context-query-capacity-first-run.log) reached original
+acceptance but failed because a PL/pgSQL variable and digest byte-index alias
+were ambiguous. The corrected explicit aliases passed the same bounded
+[selection](../test/results/context-query-capacity-native-run.log). Both runs
+preserved all 2,642 source hashes against their exact committed blobs and had
+empty cleanup failures; see the
+[first environment](../test/results/context-query-capacity-first-environment.json)
+and [passing environment](../test/results/context-query-capacity-native-environment.json).
+The fixture used the unchanged 48-connection component profile.
+
+This composes actual original setup, role/audit/root/workload activation and
+SQL69 reservation with explicitly synthetic query measurements and deployment
+guards. Separate scoped runtime credentials prove missing anchor/allocation
+denial, exact accepted positives and suspended-backing denial. Replay preserves
+the original plan; finite observations exhaust without replenishment and the
+terminal negative retains charges. SQL68 consumes the mandatory anchor lock and
+checks current workload allocation at both final transaction fences. The full
+ledger regression now uses `TestContextQueryLedgerWithRealPostgres`, a separate
+pristine-installation selection with actual root/workload/query acceptance and
+managed context publication. C-03 consumes the accepted query policy through
+`CurrentProjectionEnvironment`; the normal audit pool and finite source budget
+are reserved in the original setup. It retains every earlier ledger assertion,
+including lock synchronization, unknown replies, original lease expiry and
+cross-client aggregate charges. Its integration compilation, original
+qualification race test and integration vet pass. The
+[first native ledger run](../test/results/context-query-ledger-first-run.log)
+on `1ca69f2592d40cb20b468e6097fa3569db0c34d2` reached the late poll assertions
+but failed: the inherited 20-second evidence lifetime did not cover preparation
+plus the 18.54-second ledger subtest. Its
+[report](../test/results/context-query-ledger-first-environment.json) records
+all 2,662 source hashes independently matched and empty cleanup failures.
+The dedicated fixture now selects 60-second evidence retention and a covering
+120-second base backing interval before original installation/submission;
+existing callers retain 20 seconds. Query admission/maximum lifetime remain
+60 seconds, current request authority remains at most five seconds, and no
+persisted dates change. The corrected native selection is pending. The native69
+fence-function probes do not qualify these ledger effects. No hook bypass or
+skipped positive qualification is supplied.
+
+Assembly review then found shorter final source/plan bounds were only checked
+when read: outer guards could finish after those cutoffs and still report
+success. Five regression cases failed before the correction, including an outer
+source read retaining a longer deadline than a newly returned plan. The fix
+rejects those shortened observations before effects/further reads or final
+success. Full capacity race tests and vet pass; positive tests preserve a plan
+when the caller already imposes an earlier bound. These followup checks are
+unit evidence; the native report above remains tied to its original frozen
+commit and does not qualify the later assembled candidate.
+
+Production report acceptance, native guards, role provisioning, complete query
+worker/key delivery, installed qualification and retirement remain unfinished.
+
 ## Approved pod-status console component (ADR-206)
 
 The optional `web/src/projection` view now uses the canonical browser/MCP

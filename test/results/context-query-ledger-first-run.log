@@ -1,0 +1,24 @@
+=== RUN   TestContextQueryLedgerWithRealPostgres
+=== RUN   TestContextQueryLedgerWithRealPostgres/actual-postgres-function-type-alias
+    capacity_sql_fixture_test.go:133: same_function_oid=true display_uses_timestamp_with_time_zone=true
+=== NAME  TestContextQueryLedgerWithRealPostgres
+    context_query_ledger_fixture_test.go:102: fixed_role_production_ms=5615
+    context_query_ledger_fixture_test.go:168: managed_policy_roundtrip exact=true non_time_fields=true same_cutoff=true
+=== RUN   TestContextQueryLedgerWithRealPostgres/processing-read-rejects-uncovered-retention
+=== RUN   TestContextQueryLedgerWithRealPostgres/managed-admission-rejects-uncovered-retention-without-charge
+=== RUN   TestContextQueryLedgerWithRealPostgres/managed-admission-original-expiry-after-permission-wait
+=== NAME  TestContextQueryLedgerWithRealPostgres
+    context_query_ledger_fixture_test.go:168: managed_admission_pair_ms=261 original_request_remaining_ms=4201
+=== RUN   TestContextQueryLedgerWithRealPostgres/context-query-ledger-current-audit-bounds-and-uncertainty
+    context_query_test.go:459: finite paid poll allowance 1 context projection unavailable
+=== NAME  TestContextQueryLedgerWithRealPostgres
+    capacity_producer_test.go:164: actual initial activation and SQL54 purpose facets; source/probe/history inputs synthetic, no window reuse or installed remote observer
+--- FAIL: TestContextQueryLedgerWithRealPostgres (27.71s)
+    --- PASS: TestContextQueryLedgerWithRealPostgres/actual-postgres-function-type-alias (0.00s)
+    --- PASS: TestContextQueryLedgerWithRealPostgres/processing-read-rejects-uncovered-retention (0.00s)
+    --- PASS: TestContextQueryLedgerWithRealPostgres/managed-admission-rejects-uncovered-retention-without-charge (0.04s)
+    --- PASS: TestContextQueryLedgerWithRealPostgres/managed-admission-original-expiry-after-permission-wait (0.40s)
+    --- FAIL: TestContextQueryLedgerWithRealPostgres/context-query-ledger-current-audit-bounds-and-uncertainty (18.54s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	27.764s
+FAIL

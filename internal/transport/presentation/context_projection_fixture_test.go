@@ -78,7 +78,7 @@ func newBridgeFixture(t *testing.T) *bridgeFixture {
 	f.p = value.ContextQueryPlan{AcceptanceID: bridgeID, AccountID: bridgeID, AllocationID: bridgeID, RootID: bridgeID, InstallationID: bridgeID,
 		ClusterID: bridgeID, NamespaceUID: "namespace", WorkloadUID: "workload", AllocationRevision: 1, PoolSource: rev, PolicySource: rev, Principal: principal,
 		Profile: value.ContextQueryResourceProfile{ID: bridgeID, Source: rev, Qualification: rev, Path: path, Lifetime: value.ContextDefaultQueryTime,
-			Worker: value.ContextQueryWorkerLimits{CPUMilli: 100, MemoryBytes: 64 << 20, WorkerTransientBytes: 8 << 20, HubTransientBytes: 128 << 10,
+			Worker: value.ContextQueryWorkerLimits{CPUMilli: 100, MemoryBytes: 64 << 20, EphemeralStorageBytes: 4 << 20, WorkerTransientBytes: 8 << 20, HubTransientBytes: 128 << 10,
 				ProviderConcurrency: 1, AuthenticationConcurrency: 1, Runtime: time.Minute, CredentialLifetime: 2 * time.Minute, ProviderEffectLifetime: time.Minute, Cleanup: time.Minute},
 			Cost: value.ContextQueryCost{Workers: 1, ReadBatches: 2, ReadBytes: 2 * value.ContextBatchReadWork, StructuredBytes: 2 * value.ContextResultBytes,
 				WireBytes: 2 * value.ContextWireBytes, UnwrapAttempts: 6, ProviderRequests: 20, AuthenticationRequests: 20, SigningAttempts: 2, AuditObjects: 20,

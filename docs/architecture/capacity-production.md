@@ -197,3 +197,13 @@ native key INSERT. All generation, scope, current-window, authority and original
 capacity checks remain unchanged; the runtime schema head advances to 55 without
 rewriting migration 54 or stored sessions. Real transfer qualification is recorded
 in implementation progress.
+
+## Original-installation query extension
+
+[Protected query capacity](context-query-capacity.md) adds an optional closed
+original setup extension and a separate immutable residual reservation. Existing
+base totals stay exact. Accepted query resource/history measurements and four
+independent current deployment proofs are mandatory; absent qualification does
+not inherit download capacity. The first implementation is finite and does not
+replenish on root renewal, query expiry or restart. It supplies no installed
+query roles, native qualification or public availability.

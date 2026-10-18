@@ -25,9 +25,19 @@ import (
 // Only the initial human and Kubernetes target observations are synthetic.
 func (f *capacitySQLFixture) admitManagedContext(t *testing.T, root app.RootConfiguration, enrollment app.Enrollment) (captureAdmissionScenario, capturevalue.Accepted) {
 	t.Helper()
+	return f.admitManagedContextRetention(t, root, enrollment, capacityNativeRetentionSeconds)
+}
+
+// Select the fixture's finite retention before policy acceptance and original
+// submission preparation. This never edits a persisted cutoff or renews a
+// request; the existing renewal cases retain their original 20-second default.
+func (f *capacitySQLFixture) admitManagedContextRetention(t *testing.T, root app.RootConfiguration, enrollment app.Enrollment, retentionSeconds int64) (captureAdmissionScenario, capturevalue.Accepted) {
+	t.Helper()
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	target := capacityNativeTarget(f.input.ControlClusterID, f.namespace, f.workloads[0], n)
-	retention := newRetentionEffectFixturesWithPolicy(t, f.ctx, f.fixturePool, f.store, f.keys, capacityNativeRetentionPolicy())(t, f.input.PermissionRootID, target.Target())
+	policyInput := capacityNativeRetentionPolicy()
+	policyInput.Policy.DefaultSeconds = retentionSeconds
+	retention := newRetentionEffectFixturesWithPolicy(t, f.ctx, f.fixturePool, f.store, f.keys, policyInput)(t, f.input.PermissionRootID, target.Target())
 	recovery := &recoveryEffectFixture{installation: f.input.InstallationID}
 	var err error
 	recovery.observation, err = readSyntheticFleetObservationBinding(f.ctx, f.admin, f.input.InstallationID)
@@ -86,7 +96,7 @@ func (f *capacitySQLFixture) admitManagedContext(t *testing.T, root app.RootConf
 	}
 	n = time.Now().UTC().Truncate(time.Microsecond)
 	target.ObservedAt, target.FreshUntil = n, n.Add(5*time.Second)
-	retained, err := privacy.Resolve(policies, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "context", AnchorAt: n, RequestedSeconds: capacityNativeRetentionSeconds}, n)
+	retained, err := privacy.Resolve(policies, privacy.Input{Target: target.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "context", AnchorAt: n, RequestedSeconds: retentionSeconds}, n)
 	if err != nil {
 		t.Fatal(err)
 	}

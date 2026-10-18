@@ -19,32 +19,31 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// These explicit synthetic guards qualify SQL accounting/lineage only. They
-// are not a protected C-07 producer, enrolled C-14 worker or native key reader.
+// The real C-07 producer remains mandatory; this wrapper only injects bounded
+// response loss and a synchronized pre-SQL pause for the negative regressions.
 type querySQLBacking struct {
-	admin *pgxpool.Pool
-	plan  value.ContextQueryPlan
-	after error
+	current   postgres.ContextQueryBackingGuard
+	beforeSQL func(context.Context) error
+	after     error
 }
 
 func (f *querySQLBacking) WithCurrentQueryBacking(ctx context.Context, p value.ContextQueryPlan, a value.ContextProjectionAuthority, fn func(context.Context) error) error {
-	if p.AcceptanceID != f.plan.AcceptanceID || p.RootID != f.plan.RootID || p.InstallationID != f.plan.InstallationID || p.AllocationID != f.plan.AllocationID || p.Profile != f.plan.Profile || p.PoolSource != f.plan.PoolSource || p.PolicySource != f.plan.PolicySource || !p.HardUntil.Equal(f.plan.HardUntil) || !p.EffectsUntil.Equal(f.plan.EffectsUntil) || !p.CleanupUntil.Equal(f.plan.CleanupUntil) || !p.RetireBy.Equal(f.plan.RetireBy) || a.Environment.Path != f.plan.Profile.Path {
-		return value.ErrUnavailable
-	}
-	// Fixture-only current accepted source observation; done before SQL locks.
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	if _, e := f.admin.Exec(ctx, "UPDATE context_query_backing SET observed_at=$2,fresh_until=$3 WHERE root_id=$1", p.RootID, n, n.Add(5*time.Second)); e != nil {
-		return e
-	}
-	if e := fn(ctx); e != nil {
-		return e
+	if err := f.current.WithCurrentQueryBacking(ctx, p, a, func(bound context.Context) error {
+		if f.beforeSQL != nil {
+			if err := f.beforeSQL(bound); err != nil {
+				return err
+			}
+		}
+		return fn(bound)
+	}); err != nil {
+		return err
 	}
 	return f.after
 }
 
+// Worker ownership and joined closure are explicitly synthetic SQL inputs.
 type querySQLWorker struct{ worker value.ContextQueryWorker }
 
 func (f *querySQLWorker) WithCurrentProjectionWorker(ctx context.Context, q value.ContextQuery, r value.ContextQueryRequest, w value.ContextQueryWorker, a value.ContextProjectionAuthority, fn func(context.Context) error) error {
@@ -72,47 +71,22 @@ func (f querySQLIdentity) ResolveIdentity(ctx context.Context) (identity.Identit
 	return f.Identity, nil
 }
 
-type querySQLEnvironment struct {
-	root, installation string
-	path               value.ContextProjectionPath
-	policy             identity.Revision
-	recovery           *postgres.RecoveryReader
-	processing         *postgres.ProcessingReads
-}
-
-func (f querySQLEnvironment) ProjectionEnvironment(ctx context.Context, r authapp.ContextProjectionEvidence, p identity.Principal) (value.ContextProjectionEnvironment, error) {
-	recovery, e := f.recovery.RecoveryState(ctx)
-	if e != nil {
-		return value.ContextProjectionEnvironment{}, e
-	}
-	processing, e := f.processing.ContextProjectionProcessing(ctx, r, recovery)
-	if e != nil {
-		return value.ContextProjectionEnvironment{}, e
-	}
-	n := time.Now().UTC().Truncate(time.Microsecond)
-	return value.ContextProjectionEnvironment{RootID: f.root, InstallationID: f.installation, Region: f.path.AcquisitionRegion, StoreID: r.Retained.Registration.StoreID, Location: r.Retained.Registration.Location, Principal: p, PolicyRevision: f.policy, Recovery: recovery, Processing: processing, Path: f.path, ObservedAt: n, ValidUntil: minPublicationTime(r.ValidUntil, minPublicationTime(recovery.FreshUntil, processing.ValidUntil))}, nil
-}
-
 // Real PostgreSQL and encrypted, positively closed S3 invocation audit against
 // the actual published/verified synthetic context. Current C-03 permissions,
 // retained origins, processing and transaction guards are real adapters. Human
 // identity, resource qualification and C-14 ownership are explicit fixtures.
-func qualifyContextQueries(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) (captureAdmissionScenario, artifact.PublishedContext)) {
+func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
+	ctx, admin, poolFor, store, keys := f.base.ctx, f.base.admin, f.base.fixturePool, f.base.store, f.base.keys
 	t.Helper()
 	t.Run("context-query-ledger-current-audit-bounds-and-uncertainty", func(t *testing.T) {
-		s, published := create(t)
-		sources := startNativeScenarioSources(t, ctx, admin, s)
-		defer sources.Close()
-		s.nativeSources = sources
-		ctx = sources.ctx
+		s, published := f.scenario, f.published
+		rootID := f.base.input.PermissionRootID
 		runtime := poolFor("context_query_runtime", "synthetic-context-query")
 		defer runtime.Close()
 		keySlots := poolFor("context_query_key_fixture", "synthetic-context-query-key")
 		defer keySlots.Close()
 		catalogPool := poolFor("context_catalog_read_runtime", "synthetic-context-read")
 		defer catalogPool.Close()
-		configPool := poolFor("operation_audit_config_runtime", "synthetic-operation-config")
-		defer configPool.Close()
 		journalPool := poolFor("operation_audit_runtime", "synthetic-operation-journal")
 		defer journalPool.Close()
 		ackPool := poolFor("operation_audit_ack_runtime", "synthetic-operation-ack")
@@ -143,54 +117,28 @@ func qualifyContextQueries(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 			return b
 		}
 		e := published.Expectation
-		rev := func(mark byte) identity.Revision {
-			return identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{mark}}
-		}
-		path := value.ContextProjectionPath{Purpose: value.ContextProjectionPurpose, ID: custodyID(), TargetClusterID: e.Registration.Location.ClusterID, StoreID: e.Registration.StoreID, StorageRegion: "fixture-region", AcquisitionClusterID: e.Registration.Location.ClusterID, AcquisitionRegion: "fixture-region", ConnectorClusterID: e.Registration.Location.ClusterID, ConnectorRegion: "fixture-region", HubClusterID: e.Registration.Location.ClusterID, HubRegion: "fixture-region", WorkerConfiguration: rev(11), HubConfiguration: rev(12)}
-		profile := value.ContextQueryResourceProfile{ID: custodyID(), Source: rev(13), Qualification: rev(14), Path: path, Lifetime: 60 * time.Second, PollLimit: 4, ControlTransitionLimit: 32,
-			Worker: value.ContextQueryWorkerLimits{CPUMilli: 100, MemoryBytes: 64 << 20, WorkerTransientBytes: 8 << 20, HubTransientBytes: 128 << 10, ProviderConcurrency: 1, AuthenticationConcurrency: 1, Runtime: time.Minute, CredentialLifetime: 2 * time.Minute, ProviderEffectLifetime: time.Minute, Cleanup: time.Minute},
-			Cost:   value.ContextQueryCost{Workers: 1, ReadBatches: 2, ReadBytes: 2 * value.ContextBatchReadWork, StructuredBytes: 2 * value.ContextResultBytes, WireBytes: 2 * value.ContextWireBytes, UnwrapAttempts: 6, ProviderRequests: 32, AuthenticationRequests: 32, SigningAttempts: 2, AuditObjects: 32, SQLRows: 32, SQLBytes: 1 << 20, WALBytes: 16 << 20, BackupBytes: 4 << 20}}
-		n := time.Now().UTC().Truncate(time.Microsecond)
-		plan := value.ContextQueryPlan{AcceptanceID: custodyID(), AccountID: custodyID(), AllocationID: custodyID(), RootID: s.a.RootID, InstallationID: s.recovery.installation, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, AllocationRevision: 1, PoolSource: rev(15), PolicySource: rev(16), Principal: s.a.Plan.Input.Executor, Profile: profile, ObservedAt: n, ValidUntil: n.Add(5 * time.Second), HardUntil: n.Add(2 * time.Minute), EffectsUntil: n.Add(4 * time.Minute), CleanupUntil: n.Add(5 * time.Minute), RetireBy: n.Add(time.Hour)}
-		// Two fully reserved query obligations, across all clients. These cost
-		// figures are synthetic arithmetic inputs, not measured backend capacity.
-		envelope := map[string]int64{}
-		costBytes := raw(profile.Cost)
-		var cost map[string]int64
-		if err := json.Unmarshal(costBytes, &cost); err != nil {
-			t.Fatal(err)
-		}
-		for name, v := range cost {
-			envelope[name] = v * 2
-		}
-		for name, v := range map[string]int64{"CPUMilli": profile.Worker.CPUMilli, "MemoryBytes": profile.Worker.MemoryBytes, "WorkerTransientBytes": profile.Worker.WorkerTransientBytes, "HubTransientBytes": profile.Worker.HubTransientBytes, "ProviderConcurrency": profile.Worker.ProviderConcurrency, "AuthenticationConcurrency": profile.Worker.AuthenticationConcurrency} {
-			envelope[name] = v * 2
-		}
-		if _, err := admin.Exec(ctx, "INSERT INTO context_query_backing(root_id,installation_id,acceptance_id,profile,qualification,envelope,query_limit,principal_query_limit,principal_account_limit,allocation_limit,observed_at,fresh_until,hard_until,effects_until,cleanup_until,retire_by,suspended) VALUES($1,$2,$3,$4,$5,$6,2,2,2,1,$7,$8,$9,$10,$11,$12,false)", plan.RootID, plan.InstallationID, plan.AcceptanceID, raw(profile), raw(profile.Qualification), raw(envelope), n, n.Add(5*time.Second), plan.HardUntil, plan.EffectsUntil, plan.CleanupUntil, plan.RetireBy); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := admin.Exec(ctx, "INSERT INTO context_query_allocation(id,root_id,cluster_id,namespace_uid,workload_uid,revision,pool_source,policy_source,query_limit) VALUES($1,$2,$3,$4,$5,1,$6,$7,2)", plan.AllocationID, plan.RootID, plan.ClusterID, plan.NamespaceUID, plan.WorkloadUID, raw(plan.PoolSource), raw(plan.PolicySource)); err != nil {
-			t.Fatal(err)
-		}
-		backing := &querySQLBacking{admin: admin, plan: plan}
+		path := f.currentProfile().Path
+		principal := s.a.Plan.Input.Executor
+		backing := &querySQLBacking{current: f.current}
 		worker := &querySQLWorker{}
-		ledger, err := postgres.NewContextQueries(ctx, runtime, plan.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}, backing, worker)
+		ledger, err := postgres.NewContextQueries(ctx, runtime, rootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}, backing, worker)
 		if err != nil {
 			t.Fatal(err)
 		}
-		catalog, err := postgres.NewContextPublications(ctx, catalogPool, plan.RootID)
+		catalog, err := postgres.NewContextPublications(ctx, catalogPool, rootID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		processing, err := postgres.NewProcessingReads(ctx, catalogPool, plan.RootID, s.recovery.guard)
+		processing, err := postgres.NewProcessingReads(ctx, catalogPool, rootID, s.recovery.guard)
 		if err != nil {
 			t.Fatal(err)
 		}
-		environment := querySQLEnvironment{root: plan.RootID, installation: plan.InstallationID, path: path, policy: plan.PolicySource, recovery: s.recovery.reader, processing: processing}
-		authorityGate := authapp.ContextProjectionAuthority{RootID: plan.RootID, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: nativeFixtureRetainedPolicies(s), Now: time.Now}, Environment: environment, Now: time.Now}
-		scope := value.ContextProjectionScope{RootID: plan.RootID, CaseID: e.CaseID, CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, ClusterID: plan.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(published.Copies), SourceProjectionDigest: value.ContextSourceProjectionDigest(), SourceFormat: artifact.ContextFormat, DisplayVersion: value.ContextDisplayVersion, Selection: value.LineSelection{LineStart: 1, MaxLines: 14}, Principal: plan.Principal}
+		environment := authapp.CurrentProjectionEnvironment{RootID: rootID, InstallationID: f.base.input.InstallationID, Policies: f.current, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}
+		authorityGate := authapp.ContextProjectionAuthority{RootID: rootID, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: environment, Now: time.Now}
+		scope := value.ContextProjectionScope{RootID: rootID, CaseID: e.CaseID, CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(published.Copies), SourceProjectionDigest: value.ContextSourceProjectionDigest(), SourceFormat: artifact.ContextFormat, DisplayVersion: value.ContextDisplayVersion, Selection: value.LineSelection{LineStart: 1, MaxLines: 14}, Principal: principal}
 		authority := func(principal identity.Principal) value.ContextProjectionAuthority {
 			t.Helper()
+			f.refresh(t)
 			n := time.Now().UTC().Truncate(time.Microsecond)
 			who := s.a.Eligibility.VerifiedIdentity
 			who.Principal = principal
@@ -204,34 +152,11 @@ func qualifyContextQueries(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 			}
 			return a
 		}
-		config, err := postgres.New(ctx, configPool)
+		plan, err := f.current.ContextQueryPlan(ctx, authority(principal))
 		if err != nil {
-			t.Fatal(err)
+			t.Fatal("actual accepted query plan", err)
 		}
-		n = time.Now().UTC().Truncate(time.Microsecond)
-		// Publication setup already initialized processing through this normal
-		// audit lane. Preserve its account and storage/history identities and
-		// retained spend while expanding the explicit fixture backing via CAS.
-		var revision, accounts, records int64
-		if err = configPool.QueryRow(ctx, "SELECT revision,account_limit,records_per_account FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", plan.RootID).Scan(&revision, &accounts, &records); err != nil || revision != 1 || accounts != 2 || records != 2 {
-			t.Fatal("original processing audit backing", revision, accounts, records, err)
-		}
-		var policy audit.OperationLifecyclePolicy
-		var retainedPolicy []byte
-		var policyCount int64
-		if err = admin.QueryRow(ctx, `SELECT count(*),min(policy)::jsonb FROM (
- SELECT (intent->'Lifecycle'->'Policy')::text AS policy FROM operation_audit
- WHERE root_id=$1 AND lane='normal' AND intent->>'Name'='initialize_processing'
- AND intent_receipt IS NOT NULL AND outcome_receipt IS NOT NULL LIMIT 2
-) original`, plan.RootID).Scan(&policyCount, &retainedPolicy); err != nil || policyCount != 1 || json.Unmarshal(retainedPolicy, &policy) != nil || !policy.CertificateVerificationBacked() || policy.RootID != plan.RootID || policy.Lane != "normal" || policy.InstallationID != plan.InstallationID || policy.BackingRevision != revision {
-			t.Fatal("original acknowledged processing audit policy", err)
-		}
-		if err = config.ProvisionOperationAuditPool(ctx, auditapp.OperationAuditPool{RootID: plan.RootID, Lane: "normal", AccountVersion: "accounts-v1", ExpectedRevision: revision, Accounts: 2, RecordsPerAccount: 32, RetainedSeconds: 3600, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), ValidUntil: n.Add(time.Hour)}); err != nil {
-			t.Fatal(err)
-		}
-		policy.BackingRevision, policy.MetadataSlots, policy.ValidUntil = revision+1, 64, n.Add(time.Hour)
-		bb, ww := policy.History.SlotBacking(policy.MaxPurgeLeases)
-		policy.BackupReservedBytes, policy.WALReservedBytes = bb*policy.MetadataSlots, ww*policy.MetadataSlots
+		policy := f.audit.Normal.Policy
 		journal, err := postgres.NewHealthyOperationJournal(ctx, journalPool, policy, s.recovery.guard)
 		if err != nil {
 			t.Fatal(err)
@@ -254,8 +179,9 @@ func qualifyContextQueries(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		}
 		invocation := func(tool string, p identity.Principal, acknowledge bool) (value.ContextQueryRequest, audit.OperationIntent) {
 			t.Helper()
+			f.refresh(t)
 			n := time.Now().UTC().Truncate(time.Microsecond)
-			in := audit.OperationIntent{ID: custodyID(), RootID: plan.RootID, TraceID: custodyID(), Name: tool, InputFormat: "context-query-input/v1", MACVersion: "query-fixture-v1", AccountVersion: "accounts-v1", Actor: p, PrincipalDigest: artifact.Digest{41}, InputDigest: artifact.Digest{42}, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(30 * time.Second), RetainUntil: n.Add(time.Hour)}
+			in := audit.OperationIntent{ID: custodyID(), RootID: plan.RootID, TraceID: custodyID(), Name: tool, InputFormat: "context-query-input/v1", MACVersion: "query-fixture-v1", AccountVersion: f.base.input.AccountVersion, Actor: p, PrincipalDigest: artifact.Digest{41}, InputDigest: artifact.Digest{42}, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(30 * time.Second), RetainUntil: n.Add(time.Duration(f.audit.Normal.RetainedSeconds) * time.Second)}
 			if acknowledge {
 				if err := auditor.Begin(ctx, in); err != nil {
 					t.Fatal("healthy query intent", err)
@@ -265,9 +191,10 @@ func qualifyContextQueries(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		}
 		makeQuery := func(r value.ContextQueryRequest, a value.ContextProjectionAuthority) value.ContextQuery {
 			t.Helper()
-			p := plan
-			p.Principal = a.Scope.Principal
-			p.ObservedAt, p.ValidUntil = a.CheckedAt, a.ValidUntil
+			p, err := f.current.ContextQueryPlan(ctx, a)
+			if err != nil {
+				t.Fatal("fresh actual query plan", err)
+			}
 			// Match the real C-18 clock: deliberately supply nonzero nanoseconds.
 			originalNow := time.Now().UTC().Truncate(time.Microsecond).Add(789 * time.Nanosecond)
 			q, err := value.NewContextQuery(custodyID(), r.Call.ID, custodyID(), a, p, originalNow)
@@ -293,6 +220,7 @@ func qualifyContextQueries(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		request, intent := invocation("get_file_excerpt", plan.Principal, true)
 		a = authority(plan.Principal)
 		query := makeQuery(request, a)
+		t.Logf("original_evidence_seconds=%.0f original_query_remaining_ms=%d", e.Registration.ExpiresAt.Sub(e.Registration.AnchorAt).Seconds(), time.Until(query.Deadline).Milliseconds())
 		accepted, err := ledger.AdmitQuery(ctx, query, request, a)
 		if err != nil || !accepted.Fresh {
 			t.Fatal("first query", err)
@@ -430,16 +358,36 @@ func qualifyContextQueries(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		blockedRequest, _ := invocation("get_file_excerpt", plan.Principal, true)
 		blockedAuthority := authority(plan.Principal)
 		blockedQuery := makeQuery(blockedRequest, blockedAuthority)
+		ready, proceed := make(chan struct{}), make(chan struct{})
+		backing.beforeSQL = func(bound context.Context) error {
+			close(ready)
+			select {
+			case <-proceed:
+				return nil
+			case <-bound.Done():
+				return bound.Err()
+			}
+		}
+		result := make(chan error, 1)
+		go func() { _, e := ledger.AdmitQuery(ctx, blockedQuery, blockedRequest, blockedAuthority); result <- e }()
+		select {
+		case <-ready:
+		case e := <-result:
+			t.Fatal("guard did not reach SQL boundary", e)
+		case <-time.After(2 * time.Second):
+			t.Fatal("guard boundary not observed")
+		}
 		blocker, err := admin.Begin(ctx)
 		if err != nil {
+			close(proceed)
 			t.Fatal(err)
 		}
 		defer blocker.Rollback(context.Background())
 		if _, err = blocker.Exec(ctx, "SELECT id FROM permission_stream WHERE id=$1 FOR UPDATE", plan.RootID); err != nil {
+			close(proceed)
 			t.Fatal(err)
 		}
-		result := make(chan error, 1)
-		go func() { _, e := ledger.AdmitQuery(ctx, blockedQuery, blockedRequest, blockedAuthority); result <- e }()
+		close(proceed)
 		observed, stopObserved := context.WithTimeout(ctx, 2*time.Second)
 		for {
 			var waiting bool
@@ -475,9 +423,9 @@ func qualifyContextQueries(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		case <-time.After(5 * time.Second):
 			t.Fatal("blocked query did not join original deadline")
 		}
-		if _, err = admin.Exec(ctx, "UPDATE context_query_backing SET suspended=false WHERE root_id=$1", plan.RootID); err != nil {
-			t.Fatal(err)
-		}
+		backing.beforeSQL = nil
+		// Restore only through a fresh independently guarded producer observation.
+		f.refresh(t)
 		charged(1)
 		// A lost guard/commit response returns no Fresh result, while private lookup
 		// observes the original committed query and all aggregate accounts stay paid.
@@ -509,13 +457,13 @@ func qualifyContextQueries(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 			a := authority(plan.Principal)
 			err := ledger.AdmitQueryPoll(ctx, query, poll, a)
 			if (i < 2 && err != nil) || (i == 2 && err == nil) {
-				t.Fatal("finite paid poll allowance", i, err)
+				t.Fatalf("finite paid poll allowance %d: %v (original query remaining %s, original evidence remaining %s)", i, err, time.Until(query.Deadline), time.Until(e.Registration.ExpiresAt))
 			}
 		}
 		for _, statement := range []string{"UPDATE context_query SET generation=0 WHERE id=$1", "UPDATE context_query SET active_batch=NULL WHERE id=$1", "UPDATE context_query SET deadline=deadline+interval '1 second' WHERE id=$1", "DELETE FROM context_query WHERE id=$1"} {
 			_, err = admin.Exec(ctx, statement, query.ID)
 			requireSQLCode(err, "23514", statement)
 		}
-		t.Logf("verified real SQL/S3 query accounting and healthy invocation lineage; C07/C14 inputs remain synthetic; original query=%s, uncertain generation=%d, charged queries=2", query.ID, generation)
+		t.Logf("verified real SQL/S3 query accounting and healthy invocation lineage; C07 acceptance and C03 environment are actual; resource report/native guards and C14 ownership remain synthetic; original query=%s, uncertain generation=%d, charged queries=2", query.ID, generation)
 	})
 }

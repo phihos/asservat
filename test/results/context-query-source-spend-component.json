@@ -1,0 +1,54 @@
+{
+  "scope": "C07 source-attempt accounting component only. No native SQL or installed query qualification for this correction. Query measurements and native deployment guards in the selected fixture remain synthetic.",
+  "baseCommit": "66a728a542ccc9b216052e2bb6a172c080ebc272",
+  "environment": {
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-p=2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "PYTHON": "/home/phil/.cache/asservat-build/spec-venv/bin/python"
+  },
+  "failingFirst": {
+    "command": "go test -count=1 ./internal/application/capacity -run '^TestQueryCapacityProducerSpendsBeforeGuardAndDeniesUnknownStart$'",
+    "result": "Both guard-failure and unknown-start failed before the fix: native guard entered with starts=0 guards=1 accepts=0. Tool transcript retained; no separate original log saved."
+  },
+  "checks": [
+    {
+      "command": "go test -race -count=1 ./internal/application/capacity ./internal/adapters/postgres",
+      "exit": 0,
+      "result": "Both full touched-package race suites passed.",
+      "logSHA256": "e827b4e293c555d94f4f68c80cd3e566cd51c030804d891ddf032b58a50fa602"
+    },
+    {
+      "command": "go test -count=1 ./test/integration -run '^$'",
+      "exit": 0,
+      "result": "Compile only; no integration tests selected.",
+      "logSHA256": "4fc935e8dd9948e2be12a6333da5d2ecf15a6210b157e0bd4153c1c375200c76"
+    },
+    {
+      "command": "go test -race -count=1 ./internal/application/capacity -run 'TestQueryCapacity(Producer|SourceHistory)'",
+      "exit": 0,
+      "result": "Source pre-spend, exhaustion, joined completion, cancellation, original expiry and three-transaction WAL floor passed.",
+      "logSHA256": "9acffee584999a70cfb2aeef3ad394f8fe8aaf0e1a6506814fedd662c6a10b35"
+    },
+    {
+      "command": "go vet ./internal/application/capacity ./internal/adapters/postgres ./test/integration",
+      "exit": 0,
+      "result": "Passed.",
+      "logSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "make go-architecture-check sql-check",
+      "exit": 0,
+      "result": "58 packages/337 edges; 54 generated SQL files.",
+      "logSHA256": "74629cd910f9aee896d3f3ac5e969789fee6466e06054c92933386786b077427"
+    },
+    {
+      "command": "make spec-check architecture-check",
+      "exit": 0,
+      "result": "11364 spec assertions; 1307 architecture checks plus 120 invalid cases.",
+      "logSHA256": "7023e26598f56d8a732b5ce14dbbd56e62542fb783a57e9b47510dccf4bec272"
+    }
+  ],
+  "nativeStatus": "Not run for this correction. Parent will qualify final assembled source using separate fresh capacity and full ledger selections."
+}

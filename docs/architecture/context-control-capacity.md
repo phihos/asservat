@@ -60,3 +60,13 @@ Tests and fixtures use synthetic inputs. The focused handoff lists commands and
 actual results; native qualification is pending. Protected configuration
 producers, periodic supervision, retirement and Helm/runtime composition remain
 separate implementation work.
+
+## Independent approved-query control
+
+ADR-206 approved reads consume the separate
+[query-capacity reservation](context-query-capacity.md), not capture-control rows
+or download windows. Polls, credential continuation, first-Pod observation and
+source refresh must all fit the exact accepted finite control/history profile.
+Queries remain unavailable without original protected acceptance and measured
+worker/hub/key/provider backing. Two delivery batches are not a poll limit, and
+expiry does not prove cleanup or replenish control allowances.

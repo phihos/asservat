@@ -581,3 +581,15 @@ advertises a public operation when one of those capabilities is absent.
    default query lifetime under normal background work. Record source/image
    identities, actual exits and terminal cleanup. Component tests and offline
    document gates do not complete this installed qualification or all of S-02.
+
+## Protected query backing and environment component
+
+The [C-07 producer and C-03 environment](context-query-capacity.md) now have
+private compiler/source/read/write components. The optional original-install
+extension preserves omitted bytes and reserves additional capacity without
+changing the base graph. Separate measured deployment limits, immutable
+report/profile provenance, exact original dates and four independent guards
+are required. Their production native composition and the SQL ledger's mandatory
+anchor hook remain separate work. The C-03 environment consumes query policy,
+recovery and purpose-neutral processing state; no download permission or static
+region fallback is introduced. No public tool is enabled.

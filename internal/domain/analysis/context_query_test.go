@@ -10,7 +10,7 @@ import (
 // Synthetic accepted backing exercises structural boundaries only; no fixture
 // value is an accepted production source or a measured resource qualification.
 func queryPlan(a ContextProjectionAuthority) ContextQueryPlan {
-	w := ContextQueryWorkerLimits{CPUMilli: 100, MemoryBytes: 64 << 20, WorkerTransientBytes: 8 << 20, HubTransientBytes: 128 << 10,
+	w := ContextQueryWorkerLimits{CPUMilli: 100, MemoryBytes: 64 << 20, EphemeralStorageBytes: 4 << 20, WorkerTransientBytes: 8 << 20, HubTransientBytes: 128 << 10,
 		ProviderConcurrency: 1, AuthenticationConcurrency: 1, Runtime: time.Minute, CredentialLifetime: 2 * time.Minute,
 		ProviderEffectLifetime: time.Minute, Cleanup: time.Minute}
 	c := ContextQueryCost{Workers: 1, ReadBatches: 2, ReadBytes: 2 * ContextBatchReadWork, StructuredBytes: 2 * ContextResultBytes,
@@ -49,6 +49,7 @@ func TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate(t *testing.T) {
 		"expire-provider-at-query":           func(q *ContextQuery) { q.ProviderUntil = q.Deadline },
 		"expire-cleanup-at-query":            func(q *ContextQuery) { q.CleanupUntil = q.Deadline },
 		"missing-acceptance":                 func(q *ContextQuery) { q.Plan.AcceptanceID = "" },
+		"missing-ephemeral-storage":          func(q *ContextQuery) { q.Plan.Profile.Worker.EphemeralStorageBytes = 0 },
 		"missing-worker-copy":                func(q *ContextQuery) { q.Plan.Profile.Worker.WorkerTransientBytes = 0 },
 		"missing-hub-copy":                   func(q *ContextQuery) { q.Plan.Profile.Worker.HubTransientBytes = 0 },
 		"missing-provider-concurrency":       func(q *ContextQuery) { q.Plan.Profile.Worker.ProviderConcurrency = 0 },

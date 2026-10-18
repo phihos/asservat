@@ -1,0 +1,8 @@
+{
+  "command": "make spec-check architecture-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+  "exit": 0,
+  "specAssertions": 11385,
+  "architecturePositiveChecks": 1316,
+  "architectureRejectedInvalidCases": 120,
+  "scope": "Documentation and contract checks after retaining frozen native evidence; not an additional native qualification."
+}
