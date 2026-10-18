@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Installed native 52: setup marks dropped by the producer re-wrap (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39175416010)
+on frozen `5295886ede94a8e4c55d5623ac87177890b01b84` failed before capture with
+the same timing shape as native51 (`setup-settings-guard` at 3.3–4.3 seconds
+with 10–70 milliseconds left). Marks were still absent: the setup producer's
+re-wrap kept only the fixed code and cutoff. It now also keeps the completed
+check marks, which the receiving diagnostic restricts again.
+
+[Archive verification](../test/results/installed-journey-ci-52/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 51: setup trace missing, first setup checks take ~3 seconds (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39173419544)
