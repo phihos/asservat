@@ -77,6 +77,7 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	evidenceFile := flags.String("evidence-read-credential", "", "the publisher's read-only evidence storage credential JSON file (phase 3 with a publisher)")
 	publisherAuditFile := flags.String("publisher-audit-credential", "", "the publisher's scoped audit storage credential JSON file (phase 3 with a publisher)")
 	downloadEvidenceFile := flags.String("download-evidence-credential", "", "the download workers' read-only evidence storage credential JSON file (phase 3 with downloads)")
+	evidenceDeleteFile := flags.String("evidence-delete-credential", "", "the context deletion's list-and-delete evidence storage credential JSON file (phase 3 with deletion)")
 	if flags.Parse(args) != nil || flags.NArg() != 0 || *installation == "" || *credentialFile == "" {
 		return mounts.ErrUnavailable
 	}
@@ -120,6 +121,12 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		return err
 	}
 	defer clear(downloads)
+	// ADR-205 decision 4: the context deletion child's own evidence principal.
+	deletion, err := readEvidenceDeleteCredential(*evidenceDeleteFile)
+	if err != nil {
+		return err
+	}
+	defer clear(deletion)
 	// ADR-194: a promoted owner's public material, all three or none.
 	var public map[string][]byte
 	if *clientSecretFile != "" || *certificateFile != "" || *keyFile != "" {
@@ -153,6 +160,7 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		Publisher  json.RawMessage `json:"publisher"`
 		Public     bool            `json:"public"`
 		Downloads  json.RawMessage `json:"downloadEvidenceReadStorage"`
+		Deletion   json.RawMessage `json:"evidenceDeleteStorage"`
 	}
 	if json.Unmarshal(outbox.Recipe, &plan) == nil && len(plan.Federation) != 0 && string(plan.Federation) != "null" && federation == nil {
 		_, _ = fmt.Fprintln(out, "This recipe provisions the federation: pass --federation-audit-credential with its separately scoped audit credential.")
@@ -164,6 +172,10 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 	}
 	if hasDownloads := len(plan.Downloads) != 0 && string(plan.Downloads) != "null"; hasDownloads != (downloads != nil) {
 		_, _ = fmt.Fprintln(out, "Pass --download-evidence-credential exactly when this recipe names the download workers' evidence read credential.")
+		return mounts.ErrUnavailable
+	}
+	if hasDeletion := len(plan.Deletion) != 0 && string(plan.Deletion) != "null"; hasDeletion != (deletion != nil) {
+		_, _ = fmt.Fprintln(out, "Pass --evidence-delete-credential exactly when this recipe names the context deletion's evidence delete credential.")
 		return mounts.ErrUnavailable
 	}
 	if plan.Public != (public != nil) {
@@ -183,7 +195,7 @@ func RunInstallerProviderApply(ctx context.Context, args []string, out io.Writer
 		return err
 	}
 	defer clear(token)
-	if err = kube.WriteInstallerInbox(ctx, configuration, resolved, *installation, outbox.Phase, token, credential, federation, public, publisher, downloads); err != nil {
+	if err = kube.WriteInstallerInbox(ctx, configuration, resolved, *installation, outbox.Phase, token, credential, federation, public, publisher, downloads, deletion); err != nil {
 		return err
 	}
 	_, err = fmt.Fprintln(out, "Inbox written; the continuation verifies the provider before any use.")

@@ -32,6 +32,10 @@ const (
 	// separate read-only evidence principal in the phase-3 inbox (ADR-204
 	// decision 5); it is copied only into the worker namespace's store Secret.
 	InstallerInboxDownloadEvidenceCredential = "download-evidence-read.json"
+	// InstallerInboxEvidenceDeleteCredential is the context deletion child's
+	// evidence list-and-delete principal in the phase-3 inbox (ADR-205
+	// decision 4); it is copied only into EvidenceDeleteCredentialName.
+	InstallerInboxEvidenceDeleteCredential = "evidence-delete.json"
 )
 
 // InstallerInboxPublicFiles are the operator's public material in a promoted

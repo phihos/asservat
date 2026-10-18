@@ -41,6 +41,9 @@ func ConfigurationProviderInstalledSetupArtifact(in contracts.HubWorkerDeploymen
 // creates that Transit key, lets the two audit purposes use it and lists the
 // download-worker-configuration audit prefix; the same selection must bind
 // the resource journal, so that every later recipe recomputation agrees.
+// A selection with a ContextDeletionSigning key (ADR-205) likewise creates
+// that Ed25519 key, lets audit-wrap sign with it, names it for the readback of
+// its public keys and lists the context-deletion audit prefix.
 func ConfigurationProviderPairSetupArtifact(in contracts.HubWorkerDeployment, selection contracts.ConfigurationProviderSelection, account contracts.WorkerObjectReference, layout string, now time.Time) ([]byte, error) {
 	if layout != contracts.HubWorkerProviderInstalledLayout {
 		return nil, cfg.ErrInvalid
@@ -53,9 +56,9 @@ func configurationProviderSetupArtifact(in contracts.HubWorkerDeployment, select
 	if err != nil {
 		return nil, err
 	}
-	worker := selection.WorkerConfigurationAudit
-	// The worker configuration audit is versioned; the legacy profile has none.
-	if worker != (contracts.OwnerPublicTransit{}) && !versioned {
+	worker, signing := selection.WorkerConfigurationAudit, selection.ContextDeletionSigning
+	// Both audits are versioned; the legacy profile has neither.
+	if (worker != (contracts.OwnerPublicTransit{}) || signing != (contracts.OwnerPublicTransit{})) && !versioned {
 		return nil, cfg.ErrInvalid
 	}
 	body, err := configurationProviderRecipeBody(in, r)
@@ -83,6 +86,12 @@ func configurationProviderSetupArtifact(in contracts.HubWorkerDeployment, select
 		requests = append(requests, configurationProviderSetupRequest{Method: "POST", Path: worker.Mount + "/keys/" + worker.Key, Body: configurationTransitKey})
 		reads = append(reads, configurationWorkerAuditReads(in, worker)...)
 	}
+	if signing != (contracts.OwnerPublicTransit{}) {
+		// ADR-205 decision 6: create the deletion signing key on the already
+		// read configuration audit mount; the readback records its public keys.
+		requests = append(requests, configurationProviderSetupRequest{Method: "POST", Path: signing.Mount + "/keys/" + signing.Key, Body: configurationSigningKey})
+		reads = append(reads, signing.Mount+"/keys/"+signing.Key)
+	}
 	// Native backend qualification must establish the actual conditional-create
 	// and no-overwrite/delete semantics. These requirements neither create IAM
 	// nor pretend every S3-compatible provider implements AWS condition keys.
@@ -106,6 +115,13 @@ func configurationProviderSetupArtifact(in contracts.HubWorkerDeployment, select
 		prefixes := append(storage.Prefixes, "retention-acceptance/v1/", "lifecycle/v1/")
 		if worker != (contracts.OwnerPublicTransit{}) {
 			prefixes = append(prefixes, "download-worker-configuration/v1/"+in.InstallationID+"/")
+		}
+		// ADR-205 decision 5: deletion records are context-deletion/v1/<root>/.
+		// Like authority/v1/, the permission root is minted after this phase,
+		// so the principal is scoped to the fixed prefix; the deletion writer
+		// admits only its own root and conditional create forbids overwrites.
+		if signing != (contracts.OwnerPublicTransit{}) {
+			prefixes = append(prefixes, "context-deletion/v1/")
 		}
 		requirements = struct {
 			Prefixes             []string `json:"prefixes"`
@@ -133,6 +149,10 @@ func configurationProviderSetupArtifact(in contracts.HubWorkerDeployment, select
 // configurationTransitKey is the create body of a new audit Transit key,
 // the same as the publisher's and the owner's (ADR-184/203).
 var configurationTransitKey = json.RawMessage(`{"type":"aes256-gcm96","derived":false,"exportable":false,"allow_plaintext_backup":false}`)
+
+// configurationSigningKey is the create body of the context deletion signing
+// key, the same settings as the owner's work-signing key (ADR-194).
+var configurationSigningKey = json.RawMessage(`{"type":"ed25519","derived":false,"exportable":false,"allow_plaintext_backup":false}`)
 
 // configurationWorkerAuditReads are the named reads of the worker
 // configuration audit key: its mount, unless it is the configuration audit
