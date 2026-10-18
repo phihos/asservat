@@ -7,6 +7,8 @@ import (
 	"fmt"
 	mathrand "math/rand/v2"
 	"net"
+	"os"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -335,6 +337,7 @@ func (r *OwnerRuntime) Run(listener net.Listener, additional ...net.Listener) (r
 		}
 		observed := router.Listener(r.observation.name)
 		nativeListener = router.Listener(name)
+		router.Report = ownerRouterReporter(name, r.observation.name)
 		launch(startupRunRouter, router.Run)
 		launch(startupRunObservation, func() error { return r.observation.serve(r.root, observed, r.connections) })
 	}
@@ -365,4 +368,12 @@ func (r *OwnerRuntime) Run(listener net.Listener, additional ...net.Listener) (r
 		}
 		return err
 	}
+}
+
+// ownerRouterReporter logs the server-name router's events, naming the child
+// as native or observation rather than by its DNS name.
+func ownerRouterReporter(native, observation string) func(string) {
+	log := eventLog(os.Stderr, "owner router")
+	names := strings.NewReplacer(" "+native, " native", " "+observation, " observation")
+	return func(event string) { log(names.Replace(event)) }
 }
