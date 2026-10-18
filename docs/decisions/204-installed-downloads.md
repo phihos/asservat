@@ -7,7 +7,7 @@ Amends [ADR-194](194-promoted-owner-inputs.md) decision 5 and
 [ADR-192](192-capacity-before-download-paths.md) decision 3. Follows
 [ADR-179](179-outbound-only-first-installed-profile.md) decision 1 (hub-local
 download workers), [ADR-069](069-download-worker-dispatch.md) to
-[ADR-071](071-download-worker-enrollment.md) and [ADR-203](203-installed-publisher.md).
+[ADR-071](071-download-worker-enrollment.md) and ADR-203 (installed publisher, in review).
 
 ## Context
 
