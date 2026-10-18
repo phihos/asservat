@@ -81,8 +81,26 @@ func refusalStep(ctx context.Context, step string) {
 		return
 	}
 	if report, ok := ctx.Value(refusalStepKey{}).(func(string)); ok && report != nil {
-		report(step)
+		report(step + RemainingBucket(ctx, time.Now()))
 	}
+}
+
+// RemainingBucket coarsely names the time left on ctx for diagnostics.
+func RemainingBucket(ctx context.Context, now time.Time) string {
+	d, ok := ctx.Deadline()
+	switch left := d.Sub(now); {
+	case !ok:
+		return "@none"
+	case left <= 0:
+		return "@0"
+	case left < 500*time.Millisecond:
+		return "@<0.5s"
+	case left < time.Second:
+		return "@<1s"
+	case left < 2*time.Second:
+		return "@<2s"
+	}
+	return "@>=2s"
 }
 
 func (s *OwnerAuthenticator) authenticate(ctx context.Context, certificateFrom func() (value.OwnerCertificate, error), verify func(value.OwnerConfigurationObservation) (value.OwnerCertificate, error)) (value.AuthenticatedOwner, error) {

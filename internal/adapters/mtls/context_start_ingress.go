@@ -221,7 +221,7 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 	}
 	local, e := s.owners.ObserveOwnerServing(app.WithRefusalSteps(call, s.refuseStep("local/")), s.local)
 	if e != nil || !local.Valid(s.now()) || local.Certificate.Binding != channel.Hub {
-		s.refuse("local/" + refusalClass(e, local.Valid(s.now()), local.Certificate.Binding == channel.Hub))
+		s.refuse("local/" + refusalClass(e, local.Valid(s.now()), local.Certificate.Binding == channel.Hub) + app.RemainingBucket(call, s.now()))
 		return zero, value.ErrDenied
 	}
 	narrow(local.ValidUntil)
@@ -263,9 +263,9 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		return zero, value.ErrDenied
 	}
 	narrow(finalSource.Observation.FreshUntil)
-	finalLocal, e := s.owners.ObserveOwnerServing(call, s.local)
+	finalLocal, e := s.owners.ObserveOwnerServing(app.WithRefusalSteps(call, s.refuseStep("final-local/")), s.local)
 	if e != nil || !finalLocal.Valid(s.now()) || !sameForwardPeer(finalLocal, local) {
-		s.refuse("final-local")
+		s.refuse("final-local/" + refusalClass(e, finalLocal.Valid(s.now()), sameForwardPeer(finalLocal, local)) + app.RemainingBucket(call, s.now()))
 		return zero, value.ErrDenied
 	}
 	narrow(finalLocal.ValidUntil)
