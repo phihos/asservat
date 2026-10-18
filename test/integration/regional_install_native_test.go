@@ -216,6 +216,15 @@ func issueInstalledBootstrap(t *testing.T, ctx context.Context, admin *pgxpool.P
 	if err != nil {
 		t.Fatal("public runtime projection", err)
 	}
+	// These helper-owned issuance pools finish before regional installation
+	// and its journey. Retaining them until the parent test exits would consume
+	// four extra SQL connections throughout the later runtime qualification.
+	var issuancePools []*pgxpool.Pool
+	defer func() {
+		for _, pool := range issuancePools {
+			pool.Close()
+		}
+	}()
 	pool := func(duty string) *pgxpool.Pool {
 		var credential contracts.OwnerSQLCredential
 		if json.Unmarshal(projection.Data["sql-public-fleet-bootstrap-"+duty+".json"], &credential) != nil || credential.Username == "" {
@@ -231,7 +240,7 @@ func issueInstalledBootstrap(t *testing.T, ctx context.Context, admin *pgxpool.P
 		if e != nil {
 			t.Fatal(e)
 		}
-		t.Cleanup(out.Close)
+		issuancePools = append(issuancePools, out)
 		return out
 	}
 	reserve, err := postgres.NewBootstrapReservations(ctx, pool("reserve"), installation, uuid.NewString)
@@ -664,12 +673,12 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	}
 	t.Log("regional workload enrolled through v2 to ready_at; a refresh demand kept refreshing its binding; the pool extended once")
 	if journey != nil {
-		// Read the installed projection through its real adapter. The fixture
-		// administrator supplies only read access, never accepted assignments.
-		permissions, err := postgres.NewPermissions(ctx, admin, root)
-		if err != nil {
-			t.Fatal("installed permission observer", err)
-		}
+		// The real adapter rejects administrator/plaintext fixture pools. Read
+		// through the installed scoped permission login and verified TLS,
+		// as the hub does. This single monitoring connection uses the existing
+		// operator/monitoring reserve and closes when this journey returns.
+		permissions, closePermissions := installedPermissionObserver(t, ctx, admin, hub, namespace, installation, root)
+		defer closePermissions()
 		pods, err := region.CoreV1().Pods(ns.Name).List(ctx, meta.ListOptions{LabelSelector: "app=regional-app"})
 		if err != nil || len(pods.Items) != 1 {
 			t.Fatal("installed regional Pod observation", err)
