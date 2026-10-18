@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
-	"asservat.local/asservat/internal/domain/privacy"
 )
 
 type refusingSessions struct {
@@ -44,9 +44,10 @@ func TestContextDownloadReserveRetriesStaleBindingWithinDeadline(t *testing.T) {
 		minCalls  int32
 		atLeastMs int64
 	}{
-		{"refreshed in time", 2, privacy.ErrUnavailable, true, 1, 3, 0},
+		{"refreshed in time", 2, ErrDownloadBindingStale, true, 1, 3, 0},
 		{"permanent refusal", 1, artifact.ErrInvalid, false, 0, 1, 0},
-		{"never refreshed", -1, privacy.ErrUnavailable, false, 1, 2, 750},
+		{"other unavailable refusal", 1, privacy.ErrUnavailable, false, 0, 1, 0},
+		{"never refreshed", -1, ErrDownloadBindingStale, false, 1, 2, 750},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			sessions := &refusingSessions{failures: c.failures, err: c.err}

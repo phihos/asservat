@@ -128,6 +128,10 @@ always be refused.
   after a 1 min 44 s owner installation step. Three of the last six runs pass.
 - **Downloads** (migration 00067, schema 67): demand rows outlive their expiry,
   `demand_capacity_refresh_for_download` re-arms the demand behind a download
-  allocation, and the download coordinator retries a reservation refused as
-  unavailable within its deadline. Unit tests pass; the SQL stage is extended.
+  allocation, and the download coordinator retries, within its deadline, only
+  a reservation the database refused for a stale binding
+  (`ErrDownloadBindingStale`, mapped from the session trigger's refusal). The
+  first version retried on the retention-policy sentinel, which the SQL
+  adapter never returns, so it would not have retried at all. Unit tests pass;
+  the extended SQL stage passed on CI (fleet run 39077437536).
 

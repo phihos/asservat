@@ -1,20 +1,26 @@
 package evidence
 
 import (
-	"asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"slices"
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
 var ErrDownloadMetadataUnavailable = errors.New("verified download metadata unavailable")
+
+// ErrDownloadBindingStale is the database's refusal of a download session while
+// the workload's capacity binding is stale (ADR-200). It is the custody
+// unavailable class, so callers that do not retry see no difference.
+var ErrDownloadBindingStale = fmt.Errorf("%w: capacity binding stale", privacy.ErrUnavailable)
 
 type CurrentDownloadAuthority interface {
 	CheckDownloadCurrent(context.Context, identities.CurrentIdentity, artifact.DownloadScope) (artifact.DownloadAuthority, error)
@@ -366,12 +372,12 @@ func (s ContextDownloadCoordinator) view(ctx context.Context, current identities
 // reserve inserts the session. The database refuses it while the workload's
 // capacity binding is stale (ADR-200); with Refresh set, the first refusal
 // re-arms the refresh demand and the idempotent reservation is retried every
-// 250 ms within the caller's original deadline. Only the unavailable class is
-// retried; every other refusal, and one that outlasts the deadline, is
+// 250 ms within the caller's original deadline. Only ErrDownloadBindingStale
+// is retried; every other refusal, and one that outlasts the deadline, is
 // returned unchanged.
 func (s ContextDownloadCoordinator) reserve(ctx context.Context, r DownloadReservation) (artifact.DownloadSession, error) {
 	session, err := s.Sessions.ReserveDownload(ctx, r)
-	if !errors.Is(err, privacy.ErrUnavailable) || s.Refresh == nil || ctx.Err() != nil || s.Refresh.DemandDownloadRefresh(ctx, r.Session.AllocationID) != nil {
+	if !errors.Is(err, ErrDownloadBindingStale) || s.Refresh == nil || ctx.Err() != nil || s.Refresh.DemandDownloadRefresh(ctx, r.Session.AllocationID) != nil {
 		return session, err
 	}
 	for {
@@ -382,7 +388,7 @@ func (s ContextDownloadCoordinator) reserve(ctx context.Context, r DownloadReser
 			return session, err
 		case <-t.C:
 		}
-		if session, err = s.Sessions.ReserveDownload(ctx, r); !errors.Is(err, privacy.ErrUnavailable) {
+		if session, err = s.Sessions.ReserveDownload(ctx, r); !errors.Is(err, ErrDownloadBindingStale) {
 			return session, err
 		}
 	}
