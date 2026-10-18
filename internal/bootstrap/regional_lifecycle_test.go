@@ -58,6 +58,7 @@ type regionalServices struct {
 	ownerConfiguration value.OwnerConfiguration
 	candidates         value.APIContextOwnerCandidates
 	registration       value.OwnerRegistrationObservation
+	readRegistration   func(context.Context, *connectorlifecycle.Region, value.ConnectorCredentialCertificate) (fleetapp.ConnectorLeafRegistration, error)
 }
 
 func (s *regionalServices) Enroll(ctx context.Context, native *connectorlifecycle.Region, id string, r value.ConnectorProcessRequest) (value.ConnectorCredentialProcess, error) {
@@ -110,6 +111,9 @@ func (s *regionalServices) AuthenticateOwner(_ context.Context, _ *connectorlife
 }
 
 func (s *regionalServices) Registration(ctx context.Context, region *connectorlifecycle.Region, c value.ConnectorCredentialCertificate) (fleetapp.ConnectorLeafRegistration, error) {
+	if s.readRegistration != nil {
+		return s.readRegistration(ctx, region, c)
+	}
 	src, err := region.ReadConnectorIdentitySource(ctx)
 	if err != nil {
 		return fleetapp.ConnectorLeafRegistration{}, err

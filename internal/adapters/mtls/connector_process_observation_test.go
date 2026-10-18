@@ -4,7 +4,47 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	value "asservat.local/asservat/internal/domain/fleet"
 )
+
+type connectorObservationScopedRegistry struct {
+	app.ConnectorLeafRegistry
+	wanted value.ConnectorIdentitySource
+	used   int
+}
+
+func (s *connectorObservationScopedRegistry) ConnectorLeafRegistrationAt(ctx context.Context, certificate value.ConnectorCredentialCertificate, source value.ConnectorIdentitySource) (app.ConnectorLeafRegistration, error) {
+	s.used++
+	if !source.Observation.SameSource(s.wanted.Observation) || source.Roles != s.wanted.Roles || source.Observation.ObservedAt != s.wanted.Observation.ObservedAt || source.Observation.FreshUntil != s.wanted.Observation.FreshUntil {
+		return app.ConnectorLeafRegistration{}, value.ErrDenied
+	}
+	return s.ConnectorLeafRegistry.ConnectorLeafRegistration(ctx, certificate)
+}
+
+func TestConnectorOwnedObservationAtCarriesOriginalSourceIntoRegistration(t *testing.T) {
+	f := newConnectorPairFixture(t)
+	c := f.owner()
+	if err := c.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	source, _ := f.ReadConnectorIdentitySource(context.Background())
+	scoped := &connectorObservationScopedRegistry{ConnectorLeafRegistry: f, wanted: source}
+	c.registry = scoped
+	if _, err := c.ObserveConnectorProcessAt(context.Background(), source); err != nil || scoped.used != 1 {
+		t.Fatal("nested registration did not use the executor's original source bracket", err, scoped.used)
+	}
+	// Ordinary observations still own their independent source reads. This
+	// optimization must not silently become an ambient registration cache.
+	if _, err := c.ObserveConnectorProcess(context.Background()); err != nil || scoped.used != 1 {
+		t.Fatal("ordinary observation borrowed an unrelated source bracket", err, scoped.used)
+	}
+	f.revoked.Store(true)
+	if _, err := c.ObserveConnectorProcessAt(context.Background(), source); err == nil || scoped.used != 2 {
+		t.Fatal("scoped registration bypassed current revocation", err, scoped.used)
+	}
+}
 
 func TestConnectorOwnedObservationRequiresActivatedCurrentOriginalProcess(t *testing.T) {
 	f := newConnectorPairFixture(t)

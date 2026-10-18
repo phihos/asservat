@@ -24,7 +24,7 @@ func (c *ConnectorProcessCredentials) ObserveConnectorProcess(ctx context.Contex
 	if c == nil {
 		return ConnectorProcessObservation{}, value.ErrUnavailable
 	}
-	return c.observeConnectorProcess(ctx, c.source.ReadConnectorIdentitySource)
+	return c.observeConnectorProcess(ctx, c.source.ReadConnectorIdentitySource, false)
 }
 
 // ObserveConnectorProcessAt checks this process against one source
@@ -38,10 +38,10 @@ func (c *ConnectorProcessCredentials) ObserveConnectorProcessAt(ctx context.Cont
 		out := source
 		out.Observation.Profile = out.Observation.Profile.Clone()
 		return out, nil
-	})
+	}, true)
 }
 
-func (c *ConnectorProcessCredentials) observeConnectorProcess(ctx context.Context, read func(context.Context) (value.ConnectorIdentitySource, error)) (ConnectorProcessObservation, error) {
+func (c *ConnectorProcessCredentials) observeConnectorProcess(ctx context.Context, read func(context.Context) (value.ConnectorIdentitySource, error), bracketed bool) (ConnectorProcessObservation, error) {
 	var zero ConnectorProcessObservation
 	if c == nil || ctx == nil || ctx.Err() != nil {
 		return zero, value.ErrUnavailable
@@ -97,7 +97,12 @@ func (c *ConnectorProcessCredentials) observeConnectorProcess(ctx context.Contex
 	if e != nil || ke != nil || actual != cert || cert.PublicKeyDigest != key {
 		return zero, value.ErrUnavailable
 	}
-	registered, e := c.registry.ConnectorLeafRegistration(call, cert)
+	var registered app.ConnectorLeafRegistration
+	if scoped, ok := c.registry.(app.ConnectorLeafRegistryAt); bracketed && ok {
+		registered, e = scoped.ConnectorLeafRegistrationAt(call, cert, first)
+	} else {
+		registered, e = c.registry.ConnectorLeafRegistration(call, cert)
+	}
 	if e != nil || !registered.Valid(c.now()) || registered.Certificate != cert || registered.Process != r.Process {
 		return zero, value.ErrUnavailable
 	}

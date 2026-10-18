@@ -1,5 +1,33 @@
 # Sustained implementation progress
 
+## Executor registration source bracket (ADR-207, 2026-10-18)
+
+The executor's explicit `ObserveConnectorProcessAt` can now pass its original
+opened source into the nested read-only registration conversation. A private
+single-conversation reader allows exactly two copied source replies, retains
+original cancellation/expiry and refuses configuration/lifecycle operations.
+Known issued leaf/process checks and actual current SQL49 registration/recovery
+checks remain; the outer native proof still closes the source independently.
+Ordinary observations, enrollment and signing do not use this handoff.
+
+The dispatch regression failed before the change. Corrected mTLS/bootstrap
+selection passed nine top-level / 19 named races, both package vets and Go
+architecture (58 packages / 338 edges). Real loopback TLS1.3/HTTP2 tests exercise
+original cutoff, source copies, finite callbacks, foreign/unknown input,
+revocation, cancellation, expiry and closed-reader refusal; source/SQL facts
+are synthetic. Spec check passed 11,368 assertions; architecture passed 1,306
+positive / 120 negative checks. Logs remain in the session cache under
+`context-start-combined-proof/registry-at-*`.
+
+Independent review requested preserving the original nonnil installed Local
+composition invariant. The added pre-I/O refusal and final registration-focused
+race selection passed two top-level / 13 named cases, followed by bootstrap vet.
+
+This removes only the nested cold-proof source reads. The complete opening still
+cannot fit by static call accounting. ADR-207 records the next setup-owned
+native bracket and mandatory closing checks; that operation is not implemented
+or natively qualified yet. No installed rerun or collection pass is claimed.
+
 ## Context-start duplicate local proof regression (2026-10-18)
 
 The installed native43 failure remains before target selection/collection:

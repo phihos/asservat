@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-207 — One native proof bracket for context-start setup](207-context-setup-proof-bracket.md)
+records the original-bound setup composition under implementation. It preserves
+closing native checks and both owner authentications; native qualification is
+pending.
+
 [ADR-206 — Bounded approved pod-status projection reads](206-bounded-context-projection.md)
 defines the accepted implementation contract for ordinary browser/MCP reads of
 captured status: fixed text projection, independent read authority, original query

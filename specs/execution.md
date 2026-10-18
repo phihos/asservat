@@ -81,6 +81,14 @@ changing the later setup/work checks. A different credentials owner cannot
 borrow the result; process readers without that concrete composition retain
 independent observations.
 
+Within that same complete native proof, the explicit source bracket may also
+supply the nested read-only registration lookup's two source replies under
+[ADR-207](../docs/decisions/207-context-setup-proof-bracket.md). The temporary
+reader is bound to one exact known leaf/process and original interval, copies
+public buffers, refuses all lifecycle/configuration work and closes after that
+conversation. Current SQL registration/recovery checks and the enclosing full
+native closing source check remain mandatory; this is no ambient source cache.
+
 For the initial regional Kubernetes API snapshot, `apiContextStart/v1` binds the
 protected executor Pod/account/process and exact collector image, without target
 node/boot claims. One immutable SQL execution row and the original Kubernetes
