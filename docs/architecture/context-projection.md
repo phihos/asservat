@@ -3,7 +3,7 @@
 [ADR-206](../decisions/206-bounded-context-projection.md) defines the next narrow
 S-02 implementation: inspect existing approved pod status through the canonical
 browser/MCP `get_file_excerpt` and `get_query_result` contracts. This is an
-accepted implementation contract. Code, installed wiring and qualification are
+accepted implementation contract. Application composition, installed wiring and qualification are
 pending; no tool availability is established by this document.
 
 ## Exact result
@@ -68,10 +68,12 @@ These are implementation interfaces, not new public wire fields:
 | Owner | Interface/value | Required contract |
 | --- | --- | --- |
 | C-24 | `ContextExcerptSelection` | Case/artifact IDs and normalized line range only; no caller source, worker, deadline, key or path. |
+| C-24 | `ContextProjectionCandidate` | Internal route IDs/whole-pod target, principal/client and normalized selection only. It carries no native facts, version or authority. |
 | C-24 | `ContextProjectionScope` | Root/case/capture/artifact IDs, exact whole-pod target, committed ciphertext version, native projection digest, fixed display version, normalized selection, original `identity.Principal` including client ID. |
 | C-24 | `ContextProjectionEnvironment` | Current installation/recovery, exact registered attempt/store, processing decision, protected query path/region and actor/client; original observation bounds. It is a distinct type, not a download environment alias. |
 | C-24 | `ContextProjectionAuthority` | Exact scope, permission revision, identity policy, retained-policy proof, environment, decision digest, original checked/valid interval and effective access/delete dates. Current effects require every proof, never legacy optional-zero compatibility. |
 | C-03 | `ContextProjectionAuthority.CheckProjectionCurrent(ctx, CurrentIdentity, ContextProjectionScope)` | Returns the domain authority after `ReadApproved`, original audience and final current checks; no query creation, SQL effect or decryption. |
+| C-03 | `ContextProjectionAuthority.ResolveProjectionCurrent(ctx, CurrentIdentity, ContextProjectionCandidate)` | Initial path: checks ordinary target rights before the protected source lookup, then constructs the exact version-bound scope and returns current authority. No fabricated source version or C-18 policy duplication. |
 | C-03 | `ContextProjectionCatalog.ContextProjectionEvidence(ctx, artifactID)` | Verified published source/retained-policy projection. No native fields, native hash or filename. The authorizer checks ordinary target rights before this read. |
 | C-03 | `ContextProjectionEnvironmentReader.ProjectionEnvironment(ctx, evidence, principal)` | Independently accepts current processing/recovery/client/region/query path; no static region or download-permit fallback. |
 | C-18 | `ContextProjectionRoutes.ResolveContextProjection(ctx, caseID, artifactID, currentIdentity, recovery)` | Internal content-minimized route candidate binding case/artifact/target. Never returns evidence or authority to the caller; current ordinary rights precede protected source lookup. |
@@ -84,8 +86,11 @@ These are implementation interfaces, not new public wire fields:
 | C-14 | `ContextProjectionReader.ReadProjection(ctx, admittedBatch, currentRequestOwner)` | Uses only the already admitted exact worker and typed query authority; verifies/decrypts the pinned source, emits the fixed bounded DTO and reports positive joined completion or uncertainty. No launch fallback. |
 | C-18/C-20 | `ContextProjectionDelivery.CheckDisclosure(ctx)` and `Close(ctx)` | Opaque request-owned result guard and joined cleanup, bound to the serialized result/query/batch. Recheck after outcome audit and through the final write; no reusable authority-shaped JSON. |
 
-`ContextProjectionScope` is constructed from the protected route and source
-record, never directly decoded from public input. `CurrentIdentity` belongs to
+`ContextProjectionScope` is constructed by C-03 from the minimal route candidate
+and, only after ordinary target rights pass, the protected source record. C-18
+does not read evidence to manufacture initial authorizer input. Later checks
+compare the complete existing scope, including its original source version.
+Neither candidate nor scope is directly decoded from public input. `CurrentIdentity` belongs to
 the caller's original request; it is not persisted or passed as human credentials
 to a worker. The C-18 catalog dependency gains only C-02 for this shared identity
 handoff. Route and catalog adapters implement consumer-owned ports; C-18 does not
@@ -112,8 +117,8 @@ weakening or overloading the existing download record.
 
 At admission fix an original query start and deadline: start plus the protected
 profile lifetime (default ten seconds, maximum sixty), shortened by original
-effective evidence access and authenticated session/credential bounds. Store
-those bounds, not a current credential or renewable identity lease. A later
+effective evidence access. Store those bounds, not a current credential or
+renewable identity lease. A later
 shortening is irreversible. A pending handle cannot preserve access across
 principal/client changes, revocation, deny, recovery or expired evidence.
 
@@ -123,6 +128,15 @@ read, lock, key operation, audit and write retains that interval and the earlier
 query/dependency bounds. The query's longer lifetime permits several separate
 current requests; it never authorizes a ten- or sixty-second request lease.
 Old authority/key slots cannot be renewed by a fresh poll.
+
+REQ-MCP-002 defines bounded query state independently of transport sessions;
+REQ-AUT-002/004 require current authorization at each read/delivery, and
+REQ-PRV-003 supplies inherited evidence cutoffs. None makes initial token/session
+expiry a separate total-query cutoff. A refreshed credential for the same
+principal/client can support a fresh result-read request within the original
+query/evidence deadline. It cannot revive an old request, renew the query,
+restore spent keys or bypass current group/deny checks. The five-second
+`CurrentIdentity` observation is never extended into a longer query permit.
 
 Initial admission may create one exact worker under the live request. Its
 acknowledged Job can start afterward as a consequence of that admission, but no
@@ -230,6 +244,17 @@ before public enablement. No old worker, accepted profile or installation pin is
 silently rebound to a new purpose.
 
 ## Acceptance
+
+The first component foundation is deliberately limited: pure scope/candidate,
+authority/environment and status/excerpt values live in `internal/domain/analysis`;
+`objectstore.ParseContextProjection` strictly decodes the bounded native shape;
+`analysis.FormatContextExcerpt` in C-18 creates the fixed escaped lines. Domain
+code performs no JSON decoding, hashing or I/O. A pinned source-definition digest
+has a regression against the actual immutable definition. The decoder checks
+inner Pod/namespace/source-profile bindings; it does not establish the ciphertext
+version, envelope, manifest or publication provenance. Those still require
+independent C-14 verification before the decoder is called. These functions alone
+provide no public route, worker, query storage, key authority or disclosure.
 
 1. Browser and MCP with ordinary evidence-read rights return exactly the fourteen
    approved fields and matching line selections from the already committed

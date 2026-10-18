@@ -43,10 +43,13 @@ feature or permission to advertise an unqualified capability.
    authorize a native download. No additional consent or raw grant is introduced.
 3. **Original total and request deadlines.** The query fixes a ten-second total
    lifetime by default; a protected administrator profile may select a lifetime
-   no greater than sixty seconds. Effective artifact access and authenticated
-   session/credential bounds can only shorten it. Each invocation and each
+   no greater than sixty seconds. Effective artifact access can only shorten it.
+   Initial token/session expiry is not a separate total-query cutoff: each
+   fresh read needs current authority for the same original principal/client.
+   Each invocation and each
    acquisition/key/output operation also obeys its original at-most-five-second
-   current-request interval and every earlier dependency deadline. A pending
+   current-request interval, that request's session/credential bounds and every
+   earlier dependency deadline. A pending
    response, new poll, authority observation or batch never extends the query.
 4. **A result backed by the immutable source.** The result reference binds the
    original committed ciphertext version, native projection digest, display
