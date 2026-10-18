@@ -192,7 +192,7 @@ func TestHealthyAuditorZeroValueIsUnavailable(t *testing.T) {
 		if s.Configured() {
 			t.Fatal("empty composition configured")
 		}
-		if s.Begin(context.Background(), auditIntent()) != ErrUnavailable || s.Finish(context.Background(), auditOutcome(auditIntent())) != ErrUnavailable {
+		if !errors.Is(s.Begin(context.Background(), auditIntent()), ErrUnavailable) || !errors.Is(s.Finish(context.Background(), auditOutcome(auditIntent())), ErrUnavailable) {
 			t.Fatal("empty composition enabled")
 		}
 	}
