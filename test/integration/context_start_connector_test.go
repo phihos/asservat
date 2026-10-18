@@ -340,6 +340,7 @@ func TestConnectorAPIProcessWithRealKubernetes(t *testing.T) {
 		t.Fatalf("current API process: elapsed=%s err=%v", time.Since(readStarted), e)
 	}
 	t.Log("actual guarded Deployment/ReplicaSet/Pod defaults, explicit projected token and independently pinned startup inputs accepted")
+	previousUntil := observed.ValidUntil
 	runtimeAPI, e := kubernetes.NewForConfig(runtimeConfig)
 	if e != nil {
 		t.Fatal(e)
@@ -365,17 +366,8 @@ func TestConnectorAPIProcessWithRealKubernetes(t *testing.T) {
 		}
 	})
 	t.Run("setup-original-native-bracket", func(t *testing.T) {
-		// Begin a separate cold operation after the previous observation ends;
-		// never renew that observation or add a retry to the opening under test.
-		if delay := time.Until(observed.ValidUntil); delay > 0 {
-			timer := time.NewTimer(delay)
-			defer timer.Stop()
-			select {
-			case <-timer.C:
-			case <-ctx.Done():
-				t.Fatal(ctx.Err())
-			}
-		}
+		// This is an independent cold setup, not a renewal of the earlier read.
+		waitConnectorAPIFixtureObservation(t, ctx, previousUntil)
 		call, end := context.WithTimeout(ctx, 5*time.Second)
 		defer end()
 		before, started := stats.snapshot(), time.Now()
@@ -390,6 +382,7 @@ func TestConnectorAPIProcessWithRealKubernetes(t *testing.T) {
 		if err != nil || !first.Valid(time.Now()) {
 			t.Fatal("owned initial proof", err)
 		}
+		previousUntil = first.ValidUntil
 		source, err := setup.Source(call)
 		if err != nil || !source.Valid(time.Now()) || source.Observation.FreshUntil.After(first.ValidUntil) {
 			t.Fatal("actual closing source frame", err)
@@ -434,7 +427,7 @@ func TestConnectorAPIProcessWithRealKubernetes(t *testing.T) {
 		capacityConfig := rest.AnonymousClientConfig(config)
 		capacityConfig.BearerToken = string(minted)
 		capacityConfig.WrapTransport = stats.wrap
-		qualifyConnectorAPIStart(t, ctx, config, capacityConfig, runtimeConfig, client, process, observed, control, stats)
+		previousUntil = qualifyConnectorAPIStart(t, ctx, config, capacityConfig, runtimeConfig, client, process, observed, control, stats, previousUntil)
 	})
 	t.Run("capacity-token-admission", func(t *testing.T) {
 		// RBAC allows the connector to request the capacity token; admission
@@ -468,12 +461,14 @@ func TestConnectorAPIProcessWithRealKubernetes(t *testing.T) {
 		}
 	})
 	t.Run("changed-input-metadata", func(t *testing.T) {
+		waitConnectorAPIFixtureObservation(t, ctx, previousUntil)
 		setup, err := process.BeginAPIContextSetup(ctx, credentials)
 		if err != nil {
 			t.Fatal("opening before independent input change", err)
 		}
 		defer setup.Close()
-		if _, err = setup.Source(ctx); err != nil {
+		opened, err := setup.Source(ctx)
+		if err != nil {
 			t.Fatal("initial source before input change", err)
 		}
 		v, e := admin.CoreV1().Secrets(name).Get(ctx, secret.Name, meta.GetOptions{})
@@ -487,6 +482,9 @@ func TestConnectorAPIProcessWithRealKubernetes(t *testing.T) {
 		if err = setup.Finish(ctx); err == nil {
 			t.Fatal("closing setup accepted changed input RV")
 		}
+		if ctx.Err() != nil || !time.Now().Before(opened.Observation.FreshUntil) {
+			t.Fatal("input-change refusal was obscured by original expiry")
+		}
 		if _, _, err = setup.ReadAPIProcessConnector(ctx, credentials); err == nil {
 			t.Fatal("failed closing setup returned its opening proof")
 		}
@@ -496,7 +494,24 @@ func TestConnectorAPIProcessWithRealKubernetes(t *testing.T) {
 	})
 }
 
-func qualifyConnectorAPIStart(t *testing.T, ctx context.Context, adminConfig, capacityConfig, runtimeConfig *rest.Config, client func(*rest.Config) *kube.PermissionClient, process *kube.ConnectorAPIExecutionProcess, observed execution.APIProcessObservation, control cfg.NamespaceRef, stats *contextStartAPIStats) {
+// Independent fixture phases must not accidentally inherit a nearly spent
+// proof. Wait for the previous phase's actual original end before beginning a
+// different operation. No in-flight operation waits, refreshes or retries.
+func waitConnectorAPIFixtureObservation(t *testing.T, ctx context.Context, until time.Time) {
+	t.Helper()
+	if delay := time.Until(until); delay > 0 {
+		t.Logf("independent fixture phase waits for previous original observation: %s", delay)
+		timer := time.NewTimer(delay)
+		defer timer.Stop()
+		select {
+		case <-timer.C:
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		}
+	}
+}
+
+func qualifyConnectorAPIStart(t *testing.T, ctx context.Context, adminConfig, capacityConfig, runtimeConfig *rest.Config, client func(*rest.Config) *kube.PermissionClient, process *kube.ConnectorAPIExecutionProcess, observed execution.APIProcessObservation, control cfg.NamespaceRef, stats *contextStartAPIStats, previousUntil time.Time) time.Time {
 	t.Helper()
 	dc, e := dynamic.NewForConfig(adminConfig)
 	if e != nil {
@@ -556,6 +571,7 @@ func qualifyConnectorAPIStart(t *testing.T, ctx context.Context, adminConfig, ca
 		t.Fatal("capacity reservations not admitted", e)
 	}
 	t.Logf("start readiness: dry-run CREATE admitted after %s", time.Since(ready))
+	waitConnectorAPIFixtureObservation(t, ctx, previousUntil)
 	preparer, e := kube.NewConnectorAPIStartPreparer(process, client(capacityConfig))
 	if e != nil {
 		t.Fatal(e)
@@ -604,6 +620,7 @@ func qualifyConnectorAPIStart(t *testing.T, ctx context.Context, adminConfig, ca
 		t.Fatal("consumed local start replay", e)
 	}
 	t.Logf("work process read, actual CREATE, Ready /status and one StartCommitted /status within the work observation's original interval: %s of %s", time.Since(n), work.ValidUntil.Sub(n))
+	return work.ValidUntil
 }
 
 // Static operation classes only: never paths, request bodies, source identities,

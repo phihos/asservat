@@ -110,4 +110,9 @@ narrows its original caller cutoff before final freshness validation, without
 hiding a producer that tried to extend the original interval. Deterministic
 failing-first regressions cover both boundaries. The native fixture now contains
 an original cold setup, no-I/O local reads, current closing API/source checks,
-and a changed-input refusal; those added native cases have not yet run.
+and a changed-input refusal. The first selected native run passed the cold setup
+case, but failed a later independent work that reused the setup's nearly expired
+proof after CRD readiness; the input-change case did not reach its mutation.
+The complete selected fixture remains failed. Its corrected independent-phase
+separation and another frozen native run are tracked in
+[implementation progress](../implementation-progress.md).

@@ -1,5 +1,32 @@
 # Sustained implementation progress
 
+## Context setup native 1: setup passed, selected fixture failed (2026-10-18)
+
+The [owned native run](../test/results/context-setup-native-1/context-storage-environment.json)
+on frozen `b705387f600982903aec500e1cc9becc35eaf147` passed the new cold setup
+case: complete opening proof took 1.805 seconds and current closing native
+checks took 0.699 seconds. Local reads/source reuse performed no additional API
+requests, retained the original interval and refused reuse after closure. This
+fixture uses one approved input and synthetic connector source/issuer/registry
+facts; these timings do not represent the installed complete source graph or
+both remote-owner authentications.
+
+The selected top-level test failed (12.78 seconds; package 12.842 seconds).
+The following independent capacity-start case spent 2.014 seconds waiting for
+new CRD admission readiness, then reused the setup case's nearly spent cached
+observation. Ready refused a binding read with only 17 milliseconds remaining
+in that original interval. The later input-change case could not open its proof,
+so it did not qualify input-change denial. The full fixture is not a pass.
+
+[Archive verification](../test/results/context-setup-native-1/verification.json)
+matched all 2,695 source hashes; source bytes stayed unchanged and cleanup
+reported no failures. The fixture now waits for the preceding independent
+phase's recorded original end before opening a new operation, after CRD
+readiness where applicable. It does not wait, refresh or retry within a work,
+and changes no production deadline, limiter or guard. Input-change refusal must
+occur before that new operation's original expiry. Corrected native qualification
+remains pending.
+
 ## Context-start private setup bracket (ADR-207, component, 2026-10-18)
 
 The concrete executor now lends one full native proof to one private opening,
