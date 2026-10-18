@@ -80,7 +80,7 @@ func (d *CapacityHubWorkerDeployment) openCapacity(ctx context.Context, claim co
 		return mounts.ErrUnavailable
 	}
 	defer files.Close()
-	c, m, _, err := readCapacityWorkerInputs(read, files)
+	c, m, q, err := readCapacityWorkerInputs(read, files)
 	end()
 	if err != nil || !capacityProjectionMatches(c, m, claim, d.input) || ctx.Err() != nil || !time.Now().Before(until) {
 		return mounts.ErrUnavailable
@@ -93,6 +93,12 @@ func (d *CapacityHubWorkerDeployment) openCapacity(ctx context.Context, claim co
 	current, ready, after, err := d.activation.ReadCapacity(ctx)
 	if err != nil || !ready || !reflect.DeepEqual(current, claim) || !capacityProjectionMatches(capacity.input, capacity.manifest, current, d.input) || ctx.Err() != nil || !time.Now().Before(after) {
 		return mounts.ErrUnavailable
+	}
+	if after.Before(until) {
+		until = after
+	}
+	if err = d.acceptContextDeletion(ctx, c, q, until); err != nil {
+		return err
 	}
 	capacity.reconciler.Source.Protection = &installedCapacitySourceProtection{reader: d.activation, claim: claim, worker: d.input, input: capacity.input, manifest: capacity.manifest, source: capacity.reconciler.Source.Protection}
 	// No Run call can occur before both actual SQL scope verifications and the

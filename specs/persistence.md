@@ -72,6 +72,19 @@ Claim bounded work batches using FOR UPDATE SKIP LOCKED, then release locks befo
 
 Initial tuning budgets: <=100 work items per claim, <=30-second claim lease with bounded renewal, <=5-second SQL statement timeout and <=1-second lock wait for online requests, <=32 pooled connections per hub replica with an installation-wide allocation leaving maintenance headroom. Different lifecycle batches require explicit bounded profiles. Exhaustion returns actionable pressure and does not grow queues without limits. Ordinary completed work rows expire after the replay window; authoritative denial/accounting rows have dependency-aware retention.
 
+Before provisioning the promoted installed graph, the continuation MUST compare
+its compiled process/purpose allowance, including retained workers, simultaneous
+installer pools, verifier and maintenance reserve, with the actual server's
+ordinary connection capacity. Installer administrator pools are additional to
+the migration, backup and operator reserve; early administrator connections
+also consume the headroom needed for later ordinary admission. Count a shared
+allowance only when the preceding pool has closed. Close the continuation's
+single passive history reader before opening its administrator bridge.
+Subtract both superuser and other reserved connections. Refuse an insufficient
+server with fixed required/configured counts; never raise settings, broaden SQL
+roles or pool limits, or infer capacity from an idle snapshot. The check remains
+read-only under the original activation/incarnation and deadline checks.
+
 ### SC-DB-004
 
 Given a worker dies after object audit upload or remote dispatch, when another claims the expired lease, then it resumes the same operation, verifies audit by digest and never blindly reruns an ambiguous dump. Missing notifications do not lose work; audit failure prevents action start and evidence delivery.

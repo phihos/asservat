@@ -148,6 +148,9 @@ func OwnerProviderSetupArtifact(in contracts.OwnerDeployment, profile contracts.
 			return nil, ErrSetupUnavailable
 		}
 		deletionStorage = evidenceDeleteStorageFor(*deletion)
+		// The installer reads the deletion signing key back with this
+		// phase's inspection token (ADR-205 decision 6).
+		inspect = append(inspect, in.KeyService.AuditMount+"/keys/"+contracts.ContextDeletionSigningKeyName(in.InstallationID))
 	}
 	return ownerProviderCanonical(struct {
 		Format                      string                      `json:"format"`

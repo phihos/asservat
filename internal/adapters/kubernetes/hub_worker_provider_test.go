@@ -32,12 +32,17 @@ func TestProviderWorkerTemplateHasNativeJWTAndSeparateSQL(t *testing.T) {
 		t.Fatal(err)
 	}
 	sources := w.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources
-	if len(sources) != 11 || *w.Deployment.Spec.Replicas != 0 || sources[1].Secret == nil || sources[1].Secret.Name != selection.AuditCredentials.Name ||
+	if len(sources) != 12 || *w.Deployment.Spec.Replicas != 0 || sources[1].Secret == nil || sources[1].Secret.Name != selection.AuditCredentials.Name ||
 		!reflect.DeepEqual(sources[1].Secret.Items, []core.KeyToPath{{Key: contracts.ConfigurationProviderAuditCredentialFile, Path: contracts.ConfigurationProviderAuditCredentialFile}}) ||
 		sources[1].Secret.Optional == nil || *sources[1].Secret.Optional {
 		t.Fatal("provider storage can substitute SQL or silently be absent")
 	}
-	jwt := sources[10].ServiceAccountToken
+	deletion := sources[9].Secret
+	if deletion == nil || deletion.Name != contracts.EvidenceDeleteCredentialName(installation) || deletion.Optional == nil || !*deletion.Optional ||
+		!reflect.DeepEqual(deletion.Items, []core.KeyToPath{{Key: contracts.EvidenceDeleteCredentialFile, Path: contracts.EvidenceDeleteDirectory + "/" + contracts.EvidenceDeleteCredentialFile}}) {
+		t.Fatal("provider template changed the bounded optional deletion credential")
+	}
+	jwt := sources[11].ServiceAccountToken
 	if jwt == nil || jwt.Path != contracts.ConfigurationProviderTokenFile || jwt.Audience != contracts.ConfigurationProviderAudience(installation, cluster) || jwt.ExpirationSeconds == nil || *jwt.ExpirationSeconds != 600 {
 		t.Fatal("provider JWT has wrong original native projection")
 	}
@@ -59,7 +64,7 @@ func TestProviderWorkerTemplateHasNativeJWTAndSeparateSQL(t *testing.T) {
 	// Undo only the six reviewed additions, then compare the complete object
 	// graph. Security fields, optional receipts and all existing RBAC stay exact.
 	sources[1].Secret.Items = old.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources[1].Secret.Items
-	w.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources = sources[:10]
+	w.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources = sources[:11]
 	w.Role.Rules = w.Role.Rules[:len(w.Role.Rules)-3]
 	w.Deployment.Spec.Template.Spec.Tolerations = old.Deployment.Spec.Template.Spec.Tolerations
 	if !reflect.DeepEqual(w, old) {

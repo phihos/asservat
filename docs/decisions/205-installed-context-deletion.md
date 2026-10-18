@@ -1,6 +1,6 @@
 # ADR-205 — Installed context deletion
 
-Date: 2026-10-18. Status: accepted; implementation pending.
+Date: 2026-10-18. Status: accepted; implementation in progress.
 Requirements: S-02 (expiry and deletion in the installed journey); REQ-EVD-006,
 REQ-PRV-004, REQ-DEP-003; TASK-03.
 Composes [ADR-111](111-positive-context-writer-deletion.md) into the installed
@@ -38,7 +38,7 @@ and its storage charge is never released.
    permission stream under the hub-worker's scheduling lease, and exists only
    when the permission projection carries the optional `ContextDeletion`
    section. Each sweep advances each due attempt with `privacy.ContextCleaner`;
-   a failed or unknown step stays pending for the next sweep, as ADR-111
+   a failed or unknown step stays pending for a later sweep, as ADR-111
    requires. A sweep runs every thirty seconds.
 2. **Three SQL purposes.** `context-cleanup` (89), `context-cleanup-audit` (90)
    and `context-cleanup-finalize` (91), in the hub-worker compartment, with the
@@ -48,8 +48,16 @@ and its storage charge is never released.
 3. **A due list.** A new query lists, for the permission root, at most sixteen
    attempts with a positive writer completion, not deleted, whose
    `effective_expires_at` has passed and whose deletion lease is absent or
-   ended, oldest first. It confers nothing: `BeginContextDeletion` still checks
-   the cutoff, the lease and recovery under its own locks.
+   ended, oldest first. Each scheduling pass fixes its cutoff from database
+   time and advances a process-local expiry/attempt cursor after a successful
+   page read, including when cleaning every listed attempt fails. A short or
+   empty page wraps the next sweep to the oldest candidates. Continuous new
+   arrivals cannot extend that pass; shortened or newly eligible rows behind
+   the cursor return on the next pass. Otherwise sixteen failed oldest rows
+   could permanently hide later expiries. The cursor confers nothing and
+   changes no dates: `BeginContextDeletion` still checks the cutoff, the lease
+   and recovery under its own locks. A persisted purge awaiting audit remains
+   retryable.
 4. **Its own evidence credential.** `installer-provider-apply` gains
    `--evidence-delete-credential`: list object versions, list multipart
    uploads and list objects on the evidence bucket's `v1/` prefix, and delete
@@ -68,9 +76,14 @@ and its storage charge is never released.
    its version and those public keys. `jose` gains a remote constructor for
    context deletion signatures, like the operation retirement one. The key
    signs only `asservat-context-deletion+jws` records.
-7. **Optional throughout.** Without the section there is no child, no login,
-   no signing key or policy path and no credential, and every digest is
-   unchanged.
+7. **Optional runtime composition in a fresh-install layout.** Without the
+   section there is no deletion child, no cleanup login in its permission
+   projection, no signing key or signing policy path and no evidence-delete
+   credential. Omitting the optional fields preserves the original provider
+   selection/configuration bytes. The fixed SQL role inventory and installed
+   worker template do change: fresh installations reserve the three purposes
+   and optional projected file paths. Their role/template digests change even
+   when the child is disabled.
    `installer-continue` fills the section exactly when the publisher is
    installed.
 
@@ -96,9 +109,76 @@ and its storage charge is never released.
   access ends, with an acknowledged deletion record, and its storage charge
   is released.
 - The operator supplies one more storage credential.
-- The worst-case SQL connection plan for one hub (two retained hub-worker
-  processes during a rollout) rises by six connections, from 101 to 107. An
-  installation with deletion needs `max_connections` of at least 110.
+- The deletion purposes add six connections for two retained hub-worker
+  processes during a rollout. The [complete installed SQL inventory](../research/installed-sql-budget.md)
+  also counts five concurrent installer pools: one hub requires 112 ordinary
+  connections, or `max_connections` of at least 115 with three superuser-reserved
+  slots and no other reserved slots. The earlier 107/110 estimate omitted those
+  installer pools. The installer checks the actual available ordinary capacity;
+  these are configured upper bounds, not measured simultaneous use.
 - Copies a user downloaded are outside managed deletion, as before.
 - Capture operation audit cleanup is still not installed; it remains a
   separate gap.
+- Existing installation upgrades and restart with this changed binary are
+  unqualified. Resource journals retain their original template digests and
+  SQL role pins; the continuation rejects an older pinned template instead of
+  rebinding it to this one. This change provides no journal rewrite, workload
+  image replacement or upgrade protocol.
+
+## Progress
+
+- **SQL** (#35, unit tests and `sql-check`): purposes 89–91 with the fixture
+  grants, the worst-case plan at 107 connections, and
+  `ContextDeletions.DueContextDeletions`.
+  The earlier claim that a context-harness run qualified the deletion fixture
+  was incorrect: that harness selects the native API branch. The dedicated
+  [custody run 39122322616](https://github.com/phihos/asservat/actions/runs/39122322616)
+  on `25c7195900dd2d323c6a848cdb0e19bc19d0016a` now passes the actual SQL
+  execution/publication/deletion case, including
+  `due-pages-pass-persistent-failures-and-wrap`. It exits 0, preserves all
+  2,593 recorded source hashes and reports no cleanup failures. The separate
+  [native API run 39121784318](https://github.com/phihos/asservat/actions/runs/39121784318)
+  also passes with 2,620 matching source hashes and clean teardown; it supplies
+  API regression evidence, not installed deletion qualification.
+- **Provider, signing and credential** (#36, unit tests): the optional
+  `ContextDeletionSigning` key in the hub-worker's provider selection, the
+  audit-wrap `sign` path, the setup readback of every version's public key,
+  `jose.NewRemoteContextDeletionSignatures`, and
+  `installer-provider-apply --evidence-delete-credential`. *Amended during
+  implementation:* the recipe cannot name the permission root, which is
+  created after phase 1, so the audit prefix is the fixed
+  `context-deletion/v1/`, as `authority/v1/` already is; the writer accepts
+  only its own root.
+- **Composition** (unit tests; native runs pending). *Amended during
+  implementation:*
+  - The evidence store ID is chosen at capacity qualification, after the
+    permission projection is published, and the hub-worker's phase-1
+    inspection token is gone by then. So the permission projection carries
+    only a `contextDeletion` flag for the three logins (decision 2), and the
+    section (decision 7) rides in the capacity projection, which is
+    published after phase 3. The deletion child takes the section and the
+    qualification's single evidence store ID from the capacity child once
+    that has verified its projection; until then it skips its sweeps.
+  - The installer reads the signing key's versions and public keys back with
+    the phase-3 inspection token: the owner artifact that lists the evidence
+    delete credential also lets that token read this one key. Key IDs are
+    `v<version>`.
+  - `installer-continue` steps `deletion/credential` (the immutable Secret)
+    and `deletion/verify` (the readback) run after `publisher/verify`; the
+    hub-worker Pod projects the Secret, optionally, under `evidence-delete/`.
+  - Both legacy and provider-backed installed capacity startup hand off the
+    immutable section only after the final native projection proof. The
+    original startup deadline still applies after waiting for the handoff
+    lock. A missing or ambiguous backend qualification refuses startup;
+    subsequent capacity restarts cannot replace the store or signing pins.
+    The provider-backed path previously omitted this handoff entirely, so
+    the deletion child would have waited indefinitely. Unit regressions
+    also cover immutable returned pins and cleanup after failed preparation;
+    they do not establish installed deletion success.
+
+The pinned SeaweedFS fixture initially denied multipart abort because its policy
+engine aliases that action to `PutObject`, including explicit Deny statements.
+The [permission research and focused native qualification](../research/installed-evidence-deletion-permissions.md)
+record the fixture-specific method condition, successful abort/version removal
+and denied reads/writes/foreign-prefix access. This passing test does not
+substitute for the installed expiry, failed-cleanup and charge-release journey.

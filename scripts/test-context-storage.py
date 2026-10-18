@@ -38,17 +38,31 @@ def run(args, *, data=None):
 
 
 
-def postgres_fixture_options(regional_context_start=None, lock_waits=False):
+def postgres_fixture_options(regional_context_start=None, lock_waits=False, installed_budget=None):
     if regional_context_start not in (None, "first", "continuation", "journey"):
         raise ValueError("unknown regional context qualification")
     options = ["-c", "max_connections=48", "-c", "shared_buffers=128MB", "-c", "fsync=on", "-c", "synchronous_commit=on"]
+    if installed_budget is not None:
+        # Only the complete installed graph selects this allowance, generated
+        # by test/fixtures/installed-sql-budget from the product's Go plan.
+        fields = ("requiredOrdinary", "maxConnections", "superuserReserved", "reserved", "fixtureAdminConnections")
+        if (regional_context_start is not None or
+                any(type(installed_budget.get(key)) is not int for key in fields) or
+                installed_budget["requiredOrdinary"] < 1 or installed_budget["reserved"] < 0 or
+                installed_budget["fixtureAdminConnections"] != 1 or
+                installed_budget["superuserReserved"] < 0 or
+                installed_budget["maxConnections"] != installed_budget["requiredOrdinary"] + installed_budget["fixtureAdminConnections"] + installed_budget["superuserReserved"] + installed_budget["reserved"]):
+            raise ValueError("invalid installed PostgreSQL connection budget")
+        options[1] = "max_connections=" + str(installed_budget["maxConnections"])
+        options += ["-c", "superuser_reserved_connections=" + str(installed_budget["superuserReserved"]),
+                    "-c", "reserved_connections=" + str(installed_budget["reserved"])]
     if lock_waits:
         # Owned synthetic fixture only. The installer continuation's
         # reconcilers fail together on lock_timeout; log each wait longer than
         # 300 ms with its holder's PID, and each connection's role so the PID
         # names its purpose. No statements or parameters are logged.
         options += ["-c", "log_line_prefix=%m [%p] role=%u sqlstate=%e ",
-                    "-c", "log_lock_waits=on", "-c", "deadlock_timeout=300ms", "-c", "log_connections=on",
+                    "-c", "log_lock_waits=on", "-c", "deadlock_timeout=300ms", "-c", "log_connections=on", "-c", "log_disconnections=on",
                     "-c", "log_statement=none", "-c", "log_min_error_statement=panic",
                     "-c", "log_parameter_max_length=0", "-c", "log_parameter_max_length_on_error=0"]
     if regional_context_start == "journey":
@@ -346,6 +360,11 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             image_dir.mkdir()
             build_env = os.environ.copy()
             build_env.update({"TMPDIR": str(build_scratch or work), "CGO_ENABLED": "0"})
+            installed_budget = None
+            if installer_continuation:
+                installed_budget = json.loads(subprocess.check_output(
+                    ["go", "run", "./test/fixtures/installed-sql-budget/main.go"], cwd=ROOT, env=build_env, text=True))
+                report["postgresqlConnectionBudget"] = installed_budget
             subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"asservat"), "./cmd/asservat"], cwd=ROOT, env=build_env, check=True)
             subprocess.run(["go", "build", "-trimpath", "-buildvcs=false", "-o", str(image_dir/"provider-proxy"), "./test/fixtures/provider-proxy/main.go"], cwd=ROOT, env=build_env, check=True)
             helper_copy = ""
@@ -395,7 +414,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 return info["NetworkSettings"]["Networks"][network]["IPAddress"]
             s3ip = service("s3", SEAWEED, ["mini", "-dir=/data", "-ip.bind=0.0.0.0", "-admin.ui=false", "-s3.port=8333"], ["--user", "1000:1000", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-v", "/data", "-e", "AWS_ACCESS_KEY_ID=synthetic-only", "-e", "AWS_SECRET_ACCESS_KEY=synthetic-only-secret", "--entrypoint", "/usr/bin/weed"])
             baoip = service("kms", BAO, ["server", "-dev", "-dev-no-store-token", "-dev-root-token-id=synthetic-root", "-dev-listen-address=0.0.0.0:8200"], ["--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-e", "SKIP_SETCAP=true", "-e", "BAO_DISABLE_MLOCK=true", "--entrypoint", "/usr/bin/bao"])
-            pgip = service("postgres", POSTGRES, postgres_fixture_options(regional_context_start, lock_waits=installer_continuation), ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"])
+            pgip = service("postgres", POSTGRES, postgres_fixture_options(regional_context_start, lock_waits=installer_continuation, installed_budget=installed_budget), ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"])
             proxy_ip = service("tls", worker_tag, ["http://"+s3ip+":8333", "http://"+baoip+":8200", pgip+":5432"], ["--user", "65532:65532", "--read-only", "--entrypoint", "/provider-proxy"])
             for _ in range(50):
                 try:

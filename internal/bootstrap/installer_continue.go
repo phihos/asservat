@@ -44,7 +44,6 @@ type InstallerContinuation struct {
 	roots    [][]byte
 	preparer *kube.InitialPreparer
 	observer *kube.InitialBootstrapObserver
-	history  *pgxpool.Pool
 	record   audit.InitialInstallation
 	receipt  audit.Receipt
 	sql      *postgres.InitialRuntimeBridgeSQL
@@ -72,6 +71,9 @@ type InstallerContinuation struct {
 	// phase-3 outbox, whose pool and roots the worker control pins.
 	downloads          *installerDownloads
 	ownerConfiguration *fleetvalue.OwnerConfiguration
+	// contextDeletion is the ADR-205 section read back in phase 3, which the
+	// capacity projection pins; nil without deletion.
+	contextDeletion *contracts.ContextDeletionDeployment
 	// The public role root and producer, kept open for the permission step.
 	publicRoot  *kube.PublicRuntimeRoleRoot
 	publicRoles *postgres.PublicRuntimeSQLRoles
@@ -153,18 +155,15 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 	}
 	k.closers = append(k.closers, k.in.closeHTTP, k.observer.Close, k.preparer.Close)
 	*step = "open/history"
-	reader, pool, err := initialBootstrapHistory(ctx, preparer, k.preparer, k.plan)
+	reader, pool, err := initialBootstrapHistoryBounded(ctx, preparer, k.preparer, k.plan, 1)
 	if err != nil {
 		return nil, err
 	}
-	k.history = pool
-	k.closers = append(k.closers, pool.Close)
 	*step = "open/activation"
-	observed, err := reader.ObserveInitialInstallation(ctx)
-	if err != nil || observed.Disposition != app.InitialInstallationActivated || observed.Record == nil || observed.AuditReceipt == nil {
-		return nil, errors.Join(mounts.ErrUnavailable, err)
+	k.record, k.receipt, err = observeInstallerActivation(ctx, reader, pool.Close)
+	if err != nil {
+		return nil, err
 	}
-	k.record, k.receipt = *observed.Record, *observed.AuditReceipt
 	*step = "open/superuser"
 	if k.admin, err = k.in.sqlConfig(ctx, "postgres-administrator.json"); err != nil {
 		return nil, mounts.ErrUnavailable
@@ -174,8 +173,33 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 		return nil, mounts.ErrUnavailable
 	}
 	k.closers = append(k.closers, k.sql.Close)
+	// The promoted continuation composes the complete fixed process graph.
+	// Check its installed allowance before creating any runtime resource or
+	// role. An observation-only continuation does not select this graph.
+	if k.input.Public != nil && k.input.Public.Promotion != nil {
+		*step = "open/sql-budget"
+		plan, e := contracts.InstalledSQLConnectionPlan(1)
+		if e != nil {
+			return nil, e
+		}
+		if _, e = k.sql.VerifySQLConnectionBudget(ctx, plan, 0); e != nil {
+			return nil, e
+		}
+	}
 	complete = true
 	return k, nil
+}
+
+// The passive reader has no later use. Join its closure before opening the
+// administrator bridge, including failed observations; historical activation
+// remains subject to the bridge's independent current recovery checks.
+func observeInstallerActivation(ctx context.Context, reader app.InitialInstallationHistory, closeHistory func()) (audit.InitialInstallation, audit.Receipt, error) {
+	defer closeHistory()
+	observed, err := reader.ObserveInitialInstallation(ctx)
+	if err != nil || observed.Disposition != app.InitialInstallationActivated || observed.Record == nil || observed.AuditReceipt == nil {
+		return audit.InitialInstallation{}, audit.Receipt{}, errors.Join(mounts.ErrUnavailable, err)
+	}
+	return *observed.Record, *observed.AuditReceipt, nil
 }
 
 // Resources creates or reopens the 19-resource journal of the fresh provider
@@ -204,9 +228,14 @@ func (k *InstallerContinuation) Resources(ctx context.Context) (*kube.InitialRun
 	if err != nil {
 		return nil, snapshot, inventory, err
 	}
+	// ADR-205 decision 6: and with deletion, the deletion signing key.
+	signing, err := k.contextDeletionSigning()
+	if err != nil {
+		return nil, snapshot, inventory, err
+	}
 	k.at("resources/producer")
 	resources, err := kube.NewProviderInstalledRuntimeResources(ctx, k.preparer, k.sql, k.roots,
-		contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit},
+		contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit, ContextDeletionSigning: signing},
 		contracts.OwnerProviderSelection{AuthMount: o.AuthMount, AuthMountAccessor: o.AuthMountAccessor, AuditCredentials: owner})
 	if err != nil {
 		return nil, snapshot, inventory, err
@@ -465,8 +494,12 @@ func (k *InstallerContinuation) WorkerRecipe(ctx context.Context, resources *kub
 	if err != nil || audit != (contracts.OwnerPublicTransit{}) && audit.Mount != original.KeyService.AuditMount {
 		return docs, errors.Join(mounts.ErrUnavailable, err)
 	}
+	signing, err := k.contextDeletionSigning()
+	if err != nil || signing != (contracts.OwnerPublicTransit{}) && signing.Mount != original.KeyService.AuditMount {
+		return docs, errors.Join(mounts.ErrUnavailable, err)
+	}
 	k.at("worker/outbox")
-	artifact, err := providerconfig.ConfigurationProviderPairSetupArtifact(deployment, contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit}, inventory.WorkerAccount, snapshot.State.WorkerLayout, time.Now())
+	artifact, err := providerconfig.ConfigurationProviderPairSetupArtifact(deployment, contracts.ConfigurationProviderSelection{AuthMount: w.AuthMount, AuthMountAccessor: w.AuthMountAccessor, AuditCredentials: worker, WorkerConfigurationAudit: audit, ContextDeletionSigning: signing}, inventory.WorkerAccount, snapshot.State.WorkerLayout, time.Now())
 	if err != nil {
 		return docs, err
 	}
@@ -826,7 +859,7 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		transit, signing, pki := promotedKeyNames(input.InstallationID, k.record.Scope.IssuerEpoch, *promotion)
 		named.Public = &contracts.OwnerPublicDeployment{SessionTransit: transit, WorkSigning: signing, WorkerPKI: pki}
 	}
-	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation, k.publisherSetup(), k.downloadEvidenceSetup(), nil)
+	artifact, err := providerconfig.OwnerProviderSetupArtifact(named, profile, observed.Configuration.Pool, observed.Configuration.IssuerRoots, time.Now(), k.federation, k.publisherSetup(), k.downloadEvidenceSetup(), k.contextDeletionSetup())
 	if err != nil {
 		return err
 	}
@@ -848,6 +881,12 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 	// ADR-204 decision 5: the download workers' own evidence read principal,
 	// exactly when this installation has downloads.
 	if (k.downloads != nil) != (len(inbox.DownloadEvidenceCredential) != 0) {
+		return mounts.ErrUnavailable
+	}
+	// ADR-205 decision 4: the deletion child's own evidence delete principal,
+	// exactly when this installation deletes context evidence.
+	defer clear(inbox.EvidenceDeleteCredential)
+	if (k.contextDeletionSetup() != nil) != (len(inbox.EvidenceDeleteCredential) != 0) {
 		return mounts.ErrUnavailable
 	}
 	if promotion != nil {
@@ -896,6 +935,9 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 		}
 	}
 	if err = k.PublisherCredentials(ctx, inventory, inbox, inspector, input); err != nil {
+		return err
+	}
+	if err = k.ContextDeletionCredentials(ctx, inventory, inbox, inspector, input); err != nil {
 		return err
 	}
 	if err = k.DownloadAccepted(ctx); err != nil {
@@ -1123,6 +1165,12 @@ type InstallerContinuationStop struct {
 
 func (e *InstallerContinuationStop) Unwrap() error { return e.Err }
 func (e *InstallerContinuationStop) Error() string {
+	var budget *contracts.SQLConnectionBudgetError
+	if errors.As(e.Err, &budget) {
+		// This typed error contains only fixed rules and connection counts.
+		// Never include the surrounding SQL/provider error text.
+		return "installer continuation stopped at " + e.Step + ": " + budget.Error()
+	}
 	class := errorClass(e.Err)
 	step := e.Step
 	var inner interface{ FixedStep() string }
@@ -1260,7 +1308,7 @@ func (k *InstallerContinuation) Permission(ctx context.Context, resources *kube.
 			if projection == nil {
 				deployment := contracts.PermissionDeployment{Format: contracts.PermissionDeploymentFormat, InstallationID: k.record.Scope.InstallationID, RootID: owner.PermissionRootID,
 					RoleRootUID: verified.UID, RoleSetupID: verified.State.OperationID, Postgres: owner.Postgres, Control: control,
-					Retention: &contracts.RetentionDeployment{Guard: retention}, WorkerConfiguration: workers}
+					Retention: &contracts.RetentionDeployment{Guard: retention}, WorkerConfiguration: workers, ContextDeletion: k.contextDeletionEnabled()}
 				if projection, e = kube.NewPermissionRuntimeProjection(bridge, resources, k.publicRoot, deployment); e != nil {
 					return e
 				}
@@ -1387,7 +1435,9 @@ func (k *InstallerContinuation) CapacityProjection(ctx context.Context, resource
 			Keys: slices.Sorted(slices.Values(k.input.Public.Capacity.NamespaceKeys))}},
 		// ADR-204 decision 4: the same path template as the owner input.
 		Processing:    contracts.CapacityProcessingDeployment{Source: s.ProcessingSource, Guard: s.ProcessingGuard, Paths: []contracts.DownloadEnvironmentPath{}, PathTemplate: k.downloadPathTemplateOrNil()},
-		Qualification: c.setup.Qualification}
+		Qualification: c.setup.Qualification,
+		// ADR-205: the store and signing pins of the deletion child.
+		ContextDeletion: k.contextDeletion}
 	// One projection instance owns the one claim attempt across replays; an
 	// uncertain claim is lookup-only afterwards.
 	var projection *kube.CapacityRuntimeProjection
