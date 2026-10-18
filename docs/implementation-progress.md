@@ -42,6 +42,33 @@ neither its 112-ordinary plan nor the failed-deletion assertion is qualified by
 this run. The abort-permission failure is under investigation; no broader
 runtime storage permission has been granted.
 
+[Run 40](https://github.com/phihos/asservat/actions/runs/39124983082), at
+`7321bacbfb7da3cf50c8eebd81053c7bca3f2a78`, passed the deletion credential
+probes and reached the regional workload's `ready_at`: six distinct binding
+observations and fourteen samples with at least one second left in fifteen
+seconds. It then failed before collection when the fixture passed its plaintext
+administrator pool to `NewPermissions`. That constructor correctly requires
+verified TLS and a restricted runtime role. The
+[report](../test/results/installed-journey-ci-40/context-storage-environment.json)
+records exit 1, the 112-ordinary/116-total fixture profile, all 2,629 hashes
+matching the frozen commit and no cleanup failures. This run does not qualify
+collection, native download or installed expiry/deletion.
+
+The fixture now uses the installed `permission-read` credential through verified
+TLS with one scoped monitoring connection, closed when the journey returns.
+This fits the existing operator/monitoring reserve; no connection limit or
+runtime grant was raised. Four issuance helper pools now close before regional
+installation instead of remaining open until the parent test ends. The focused
+[PostgreSQL regression](../test/results/installed-permission-observer-native-1/custody.log)
+at `1b989271b572d5055230dea5ee00ea2efde65d97` passes: both administrator paths
+are rejected, the projected scoped reader constructs and rejects authority
+mutation, and its connection closes. Its
+[report](../test/results/installed-permission-observer-native-1/custody-environment.json)
+records exit 0, 2,602 matching hashes and no cleanup failures. The projection in
+that focused check is synthetic; installed projection protection and the
+complete journey still require the next frozen run. The subsequent probe also
+requires PostgreSQL's exact insufficient-privilege SQLSTATE, not a generic error.
+
 ADR-205's SQL purposes/due list and provider signing/delete-credential
 components merged in [#35](https://github.com/phihos/asservat/pull/35) and
 [#36](https://github.com/phihos/asservat/pull/36), after passing CI and current
