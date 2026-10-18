@@ -48,7 +48,10 @@ func (d *contextStartOpeningDiagnostic) setupStep(err error) {
 		case "source-open", "owned-process", "process-proof", "process-match", "execution-account", "settings-guard", "settings-snapshot", "workload", "settings-guard-after", "settings-snapshot-after", "workload-guard-after", "source-close", "owned-process-after", "fresh":
 			d.stage = "setup-" + s
 			d.bound(step.ContextStartSetupUntil())
-			d.trace = setupMarks(err)
+			// The trace belongs to this same setup error, not an outer wrapper.
+			if traced, ok := step.(error); ok {
+				d.trace = setupMarks(traced)
+			}
 		}
 	}
 }
@@ -57,8 +60,8 @@ func (d *contextStartOpeningDiagnostic) setupStep(err error) {
 // ("name@duration ..."), which its producer builds from fixed names and
 // durations, restricted to that alphabet and length.
 func setupMarks(err error) string {
-	var fixed interface{ FixedStep() string }
-	if !errors.As(err, &fixed) {
+	fixed, ok := err.(interface{ FixedStep() string })
+	if !ok {
 		return ""
 	}
 	trace := fixed.FixedStep()

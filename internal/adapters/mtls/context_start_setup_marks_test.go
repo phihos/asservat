@@ -1,6 +1,10 @@
 package mtls
 
-import "testing"
+import (
+	"context"
+	"testing"
+	"time"
+)
 
 type fixedTrace string
 
@@ -16,5 +20,24 @@ func TestSetupMarksKeepOnlyFixedMarks(t *testing.T) {
 		if got := setupMarks(fixedTrace(trace)); got != want {
 			t.Fatalf("%q: got %q want %q", trace, got, want)
 		}
+	}
+}
+
+type setupTraceError struct{ fixedTrace }
+
+func (setupTraceError) ContextStartSetupStep() string     { return "settings-guard" }
+func (setupTraceError) ContextStartSetupUntil() time.Time { return time.Time{} }
+
+type outerStep struct{ err error }
+
+func (o outerStep) Error() string     { return "outer" }
+func (o outerStep) Unwrap() error     { return o.err }
+func (o outerStep) FixedStep() string { return "outer-step" }
+
+func TestSetupStepTraceIgnoresOuterWrapper(t *testing.T) {
+	d := newContextStartOpeningDiagnostic(context.Background(), time.Now().Add(time.Second))
+	d.setupStep(outerStep{setupTraceError{"settings-guard@3s after [source-open@20ms]"}})
+	if d.stage != "setup-settings-guard" || d.trace != "source-open@20ms" {
+		t.Fatalf("stage=%q trace=%q", d.stage, d.trace)
 	}
 }
