@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -26,7 +27,7 @@ import (
 // original receipts and token identity remain explicitly synthetic; no SQL or
 // external storage authority is inferred from this component regression.
 func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
-	for _, mode := range []string{"valid", "rotated-current", "stale-mount", "replaced-secret", "wrong-secret-kind", "wrong-secret-version", "extra-key", "placeholder", "missing-receipt", "guard-lost", "allowing-probe", "wrong-token-pod", "token-revoked", "late-secret", "cancelled"} {
+	for _, mode := range []string{"valid", "rotated-current", "stale-mount", "replaced-secret", "wrong-secret-kind", "wrong-secret-version", "extra-key", "placeholder", "missing-receipt", "guard-lost", "allowing-probe", "wrong-token-pod", "token-revoked", "late-secret", "cancelled", "sdk-budget", "final-pod-changed", "final-pod-read"} {
 		t.Run(mode, func(t *testing.T) {
 			x := providerOwnerObjectFixture(t)
 			in := x.reader.input
@@ -164,6 +165,18 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 					}
 					permissionReply(w, reply)
 				case "/api/v1/namespaces/" + in.Namespace.Name + "/pods/" + pod.Name:
+					if reviews.Load() == 2 {
+						if mode == "final-pod-read" {
+							http.Error(w, "synthetic unavailable", 503)
+							break
+						}
+						if mode == "final-pod-changed" {
+							changed := pod.DeepCopy()
+							changed.Spec.Containers[0].Image = "different-synthetic-image"
+							permissionReply(w, changed)
+							break
+						}
+					}
 					permissionReply(w, pod)
 				case "/apis/apps/v1/namespaces/" + in.Namespace.Name + "/replicasets/" + rs.Name:
 					permissionReply(w, rs)
@@ -172,8 +185,11 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 				}
 				return true
 			}
-			probe := *x.reader.client
-			guard, e := NewOwnerWorkloadProtection(x.reader.client, &probe, x.plan, GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
+			probe, e := NewPermissionClient(x.apiConfig, in.ClusterID, x.reader.client.control, x.reader.client.now)
+			if e != nil {
+				t.Fatal(e)
+			}
+			guard, e := NewOwnerWorkloadProtection(x.reader.client, probe, x.plan, GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
 			if e != nil {
 				t.Fatal("fixture guard construction", e)
 			}
@@ -199,6 +215,10 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 			reader, e := NewInstalledOwnerIdentityReader(x.reader.client, guard, in, a, ownerTokenFunc(func(context.Context) ([]byte, error) { return append([]byte(nil), token...), nil }), x.reader.podUID)
 			if e != nil {
 				t.Fatal(e)
+			}
+			if mode == "sdk-budget" {
+				exerciseProviderCredentialAuditBudget(t, reader, x, mounted)
+				return
 			}
 			verifyStart := time.Now()
 			ctx, end := context.WithDeadline(context.Background(), verifyStart.Add(5*time.Second))
@@ -241,6 +261,16 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 				stopFresh()
 				if err != nil || fresh.AccessKeyID != "synthetic-rotated" || !freshUntil.After(time.Now()) || freshUntil.After(freshStart.Add(5*time.Second)) || storageReads.Load() != 3 {
 					t.Fatal("same original Secret could not rotate current mounted credentials", err)
+				}
+			}
+			if mode == "final-pod-changed" || mode == "final-pod-read" {
+				want := "identity/final-pod-changed"
+				if mode == "final-pod-read" {
+					want = "identity/final-pod/live-pod-read"
+				}
+				var named interface{ FixedStep() string }
+				if !errors.As(e, &named) || named.FixedStep() != want {
+					t.Fatal("indistinguishable Pod failure", e)
 				}
 			}
 			if string(x.journal.Data["state.json"]) != originalJournal {

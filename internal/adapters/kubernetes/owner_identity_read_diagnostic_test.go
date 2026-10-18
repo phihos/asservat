@@ -23,7 +23,7 @@ func TestOwnerIdentityReadDiagnosticOnlyRendersClosedChecks(t *testing.T) {
 	// The closed steps compose through a provider material read, without
 	// rendering the private cause.
 	var step interface{ FixedStep() string }
-	if wrapped := materialStep("identity", inner); !errors.As(wrapped, &step) || step.FixedStep() != "identity/projections/credentials-read" || !errors.Is(wrapped, cause) {
+	if wrapped := materialStep("identity", inner); !errors.As(wrapped, &step) || step.FixedStep() != "identity/projections/credentials-read/deadline" || !errors.Is(wrapped, cause) {
 		t.Fatal("material step lost the nested identity checks", step)
 	}
 	check = OwnerIdentityReadCheck(255)
@@ -31,5 +31,25 @@ func TestOwnerIdentityReadDiagnosticOnlyRendersClosedChecks(t *testing.T) {
 	ownerReadAnnotate(&check, &e)
 	if e.Error() != "owner identity unavailable: check=unspecified detail=unspecified" {
 		t.Fatal("unknown check rendered caller input")
+	}
+}
+
+func TestOwnerIdentityReadDiagnosticSeparatesReadAndChangedIdentity(t *testing.T) {
+	for _, tc := range []struct {
+		step  OwnerIdentityReadCheck
+		cause error
+		want  string
+	}{{ownerReadLivePodRead, context.DeadlineExceeded, "final-pod/live-pod-read/deadline"}, {ownerReadLivePodRead, cfg.ErrUnavailable, "final-pod/live-pod-read"}, {ownerReadFinalPodChanged, cfg.ErrChanged, "final-pod-changed"}} {
+		e := tc.cause
+		step := tc.step
+		ownerReadAnnotate(&step, &e)
+		if step != ownerReadFinalPodChanged {
+			step = ownerReadFinalPod
+			ownerReadAnnotate(&step, &e)
+		}
+		var diagnostic interface{ FixedStep() string }
+		if !errors.As(e, &diagnostic) || diagnostic.FixedStep() != tc.want {
+			t.Fatal("unsafe or indistinguishable failure", e)
+		}
 	}
 }

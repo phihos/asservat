@@ -111,10 +111,11 @@ func publicDigest(s string) (artifact.Digest, bool) {
 // publicAuditStore is the owner's audit store and audit Transit keys, shared
 // by owner enrollment audit and the public capture/operation audit lanes.
 type publicAuditStore struct {
-	store *objectstore.Store
-	seal  *kms.Sealer
-	open  *kms.Opener
-	keys  *http.Client
+	store     *objectstore.Store
+	seal      *kms.Sealer
+	open      *kms.Opener
+	keys      *http.Client
+	operation *installedOperationAudit
 }
 
 // publicShared are the owner native composition's retention topology and
@@ -297,11 +298,11 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	writer, err := objectstore.NewClosedOperationAuditObjects(a.store, capture.StoreID, a.seal, a.open)
+	reader, writer, err := a.operationObjects(capture.StoreID)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.intents = auditapp.CaptureOperationPublication{RootID: root, Completed: completed, Journal: journal, Acknowledgements: acks, Writer: writer, Reader: &objectstore.OperationAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}, MAC: out.mac}
+	out.intents = auditapp.CaptureOperationPublication{RootID: root, Completed: completed, Journal: journal, Acknowledgements: acks, Writer: writer, Reader: reader, MAC: out.mac}
 
 	runner := executionapp.APIContextRunner{Eligibility: eligibility, Retention: out.retention}
 	for purpose, port := range map[string]func(*postgres.APIContextExecutions){

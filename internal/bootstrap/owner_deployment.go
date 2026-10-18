@@ -621,24 +621,26 @@ func (d *OwnerDeployment) projectionInputs(path string) (*providerInputs, error)
 // providerAuditCredentials reads the installed audit store credential from
 // the provider effects on each use; nothing is cached across reads.
 type providerAuditCredentials struct {
-	providers *kms.InstalledOwnerProviderEffects
+	providers installedAuditCredentialReader
 }
 
 func (s providerAuditCredentials) Retrieve(ctx context.Context) (aws.Credentials, error) {
 	c, until, err := s.providers.ReadAuditCredentials(ctx)
 	if err != nil {
-		// The provider's own closed step (credentials-<step>) reaches the
-		// object store's diagnostics through the SDK's error chain.
-		var named interface{ FixedStep() string }
-		if errors.As(err, &named) {
-			return aws.Credentials{}, &fixedStepError{named.FixedStep(), mounts.ErrUnavailable}
-		}
-		return aws.Credentials{}, &fixedStepError{"credentials", mounts.ErrUnavailable}
+		return aws.Credentials{}, auditCredentialFailure(err)
 	}
 	if !time.Now().Before(until) {
 		return aws.Credentials{}, &fixedStepError{"credentials-expired", mounts.ErrUnavailable}
 	}
 	return aws.Credentials{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey, SessionToken: c.SessionToken, Source: "installed-owner-provider"}, nil
+}
+
+func auditCredentialFailure(err error) error {
+	var named interface{ FixedStep() string }
+	if errors.As(err, &named) {
+		return &fixedStepError{named.FixedStep(), mounts.ErrUnavailable}
+	}
+	return &fixedStepError{"credentials", mounts.ErrUnavailable}
 }
 
 // installedAuditStore is the public layer's audit store in the installed
@@ -663,7 +665,7 @@ func (d *OwnerDeployment) installedAuditStore(providers *kms.InstalledOwnerProvi
 		return publicAuditStore{}, mounts.ErrUnavailable
 	}
 	d.closers = append(d.closers, store.Close)
-	return publicAuditStore{store: store, seal: providers.Sealer(), open: providers.Opener(), keys: keys}, nil
+	return publicAuditStore{store: store, seal: providers.Sealer(), open: providers.Opener(), keys: keys, operation: &installedOperationAudit{input: c, providers: providers, http: h, seal: providers.Sealer(), open: providers.Opener()}}, nil
 }
 
 // backendInputs is the backend root: the installed observation projection

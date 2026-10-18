@@ -1,5 +1,42 @@
 # Sustained implementation progress
 
+## Installed public audit credential deadline correction (2026-10-18)
+
+The installed public operation and capture-intent audit adapters now obtain one
+current audit-store credential per finite create or lookup, preserving its
+original deadline through seal, conditional PUT, exact-version GET, body close
+and verification. The previous SDK credential adapter discarded that deadline
+and repeated the complete native proof on each S3 request. No credential cache,
+request extension, higher QPS or admission retry was added; SQL audit claims,
+acknowledgements, recovery and final identity checks remain independent.
+
+The blocked PUT and GET regressions failed against the old behavior: a 100 ms
+credential proof allowed I/O to run until the 700 ms caller deadline. Both pass
+with the operation-owned context. Actual loopback TLS/S3 SDK tests cover exact
+version verification, expired credentials before sealing, cancellation, unknown
+or conflicting writes, and lookup without another PUT. Native identity failures
+now distinguish failed resource reads from changed security-relevant Pod state;
+errors expose only closed labels.
+
+The unchanged, separate 20-QPS/burst-20 native clients measured 51 API calls per
+credential proof. A fresh five-second single-object SDK PUT/GET still passes with
+the old behavior (two proofs, 102 calls, 3.203 s); it does not reproduce the whole
+installed preview failure. With an original three-second remaining bound the old
+sequence fails during its second proof, while one scoped proof completes in
+2.101 s. A synthetic C08 Begin/Finish pair under one original five-second caller
+bound exhausts the old sequence during its third proof; the scoped pair finishes
+in 4.198 s with two proofs, 102 API calls and two PUTs/two GETs. This uses the real
+coordinator, SDK and native readers with synthetic SQL acknowledgements, stored
+bytes and API authority. It excludes real SQL, key-service, application and
+identity latency and does not qualify installed preview availability or identify
+the exact cause of native41's coarse final-Pod diagnostic.
+
+Focused bootstrap/Kubernetes race tests and both-package vet pass. The remaining
+shared credential users are bootstrap issue audit and download stop, dispatch,
+enrollment, window and session audit in `public_fleet.go` and
+`public_downloads.go`; their equivalent operation ownership remains required.
+No full installed journey or S-02 acceptance follows from this component fix.
+
 ## Installed journey native 41: public preview remains unavailable
 
 [Run 39128220426](https://github.com/phihos/asservat/actions/runs/39128220426)

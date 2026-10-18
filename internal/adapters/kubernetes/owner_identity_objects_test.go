@@ -25,6 +25,7 @@ import (
 // receipts are synthetic; this fixture confers no current guard/SQL authority.
 type ownerIdentityObjectFixture struct {
 	extra      func(http.ResponseWriter, *http.Request) bool
+	apiConfig  *rest.Config
 	plan       cfg.OwnerWorkloadAdministration
 	reader     *InstalledOwnerIdentityReader
 	state      contracts.InitialRuntimeResourceState
@@ -111,7 +112,8 @@ func newOwnerIdentityObjectFixture(t *testing.T) *ownerIdentityObjectFixture {
 		}
 	}))
 	t.Cleanup(server.Close)
-	client, e := NewPermissionClient(&rest.Config{Host: server.URL, TLSClientConfig: rest.TLSClientConfig{CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})}}, in.ClusterID, cfg.NamespaceRef{Name: in.Namespace.Name, UID: in.Namespace.UID}, time.Now)
+	x.apiConfig = &rest.Config{Host: server.URL, TLSClientConfig: rest.TLSClientConfig{CAData: pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})}}
+	client, e := NewPermissionClient(x.apiConfig, in.ClusterID, cfg.NamespaceRef{Name: in.Namespace.Name, UID: in.Namespace.UID}, time.Now)
 	if e != nil {
 		t.Fatal(e)
 	}

@@ -90,6 +90,25 @@ Each normal complete audit takes two wraps, two unwraps, two PUTs and two GETs;
 lookup recovery adds a GET/unwrap and no wrap/PUT. Independently acknowledged
 receipts precede response delivery. The journal is never treated as object audit.
 
+The installed provider layout obtains the audit-store credential once for each
+finite intent/outcome create or lookup. As in the owner-enrollment adapter, the
+bootstrap wrapper owns a private static-credential store only for that operation.
+The earliest original caller, write, five-second observation and accepted-source
+deadline bounds sealing, signed PUT, pinned GET, response-body closure and
+verification. SDK credential expiry alone cannot cancel an already signed
+request. No credential cache crosses operations; a later outcome or replay gets
+its own current observation without replacing the original operation dates.
+Normal public audit and capture-intent publication share this composition.
+Their SQL claims, acknowledgement, recovery and final request-identity checks
+remain independent and mandatory. Completed object receipts are historical
+facts, never authority for later SQL work or evidence disclosure.
+
+Other installed audit families still use the shared per-SDK credential adapter:
+bootstrap issue objects (`bootstrap/public_fleet.go`), and download stop,
+dispatch, enrollment, window and session objects (`bootstrap/public_downloads.go`).
+Equivalent operation-owned deadline composition remains required there; this
+change does not qualify those families or the whole installed investigation.
+
 Known scope/target denials and unsupported inputs retain their private typed
 classification through the nondisclosing public error envelope. The audit does
 not interpret the public `NotAvailable` code as proof of a denial: provider

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mounts"
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
@@ -69,11 +68,11 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			if err != nil {
 				return nil, mounts.ErrUnavailable
 			}
-			closed, err := objectstore.NewClosedOperationAuditObjects(a.store, policy.StoreID, a.seal, a.open)
+			objects, closed, err := a.operationObjects(policy.StoreID)
 			if err != nil {
 				return nil, mounts.ErrUnavailable
 			}
-			return auditapp.NewHealthyOperationAuditor(policy, journal, acks, &objectstore.OperationAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}, closed, lifecycle, time.Now)
+			return auditapp.NewHealthyOperationAuditor(policy, journal, acks, objects, closed, lifecycle, time.Now)
 		})
 	}
 	normal, err := auditor("normal")

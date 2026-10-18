@@ -186,8 +186,12 @@ func (s *InstalledOwnerIdentityReader) verify(ctx context.Context, manifest cont
 	}
 	check = ownerReadFinalPod
 	last, e := reader.live(call, pool, value.OwnerBinding{PodUID: s.podUID}, name)
-	if e != nil || first != last {
-		return time.Time{}, errors.Join(cfg.ErrChanged, e)
+	if e != nil {
+		return time.Time{}, e
+	}
+	if first != last {
+		check = ownerReadFinalPodChanged
+		return time.Time{}, cfg.ErrChanged
 	}
 	check = ownerReadFinalDeployment
 	if e = s.deployment(call, before); e != nil {
