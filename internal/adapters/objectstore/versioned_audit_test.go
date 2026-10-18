@@ -146,3 +146,35 @@ func TestLegacyStoreRetainsVersionOptionalContract(t *testing.T) {
 		})
 	}
 }
+
+// A refused or unacceptable write names its closed cause for diagnostics and
+// still matches ErrStorage.
+func TestPutSmallNamesTheStorageCause(t *testing.T) {
+	for _, c := range []struct {
+		name    string
+		status  int
+		version string
+		want    string
+	}{{"refused", http.StatusForbidden, "v", "http-403"}, {"unversioned", http.StatusOK, "", "unversioned"}} {
+		t.Run(c.name, func(t *testing.T) {
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("ETag", `"original"`)
+				if c.version != "" {
+					w.Header().Set("X-Amz-Version-Id", c.version)
+				}
+				w.WriteHeader(c.status)
+			}))
+			defer server.Close()
+			store, err := NewVersionedAudit(server.URL, "test", "audit", credentials.NewStaticCredentialsProvider("synthetic", "synthetic", ""), server.Client())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer store.Close()
+			_, err = store.PutSmall(context.Background(), "audit-record", []byte("data"))
+			var step interface{ FixedStep() string }
+			if !errors.Is(err, ErrStorage) || !errors.As(err, &step) || step.FixedStep() != c.want {
+				t.Fatal(err)
+			}
+		})
+	}
+}

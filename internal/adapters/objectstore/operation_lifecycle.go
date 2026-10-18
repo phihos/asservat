@@ -105,12 +105,12 @@ func (s *ClosedOperationAuditObjects) write(ctx context.Context, root, id, phase
 	key := value.OperationAuditKey(root, id, phase)
 	put, e := s.store.PutSmall(live, key, b)
 	if e != nil {
-		return value.OperationWriteCompletion{}, objectStep("put")
+		return value.OperationWriteCompletion{}, objectStepWith("put", e)
 	}
 	stored := time.Now().UTC().Truncate(time.Microsecond)
 	obj, got, e := s.store.readAcknowledgedControlAudit(live, put, value.OperationCipherLimit)
 	if e != nil {
-		return value.OperationWriteCompletion{}, objectStep("read")
+		return value.OperationWriteCompletion{}, objectStepWith("read", e)
 	}
 	defer clear(got)
 	if put != obj || verify(live, got) != nil || live.Err() != nil || ctx.Err() != nil {

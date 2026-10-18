@@ -29,11 +29,11 @@ func (s *Store) readAcknowledgedControlAudit(ctx context.Context, expected Objec
 	}
 	v, err := s.client.GetObject(ctx, q)
 	if err != nil {
-		return zero, nil, ErrStorage
+		return zero, nil, storageRefusal(err)
 	}
 	defer v.Body.Close()
 	if aws.ToInt64(v.ContentLength) != expected.Bytes || aws.ToString(v.ETag) != expected.ETag || aws.ToString(v.VersionId) != expected.VersionID {
-		return zero, nil, artifact.ErrIntegrity
+		return zero, nil, readMismatch{}
 	}
 	body, err := io.ReadAll(io.LimitReader(v.Body, expected.Bytes+1))
 	if err != nil || int64(len(body)) != expected.Bytes || artifact.Digest(sha256.Sum256(body)) != expected.SHA256 || ctx.Err() != nil {
@@ -42,3 +42,11 @@ func (s *Store) readAcknowledgedControlAudit(ctx context.Context, expected Objec
 	}
 	return expected, body, nil
 }
+
+// readMismatch is ErrIntegrity naming that the returned length, ETag or version
+// differed from the acknowledged write.
+type readMismatch struct{}
+
+func (readMismatch) Error() string     { return artifact.ErrIntegrity.Error() }
+func (readMismatch) Unwrap() error     { return artifact.ErrIntegrity }
+func (readMismatch) FixedStep() string { return "mismatch" }
