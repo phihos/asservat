@@ -27,6 +27,25 @@ func nativeKubernetesTokenName(c contracts.OwnerNativeWorkerAPI) string {
 	return "native-kube-" + c.ClusterID + "-" + c.Namespace.UID + ".token"
 }
 
+// nativeKubernetesProbeTokenName is the worker namespace's separate probe
+// credential (ADR-204 decision 2): it proves the worker profile source's guard
+// by a denied dry-run update, as kube-probe.token does in the hub namespace.
+func nativeKubernetesProbeTokenName(c contracts.OwnerNativeWorkerAPI) string {
+	return "native-kube-probe-" + c.ClusterID + "-" + c.Namespace.UID + ".token"
+}
+
+// workerAPIClient is one pinned worker API's client for one fixed token file
+// of the backend projection; the returned func closes its HTTP transport.
+func (d *OwnerDeployment) workerAPIClient(a contracts.OwnerNativeWorkerAPI, token string) (*kube.PermissionClient, func(), error) {
+	in := &providerInputs{files: d.backendInputs().files, kubernetesEndpoint: a.Kubernetes}
+	client, err := kube.NewPermissionClient(in.kubernetes(token), a.ClusterID, configvalue.NamespaceRef{Name: a.Namespace.Name, UID: a.Namespace.UID}, time.Now)
+	if err != nil {
+		in.closeHTTP()
+		return nil, nil, err
+	}
+	return client, in.closeHTTP, nil
+}
+
 // hub is the owner's own cluster: download-peer proofs read only that cluster
 // API (ADR-179). Workload clusters are never addressed directly. ADR-194 D2/D3:
 // the provider-installed layout may start with no worker API and no topology;
@@ -152,13 +171,11 @@ func (d *OwnerDeployment) nativeConfiguration(ctx context.Context, pool *pgxpool
 	}
 	clients := make(map[ownerNativeAPIKey]*kube.PermissionClient, len(n.WorkerAPIs))
 	for _, a := range n.WorkerAPIs {
-		in := &providerInputs{files: d.backendInputs().files, kubernetesEndpoint: a.Kubernetes}
-		client, err := kube.NewPermissionClient(in.kubernetes(nativeKubernetesTokenName(a)), a.ClusterID, configvalue.NamespaceRef{Name: a.Namespace.Name, UID: a.Namespace.UID}, time.Now)
+		client, closeHTTP, err := d.workerAPIClient(a, nativeKubernetesTokenName(a))
 		if err != nil {
-			in.closeHTTP()
 			return nil, err
 		}
-		d.closers = append(d.closers, in.closeHTTP)
+		d.closers = append(d.closers, closeHTTP)
 		clients[ownerNativeAPIKey{a.ClusterID, a.Namespace.UID}] = client
 	}
 	roots, _, err := mtls.OwnerTrustRoots(n.ConnectorRoots, time.Now())

@@ -46,6 +46,10 @@ type runtimeFixture struct {
 	signings, routes   atomic.Int32
 	mutateProof        func(*value.OwnerEnrollmentProof)
 	mutateRegistration func(*value.OwnerRegistrationObservation)
+	// bootstrapSAN adds the pool's fixed serving name to server leaves, as an
+	// owner-bootstrap/v1 pool's issuer does; ownerReads counts locator reads.
+	bootstrapSAN bool
+	ownerReads   atomic.Int32
 }
 
 func (f *runtimeFixture) ReadOwnerConfiguration(context.Context) (value.OwnerConfigurationObservation, error) {
@@ -68,6 +72,10 @@ func (f *runtimeFixture) Enroll(ctx context.Context, r value.OwnerEnrollmentRequ
 	if r.Usage == "server" {
 		name, _ := mtls.OwnerServerName(r.Binding)
 		leaf.DNSNames = []string{name}
+		if f.bootstrapSAN {
+			common, _ := mtls.OwnerBootstrapServerName(f.configuration.Pool)
+			leaf.DNSNames = append(leaf.DNSNames, common)
+		}
 		leaf.ExtKeyUsage = []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}
 	}
 	der, err := x509.CreateCertificate(rand.Reader, leaf, f.ca, csr.PublicKey, f.key)
@@ -123,6 +131,7 @@ func (f *runtimeFixture) ReadDownloadWorkerEnrollment(context.Context, string, s
 	return authorization.DownloadWorkerIdentity{}, artifact.ErrDownloadUnavailable
 }
 func (f *runtimeFixture) ReadWorkerOwner(context.Context, string, string) (authorization.WorkerOwnerLease, error) {
+	f.ownerReads.Add(1)
 	return authorization.WorkerOwnerLease{}, artifact.ErrDownloadUnavailable
 }
 func (f *runtimeFixture) BeginOwnedWorkerEnrollment(context.Context, authorization.WorkerOwnerLease, []byte, []byte) (evidence.WorkerEnrollmentDelivery, error) {

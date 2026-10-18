@@ -7,9 +7,12 @@ const WorkerStoreCredentialsPath = "/run/asservat/native-store/credentials.json"
 const WorkerStoreCredentialsMaxBytes = 16 << 10
 
 // Public installation pins, never per-request work or a disclosure grant.
+// ExchangeAddress, when present, is the "host:port" dialed for
+// ExchangeEndpoint, with WorkerControl.Address's connectivity-only meaning.
 type WorkerNativeControl struct {
 	Format              string                 `json:"format"`
 	ExchangeEndpoint    string                 `json:"exchangeEndpoint"`
+	ExchangeAddress     string                 `json:"exchangeAddress,omitempty"`
 	ExchangeServerRoots [][]byte               `json:"exchangeServerRoots"`
 	ObjectStore         WorkerNativeStore      `json:"objectStore"`
 	KeyService          WorkerNativeKeyService `json:"keyService"`

@@ -2,10 +2,13 @@ package mtls
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"crypto/x509"
 	"encoding/json"
+	"net"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,10 +17,12 @@ import (
 	value "asservat.local/asservat/internal/domain/authorization"
 )
 
+// Address is the optional connectivity-only dial target for Endpoint; it
+// never changes the verified TLS name or HTTP authority.
 type WorkerControlTrust struct {
-	InstallationID, ClusterID, Endpoint string
-	server, issuer                      []*x509.Certificate
-	native                              *WorkerNativeTrust
+	InstallationID, ClusterID, Endpoint, Address string
+	server, issuer                               []*x509.Certificate
+	native                                       *WorkerNativeTrust
 }
 
 func workerEndpoint(endpoint string) (*url.URL, error) {
@@ -26,6 +31,40 @@ func workerEndpoint(endpoint string) (*url.URL, error) {
 		return nil, artifact.ErrInvalid
 	}
 	return u, nil
+}
+
+// workerAddress accepts an absent address or one canonical "host:port" dial
+// target: a DNS name or IP literal and a decimal port without leading zeros.
+func workerAddress(address string) error {
+	if address == "" {
+		return nil
+	}
+	host, port, err := net.SplitHostPort(address)
+	n, perr := strconv.Atoi(port)
+	if err != nil || perr != nil || n < 1 || n > 65535 || strconv.Itoa(n) != port || host == "" || len(host) > 253 || strings.ContainsAny(host, "/\\@?#%[] \t\r\n") || net.JoinHostPort(host, port) != address {
+		return artifact.ErrInvalid
+	}
+	return nil
+}
+
+// workerDial returns a dialer that connects only for the exact authority of
+// endpoint and then only to address. Without an address it is nil, so the
+// transport keeps its own dialer for the endpoint host.
+func workerDial(endpoint *url.URL, address string, dial func(context.Context, string, string) (net.Conn, error)) func(context.Context, string, string) (net.Conn, error) {
+	if address == "" {
+		return nil
+	}
+	port := endpoint.Port()
+	if port == "" {
+		port = "443"
+	}
+	expected := net.JoinHostPort(endpoint.Hostname(), port)
+	return func(ctx context.Context, network, authority string) (net.Conn, error) {
+		if network != "tcp" || authority != expected {
+			return nil, artifact.ErrDownloadUnavailable
+		}
+		return dial(ctx, "tcp", address)
+	}
 }
 
 // ParseWorkerControl has no clock-dependent digest behavior. Roots must be
@@ -38,7 +77,10 @@ func ParseWorkerControl(raw []byte) (*WorkerControlTrust, error) {
 	if _, err = workerEndpoint(wire.Endpoint); err != nil {
 		return nil, err
 	}
-	trust := &WorkerControlTrust{InstallationID: wire.InstallationID, ClusterID: wire.ClusterID, Endpoint: wire.Endpoint}
+	if err = workerAddress(wire.Address); err != nil {
+		return nil, err
+	}
+	trust := &WorkerControlTrust{InstallationID: wire.InstallationID, ClusterID: wire.ClusterID, Endpoint: wire.Endpoint, Address: wire.Address}
 	total := 0
 	trust.server, err = parseWorkerRootSet(wire.ServerRoots, &total)
 	if err != nil {
