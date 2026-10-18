@@ -12,22 +12,27 @@ func TestInstalledSQLConnectionBudget(t *testing.T) {
 	}
 	// The hub-worker holds 19 logins per retained process, and the key
 	// service 4: ADR-204 added two worker configuration logins and the
-	// acquisition login (101), and ADR-205 the three context deletion logins,
-	// so one hub now needs 107 ordinary connections.
-	required := 32 + 19*PublicRuntimeRetainedWorkerProcesses + len(PublicRuntimeFederationPurposes())*PublicRuntimeRetainedFederationProcesses + len(PublicRuntimePublisherPurposes())*PublicRuntimeRetainedPublisherProcesses + len(PublicRuntimeKeyServicePurposes())*PublicRuntimeRetainedKeyServiceProcesses + 1 + SQLMaintenanceReserve
+	// acquisition login (101), and ADR-205 the three context deletion logins
+	// (107). Five simultaneous installer pools bring the allowance to 112.
+	required := 32 + 19*PublicRuntimeRetainedWorkerProcesses + len(PublicRuntimeFederationPurposes())*PublicRuntimeRetainedFederationProcesses + len(PublicRuntimePublisherPurposes())*PublicRuntimeRetainedPublisherProcesses + len(PublicRuntimeKeyServicePurposes())*PublicRuntimeRetainedKeyServiceProcesses + 5 + 1 + SQLMaintenanceReserve
 	// PostgreSQL defaults (100 connections, three superuser slots) no longer
 	// hold that worst case; the error names the exact counts.
 	_, err = one.Validate(0, SQLServerCapacity{MaxConnections: 100, SuperuserReserved: 3})
 	var budget *SQLConnectionBudgetError
-	if required != 107 || !errors.As(err, &budget) || budget.Rule != "installation-allocation" || budget.Required != required || budget.Configured != 97 {
+	if required != 112 || !errors.As(err, &budget) || budget.Rule != "installation-allocation" || budget.Required != required || budget.Configured != 97 {
 		t.Fatal("single-hub worst case accepted or misreported at the defaults", err)
 	}
-	// ADR-205: an installation with deletion needs max_connections of at least 110.
-	if _, err = one.Validate(0, SQLServerCapacity{MaxConnections: 109, SuperuserReserved: 3}); !errors.As(err, &budget) || budget.Required != 107 || budget.Configured != 106 {
-		t.Fatal("single-hub worst case accepted below 110 connections", err)
+	// The installer is separate from both the verifier and maintenance reserve.
+	installer := one.Compartments[len(one.Compartments)-1]
+	if installer.Name != "installer" || installer.RetainedProcesses != 1 || installer.open() != 5 || one.Verifiers != 1 || one.Reserve != SQLMaintenanceReserve {
+		t.Fatal("installer allowance borrowed verifier or maintenance capacity", one)
 	}
-	got, err := one.Validate(0, SQLServerCapacity{MaxConnections: 110, SuperuserReserved: 3})
-	if err != nil || got.PerHubProcess != SQLConnectionsPerHubReplica || got.Required != required || got.Allocation != 107 || got.Available != 107 {
+	// Retained runtime plus installer needs max_connections of at least 115.
+	if _, err = one.Validate(0, SQLServerCapacity{MaxConnections: 114, SuperuserReserved: 3}); !errors.As(err, &budget) || budget.Required != 112 || budget.Configured != 111 {
+		t.Fatal("single-hub worst case accepted below 115 connections", err)
+	}
+	got, err := one.Validate(0, SQLServerCapacity{MaxConnections: 115, SuperuserReserved: 3})
+	if err != nil || got.PerHubProcess != SQLConnectionsPerHubReplica || got.Required != required || got.Allocation != 112 || got.Available != 112 {
 		t.Fatal("single-hub installed budget", got, err)
 	}
 	// Four retained hub processes (two replicas with surge) do not fit the defaults.

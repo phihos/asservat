@@ -1,15 +1,59 @@
 package bootstrap
 
 import (
-	"asservat.local/asservat/internal/contracts"
 	"context"
 	"errors"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/postgres"
+	fleetapp "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/audit"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 )
+
+func TestInstallerActivationClosesHistoryBeforeRuntimeWork(t *testing.T) {
+	record, receipt := audit.InitialInstallation{}, audit.Receipt{}
+	record.Scope.InstallationID = "retained-installation"
+	receipt.Key, receipt.Version = "retained-audit", "original-version"
+	readFailure := errors.New("observation failed")
+	for _, tc := range []struct {
+		name        string
+		observation fleetapp.InitialInstallationObservation
+		err         error
+		want        bool
+	}{
+		{"activated", fleetapp.InitialInstallationObservation{Disposition: fleetapp.InitialInstallationActivated, Record: &record, AuditReceipt: &receipt}, nil, true},
+		{"not activated", fleetapp.InitialInstallationObservation{Disposition: fleetapp.InitialInstallationAudited, Record: &record, AuditReceipt: &receipt}, nil, false},
+		{"missing record", fleetapp.InitialInstallationObservation{Disposition: fleetapp.InitialInstallationActivated, AuditReceipt: &receipt}, nil, false},
+		{"missing receipt", fleetapp.InitialInstallationObservation{Disposition: fleetapp.InitialInstallationActivated, Record: &record}, nil, false},
+		{"read failure", fleetapp.InitialInstallationObservation{}, readFailure, false},
+		{"cancellation", fleetapp.InitialInstallationObservation{}, context.Canceled, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var events []string
+			history := initialHandoverHistoryFunc(func(context.Context) (fleetapp.InitialInstallationObservation, error) {
+				events = append(events, "observe")
+				return tc.observation, tc.err
+			})
+			gotRecord, gotReceipt, err := observeInstallerActivation(context.Background(), history, func() { events = append(events, "closed") })
+			events = append(events, "caller resumes")
+			if !reflect.DeepEqual(events, []string{"observe", "closed", "caller resumes"}) {
+				t.Fatal("passive pool was retained into runtime work", events)
+			}
+			if (err == nil) != tc.want || tc.err != nil && !errors.Is(err, tc.err) || err != nil && !errors.Is(err, mounts.ErrUnavailable) {
+				t.Fatal("activation acceptance changed", err)
+			}
+			if tc.want && (!reflect.DeepEqual(gotRecord, record) || !reflect.DeepEqual(gotReceipt, receipt)) {
+				t.Fatal("original activation identity replaced")
+			}
+		})
+	}
+}
 
 // The operator's stop message names the step and class, never inner text.
 func TestInstallerContinuationStopIsFixed(t *testing.T) {
@@ -20,6 +64,15 @@ func TestInstallerContinuationStopIsFixed(t *testing.T) {
 	nested := &InstallerContinuationStop{Step: "worker/roles-provision", Err: &postgres.ProvisionStop{Step: "authenticate:configuration-source", Err: cfg.ErrUnavailable}}
 	if nested.Error() != "installer continuation stopped at worker/roles-provision/authenticate:configuration-source (unavailable)" {
 		t.Fatal(nested.Error())
+	}
+}
+
+func TestInstallerContinuationBudgetStopNamesSafeCounts(t *testing.T) {
+	plan, _ := contracts.InstalledSQLConnectionPlan(1)
+	_, err := plan.Validate(0, contracts.SQLServerCapacity{MaxConnections: 48, SuperuserReserved: 3})
+	stop := &InstallerContinuationStop{Step: "open/sql-budget", Err: errors.Join(err, errors.New("secret SQL detail"))}
+	if !strings.Contains(stop.Error(), "requires 112 connections, 45 configured") || strings.Contains(stop.Error(), "secret") || !errors.Is(stop, contracts.ErrSQLConnectionBudget) {
+		t.Fatal(stop.Error())
 	}
 }
 

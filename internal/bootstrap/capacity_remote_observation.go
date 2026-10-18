@@ -57,6 +57,10 @@ func (s *capacityRemoteObservation) reportWorkload(err error, elapsed time.Durat
 	}
 }
 
+func (s *capacityRemoteObservation) reportProgress(p app.CapacityDiscoveryProgress) {
+	fmt.Fprintf(os.Stderr, "capacity %s discovery: steps=%d candidates=%d namespace-index=%d namespace-count=%d kind-index=%d workload-index=%d workload-count=%d\n", s.diagnose, p.Steps, p.Candidates, p.NamespaceIndex, p.NamespaceCount, p.KindIndex, p.WorkloadIndex, p.WorkloadCount)
+}
+
 // capacityClusterExchange is the installed v1 local client or, for a
 // regional cluster, the v2 holder client (ADR-197).
 type capacityClusterExchange interface {
