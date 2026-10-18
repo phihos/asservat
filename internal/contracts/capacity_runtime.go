@@ -56,6 +56,9 @@ type CapacityProcessingDeployment struct {
 	Source WorkerObjectReference     `json:"source"`
 	Guard  OwnerDeploymentGuard      `json:"guard"`
 	Paths  []DownloadEnvironmentPath `json:"paths"`
+	// PathTemplate, when set, adds one derived path per joined regional
+	// cluster, the same paths as the hub-api's (ADR-204 decision 4).
+	PathTemplate *DownloadEnvironmentPathTemplate `json:"pathTemplate,omitempty"`
 }
 
 // Only these two original credentials are projected. In particular this is

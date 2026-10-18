@@ -163,6 +163,9 @@ type OwnerPublicEnvironment struct {
 	Source WorkerObjectReference     `json:"source"`
 	Guard  OwnerDeploymentGuard      `json:"guard"`
 	Paths  []DownloadEnvironmentPath `json:"paths"`
+	// PathTemplate, when set, adds one derived path per cluster in the guarded
+	// cluster catalog (ADR-204 decision 4).
+	PathTemplate *DownloadEnvironmentPathTemplate `json:"pathTemplate,omitempty"`
 }
 type OwnerPublicDownloadPlan struct {
 	OutputLimit     int64 `json:"outputLimit"`
