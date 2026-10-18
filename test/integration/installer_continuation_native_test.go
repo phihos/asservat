@@ -327,6 +327,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	t.Log("federation available with zero peers; regional offer published")
 	installerOwnerExposed(t, ctx, api, desired.TargetNamespace, installation, offer)
 	installerKeyServiceInstalled(t, ctx, api, admin, desired.TargetNamespace, installation, offer, keyServingCA)
+	installerPublisherInstalled(t, ctx, api, desired.TargetNamespace, installation)
 	// ADR-190 step 7: the continuation published the capacity projection after
 	// the owner launch, and the hub-worker ran capacity to ReadyAt.
 	if c := state.CapacityProjection; c == nil || c.Receipt == nil {
@@ -970,6 +971,26 @@ func installerCrashHubWorker(t *testing.T, ctx context.Context, api kubernetes.I
 // available, accepted its configuration in SQL, serves TLS under the offer's
 // roots at the offered endpoint and refuses an unknown client chain, and no
 // other Pod mounts the root key Secret or the key-service logins.
+// installerPublisherInstalled checks the ADR-203 publisher's Deployment is
+// available and its process has not restarted: it composed every input,
+// logged in to OpenBao and read the cluster catalog. Publishing a capture is
+// the journey's check.
+func installerPublisherInstalled(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, installation string) {
+	t.Helper()
+	name := contracts.PublisherName(installation)
+	d, err := api.AppsV1().Deployments(namespace).Get(ctx, name, meta.GetOptions{})
+	if err != nil || d.Status.AvailableReplicas != 1 {
+		installedProcessDiagnostics(t, ctx, api, namespace, name)
+		t.Fatal("publisher not available", err)
+	}
+	pods, err := api.CoreV1().Pods(namespace).List(ctx, meta.ListOptions{LabelSelector: meta.FormatLabelSelector(d.Spec.Selector)})
+	if err != nil || len(pods.Items) != 1 || len(pods.Items[0].Status.ContainerStatuses) != 1 || pods.Items[0].Status.ContainerStatuses[0].RestartCount != 0 {
+		installedProcessDiagnostics(t, ctx, api, namespace, name)
+		t.Fatal("publisher restarted or is not alone", err)
+	}
+	t.Log("publisher available without restarts")
+}
+
 func installerKeyServiceInstalled(t *testing.T, ctx context.Context, api kubernetes.Interface, admin *pgxpool.Pool, namespace, installation string, offer contracts.RegionalOffer, servingCA []byte) {
 	t.Helper()
 	k := offer.KeyService
