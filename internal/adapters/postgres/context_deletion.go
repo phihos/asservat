@@ -6,6 +6,7 @@ import (
 	app "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/privacy"
 	"bytes"
 	"context"
@@ -148,45 +149,101 @@ func (s *ContextDeletions) ReadContextDeletion(ctx context.Context, loc artifact
 	return out, found, nil
 }
 
-// DueContextDeletions lists, for this facet's permission root, at most sixteen
-// attempts with a positive writer completion that are not deleted, whose
-// effective cutoff has passed and whose deletion lease is absent or ended,
-// oldest cutoff first (ADR-205 decision 3). It is a scheduling hint only and
-// confers no authority: BeginContextDeletion rechecks the cutoff, the lease and
-// recovery under its own locks. It needs only the cleaner's reads.
-func (s *ContextDeletions) DueContextDeletions(ctx context.Context) ([]artifact.Location, error) {
-	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil {
-		return nil, app.ErrUnavailable
+// ContextDeletionCursor is process-local scheduling state, never authority or a
+// cleanup lease. Through fixes one pass's due cutoff so continuous new arrivals
+// cannot postpone retrying its failed rows forever. The remaining fields name
+// the last listed row, regardless of whether cleaning that row succeeded.
+type ContextDeletionCursor struct {
+	Through, AfterExpiresAt time.Time
+	AfterAttemptID          string
+}
+
+// ContextDeletionPage contains at most sixteen candidates in oldest-cutoff/ID
+// order. A zero Next starts another pass on the next sweep. Rows shortened or
+// made eligible behind the cursor are revisited then, without extending dates.
+type ContextDeletionPage struct {
+	Locations []artifact.Location
+	Next      ContextDeletionCursor
+}
+
+func (c ContextDeletionCursor) valid() bool {
+	if c.Through.IsZero() {
+		return c.AfterExpiresAt.IsZero() && c.AfterAttemptID == ""
 	}
-	var out []artifact.Location
+	return c.Through.Equal(c.Through.UTC().Truncate(time.Microsecond)) &&
+		!c.AfterExpiresAt.IsZero() && c.AfterExpiresAt.Equal(c.AfterExpiresAt.UTC().Truncate(time.Microsecond)) &&
+		!c.AfterExpiresAt.After(c.Through) && authorization.UUID(c.AfterAttemptID)
+}
+
+// DueContextDeletions retains the bounded first-page compatibility interface.
+// Schedulers should use DueContextDeletionPage to avoid repeatedly selecting a
+// permanently failing oldest page. Neither interface grants cleanup authority.
+func (s *ContextDeletions) DueContextDeletions(ctx context.Context) ([]artifact.Location, error) {
+	page, err := s.DueContextDeletionPage(ctx, ContextDeletionCursor{})
+	return page.Locations, err
+}
+
+// DueContextDeletionPage lists current candidates with the cleaner's reads
+// alone. BeginContextDeletion still checks cutoff, lease and recovery under its
+// own locks. Purged but unaudited checkpoints remain eligible for safe retry.
+func (s *ContextDeletions) DueContextDeletionPage(ctx context.Context, cursor ContextDeletionCursor) (ContextDeletionPage, error) {
+	if s == nil || s.ledger == nil || ctx == nil || ctx.Err() != nil {
+		return ContextDeletionPage{}, app.ErrUnavailable
+	}
+	if !cursor.valid() {
+		return ContextDeletionPage{}, artifact.ErrInvalid
+	}
+	var out ContextDeletionPage
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		rows, err := q.ListDueContextDeletions(ctx, id(s.root))
+		if cursor.Through.IsZero() {
+			now, err := q.CurrentTime(ctx)
+			if err != nil {
+				return err
+			}
+			if !now.Valid || now.InfinityModifier != pgtype.Finite || now.Time.IsZero() {
+				return app.ErrUnavailable
+			}
+			cursor.Through = now.Time.UTC().Truncate(time.Microsecond)
+		}
+		args := custodydb.ListDueContextDeletionPageParams{RootID: id(s.root), Through: ts(cursor.Through)}
+		if cursor.AfterAttemptID != "" {
+			args.AfterExpiresAt, args.AfterAttemptID = ts(cursor.AfterExpiresAt), id(cursor.AfterAttemptID)
+		}
+		rows, err := q.ListDueContextDeletionPage(ctx, args)
 		if err != nil {
 			return err
 		}
-		out, err = dueContextDeletions(rows)
+		out, err = contextDeletionPage(rows, cursor)
 		return err
 	})
 	if err != nil {
-		return nil, err
+		return ContextDeletionPage{}, err
 	}
 	return out, nil
 }
 
-// dueContextDeletions accepts only a bounded page of distinct valid locations.
-func dueContextDeletions(rows []custodydb.ListDueContextDeletionsRow) ([]artifact.Location, error) {
+// Accept only a bounded, strictly ordered page inside the original pass. A
+// malformed partial result cannot advance the cursor or skip an obligation.
+func contextDeletionPage(rows []custodydb.ListDueContextDeletionPageRow, cursor ContextDeletionCursor) (ContextDeletionPage, error) {
 	if len(rows) > 16 {
-		return nil, app.ErrUnavailable
+		return ContextDeletionPage{}, app.ErrUnavailable
 	}
-	out := make([]artifact.Location, 0, len(rows))
+	out := ContextDeletionPage{Locations: make([]artifact.Location, 0, len(rows))}
 	seen := make(map[string]bool, len(rows))
+	last := cursor
 	for _, r := range rows {
 		loc := artifact.Location{ClusterID: uid(r.ClusterID), ArtifactID: uid(r.ArtifactID), AttemptID: uid(r.ID)}
-		if loc.Validate() != nil || seen[loc.AttemptID] {
-			return nil, app.ErrUnavailable
+		expires := r.EffectiveExpiresAt
+		if loc.Validate() != nil || seen[loc.AttemptID] || !expires.Valid || expires.InfinityModifier != pgtype.Finite || expires.Time.IsZero() ||
+			expires.Time.After(cursor.Through) || last.AfterAttemptID != "" && (expires.Time.Before(last.AfterExpiresAt) || expires.Time.Equal(last.AfterExpiresAt) && loc.AttemptID <= last.AfterAttemptID) {
+			return ContextDeletionPage{}, app.ErrUnavailable
 		}
 		seen[loc.AttemptID] = true
-		out = append(out, loc)
+		out.Locations = append(out.Locations, loc)
+		last.AfterExpiresAt, last.AfterAttemptID = expires.Time.UTC().Truncate(time.Microsecond), loc.AttemptID
+	}
+	if len(rows) == 16 {
+		out.Next = last
 	}
 	return out, nil
 }
