@@ -135,3 +135,46 @@ func TestReadBatchRequiresExactWorkerInvocationAndOriginalBounds(t *testing.T) {
 		}
 	}
 }
+
+func TestQuerySQLPrecisionNeverRenewsOriginalBounds(t *testing.T) {
+	a := testAuthority()
+	actual := a.CheckedAt.Add(789 * time.Nanosecond)
+	p := queryPlan(a)
+	// Deliberate fractional configured intervals also round down, never up.
+	p.Profile.Worker.Runtime += 456 * time.Nanosecond
+	p.Profile.Worker.CredentialLifetime += 456 * time.Nanosecond
+	p.Profile.Worker.ProviderEffectLifetime += 456 * time.Nanosecond
+	p.Profile.Worker.Cleanup += 456 * time.Nanosecond
+	p.CleanupUntil = p.CleanupUntil.Add(time.Second)
+	q, err := NewContextQuery(queryTestID, queryTestID, queryTestID, a, p, actual)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := []time.Time{actual, actual.Add(p.Profile.Lifetime), actual.Add(p.Profile.Worker.Runtime), actual.Add(p.Profile.Worker.CredentialLifetime), actual.Add(p.Profile.Worker.ProviderEffectLifetime), actual.Add(p.Profile.Worker.CredentialLifetime + p.Profile.Worker.Cleanup)}
+	stored := []time.Time{q.CreatedAt, q.Deadline, q.WorkerUntil, q.CredentialUntil, q.ProviderUntil, q.CleanupUntil}
+	for i, got := range stored {
+		if got.Nanosecond()%1000 != 0 || got.After(original[i]) {
+			t.Fatalf("nonconservative SQL time %d: %s > %s", i, got, original[i])
+		}
+	}
+	replay := q
+	replay.CreatedAt = replay.CreatedAt.Truncate(time.Microsecond)
+	replay.Deadline = replay.Deadline.Truncate(time.Microsecond)
+	replay.WorkerUntil = replay.WorkerUntil.Truncate(time.Microsecond)
+	replay.CredentialUntil = replay.CredentialUntil.Truncate(time.Microsecond)
+	replay.ProviderUntil = replay.ProviderUntil.Truncate(time.Microsecond)
+	replay.CleanupUntil = replay.CleanupUntil.Truncate(time.Microsecond)
+	if !q.Equal(replay) || !replay.Valid() {
+		t.Fatal("SQL scalar replay changed immutable query")
+	}
+	changed := q
+	changed.WorkerUntil = changed.WorkerUntil.Add(time.Nanosecond)
+	if changed.Valid() {
+		t.Fatal("noncanonical effect bound accepted")
+	}
+	// Freshness is checked at actual now, not at the earlier floored timestamp.
+	a.ValidUntil = a.CheckedAt.Add(500 * time.Nanosecond)
+	if _, err = NewContextQuery(queryTestID, queryTestID, queryTestID, a, queryPlan(a), actual); err == nil {
+		t.Fatal("rounding revived already expired authority")
+	}
+}

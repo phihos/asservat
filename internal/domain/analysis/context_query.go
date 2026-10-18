@@ -113,7 +113,17 @@ type ContextQuery struct {
 	ProviderUntil, CleanupUntil                       time.Time
 }
 
+// Immutable query instants use the transaction store's fixed microsecond
+// precision. Flooring is conservative and never changes a current observation.
+func contextQueryTime(t time.Time) time.Time { return t.UTC().Truncate(time.Microsecond) }
+
 func (q ContextQuery) Valid() bool {
+	for _, t := range []time.Time{q.CreatedAt, q.Deadline, q.WorkerUntil, q.CredentialUntil, q.ProviderUntil, q.CleanupUntil} {
+		if !t.Equal(contextQueryTime(t)) {
+			return false
+		}
+	}
+
 	if !authorization.UUID(q.ID) || !authorization.UUID(q.OperationID) || !authorization.UUID(q.WorkerID) ||
 		!q.Plan.Matches(q.Scope) || !authorization.UUID(q.RecoveryIssuerEpoch) || !q.RecoveryRevision.Valid() || q.CreatedAt.IsZero() ||
 		!q.Deadline.After(q.CreatedAt) || q.Deadline.After(q.CreatedAt.Add(q.Plan.Profile.Lifetime)) ||
@@ -121,8 +131,8 @@ func (q ContextQuery) Valid() bool {
 		return false
 	}
 	w := q.Plan.Profile.Worker
-	if !q.WorkerUntil.Equal(q.CreatedAt.Add(w.Runtime)) || !q.CredentialUntil.Equal(q.CreatedAt.Add(w.CredentialLifetime)) ||
-		!q.ProviderUntil.Equal(q.CreatedAt.Add(w.ProviderEffectLifetime)) {
+	if !q.WorkerUntil.Equal(contextQueryTime(q.CreatedAt.Add(w.Runtime))) || !q.CredentialUntil.Equal(contextQueryTime(q.CreatedAt.Add(w.CredentialLifetime))) ||
+		!q.ProviderUntil.Equal(contextQueryTime(q.CreatedAt.Add(w.ProviderEffectLifetime))) {
 		return false
 	}
 	end := q.WorkerUntil
@@ -131,29 +141,30 @@ func (q ContextQuery) Valid() bool {
 			end = t
 		}
 	}
-	return !end.After(q.Plan.EffectsUntil) && q.CleanupUntil.Equal(end.Add(w.Cleanup)) && !q.CleanupUntil.After(q.Plan.CleanupUntil)
+	return !end.After(q.Plan.EffectsUntil) && q.CleanupUntil.Equal(contextQueryTime(end.Add(w.Cleanup))) && !q.CleanupUntil.After(q.Plan.CleanupUntil)
 }
 
 func NewContextQuery(id, operationID, workerID string, a ContextProjectionAuthority, p ContextQueryPlan, now time.Time) (ContextQuery, error) {
 	q := ContextQuery{ID: id, OperationID: operationID, WorkerID: workerID, Scope: a.Scope, Plan: p,
-		RecoveryIssuerEpoch: a.Environment.Recovery.IssuerEpoch, RecoveryRevision: a.Environment.Recovery.Revision, CreatedAt: now}
+		RecoveryIssuerEpoch: a.Environment.Recovery.IssuerEpoch, RecoveryRevision: a.Environment.Recovery.Revision, CreatedAt: contextQueryTime(now)}
 	if !a.Valid(now) || !p.Valid(a.Scope, now) || p.Profile.Path != a.Environment.Path || p.InstallationID != a.Environment.InstallationID {
 		return ContextQuery{}, ErrUnavailable
 	}
 	var err error
-	q.Deadline, err = ContextQueryDeadline(now, p.Profile.Lifetime, identity.Earlier(a.AccessUntil, p.HardUntil))
+	q.Deadline, err = ContextQueryDeadline(q.CreatedAt, p.Profile.Lifetime, identity.Earlier(a.AccessUntil, p.HardUntil))
 	if err != nil {
 		return ContextQuery{}, err
 	}
+	q.Deadline = contextQueryTime(q.Deadline)
 	w := p.Profile.Worker
-	q.WorkerUntil, q.CredentialUntil, q.ProviderUntil = now.Add(w.Runtime), now.Add(w.CredentialLifetime), now.Add(w.ProviderEffectLifetime)
+	q.WorkerUntil, q.CredentialUntil, q.ProviderUntil = contextQueryTime(q.CreatedAt.Add(w.Runtime)), contextQueryTime(q.CreatedAt.Add(w.CredentialLifetime)), contextQueryTime(q.CreatedAt.Add(w.ProviderEffectLifetime))
 	end := q.WorkerUntil
 	for _, t := range []time.Time{q.CredentialUntil, q.ProviderUntil} {
 		if t.After(end) {
 			end = t
 		}
 	}
-	q.CleanupUntil = end.Add(w.Cleanup)
+	q.CleanupUntil = contextQueryTime(end.Add(w.Cleanup))
 	if !q.Valid() {
 		return ContextQuery{}, ErrInvalid
 	}
