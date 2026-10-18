@@ -261,7 +261,7 @@ BEGIN
  n:=clock_timestamp();
  IF TG_TABLE_NAME='context_query_call' THEN
   IF TG_OP<>'INSERT' OR n>=q.deadline OR NOT public.context_query_complete_object(NEW.request,ARRAY['Call','OwnerID','HubProcessEpoch']) OR NOT public.context_query_intent_current(q.root_id,NEW.operation_id,q.actor,q.issuer_epoch,NEW.request->'Call') OR NEW.request->'Call'->>'ID'<>NEW.operation_id::text OR NEW.request->'Call'->'Principal' IS DISTINCT FROM q.actor OR
-   NEW.request->'Call'->>'RootID'<>q.root_id::text OR NEW.is_poll<>(NEW.operation_id<>q.operation_id) OR NEW.request->'Call'->>'Tool' IS DISTINCT FROM CASE WHEN NEW.is_poll THEN 'get_query_result' ELSE 'get_file_excerpt' END THEN RAISE EXCEPTION 'query invocation mismatch' USING ERRCODE='23514'; END IF;
+   NEW.request->'Call'->>'RootID'<>q.root_id::text OR NEW.is_poll<>(NEW.operation_id<>q.operation_id) OR NEW.request->'Call'->>'Tool' IS DISTINCT FROM (CASE WHEN NEW.is_poll THEN 'get_query_result' ELSE 'get_file_excerpt' END) THEN RAISE EXCEPTION 'query invocation mismatch' USING ERRCODE='23514'; END IF;
   UPDATE public.context_query SET polls=polls+CASE WHEN NEW.is_poll THEN 1 ELSE 0 END,controls=controls+1 WHERE id=q.id;
  ELSIF TG_TABLE_NAME='context_query_batch' THEN
   IF TG_OP='INSERT' THEN

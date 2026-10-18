@@ -496,8 +496,14 @@ The native fixture supplies explicit synthetic C-07 qualification, human
 identity and C-14 worker/closure guards while using the actual publication,
 current C-03/retention/processing/recovery readers, scoped SQL credentials and
 healthy encrypted C-08 audit. It owns and closes its helper pools before later
-suites. Its source is present but native execution is pending; unit tests and
-integration-package compilation are not a native SQL/S3 pass.
+suites. The [selected native ledger test](../../test/results/adr206-context-query-local-2/custody.log)
+passes against PostgreSQL and encrypted S3 audit after correcting the migration's
+PL/pgSQL CASE expression and retaining the publication fixture's existing audit
+account/history identity during its revisioned capacity increase. The
+[report](../../test/results/adr206-context-query-local-2/custody-environment.json)
+records unchanged source, the exact selected test and complete owned-fixture
+cleanup. This qualifies the component ledger with synthetic C-07/C-14 inputs,
+not installed resource acceptance, worker/key authority or public query delivery.
 
 ## Acceptance
 

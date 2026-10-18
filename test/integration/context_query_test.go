@@ -209,10 +209,27 @@ func qualifyContextQueries(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 			t.Fatal(err)
 		}
 		n = time.Now().UTC().Truncate(time.Microsecond)
-		if err = config.ProvisionOperationAuditPool(ctx, auditapp.OperationAuditPool{RootID: plan.RootID, Lane: "normal", AccountVersion: "query-fixture-v1", Accounts: 2, RecordsPerAccount: 32, RetainedSeconds: 3600, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), ValidUntil: n.Add(time.Hour)}); err != nil {
+		// Publication setup already initialized processing through this normal
+		// audit lane. Preserve its account and storage/history identities and
+		// retained spend while expanding the explicit fixture backing via CAS.
+		var revision, accounts, records int64
+		if err = configPool.QueryRow(ctx, "SELECT revision,account_limit,records_per_account FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", plan.RootID).Scan(&revision, &accounts, &records); err != nil || revision != 1 || accounts != 2 || records != 2 {
+			t.Fatal("original processing audit backing", revision, accounts, records, err)
+		}
+		var policy audit.OperationLifecyclePolicy
+		var retainedPolicy []byte
+		var policyCount int64
+		if err = admin.QueryRow(ctx, `SELECT count(*),min(policy)::jsonb FROM (
+ SELECT (intent->'Lifecycle'->'Policy')::text AS policy FROM operation_audit
+ WHERE root_id=$1 AND lane='normal' AND intent->>'Name'='initialize_processing'
+ AND intent_receipt IS NOT NULL AND outcome_receipt IS NOT NULL LIMIT 2
+) original`, plan.RootID).Scan(&policyCount, &retainedPolicy); err != nil || policyCount != 1 || json.Unmarshal(retainedPolicy, &policy) != nil || !policy.CertificateVerificationBacked() || policy.RootID != plan.RootID || policy.Lane != "normal" || policy.InstallationID != plan.InstallationID || policy.BackingRevision != revision {
+			t.Fatal("original acknowledged processing audit policy", err)
+		}
+		if err = config.ProvisionOperationAuditPool(ctx, auditapp.OperationAuditPool{RootID: plan.RootID, Lane: "normal", AccountVersion: "accounts-v1", ExpectedRevision: revision, Accounts: 2, RecordsPerAccount: 32, RetainedSeconds: 3600, ObservedAt: n, FreshUntil: n.Add(5 * time.Second), ValidUntil: n.Add(time.Hour)}); err != nil {
 			t.Fatal(err)
 		}
-		policy := audit.OperationLifecyclePolicy{RootID: plan.RootID, Lane: "normal", InstallationID: plan.InstallationID, StoreID: e.Registration.StoreID, PolicyID: custodyID(), BackupProfileID: custodyID(), PolicyDigest: artifact.Digest{31}, BackupProfileDigest: artifact.Digest{32}, BackingRevision: 1, MetadataSlots: 64, MaxPurgeLeases: 2, CleanupBudgetSeconds: 1, ProofWindowSeconds: 1, ValidUntil: n.Add(time.Hour), History: &audit.OperationHistoryQualification{ID: custodyID(), Digest: artifact.Digest{33}, Layout: audit.OperationVerificationHistoryLayout, MaximumRowFootprintBytes: 128 << 10, MaximumTransitionWALBytes: 128 << 10, BackupCopies: 1, WALCopies: 1}}
+		policy.BackingRevision, policy.MetadataSlots, policy.ValidUntil = revision+1, 64, n.Add(time.Hour)
 		bb, ww := policy.History.SlotBacking(policy.MaxPurgeLeases)
 		policy.BackupReservedBytes, policy.WALReservedBytes = bb*policy.MetadataSlots, ww*policy.MetadataSlots
 		journal, err := postgres.NewHealthyOperationJournal(ctx, journalPool, policy, s.recovery.guard)
@@ -238,7 +255,7 @@ func qualifyContextQueries(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		invocation := func(tool string, p identity.Principal, acknowledge bool) (value.ContextQueryRequest, audit.OperationIntent) {
 			t.Helper()
 			n := time.Now().UTC().Truncate(time.Microsecond)
-			in := audit.OperationIntent{ID: custodyID(), RootID: plan.RootID, TraceID: custodyID(), Name: tool, InputFormat: "context-query-input/v1", MACVersion: "query-fixture-v1", AccountVersion: "query-fixture-v1", Actor: p, PrincipalDigest: artifact.Digest{41}, InputDigest: artifact.Digest{42}, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(30 * time.Second), RetainUntil: n.Add(time.Hour)}
+			in := audit.OperationIntent{ID: custodyID(), RootID: plan.RootID, TraceID: custodyID(), Name: tool, InputFormat: "context-query-input/v1", MACVersion: "query-fixture-v1", AccountVersion: "accounts-v1", Actor: p, PrincipalDigest: artifact.Digest{41}, InputDigest: artifact.Digest{42}, CreatedAt: n, RequestUntil: n.Add(5 * time.Second), WriteUntil: n.Add(30 * time.Second), RetainUntil: n.Add(time.Hour)}
 			if acknowledge {
 				if err := auditor.Begin(ctx, in); err != nil {
 					t.Fatal("healthy query intent", err)

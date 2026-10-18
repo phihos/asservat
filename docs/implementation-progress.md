@@ -37,12 +37,20 @@ Pinned SQL generation, focused PostgreSQL query/initial-schema race tests,
 integration-package compilation, touched-package vet and Go architecture checks
 passed. Two failing regressions reproduced loss of an earlier guard deadline and
 success after that deadline expired; the guarded callback now preserves both.
-The native SQL/S3 fixture is written, including acknowledged audit lineage,
-actual SQL lock synchronization, one-use starts, unknown closure and retained
-aggregate charges, but has not run. Its C-07 qualification and C-14 ownership
-inputs are explicitly synthetic. The constructor now floors query timestamps conservatively to PostgreSQL
-microseconds; the native fixture deliberately supplies a nanosecond clock.
-Combined frozen native qualification remains the next checkpoint.
+The [selected native SQL/S3 ledger test](../test/results/adr206-context-query-local-2/custody.log)
+passes in 7.33 seconds, including acknowledged audit lineage, actual SQL lock
+synchronization, one-use starts, unknown closure and retained aggregate charges.
+Its [report](../test/results/adr206-context-query-local-2/custody-environment.json)
+records exit 0, all 2615 source hashes independently matched and empty cleanup
+failures. The first combined native attempt stopped before tests at a PL/pgSQL
+CASE parsing error; the next local attempt exposed the fixture's attempt to
+replace its existing normal audit account. The correction parenthesizes CASE
+and preserves the acknowledged processing audit policy/account and retained
+spend while increasing explicitly synthetic capacity through the existing CAS
+API. Its C-07 qualification and C-14 ownership inputs remain synthetic. The
+constructor floors query timestamps conservatively to PostgreSQL microseconds;
+the passing native fixture deliberately supplies a nanosecond clock. Combined
+catalog/transport qualification and installed query composition remain separate.
 
 ## Initial approved pod-status projection foundations (ADR-206)
 
