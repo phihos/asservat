@@ -392,7 +392,7 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 	// at its 20 QPS limit, so request paths queued behind it and overran their
 	// five seconds. It gets its own clients, guard and attester; the proofs
 	// are unchanged.
-	if parts.readinessProofs, err = ownerReadinessProofs(in, c.ClusterID, control, administration, pin, configs); err != nil {
+	if parts.readinessProofs, err = ownerReadinessProofs(in, c.ClusterID, control, administration, pin, configs, &d.readinessStats); err != nil {
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
 	*phase = startupEndpoints
@@ -504,12 +504,15 @@ func readPublicProjectionFiles(ctx context.Context, root *os.Root) (map[string][
 
 // ownerReadinessProofs builds the readiness loop's enrollment attester on its
 // own observer and probe clients, with the same guard administration and pin.
-func ownerReadinessProofs(in *ownerInputs, cluster string, control configuration.NamespaceRef, administration configuration.OwnerWorkloadAdministration, pin kube.GuardPin, configs *postgres.OwnerConfigurations) (*kube.OwnerEnrollmentAttester, error) {
-	observer, err := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), cluster, control, time.Now)
+func ownerReadinessProofs(in *ownerInputs, cluster string, control configuration.NamespaceRef, administration configuration.OwnerWorkloadAdministration, pin kube.GuardPin, configs *postgres.OwnerConfigurations, stats *regionalAPIStats) (*kube.OwnerEnrollmentAttester, error) {
+	observerConfig, probeConfig := in.kubernetes("kube-observer.token"), in.kubernetes("kube-probe.token")
+	observerConfig.Wrap(stats.wrap)
+	probeConfig.Wrap(stats.wrap)
+	observer, err := kube.NewPermissionClient(observerConfig, cluster, control, time.Now)
 	if err != nil {
 		return nil, err
 	}
-	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), cluster, control, time.Now)
+	probe, err := kube.NewPermissionClient(probeConfig, cluster, control, time.Now)
 	if err != nil {
 		return nil, err
 	}

@@ -36,6 +36,9 @@ import (
 // process cannot initialize them, accept profiles or clear RecoveryBlocked.
 type OwnerDeployment struct {
 	observerStats, operationStats regionalAPIStats
+	// readinessStats and identityStats count the readiness loop's and the
+	// identity readers' own clients (ADR-173), reported beside the observer.
+	readinessStats, identityStats regionalAPIStats
 	Runtime                       *OwnerRuntime
 	Router                        *evidence.WorkerEnrollmentRouter
 	inputs                        *ownerInputs
@@ -225,7 +228,9 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		// ADR-173: identity and browser settings reads (three calls per
 		// identity resolution, about 39 per capture preview) get their own
 		// client rather than queuing behind the owner's other observers.
-		identityObserver, e := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), c.ClusterID, configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}, time.Now)
+		identityConfig := in.kubernetes("kube-observer.token")
+		identityConfig.Wrap(d.identityStats.wrap)
+		identityObserver, e := kube.NewPermissionClient(identityConfig, c.ClusterID, configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}, time.Now)
 		if e != nil {
 			return nil, mounts.ErrUnavailable
 		}
@@ -419,7 +424,10 @@ func (d *OwnerDeployment) Run(listener net.Listener, additional ...net.Listener)
 			if ticks%30 == 0 {
 				if calls, spent := d.observerStats.load(); calls > 0 {
 					operation, operationSpent := d.operationStats.load()
-					fmt.Fprintf(os.Stderr, "owner observer %d calls %s, operation %d calls %s total\n", calls, spent.Round(10*time.Millisecond), operation, operationSpent.Round(10*time.Millisecond))
+					readiness, readinessSpent := d.readinessStats.load()
+					identity, identitySpent := d.identityStats.load()
+					fmt.Fprintf(os.Stderr, "owner observer %d calls %s, operation %d calls %s, readiness %d calls %s, identity %d calls %s total\n", calls, spent.Round(10*time.Millisecond), operation, operationSpent.Round(10*time.Millisecond),
+						readiness, readinessSpent.Round(10*time.Millisecond), identity, identitySpent.Round(10*time.Millisecond))
 				}
 			}
 			if _, err := d.refreshWorkerTrust(d.root); err != nil {
