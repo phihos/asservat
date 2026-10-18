@@ -1,5 +1,37 @@
 # Sustained implementation progress
 
+## Installed journey native 43: target and context-start opening refusal (2026-10-18)
+
+[Run 39143620577](https://github.com/phihos/asservat/actions/runs/39143620577)
+tested frozen source `4ba2f4818ccee9a2c7297078f816bfc34a9ef1b7`. All four
+`preview_capture` calls returned acknowledged, retryable `NotAvailable` replies
+in 3.317–3.425 seconds. The new private diagnostic identifies `target`, before
+eligibility, capability, retention, storage, processing or draft creation.
+Regional diagnostics repeatedly report `context standby refused: open
+(unavailable)`. Five capacity binding observations and four samples with at least
+one second remaining in fifteen seconds establish only the independent capacity
+lane; they do not establish an available context-start standby.
+
+The initial execution-process proof also reached its original five-second
+`source-close` bound after 102 observer and 30 probe calls, then subsequently
+reported context-start active. Other source reads exhausted short original
+observation tails. The complete opening path nests local native proof checks
+before and after route/TLS work; these logs motivate a focused whole-open budget
+regression but do not identify the exact failed open substage or establish a
+semantic identity mutation. No SQL permission error is assigned as the cause.
+Collection, publication, transfer, revocation, expiry and deletion were not reached.
+
+The parent test failed after 1,318.12 seconds; the continuation failed after
+994.37 seconds. Terminal exit is 1. All 2,688 recorded source hashes independently
+match the frozen commit archive, tested sources were unchanged and cleanup
+failures are empty. The [environment report](../test/results/installed-journey-ci-43/context-storage-environment.json)
+has SHA-256 `b4cf399bdc683996049b76d1afa01c547254a789d10427a1ab563110c80f9121`;
+the adjacent [archive verification](../test/results/installed-journey-ci-43/verification.json)
+and original run, PostgreSQL and kubelet logs retain the failure. The next task
+is the focused context-start opening investigation under unchanged original
+five-second bounds and 20-QPS clients. There is no automatic full rerun or S-02
+acceptance from this diagnostic result.
+
 ## Installed preview private diagnostics (2026-10-18)
 
 Native42's schema-valid `NotAvailable` replies establish that those error
@@ -25,10 +57,10 @@ helpers. Integration compilation selects no external tests and passes. Tests
 cover closed labels, preserved causes, public wire parity, post-draft expiry,
 foreign diagnostic suppression and missing optional reporters. Affected-package
 vet and Go architecture checks pass; specification/architecture gates pass.
-Installed
-qualification of these diagnostics remains pending; preview, collection and
-the later S-02 journey remain unqualified. The next native run is for diagnosis,
-without a claimed fix, increased limit or freshness extension.
+Native43 below exercises these diagnostics and identifies the target/open
+boundary. Preview, collection and the later S-02 journey remain unqualified;
+this diagnostic run establishes no product fix, increased limit or freshness
+extension.
 
 ## Installed journey native 42: structured preview refusal (2026-10-18)
 
