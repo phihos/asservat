@@ -478,6 +478,10 @@ func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidenceretentionpolicies"}, Verbs: []string{"get", "list", "watch", "create", "update"}},
 		{APIGroups: []string{""}, Resources: []string{"namespaces", "pods"}, Verbs: []string{"get", "list"}},
 		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets"}, Verbs: []string{"get", "list"}},
+		// ADR-204: the download workers' PriorityClass and the hub-api's Job
+		// dispatch and retirement Role in the workers' namespace.
+		{APIGroups: []string{"scheduling.k8s.io"}, Resources: []string{"priorityclasses"}, Verbs: []string{"get", "create"}},
+		{APIGroups: []string{"batch"}, Resources: []string{"jobs"}, Verbs: []string{"get", "create", "delete"}},
 	}}, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
