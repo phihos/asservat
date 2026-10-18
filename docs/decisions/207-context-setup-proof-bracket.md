@@ -1,7 +1,7 @@
 # ADR-207 — One native proof bracket for context-start setup
 
-Date: 2026-10-18. Status: registration source handoff implemented with component
-tests; setup operation and native qualification remain pending.
+Date: 2026-10-18. Status: registration source handoff and private setup operation
+implemented with component tests; native qualification remains pending.
 Requirements: REQ-EXE-002, REQ-FED-001/003, S-02; TASK-03 / TASK-11.
 
 ## Context
@@ -37,7 +37,7 @@ source-derived cost argument, not a measured successful setup.
    ambient source. SQL49, its current recovery/registration checks and roles are
    unchanged. The enclosing native proof still performs its full closing source
    read and local credential confirmation before returning a usable proof.
-2. The concrete executor will own a private setup operation containing one
+2. The concrete executor owns a private setup operation containing one
    complete native proof and the exact process-owned credentials instance. Its
    original proof generation must be captured atomically with the proof result.
    No subsequent generation read can make an older proof current. It can supply
@@ -72,8 +72,8 @@ within one original observation interval; no instantaneous revocation is claimed
 
 The combined-reader regression has failing-before limiter evidence and passing
 component races, including exact credential ownership, copy isolation, original
-cutoffs, cancellation and expiry. The setup operation, whole-opening timing/
-failure tests and an installed rerun remain pending.
+cutoffs, cancellation and expiry. The setup operation and whole-opening
+component tests now exist; native setup and an installed rerun remain pending.
 The registration dispatch regression fails on unchanged dispatch. Its corrected
 selection passes nine top-level / 19 named race tests, including real
 TLS1.3/HTTP2/exporter-bound presentation with synthetic registry/source authority.
@@ -84,3 +84,30 @@ architecture pass; spec check passes 11,368 assertions and design architecture
 passes 1,306 positive / 120 negative checks. No real SQL49 or native source
 producer ran in that component fixture. Component fixtures and static call
 counts cannot establish an installed pass.
+
+The final affected setup selection passed 30 top-level / 69 named races across
+mTLS and Kubernetes, followed by touched-package and integration vet and
+integration compile-only (zero native tests). The preceding wider selection
+passed 32 top-level / 90 named cases and the Go architecture gate. These cover
+atomic proof generations, one source frame and closing operation, original
+cutoffs, parent/caller cancellation, joined closure, errors throughout an actual
+loopback HTTP/2 opening and later full exchange checks. Removing setup dispatch
+from the exact final fixture reproduced both expected failures; the original
+source was restored before the passing selections.
+
+The synthetic limiter model accounts for 114 observer calls and 24 probe calls
+(two installed inputs), at 20 QPS/burst 20, plus two synthetic current-owner
+checks. Its measured loopback opening took 4.706 seconds; its best-case observer
+wait alone is 4.7 seconds. This is not native latency or concurrent availability
+qualification. No limiter or observation interval is enlarged.
+
+Independent review found the existing local credential confirmation could return
+after its active key changed during chain verification, or after a shorter
+caller deadline before the cancellation timer ran. It now rechecks the exact
+active process, installed leaf, root, caller and original source/registration
+interval under its lock after verification. The closing native result also
+narrows its original caller cutoff before final freshness validation, without
+hiding a producer that tried to extend the original interval. Deterministic
+failing-first regressions cover both boundaries. The native fixture now contains
+an original cold setup, no-I/O local reads, current closing API/source checks,
+and a changed-input refusal; those added native cases have not yet run.

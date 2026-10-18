@@ -364,6 +364,62 @@ func TestConnectorAPIProcessWithRealKubernetes(t *testing.T) {
 			t.Fatal("unapproved shared Secret accepted")
 		}
 	})
+	t.Run("setup-original-native-bracket", func(t *testing.T) {
+		// Begin a separate cold operation after the previous observation ends;
+		// never renew that observation or add a retry to the opening under test.
+		if delay := time.Until(observed.ValidUntil); delay > 0 {
+			timer := time.NewTimer(delay)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
+			}
+		}
+		call, end := context.WithTimeout(ctx, 5*time.Second)
+		defer end()
+		before, started := stats.snapshot(), time.Now()
+		setup, err := process.BeginAPIContextSetup(call, credentials)
+		stats.phase(t, "setup-begin", started, before)
+		if err != nil {
+			t.Fatal("complete native setup proof", err)
+		}
+		defer setup.Close()
+		before = stats.snapshot()
+		first, _, err := setup.ReadAPIProcessConnector(call, credentials)
+		if err != nil || !first.Valid(time.Now()) {
+			t.Fatal("owned initial proof", err)
+		}
+		source, err := setup.Source(call)
+		if err != nil || !source.Valid(time.Now()) || source.Observation.FreshUntil.After(first.ValidUntil) {
+			t.Fatal("actual closing source frame", err)
+		}
+		if _, err = setup.Source(call); err == nil {
+			t.Fatal("source frame repeated")
+		}
+		if after := stats.snapshot(); !reflect.DeepEqual(before.counts, after.counts) {
+			t.Fatal("local setup reads repeated native API work")
+		}
+		started = time.Now()
+		if err = setup.Finish(call); err != nil {
+			t.Fatal("closing native/source checks", err)
+		}
+		stats.phase(t, "setup-finish", started, before)
+		if after := stats.snapshot(); reflect.DeepEqual(before.counts, after.counts) {
+			t.Fatal("closing native checks performed no API work")
+		}
+		last, _, err := setup.ReadAPIProcessConnector(call, credentials)
+		if err != nil || !last.CheckedAt.Equal(first.CheckedAt) || last.ValidUntil.After(first.ValidUntil) {
+			t.Fatal("setup renewed original proof", err)
+		}
+		if err = setup.Finish(call); err == nil {
+			t.Fatal("closing native work repeated")
+		}
+		setup.Close()
+		if _, _, err = setup.ReadAPIProcessConnector(call, credentials); err == nil {
+			t.Fatal("closed setup remained usable")
+		}
+	})
 	t.Run("actual-start-status-under-both-guards", func(t *testing.T) {
 		// ADR-175: the connector's own Pod-bound account mints the capacity token.
 		tokens, e := kube.NewCapacityTokens(ctx, runtime, "capacity", apiAudience, string(pod.UID))
@@ -412,6 +468,14 @@ func TestConnectorAPIProcessWithRealKubernetes(t *testing.T) {
 		}
 	})
 	t.Run("changed-input-metadata", func(t *testing.T) {
+		setup, err := process.BeginAPIContextSetup(ctx, credentials)
+		if err != nil {
+			t.Fatal("opening before independent input change", err)
+		}
+		defer setup.Close()
+		if _, err = setup.Source(ctx); err != nil {
+			t.Fatal("initial source before input change", err)
+		}
 		v, e := admin.CoreV1().Secrets(name).Get(ctx, secret.Name, meta.GetOptions{})
 		if e != nil {
 			t.Fatal(e)
@@ -419,6 +483,12 @@ func TestConnectorAPIProcessWithRealKubernetes(t *testing.T) {
 		v.Annotations = map[string]string{"synthetic-revision": "changed"}
 		if _, e = admin.CoreV1().Secrets(name).Update(ctx, v, meta.UpdateOptions{}); e != nil {
 			t.Fatal(e)
+		}
+		if err = setup.Finish(ctx); err == nil {
+			t.Fatal("closing setup accepted changed input RV")
+		}
+		if _, _, err = setup.ReadAPIProcessConnector(ctx, credentials); err == nil {
+			t.Fatal("failed closing setup returned its opening proof")
 		}
 		if _, e = process.ReadAPIProcess(ctx); e == nil {
 			t.Fatal("changed input RV accepted")

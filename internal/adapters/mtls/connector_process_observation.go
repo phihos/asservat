@@ -162,7 +162,17 @@ func (c *ConnectorProcessCredentials) ConfirmConnectorProcessAt(ctx context.Cont
 		return zero, value.ErrUnavailable
 	}
 	until := identity.Earlier(opened.ValidUntil, identity.Earlier(source.Observation.FreshUntil, identity.Earlier(runUntil, opened.Registration.FreshUntil)))
-	if !now.Before(until) || ctx.Err() != nil {
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	// Verification above runs outside the credentials lock. A concurrent
+	// renewal/close must not make that earlier snapshot a current local proof.
+	// Keep the original interval and recheck time after the verification too.
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now = c.now()
+	if c.closed || c.root.Err() != nil || c.active != p || p.retired || p.certs[0] == nil || p.installed[0] != opened.Registration.Certificate || p.request.Process != opened.Request.Process ||
+		!now.Before(p.process.RunUntil) || !identity.Fresh(opened.ObservedAt, until, now, 5*time.Second) || !source.Valid(now) || !opened.Registration.Valid(now) || ctx.Err() != nil {
 		return zero, value.ErrUnavailable
 	}
 	out := opened

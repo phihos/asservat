@@ -402,7 +402,8 @@ func (g *ConnectorAPIExecutionProtection) produceProof(ctx context.Context) (con
 	if call.Err() != nil || !identity.Fresh(start, until, g.attester.client.now(), 5*time.Second) || !proof.Valid(g.attester.client.now()) {
 		return connectorAPIProof{}, stage("fresh", cfg.ErrUnavailable)
 	}
-	return connectorAPIProof{proof: proof.Clone(), owned: owned, observedAt: start, validUntil: until}, nil
+	closed.Observation.Profile = closed.Observation.Profile.Clone()
+	return connectorAPIProof{proof: proof.Clone(), owned: owned, source: closed, observedAt: start, validUntil: until}, nil
 }
 
 type ConnectorAPIExecutionProcess struct {

@@ -1,5 +1,41 @@
 # Sustained implementation progress
 
+## Context-start private setup bracket (ADR-207, component, 2026-10-18)
+
+The concrete executor now lends one full native proof to one private opening,
+with an atomically captured generation and exact process-owned credentials. Its
+single source frame carries the actual initial closing source. After headers
+and Hello delivery, Finish checks current native workload/settings/inputs and a
+full current source; both owner authentications and a final local confirmation
+remain. Close joins owned work before Open can return. The returned exchange's
+later Check still takes the ordinary full current path.
+
+The final affected race selection passed 30 top-level / 69 named cases (mTLS
+8.543 seconds; Kubernetes 1.058 seconds), followed by mTLS/Kubernetes/integration
+vet and integration compile-only (zero selected native tests). The earlier wider
+selection passed 32 top-level / 90 named cases, including unchanged template
+validation. Go architecture passed 58 packages / 338 edges. Removing setup
+dispatch with the exact final limiter fixture reproduced both intended failures;
+the original source bytes were restored before the passing selections.
+
+Independent review found and reproduced two existing credential-confirmation
+races: an active process/leaf change during chain verification, and caller expiry
+before the cancellation timer fired. Confirmation now rechecks the exact active
+process/leaf/root and original source/registration/caller cutoffs under its lock.
+The new Finish path's shorter-caller cutoff is narrowed before final freshness
+validation; its failing-first regression also passes. Closing retains all owned
+work until it joins. Independent producer, transport and fixture reviews cleared
+the changes.
+
+The actual loopback HTTP/2 limiter model uses synthetic authority and counts 114
+observer / 24 probe requests plus two owner checks. Its measured 4.706-second
+opening at 20 QPS/burst 20 does not establish native or installed availability.
+The added native fixture checks the complete setup close and an intervening
+input metadata change, but has not run. Native setup and installed journey
+qualification remain pending; no collection result is claimed. Exact failure,
+mutation, race/vet/compile logs and source hashes are retained in the session
+cache under `context-start-combined-proof/`.
+
 ## Executor registration source bracket (ADR-207, 2026-10-18)
 
 The executor's explicit `ObserveConnectorProcessAt` can now pass its original
@@ -23,10 +59,10 @@ Independent review requested preserving the original nonnil installed Local
 composition invariant. The added pre-I/O refusal and final registration-focused
 race selection passed two top-level / 13 named cases, followed by bootstrap vet.
 
-This removes only the nested cold-proof source reads. The complete opening still
-cannot fit by static call accounting. ADR-207 records the next setup-owned
-native bracket and mandatory closing checks; that operation is not implemented
-or natively qualified yet. No installed rerun or collection pass is claimed.
+This earlier step removed only the nested cold-proof source reads. At that
+checkpoint the complete opening still could not fit by static call accounting.
+The setup-owned native bracket is tracked above; no installed rerun or
+collection pass is claimed.
 
 ## Context-start duplicate local proof regression (2026-10-18)
 

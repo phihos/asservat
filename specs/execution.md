@@ -89,6 +89,18 @@ public buffers, refuses all lifecycle/configuration work and closes after that
 conversation. Current SQL registration/recovery checks and the enclosing full
 native closing source check remain mandatory; this is no ambient source cache.
 
+The same concrete executor may lend one complete native proof to one private
+context-start setup. The original proof generation and exact owned credentials
+remain binding through the earliest original discovery, setup, proof and caller
+cutoffs. A single initial source frame may use that proof's actual closing source
+with original dates. After HTTP response headers and Hello delivery, a current
+native workload/settings/input and full source close is mandatory. Both remote
+owner authentications remain current; a final local credential/generation check
+follows the second. Close cancels and joins owned work before a positive opening
+returns. The setup handle is never reused by later exchange checks, target
+queries or accepted work. Any failure, known change, cancellation or expiry
+refuses the opening without a stale fallback or renewed interval.
+
 For the initial regional Kubernetes API snapshot, `apiContextStart/v1` binds the
 protected executor Pod/account/process and exact collector image, without target
 node/boot claims. One immutable SQL execution row and the original Kubernetes

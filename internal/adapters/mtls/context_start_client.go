@@ -206,6 +206,10 @@ func (c *ContextStartClient) Close() {
 	}
 }
 func (c *ContextStartClient) local(ctx context.Context, expected *value.APIContextChannel) (ConnectorProcessObservation, value.APIContextExecutor, time.Time, error) {
+	return c.localWithReader(ctx, expected, nil)
+}
+
+func (c *ContextStartClient) localWithReader(ctx context.Context, expected *value.APIContextChannel, reader ContextStartProcessReader) (ConnectorProcessObservation, value.APIContextExecutor, time.Time, error) {
 	var zero ConnectorProcessObservation
 	started := c.now()
 	call, stop := context.WithDeadline(ctx, started.Add(5*time.Second))
@@ -214,8 +218,11 @@ func (c *ContextStartClient) local(ctx context.Context, expected *value.APIConte
 	var observed ConnectorProcessObservation
 	var process executionvalue.APIProcessObservation
 	var e error
-	if combined, ok := c.process.(ContextStartProcessReader); ok {
-		process, observed, e = combined.ReadAPIProcessConnector(call, c.connector)
+	if reader == nil {
+		reader, _ = c.process.(ContextStartProcessReader)
+	}
+	if reader != nil {
+		process, observed, e = reader.ReadAPIProcessConnector(call, c.connector)
 	} else {
 		observed, e = c.connector.ObserveConnectorProcess(call)
 		if e == nil {
@@ -248,11 +255,15 @@ func (c *ContextStartClient) local(ctx context.Context, expected *value.APIConte
 	return observed, executor, until, nil
 }
 func (c *ContextStartClient) current(ctx context.Context, channel value.APIContextChannel, remote *OwnerConnection) (value.APIContextReceiver, error) {
+	return c.currentWithReader(ctx, channel, remote, nil, false)
+}
+
+func (c *ContextStartClient) currentWithReader(ctx context.Context, channel value.APIContextChannel, remote *OwnerConnection, reader ContextStartProcessReader, afterOwner bool) (value.APIContextReceiver, error) {
 	var zero value.APIContextReceiver
 	started := c.now()
 	call, stop := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer stop()
-	_, _, until, e := c.local(call, &channel)
+	_, _, until, e := c.localWithReader(call, &channel, reader)
 	if e != nil {
 		return zero, e
 	}
@@ -263,6 +274,18 @@ func (c *ContextStartClient) current(ctx context.Context, channel value.APIConte
 		return zero, value.ErrDenied
 	}
 	until = identity.Earlier(until, owner.ValidUntil)
+	if afterOwner {
+		// Finish may have shortened the local bound before the owner read; the
+		// read above carries that bound into it. This final cheap read also
+		// detects a local change while owner authentication was blocking.
+		finalCall, stopFinal := context.WithDeadline(call, until)
+		_, _, finalUntil, err := c.localWithReader(finalCall, &channel, reader)
+		stopFinal()
+		if err != nil {
+			return zero, err
+		}
+		until = identity.Earlier(until, finalUntil)
+	}
 	out := value.APIContextReceiver{Channel: channel, ObservedAt: started, ValidUntil: until}
 	if call.Err() != nil || c.root.Err() != nil || !out.Valid(c.now()) {
 		return zero, value.ErrUnavailable
@@ -333,7 +356,20 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 			<-setupDone
 		}
 	}()
-	local, executor, bound, e := c.local(setup, nil)
+	var owned ContextStartProcessSetup
+	defer func() {
+		if owned != nil {
+			owned.Close()
+		}
+	}()
+	if producer, ok := c.process.(ContextStartProcessSetupReader); ok {
+		var err error
+		owned, err = producer.BeginAPIContextSetup(setup, c.connector)
+		if err != nil || owned == nil {
+			return nil, value.ErrUnavailable
+		}
+	}
+	local, executor, bound, e := c.localWithReader(setup, nil, owned)
 	if e != nil {
 		return nil, e
 	}
@@ -413,7 +449,9 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 		return nil, e
 	}
 	check := func(call context.Context) (value.APIContextReceiver, error) { return c.current(call, channel, remote) }
-	receiver, e := check(setup)
+	// Only this opening uses the private setup handle. The closure retained
+	// by the returned exchange deliberately keeps the full current path.
+	receiver, e := c.currentWithReader(setup, channel, remote, owned, false)
 	if e != nil {
 		return nil, e
 	}
@@ -463,9 +501,22 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 	if e != nil {
 		return nil, e
 	}
-	// ADR-178: this region's own fresh source follows Hello for the hub's
-	// accept check; the hub never reads the regional API.
-	source, e := contextStartSourceFrame(setup, c.connector.source, channel.ExchangeID)
+	// ADR-207: the private setup may lend its actual initial closing source,
+	// once, within the same original interval. Other readers retain ADR-178's
+	// independent source read. The hub still verifies the received source.
+	var source []byte
+	if owned != nil {
+		var observed value.ConnectorIdentitySource
+		observed, e = owned.Source(phase)
+		if e == nil && (!observed.Valid(c.now()) || !observed.Observation.SameSource(local.Configuration) || observed.Observation.FreshUntil.Before(bound) || phase.Err() != nil) {
+			e = value.ErrUnavailable
+		}
+		if e == nil {
+			source, e = encodeContextStartSourceFrame(observed, channel.ExchangeID)
+		}
+	} else {
+		source, e = contextStartSourceFrame(setup, c.connector.source, channel.ExchangeID)
+	}
 	if e != nil {
 		clear(hello)
 		return nil, value.ErrUnavailable
@@ -512,8 +563,22 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 	}
 	// Header completion does not grant a capture. Future frames independently
 	// retain a current peer bound and the original signed human request interval.
-	final, e := check(phase)
+	if owned != nil {
+		if e = owned.Finish(phase); e != nil || phase.Err() != nil {
+			return nil, value.ErrUnavailable
+		}
+	}
+	final, e := c.currentWithReader(phase, channel, remote, owned, owned != nil)
 	if e != nil || !final.Valid(c.now()) || phase.Err() != nil {
+		return nil, value.ErrUnavailable
+	}
+	if owned != nil {
+		// Join before publishing the exchange or releasing setup ownership.
+		// A cancellation/expiry during cleanup must not return a positive Open.
+		owned.Close()
+		owned = nil
+	}
+	if phase.Err() != nil || work.Err() != nil || c.root.Err() != nil || !final.Valid(c.now()) || !c.now().Before(bound) {
 		return nil, value.ErrUnavailable
 	}
 	if socket.SetDeadline(until) != nil {
@@ -539,6 +604,10 @@ func contextStartSourceFrame(ctx context.Context, source app.ConnectorIdentitySo
 	if e != nil {
 		return nil, e
 	}
+	return encodeContextStartSourceFrame(observed, exchange)
+}
+
+func encodeContextStartSourceFrame(observed value.ConnectorIdentitySource, exchange string) ([]byte, error) {
 	raw, e := json.Marshal(observed)
 	if e != nil {
 		return nil, value.ErrInvalid
