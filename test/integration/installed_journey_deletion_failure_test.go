@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"reflect"
@@ -297,21 +298,38 @@ func TestInstalledDeletionProbeRequiresActualAccessDenied(t *testing.T) {
 	for _, tc := range []struct {
 		code             string
 		denied, ok, fail bool
-		calls            int
+		calls, allowAt   int
 	}{
-		{"AccessDenied", true, true, false, 3},
-		{"AccessDenied", false, false, false, 3},
-		{"InvalidAccessKeyId", true, false, true, 1},
-		{"ServiceUnavailable", true, false, true, 1},
+		{"AccessDenied", true, true, false, 3, 0},
+		{"AccessDenied", false, false, false, 3, 0},
+		{"InvalidAccessKeyId", true, false, true, 1, 0},
+		{"ServiceUnavailable", true, false, true, 1, 0},
+		// Any one successful inventory operation invalidates the denial proof,
+		// even when the other two return the expected AccessDenied response.
+		{"AccessDenied", true, false, false, 3, 1},
+		{"AccessDenied", true, false, false, 3, 2},
+		{"AccessDenied", true, false, false, 3, 3},
 	} {
-		t.Run(tc.code+"/"+map[bool]string{true: "denied", false: "restored"}[tc.denied], func(t *testing.T) {
+		t.Run(fmt.Sprintf("%s/%s/allow%d", tc.code, map[bool]string{true: "denied", false: "restored"}[tc.denied], tc.allowAt), func(t *testing.T) {
 			calls := 0
 			h := &http.Client{Transport: installedDeletionProbeTransport(func(r *http.Request) (*http.Response, error) {
 				calls++
 				if r.Method != http.MethodGet || r.URL.Query().Get("prefix") != "v1/exact-attempt/" {
 					t.Fatal("permission probe escaped the exact read-only prefix")
 				}
-				return &http.Response{StatusCode: http.StatusForbidden, Header: http.Header{"Content-Type": {"application/xml"}}, Body: io.NopCloser(strings.NewReader("<Error><Code>" + tc.code + "</Code><Message>synthetic</Message></Error>")), Request: r}, nil
+				status := http.StatusForbidden
+				body := "<Error><Code>" + tc.code + "</Code><Message>synthetic</Message></Error>"
+				if calls == tc.allowAt {
+					status = http.StatusOK
+					root := "ListBucketResult"
+					if r.URL.Query().Has("versions") {
+						root = "ListVersionsResult"
+					} else if r.URL.Query().Has("uploads") {
+						root = "ListMultipartUploadsResult"
+					}
+					body = "<" + root + "><IsTruncated>false</IsTruncated></" + root + ">"
+				}
+				return &http.Response{StatusCode: status, Header: http.Header{"Content-Type": {"application/xml"}}, Body: io.NopCloser(strings.NewReader(body)), Request: r}, nil
 			})}
 			store := s3.New(s3.Options{Region: "synthetic", BaseEndpoint: aws.String("https://synthetic.invalid"), UsePathStyle: true,
 				Credentials: credentials.NewStaticCredentialsProvider("synthetic", "synthetic", ""), HTTPClient: h, RetryMaxAttempts: 1})
