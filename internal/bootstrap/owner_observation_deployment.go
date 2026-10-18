@@ -288,7 +288,10 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
 	*phase = startupNativeIdentity
-	identityUntil, err := identityReader.VerifyStartup(startup, manifest, mounted)
+	// The installer may still be recording this launch in the resource
+	// journal, so a journal that changed between the proof's reads is proved
+	// again, in full, within the same startup deadline (journey run 33).
+	identityUntil, err := retryChanged(startup, func() (time.Time, error) { return identityReader.VerifyStartup(startup, manifest, mounted) })
 	if err != nil || !time.Now().Before(identityUntil) {
 		return parts, errors.Join(mounts.ErrUnavailable, err)
 	}
@@ -558,4 +561,15 @@ func ownerProviderProofReader(in *ownerInputs, c contracts.OwnerDeployment, cont
 		return nil, err
 	}
 	return kube.NewInstalledOwnerIdentityReader(observer, own, c, activation, mountedOwnerPodToken{in}, podUID)
+}
+
+// retryChanged runs proof up to three times, a second apart, while it fails
+// with configuration.ErrChanged and ctx lasts. Each attempt is a complete proof; no
+// earlier attempt's result is kept.
+func retryChanged(ctx context.Context, proof func() (time.Time, error)) (time.Time, error) {
+	until, err := proof()
+	for attempt := 1; attempt < 3 && errors.Is(err, configuration.ErrChanged) && sleepContext(ctx, time.Second); attempt++ {
+		until, err = proof()
+	}
+	return until, err
 }
