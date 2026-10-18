@@ -233,6 +233,13 @@ func (d *initialBootstrapProcess) projectCommon(c contracts.InitialPreparer) err
 // history obtains the exact existing passive reader under native protection.
 // No setup SQL/provider file is consulted, even if the independent read fails.
 func initialBootstrapHistory(ctx context.Context, files *os.Root, p *kube.InitialPreparer, c contracts.InitialPreparer) (*postgres.InitialInstallationReader, *pgxpool.Pool, error) {
+	return initialBootstrapHistoryBounded(ctx, files, p, c, 0)
+}
+
+// A positive maximum narrows only this reader's pool, never the protected plan.
+// The continuation reads once before runtime provisioning and needs one slot;
+// other bootstrap phases retain the independently selected pool limit.
+func initialBootstrapHistoryBounded(ctx context.Context, files *os.Root, p *kube.InitialPreparer, c contracts.InitialPreparer, maximum int32) (*postgres.InitialInstallationReader, *pgxpool.Pool, error) {
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	in := &providerInputs{files: files, postgresEndpoint: c.Services.Postgres}
@@ -242,6 +249,9 @@ func initialBootstrapHistory(ctx context.Context, files *os.Root, p *kube.Initia
 	}
 	if !postgres.ValidInitialSQLHistoryLogin(c.Plan.InstallationID, postgres.InitialSQLLogin{Username: config.ConnConfig.User, Password: config.ConnConfig.Password}) {
 		return nil, nil, mounts.ErrUnavailable
+	}
+	if maximum > 0 {
+		config.MaxConns = min(config.MaxConns, maximum)
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {

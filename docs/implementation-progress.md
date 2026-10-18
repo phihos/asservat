@@ -690,8 +690,13 @@ which PostgreSQL's default 97 ordinary slots cannot hold. That checkpoint was
 unit-tested only. The [installed SQL budget correction](research/installed-sql-budget.md)
 now wires the compiled one-hub plan into the promoted continuation before
 runtime resource creation, against actual non-reserved server capacity. The
-ADR-205 graph requires 107 ordinary slots. Only its installed fixture derives
-110 total slots from that same plan; ordinary component fixtures remain at 48.
+ADR-205 graph plus five overlapping installer pools, a separate verifier and
+four maintenance slots requires 112 ordinary slots. The continuation's passive
+history reader closes before bridge opening and is limited to one connection.
+Only its installed fixture derives 116 total slots: 112 product, one independent
+fixture observer, and three superuser-reserved. Ordinary component fixtures
+remain at 48; early superuser sessions are not treated as isolated reserved
+capacity.
 Native installed qualification of this correction remains pending.
 
 ## Regional investigation journey passes end to end (native36/37)

@@ -56,23 +56,71 @@ kind allows 64/67 physical connections before verifier and maintenance headroom,
 above the fixture's 45 ordinary slots. These are source-derived upper bounds,
 not observed concurrent usage.
 
-The existing compiled plan includes retained processes, one verifier and four
-ordinary maintenance slots: 101 ordinary connections under ADR-204, 107 under
-ADR-205. The fixed promoted continuation now checks this plan against actual
-PostgreSQL settings under its verified activation/incarnation bridge before
-runtime resource provisioning. Both superuser and other reserved slots are
-excluded. Insufficient capacity reports fixed counts and an operator remedy;
-the product changes no server setting, SQL role or pool/governor limit.
+The runtime-only inventory plus one verifier and four ordinary maintenance
+slots was 101 under ADR-204 and 107 under ADR-205. Review found that this omitted
+the installer pools retained while the runtime starts. Those connections cannot
+be charged to PostgreSQL's superuser reserve: its admission threshold uses the
+number of free connections, so an administrator connected first can prevent a
+later ordinary login. See the [PostgreSQL 18 connection settings](https://www.postgresql.org/docs/18/runtime-config-connection.html).
+
+The one admitted continuation has this additional inventory. Every listed pool
+has `MaxConns=1`; limits on runtime pools and the hub governor are unchanged.
+
+| Pool | Construction and lifetime | Simultaneous allowance |
+| --- | --- | ---: |
+| Administrator runtime bridge | `OpenInstallerContinuation` opens `NewInitialRuntimeBridgeSQL`; `InstallerContinuation.Close` joins closure | 1 |
+| Administrator public role producer | `PublicRoles` opens `NewPublicRuntimeSQLRoles`; retained until continuation closure | 1 |
+| Administrator owner role producer | `Owner` opens `NewOwnerIdentityOperationSQL`, wrapping one `NewOwnerIdentitySQLRoles` pool; closes when `Owner` returns | 1 |
+| Administrator acceptance reader | `DownloadAccepted` and `RetentionBaseline` each open a one-connection pool and close before returning; these calls are serial inside `Owner` | 1 |
+| Ordinary accepted owner source | `acceptedOwnerSource` opens the scoped configuration-source pool; `Owner` closes it only after its remaining steps return | 1 |
+
+The construction and close points are in
+[`installer_continue.go`](../../internal/bootstrap/installer_continue.go) and
+[`installer_downloads.go`](../../internal/bootstrap/installer_downloads.go).
+The bridge and role-producer constructors fix their one-connection limits in
+[`initial_runtime_bridge.go`](../../internal/adapters/postgres/initial_runtime_bridge.go),
+[`public_runtime_roles.go`](../../internal/adapters/postgres/public_runtime_roles.go),
+[`owner_identity_roles.go`](../../internal/adapters/postgres/owner_identity_roles.go)
+and [`configuration_runtime_roles.go`](../../internal/adapters/postgres/configuration_runtime_roles.go).
+`WorkerLaunch` closes its configuration-role producer before `Owner` starts,
+so that pool does not add to the five-pool peak. The role producers' temporary
+`pgx.ConnectConfig` login checks close before each returns and remain covered
+by the separate serialized verifier slot. They do not replace the accepted
+owner-source allowance, which overlaps them.
+
+The passive history reader previously inherited up to four configured
+connections and remained open until continuation closure despite having no
+further use. `initialBootstrapHistoryBounded` now limits this continuation's
+reader to one; `observeInstallerActivation` closes it after the sole activation
+observation, including failures, before the administrator bridge opens. Its
+opening phase uses the same one-slot allowance as the later serialized login
+checks. Other bootstrap history readers retain their selected limits. No
+history or administrator observation substitutes for current bridge authority.
+
+The selected full plan is therefore 102 retained runtime connections, five
+installer connections, one verifier and four maintenance slots: **112 ordinary
+slots**, or 115 total with three superuser slots and no other reserved slots.
+Maintenance still means one DDL, two backup/restore and one operator/monitoring
+connection. This is a conservative configured maximum for the selected graph,
+not an observed simultaneous count or permission for concurrent continuations.
+
+The promoted continuation checks that plan against actual PostgreSQL settings
+under its verified activation/incarnation bridge before runtime provisioning.
+Both superuser and other reserved slots are excluded. Insufficient capacity
+reports fixed counts and an operator remedy; the product changes no server
+setting, SQL role or runtime pool/governor limit.
 
 Only the installed continuation fixture obtains its server allowance from a
-Go helper using that same plan. It configures 107 ordinary plus three superuser
-slots (110 total), with one of those superuser slots available to its explicitly
-single-connection test observer. Other bootstrap modes keep their original
-pool behavior because some deliberately hold a lock while reading through
-another connection. Ordinary component fixtures remain at 48 server slots.
-The report records the complete compiled plan and selected settings, and the
-installed PostgreSQL log now includes disconnects without statements or
-parameters.
+Go helper using that same plan. It adds its independent one-connection test
+observer to ordinary capacity, then three superuser slots: **116 total**. This
+remains sufficient regardless of whether the observer connected before the
+runtime. The fixture's short retention reader runs only after the continuation
+Pod has finished and reuses the now-free verifier allowance. Other bootstrap
+modes keep their original observer pool behavior because some deliberately
+hold a lock while reading through another connection. Ordinary component
+fixtures remain at 48 server slots. The report records the complete compiled
+plan and selected settings; installed PostgreSQL logs include disconnects
+without statements or parameters.
 
 The capacity worker also emits cursor position and step/candidate counts at
 most once per thirty seconds, using fixed locality labels and kind ordinals.
@@ -87,5 +135,8 @@ allocation refusal, cancellation after the settings read, sanitized operator
 messages, existing bridge checks and the connection governor. The capacity
 package race tests pass. The Python fixture regression failed on the old
 profile interface and passes with explicit installed sizing; unchanged component
-selection is asserted. The full installed native journey has not been rerun
-for this correction and remains required.
+selection is asserted. Regressions for the installer allowance and fixture arithmetic fail against the
+earlier 107/110 plan. The activation-reader regression covers closure before
+runtime work on accepted, refused and failed observations. Native qualification
+of the corrected 112-slot product plan and 116-slot fixture remains required;
+a run using the earlier 110-slot profile cannot qualify this source change.

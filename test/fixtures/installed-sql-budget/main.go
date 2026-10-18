@@ -31,9 +31,11 @@ func installedFixtureBudget() (fixtureBudget, error) {
 	if err != nil {
 		return fixtureBudget{}, err
 	}
-	// The fixture's single administrator uses one of PostgreSQL's three
-	// explicit superuser slots. No extra ordinary slots or pool cap are added.
-	out := fixtureBudget{Plan: plan, RequiredOrdinary: budget.Required, MaxConnections: budget.Required + 3, SuperuserReserved: 3, FixtureAdminConnections: 1}
+	// A superuser connection opened first also consumes ordinary admission
+	// headroom. Budget the fixture observer separately, then keep the server's
+	// reserve free regardless of connection order.
+	out := fixtureBudget{Plan: plan, RequiredOrdinary: budget.Required, SuperuserReserved: 3, FixtureAdminConnections: 1}
+	out.MaxConnections = out.RequiredOrdinary + out.FixtureAdminConnections + out.SuperuserReserved + out.Reserved
 	_, err = plan.Validate(0, contracts.SQLServerCapacity{MaxConnections: out.MaxConnections, SuperuserReserved: out.SuperuserReserved})
 	return out, err
 }

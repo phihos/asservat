@@ -39,15 +39,16 @@ func TestInstalledSQLBudgetReadsActualReservedCapacity(t *testing.T) {
 		want       bool
 	}{
 		{"component fixture", contracts.SQLServerCapacity{MaxConnections: 48, SuperuserReserved: 3}, 0, false},
-		{"minimum installed", contracts.SQLServerCapacity{MaxConnections: 110, SuperuserReserved: 3}, 0, true},
-		{"additional reserved", contracts.SQLServerCapacity{MaxConnections: 110, SuperuserReserved: 3, Reserved: 1}, 0, false},
-		{"below declared allocation", contracts.SQLServerCapacity{MaxConnections: 110, SuperuserReserved: 3}, 106, false},
-		{"allocation exceeds server", contracts.SQLServerCapacity{MaxConnections: 110, SuperuserReserved: 3}, 108, false},
+		{"old installed allowance", contracts.SQLServerCapacity{MaxConnections: 110, SuperuserReserved: 3}, 0, false},
+		{"minimum installed", contracts.SQLServerCapacity{MaxConnections: 115, SuperuserReserved: 3}, 0, true},
+		{"additional reserved", contracts.SQLServerCapacity{MaxConnections: 115, SuperuserReserved: 3, Reserved: 1}, 0, false},
+		{"below declared allocation", contracts.SQLServerCapacity{MaxConnections: 115, SuperuserReserved: 3}, 111, false},
+		{"allocation exceeds server", contracts.SQLServerCapacity{MaxConnections: 115, SuperuserReserved: 3}, 113, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			q := &connectionCapacityRead{server: tc.server}
 			got, err := readSQLConnectionBudget(context.Background(), q, plan, tc.allocation)
-			if (err == nil) != tc.want || got.Required != 107 || got.Available != tc.server.Ordinary() {
+			if (err == nil) != tc.want || got.Required != 112 || got.Available != tc.server.Ordinary() {
 				t.Fatal(got, err)
 			}
 			if err != nil && !errors.Is(err, contracts.ErrSQLConnectionBudget) {
@@ -64,7 +65,7 @@ func TestInstalledSQLBudgetReadCannotOutliveCaller(t *testing.T) {
 	plan, _ := contracts.InstalledSQLConnectionPlan(1)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	q := &connectionCapacityRead{server: contracts.SQLServerCapacity{MaxConnections: 110, SuperuserReserved: 3}, after: cancel}
+	q := &connectionCapacityRead{server: contracts.SQLServerCapacity{MaxConnections: 115, SuperuserReserved: 3}, after: cancel}
 	if _, err := readSQLConnectionBudget(ctx, q, plan, 0); !errors.Is(err, cfg.ErrUnavailable) {
 		t.Fatal(err)
 	}

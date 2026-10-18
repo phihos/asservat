@@ -17,9 +17,10 @@ const SQLMaintenanceReserve = 4
 
 var ErrSQLConnectionBudget = errors.New("PostgreSQL connection budget insufficient")
 
-// SQLConnectionCompartment is one fixed process kind. Every product purpose
-// owns one MaxConns=1 pool per process; RetainedProcesses is the selected
-// worst case including rollout surge and closing processes. MaxOpen, when set,
+// SQLConnectionCompartment is one fixed process kind. Every listed purpose
+// owns one MaxConns=1 pool per process; serial installer phases can share one
+// listed allowance only when the preceding pool has closed. RetainedProcesses
+// is the selected worst case including rollout surge and closing processes. MaxOpen, when set,
 // is the process's connection governor cap (ADR-177): its purposes keep their
 // own logins, but at most MaxOpen of them hold a physical connection at once.
 type SQLConnectionCompartment struct {
@@ -39,8 +40,8 @@ func (c SQLConnectionCompartment) open() int {
 }
 
 // SQLConnectionPlan is derived from the selected immutable deployment graph,
-// never from an observed idle count. Verifiers are installer login checks
-// active at the same time (the installers serialize them).
+// never from an observed idle count. Verifiers are serialized installer login
+// checks, or the single passive history reader closed before runtime work.
 type SQLConnectionPlan struct {
 	Compartments []SQLConnectionCompartment
 	Verifiers    int
@@ -82,7 +83,9 @@ func (e *SQLConnectionBudgetError) Unwrap() error { return ErrSQLConnectionBudge
 // capacity and capture-cleanup purposes per hub-worker process. The worst case
 // includes the downloads logins of ADR-204 (worker configuration acceptance
 // and acquisition unwraps) and the context deletion logins of ADR-205, which
-// open only with their deployment sections.
+// open only with their deployment sections. One continuation may overlap the
+// retained runtime graph: four administrator pools and an accepted-owner reader
+// remain separately budgeted, without spending verifier or maintenance headroom.
 func InstalledSQLConnectionPlan(hubProcesses int) (SQLConnectionPlan, error) {
 	if hubProcesses < 1 || hubProcesses > PublicRuntimeRetainedHubProcesses {
 		return SQLConnectionPlan{}, ErrSQLConnectionBudget
@@ -100,6 +103,13 @@ func InstalledSQLConnectionPlan(hubProcesses int) (SQLConnectionPlan, error) {
 		{Name: "hub-federation", Purposes: PublicRuntimeFederationPurposes(), RetainedProcesses: PublicRuntimeRetainedFederationProcesses},
 		{Name: "publisher", Purposes: PublicRuntimePublisherPurposes(), RetainedProcesses: PublicRuntimeRetainedPublisherProcesses},
 		{Name: "key-service", Purposes: PublicRuntimeKeyServicePurposes(), RetainedProcesses: PublicRuntimeRetainedKeyServiceProcesses},
+		{Name: "installer", Purposes: []string{
+			"runtime-bridge", "public-role-producer", "owner-role-producer",
+			// DownloadAccepted and RetentionBaseline close their pools on
+			// return and run serially inside Owner. WorkerLaunch's configuration
+			// producer also closes before Owner opens any of these pools.
+			"acceptance-reader", "accepted-owner-source",
+		}, RetainedProcesses: 1},
 	}, Verifiers: 1, Reserve: SQLMaintenanceReserve}, nil
 }
 

@@ -23,11 +23,18 @@ tests; their actual installed composition remains a separate qualification.
 The promoted continuation's SQL preflight reads actual server capacity through
 the already verified bridge, in the original five-second transaction. It uses
 the compiled one-hub connection plan, including retained worker processes,
-separate verifier and maintenance headroom, before creating runtime resources.
+five simultaneous installer pools, separate verifier and maintenance headroom, before creating runtime resources.
 The helper never exposes the administrator transaction to native callbacks and
-never changes pool limits or SQL settings. With ADR-204 the plan needs 101
-ordinary slots; ADR-205 adds six for the three deletion purposes in two retained
-hub-worker processes, bringing it to 107 (110 total with three superuser slots).
+never changes runtime pool limits or SQL settings. The retained ADR-205 runtime
+needs 102 connections. Four administrator installer pools and one accepted
+owner-source pool add five, independently of one serialized verifier and four
+maintenance slots: 112 ordinary slots, or 115 total with three superuser slots.
+The passive history reader is limited to one connection and closed immediately
+after activation observation, before the bridge opens. Serial acceptance-reader
+and configuration-producer phases share only allowances whose prior pool has
+closed. The [source inventory](../research/installed-sql-budget.md) records every
+constructor and close point; a fixture observer needs its own extra ordinary
+slot, independently of the server reserve.
 
 The runtime profile uses standard Kubernetes authentication with two worker and
 four owner token purposes. Explicit scoped storage credentials retain their
