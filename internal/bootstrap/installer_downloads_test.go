@@ -124,7 +124,7 @@ func TestDownloadWorkerProfileAndPathTemplate(t *testing.T) {
 		t.Fatal("profile too large for the source")
 	}
 	hub := identity.Revision{UID: "20000000-0000-4000-8000-000000000007", Generation: 3, Digest: [32]byte{7}}
-	template := downloadPathTemplate(runtimeID, "synthetic-region", "20000000-0000-4000-8000-000000000008", p.Configuration, hub)
+	template := buildDownloadPathTemplate(runtimeID, "synthetic-region", "20000000-0000-4000-8000-000000000008", p.Configuration, hub)
 	if template.AcquisitionClusterID != runtimeID || template.ConnectorClusterID != runtimeID || template.HubClusterID != runtimeID || template.StorageRegion != "synthetic-region" || template.AcquisitionRegion != "synthetic-region" ||
 		template.ConnectorRegion != "synthetic-region" || template.HubRegion != "synthetic-region" || template.WorkerConfiguration != downloadRevision(p.Configuration) ||
 		template.HubConfiguration != (contracts.DownloadEnvironmentRevision{UID: hub.UID, Generation: 3, SHA256: hex.EncodeToString(hub.Digest[:])}) {

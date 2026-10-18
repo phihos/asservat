@@ -220,7 +220,7 @@ func downloadRevision(r identity.Revision) contracts.DownloadEnvironmentRevision
 // 3 and 4): the evidence store, and the hub as acquisition, connector and hub
 // cluster in the store's region, at the configured worker profile's and the
 // accepted owner configuration's revisions.
-func downloadPathTemplate(cluster, region, store string, worker, hub identity.Revision) contracts.DownloadEnvironmentPathTemplate {
+func buildDownloadPathTemplate(cluster, region, store string, worker, hub identity.Revision) contracts.DownloadEnvironmentPathTemplate {
 	return contracts.DownloadEnvironmentPathTemplate{StoreID: store, StorageRegion: region, AcquisitionClusterID: cluster, AcquisitionRegion: region, ConnectorClusterID: cluster, ConnectorRegion: region,
 		HubClusterID: cluster, HubRegion: region, WorkerConfiguration: downloadRevision(worker), HubConfiguration: downloadRevision(hub)}
 }
@@ -294,7 +294,7 @@ func (k *InstallerContinuation) DownloadConfigure(ctx context.Context, inventory
 		return nil, err
 	}
 	d.configured, d.control, d.profile = true, control, profile
-	d.template = downloadPathTemplate(cluster, k.downloadRegion(), storeID, pinned.Profile.Configuration, owner.Revision)
+	d.template = buildDownloadPathTemplate(cluster, k.downloadRegion(), storeID, pinned.Profile.Configuration, owner.Revision)
 	return &promotedDownloads{API: contracts.OwnerNativeWorkerAPI{ClusterID: cluster, Namespace: d.sources.Namespace, Kubernetes: input.Kubernetes}, Source: d.sources.Profile, Template: d.template}, nil
 }
 
