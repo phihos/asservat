@@ -93,10 +93,27 @@ first profile's workers in the hub region instead.
   downloads client in the identity provider.
 - Adding a second download path needs a new owner input until runtime path
   acceptance exists.
+- The worst-case SQL connection plan for one hub (two retained hub-worker
+  processes during a rollout) rises from 97 to 101 ordinary connections with
+  the three new logins, above PostgreSQL's default of 97 usable connections.
+  An installation with downloads needs `max_connections` of at least 104.
 
 ## Progress
 
-- Decision recorded; implementation pending.
+- **SQL and composition** (unit tests pass): three new public runtime
+  purposes, `worker-config-observe` (86) and `worker-config-audit` (87) for
+  the hub-worker and `key-acquisition` (88) for the key service, each with
+  only the grants its queries use; the worker configuration observer runs
+  beside the permission stream from an optional section of the permission
+  projection, because the hub-worker's deployment input is written before the
+  worker namespace exists; the key service resolves `unwrap/acquisition`
+  through the native key authority from an optional `Downloads` section that
+  pins the worker profile (every spend still needs SQL's current audited
+  revision to equal it) and reads topology pins from the guarded catalog.
+  The installer does not fill either section yet.
+- Found while composing: the hub-api's download purposes lack SELECT on the
+  processing tables their download fence reads (the test fixture grants
+  them), so an installed download would be refused until they get it.
 - **Decisions 7 and 8, SQL and composition** (unit tests only; no installer
   step, native run or qualification yet):
   - Purposes `worker-config-observe` (86) and `worker-config-audit` (87) in
