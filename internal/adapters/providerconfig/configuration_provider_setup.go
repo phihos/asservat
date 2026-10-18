@@ -64,9 +64,7 @@ func (r *SetupReader) VerifyConfiguration(ctx context.Context, in contracts.HubW
 	if err != nil {
 		return zero, ErrSetupUnavailable
 	}
-	recipe, err := ConfigurationProviderRecipeFor(in, contracts.ConfigurationProviderSelection{
-		AuthMount: profile.AuthMount, AuthMountAccessor: profile.AuthMountAccessor, AuditCredentials: profile.AuditCredentials,
-	}, profile.ServiceAccount, time.Now())
+	recipe, err := ConfigurationProviderRecipeFor(in, configurationProviderSelectionOf(profile), profile.ServiceAccount, time.Now())
 	if err != nil {
 		return zero, ErrSetupUnavailable
 	}
@@ -74,6 +72,14 @@ func (r *SetupReader) VerifyConfiguration(ctx context.Context, in contracts.HubW
 		"sys/mounts/" + in.KeyService.AuditMount, in.KeyService.AuditMount + "/keys/" + in.KeyService.AuditKey}
 	for _, role := range recipe.Roles {
 		paths = append(paths, "sys/policies/acl/"+role.Name, "auth/"+profile.AuthMount+"/role/"+role.Name)
+	}
+	// ADR-204: the worker configuration audit key, read after the purposes
+	// (whose policies the recipe already extends to it).
+	worker := profile.WorkerConfigurationAudit
+	var workerReads []string
+	if worker != (contracts.OwnerPublicTransit{}) {
+		workerReads = configurationWorkerAuditReads(in, worker)
+		paths = append(paths, workerReads...)
 	}
 	o, err := r.begin(ctx, contracts.OwnerProviderEndpoint{Endpoint: in.KeyService.Endpoint, Roots: in.KeyService.Roots}, paths)
 	if err != nil {
@@ -104,6 +110,18 @@ func (r *SetupReader) VerifyConfiguration(ctx context.Context, in contracts.HubW
 		data, err = o.get(paths[5+2*i])
 		if err != nil || verifyKubernetesRole(data, role.Role) != nil {
 			return zero, setupComponentError("configuration purpose role")
+		}
+	}
+	if len(workerReads) == 2 {
+		data, err = o.get(workerReads[0])
+		if err != nil || verifyTransitMount(data) != nil {
+			return zero, setupComponentError("worker configuration Transit mount")
+		}
+	}
+	if len(workerReads) > 0 {
+		data, err = o.get(workerReads[len(workerReads)-1])
+		if err != nil || verifyTransitKey(data, worker.Key) != nil {
+			return zero, setupComponentError("worker configuration Transit key")
 		}
 	}
 	if !o.valid() {

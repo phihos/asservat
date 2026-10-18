@@ -35,7 +35,15 @@ func ValidateConfigurationProviderSelection(installation string, p contracts.Con
 		p.AuditCredentials.Name != "asservat-"+strings.ReplaceAll(installation, "-", "")+"-worker-providers" {
 		return cfg.ErrInvalid
 	}
+	if w := p.WorkerConfigurationAudit; w != (contracts.OwnerPublicTransit{}) && (!providerName.MatchString(w.Mount) || w.Mount == "sys" || w.Mount == "auth" || !providerName.MatchString(w.Key)) {
+		return cfg.ErrInvalid
+	}
 	return nil
+}
+
+// configurationProviderSelectionOf is the selection a profile was derived from.
+func configurationProviderSelectionOf(p contracts.ConfigurationProviderAuthentication) contracts.ConfigurationProviderSelection {
+	return contracts.ConfigurationProviderSelection{AuthMount: p.AuthMount, AuthMountAccessor: p.AuthMountAccessor, AuditCredentials: p.AuditCredentials, WorkerConfigurationAudit: p.WorkerConfigurationAudit}
 }
 
 func ConfigurationProviderRecipeFor(in contracts.HubWorkerDeployment, selection contracts.ConfigurationProviderSelection, account contracts.WorkerObjectReference, now time.Time) (ConfigurationProviderRecipe, error) {
@@ -54,12 +62,15 @@ func ConfigurationProviderRecipeFor(in contracts.HubWorkerDeployment, selection 
 		}
 		seen[ref.UID] = true
 	}
-	if in.FleetSource.Name == in.OwnerSource.Name {
+	// The worker configuration audit key is a key of its own (ADR-070); it is
+	// never the hub-worker's configuration audit key.
+	worker := selection.WorkerConfigurationAudit
+	if in.FleetSource.Name == in.OwnerSource.Name || worker.Mount == in.KeyService.AuditMount && worker.Key == in.KeyService.AuditKey {
 		return out, cfg.ErrInvalid
 	}
 	out.Profile = contracts.ConfigurationProviderAuthentication{Format: contracts.ConfigurationProviderAuthenticationFormat,
 		AuthMount: selection.AuthMount, AuthMountAccessor: selection.AuthMountAccessor,
-		ServiceAccount: account, AuditCredentials: selection.AuditCredentials}
+		ServiceAccount: account, AuditCredentials: selection.AuditCredentials, WorkerConfigurationAudit: worker}
 	scope, err := ownerProviderCanonical(struct {
 		Format         string                          `json:"format"`
 		InstallationID string                          `json:"installationID"`
@@ -74,6 +85,11 @@ func ConfigurationProviderRecipeFor(in contracts.HubWorkerDeployment, selection 
 	prefix := "asservat-configuration-" + hex.EncodeToString(digest[:]) + "-"
 	purposes := [2]string{"audit-wrap", "audit-unwrap"}
 	paths := [2]string{in.KeyService.AuditMount + "/encrypt/" + in.KeyService.AuditKey, in.KeyService.AuditMount + "/decrypt/" + in.KeyService.AuditKey}
+	// ADR-204: the same two purposes, on the worker configuration audit key.
+	var workerPaths [2]string
+	if worker != (contracts.OwnerPublicTransit{}) {
+		workerPaths = [2]string{worker.Mount + "/encrypt/" + worker.Key, worker.Mount + "/decrypt/" + worker.Key}
+	}
 	for i, purpose := range purposes {
 		name := prefix + purpose
 		role := OwnerKubernetesAuthRole{Accounts: []string{account.Name}, Namespaces: []string{in.Namespace.Name},
@@ -87,6 +103,9 @@ func ConfigurationProviderRecipeFor(in contracts.HubWorkerDeployment, selection 
 			"auth/token/revoke-self": {Capabilities: []string{"update"}},
 			paths[i]:                 {Capabilities: []string{"update"}},
 		}}
+		if workerPaths[i] != "" {
+			acl.Path[workerPaths[i]] = ownerProviderACLRule{Capabilities: []string{"update"}}
+		}
 		r, e := ownerProviderCanonical(role)
 		if e != nil {
 			return ConfigurationProviderRecipe{}, e
@@ -112,7 +131,7 @@ func ValidateConfigurationProviderAuthentication(in contracts.HubWorkerDeploymen
 	if p.Format != contracts.ConfigurationProviderAuthenticationFormat || len(p.RecipeSHA256) != 64 {
 		return cfg.ErrInvalid
 	}
-	want, e := ConfigurationProviderRecipeFor(in, contracts.ConfigurationProviderSelection{AuthMount: p.AuthMount, AuthMountAccessor: p.AuthMountAccessor, AuditCredentials: p.AuditCredentials}, p.ServiceAccount, now)
+	want, e := ConfigurationProviderRecipeFor(in, configurationProviderSelectionOf(p), p.ServiceAccount, now)
 	if e != nil || want.Profile != p {
 		return cfg.ErrInvalid
 	}
