@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
@@ -59,6 +60,27 @@ func (s *ContextStartIngress) refuse(stage string) {
 	if s != nil && s.Refused != nil {
 		s.Refused(stage)
 	}
+}
+
+func (s *ContextStartIngress) refuseStep(prefix string) func(string) {
+	return func(step string) { s.refuse(prefix + step) }
+}
+
+// refusalClass names a refusal without request data.
+func refusalClass(e error, valid, matches bool) string {
+	switch {
+	case errors.Is(e, value.ErrDenied):
+		return "denied"
+	case errors.Is(e, value.ErrUnavailable):
+		return "unavailable"
+	case e != nil:
+		return "error"
+	case !valid:
+		return "expired"
+	case !matches:
+		return "binding"
+	}
+	return "other"
 }
 
 func NewContextStartIngress(rootID string, local *OwnerCredentials, owners *app.OwnerAuthenticator, inputs []ContextStartConnectorAdmission, now func() time.Time) (*ContextStartIngress, error) {
@@ -197,9 +219,9 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		call, cancel = context.WithDeadline(call, until)
 		cancels = append(cancels, cancel)
 	}
-	local, e := s.owners.ObserveOwnerServing(call, s.local)
+	local, e := s.owners.ObserveOwnerServing(app.WithRefusalSteps(call, s.refuseStep("local/")), s.local)
 	if e != nil || !local.Valid(s.now()) || local.Certificate.Binding != channel.Hub {
-		s.refuse("local")
+		s.refuse("local/" + refusalClass(e, local.Valid(s.now()), local.Certificate.Binding == channel.Hub))
 		return zero, value.ErrDenied
 	}
 	narrow(local.ValidUntil)
@@ -222,7 +244,16 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 	narrow(cert.NotAfter)
 	registered, e := a.Registry.ReadConnectorObservationRegistration(call, a.Profile, sources, cert)
 	if e != nil || !registered.Valid(s.now()) || registered.Certificate != cert || registered.Process != channel.Connector || registered.Revision != source.Observation.Profile.Revision {
-		s.refuse("registration")
+		switch {
+		case e != nil || !registered.Valid(s.now()):
+			s.refuse("registration/" + refusalClass(e, registered.Valid(s.now()), true))
+		case registered.Certificate != cert:
+			s.refuse("registration/certificate")
+		case registered.Process != channel.Connector:
+			s.refuse("registration/process")
+		default:
+			s.refuse("registration/revision")
+		}
 		return zero, value.ErrDenied
 	}
 	narrow(registered.FreshUntil)

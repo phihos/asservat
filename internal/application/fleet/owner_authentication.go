@@ -68,9 +68,27 @@ func (s *OwnerAuthenticator) checkLocal(ctx context.Context, usage string, get f
 	return out.ValidUntil, nil
 }
 
+type refusalStepKey struct{}
+
+// WithRefusalSteps carries a diagnostic sink for fixed authentication step
+// names. It carries no request data and changes no result.
+func WithRefusalSteps(ctx context.Context, report func(string)) context.Context {
+	return context.WithValue(ctx, refusalStepKey{}, report)
+}
+
+func refusalStep(ctx context.Context, step string) {
+	if ctx == nil {
+		return
+	}
+	if report, ok := ctx.Value(refusalStepKey{}).(func(string)); ok && report != nil {
+		report(step)
+	}
+}
+
 func (s *OwnerAuthenticator) authenticate(ctx context.Context, certificateFrom func() (value.OwnerCertificate, error), verify func(value.OwnerConfigurationObservation) (value.OwnerCertificate, error)) (value.AuthenticatedOwner, error) {
 	var zero value.AuthenticatedOwner
 	if s == nil || ctx == nil || s.Registry == nil || s.Routes == nil || s.Protection == nil || s.Now == nil {
+		refusalStep(ctx, "invalid")
 		return zero, value.ErrInvalid
 	}
 	start := s.Now()
@@ -78,41 +96,50 @@ func (s *OwnerAuthenticator) authenticate(ctx context.Context, certificateFrom f
 	defer end()
 	certificate, err := certificateFrom()
 	if err != nil || !certificate.Valid(s.Now()) || ctx.Err() != nil {
+		refusalStep(ctx, "certificate")
 		return zero, value.ErrDenied
 	}
 	first, err := s.Registry.ReadOwnerRegistration(ctx, certificate)
 	if err != nil || !first.Valid(s.Now()) || first.Certificate != certificate {
+		refusalStep(ctx, "registration-first")
 		return zero, value.ErrUnavailable
 	}
 	first.Configuration.Configuration = first.Configuration.Configuration.Clone()
 	current, err := verify(first.Configuration)
 	if err != nil || current != certificate {
+		refusalStep(ctx, "verify-first")
 		return zero, value.ErrDenied
 	}
 	pool := first.Enrollment.Pool
 	before, err := s.Protection.ReadOwnerProtection(ctx, pool)
 	if err != nil || !before.Valid(s.Now()) || before.Pool != pool {
+		refusalStep(ctx, "protection-before")
 		return zero, value.ErrUnavailable
 	}
 	route, err := s.Routes.CurrentOwnerRoute(ctx, certificate.Binding)
 	if err != nil || !route.Valid(s.Now()) || route.Endpoint.Binding != certificate.Binding || route.Endpoint.Pool != pool || route.Endpoint.Pod != first.Enrollment.Pod || route.Endpoint.ReplicaSetUID != first.Enrollment.ReplicaSetUID || !route.Configuration.Configuration.Equal(first.Configuration.Configuration) {
+		refusalStep(ctx, "route")
 		return zero, value.ErrUnavailable
 	}
 	route.Configuration.Configuration = route.Configuration.Configuration.Clone()
 	after, err := s.Protection.ReadOwnerProtection(ctx, pool)
 	if err != nil || !after.Valid(s.Now()) || after.Pool != pool || after.Digest != before.Digest {
+		refusalStep(ctx, "protection-after")
 		return zero, value.ErrUnavailable
 	}
 	last, err := s.Registry.ReadOwnerRegistration(ctx, certificate)
 	if err != nil || !last.Valid(s.Now()) || last.Certificate != certificate || last.Enrollment != first.Enrollment || !last.Configuration.Configuration.Equal(first.Configuration.Configuration) {
+		refusalStep(ctx, "registration-last")
 		return zero, value.ErrUnavailable
 	}
 	current, err = verify(last.Configuration)
 	if err != nil || current != certificate {
+		refusalStep(ctx, "verify-last")
 		return zero, value.ErrDenied
 	}
 	now := s.Now()
 	if ctx.Err() != nil || !first.Valid(now) || !last.Valid(now) || !before.Valid(now) || !after.Valid(now) || !route.Valid(now) || !certificate.Valid(now) {
+		refusalStep(ctx, "expired")
 		return zero, value.ErrUnavailable
 	}
 	until := start.Add(5 * time.Second)
@@ -121,6 +148,7 @@ func (s *OwnerAuthenticator) authenticate(ctx context.Context, certificateFrom f
 	}
 	out := value.AuthenticatedOwner{Certificate: certificate, EnrollmentID: first.Enrollment.ID, Pool: pool, Pod: route.Endpoint.Pod, ReplicaSetUID: route.Endpoint.ReplicaSetUID, ConfigurationRevision: first.Configuration.Configuration.Revision, ProtectionDigest: before.Digest, VerifiedAt: start, ValidUntil: until}
 	if !out.Valid(s.Now()) {
+		refusalStep(ctx, "result")
 		return zero, value.ErrUnavailable
 	}
 	return out, nil
