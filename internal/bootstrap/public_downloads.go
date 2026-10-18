@@ -135,11 +135,15 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: sources, Sources: sources, Authority: gate, Sessions: downloads, Refresh: refresh}
 
 	wa, wp := capacityWorkerGuard(p.WorkerConfiguration.Guard)
-	workerGuard, err := kube.NewWorkerConfigurationProtection(observer, probe, cfg.WorkerAdministration{Name: p.WorkerConfiguration.Guard.Name, SourceName: p.WorkerConfiguration.Source.Name, ControlNamespace: control, Administrators: wa}, wp)
+	sourceObserver, sourceProbe, sourceControl, err := d.workerSourceClients(observer, probe, control, closers)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	workerSource, err := kube.NewWorkerConfigurationSource(observer, workerGuard, p.WorkerConfiguration.Source.Name, p.WorkerConfiguration.Source.UID, installation)
+	workerGuard, err := kube.NewWorkerConfigurationProtection(sourceObserver, sourceProbe, cfg.WorkerAdministration{Name: p.WorkerConfiguration.Guard.Name, SourceName: p.WorkerConfiguration.Source.Name, ControlNamespace: sourceControl, Administrators: wa}, wp)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	workerSource, err := kube.NewWorkerConfigurationSource(sourceObserver, workerGuard, p.WorkerConfiguration.Source.Name, p.WorkerConfiguration.Source.UID, installation)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -273,11 +277,48 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		return nil, mounts.ErrUnavailable
 	}
 	coordinator.Plans = plans
+	// ADR-204 decision 9: this profile's hub-local workers enroll and run
+	// their native path on the owner port. TLS client roots are the profile's
+	// current issuer roots from the trust catalog, resolved per handshake.
+	if err = d.Runtime.ServeDownloadWorkers(func(now time.Time) (*x509.CertPool, error) { return d.trust.IssuerRoots(profile, now) }); err != nil {
+		return nil, mounts.ErrUnavailable
+	}
 	out := &publicDownloads{native: services, downloads: downloads, gate: gate, coordinator: coordinator}
 	if ctx.Err() != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	return out, nil
+}
+
+// workerSourceClients selects the clients that read the guarded worker
+// profile source (ADR-204 decision 2). With exactly one pinned worker API in
+// its own namespace, the source and guard live there: that API's client reads
+// them and the namespace's separate probe token proves the guard. Without a
+// worker API (the unconfigured installed layout), or with one pinned to the
+// hub namespace itself, the hub namespace clients read it as before. More
+// than one worker API names no single source namespace and is refused.
+func (d *OwnerDeployment) workerSourceClients(observer, probe *kube.PermissionClient, control cfg.NamespaceRef, closers *[]func()) (*kube.PermissionClient, *kube.PermissionClient, cfg.NamespaceRef, error) {
+	n := d.inputs.config.Native
+	if n == nil || len(n.WorkerAPIs) == 0 {
+		return observer, probe, control, nil
+	}
+	if len(n.WorkerAPIs) != 1 {
+		return nil, nil, control, mounts.ErrUnavailable
+	}
+	a := n.WorkerAPIs[0]
+	if a.Namespace.UID == control.UID {
+		return observer, probe, control, nil
+	}
+	client := d.shared.workers[ownerNativeAPIKey{a.ClusterID, a.Namespace.UID}]
+	if client == nil {
+		return nil, nil, control, mounts.ErrUnavailable
+	}
+	workerProbe, closeHTTP, err := d.workerAPIClient(a, nativeKubernetesProbeTokenName(a))
+	if err != nil {
+		return nil, nil, control, mounts.ErrUnavailable
+	}
+	*closers = append(*closers, closeHTTP)
+	return client, workerProbe, cfg.NamespaceRef{Name: a.Namespace.Name, UID: a.Namespace.UID}, nil
 }
 
 // unconfiguredDownloadPlans plans nothing: without a configured worker no

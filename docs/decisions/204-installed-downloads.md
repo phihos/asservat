@@ -119,6 +119,26 @@ first profile's workers in the hub region instead.
     equal it. Topology pins come from the guarded cluster catalog, and a
     catalog change restarts the service, as for the publisher. Without the
     section the authority map is unchanged.
+- **Decision 9, owner serving, and decision 2's hub-api side** (unit-test
+  results only; installer wiring, native runs and qualification are pending):
+  - Only with a configured worker profile, the owner port (9443, the
+    in-cluster owner Service) is split by ClientHello. The exact process name
+    stays the owner relay. The pool's fixed serving name (the
+    `owner-bootstrap/v1` name already in every owner server leaf) reaches
+    worker enrollment over HTTP/1.1, and the worker native path over h2 with
+    client roots from the profile's current issuer roots, per handshake.
+  - Enrollment reuses the owner runtime's exact-owner forwarder and locators.
+    The native path (`HubWorkerAdmission`) attaches only an operation this
+    exact process owns, on a path whose connector cluster is the hub
+    cluster. It forwards nothing, so a second hub-api replica cannot serve
+    another replica's conversation.
+  - Workers dial the Service but verify the fixed name. `WorkerControl`
+    gains the optional `address` and `native.exchangeAddress` (connectivity
+    only); absent, documents and digests are unchanged.
+  - With exactly one pinned worker API in its own namespace, the hub-api
+    reads the guarded profile source with that API's client and proves its
+    guard with `native-kube-probe-<cluster>-<namespace UID>.token`. More than
+    one worker API is refused; none keeps the hub namespace source.
 - Found while composing: the hub-api's download purposes lack SELECT on the
   processing tables their download fence reads (the test fixture grants
   them), so an installed download would be refused until they get it.

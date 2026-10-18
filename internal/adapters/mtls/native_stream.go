@@ -46,6 +46,20 @@ func NewNativeClient(endpoint string, trust *tls.Config) (*NativeClient, error) 
 	return &NativeClient{endpoint: endpoint, trust: t}, nil
 }
 
+// NewNativeClientVia is NewNativeClient with an installation-pinned,
+// connectivity-only address: TCP goes to address, while TLS still verifies
+// the endpoint's host and the request names the endpoint's authority. An
+// empty address is NewNativeClient.
+func NewNativeClientVia(endpoint, address string, trust *tls.Config) (*NativeClient, error) {
+	c, err := NewNativeClient(endpoint, trust)
+	if err != nil || workerAddress(address) != nil {
+		return nil, contracts.ErrNativeProtocol
+	}
+	u, _ := url.Parse(endpoint)
+	c.dial = workerDial(u, address, (&net.Dialer{Timeout: 5 * time.Second, KeepAlive: -1}).DialContext)
+	return c, nil
+}
+
 // NativeClientStream has one read and one write owner. Close interrupts and
 // joins their actual I/O before returning; no spent command is retransmitted.
 type NativeClientStream struct {

@@ -31,6 +31,12 @@
       "maxLength": 2048,
       "pattern": "^https://[^/@?#\\s]+/?(?![\\s\\S])"
     },
+    "address": {
+      "description": "Optional connectivity-only host:port dialed for endpoint (ADR-204 decision 9). TLS name and HTTP authority remain the endpoint's. Omit rather than send an empty string; runtime also requires a port of 1-65535.",
+      "type": "string",
+      "maxLength": 262,
+      "pattern": "^(?:[^/\\\\@?#%\\[\\]\\s:]{1,253}|\\[[0-9A-Fa-f:.]+\\]):[1-9][0-9]{0,4}(?![\\s\\S])"
+    },
     "serverRoots": {
       "type": "array",
       "minItems": 1,
@@ -73,6 +79,12 @@
           "type": "string",
           "maxLength": 2048,
           "pattern": "^https://[^/@?#\\s]+/internal/download-native/v1/worker(?![\\s\\S])"
+        },
+        "exchangeAddress": {
+          "description": "Optional connectivity-only host:port dialed for exchangeEndpoint, with the meaning of the top-level address.",
+          "type": "string",
+          "maxLength": 262,
+          "pattern": "^(?:[^/\\\\@?#%\\[\\]\\s:]{1,253}|\\[[0-9A-Fa-f:.]+\\]):[1-9][0-9]{0,4}(?![\\s\\S])"
         },
         "exchangeServerRoots": {
           "type": "array",

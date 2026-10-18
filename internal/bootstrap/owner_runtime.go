@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -67,11 +68,16 @@ type OwnerRuntime struct {
 	handler        *ownerrelay.Handler
 	readiness      app.OwnerStartupReadiness
 	connections    int
+	concurrency    int
 	started        atomic.Bool
 	ready          atomic.Pointer[ownerReadinessSnapshot]
 	native         *ownerNativeRuntime
 	observation    *ownerObservationServing
 	operation      *OwnerOperationConfig
+	// compose orders ServeDownloadWorkers before Run's start; workers is the
+	// optional ADR-204 worker serving on the owner port.
+	compose sync.Mutex
+	workers *ownerWorkerServing
 }
 
 func NewOwnerRuntime(ctx context.Context, c OwnerRuntimeConfig) (*OwnerRuntime, error) {
@@ -105,7 +111,7 @@ func NewOwnerRuntime(ctx context.Context, c OwnerRuntimeConfig) (*OwnerRuntime, 
 	epoch[8] = (epoch[8] & 63) | 128
 	binding := value.OwnerBinding{InstallationID: c.Pool.InstallationID, ClusterID: c.Pool.ClusterID, IssuerEpoch: c.Pool.IssuerEpoch, PodUID: c.PodUID, ProcessEpoch: fmt.Sprintf("%x-%x-%x-%x-%x", epoch[:4], epoch[4:6], epoch[6:8], epoch[8:10], epoch[10:])}
 	root, cancel := context.WithCancel(ctx)
-	r := &OwnerRuntime{root: root, cancel: cancel, binding: binding, pool: c.Pool, roots: roots, connections: c.Connections}
+	r := &OwnerRuntime{root: root, cancel: cancel, binding: binding, pool: c.Pool, roots: roots, connections: c.Connections, concurrency: c.Concurrency}
 	complete := false
 	defer func() {
 		if !complete {
@@ -273,14 +279,18 @@ func (r *OwnerRuntime) Run(listener net.Listener, additional ...net.Listener) (r
 		return value.ErrInvalid
 	}
 	address, ok := listener.Addr().(*net.TCPAddr)
-	if !ok || address.Port != r.pool.Port || !r.started.CompareAndSwap(false, true) {
+	r.compose.Lock()
+	ok = ok && address.Port == r.pool.Port && r.started.CompareAndSwap(false, true)
+	workers := r.workers
+	r.compose.Unlock()
+	if !ok {
 		return value.ErrInvalid
 	}
 	defer listener.Close()
 	if nativeListener != nil {
 		defer nativeListener.Close()
 	}
-	finished := make(chan error, 8)
+	finished := make(chan error, 16)
 	running := 0
 	// Each child's error names its fixed server phase in the startup
 	// diagnostic; the cause stays available to errors.Is/As.
@@ -331,7 +341,16 @@ func (r *OwnerRuntime) Run(listener net.Listener, additional ...net.Listener) (r
 		return err
 	case <-identityReady:
 	}
-	launch(startupRunRelay, func() error { return ownerrelay.Serve(r.root, listener, r.roots, r.server, r.handler, r.connections) })
+	relay := listener
+	if workers != nil {
+		// ADR-204 decision 9: the owner port also carries the pool's fixed
+		// worker-facing name; the exact process name stays the owner relay's.
+		var err error
+		if relay, err = r.launchWorkerServing(workers, listener, launch); err != nil {
+			return err
+		}
+	}
+	launch(startupRunRelay, func() error { return ownerrelay.Serve(r.root, relay, r.roots, r.server, r.handler, r.connections) })
 	if r.observation != nil {
 		// One port, two servers: each keeps its TLS profile and slots.
 		name, err := mtls.OwnerServerName(r.binding)

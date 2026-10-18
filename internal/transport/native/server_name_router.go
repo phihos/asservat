@@ -24,6 +24,7 @@ type ServerNameRouter struct {
 	ctx      context.Context
 	children map[string]*routedListener
 	peeks    chan struct{}
+	classify func(*tls.ClientHelloInfo) string
 	// Report, when set before Run, receives closed events: started, each
 	// dropped connection (peek-failed, unknown-name, dropped-handoff), each
 	// hand-off, slow-handoff once a hand-off has waited a second for the child
@@ -43,15 +44,24 @@ const (
 var errServerNamePeeked = errors.New("server name peeked")
 
 func NewServerNameRouter(ctx context.Context, listener net.Listener, names ...string) (*ServerNameRouter, error) {
-	if ctx == nil || listener == nil || len(names) < 1 || len(names) > 4 {
+	return NewClientHelloRouter(ctx, listener, func(hello *tls.ClientHelloInfo) string { return hello.ServerName }, names...)
+}
+
+// NewClientHelloRouter is NewServerNameRouter keyed by classify, which sees
+// only the peeked, unauthenticated ClientHello (ADR-204 decision 9 splits one
+// server name by whether it offers h2). The key selects a child listener, never
+// a peer: the child's server runs its own complete handshake, client
+// authentication and per-request checks. An empty or unknown key closes.
+func NewClientHelloRouter(ctx context.Context, listener net.Listener, classify func(*tls.ClientHelloInfo) string, keys ...string) (*ServerNameRouter, error) {
+	if ctx == nil || listener == nil || classify == nil || len(keys) < 1 || len(keys) > 4 {
 		return nil, contracts.ErrNativeProtocol
 	}
-	r := &ServerNameRouter{listener: listener, ctx: ctx, children: map[string]*routedListener{}, peeks: make(chan struct{}, serverNamePeeks)}
-	for _, name := range names {
-		if r.children[name] != nil {
+	r := &ServerNameRouter{listener: listener, ctx: ctx, children: map[string]*routedListener{}, peeks: make(chan struct{}, serverNamePeeks), classify: classify}
+	for _, key := range keys {
+		if key == "" || r.children[key] != nil {
 			return nil, contracts.ErrNativeProtocol
 		}
-		r.children[name] = &routedListener{addr: listener.Addr(), conns: make(chan net.Conn), done: make(chan struct{})}
+		r.children[key] = &routedListener{addr: listener.Addr(), conns: make(chan net.Conn), done: make(chan struct{})}
 	}
 	return r, nil
 }
@@ -95,7 +105,7 @@ func (r *ServerNameRouter) Run() error {
 }
 
 func (r *ServerNameRouter) route(conn net.Conn) {
-	name, replay, ok := peekServerName(conn)
+	name, replay, ok := peekClientHello(conn, r.classify)
 	<-r.peeks
 	child := r.children[name]
 	if !ok || child == nil {
@@ -135,9 +145,9 @@ func (r *ServerNameRouter) report(event string) {
 	}
 }
 
-// peekServerName lets crypto/tls parse the ClientHello from a read-only copy
-// and stops at the server name. The returned connection replays the bytes.
-func peekServerName(conn net.Conn) (string, net.Conn, bool) {
+// peekClientHello lets crypto/tls parse the ClientHello from a read-only copy
+// and stops at its classification. The returned connection replays the bytes.
+func peekClientHello(conn net.Conn, classify func(*tls.ClientHelloInfo) string) (string, net.Conn, bool) {
 	if conn.SetReadDeadline(time.Now().Add(serverNamePeekTimeout)) != nil {
 		return "", nil, false
 	}
@@ -145,7 +155,7 @@ func peekServerName(conn net.Conn) (string, net.Conn, bool) {
 	var name string
 	peeked := false
 	err := tls.Server(readOnlyConn{conn, io.TeeReader(io.LimitReader(conn, serverNamePeekBytes), &seen)}, &tls.Config{GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
-		name, peeked = hello.ServerName, true
+		name, peeked = classify(hello), true
 		return nil, errServerNamePeeked
 	}}).Handshake()
 	if !peeked || !errors.Is(err, errServerNamePeeked) || conn.SetReadDeadline(time.Time{}) != nil {

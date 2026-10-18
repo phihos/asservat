@@ -46,6 +46,11 @@ type ownerNativeRuntime struct {
 	starts           *contextstart.Handler
 	startRouter      *contextstart.Router
 	startConnections int
+	// peers, hub and concurrency are the same checks and bound the owner
+	// path uses; the optional worker path (ADR-204) reuses them.
+	peers       native.NativePeers
+	hub         native.NativeHubServing
+	concurrency int
 }
 
 func newOwnerNativeRuntime(r *OwnerRuntime, c OwnerNativeRuntimeConfig, auth *app.OwnerAuthenticator) (*ownerNativeRuntime, error) {
@@ -76,7 +81,7 @@ func newOwnerNativeRuntime(r *OwnerRuntime, c OwnerNativeRuntimeConfig, auth *ap
 		router.Close()
 		return nil, err
 	}
-	out := &ownerNativeRuntime{roots: c.ConnectorRoots.Clone(), router: router, handler: handler, connections: c.Connections}
+	out := &ownerNativeRuntime{roots: c.ConnectorRoots.Clone(), router: router, handler: handler, connections: c.Connections, peers: &p, hub: serving, concurrency: c.Concurrency}
 	if c.ContextStarts != nil {
 		start := c.ContextStarts
 		if !authorization.UUID(start.RootID) || start.Router == nil || start.Connections < 1 || start.Connections > 64 || start.Preflight < 1 || start.Preflight > start.Connections || c.Connections+start.Connections > 64 {
