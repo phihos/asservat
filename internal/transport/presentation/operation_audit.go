@@ -309,7 +309,14 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		if e != nil || !sameAuditIdentity(initial, fresh, s.config.Now()) || ctx.Err() != nil {
 			callErr = identity.ErrDenied
 		} else {
-			reply, callErr = s.inner.CallWithContext(ctx, current, OperationCall{requestID: requestID, downloadAttachment: attachment}, name, raw)
+			call := OperationCall{requestID: requestID, downloadAttachment: attachment}
+			if queryOperation(name) {
+				// The private owner exists only after this invocation's existing
+				// Begin acknowledgement. Neither a DTO nor a public context value
+				// can manufacture it; SQL still checks the acknowledged row.
+				call.queryInvocation = newContextQueryInvocation(ctx, intent, s.mac, s.config.Now)
+			}
+			reply, callErr = s.inner.CallWithContext(ctx, current, call, name, raw)
 			reply.boundCleanup(intent.WriteUntil)
 			// Only a private, proven pre-dispatch rejection can rule out an
 			// effect from this invocation. A service error or response timeout

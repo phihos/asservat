@@ -285,6 +285,17 @@ delivery pointer to its existing keyed output digest and acknowledged outcome.
 handles. Admission, paid polling and paid reading have explicit effect
 dispositions; an uncertain service error never proves no effect.
 
+The concrete C-20 `ContextProjectionOperations` component accepts separate
+initial-admission and result ports returning that C-18 pointer. It exposes only
+the private-context call path: existing tool registration and installation
+composition do not include it. The wrapper creates `contextQueryInvocation`
+after its existing `Begin` acknowledgement; the adapter checks the typed input
+against the same normalized input MAC before calling either port. The private
+reply callback accepts only the unchanged intent, exact prepared byte count and
+successful accepted-effect outcome from the existing `Finish`. A late failure
+closes the original delivery before discarding its bytes; it cannot transform
+unknown query/read spend into a no-effect audit result.
+
 Each prepared delivery freezes `ObservedAt` at that response's preparation,
 `QueryDeadline` at the earlier original query/effective-access cutoff, and
 `CleanupUntil` at the original prepaid cleanup/write cutoff. These differ from
@@ -331,6 +342,14 @@ even when passed an expired public request. It joins the application close befor
 clearing owned bytes and releasing the slot. A failed close retains uncertainty;
 it never produces a positive remote-completion receipt. HTTP transport slots
 remain held until this cleanup returns.
+
+The delivery's read-only `Done` signal is also linked to that reply owner. The
+application request is a child of the HTTP request, so its earlier cutoff or
+cancellation would not otherwise interrupt a blocked outward write. One bounded
+watcher is joined by reply close; `ResponseContext` links this owner to the actual
+browser/MCP write/flush context, whose socket-deadline callback is also joined
+before reuse. A final blocking guard that discovers a shorter private lease
+rejects the already prepared response instead of using its older socket bound.
 
 ## Native reuse boundary
 

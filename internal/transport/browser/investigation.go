@@ -298,7 +298,9 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	if sent, err := presentation.WriteOperationResponse(ctx, w, http.StatusOK, out.Body, deadline, out.CheckDisclosure); err != nil && !sent {
+	writeCtx, finishWrite := out.ResponseContext(ctx)
+	defer finishWrite()
+	if sent, err := presentation.WriteOperationResponse(writeCtx, w, http.StatusOK, out.Body, deadline, out.CheckDisclosure); err != nil && !sent {
 		sessionProblem(w, 503)
 	}
 }

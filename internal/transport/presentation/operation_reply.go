@@ -17,6 +17,7 @@ var ErrOperationDelivery = errors.New("operation delivery unavailable")
 type operationReplyGuard interface {
 	CheckDisclosure(context.Context) error
 	Close(context.Context) error
+	Done() <-chan struct{}
 }
 
 // Every value copy of OperationReply shares this owner. mu joins disclosure
@@ -36,6 +37,7 @@ type operationReplyOwner struct {
 	parentCancel         context.CancelFunc
 	release              func()
 	err                  error
+	lifetimeJoined       <-chan struct{}
 }
 
 // Ownership is private to presentation composition; public constructors do not
@@ -49,9 +51,56 @@ func ownOperationReply(ctx context.Context, reply OperationReply, guard operatio
 	if !ok || reply.ValidUntil.After(deadline) {
 		return OperationReply{}, ErrOperationDelivery
 	}
+	done := guard.Done()
+	if done == nil {
+		return OperationReply{}, ErrOperationDelivery
+	}
+	select {
+	case <-done:
+		return OperationReply{}, ErrOperationDelivery
+	default:
+	}
 	owned, cancel := context.WithCancel(ctx)
-	reply.owner = &operationReplyOwner{ctx: owned, cancel: cancel, guard: guard, body: reply.Body, digest: sha256.Sum256(reply.Body), until: reply.ValidUntil, cleanupUntil: cleanupUntil, ack: ack}
+	joined := make(chan struct{})
+	// The application owns a child of the original request. Its cancellation
+	// cannot otherwise propagate upward into a blocked public socket write.
+	// Exactly one watcher belongs to this shared reply owner and Close joins it.
+	go func() {
+		defer close(joined)
+		select {
+		case <-done:
+			cancel()
+		case <-owned.Done():
+		}
+	}()
+	reply.owner = &operationReplyOwner{ctx: owned, cancel: cancel, guard: guard, body: reply.Body, digest: sha256.Sum256(reply.Body), until: reply.ValidUntil, cleanupUntil: cleanupUntil, ack: ack, lifetimeJoined: joined}
 	return reply, nil
+}
+
+// ResponseContext combines transport cancellation with the original live
+// application owner. It grants no authority and cannot extend either deadline.
+// The caller joins the returned callback before closing the reply/reusing the
+// socket, after WriteOperationResponse has joined its own deadline callback.
+func (r OperationReply) ResponseContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	if r.owner == nil {
+		return ctx, func() {}
+	}
+	o := r.owner
+	o.mu.Lock()
+	until := o.until
+	o.mu.Unlock()
+	call, cancel := context.WithDeadline(ctx, until)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(o.ctx, func() { cancel(); close(joined) })
+	var once sync.Once
+	return call, func() {
+		once.Do(func() {
+			cancel()
+			if !stop() {
+				<-joined
+			}
+		})
+	}
 }
 
 func (r OperationReply) CheckDisclosure(ctx context.Context) error {
@@ -140,6 +189,7 @@ func (r OperationReply) Close(ctx context.Context) error {
 	o.once.Do(func() {
 		// Cancel before waiting for an in-flight disclosure check to return.
 		o.cancel()
+		<-o.lifetimeJoined
 		o.mu.Lock()
 		defer o.mu.Unlock()
 		if o.parentCancel != nil {

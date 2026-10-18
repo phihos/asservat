@@ -19,6 +19,14 @@ type replyGuardFixture struct {
 	check          func(context.Context) error
 	close          func(context.Context) error
 	checks, closes atomic.Int32
+	done           chan struct{}
+}
+
+func (g *replyGuardFixture) Done() <-chan struct{} {
+	if g.done == nil {
+		g.done = make(chan struct{})
+	}
+	return g.done
 }
 
 func (g *replyGuardFixture) CheckDisclosure(ctx context.Context) error {

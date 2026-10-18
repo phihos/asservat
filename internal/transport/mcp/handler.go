@@ -160,6 +160,21 @@ func (d *operationDeadline) close(ctx context.Context) {
 	}
 }
 
+func (d *operationDeadline) responseContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	d.mu.Lock()
+	reply, closed := d.reply, d.closed
+	d.mu.Unlock()
+	if closed {
+		canceled, cancel := context.WithCancel(ctx)
+		cancel()
+		return canceled, cancel
+	}
+	if reply == nil {
+		return ctx, func() {}
+	}
+	return reply.ResponseContext(ctx)
+}
+
 func (d *operationDeadline) fail(reason string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -616,7 +631,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if response.status == http.StatusServiceUnavailable && h.Report != nil {
 		h.Report("protocol")
 	}
-	if sent, err := presentation.WriteOperationResponse(ctx, w, response.status, response.body, deadline, delivery.check); err != nil && !sent {
+	writeCtx, finishWrite := delivery.responseContext(ctx)
+	defer finishWrite()
+	if sent, err := presentation.WriteOperationResponse(writeCtx, w, response.status, response.body, deadline, delivery.check); err != nil && !sent {
 		h.unavailable(w, "final-disclosure")
 	}
 }
