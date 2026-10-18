@@ -119,6 +119,14 @@ first profile's workers in the hub region instead.
     equal it. Topology pins come from the guarded cluster catalog, and a
     catalog change restarts the service, as for the publisher. Without the
     section the authority map is unchanged.
-- Found while composing: the hub-api's download purposes lack SELECT on the
-  processing tables their download fence reads (the test fixture grants
-  them), so an installed download would be refused until they get it.
+- **Download purposes' reads** (unit-test results only): the download fence
+  reads the processing tables and, for `download-session`, the retention
+  source tables; the test fixture granted them, the product role plan did
+  not. `download-session`, `download-worker`, `worker-enrollment`,
+  `worker-enrollment-activate`, `worker-owner` and `download-key-bind` now get
+  exactly those SELECTs.
+- **Hub-worker provider setup** (unit-test results only): an optional
+  `WorkerConfigurationAudit` Transit key in the configuration provider
+  selection extends the hub-worker's audit wrap/unwrap policies to that key,
+  creates it, adds the `download-worker-configuration/v1/<installation>/`
+  audit prefix and is read back; without it the recipe digest is unchanged.
