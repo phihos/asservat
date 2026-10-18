@@ -48,8 +48,16 @@ and its storage charge is never released.
 3. **A due list.** A new query lists, for the permission root, at most sixteen
    attempts with a positive writer completion, not deleted, whose
    `effective_expires_at` has passed and whose deletion lease is absent or
-   ended, oldest first. It confers nothing: `BeginContextDeletion` still checks
-   the cutoff, the lease and recovery under its own locks.
+   ended, oldest first. Each scheduling pass fixes its cutoff from database
+   time and advances a process-local expiry/attempt cursor after a successful
+   page read, including when cleaning every listed attempt fails. A short or
+   empty page wraps the next sweep to the oldest candidates. Continuous new
+   arrivals cannot extend that pass; shortened or newly eligible rows behind
+   the cursor return on the next pass. Otherwise sixteen failed oldest rows
+   could permanently hide later expiries. The cursor confers nothing and
+   changes no dates: `BeginContextDeletion` still checks the cutoff, the lease
+   and recovery under its own locks. A persisted purge awaiting audit remains
+   retryable.
 4. **Its own evidence credential.** `installer-provider-apply` gains
    `--evidence-delete-credential`: list object versions, list multipart
    uploads and list objects on the evidence bucket's `v1/` prefix, and delete

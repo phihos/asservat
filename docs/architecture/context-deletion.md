@@ -41,6 +41,14 @@ credential. Cleanup does not depend on a departed human retaining evidence
 rights; current installation recovery and exact accepted attempt scope remain
 required. It is not a public evidence lookup interface.
 
+The installed scheduler reads at most sixteen candidates per sweep, ordered by
+effective cutoff and attempt ID. Its process-local cursor advances past failed
+rows and wraps after a short or empty page. Each pass keeps its original
+database-time cutoff so new arrivals cannot postpone retrying old failures.
+Lease changes or retention shortening behind the cursor are picked up in the
+next pass. Cursor loss only restarts from the oldest page; it cannot authorize
+purging, change retention, renew a lease or remove a pending audit obligation.
+
 The cleanup facet locks recovery, permission root, storage pool, workload
 allocation and attempt in the established order. It requires the persisted
 positive writer checkpoint, effective access cutoff and no live deletion lease.
@@ -124,6 +132,14 @@ tests cover protocol absence and retained failure spend. Signature/framing tests
 cover purpose, record/incarnation binding, tampering and historical public keys.
 Cleanup unit tests retain positive purge results across audit failure and reject
 uncertain purge results.
+
+The scheduling regression uses the real PostgreSQL query and adapter against
+private temporary relations containing synthetic rows. It leaves sixteen failed
+rows eligible, reaches later candidates, wraps to retry the failures and retains
+the original pass cutoff. Those rows are scheduling evidence only. The separate
+full deletion fixture checks that a real persisted purge remains eligible until
+its audit and finalization complete. A fixture's presence is not a passing
+native result.
 
 The added real-service fixture extends the existing API execution/publication
 case. It uses the actual producer, scoped SQL roles and S3 inventory/deletion,
