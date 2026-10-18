@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## Installed native 50: connector setup consumes the opening interval (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39171254007)
+on frozen `d322af7680b20de04d6edb0bc8d330ead3918375` (concurrent independent
+ingress reads) failed before capture at the same preview point. Closing hub
+refusals still had under 0.5 seconds left, so the hub-side concurrency did not
+recover enough time. Client timings place the cost before the hub: openings
+reach `headers` after 3.1–4.4 seconds of a 4.4–4.7 second bound, and setup
+steps fail at 3–4 seconds with 0–80 milliseconds left. The connector setup
+proof's per-check marks were not forwarded; the timing line now carries them
+(fixed names and durations only, outside the count key) to locate the slow
+checks. Review follow-ups now always join the closing ingress read and stop
+step reports from a deliberately abandoned opening read.
+
+[Archive verification](../test/results/installed-journey-ci-50/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 49: closing hub check runs out of time (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39168966828)
