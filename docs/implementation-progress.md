@@ -1,5 +1,21 @@
 # Sustained implementation progress
 
+## Installed native 51: setup trace missing, first setup checks take ~3 seconds (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39173419544)
+on frozen `5d5e7bdd74b4b8ca97d690b2449d6a8c1194cda0` failed before capture at
+the same preview point. No setup marks were printed: the extraction matched an
+outer wrapper's fixed step instead of the setup proof error, now fixed with a
+regression. Openings spend about 0.7 seconds before setup, and
+`setup-settings-guard` refusals at 3.0–4.0 seconds with 20–60 milliseconds left
+place about three seconds in the first four setup checks (source open, owned
+process, process proof, execution account). Which of those dominates is not
+yet measured.
+
+[Archive verification](../test/results/installed-journey-ci-51/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 50: connector setup consumes the opening interval (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39171254007)
