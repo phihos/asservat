@@ -166,3 +166,12 @@ first profile's workers in the hub region instead.
   selection extends the hub-worker's audit wrap/unwrap policies to that key,
   creates it, adds the `download-worker-configuration/v1/<installation>/`
   audit prefix and is read back; without it the recipe digest is unchanged.
+- **Decision 4, paths from the catalog** (unit-test results only): the
+  hub-api and the capacity hub-worker derive one path per joined cluster from
+  the template with `contracts.DownloadPathFor` and union them with the
+  pinned paths; the template must name the hub as acquisition, connector and
+  hub cluster in one region. `installer-cluster-join` adds the joined
+  cluster's path to the download environment source, and to the capacity
+  processing source when the joined entry has a capacity section, once, and
+  adds its ID to every client's `PathIDs`. `PermittedRegions` and the clients
+  stay the installer's choice.
