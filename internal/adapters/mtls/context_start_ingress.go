@@ -219,12 +219,37 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		call, cancel = context.WithDeadline(call, until)
 		cancels = append(cancels, cancel)
 	}
-	local, e := s.owners.ObserveOwnerServing(app.WithRefusalSteps(call, s.refuseStep("local/")), s.local)
-	if e != nil || !local.Valid(s.now()) || local.Certificate.Binding != channel.Hub {
-		s.refuse("local/" + refusalClass(e, local.Valid(s.now()), local.Certificate.Binding == channel.Hub) + app.RemainingBucket(call, s.now()))
-		return zero, value.ErrDenied
+	// The hub's own serving identity is independent of the connector reads, so
+	// both opening reads run together within the same original bound; the
+	// closing pair below starts only after both have returned. Each result is
+	// still checked and narrows the bound, so no interval is extended.
+	opening, cancelOpening := context.WithCancel(call)
+	var local value.AuthenticatedOwner
+	var localErr error
+	localDone := make(chan struct{})
+	go func() {
+		defer close(localDone)
+		local, localErr = s.owners.ObserveOwnerServing(app.WithRefusalSteps(opening, s.refuseStep("local/")), s.local)
+	}()
+	joined := false
+	joinLocal := func() bool {
+		if !joined {
+			<-localDone
+			joined = true
+		}
+		if localErr != nil || !local.Valid(s.now()) || local.Certificate.Binding != channel.Hub {
+			s.refuse("local/" + refusalClass(localErr, local.Valid(s.now()), local.Certificate.Binding == channel.Hub) + app.RemainingBucket(opening, s.now()))
+			return false
+		}
+		return true
 	}
-	narrow(local.ValidUntil)
+	defer func() {
+		if !joined {
+			cancelOpening() // An earlier refusal needs no opening result.
+			<-localDone
+		}
+		cancelOpening()
+	}()
 	source, e := sources.ReadConnectorIdentitySource(call)
 	if e != nil || !source.Valid(s.now()) || !source.Observation.Profile.Equal(a.Profile) {
 		s.refuse("source")
@@ -257,15 +282,27 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		return zero, value.ErrDenied
 	}
 	narrow(registered.FreshUntil)
-	finalSource, e := sources.ReadConnectorIdentitySource(call)
+	if !joinLocal() {
+		return zero, value.ErrDenied
+	}
+	narrow(local.ValidUntil)
+	closing := call
+	var finalLocal value.AuthenticatedOwner
+	var finalLocalErr error
+	finalDone := make(chan struct{})
+	go func() {
+		defer close(finalDone)
+		finalLocal, finalLocalErr = s.owners.ObserveOwnerServing(app.WithRefusalSteps(closing, s.refuseStep("final-local/")), s.local)
+	}()
+	finalSource, e := sources.ReadConnectorIdentitySource(closing)
+	<-finalDone
 	if e != nil || !finalSource.Valid(s.now()) || !finalSource.Observation.SameSource(source.Observation) || finalSource.Roles != source.Roles {
 		s.refuse("final-source")
 		return zero, value.ErrDenied
 	}
 	narrow(finalSource.Observation.FreshUntil)
-	finalLocal, e := s.owners.ObserveOwnerServing(app.WithRefusalSteps(call, s.refuseStep("final-local/")), s.local)
-	if e != nil || !finalLocal.Valid(s.now()) || !sameForwardPeer(finalLocal, local) {
-		s.refuse("final-local/" + refusalClass(e, finalLocal.Valid(s.now()), sameForwardPeer(finalLocal, local)) + app.RemainingBucket(call, s.now()))
+	if finalLocalErr != nil || !finalLocal.Valid(s.now()) || !sameForwardPeer(finalLocal, local) {
+		s.refuse("final-local/" + refusalClass(finalLocalErr, finalLocal.Valid(s.now()), sameForwardPeer(finalLocal, local)) + app.RemainingBucket(closing, s.now()))
 		return zero, value.ErrDenied
 	}
 	narrow(finalLocal.ValidUntil)
