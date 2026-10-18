@@ -7,6 +7,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"context"
+	"errors"
 	"time"
 )
 
@@ -82,10 +83,22 @@ func (a *OperationAuditObjects) write(ctx context.Context, in audit.OperationInt
 }
 
 // objectStepError is ErrUnavailable with the closed step where an operation
-// audit object write stopped: seal (Transit), put, read, verify or receipt.
-type objectStepError struct{ step string }
+// audit object write stopped: seal (Transit), put, read, verify or receipt,
+// followed by the storage cause's own closed step (an HTTP status or
+// mismatch) when it has one.
+type objectStepError struct {
+	step  string
+	cause error
+}
 
-func objectStep(step string) error          { return objectStepError{step} }
-func (e objectStepError) Error() string     { return app.ErrUnavailable.Error() }
-func (e objectStepError) Unwrap() error     { return app.ErrUnavailable }
-func (e objectStepError) FixedStep() string { return e.step }
+func objectStep(step string) error                  { return objectStepError{step: step} }
+func objectStepWith(step string, cause error) error { return objectStepError{step, cause} }
+func (e objectStepError) Error() string             { return app.ErrUnavailable.Error() }
+func (e objectStepError) Unwrap() error             { return app.ErrUnavailable }
+func (e objectStepError) FixedStep() string {
+	var nested interface{ FixedStep() string }
+	if e.cause != nil && errors.As(e.cause, &nested) {
+		return e.step + "/" + nested.FixedStep()
+	}
+	return e.step
+}

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"time"
 
 	"asservat.local/asservat/internal/application/evidence"
@@ -22,6 +23,32 @@ import (
 )
 
 var ErrStorage = errors.New("object storage refused or unavailable")
+
+// storageStatus is ErrStorage with the response's HTTP status, a closed
+// diagnostic class (FixedStep); no key, body or provider message is kept.
+type storageStatus struct{ code int }
+
+func (e storageStatus) Error() string     { return ErrStorage.Error() }
+func (e storageStatus) Unwrap() error     { return ErrStorage }
+func (e storageStatus) FixedStep() string { return "http-" + strconv.Itoa(e.code) }
+
+// storageAnswer is ErrStorage for a successful reply that cannot be accepted.
+type storageAnswer struct{ step string }
+
+func (e storageAnswer) Error() string     { return ErrStorage.Error() }
+func (e storageAnswer) Unwrap() error     { return ErrStorage }
+func (e storageAnswer) FixedStep() string { return e.step }
+
+// storageRefusal returns ErrStorage, carrying the HTTP status when the
+// provider answered at all.
+func storageRefusal(err error) error {
+	var response interface{ HTTPStatusCode() int }
+	if errors.As(err, &response) && response.HTTPStatusCode() >= 100 && response.HTTPStatusCode() < 600 {
+		return storageStatus{response.HTTPStatusCode()}
+	}
+	return ErrStorage
+}
+
 var ErrExists = errors.New("immutable object already exists")
 var safeKey = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9/_-]{0,511}$`)
 
@@ -128,10 +155,14 @@ func (s *Store) PutSmall(ctx context.Context, key string, ciphertext []byte) (Ob
 		if errors.As(err, &response) && response.HTTPStatusCode() == http.StatusPreconditionFailed {
 			return Object{}, ErrExists
 		}
-		return Object{}, ErrStorage // outcome may be uncertain: keep the reservation
+		return Object{}, storageRefusal(err) // outcome may be uncertain: keep the reservation
 	}
-	if o.ETag == nil || *o.ETag == "" || !s.acceptsVersion(aws.ToString(o.VersionId)) {
-		return Object{}, ErrStorage
+	if o.ETag == nil || *o.ETag == "" {
+		return Object{}, storageAnswer{"no-etag"}
+	}
+	if !s.acceptsVersion(aws.ToString(o.VersionId)) {
+		// A versioned audit store whose bucket returned no usable version.
+		return Object{}, storageAnswer{"unversioned"}
 	}
 	return Object{key, aws.ToString(o.VersionId), *o.ETag, int64(len(ciphertext)), d}, nil
 }
