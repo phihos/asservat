@@ -1029,6 +1029,19 @@ type ContextQueryCall struct {
 	IsPoll      bool
 }
 
+type ContextQueryCapacity struct {
+	RootID       pgtype.UUID
+	AcceptanceID pgtype.UUID
+	CapacityID   pgtype.UUID
+	Plan         []byte
+	SourceDigest []byte
+	IssuerEpoch  pgtype.UUID
+	PostmasterAt pgtype.Timestamptz
+	DatabaseOid  pgtype.Uint32
+	AcceptedAt   pgtype.Timestamptz
+	Observations int64
+}
+
 type ContextQueryKeyBinding struct {
 	BatchID   pgtype.UUID
 	QueryID   pgtype.UUID

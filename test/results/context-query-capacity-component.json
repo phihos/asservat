@@ -1,0 +1,98 @@
+{
+  "date": "2026-10-18",
+  "scope": "Protected C07 query-capacity compiler/guards/SQL facets and C03 environment component; no actual SQL69 or installed query qualification",
+  "nativePostgres69Run": false,
+  "nativeTestPrepared": "TestContextQueryCapacityWithRealPostgres",
+  "syntheticDeclarations": "Unit/native fixture report, resource, history and deployment-guard declarations are synthetic; no production resource qualification exists",
+  "checks": [
+    {
+      "log": "/home/phil/.cache/asservat-build/context-query-capacity/final-capacity-environment-race.jsonl",
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-json",
+        "./internal/application/capacity",
+        "./internal/application/authorization"
+      ],
+      "exit": 0
+    },
+    {
+      "log": "/home/phil/.cache/asservat-build/context-query-capacity/final-component-vet.log",
+      "command": [
+        "go",
+        "vet",
+        "./internal/application/capacity",
+        "./internal/application/authorization",
+        "./internal/adapters/postgres",
+        "./internal/domain/analysis",
+        "./test/integration"
+      ],
+      "exit": 0
+    },
+    {
+      "log": "/home/phil/.cache/asservat-build/context-query-capacity/final-integration-compile.log",
+      "command": [
+        "go",
+        "test",
+        "./test/integration",
+        "-run",
+        "^$"
+      ],
+      "exit": 0
+    },
+    {
+      "log": "/home/phil/.cache/asservat-build/context-query-capacity/final-sql-check.log",
+      "command": [
+        "make",
+        "sql-check"
+      ],
+      "exit": 0
+    },
+    {
+      "log": "/home/phil/.cache/asservat-build/context-query-capacity/final-go-architecture.log",
+      "command": [
+        "make",
+        "go-architecture-check"
+      ],
+      "exit": 0
+    }
+  ],
+  "raceCounts": {
+    "bounded-components-race.jsonl": {
+      "namedPass": 1164,
+      "topLevelPass": 213
+    },
+    "final-capacity-environment-race.jsonl": {
+      "namedPass": 436,
+      "topLevelPass": 88
+    },
+    "environment-slice-after.jsonl": {
+      "namedPass": 190,
+      "topLevelPass": 26
+    }
+  },
+  "regressions": [
+    {
+      "name": "Original policy slice ownership",
+      "beforeExit": 1,
+      "afterExit": 0,
+      "beforeLog": "/home/phil/.cache/asservat-build/context-query-capacity/environment-slice-before.log",
+      "afterLog": "/home/phil/.cache/asservat-build/context-query-capacity/environment-slice-after.jsonl"
+    },
+    {
+      "name": "Original query backing bounds blocking guard and final source",
+      "beforeExit": 1,
+      "afterExit": 0,
+      "beforeLog": "/home/phil/.cache/asservat-build/context-query-capacity/backing-deadline-before.log",
+      "afterLog": "/home/phil/.cache/asservat-build/context-query-capacity/final-capacity-environment-race.jsonl"
+    }
+  ],
+  "remaining": [
+    "Actual selected PostgreSQL69 migration/producer qualification with source hashes and cleanup",
+    "Mandatory SQL68 consumer anchor/allocation hooks",
+    "Independent accepted measured report and four protected native deployment guards",
+    "Original installer/runtime role provisioning and installed query workflow qualification"
+  ]
+}

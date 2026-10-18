@@ -52,6 +52,7 @@ var initialInstallationTables = []string{
 	"context_query_backing",
 	"context_query_batch",
 	"context_query_call",
+	"context_query_capacity",
 	"context_query_key_binding",
 	"context_query_principal",
 	"context_query_worker",

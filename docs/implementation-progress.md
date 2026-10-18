@@ -1,5 +1,38 @@
 # Sustained implementation progress
 
+## Protected approved-query backing component (ADR-206)
+
+C-07 now has an optional original-installation query qualification, independent
+resource/history compiler, private four-guard producer and separate SQL69 read/
+write facets. The immutable reservation consumes only residual base-root and
+system-pool capacity; all original root dates, finite principal/workload/query
+allowances and uncertain charges remain fixed. Per-deployment numeric limits,
+worker lifecycle/signing/observation history, child audits and finite source
+refresh work require exact measured qualification. C-03 composes that current
+query policy with current recovery and durable processing independently of
+ordinary approved-read authorization. No query role, installer setting or
+public tool is enabled. See [the contract](architecture/context-query-capacity.md).
+
+Full capacity/authorization/PostgreSQL race tests passed before the final history
+and consumer-deadline tightening; the final capacity/authorization race, five-
+package vet, integration compilation, SQL generation and Go architecture checks
+also passed. Two regressions failed before their fixes: reader buffer reuse
+changed the original accepted policy, and blocking guards/final source reads
+outlived the first backing deadline. Their corrected race runs passed. Recorded
+commands, exits and counts are in
+[test/results/context-query-capacity-component.json](../test/results/context-query-capacity-component.json).
+These are component checks, not execution of PL/pgSQL bodies or native proof.
+
+`TestContextQueryCapacityWithRealPostgres` is prepared using the existing owned
+fleet fixture, actual original setup/role/audit/root/workload activation, explicit
+synthetic query measurements and narrow fixture-only grants. It has **not run**.
+Run `scripts/test-custody.py --fleet --run '^TestContextQueryCapacityWithRealPostgres$'`
+only with coordinated source freeze and the sole native slot, then verify exact
+selection, source hashes and cleanup. Follow with the mandatory SQL68 anchor and
+allocation-current hooks; missing69 acceptance must deny after that integration.
+Production report acceptance, native guards, role provisioning, complete query
+worker/key delivery, installed qualification and retirement remain unfinished.
+
 ## Approved pod-status console component (ADR-206)
 
 The optional `web/src/projection` view now uses the canonical browser/MCP

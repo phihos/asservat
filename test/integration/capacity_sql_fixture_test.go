@@ -62,7 +62,7 @@ type capacitySQLFixture struct {
 	additional         []app.Enrollment
 }
 
-func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) *capacitySQLFixture {
+func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects, configure ...func(*capacitySQLFixture)) *capacitySQLFixture {
 	t.Helper()
 	input := contracts.PublicRuntimeRoles{Format: contracts.PublicRuntimeRolesFormat, InstallationID: scope.InstallationID, InitialClaimID: claim, OwnerConfigurationUID: custodyID(), ClusterID: scope.ClusterID, Namespace: contracts.WorkerObjectReference{Name: scope.Namespace, UID: scope.NamespaceUID}, LayoutDigest: postgres.PublicRuntimeRoleLayoutDigest()}
 	input.Worker = capacityNativeWorkerScope(t, input)
@@ -192,6 +192,9 @@ func newCapacitySQLFixture(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		}
 	}
 	f.qualification, f.template = capacityNativeQualification(t, rootID, scope.InstallationID, scope.ClusterID, scope.NamespaceUID, f.root.value.State.MAC.AccountVersion)
+	for _, option := range configure {
+		option(f)
+	}
 	f.processingPolicy = capacityNativeProcessingPolicy(f.qualification, scope.IssuerEpoch)
 	raw, err = json.Marshal(f.qualification)
 	if err != nil {

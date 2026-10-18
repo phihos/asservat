@@ -116,6 +116,20 @@ describes the private producer and outstanding installed/backend qualification.
 The provisional sixteen-account test envelope is not a product-wide workload
 limit or a measured operating capacity.
 
+Approved context queries require a separate original-installation qualification
+and additive reservation under the same protected root. Preserve the base
+capture/download graph's exact totals; use only its unreserved SQL/backup/WAL,
+audit and key-service envelope. Bind measured report/source/profile provenance
+and independently enforced numeric worker, hub, key-service and provider limits.
+A report digest, administrator struct, unique capacity ID or existing download
+qualification alone is insufficient. Bound root queries, aggregate principals,
+workload allocations, polls, control and source-observation work, including
+uncertain workers and history. Retain original hard/effect/cleanup/retirement
+dates; no poll, root renewal or expiry replenishes the finite allocation. An
+installation without the original extension remains unavailable until a separate
+audited upgrade protocol exists. See the
+[protected query-capacity contract](../docs/architecture/context-query-capacity.md).
+
 ### SC-CAP-005
 
 Given two 8 GiB attempts racing for 8 GiB remaining capacity, when both reserve, then only one becomes Ready. A crash after multipart start retains the uncertain charge. A failed DELETE or hidden version does not free space for another reservation. A retry after leadership loss cannot reuse a spent prepaid slice.
