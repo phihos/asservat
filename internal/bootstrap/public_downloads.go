@@ -277,14 +277,15 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		return nil, mounts.ErrUnavailable
 	}
 	coordinator.Plans = plans
+	out := &publicDownloads{native: services, downloads: downloads, gate: gate, coordinator: coordinator}
+	if ctx.Err() != nil {
+		return nil, mounts.ErrUnavailable
+	}
 	// ADR-204 decision 9: this profile's hub-local workers enroll and run
 	// their native path on the owner port. TLS client roots are the profile's
 	// current issuer roots from the trust catalog, resolved per handshake.
+	// It changes the runtime, so it is the last step that can fail.
 	if err = d.Runtime.ServeDownloadWorkers(func(now time.Time) (*x509.CertPool, error) { return d.trust.IssuerRoots(profile, now) }); err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	out := &publicDownloads{native: services, downloads: downloads, gate: gate, coordinator: coordinator}
-	if ctx.Err() != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	return out, nil

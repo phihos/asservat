@@ -117,8 +117,9 @@ func (r *ServerNameRouter) route(conn net.Conn) {
 		conn.Close()
 		return
 	}
-	slow := time.NewTimer(time.Second)
+	slow, expire := time.NewTimer(time.Second), time.NewTimer(handoffLimit)
 	defer slow.Stop()
+	defer expire.Stop()
 	event := "handoff "
 	for {
 		select {
@@ -128,6 +129,12 @@ func (r *ServerNameRouter) route(conn net.Conn) {
 		case <-slow.C:
 			event = "late-handoff "
 			r.report("slow-handoff " + name)
+		case <-expire.C:
+			// A child that stays full must not keep the raw socket's share of
+			// the listener's ceiling, or one child starves the others.
+			r.report("expired-handoff " + name)
+			conn.Close()
+			return
 		case <-child.done:
 			r.report("dropped-handoff " + name)
 			conn.Close()
@@ -138,6 +145,10 @@ func (r *ServerNameRouter) route(conn net.Conn) {
 		}
 	}
 }
+
+// handoffLimit bounds how long a peeked connection waits for its child
+// server; clients time out after about five seconds anyway.
+var handoffLimit = 5 * time.Second
 
 func (r *ServerNameRouter) report(event string) {
 	if r.Report != nil {

@@ -239,3 +239,43 @@ func TestClientHelloRouterSplitsOneNameByProtocol(t *testing.T) {
 	cancel()
 	<-done
 }
+
+// A child that never accepts cannot hold a routed socket past the handoff
+// limit: the router closes it and reports why.
+func TestServerNameRouterExpiresAStuckHandoff(t *testing.T) {
+	previous := handoffLimit
+	handoffLimit = 300 * time.Millisecond
+	t.Cleanup(func() { handoffLimit = previous })
+	raw, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	router, err := NewServerNameRouter(ctx, raw, "observation.synthetic.invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reported := make(chan string, 8)
+	router.Report = func(e string) { reported <- e }
+	go func() { _ = router.Run() }()
+	go func() {
+		c, e := tls.Dial("tcp", raw.Addr().String(), &tls.Config{ServerName: "observation.synthetic.invalid", InsecureSkipVerify: true, MinVersion: tls.VersionTLS13})
+		if e == nil {
+			c.Close()
+		}
+	}()
+	for {
+		select {
+		case e := <-reported:
+			if e == "expired-handoff observation.synthetic.invalid" {
+				return
+			}
+			if e != "started" && e != "slow-handoff observation.synthetic.invalid" {
+				t.Fatal("event", e)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("stuck hand-off not expired")
+		}
+	}
+}
