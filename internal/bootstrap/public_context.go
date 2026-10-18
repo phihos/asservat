@@ -50,32 +50,32 @@ type PublicContextServices struct {
 func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, files fs.FS) (http.Handler, error) {
 	host, ok := publicContextHost(c.PublicOrigin)
 	if !ok || s.Sessions == nil || s.Sessions.Issuer != c.Issuer || s.RefreshOwners == nil || s.RefreshPauses == nil || s.MCPIdentity == nil || s.DownloadIdentity == nil || s.Operations == nil || s.Operations.PublicOrigin() != c.PublicOrigin {
-		return nil, presentation.ErrOperationsConfiguration
+		return nil, &fixedStepError{"services", presentation.ErrOperationsConfiguration}
 	}
 	// No missing case or download service may be hidden behind an app-shell
 	// fallback. Capture enablement remains the existing operation set's decision;
 	// a deliberately disabled capture service may still expose retained evidence.
 	for _, name := range []string{"list_diagnostics", "preview_capture", "get_capture", "resolve_capture_request", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download"} {
 		if _, available := s.Operations.Tool(name); !available {
-			return nil, presentation.ErrOperationsConfiguration
+			return nil, &fixedStepError{"tools", presentation.ErrOperationsConfiguration}
 		}
 	}
 	static, e := console.New(c.PublicOrigin, files)
 	if e != nil {
-		return nil, e
+		return nil, &fixedStepError{"console", e}
 	}
 	audited, e := presentation.NewHealthyAuditedOperations(c.Audit, s.Operations, s.NormalAudit, s.ResolutionAudit, s.AuditMAC)
 	if e != nil {
-		return nil, e
+		return nil, &fixedStepError{"audited", e}
 	}
 	sessions := browser.SessionHandler{Origin: c.PublicOrigin, Issuer: c.Issuer, Sessions: s.Sessions}
 	investigations, e := browser.NewAuditedDownloadInvestigationHandler(sessions, audited, s.RefreshOwners, c.OperationConcurrency)
 	if e != nil {
-		return nil, e
+		return nil, &fixedStepError{"investigations", e}
 	}
 	mcpHandler, e := mcp.NewAuditedContextHandler(mcp.Config{PublicOrigin: c.PublicOrigin, Issuer: c.Issuer, Version: c.Version, MaxConcurrent: c.OperationConcurrency, MaxPerIdentity: c.MCPPerIdentity}, s.MCPIdentity, audited)
 	if e != nil {
-		return nil, e
+		return nil, &fixedStepError{"mcp", e}
 	}
 	mcpHandler.Report = eventLog(os.Stderr, "mcp unavailable")
 	// ADR-194 D1: a nil Native (no configured worker) serves no content; its
@@ -87,13 +87,13 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 			MaxConcurrent: c.DownloadConcurrency, MaxPerIdentity: c.DownloadsPerIdentity,
 			MaxDuration: c.DownloadMaxDuration, Now: c.Audit.Now, NewID: c.Audit.NewID,
 		}, sessions, s.DownloadIdentity, s.RefreshPauses, audited, s.Native, s.Transfer); e != nil {
-			return nil, e
+			return nil, &fixedStepError{"downloads", e}
 		}
 	}
 	var fleet http.Handler
 	if s.Fleet != nil {
 		if fleet, e = browser.NewFleetHandler(sessions, s.Fleet); e != nil {
-			return nil, e
+			return nil, &fixedStepError{"fleet", e}
 		}
 	}
 	return &publicContextRoutes{

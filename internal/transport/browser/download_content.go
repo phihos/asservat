@@ -26,6 +26,14 @@ const DownloadContentMetadataPath = "/.well-known/oauth-protected-resource/downl
 
 var ErrDownloadContentConfiguration = errors.New("invalid native content configuration")
 
+// contentConfigurationStep is ErrDownloadContentConfiguration naming the
+// closed check that refused it, for startup diagnostics.
+type contentConfigurationStep string
+
+func (s contentConfigurationStep) Error() string     { return ErrDownloadContentConfiguration.Error() }
+func (s contentConfigurationStep) Unwrap() error     { return ErrDownloadContentConfiguration }
+func (s contentConfigurationStep) FixedStep() string { return "content-" + string(s) }
+
 // Protected installation input. Bearer verification must be pinned to Resource
 // and Issuer independently of the MCP resource. No forwarded-header trust.
 type DownloadContentConfig struct {
@@ -55,15 +63,26 @@ type DownloadContentHandler struct {
 func NewDownloadContentHandler(c DownloadContentConfig, sessions SessionHandler, bearer identities.Resolver, pauses identities.BrowserRefreshPauseReader, audit *presentation.AuditedOperations, runtime *evidence.ContextNativeRuntime, transfer evidence.DownloadResponseTransfer) (*DownloadContentHandler, error) {
 	issuer, e := url.Parse(c.Issuer)
 	credential, ok := bearer.(identities.CredentialObserver)
-	if e != nil || issuer.Scheme != "https" || issuer.Host == "" || issuer.User != nil || issuer.RawQuery != "" || issuer.Fragment != "" || c.Now == nil || c.NewID == nil || c.MaxConcurrent < 1 || c.MaxConcurrent > 16 || c.MaxPerIdentity < 1 || c.MaxPerIdentity > c.MaxConcurrent || c.MaxDuration <= 0 || c.MaxDuration > 8*time.Hour || !sessions.validOrigin() || sessions.Origin != c.PublicOrigin || sessions.Issuer != c.Issuer || sessions.Sessions == nil || bearer == nil || !ok || pauses == nil || audit == nil || audit.PublicOrigin() != c.PublicOrigin || !runtime.Configured() || !transfer.Configured() {
-		return nil, ErrDownloadContentConfiguration
+	switch {
+	case e != nil || issuer.Scheme != "https" || issuer.Host == "" || issuer.User != nil || issuer.RawQuery != "" || issuer.Fragment != "" || c.Now == nil || c.NewID == nil || c.MaxConcurrent < 1 || c.MaxConcurrent > 16 || c.MaxPerIdentity < 1 || c.MaxPerIdentity > c.MaxConcurrent || c.MaxDuration <= 0 || c.MaxDuration > 8*time.Hour:
+		return nil, contentConfigurationStep("config")
+	case !sessions.validOrigin() || sessions.Origin != c.PublicOrigin || sessions.Issuer != c.Issuer || sessions.Sessions == nil:
+		return nil, contentConfigurationStep("sessions")
+	case bearer == nil || !ok || pauses == nil:
+		return nil, contentConfigurationStep("identity")
+	case audit == nil || audit.PublicOrigin() != c.PublicOrigin:
+		return nil, contentConfigurationStep("audit")
+	case !runtime.Configured():
+		return nil, contentConfigurationStep("runtime")
+	case !transfer.Configured():
+		return nil, contentConfigurationStep("transfer")
 	}
 	if _, ok := transfer.Responses.(interface{ FirstContextResponsesOnly() }); !ok {
-		return nil, ErrDownloadContentConfiguration
+		return nil, contentConfigurationStep("responses")
 	}
 	// Check the healthy shared owner without admitting an operation.
 	if _, e = presentation.NewNativeContentAuditor(audit, presentation.NativeContentInput{DownloadID: "00000000-0000-4000-8000-000000000001"}, c.Now().Add(time.Second)); e != nil {
-		return nil, ErrDownloadContentConfiguration
+		return nil, contentConfigurationStep("auditor")
 	}
 	return &DownloadContentHandler{config: c, sessions: sessions, bearer: bearer, credentials: credential, pauses: pauses, audit: audit, runtime: runtime, transfer: transfer, slots: make(chan struct{}, c.MaxConcurrent), active: make(map[identity.Principal]int)}, nil
 }

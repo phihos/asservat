@@ -296,6 +296,11 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 			d.publicHandler, err = newPublicHandler(startup, d, a, &app.OwnerAuthenticator{Registry: ledgers["registry"], Routes: routes, Protection: guard, Now: time.Now}, &closers)
 		}
 		d.closers = append(d.closers, closers...)
+		if err != nil {
+			// The startup line names only the phase; this names the closed
+			// step inside it.
+			fmt.Fprintln(os.Stderr, "owner public composition stopped: "+regionalOutcome(err))
+		}
 		if err != nil || startup.Err() != nil {
 			return nil, mounts.ErrUnavailable
 		}
