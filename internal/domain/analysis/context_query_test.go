@@ -178,3 +178,22 @@ func TestQuerySQLPrecisionNeverRenewsOriginalBounds(t *testing.T) {
 		t.Fatal("rounding revived already expired authority")
 	}
 }
+
+func TestQueryFlooredDeadlineMustStillFollowActualNow(t *testing.T) {
+	a := testAuthority()
+	actual := a.CheckedAt.Add(789 * time.Nanosecond)
+	a.AccessUntil = actual.Add(100 * time.Nanosecond)
+	a.ValidUntil = a.AccessUntil
+	if !a.Valid(actual) {
+		t.Fatal("invalid short authority fixture")
+	}
+	if _, err := NewContextQuery(queryTestID, queryTestID, queryTestID, a, queryPlan(a), actual); err == nil {
+		t.Fatal("sub-microsecond evidence lifetime became an already-expired query")
+	}
+	a.AccessUntil = actual.Add(500 * time.Nanosecond)
+	a.ValidUntil = a.AccessUntil
+	q, err := NewContextQuery(queryTestID, queryTestID, queryTestID, a, queryPlan(a), actual)
+	if err != nil || !q.Deadline.After(actual) || q.Deadline.After(a.AccessUntil) {
+		t.Fatal("remaining representable interval changed", err)
+	}
+}

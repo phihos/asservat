@@ -86,6 +86,10 @@ These are implementation interfaces, not new public wire fields:
 | C-18 | `ContextQueryLedger.ClaimReadBatch(ctx, batch, authority)` | Separately consumes a one-use start for the exact generation/worker/live request owner. Unknown or repeated claims never start again; `PermitReadBatch` is only a repeatable current fence. |
 | C-14 | `ContextProjectionWorkerAdmission.AdmitProjectionWorker(ctx, admittedQuery, currentRequestOwner)` | Separate creation capability, available only to initial admission. Exact Job/Pod/configuration, original signing intervals, independently audited enrollment and capacity remain mandatory. |
 | C-14 | `ContextProjectionReader.ReadProjection(ctx, ContextReadStart, currentRequestOwner)` | Independently verifies the one-use claim, existing exact worker and current typed query authority; decrypts/verifies the pinned source and returns an opaque DTO/closure handle. No launch fallback. |
+| C-24 | `ContextProjectionWorkerBinding`, `ContextProjectionWorkerProof`, `ContextProjectionKeyBinding` | Query-only immutable Job/Pod/spec/configuration, actual peer/process/certificate and original observation intervals; structural checks never establish protected admission, live ownership or key authority. |
+| C-14 | `RegionalContextProjection.ExecuteProjection(ctx, start, owner)` | Local regional component. Requires a mandatory protected execution guard and query-specific key operations; fixes exact claim ID to batch ID, consumes local generation/role fences and returns only verified status DTOs. |
+| C-14 | `RegionalProjectionRead.Projection(ctx)` and `CloseLocal(ctx)` | At most one local current-proof check; closure cancels and joins execution/checks within the original prepaid cleanup horizon. Deliberately does not implement remote `WithProjectionClosed` or SQL completion. |
+| C-21 | `ContextProjectionReader.ReadProjectionNative(ctx, source, scope, keys, until)` | Reuses complete pinned commit/manifest/envelope/index/native verification and strict status decoding under the original request. Regional-only keys never reach the hub. |
 | C-18/C-20 | `ContextProjectionDelivery.CheckDisclosure(ctx)` and `Close(cleanupCtx)` | Process-owned result guard and joined cleanup, bound to the exact prepared association/query/batch. Recheck after outcome audit and through the final write. The transport supplies its separate original prepaid cleanup context after joining writes. |
 
 `ContextProjectionScope` is constructed by C-03 from the minimal route candidate
@@ -368,6 +372,66 @@ not the native download whole-response lifetime. Protected installer/provider
 configuration and negative cross-purpose probes must establish this authority
 before public enablement. No old worker, accepted profile or installation pin is
 silently rebound to a new purpose.
+
+Immutable query start, disclosure and worker/credential/provider/cleanup instants
+use UTC microsecond precision so JSON and SQL replay retain the same identity.
+Creation checks authority and plan freshness against the actual current instant
+before flooring any persisted time. Every original derived cutoff rounds down;
+normalization cannot revive expired authority or extend a deadline.
+
+### Regional component and unimplemented protected bindings
+
+The local C-14 component holds one immutable query/worker and at most one active
+batch. `ContextProjectionExecutionGuard.OpenProjectionExecution` must independently
+verify the durable spent start, acknowledged intent, accepted backing, exact live
+owner and actual worker proof before returning a process-owned execution handle.
+`Fresh`, certificates, DTO validation or constructor arguments cannot substitute
+for that guard. The full native worker proof includes exact namespace/account/
+Job/Pod identities and specs, accepted configuration, token/public-key digests,
+actual peer certificate/process and protected observation interval. The producer
+must hold that exact current proof while a SQL binder compares it under locks.
+No protected producer or worker/key insertion grant is supplied here.
+
+`ContextProjectionKeyOperations` is a distinct query-only effect boundary. Its
+producer must consume the exact data/index/manifest role durably under the full
+query/batch/source/worker/request and current authority, including the sealed key
+and canonical artifact binding. Existing artifact framing/AAD remains unchanged;
+query authority never falls back to a download key resolver. Local role bits are
+an additional nonrefundable fence, not the durable grant. Failed/unknown provider
+calls retain spend and discard returned key bytes. All three positive roles and
+complete authenticated source verification precede a typed result.
+
+Local closure joins the source/key work and any in-flight current-proof read,
+then closes the known execution handle even if its opening outcome was uncertain.
+An unknown opening/closure retains the local active worker. Cleanup uses the
+original minimum of query cleanup and invocation audit-write horizon independently
+of an expired public context; it grants no new source/key read. The local type has
+no remote-closure method. A separate authenticated private query protocol must
+establish exact remote operation/peer/process/generation completion before C-18
+can authorize restrictive SQL completion. Socket EOF, local buffer release and
+this local join cannot provide it.
+
+The local component's race tests cover wrong claim/source/worker/process,
+caller and original proof cancellation through blocking reads/key calls, all
+three one-use roles, failed-key clearing, current revocation, two paid batches,
+unknown opening/closure, cleanup after public cancellation and joining an
+in-flight current check. Tests first reproduced foreign-claim acceptance, a
+short caller deadline being lost, skipped known-handle cleanup on uncertain
+opening and cleanup suppressed by public cancellation; all now pass. The C-21
+TLS object fixture uses actual framing, authenticated manifest/native checking
+and the strict parser; tampering with any of the four pinned objects prevents
+output. Its wrapping keys and HTTP receipts are explicitly synthetic.
+
+`go test -race -count=1 -timeout=2m ./internal/domain/analysis ./internal/application/evidence ./internal/adapters/objectstore`
+and affected-package `go vet` and the Go architecture gate pass for this
+component. Domain/C-18 race tests also pass after the timestamp regression.
+These results establish neither native provider authorization nor remote closure.
+
+Protected query dispatch/enrollment/signing, the current execution proof producer,
+SQL worker/key binding and durable consume composition, purpose-specific private
+key routing, private DTO/remote closure protocol and runtime/installer acceptance
+remain required. These missing ports keep this component unavailable in production;
+no default authority, public route or native qualification is implied.
 
 ## Acceptance
 

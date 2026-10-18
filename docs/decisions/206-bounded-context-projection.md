@@ -118,7 +118,12 @@ not relax isolation for ELF, packet, log, memory or other untrusted parsers.
 New query-specific SQL facets, key consumption, worker/protocol purpose, audit
 normalization, installer projections and current path acceptance are required.
 Sharing lower-level verification, TLS or framing code does not establish those
-authorities. Installed proof/read/audit latency must fit the unchanged five-second
+authorities. The regional local read/verification component deliberately cannot
+implement the remote closure capability: local proof checks and known execution
+handles must join, but only independently authenticated remote completion can
+release the active SQL batch. An uncertain opening still closes any known local
+handle under its original cleanup horizon without claiming remote completion.
+Installed proof/read/audit latency must fit the unchanged five-second
 request intervals and original query lifetime at production resource limits.
 
 The [architecture acceptance cases](../architecture/context-projection.md#acceptance)
