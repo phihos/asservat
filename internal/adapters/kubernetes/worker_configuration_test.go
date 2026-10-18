@@ -81,6 +81,22 @@ func TestWorkerConfigurationClosedSnapshot(t *testing.T) {
 			if e != nil || !c.Profile.Valid() || c.Profile.Configuration.UID != source {
 				t.Fatal("valid worker snapshot", e)
 			}
+			// ADR-204 decision 8: an installer-pinned copy of the document
+			// derives the identical profile with the same parse; another
+			// source UID is another profile, and another installation fails.
+			var pinned contracts.WorkerConfiguration
+			if json.Unmarshal(b, &pinned) != nil {
+				t.Fatal("pinned document")
+			}
+			if copied, e := PinnedWorkerConfiguration(pinned, source, installation, permissionCluster); e != nil || copied != c {
+				t.Fatal("pinned copy derived another profile", e)
+			}
+			if other, e := PinnedWorkerConfiguration(pinned, installation, installation, permissionCluster); e != nil || other.Profile == c.Profile {
+				t.Fatal("pinned copy ignored its source", e)
+			}
+			if _, e := PinnedWorkerConfiguration(pinned, source, permissionCluster, permissionCluster); e == nil {
+				t.Fatal("pinned copy of another installation accepted")
+			}
 			pretty, _ := json.MarshalIndent(v, "", "  ")
 			payload.Store(string(pretty))
 			again, e := s.snapshot(context.Background())

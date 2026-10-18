@@ -22,13 +22,14 @@ import (
 // publicRuntimeWorkerPurpose reports a purpose outside the hub projection.
 // ADR-170's federation and connector maintenance duties are included: none of
 // them may enter the hub, and creating them also requires the worker binding.
-// ADR-198's key-service logins likewise stay out of the hub.
+// ADR-198's key-service logins and ADR-204's worker configuration logins
+// likewise stay out of the hub.
 func publicRuntimeWorkerPurpose(purpose string) bool {
 	switch purpose {
 	case "capture-cleanup", "capture-verifier", "capture-finalizer", "capacity", "capacity-capture":
 		return true
 	}
-	return slices.Contains(contracts.PublicRuntimePermissionPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeFederationPurposes(), purpose) || slices.Contains(contracts.PublicRuntimePublisherPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeConnectorMaintenancePurposes(), purpose) || slices.Contains(contracts.PublicRuntimeKeyServicePurposes(), purpose)
+	return slices.Contains(contracts.PublicRuntimePermissionPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeFederationPurposes(), purpose) || slices.Contains(contracts.PublicRuntimePublisherPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeConnectorMaintenancePurposes(), purpose) || slices.Contains(contracts.PublicRuntimeKeyServicePurposes(), purpose)
 }
 
 func publicRuntimeWorkerBindingValid(in contracts.PublicRuntimeRoles) bool {

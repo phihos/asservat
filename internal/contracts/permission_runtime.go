@@ -44,6 +44,25 @@ type PermissionDeployment struct {
 	// Retention is the hub retention source (ADR-195). It rides in this
 	// projection: the same root, process and mount as the permission stream.
 	Retention *RetentionDeployment `json:"retention,omitempty"`
+	// WorkerConfiguration is the download worker configuration acceptance
+	// (ADR-204 decision 7). Like retention, it rides in this projection; its
+	// two logins follow the retention logins. Without it no worker
+	// configuration child runs.
+	WorkerConfiguration *WorkerConfigurationDeployment `json:"workerConfiguration,omitempty"`
+}
+
+// WorkerConfigurationDeployment pins the guarded worker profile source
+// (ADR-070) in the hub cluster's worker namespace: the source ConfigMap, its
+// administrator admission guard and the dedicated Transit key of the
+// encrypted acceptance audit, written under
+// download-worker-configuration/v1/<installation>/ by the hub-worker's audit
+// principal. The SQL logins are the fixed files of
+// PublicRuntimeWorkerConfigurationPurposes; no input names a file.
+type WorkerConfigurationDeployment struct {
+	Namespace    WorkerObjectReference `json:"namespace"`
+	Source       WorkerObjectReference `json:"source"`
+	Guard        OwnerDeploymentGuard  `json:"guard"`
+	AuditTransit OwnerPublicTransit    `json:"auditTransit"`
 }
 
 // RetentionDeployment pins the installer-applied retention guard. Its plan
@@ -91,7 +110,8 @@ type PermissionWorkload struct {
 	UID  string `json:"uid"`
 }
 
-// Only the two permission logins are projected (ADR-189).
+// Only the two permission logins are projected (ADR-189), with the retention
+// (ADR-195) and worker configuration (ADR-204) logins of present sections.
 type PermissionCredentialManifest struct {
 	Format  string                         `json:"format"`
 	Input   PublicRuntimeRoles             `json:"input"`

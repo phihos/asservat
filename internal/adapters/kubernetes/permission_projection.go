@@ -13,6 +13,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	"k8s.io/utils/ptr"
 )
 
@@ -33,7 +34,7 @@ func NewPermissionRuntimeProjection(bridge *InitialRuntimeBridge, resources *Ini
 		!equalJSON(bridge.initial, resources.initial) || resources.workerLayout == "" || resources.ownerLayout == "" ||
 		input.Format != contracts.PermissionDeploymentFormat || input.InstallationID != bridge.initial.InstallationID || input.InstallationID != roles.input.InstallationID ||
 		!authorization.UUID(input.RootID) || input.Control.Namespace != roles.input.Namespace || input.Control.ClusterID != roles.input.ClusterID ||
-		input.Control.Guard.Name != contracts.PermissionGuardName(input.InstallationID) || !publicRuntimeWorkerBindingValid(roles.input) {
+		input.Control.Guard.Name != contracts.PermissionGuardName(input.InstallationID) || !publicRuntimeWorkerBindingValid(roles.input) || !WorkerConfigurationSectionValid(input) {
 		return nil, cfg.ErrInvalid
 	}
 	b, e := json.Marshal(input)
@@ -45,6 +46,35 @@ func NewPermissionRuntimeProjection(bridge *InitialRuntimeBridge, resources *Ini
 		return nil, cfg.ErrInvalid
 	}
 	return &PermissionRuntimeProjection{bridge: bridge, resources: resources, roles: roles, input: cloned}, nil
+}
+
+// WorkerConfigurationSectionValid checks the shape of the projection's
+// optional worker configuration section (ADR-204 decision 7). The projection
+// is published once and immutable, so the installer and the hub-worker check
+// the same shape; the guard, source and SQL revision are proved only at each
+// observation. Workers never run in the hub namespace (ADR-204 decision 1),
+// and the section names its own guard and Transit key.
+func WorkerConfigurationSectionValid(c contracts.PermissionDeployment) bool {
+	v := c.WorkerConfiguration
+	if v == nil {
+		return true
+	}
+	g := v.Guard
+	if len(validation.IsDNS1123Label(v.Namespace.Name)) != 0 || !authorization.UUID(v.Namespace.UID) || v.Namespace.Name == c.Control.Namespace.Name || v.Namespace.UID == c.Control.Namespace.UID ||
+		len(validation.IsDNS1123Subdomain(v.Source.Name)) != 0 || !authorization.UUID(v.Source.UID) ||
+		len(validation.IsDNS1123Label(g.Name)) != 0 || g.Name == c.Control.Guard.Name || !authorization.UUID(g.PolicyUID) || !authorization.UUID(g.BindingUID) || !identity.Text(g.BindingResourceVersion, 128) ||
+		g.PolicyGeneration < 1 || g.PolicyGeneration > 2147483647 || len(g.Administrators) < 1 || len(g.Administrators) > 32 ||
+		!ownerBootstrapProviderName.MatchString(v.AuditTransit.Mount) || !ownerBootstrapProviderName.MatchString(v.AuditTransit.Key) {
+		return false
+	}
+	seen := map[contracts.OwnerDeploymentActor]bool{}
+	for _, a := range g.Administrators {
+		if (a.Kind != "User" && a.Kind != "Group") || !identity.Text(a.Name, 256) || seen[a] {
+			return false
+		}
+		seen[a] = true
+	}
+	return true
 }
 
 // projectionStop names the fixed publication stage that stopped, with the
@@ -81,7 +111,7 @@ func permissionProjectionMaterial(c contracts.PermissionDeployment, original con
 			clearRuntimeProjection(data)
 		}
 	}()
-	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil) {
+	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil, c.WorkerConfiguration != nil) {
 		i := slices.IndexFunc(v.Roles, func(r contracts.PublicRuntimeRoleMaterial) bool { return r.Purpose == purpose })
 		if i < 0 || slices.IndexFunc(v.Roles[i+1:], func(r contracts.PublicRuntimeRoleMaterial) bool { return r.Purpose == purpose }) >= 0 {
 			return nil, "", cfg.ErrChanged

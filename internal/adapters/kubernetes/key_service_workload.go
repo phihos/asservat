@@ -55,6 +55,11 @@ func BuildKeyServiceWorkload(namespace, image string, d contracts.KeyServiceDepl
 		{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: contracts.KeyServiceServingSecretName(d.InstallationID)}, Items: []core.KeyToPath{{Key: "tls.crt", Path: "tls.crt"}, {Key: "tls.key", Path: "tls.key"}}, Optional: ptr.To(false)}},
 		{ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "kube-observer.token", ExpirationSeconds: ptr.To(int64(600))}},
 	}
+	if d.Downloads != nil {
+		// ADR-204: the guarded catalog's dry-run probe uses a second client of
+		// the same account, as the hub-api's and the publisher's reads do.
+		projection = append(projection, core.VolumeProjection{ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "kube-probe.token", ExpirationSeconds: ptr.To(int64(600))}})
+	}
 	labels := map[string]string{"app.kubernetes.io/name": "asservat", "asservat.io/private-role": "key-service", "asservat.io/workload": name}
 	selector := map[string]string{"asservat.io/private-role": "key-service", "asservat.io/workload": name}
 	deployment := &apps.Deployment{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: namespace}, Spec: apps.DeploymentSpec{
@@ -82,6 +87,18 @@ func BuildKeyServiceWorkload(namespace, image string, d contracts.KeyServiceDepl
 	cluster := &rbac.ClusterRole{TypeMeta: meta.TypeMeta{APIVersion: rbac.SchemeGroupVersion.String(), Kind: "ClusterRole"}, ObjectMeta: meta.ObjectMeta{Name: clusterName}, Rules: []rbac.PolicyRule{
 		{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{namespace}, Verbs: []string{"get"}},
 	}}
+	if w := d.Downloads; w != nil {
+		// ADR-204: the guarded cluster catalog (update only for its denied
+		// dry-run probe), its guard, and the fixed and slot topology pins.
+		topologies := contracts.OwnerClusterTopologyNames(d.InstallationID)
+		for _, p := range w.RetentionTopologies {
+			topologies = append(topologies, p.Name)
+		}
+		role.Rules = append(role.Rules,
+			rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{w.ClusterCatalog.Source.Name}, Verbs: []string{"get", "update"}},
+			rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: topologies, Verbs: []string{"get"}})
+		cluster.Rules = append(cluster.Rules, rbac.PolicyRule{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{w.ClusterCatalog.Guard.Name}, Verbs: []string{"get"}})
+	}
 	subjects := []rbac.Subject{{Kind: "ServiceAccount", Name: name, Namespace: namespace}}
 	return &FederationWorkload{Inputs: inputs, Deployment: deployment, Service: service, Role: role,
 		Binding:        &rbac.RoleBinding{TypeMeta: meta.TypeMeta{APIVersion: rbac.SchemeGroupVersion.String(), Kind: "RoleBinding"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: namespace}, Subjects: subjects, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: name}},

@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -58,5 +59,34 @@ func TestKeyServiceWorkloadMountsAndReadsOnlyItsOwn(t *testing.T) {
 	}
 	if _, err := BuildKeyServiceWorkload("hub", "registry.synthetic.invalid/asservat:latest", d, keySecret, "NodePort", 31448); err == nil {
 		t.Fatal("unpinned image accepted")
+	}
+	// ADR-204: only with downloads does the Pod get its probe token and the
+	// catalog, guard and topology reads; the catalog's update serves only its
+	// denied dry-run probe.
+	tokens := func(w *FederationWorkload) (out []string) {
+		for _, s := range w.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources {
+			if s.ServiceAccountToken != nil {
+				out = append(out, s.ServiceAccountToken.Path)
+			}
+		}
+		return out
+	}
+	if !slices.Equal(tokens(w), []string{"kube-observer.token"}) {
+		t.Fatal("probe token without downloads", tokens(w))
+	}
+	d.Downloads = &contracts.KeyServiceDownloads{ClusterCatalog: contracts.OwnerPublicGuardedSource{Source: contracts.WorkerObjectReference{Name: contracts.OwnerClusterCatalogName(installation), UID: ownerID(7)}, Guard: contracts.OwnerDeploymentGuard{Name: "cluster-catalog-guard"}},
+		RetentionTopologies: []contracts.OwnerNativeTopology{{TargetClusterID: d.ClusterID, Name: "hub-topology", UID: ownerID(8), SHA256: strings.Repeat("1", 64)}}}
+	downloads, err := BuildKeyServiceWorkload("hub", image, d, keySecret, "NodePort", 31448)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(tokens(downloads), []string{"kube-observer.token", "kube-probe.token"}) || len(downloads.Role.Rules) != 4 || len(downloads.ClusterRole.Rules) != 2 {
+		t.Fatal("downloads workload", tokens(downloads))
+	}
+	catalog, topology, guard := downloads.Role.Rules[2], downloads.Role.Rules[3], downloads.ClusterRole.Rules[1]
+	if !slices.Equal(catalog.ResourceNames, []string{contracts.OwnerClusterCatalogName(installation)}) || !slices.Equal(catalog.Verbs, []string{"get", "update"}) ||
+		!slices.Contains(topology.ResourceNames, "hub-topology") || !slices.Contains(topology.ResourceNames, contracts.OwnerClusterSourceName(installation, 1, "topology")) || !slices.Equal(topology.Verbs, []string{"get"}) ||
+		!slices.Equal(guard.ResourceNames, []string{"cluster-catalog-guard"}) || !slices.Equal(guard.Verbs, []string{"get"}) {
+		t.Fatal("downloads RBAC", catalog, topology, guard)
 	}
 }

@@ -51,6 +51,9 @@ func BuildInstalledHubWorkerWorkload(p HubWorkerWorkloadPlan, installationID str
 		"sql-permission-accept.json", "sql-permission-audit.json",
 		// ADR-195: the hub retention source logins ride in this projection.
 		"sql-retention-source.json", "sql-retention-source-audit.json", "sql-retention-catchup.json", "sql-retention-lifecycle-audit.json",
+		// ADR-204: the worker configuration acceptance logins, present only
+		// with the projection's worker configuration section.
+		"sql-worker-config-observe.json", "sql-worker-config-audit.json",
 	})
 	// Only this Pod's rotating token is projected. It has the fixed local-hop
 	// audience and carries no remote Kubernetes credential. The UID hint is

@@ -8,8 +8,9 @@ import (
 // ADR-176 local key service: installation-owned startup inputs at a fixed
 // root. Credentials are fixed projected files (sql-key-configuration.json,
 // sql-key-wrap.json, sql-key-verify.json, kube-observer.token, tls.crt,
-// tls.key); root keys are read only through the protected local key source,
-// never from this document.
+// tls.key; with a Downloads section also sql-key-acquisition.json and
+// kube-probe.token); root keys are read only through the protected local key
+// source, never from this document.
 const KeyServiceDeploymentFormat = "asservat-key-service-deployment/v1"
 const KeyServiceDeploymentRoot = "/run/asservat/key-service"
 const KeyServiceDeploymentMaxBytes = 1 << 20
@@ -37,6 +38,23 @@ type KeyServiceDeployment struct {
 	KeyClientRoots       [][]byte `json:"keyClientRoots"`
 	ConnectorClientRoots [][]byte `json:"connectorClientRoots"`
 	Concurrency          int      `json:"concurrency"`
+	// Downloads enables acquisition unwraps (ADR-204 decision 8). Without it
+	// the service authorizes wraps and verifier unwraps only.
+	Downloads *KeyServiceDownloads `json:"downloads,omitempty"`
+}
+
+// KeyServiceDownloads pins what the native download key authority needs.
+// WorkerProfile is the exact worker-profile.json document of the guarded
+// worker source WorkerSource; it selects the profile only. Every acquisition
+// unwrap still requires SQL's current audited revision to equal it (ADR-070),
+// so a stale or wrong pin denies and never authorizes. RetentionTopologies are
+// fixed pins (possibly none), united with each joined slot's pin from the
+// guarded cluster catalog, read with the probe account like the hub-api.
+type KeyServiceDownloads struct {
+	WorkerSource        WorkerObjectReference    `json:"workerSource"`
+	WorkerProfile       WorkerConfiguration      `json:"workerProfile"`
+	ClusterCatalog      OwnerPublicGuardedSource `json:"clusterCatalog"`
+	RetentionTopologies []OwnerNativeTopology    `json:"retentionTopologies"`
 }
 
 func DecodeKeyServiceDeployment(r io.Reader) (KeyServiceDeployment, error) {
@@ -44,9 +62,10 @@ func DecodeKeyServiceDeployment(r io.Reader) (KeyServiceDeployment, error) {
 }
 
 // PublicRuntimeKeyServicePurposes are the key service's logins (ADR-198),
-// projected only into its own Secret.
+// projected only into its own Secret. ADR-204 adds the acquisition unwrap
+// login, which spends download key slots and opens only with Downloads.
 func PublicRuntimeKeyServicePurposes() []string {
-	return []string{"key-configuration", "key-wrap", "key-verify"}
+	return []string{"key-configuration", "key-wrap", "key-verify", "key-acquisition"}
 }
 
 // One Recreate replica; a failed process may still close its pools.

@@ -71,6 +71,29 @@ func (s *InstalledConfigurationProviderEffects) Opener() *Opener {
 	return s.effects.open
 }
 
+// AuditKeys seals and opens with another Transit key through the same two
+// purpose-fixed audit lifetimes (ADR-204 decision 7: the worker configuration
+// audit has its own key). It cannot name the configuration audit key itself;
+// the provider policy, not this client, decides whether the key is usable.
+// Every call still borrows the lifetimes' current tokens; the caller closes
+// both clients.
+func (s *InstalledConfigurationProviderEffects) AuditKeys(mount, key string) (*Sealer, *Opener, error) {
+	if s == nil || s.effects == nil || s.effects.wrap == nil || s.effects.unwrap == nil || !keyName.MatchString(mount) || !keyName.MatchString(key) || mount == s.input.KeyService.AuditMount && key == s.input.KeyService.AuditKey {
+		return nil, nil, ErrKeyService
+	}
+	wrap, err := newOwnerProviderEffectClient(s.effects.wrap, mount+"/encrypt/"+key)
+	if err != nil {
+		return nil, nil, err
+	}
+	seal := &Sealer{client: wrap, mount: mount, key: key, reference: mount + "/" + key}
+	unwrap, err := newOwnerProviderEffectClient(s.effects.unwrap, mount+"/decrypt/"+key)
+	if err != nil {
+		seal.Close()
+		return nil, nil, err
+	}
+	return seal, &Opener{client: unwrap, mount: mount, key: key, reference: mount + "/" + key}, nil
+}
+
 func (s *InstalledConfigurationProviderEffects) borrow(ctx context.Context) (context.Context, func(), error) {
 	if s == nil || ctx == nil || ctx.Err() != nil {
 		return nil, nil, ErrKeyService

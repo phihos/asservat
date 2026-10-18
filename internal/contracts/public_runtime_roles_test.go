@@ -7,8 +7,19 @@ import (
 
 func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
-	if len(all) != 80 || len(hub) != 51 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
+	// ADR-204 added three logins outside the hub projection (80 to 83).
+	if len(all) != 83 || len(hub) != 51 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
 		t.Fatal("unreviewed compartment expansion")
+	}
+	for purpose, want := range map[string]int{"worker-config-observe": 86, "worker-config-audit": 87, "key-acquisition": 88} {
+		id, ok := PublicRuntimeRoleOrdinal(purpose)
+		limit, bounded := PublicRuntimeRoleConnectionLimit(purpose)
+		if !ok || id != want || !bounded || limit != 3 || !slices.Contains(all, purpose) || slices.Contains(hub, purpose) {
+			t.Fatal("download compartment changed", purpose)
+		}
+	}
+	if !slices.Equal(PermissionProjectionPurposes(false, true), []string{"permission-accept", "permission-audit", "worker-config-observe", "worker-config-audit"}) || slices.Contains(PermissionProjectionPurposes(true, false), "worker-config-observe") || !slices.Contains(PublicRuntimeKeyServicePurposes(), "key-acquisition") {
+		t.Fatal("download logins left their projections")
 	}
 	seen := map[int]bool{}
 	for _, purpose := range all {

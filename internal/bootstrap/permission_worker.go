@@ -34,7 +34,10 @@ type permissionWorker struct {
 	admission  *fleetapp.WorkerRuntimeAdmission
 	// retention is the hub retention source (ADR-195); nil without it.
 	retention *retentionWorker
-	closers   []func()
+	// workerConfiguration is the download worker configuration acceptance
+	// (ADR-204 decision 7); nil without its section.
+	workerConfiguration *workerConfigurationWorker
+	closers             []func()
 }
 
 func (p *permissionWorker) Close() {
@@ -130,7 +133,7 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 	sql := &providerInputs{files: files, postgresEndpoint: c.Postgres}
 	w.closers = append(w.closers, sql.closeHTTP)
 	pools := map[string]*pgxpool.Pool{}
-	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil) {
+	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil, c.WorkerConfiguration != nil) {
 		p, e := sql.sqlConfig(startup, "sql-"+purpose+".json")
 		if e != nil {
 			return nil, mounts.ErrUnavailable
@@ -195,6 +198,12 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 			return nil, &fixedStepError{"retention/open", err}
 		}
 	}
+	if w.workerConfiguration, err = openWorkerConfiguration(startup, c, pools, local, writer, b.admission); err != nil {
+		return nil, &fixedStepError{"worker-configuration/open", err}
+	}
+	if w.workerConfiguration != nil {
+		w.closers = append(w.closers, w.workerConfiguration.Close)
+	}
 	if err = op.Finish(op.Context()); err != nil || ctx.Err() != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -213,7 +222,7 @@ func readPermissionWorkerInputs(ctx context.Context, files *os.Root) (contracts.
 	clear(b)
 	if err != nil || c.Format != contracts.PermissionDeploymentFormat || !authorization.UUID(c.InstallationID) || !authorization.UUID(c.RootID) ||
 		!authorization.UUID(c.RoleRootUID) || !authorization.UUID(c.RoleSetupID) || c.Control.Guard.Name != contracts.PermissionGuardName(c.InstallationID) ||
-		c.Retention != nil && c.Retention.Guard.Name != contracts.RetentionGuardName(c.InstallationID) {
+		c.Retention != nil && c.Retention.Guard.Name != contracts.RetentionGuardName(c.InstallationID) || !kube.WorkerConfigurationSectionValid(c) {
 		return c, m, mounts.ErrUnavailable
 	}
 	b, err = mounts.Read(ctx, files, contracts.PermissionCredentialManifestFile, contracts.PermissionCredentialManifestMaxBytes)
@@ -228,7 +237,8 @@ func readPermissionWorkerInputs(ctx context.Context, files *os.Root) (contracts.
 	return c, m, nil
 }
 
-// run supervises the reconciler and the publisher until the Lease ends.
+// run supervises the reconciler and the publisher, and with their sections the
+// retention source and the worker configuration child, until the Lease ends.
 func (p *permissionWorker) run(ctx context.Context) error {
 	done := make(chan struct{})
 	go func() {
@@ -242,6 +252,15 @@ func (p *permissionWorker) run(ctx context.Context) error {
 			p.retention.run(ctx)
 		}()
 		defer func() { <-retention }()
+	}
+	// ADR-204: absent without its section; joined like retention.
+	if p.workerConfiguration != nil {
+		worker := make(chan struct{})
+		go func() {
+			defer close(worker)
+			p.workerConfiguration.run(ctx)
+		}()
+		defer func() { <-worker }()
 	}
 	// A failed epoch retries after the 30-second SQL controller lease, so a
 	// new epoch is not refused while the old lease is still live.

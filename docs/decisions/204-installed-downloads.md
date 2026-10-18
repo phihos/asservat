@@ -93,7 +93,32 @@ first profile's workers in the hub region instead.
   downloads client in the identity provider.
 - Adding a second download path needs a new owner input until runtime path
   acceptance exists.
+- The worst-case SQL connection plan for one hub (two retained hub-worker
+  processes during a rollout) rises from 95 to 101 ordinary connections with
+  the three new logins, above PostgreSQL's default of 97 usable connections.
+  An installation with downloads needs `max_connections` of at least 104.
 
 ## Progress
 
-- Decision recorded; implementation pending.
+- **Decisions 7 and 8, SQL and composition** (unit-test results only; the
+  installer step, native runs and qualification are pending):
+  - Purposes `worker-config-observe` (86) and `worker-config-audit` (87) in
+    the hub-worker compartment, `key-acquisition` (88) in the key service's.
+    Their grants are the exact statements of `WorkerConfigurations` and of
+    both `NativeKeyAuthority` resolvers. The role layout digest changes
+    (fresh installations only).
+  - `PermissionDeployment.WorkerConfiguration` (optional): the worker
+    namespace, source, guard and audit Transit key. Its two logins ride in
+    the permission projection after the retention logins, and the child runs
+    beside the permission stream, like retention, because the section
+    arrives with that projection after the hub-worker starts. Without the
+    section there is no child and no login.
+  - `KeyServiceDeployment.Downloads` (optional): a pinned copy of the
+    worker profile document, parsed like the guarded source. It only selects
+    the profile; every spend still needs SQL's current audited revision to
+    equal it. Topology pins come from the guarded cluster catalog, and a
+    catalog change restarts the service, as for the publisher. Without the
+    section the authority map is unchanged.
+- Found while composing: the hub-api's download purposes lack SELECT on the
+  processing tables their download fence reads (the test fixture grants
+  them), so an installed download would be refused until they get it.

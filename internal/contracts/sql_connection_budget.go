@@ -79,7 +79,9 @@ func (e *SQLConnectionBudgetError) Unwrap() error { return ErrSQLConnectionBudge
 
 // InstalledSQLConnectionPlan returns the currently composed installed purposes:
 // the public hub and owner identity per hub process, and configuration,
-// capacity and capture-cleanup purposes per hub-worker process.
+// capacity and capture-cleanup purposes per hub-worker process. The worst case
+// includes the downloads logins of ADR-204 (worker configuration acceptance
+// and acquisition unwraps), which open only with their deployment sections.
 func InstalledSQLConnectionPlan(hubProcesses int) (SQLConnectionPlan, error) {
 	if hubProcesses < 1 || hubProcesses > PublicRuntimeRetainedHubProcesses {
 		return SQLConnectionPlan{}, ErrSQLConnectionBudget
@@ -88,6 +90,7 @@ func InstalledSQLConnectionPlan(hubProcesses int) (SQLConnectionPlan, error) {
 	worker := append(ConfigurationRuntimeRolePurposes(), "capacity", "capacity-capture")
 	worker = append(worker, PublicRuntimePermissionPurposes()...)
 	worker = append(worker, PublicRuntimeRetentionPurposes()...)
+	worker = append(worker, PublicRuntimeWorkerConfigurationPurposes()...)
 	worker = append(worker, PublicRuntimeCaptureCleanupPurposes()...)
 	return SQLConnectionPlan{Compartments: []SQLConnectionCompartment{
 		{Name: "hub", Purposes: hub, RetainedProcesses: hubProcesses, MaxOpen: SQLConnectionsPerHubReplica, Hub: true},
