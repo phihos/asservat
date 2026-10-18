@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"net"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -85,7 +86,7 @@ func (l *Ledger) transaction(ctx context.Context, f func(*custodydb.Queries) err
 			if ctx.Err() != nil {
 				return unavailableCause("begin-deadline")
 			}
-			return unavailableCause("begin")
+			return unavailableCause("begin-" + connectCause(err))
 		}
 		_, err = tx.Exec(ctx, "SET LOCAL statement_timeout='5s'; SET LOCAL lock_timeout='1s'; SET LOCAL idle_in_transaction_session_timeout='5s'; SET LOCAL synchronous_commit=on")
 		if err == nil {
@@ -137,6 +138,33 @@ func (l *Ledger) transaction(ctx context.Context, f func(*custodydb.Queries) err
 		return unavailableCause("client")
 	}
 	return unavailableCause("retries")
+}
+
+// connectCause classifies a failed connection acquisition by error type only:
+// a hook's own closed step (the credential re-read before connecting names
+// itself), dial (TCP), tls, server (a PostgreSQL error such as
+// authentication), connect (any other connect failure) or acquire.
+func connectCause(err error) string {
+	var op *net.OpError
+	var record tls.RecordHeaderError
+	var alert tls.AlertError
+	var verify *tls.CertificateVerificationError
+	var server *pgconn.PgError
+	var connect *pgconn.ConnectError
+	var named interface{ FixedStep() string }
+	switch {
+	case errors.As(err, &named):
+		return named.FixedStep()
+	case errors.As(err, &server):
+		return "server"
+	case errors.As(err, &record), errors.As(err, &alert), errors.As(err, &verify):
+		return "tls"
+	case errors.As(err, &op):
+		return "dial"
+	case errors.As(err, &connect):
+		return "connect"
+	}
+	return "acquire"
 }
 
 // ledgerCause is privacy.ErrUnavailable with a closed cause word; callers keep
