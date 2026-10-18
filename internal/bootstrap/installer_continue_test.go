@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"asservat.local/asservat/internal/contracts"
 	"context"
 	"errors"
 	"testing"
@@ -30,5 +31,29 @@ func TestConvergeStopNamesFirstAttempt(t *testing.T) {
 	stop := &InstallerContinuationStop{Step: "worker/roles-provision", Err: err}
 	if want := "installer continuation stopped at worker/roles-provision/role:configuration-fleet after 2 attempts; first complete:configuration-fleet (unavailable) (changed)"; stop.Error() != want || !errors.Is(err, cfg.ErrChanged) {
 		t.Fatal(stop.Error())
+	}
+}
+
+func TestValidPublicExposure(t *testing.T) {
+	f := contracts.InstallerFederationSettings{NodePort: 31443, KeyServiceNodePort: 31444, OwnerNodePort: 31446, OwnerOperationNodePort: 31447}
+	for _, tc := range []struct {
+		e    contracts.InstallerPublicExposure
+		want bool
+	}{
+		{contracts.InstallerPublicExposure{ServiceType: "NodePort"}, true},
+		{contracts.InstallerPublicExposure{ServiceType: "NodePort", NodePort: 31450}, true},
+		{contracts.InstallerPublicExposure{ServiceType: "LoadBalancer"}, true},
+		{contracts.InstallerPublicExposure{ServiceType: "LoadBalancer", NodePort: 31450}, false},
+		{contracts.InstallerPublicExposure{ServiceType: "ClusterIP"}, false},
+		{contracts.InstallerPublicExposure{ServiceType: "NodePort", NodePort: 29999}, false},
+		{contracts.InstallerPublicExposure{ServiceType: "NodePort", NodePort: 32768}, false},
+		{contracts.InstallerPublicExposure{ServiceType: "NodePort", NodePort: 31443}, false},
+		{contracts.InstallerPublicExposure{ServiceType: "NodePort", NodePort: 31444}, false},
+		{contracts.InstallerPublicExposure{ServiceType: "NodePort", NodePort: 31446}, false},
+		{contracts.InstallerPublicExposure{ServiceType: "NodePort", NodePort: 31447}, false},
+	} {
+		if got := validPublicExposure(tc.e, f); got != tc.want {
+			t.Errorf("%+v: %v, want %v", tc.e, got, tc.want)
+		}
 	}
 }
