@@ -1,12 +1,15 @@
 package bootstrap
 
 import (
+	"bytes"
 	"context"
 	"os"
+	"reflect"
 	"sync"
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	capacityapp "asservat.local/asservat/internal/application/capacity"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 
@@ -28,6 +31,12 @@ type CapacityHubWorkerDeployment struct {
 	closeObserver   func()
 	mu              sync.Mutex
 	closed, running bool
+	// contextDeletion and evidenceStoreID are the verified capacity
+	// projection's deletion section and its qualification's single backend's
+	// evidence store ID, once the capacity projection has opened; the context
+	// deletion child purges only that store's attempts (ADR-205).
+	contextDeletion *contracts.ContextDeletionDeployment
+	evidenceStoreID string
 	owners          sync.WaitGroup
 	once            sync.Once
 }
@@ -135,4 +144,57 @@ func (d *CapacityHubWorkerDeployment) Close() {
 			d.closeObserver()
 		}
 	})
+}
+
+// ContextDeletion returns the verified capacity projection's deletion
+// section and evidence store ID, or false before the capacity projection
+// has opened or without a section.
+func (d *CapacityHubWorkerDeployment) ContextDeletion() (contracts.ContextDeletionDeployment, string, bool) {
+	if d == nil {
+		return contracts.ContextDeletionDeployment{}, "", false
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.closed || d.root == nil || d.root.Err() != nil || d.contextDeletion == nil || d.evidenceStoreID == "" {
+		return contracts.ContextDeletionDeployment{}, "", false
+	}
+	return cloneContextDeletion(*d.contextDeletion), d.evidenceStoreID, true
+}
+
+// Both installed layouts call this only after their final current projection
+// check succeeds. The pins identify the immutable backend; they do not renew
+// any cleanup authority. SQL still authorizes every deletion transition.
+func (d *CapacityHubWorkerDeployment) acceptContextDeletion(ctx context.Context, c contracts.CapacityDeployment, q capacityapp.CapacityQualification, until time.Time) error {
+	if d == nil || ctx == nil || ctx.Err() != nil || !time.Now().Before(until) || !kube.ContextDeletionSectionValid(c.ContextDeletion, time.Now()) {
+		return mounts.ErrUnavailable
+	}
+	if c.ContextDeletion == nil {
+		return nil
+	}
+	if !q.Valid() || len(q.Backends) != 1 || q.RootBacking.RootID != c.PermissionRootID || q.RootBacking.InstallationID != c.InstallationID || c.InstallationID != d.input.InstallationID {
+		return mounts.ErrUnavailable
+	}
+	section := cloneContextDeletion(*c.ContextDeletion)
+	store := q.Backends[0].EvidenceStoreID
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.closed || ctx.Err() != nil || !time.Now().Before(until) || d.contextDeletion != nil && (!reflect.DeepEqual(*d.contextDeletion, section) || d.evidenceStoreID != store) {
+		return mounts.ErrUnavailable
+	}
+	d.contextDeletion, d.evidenceStoreID = &section, store
+	return nil
+}
+
+func cloneContextDeletion(v contracts.ContextDeletionDeployment) contracts.ContextDeletionDeployment {
+	roots := make([][]byte, len(v.EvidenceStore.Roots))
+	for i, root := range v.EvidenceStore.Roots {
+		roots[i] = bytes.Clone(root)
+	}
+	v.EvidenceStore.Roots = roots
+	keys := make(map[string][]byte, len(v.Signing.PublicKeys))
+	for id, key := range v.Signing.PublicKeys {
+		keys[id] = bytes.Clone(key)
+	}
+	v.Signing.PublicKeys = keys
+	return v
 }

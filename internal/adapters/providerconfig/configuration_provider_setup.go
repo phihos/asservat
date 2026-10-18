@@ -186,3 +186,33 @@ func (r *SetupReader) VerifyConfiguration(ctx context.Context, in contracts.HubW
 	}
 	return out, nil
 }
+
+// ReadContextDeletionSigning reads the hub-worker's context deletion signing
+// key (ADR-205 decision 6) with the phase-3 inspection token: the owner
+// artifact that lists the evidence delete credential also lets that token
+// read this one key. The installer pins the result in the capacity
+// projection.
+func (r *SetupReader) ReadContextDeletionSigning(ctx context.Context, endpoint contracts.OwnerProviderEndpoint, mount, key string) (ContextDeletionSigningReadback, error) {
+	var zero ContextDeletionSigningReadback
+	if !providerName.MatchString(mount) || !providerName.MatchString(key) {
+		return zero, ErrSetupUnavailable
+	}
+	path := mount + "/keys/" + key
+	o, err := r.begin(ctx, endpoint, []string{path})
+	if err != nil {
+		return zero, err
+	}
+	defer o.finish()
+	data, err := o.get(path)
+	if err != nil {
+		return zero, setupComponentError("context deletion signing key")
+	}
+	version, keys, err := verifySigningKeyVersions(data, key)
+	if err != nil {
+		return zero, setupComponentError("context deletion signing key")
+	}
+	if !o.valid() {
+		return zero, ErrSetupUnavailable
+	}
+	return ContextDeletionSigningReadback{Mount: mount, Key: key, Version: version, PublicKeys: keys}, nil
+}

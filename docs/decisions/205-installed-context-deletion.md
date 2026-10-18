@@ -1,6 +1,6 @@
 # ADR-205 — Installed context deletion
 
-Date: 2026-10-18. Status: accepted; implementation pending.
+Date: 2026-10-18. Status: accepted; implementation in progress.
 Requirements: S-02 (expiry and deletion in the installed journey); REQ-EVD-006,
 REQ-PRV-004, REQ-DEP-003; TASK-03.
 Composes [ADR-111](111-positive-context-writer-deletion.md) into the installed
@@ -68,9 +68,14 @@ and its storage charge is never released.
    its version and those public keys. `jose` gains a remote constructor for
    context deletion signatures, like the operation retirement one. The key
    signs only `asservat-context-deletion+jws` records.
-7. **Optional throughout.** Without the section there is no child, no login,
-   no signing key or policy path and no credential, and every digest is
-   unchanged.
+7. **Optional runtime composition in a fresh-install layout.** Without the
+   section there is no deletion child, no cleanup login in its permission
+   projection, no signing key or signing policy path and no evidence-delete
+   credential. Omitting the optional fields preserves the original provider
+   selection/configuration bytes. The fixed SQL role inventory and installed
+   worker template do change: fresh installations reserve the three purposes
+   and optional projected file paths. Their role/template digests change even
+   when the child is disabled.
    `installer-continue` fills the section exactly when the publisher is
    installed.
 
@@ -106,3 +111,50 @@ and its storage charge is never released.
 - Copies a user downloaded are outside managed deletion, as before.
 - Capture operation audit cleanup is still not installed; it remains a
   separate gap.
+- Existing installation upgrades and restart with this changed binary are
+  unqualified. Resource journals retain their original template digests and
+  SQL role pins; the continuation rejects an older pinned template instead of
+  rebinding it to this one. This change provides no journal rewrite, workload
+  image replacement or upgrade protocol.
+
+## Progress
+
+- **SQL** (#35, unit tests and `sql-check`; the context suite's deletion
+  fixture passed on CI run 39113937237): purposes 89–91 with the fixture
+  grants, the worst-case plan at 107 connections, and
+  `ContextDeletions.DueContextDeletions`.
+- **Provider, signing and credential** (#36, unit tests): the optional
+  `ContextDeletionSigning` key in the hub-worker's provider selection, the
+  audit-wrap `sign` path, the setup readback of every version's public key,
+  `jose.NewRemoteContextDeletionSignatures`, and
+  `installer-provider-apply --evidence-delete-credential`. *Amended during
+  implementation:* the recipe cannot name the permission root, which is
+  created after phase 1, so the audit prefix is the fixed
+  `context-deletion/v1/`, as `authority/v1/` already is; the writer accepts
+  only its own root.
+- **Composition** (unit tests; native runs pending). *Amended during
+  implementation:*
+  - The evidence store ID is chosen at capacity qualification, after the
+    permission projection is published, and the hub-worker's phase-1
+    inspection token is gone by then. So the permission projection carries
+    only a `contextDeletion` flag for the three logins (decision 2), and the
+    section (decision 7) rides in the capacity projection, which is
+    published after phase 3. The deletion child takes the section and the
+    qualification's single evidence store ID from the capacity child once
+    that has verified its projection; until then it skips its sweeps.
+  - The installer reads the signing key's versions and public keys back with
+    the phase-3 inspection token: the owner artifact that lists the evidence
+    delete credential also lets that token read this one key. Key IDs are
+    `v<version>`.
+  - `installer-continue` steps `deletion/credential` (the immutable Secret)
+    and `deletion/verify` (the readback) run after `publisher/verify`; the
+    hub-worker Pod projects the Secret, optionally, under `evidence-delete/`.
+  - Both legacy and provider-backed installed capacity startup hand off the
+    immutable section only after the final native projection proof. The
+    original startup deadline still applies after waiting for the handoff
+    lock. A missing or ambiguous backend qualification refuses startup;
+    subsequent capacity restarts cannot replace the store or signing pins.
+    The provider-backed path previously omitted this handoff entirely, so
+    the deletion child would have waited indefinitely. Unit regressions
+    also cover immutable returned pins and cleanup after failed preparation;
+    they do not establish installed deletion success.

@@ -37,14 +37,18 @@ func PublicRuntimeRolePurposes() []string {
 // PermissionProjectionPurposes are the logins of the permission projection,
 // in order: the permission stream's, then, with a retention section
 // (ADR-195), the retention source's, then, with a worker configuration
-// section (ADR-204), the worker configuration acceptance logins.
-func PermissionProjectionPurposes(retention, workerConfiguration bool) []string {
+// section (ADR-204), the worker configuration acceptance logins, then, with a
+// context deletion section (ADR-205), the deletion logins.
+func PermissionProjectionPurposes(retention, workerConfiguration, contextDeletion bool) []string {
 	out := PublicRuntimePermissionPurposes()
 	if retention {
 		out = append(out, PublicRuntimeRetentionPurposes()...)
 	}
 	if workerConfiguration {
 		out = append(out, PublicRuntimeWorkerConfigurationPurposes()...)
+	}
+	if contextDeletion {
+		out = append(out, PublicRuntimeContextDeletionPurposes()...)
 	}
 	return out
 }
