@@ -199,7 +199,11 @@ all 2,651 source hashes and record exit zero with complete cleanup:
 and [ledger](../../test/results/context-query-ledger-assembled-1/fleet-environment.json).
 Real accepted resource proof and installed query composition remain separate.
 
-The source pre-I/O accounting correction is later than the native report above.
-Its unit regressions cover guard-entry order, exhaustion and joined completion;
-that historical report does not qualify the new SQL claim/completion protocol.
-A fresh frozen native selection is required before integration.
+The source pre-I/O accounting correction is later than those historical reports.
+Fresh separate native capacity and full ledger selections passed at
+`51fd2e94d41d6ce5e9105b755e7e39671df5944e`, each with all 2,652 source hashes matched,
+unchanged source and complete cleanup. The [capacity report](../../test/results/context-query-source-spend-capacity-1/fleet-environment.json)
+and [ledger report](../../test/results/context-query-source-spend-ledger-1/fleet-environment.json)
+qualify the new SQL claim/completion protocol, including failed/unknown starts,
+concurrent work, expiry without completion, exhaustion and negative fencing.
+Synthetic resource measurements and guard/authority inputs retain the limits above.

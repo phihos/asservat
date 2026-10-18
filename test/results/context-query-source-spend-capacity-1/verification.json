@@ -1,0 +1,21 @@
+{
+  "frozenCommit": "51fd2e94d41d6ce5e9105b755e7e39671df5944e",
+  "test": "TestContextQueryCapacityWithRealPostgres",
+  "reportSHA256": "2a545c3199e09790ea11f32c21cb62b09bc456e26d219f38d27b149c3ff6a017",
+  "logSHA256": "0a0645f2d084530fa510c3100585395cedc46ee9b87dfec7eeb598686d7ca79b",
+  "verification": {
+    "headMatches": true,
+    "archiveExit": 0,
+    "sourceUnchanged": true,
+    "allHashesMatch": true,
+    "matchedSourceHashes": 2652,
+    "expectedSourceHashes": 2652,
+    "testExit": 0,
+    "exactPattern": true,
+    "exactSelectedPass": true,
+    "cleanupFailures": [],
+    "missing": [],
+    "mismatches": [],
+    "pass": true
+  }
+}

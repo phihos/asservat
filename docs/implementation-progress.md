@@ -1,5 +1,33 @@
 # Sustained implementation progress
 
+## Query source attempts: native pre-I/O accounting qualification (2026-10-18)
+
+Separate fresh PostgreSQL/S3 fixtures tested frozen
+`51fd2e94d41d6ce5e9105b755e7e39671df5944e` after the source-accounting review fix.
+`TestContextQueryCapacityWithRealPostgres` passed in 9.25 seconds, including
+committed-but-unknown Begin, replay, concurrent outer guard work, expiry with an
+unfinished claim, exhaustion and the reserved terminal negative transition.
+`TestContextQueryLedgerWithRealPostgres` passed in 29.77 seconds, including its
+20.54-second full ledger child. Both run the updated three-transaction source
+protocol; the older reports below qualify only their earlier source.
+
+Each report independently matches all 2,652 source hashes to the frozen commit
+archive, records unchanged source and exit zero, and has no cleanup failures.
+The [capacity report](../test/results/context-query-source-spend-capacity-1/fleet-environment.json)
+has SHA-256 `2a545c3199e09790ea11f32c21cb62b09bc456e26d219f38d27b149c3ff6a017`;
+the [ledger report](../test/results/context-query-source-spend-ledger-1/fleet-environment.json)
+has SHA-256 `64cadc8209909a990398b861d017dee1254e9d98227e676b1e47441ad64921e5`.
+Assembled gates passed: 54 generated SQL files, 58 Go packages/338 allowed edges,
+11,375 specification assertions and 1,316 architecture positive/120 invalid cases.
+Independent review cleared the exact source correction and final assembly.
+
+Resource/history measurements and independent deployment guards remain synthetic;
+the ledger also uses synthetic human authority and C-14 closure. This establishes
+component SQL behavior, not installed query authority, protected issuer/runtime
+composition or public disclosure. Missing completion and negative-raced claims
+remain conservatively held; this component supplies no recovery bypass.
+
+
 ## Combined protected query capacity and ledger qualification (ADR-206)
 
 Two separate owned PostgreSQL/S3 fixtures passed at frozen
@@ -52,9 +80,8 @@ enter guards; expiry cannot release unfinished work. Declared WAL accounting now
 covers all three source transactions without increasing the original limit.
 The original guard-entry regression failed before the change. Full capacity and
 PostgreSQL race tests, focused source-history/join regressions, integration
-compilation, vet, SQL generation and design gates passed. The new native fixture
-is compiled but has not run; older native reports predate this protocol and do
-not qualify it. [Component evidence](../test/results/context-query-source-spend-component.json)
+compilation, vet, SQL generation and design gates passed. The later frozen native runs above qualify the new protocol; older native
+reports predate it and do not qualify it. [Component evidence](../test/results/context-query-source-spend-component.json)
 records the exact commands and scope.
 
 Full capacity/authorization/PostgreSQL race tests passed before the final history
