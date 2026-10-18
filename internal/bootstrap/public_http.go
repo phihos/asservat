@@ -27,21 +27,21 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
 	if p == nil || id == nil || pc == nil || dl == nil || d.Runtime == nil || owners == nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"inputs", mounts.ErrUnavailable}
 	}
 	// ADR-190: the normal and resolution lanes read their current accepted
 	// profile before each new Begin; each policy gets its own auditor.
 	digest, ok := publicDigest(p.Capacity.QualificationDigest)
 	if !ok {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"qualification", mounts.ErrUnavailable}
 	}
 	profilePool, err := d.public.open(ctx, "capacity-profile-read")
 	if err != nil {
-		return nil, err
+		return nil, &fixedStepError{"profiles", err}
 	}
 	profiles, err := postgres.NewCapacityAuditProfiles(ctx, profilePool, root, installation, p.Capacity.QualificationID, digest, p.Capacity.AccountVersion)
 	if err != nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"profiles", mounts.ErrUnavailable}
 	}
 	auditor := func(lane string) (*auditapp.SelectedOperationAuditor, error) {
 		journalPool, err := d.public.open(ctx, "audit-"+lane+"-journal")
@@ -78,11 +78,11 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	}
 	normal, err := auditor("normal")
 	if err != nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"audit-normal", mounts.ErrUnavailable}
 	}
 	resolution, err := auditor("resolution")
 	if err != nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"audit-resolution", mounts.ErrUnavailable}
 	}
 
 	settings := id.settings
@@ -92,36 +92,40 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	for _, purpose := range []string{"refresh-admit", "refresh-owner", "refresh-read"} {
 		pool, err := d.public.open(ctx, purpose)
 		if err != nil {
-			return nil, err
+			return nil, &fixedStepError{"refresh-sql", err}
 		}
 		if refreshSQL[purpose], err = postgres.NewBrowserSessions(ctx, pool, settings.Binding()); err != nil {
-			return nil, mounts.ErrUnavailable
+			return nil, &fixedStepError{"refresh-sql", mounts.ErrUnavailable}
 		}
 	}
 	journal, err := postgres.NewBrowserRefreshOwners(postgres.BrowserRefreshDatabases{Admission: refreshSQL["refresh-admit"], Maintenance: refreshSQL["refresh-owner"], Reader: refreshSQL["refresh-read"]}, dl.downloads, dl.gate, d.Runtime.server, owners, process, time.Now)
 	if err != nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"refresh-journal", mounts.ErrUnavailable}
 	}
 	refresh, err := identities.NewBrowserRefreshOwners(d.root, *id.sessions, journal, process, p.Origin, ownerRandomID)
 	if err != nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"refresh-owners", mounts.ErrUnavailable}
 	}
 	*closers = append(*closers, func() { _ = refresh.Close() })
 
 	operations, err := NewPublicContextOperations(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
 		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native})
 	if err != nil {
-		return nil, mounts.ErrUnavailable
+		return nil, &fixedStepError{"operations", mounts.ErrUnavailable}
 	}
 	o := p.OperationAudit
 	services := PublicContextServices{Sessions: id.sessions, RefreshOwners: refresh, RefreshPauses: journal, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
 	if pc.fleet != nil {
 		services.Fleet = pc.fleet
 	}
-	return NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: settings.Issuer, Version: p.Version,
+	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: settings.Issuer, Version: p.Version,
 		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxDuration: time.Duration(p.DownloadMaxSeconds) * time.Second,
 		Audit: presentation.AuditedOperationsConfig{RootID: root, Retention: time.Duration(o.RetentionSeconds) * time.Second, NormalConcurrency: o.NormalConcurrency, ResolutionConcurrency: o.ResolutionConcurrency, PerPrincipalConcurrency: o.PerPrincipalConcurrency, NormalPerSecond: o.NormalPerSecond, ResolutionPerSecond: o.ResolutionPerSecond, Now: time.Now, NewID: ownerRandomID}},
 		services, os.DirFS(contracts.OwnerPublicConsoleRoot))
+	if err != nil {
+		return nil, &fixedStepError{"handler", err}
+	}
+	return h, nil
 }
 
 // publicCertificate serves the mounted public TLS pair and reloads it when the
