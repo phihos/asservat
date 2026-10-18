@@ -48,8 +48,8 @@ def postgres_fixture_options(regional_context_start=None, lock_waits=False, inst
                 any(type(installed_budget.get(key)) is not int for key in fields) or
                 installed_budget["requiredOrdinary"] < 1 or installed_budget["reserved"] < 0 or
                 installed_budget["fixtureAdminConnections"] != 1 or
-                installed_budget["superuserReserved"] < installed_budget["fixtureAdminConnections"] or
-                installed_budget["maxConnections"] != installed_budget["requiredOrdinary"] + installed_budget["superuserReserved"] + installed_budget["reserved"]):
+                installed_budget["superuserReserved"] < 0 or
+                installed_budget["maxConnections"] != installed_budget["requiredOrdinary"] + installed_budget["fixtureAdminConnections"] + installed_budget["superuserReserved"] + installed_budget["reserved"]):
             raise ValueError("invalid installed PostgreSQL connection budget")
         options[1] = "max_connections=" + str(installed_budget["maxConnections"])
         options += ["-c", "superuser_reserved_connections=" + str(installed_budget["superuserReserved"]),

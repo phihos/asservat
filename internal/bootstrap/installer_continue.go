@@ -44,7 +44,6 @@ type InstallerContinuation struct {
 	roots    [][]byte
 	preparer *kube.InitialPreparer
 	observer *kube.InitialBootstrapObserver
-	history  *pgxpool.Pool
 	record   audit.InitialInstallation
 	receipt  audit.Receipt
 	sql      *postgres.InitialRuntimeBridgeSQL
@@ -153,18 +152,15 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 	}
 	k.closers = append(k.closers, k.in.closeHTTP, k.observer.Close, k.preparer.Close)
 	*step = "open/history"
-	reader, pool, err := initialBootstrapHistory(ctx, preparer, k.preparer, k.plan)
+	reader, pool, err := initialBootstrapHistoryBounded(ctx, preparer, k.preparer, k.plan, 1)
 	if err != nil {
 		return nil, err
 	}
-	k.history = pool
-	k.closers = append(k.closers, pool.Close)
 	*step = "open/activation"
-	observed, err := reader.ObserveInitialInstallation(ctx)
-	if err != nil || observed.Disposition != app.InitialInstallationActivated || observed.Record == nil || observed.AuditReceipt == nil {
-		return nil, errors.Join(mounts.ErrUnavailable, err)
+	k.record, k.receipt, err = observeInstallerActivation(ctx, reader, pool.Close)
+	if err != nil {
+		return nil, err
 	}
-	k.record, k.receipt = *observed.Record, *observed.AuditReceipt
 	*step = "open/superuser"
 	if k.admin, err = k.in.sqlConfig(ctx, "postgres-administrator.json"); err != nil {
 		return nil, mounts.ErrUnavailable
@@ -189,6 +185,18 @@ func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, st
 	}
 	complete = true
 	return k, nil
+}
+
+// The passive reader has no later use. Join its closure before opening the
+// administrator bridge, including failed observations; historical activation
+// remains subject to the bridge's independent current recovery checks.
+func observeInstallerActivation(ctx context.Context, reader app.InitialInstallationHistory, closeHistory func()) (audit.InitialInstallation, audit.Receipt, error) {
+	defer closeHistory()
+	observed, err := reader.ObserveInitialInstallation(ctx)
+	if err != nil || observed.Disposition != app.InitialInstallationActivated || observed.Record == nil || observed.AuditReceipt == nil {
+		return audit.InitialInstallation{}, audit.Receipt{}, errors.Join(mounts.ErrUnavailable, err)
+	}
+	return *observed.Record, *observed.AuditReceipt, nil
 }
 
 // Resources creates or reopens the 19-resource journal of the fresh provider
