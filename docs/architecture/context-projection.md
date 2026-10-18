@@ -285,6 +285,14 @@ delivery pointer to its existing keyed output digest and acknowledged outcome.
 handles. Admission, paid polling and paid reading have explicit effect
 dispositions; an uncertain service error never proves no effect.
 
+Each prepared delivery freezes `ObservedAt` at that response's preparation,
+`QueryDeadline` at the earlier original query/effective-access cutoff, and
+`CleanupUntil` at the original prepaid cleanup/write cutoff. These differ from
+the current at-most-five-second `ValidUntil`. A late poll must not report query
+creation as its observation and thereby restart a browser's remaining TTL. A
+later access shortening below the already prepared cutoff rejects that exact
+delivery rather than mutating audited output or disclosing the older cutoff.
+
 The browser renders the same fixed projection as text, with no provider token
 or HTML interpretation. Its managed view has a finite original cutoff, clears
 on scope loss/close and does not silently create a new query after a terminal

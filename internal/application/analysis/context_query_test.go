@@ -622,3 +622,37 @@ func TestQueryExpiredPublicContextCannotActAsCleanupPermit(t *testing.T) {
 		t.Fatal("cleanup retry renewed original failed close")
 	}
 }
+
+func TestQueryDeliveryTimingDoesNotRenewLatePollOrPreparedCutoff(t *testing.T) {
+	f := newProjectionFixture(t)
+	d, i := f.begin(t)
+	if !d.QueryDeadline().Equal(f.q.Deadline) || !d.ObservedAt().Equal(f.now) || !d.CleanupUntil().Equal(i.call.WriteUntil) || !d.ValidUntil().Before(d.QueryDeadline()) {
+		t.Fatal("query, observation, cleanup and request bounds were conflated")
+	}
+	if err := d.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.refresh(f.now.Add(9 * time.Second))
+	i = f.invocation("get_query_result")
+	d, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.ObservedAt().Equal(f.now) || d.QueryDeadline().Sub(d.ObservedAt()) != time.Second {
+		t.Fatal("late poll used query creation to renew remaining lifetime")
+	}
+	i.outcome = d
+	if err = d.CheckDisclosure(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	observed, deadline := d.ObservedAt(), d.QueryDeadline()
+	f.a.AccessUntil = f.now.Add(500 * time.Millisecond)
+	f.a.ValidUntil = f.a.AccessUntil
+	if d.CheckDisclosure(context.Background()) == nil {
+		t.Fatal("prepared longer evidence cutoff survived shortening")
+	}
+	if !d.ObservedAt().Equal(observed) || !d.QueryDeadline().Equal(deadline) {
+		t.Fatal("audited prepared metadata mutated after observation")
+	}
+	_ = d.Close(context.Background())
+}

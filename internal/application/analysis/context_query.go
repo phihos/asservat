@@ -59,20 +59,28 @@ type ContextProjectionAssociation struct {
 // acknowledge its existing outcome and retain the guard through write/flush.
 // Its own audit slot/cancel must also transfer to transport-owned cleanup.
 type ContextProjectionDelivery struct {
-	owner       *projectionRequest
-	association ContextProjectionAssociation
-	effect      ContextQueryEffect
-	excerpt     value.ContextExcerpt
-	pending     bool
-	batch       *value.ContextReadBatch
-	read        ContextProjectionRead
-	once        sync.Once
-	closeErr    error
+	owner                                   *projectionRequest
+	association                             ContextProjectionAssociation
+	effect                                  ContextQueryEffect
+	excerpt                                 value.ContextExcerpt
+	pending                                 bool
+	batch                                   *value.ContextReadBatch
+	read                                    ContextProjectionRead
+	observedAt, queryDeadline, cleanupUntil time.Time
+	once                                    sync.Once
+	closeErr                                error
 }
 
 func (d *ContextProjectionDelivery) Association() ContextProjectionAssociation { return d.association }
 func (d *ContextProjectionDelivery) Effect() ContextQueryEffect                { return d.effect }
 func (d *ContextProjectionDelivery) Pending() bool                             { return d.pending }
+
+// These are frozen for this exact prepared association. QueryDeadline is the
+// original total query/evidence cutoff, never the private five-second lease;
+// ObservedAt is this response's preparation observation, not query creation.
+func (d *ContextProjectionDelivery) ObservedAt() time.Time    { return d.observedAt }
+func (d *ContextProjectionDelivery) QueryDeadline() time.Time { return d.queryDeadline }
+func (d *ContextProjectionDelivery) CleanupUntil() time.Time  { return d.cleanupUntil }
 func (d *ContextProjectionDelivery) Excerpt() (value.ContextExcerpt, bool) {
 	if d == nil || d.pending {
 		return value.ContextExcerpt{}, false
@@ -112,6 +120,9 @@ func (d *ContextProjectionDelivery) CheckDisclosure(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if a.AccessUntil.Before(d.queryDeadline) {
+		return value.ErrUnavailable
+	}
 	if d.batch == nil {
 		err = o.service.Ledger.PermitQuery(checked, o.query, o.request, a)
 	} else {
@@ -123,7 +134,10 @@ func (d *ContextProjectionDelivery) CheckDisclosure(ctx context.Context) error {
 	if err != nil {
 		return value.ErrUnavailable
 	}
-	_, err = o.CheckCurrent(checked)
+	a, err = o.CheckCurrent(checked)
+	if err == nil && a.AccessUntil.Before(d.queryDeadline) {
+		return value.ErrUnavailable
+	}
 	return err
 }
 
@@ -150,7 +164,7 @@ func (d *ContextProjectionDelivery) Close(ctx context.Context) error {
 			d.closeErr = value.ErrUnavailable
 			return
 		}
-		until := identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil)
+		until := d.cleanupUntil
 		if deadline, ok := ctx.Deadline(); ok {
 			until = identity.Earlier(until, deadline)
 		}
@@ -479,7 +493,9 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 		return nil, err
 	}
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
-		association: ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection}}
+		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
+		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
+		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection}}
 	if !authorization.UUID(d.association.ID) {
 		return nil, value.ErrUnavailable
 	}
