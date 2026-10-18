@@ -212,3 +212,15 @@ and [ledger report](../../test/results/context-query-source-spend-ledger-1/fleet
 qualify the new SQL claim/completion protocol, including failed/unknown starts,
 concurrent work, expiry without completion, exhaustion and negative fencing.
 Synthetic resource measurements and guard/authority inputs retain the limits above.
+
+The delayed-negative adapter regression first failed at `f8d73a8`, then passed
+at `e538a403`. The final assembled capacity selection passed at
+`7fcc30fd0bd4d1896cbe843d555f37b2b211767c`, matching all 2,652 source hashes with
+unchanged source and complete cleanup. Its
+[report](../../test/results/context-query-stale-negative-assembled-1/fleet-environment.json)
+and [log](../../test/results/context-query-stale-negative-assembled-1/fleet.log)
+cover persistence after the original negative is over five seconds old, no
+freshness renewal from an older replay, and the caller's earlier deadline while
+blocked on SQL locks. The full ledger result remains scoped to `51fd2e9`; it was
+not rerun for this restrictive adapter-only change. Installed/public query
+qualification remains pending.

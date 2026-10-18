@@ -1,5 +1,48 @@
 # Sustained implementation progress
 
+## Delayed query negatives: reproduced and qualified correction (2026-10-18)
+
+Review found that `SuspendQueryCapacity` derived its SQL deadline from the
+negative observation's timestamp, preventing persistence after a five-second
+delay. The restrictive write now gets at most five seconds from the current
+call, preserving the caller's earlier deadline and cancellation. SQL receives
+the unchanged original watermark; no positive freshness, source limit or
+authority interval is renewed.
+
+The exact owned `TestContextQueryCapacityWithRealPostgres` selection failed at
+the new delayed-negative assertion on frozen
+`f8d73a8810b84f97e9a02bfc82c3a6604fae0dd4` (13.47 seconds), then passed on
+`e538a40306759cb13dec0e432ed3ea875410c589` (14.54 seconds). Each run matched all
+2,644 frozen source hashes and completed cleanup. The final assembled selection
+passed at `7fcc30fd0bd4d1896cbe843d555f37b2b211767c` (14.55 seconds; race package
+15.603 seconds), with all 2,652 hashes matching its Git archive, unchanged source,
+exit zero and no cleanup failures. The native test checks the original expired
+negative watermark, older replay without new spend/freshness and a blocked
+restrictive write under the caller's original 50 ms deadline. Existing source
+claim, unknown reply, concurrency, joined completion and exhaustion assertions
+remain selected.
+
+The [failing report](../test/results/context-query-stale-negative-failing-1/fleet-environment.json),
+[first passing report](../test/results/context-query-stale-negative-passing-1/fleet-environment.json)
+and [final assembled report](../test/results/context-query-stale-negative-assembled-1/fleet-environment.json)
+retain exact source manifests; their sibling logs and verification records
+retain outcomes and independent archive comparisons. The final report SHA-256 is
+`c535b51c280c3fdc747074d3d62caf66b2b247fca036223c8246ff1a2cebaaff`.
+
+CI on the preceding `4157b8c` candidate failed its evidence-package shard because
+one synthetic worker fixture omitted the newly mandatory ephemeral-storage
+dimension. The final freeze adds that fixture's original 4 MiB value; it changes
+no production limit. The complete evidence-package race suite then passed in
+3.857 seconds ([log](../test/results/context-query-stale-negative-assembled-1/evidence-race.log)).
+Touched PostgreSQL/integration vet and Go/specification/architecture gates also
+passed for the correction. The full ledger qualification below remains evidence
+for `51fd2e9`; it was not repeated for this restrictive adapter-only correction.
+
+Query resource/history measurements and independent native deployment guards
+remain synthetic. These component results do not qualify installed query
+authority, protected issuer/runtime composition, public disclosure or a later
+source tree. No public tool or Helm runtime capability is enabled.
+
 ## Query source attempts: native pre-I/O accounting qualification (2026-10-18)
 
 Separate fresh PostgreSQL/S3 fixtures tested frozen
