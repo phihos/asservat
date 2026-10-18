@@ -72,7 +72,7 @@ class BootstrapSelection(unittest.TestCase):
         self.assertNotIn("ASSERVAT_INITIAL_RUNTIME_PROVIDER_WORKER", selected)
         stale = fixture.qualification_environment({"ASSERVAT_INSTALLER_CONTINUATION": "1"}, Path("fixture"), Path("work"), False, False, True, runtime_provider_pair=True)
         self.assertNotIn("ASSERVAT_INSTALLER_CONTINUATION", stale)
-        self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "38m")
+        self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "50m")
 
     def test_owner_only_aggregate_timeout_keeps_existing_modes(self):
         self.assertIsNone(fixture.qualification_go_timeout())
