@@ -24,7 +24,8 @@ import (
 // reads the hub's published offer and installed owner input, checks the
 // region's join record against both and with the hub-api's own connector
 // profile decoding, and writes the slot's guarded capability and work-trust
-// sources, its retention topology and the catalog entry. Every value is an
+// sources, its retention topology and the catalog entry, then, with a path
+// template, the cluster's download path (ADR-204). Every value is an
 // administrator assertion checked again at runtime; a wrong entry fails
 // closed at the first connection.
 func RunInstallerClusterJoin(ctx context.Context, args []string, out io.Writer) error {
@@ -87,11 +88,39 @@ func RunInstallerClusterJoin(ctx context.Context, args []string, out io.Writer) 
 		return err
 	}
 	topology.Hub = contracts.RetentionPolicySource{ClusterID: offer.HubClusterID, ControlNamespaceUID: owner.Namespace.UID, ProtectionSHA256: hex.EncodeToString(digest[:])}
-	joined, err := kube.JoinRegionalCluster(ctx, config, kube.ClusterJoinPlan{Control: control, Installation: join.InstallationID, Slot: 1, Admins: admins, Catalog: owner.Public.ClusterCatalog.Source, Topology: topology, Entry: entry})
+	downloads, err := regionalJoinDownloads(owner, entry)
+	if err != nil {
+		return err
+	}
+	joined, err := kube.JoinRegionalCluster(ctx, config, kube.ClusterJoinPlan{Control: control, Installation: join.InstallationID, Slot: 1, Admins: admins, Catalog: owner.Public.ClusterCatalog.Source, Topology: topology, Entry: entry, Downloads: downloads})
 	if err != nil {
 		return err
 	}
 	return json.NewEncoder(out).Encode(joined)
+}
+
+// regionalJoinDownloads is the joined cluster's derived download path
+// (ADR-204 decision 4), from the owner input's path template, and the guarded
+// sources it joins. The hub-api derives it for every catalog cluster. The
+// capacity hub-worker derives it only for clusters with a regional capacity
+// qualification, which the hub-api records from an entry's capacity section
+// (ADR-197), so the processing source gains the path only with that section:
+// otherwise the capacity hub-worker would never accept that source again.
+// Without a template the join is unchanged.
+func regionalJoinDownloads(owner contracts.OwnerDeployment, entry contracts.OwnerPublicCluster) (*kube.ClusterJoinDownloads, error) {
+	e := owner.Public.DownloadEnvironment
+	if e.PathTemplate == nil {
+		return nil, nil
+	}
+	if _, err := downloadEnvironmentPaths(owner.InstallationID, owner.ClusterID, []contracts.DownloadEnvironmentPath{}, e.PathTemplate, []string{entry.ClusterID}); err != nil || !capacityRuntimeReference(e.Source) {
+		return nil, mounts.ErrUnavailable
+	}
+	out := &kube.ClusterJoinDownloads{RootID: owner.PermissionRootID, Path: contracts.DownloadPathFor(owner.InstallationID, *e.PathTemplate, entry.ClusterID), Sources: []contracts.WorkerObjectReference{e.Source}}
+	if entry.Capacity != nil {
+		_, _, _, processing, _ := kube.CapacitySourceNames(owner.InstallationID)
+		out.Sources = append(out.Sources, contracts.WorkerObjectReference{Name: processing})
+	}
+	return out, nil
 }
 
 // regionalJoinEntry checks the join record against the offer and the owner

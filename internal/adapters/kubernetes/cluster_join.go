@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"slices"
 	"strings"
 	"time"
 
@@ -34,6 +35,19 @@ type ClusterJoinPlan struct {
 	// Entry carries the cluster, connector, executor, limits, capability
 	// settings and trust; the join fills its source references and pin.
 	Entry contracts.OwnerPublicCluster
+	// Downloads, when set, adds the slot's derived download path after the
+	// catalog entry (ADR-204 decision 4).
+	Downloads *ClusterJoinDownloads
+}
+
+// ClusterJoinDownloads is the slot's derived download path and the guarded
+// download environment sources it joins: the hub-api's, pinned by UID in the
+// owner input, and, with regional capacity, the capacity processing source,
+// which only its fixed name identifies (empty UID).
+type ClusterJoinDownloads struct {
+	RootID  string
+	Path    contracts.DownloadEnvironmentPath
+	Sources []contracts.WorkerObjectReference
 }
 
 // OwnerInputs reads the installed owner deployment input, the hub's record of
@@ -78,12 +92,23 @@ func ReadRegionalOffer(ctx context.Context, config *rest.Config, namespace, inst
 
 // JoinRegionalCluster creates the slot's guarded capability and work-trust
 // sources and its topology, create-only with exact reopen, then appends the
-// entry to the guarded catalog by resourceVersion CAS. The catalog write is
-// last: it makes the hub-api restart its process to read the new entry.
+// entry to the guarded catalog by resourceVersion CAS. The catalog write
+// makes the hub-api restart its process to read the new entry; only the
+// optional download path additions follow it.
 func JoinRegionalCluster(ctx context.Context, config *rest.Config, p ClusterJoinPlan) (contracts.OwnerPublicCluster, error) {
 	e := p.Entry
 	if ctx == nil || config == nil || p.Slot < 1 || p.Slot > contracts.OwnerClusterCatalogSlots || len(p.Admins) == 0 || !authorization.UUID(p.Control.UID) || !authorization.UUID(p.Catalog.UID) || !authorization.UUID(e.ClusterID) || p.Topology.TargetClusterID != e.ClusterID {
 		return e, cfg.ErrInvalid
+	}
+	if d := p.Downloads; d != nil {
+		if !authorization.UUID(d.RootID) || !authorization.UUID(d.Path.ID) || d.Path.TargetClusterID != e.ClusterID || len(d.Sources) < 1 || len(d.Sources) > 2 {
+			return e, cfg.ErrInvalid
+		}
+		for i, s := range d.Sources {
+			if s.Name == "" || (s.UID != "" && !authorization.UUID(s.UID)) || slices.ContainsFunc(d.Sources[:i], func(v contracts.WorkerObjectReference) bool { return v.Name == s.Name }) {
+				return e, cfg.ErrInvalid
+			}
+		}
 	}
 	api, err := installerAPI(config)
 	if err != nil {
@@ -120,7 +145,75 @@ func JoinRegionalCluster(ctx context.Context, config *rest.Config, p ClusterJoin
 	}
 	sum := sha256.Sum256(canonical)
 	e.Topology = contracts.OwnerNativeTopology{TargetClusterID: e.ClusterID, Name: object.Name, UID: object.UID, SHA256: hex.EncodeToString(sum[:])}
-	return e, appendCatalogEntry(call, api, p, e)
+	if err = appendCatalogEntry(call, api, p, e); err != nil {
+		return e, err
+	}
+	// The path follows the entry: a source path is accepted only once the
+	// restarted hub-api derives it from the catalog, so the reverse order
+	// would fail the current source closed until the restart.
+	if d := p.Downloads; d != nil {
+		for _, source := range d.Sources {
+			if err = addDownloadPath(call, api, p.Control.Name, source, d.RootID, p.Installation, d.Path); err != nil {
+				return e, err
+			}
+		}
+	}
+	return e, nil
+}
+
+// addDownloadPath adds one derived path to a guarded download environment
+// source by resourceVersion CAS, as an administrator does: the path, its ID
+// in every client's PathIDs and the next revision. Operators name no paths.
+// A source already holding the equal path in every client is an exact rerun
+// and is not written; another path with that ID refuses.
+func addDownloadPath(ctx context.Context, api kubernetes.Interface, namespace string, source contracts.WorkerObjectReference, root, installation string, path contracts.DownloadEnvironmentPath) error {
+	configMaps := api.CoreV1().ConfigMaps(namespace)
+	for range 3 {
+		c, err := configMaps.Get(ctx, source.Name, meta.GetOptions{})
+		if err != nil || !authorization.UUID(string(c.UID)) || (source.UID != "" && string(c.UID) != source.UID) || len(c.Data) != 1 {
+			return cfg.ErrUnavailable
+		}
+		var s contracts.DownloadEnvironmentSettings
+		if strictGuardJSON([]byte(c.Data[contracts.DownloadEnvironmentFile]), &s) != nil || s.Format != contracts.DownloadEnvironmentFormat || s.RootID != root || s.InstallationID != installation || s.Paths == nil || s.Clients == nil {
+			return cfg.ErrInvalid
+		}
+		changed := false
+		switch i := slices.IndexFunc(s.Paths, func(v contracts.DownloadEnvironmentPath) bool { return v.ID == path.ID }); {
+		case i >= 0 && s.Paths[i] != path:
+			return cfg.ErrChanged
+		case i < 0:
+			if len(s.Paths) >= 32 {
+				return cfg.ErrUnavailable
+			}
+			s.Paths, changed = append(s.Paths, path), true
+		}
+		for i := range s.Clients {
+			if !slices.Contains(s.Clients[i].PathIDs, path.ID) {
+				if len(s.Clients[i].PathIDs) >= 32 {
+					return cfg.ErrUnavailable
+				}
+				s.Clients[i].PathIDs, changed = append(s.Clients[i].PathIDs, path.ID), true
+			}
+		}
+		if !changed {
+			return nil
+		}
+		if s.Revision < 1 || s.Revision >= 2147483647 {
+			return cfg.ErrInvalid
+		}
+		s.Revision++
+		raw, err := json.Marshal(s)
+		if err != nil || len(raw) > contracts.DownloadEnvironmentMaxBytes {
+			return cfg.ErrInvalid
+		}
+		c.Data[contracts.DownloadEnvironmentFile] = string(raw)
+		if _, err = configMaps.Update(ctx, c, meta.UpdateOptions{}); err == nil {
+			return nil
+		} else if !apierrors.IsConflict(err) {
+			return cfg.ErrUnavailable
+		}
+	}
+	return cfg.ErrUnavailable
 }
 
 func ensureGuardedSource(ctx context.Context, api kubernetes.Interface, p ClusterJoinPlan, name, key string, data []byte, build func(cfg.ConfigMapAdministration) (*admission.ValidatingAdmissionPolicy, *admission.ValidatingAdmissionPolicyBinding, error)) (contracts.OwnerPublicGuardedSource, error) {

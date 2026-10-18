@@ -287,7 +287,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		var closers []func()
 		a := parts.audit
 		phase = startupPublicDownloads
-		d.publicDownloads, err = newPublicDownloads(startup, d, observer, probe, a, &closers)
+		d.publicDownloads, err = newPublicDownloads(startup, d, observer, probe, catalog, a, &closers)
 		if err == nil {
 			phase = startupPublicHandler
 			d.publicHandler, err = newPublicHandler(startup, d, a, &app.OwnerAuthenticator{Registry: ledgers["registry"], Routes: routes, Protection: guard, Now: time.Now}, &closers)

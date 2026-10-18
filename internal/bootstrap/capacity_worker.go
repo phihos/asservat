@@ -233,14 +233,6 @@ func newCapacityWorkerDeployment(ctx context.Context, files *os.Root, installed 
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	paths, err := capacityRuntimeProcessingPaths(c.Processing.Paths)
-	if err != nil {
-		return nil, err
-	}
-	processing, err := kube.NewDownloadEnvironmentSource(observer, processingGuard, c.Processing.Source.Name, c.Processing.Source.UID, c.PermissionRootID, c.InstallationID, paths)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
 	at = "clusters"
 	clusters := make([]app.CapacityClusterReaders, 0, len(c.Clusters))
 	var regional []app.CapacityNamespaceQualification
@@ -270,6 +262,17 @@ func newCapacityWorkerDeployment(ctx context.Context, files *os.Root, installed 
 			}
 			clusters = append(clusters, app.CapacityClusterReaders{ClusterID: v.ClusterID, Workloads: read, Guard: g})
 		}
+	}
+	// ADR-204 decision 4: one derived path per regional cluster read above,
+	// the same paths as the hub-api's; a changed set restarts this child.
+	at = "processing-paths"
+	paths, err := downloadEnvironmentPaths(c.InstallationID, c.Control.ClusterID, c.Processing.Paths, c.Processing.PathTemplate, regionalTargets(regional))
+	if err != nil {
+		return nil, err
+	}
+	processing, err := kube.NewDownloadEnvironmentSource(observer, processingGuard, c.Processing.Source.Name, c.Processing.Source.UID, c.PermissionRootID, c.InstallationID, paths)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
 	}
 	at = "sql-adapters"
 	journal, err := postgres.NewCapacitySourceJournal(startup, pools["capacity"], c.PermissionRootID, c.InstallationID, q.ID, q.Digest)
