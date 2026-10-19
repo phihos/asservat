@@ -1,5 +1,24 @@
 # Sustained implementation progress
 
+## Installed native 64: audits fast; previews wait for storage or find no standby (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39249314109)
+on frozen `47067a747a5182d76332f249e3dd47a02e732d2d` failed at preview, all
+attempts `NotAvailable` and retryable. Each operation audit now takes under
+250 ms, so ADR-208's audit credential change took effect. The first preview
+resolved its target and then spent the rest of its five seconds in
+`awaitStorage`: a cold storage binding needs a capacity demand refresh, which
+took about 2.5 s, before eligibility met an expired request. The other attempts
+found no idle standby (`router`). The region held one exchange per hub owner;
+over the journey window it had three standbys of at most 30 s, each reopened
+one second after ending and often after several refused attempts. ADR-209 now
+allows two exchanges per owner within the hub's existing per-cluster standby
+limit. Native 63's unexpected public code did not recur.
+
+[Archive verification](../test/results/installed-journey-ci-64/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 63: preview answers quickly with an unexpected public code (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39245953884)

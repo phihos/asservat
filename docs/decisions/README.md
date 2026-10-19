@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-209 — Two context-start standbys per hub owner](209-two-context-start-standbys-per-owner.md)
+lets the region hold two exchanges per hub owner within the hub's existing
+per-cluster standby limit; checks, deadlines and residency are unchanged and
+installed qualification is pending.
+
 [ADR-208 — Opening limiter for context-start Kubernetes clients](208-context-opening-client-burst.md)
 gives only the dedicated opening clients and the hub's audit credential reader
 50 QPS/burst 100 (from 20/20); checks and deadlines are unchanged and installed
