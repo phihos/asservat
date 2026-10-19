@@ -60,6 +60,14 @@ reproduction after native 68). Every preview reads that source twice inside
 its five seconds. The follower now has its own observer and probe clients with
 the opening limiter; observation content and freshness bounds are unchanged.
 
+## Extension to regional capacity observation
+
+The hub-worker's v2 regional observation clients serve both regional
+discovery and the ADR-200 demand lane. A guarded demand read took 2.6–3.7 s
+against the binding's five seconds, so a refreshed binding had about 2 s left
+and previews waited for it. Those two clients now use the opening limiter;
+the observations and their bounds are unchanged.
+
 ## Alternatives
 
 - Raising QPS (as the configuration worker's 40 QPS observer) increases
