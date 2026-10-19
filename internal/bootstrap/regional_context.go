@@ -108,13 +108,35 @@ func storageCredentials(in *providerInputs, name string) aws.CredentialsProvider
 }
 
 // newRegionalContext builds every input that does not need an enrolled
-// process. observer/probe are the regional account's own clients.
-func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in *providerInputs, podUID string, observer, probe *kube.PermissionClient, source *kube.ConnectorIdentitySource, guard *kube.OwnerWorkloadProtection, owners *RegionalLifecycle, credentials *mtls.ConnectorProcessCredentials) (*regionalContext, []func(), error) {
+// process. Like regional capacity, its observer/probe are its own instances of
+// the regional account's identities, each with its own fixed 20 QPS limiter:
+// sharing the lifecycle/source client let other regional reads starve the
+// opening setup's original five seconds (installed native 53).
+func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in *providerInputs, podUID string, workload cfg.OwnerWorkloadAdministration, sourcePlan cfg.ConfigMapAdministration, binding value.PeerBinding, owners *RegionalLifecycle, credentials *mtls.ConnectorProcessCredentials) (*regionalContext, []func(), error) {
 	var closers []func()
 	a := *c.APIContext
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+	observer, err := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	guard, err := kube.NewOwnerWorkloadProtection(observer, probe, workload, regionalPin(c.WorkloadGuard))
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	protection, err := kube.NewConnectorIdentityProtection(observer, probe, sourcePlan, regionalPin(c.SourceGuard))
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	source, err := kube.NewConnectorIdentitySource(observer, protection, c.Source.Name, c.Source.UID, c.PermissionRootID, binding)
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
 	out := &regionalContext{c: a, rootID: c.PermissionRootID, owners: owners, source: source}
-	var err error
 	if out.pool, err = regionalOwnerPool(c, a.Owners.Configuration); err != nil {
 		return nil, closers, err
 	}
