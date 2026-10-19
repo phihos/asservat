@@ -797,7 +797,11 @@ func installShippedPermissionCRDs(t *testing.T, ctx context.Context, api kuberne
 }
 
 // nativeCapacityProfile is the operator's synthetic capacity profile; its
-// footprints and sizes mirror the capacity SQL fixture (ADR-190).
+// footprints and sizes mirror the capacity SQL fixture (ADR-190). Each
+// sixty-second root renewal spends one processing root transition and one
+// configuration transition for the installation's lifetime, so both budgets
+// cover the journey plus a local hold (about 150 renewals); 8 and 100
+// expired the processing root about nine minutes after install (local hold 10).
 func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	f := func(row, wal int64) contracts.InstallerCapacityFootprint {
 		return contracts.InstallerCapacityFootprint{RowBytes: row, TransitionWALBytes: wal}
@@ -811,8 +815,8 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
 		Footprints:          contracts.InstallerCapacityFootprints{Capture: f(128<<10, 256<<10), Operation: f(128<<10, 256<<10), Processing: f(128<<10, 256<<10), Native: f(64<<10, 128<<10), Stop: f(128<<10, 256<<10), ProcessingState: f(16<<10, 64<<10)},
 		PurgeLeases:         4,
-		Processing:          contracts.InstallerCapacityProcessing{MaxRules: 2, MaxRootTransitions: 8},
-		Metadata:            contracts.InstallerCapacityMetadata{FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, ConfigurationTransitions: 100},
+		Processing:          contracts.InstallerCapacityProcessing{MaxRules: 2, MaxRootTransitions: 512},
+		Metadata:            contracts.InstallerCapacityMetadata{FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, ConfigurationTransitions: 4096},
 		Envelope:            contracts.InstallerCapacityEnvelope{SystemObjects: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1 << 50}, SQLBytes: 1 << 50, BackupBytes: 1 << 50, WALBytes: 1 << 50, KeyAttempts: 1 << 50},
 		Backends:            []contracts.InstallerCapacityBackend{{StorageProfile: "dedicated", Usable: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1000000000}}}}
 }

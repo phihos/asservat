@@ -1,5 +1,34 @@
 # Sustained implementation progress
 
+## Local holds 7–10: regional limiter, then the processing root budget (2026-10-20)
+
+Hold 7 (`bd2b244`) split the remaining time. The region's target answer spent
+1–3 s in the connector's local proof (`r-local`), and every capacity refresh
+spent 2.16–2.25 s in the claim (`c-post`, owner `observe`). The region's
+kube-apiserver answered non-watch requests in about 1 ms on average, while one
+regional capacity cycle makes about 63 calls on 20 QPS / burst 20 clients
+(≈2.15 s of limiter waits). ADR-208 now covers the regional capacity and
+lifecycle clients (`0c25531`). Hold 10 measured `r-local` under 100 ms,
+`q-answer` about 0.9 s, every target query `ok`, and capacity refreshes of
+1.9–2.3 s.
+
+Hold 10's previews then refused at `processing/read/root-invalid` and
+`processing/current`. Live SQL showed the cause: every sixty-second capacity
+root renewal spends one processing `root_transitions` (lifetime, never
+reclaimed) and one `configuration_spent`. The journey profile set
+`MaxRootTransitions: 8` and `ConfigurationTransitions: 100`, so the ninth
+renewal failed `processing_root_check3` (100 logged attempts) and the processing
+root expired about nine minutes after install; `configuration_spent` was 81.
+CI native 75 (`0c25531`, run 39336623616) refused at the same step. The journey
+profile now sizes both for about 150 renewals (512 / 4096), and the root loop
+logs its outcome per change (`capacity root:`); it was discarded before.
+
+Holds 8 and 9 stopped during install (owner exit after `provider refresh:
+audit-wrap final-proof`, and `public/roles-provision ... (changed)`) while
+another session loaded the host; both are hub-side and unrelated to the
+regional change. Each hold allows about seven previews: the installed
+per-account audit record budget then refuses `audit-begin/reserve`.
+
 ## Local journey holds 4–6: claim and regional answer dominate (2026-10-19)
 
 Hold 4 produced no previews: the collector read hold 3's stale `out` file

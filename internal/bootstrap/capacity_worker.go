@@ -306,7 +306,7 @@ func newCapacityWorkerDeployment(ctx context.Context, files *os.Root, installed 
 	}
 	d.reconciler = &app.CapacityReconciler{Source: &app.CapacitySourceObserver{RootID: c.PermissionRootID, InstallationID: c.InstallationID, QualificationID: q.ID, QualificationDigest: q.Digest, Source: source, Protection: guard, Recovery: journal, Journal: journal, Now: time.Now},
 		Work: &app.CapacityWorkReconciler{Qualification: q, Recovery: journal, Permissions: permissions, Processing: processing, Root: &app.RootBackingCoordinator{Store: general, Capture: capture, Now: time.Now}, Enrollment: &app.EnrollmentCoordinator{Store: enroll, Capture: captureEnroll, Accounts: accounts, Now: time.Now}, Bindings: enroll, Now: time.Now, Regional: regional}, Clusters: clusters,
-		SourceReport: capacitySourceReporter(),
+		SourceReport: capacitySourceReporter("capacity source: "), RootReport: capacitySourceReporter("capacity root: "),
 		Demands:      demands, DemandReport: capacityDemandReporter(),
 		DemandContext: func(ctx context.Context) (context.Context, func() string) {
 			ctx, marks := auditapp.WithStepTimes(ctx)
@@ -369,15 +369,15 @@ func (d *CapacityWorkerDeployment) Close() {
 	})
 }
 
-// capacitySourceReporter logs one line per change of the source loop's
-// outcome (ADR-197 CI continuation run 18b). The loop is serial, so the
-// closure needs no lock.
-func capacitySourceReporter() func(error) {
+// capacitySourceReporter logs one line per change of a serial loop's outcome
+// (ADR-197 CI continuation run 18b; the root loop since local hold 10). Each
+// loop is serial, so the closure needs no lock.
+func capacitySourceReporter(prefix string) func(error) {
 	last := "ok"
 	return func(err error) {
 		if outcome := regionalOutcome(err); outcome != last {
 			last = outcome
-			fmt.Fprintln(os.Stderr, "capacity source: "+outcome)
+			fmt.Fprintln(os.Stderr, prefix+outcome)
 		}
 	}
 }
