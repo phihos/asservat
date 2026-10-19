@@ -2,6 +2,7 @@ package privacy
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -36,18 +37,23 @@ func (r RetentionResolver) Resolve(ctx context.Context, in value.Input) (value.R
 	defer cancel()
 	set, err := r.Policies.RetentionPolicies(ctx, in.Target)
 	if err != nil || ctx.Err() != nil {
-		return value.Resolution{}, policyReadError{}
+		step := "other"
+		var s readStepError
+		if errors.As(err, &s) {
+			step = s.step
+		}
+		return value.Resolution{}, policyReadError{step}
 	}
 	return value.Resolve(set, in, r.Now())
 }
 
 // policyReadError is ErrUnavailable from the current policy read, as opposed
 // to the domain resolution; only diagnostics distinguish them.
-type policyReadError struct{}
+type policyReadError struct{ step string }
 
-func (policyReadError) Error() string       { return value.ErrUnavailable.Error() }
-func (policyReadError) Unwrap() error       { return value.ErrUnavailable }
-func (policyReadError) RetentionRead() bool { return true }
+func (policyReadError) Error() string           { return value.ErrUnavailable.Error() }
+func (policyReadError) Unwrap() error           { return value.ErrUnavailable }
+func (e policyReadError) RetentionRead() string { return e.step }
 
 // ResolveRetained consumes original ledger facts and current parent obligations.
 // Public callers cannot supply their own older/newer lifetime or classification.

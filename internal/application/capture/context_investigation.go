@@ -446,9 +446,13 @@ func (s ContextInvestigation) awaitStorage(ctx context.Context, target targets.P
 
 // retentionFailure names a closed retention failure class for diagnostics.
 func retentionFailure(err error) string {
-	var read interface{ RetentionRead() bool }
+	var read interface{ RetentionRead() string }
 	switch {
 	case errors.As(err, &read):
+		switch step := read.RetentionRead(); step {
+		case "topology", "source-hub", "source-region", "selector-limit", "selectors-absent", "selectors", "final-topology", "final-sources", "final-source", "fresh":
+			return "read/" + step
+		}
 		return "read"
 	case errors.Is(err, privacy.ErrInvalid):
 		return "invalid"

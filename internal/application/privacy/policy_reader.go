@@ -51,7 +51,7 @@ func (r AcceptedRetentionReader) read(ctx context.Context, t authorization.Targe
 	defer cancel()
 	topology, err := r.Topology.RetentionTopology(ctx, t.ClusterID)
 	if err != nil || !topology.Valid(r.Now()) || topology.TargetClusterID != t.ClusterID {
-		return out, value.ErrUnavailable
+		return out, readStep("topology")
 	}
 	topology.Sources = slices.Clone(topology.Sources)
 	// Stable order is independent of the configuration's source array order.
@@ -83,7 +83,10 @@ func (r AcceptedRetentionReader) read(ctx context.Context, t authorization.Targe
 	for _, ref := range topology.Sources {
 		s, err := source(ref)
 		if err != nil {
-			return out, err
+			if ref.Hub {
+				return out, readStep("source-hub")
+			}
+			return out, readStep("source-region")
 		}
 		observed = identity.Earlier(observed, identity.Earlier(s.ObservedAt, s.Snapshot.ObservedAt))
 		until = identity.Earlier(until, identity.Earlier(s.FreshUntil, s.Snapshot.FreshUntil))
@@ -109,16 +112,16 @@ func (r AcceptedRetentionReader) read(ctx context.Context, t authorization.Targe
 	slices.Sort(workloadKeys)
 	workloadKeys = slices.Compact(workloadKeys)
 	if len(namespaceKeys) > 64 || len(workloadKeys) > 64 {
-		return out, value.ErrUnavailable
+		return out, readStep("selector-limit")
 	}
 	facts := value.SelectorFacts{Target: t, Revision: identity.Revision{UID: topology.Revision.UID, Generation: topology.Revision.Generation, Digest: stableDigest(t)}, ObservedAt: observed, FreshUntil: until}
 	if len(namespaceKeys)+len(workloadKeys) > 0 {
 		if r.Selectors == nil {
-			return out, value.ErrUnavailable
+			return out, readStep("selectors-absent")
 		}
 		facts, err = r.Selectors.ProtectedRetentionSelectors(ctx, t, slices.Clone(namespaceKeys), slices.Clone(workloadKeys))
 		if err != nil || !facts.Valid(r.Now()) || facts.Target != t {
-			return out, value.ErrUnavailable
+			return out, readStep("selectors")
 		}
 	}
 	sourceUntil := until
@@ -137,7 +140,7 @@ func (r AcceptedRetentionReader) read(ctx context.Context, t authorization.Targe
 	// cannot be combined with policies from an older read. Never freshen old input.
 	final, err := r.Topology.RetentionTopology(ctx, t.ClusterID)
 	if err != nil || !final.Valid(r.Now()) || final.RootID != topology.RootID || final.TargetClusterID != topology.TargetClusterID || final.Revision != topology.Revision {
-		return out, value.ErrUnavailable
+		return out, readStep("final-topology")
 	}
 	final.Sources = slices.Clone(final.Sources)
 	slices.SortFunc(final.Sources, func(a, b value.PolicySourceRef) int {
@@ -150,18 +153,18 @@ func (r AcceptedRetentionReader) read(ctx context.Context, t authorization.Targe
 		return 0
 	})
 	if !slices.Equal(final.Sources, topology.Sources) {
-		return out, value.ErrUnavailable
+		return out, readStep("final-sources")
 	}
 	until = identity.Earlier(until, final.FreshUntil)
 	for _, p := range points {
 		s, err := source(p.Source)
 		if err != nil || s.Epoch != p.Epoch || s.Acceptance != p.Acceptance || s.Snapshot.Revision != p.Snapshot {
-			return out, value.ErrUnavailable
+			return out, readStep("final-source")
 		}
 		until = identity.Earlier(until, identity.Earlier(s.FreshUntil, s.Snapshot.FreshUntil))
 	}
 	if ctx.Err() != nil || !identity.Fresh(observed, until, r.Now(), 5*time.Second) {
-		return out, value.ErrUnavailable
+		return out, readStep("fresh")
 	}
 	slices.SortFunc(origins, func(a, b artifact.RetentionRule) int {
 		if a.UID < b.UID {
@@ -189,3 +192,12 @@ func (r AcceptedRetentionReader) read(ctx context.Context, t authorization.Targe
 	}
 	return value.PolicySet{Target: t, Revision: revision, ObservedAt: observed, FreshUntil: until, Complete: true, Policies: policies, Proof: proof}, nil
 }
+
+// readStepError is ErrUnavailable with the closed step where an accepted
+// policy read stopped, for diagnostics only.
+type readStepError struct{ step string }
+
+func readStep(step string) error              { return readStepError{step} }
+func (e readStepError) Error() string         { return value.ErrUnavailable.Error() }
+func (e readStepError) Unwrap() error         { return value.ErrUnavailable }
+func (e readStepError) RetentionStep() string { return e.step }

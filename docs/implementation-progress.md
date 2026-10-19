@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Installed native 66: openings to unserved owners starve the live opening (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39257553144)
+on frozen `0aa44cc03c4ee5fe1455a298cb52d26709e8af7d` failed at preview: one cold
+attempt ran out of time at eligibility and three found no idle standby. Only
+two regional exchanges opened. Openings to the live owner mostly refused at
+`setup-begin` within 10 ms–2.4 s and without a setup trace, while openings to
+registered owner processes the hub no longer serves (after the test's hub
+restart) were refused at TLS 32 or more times (`unknown-name` on the hub). Each
+of those runs a full connector setup proof first, and concurrent openings share
+one coalesced proof whose failure or invalidation fails every waiter. After a
+TLS refusal the region now waits thirty seconds before trying that owner again;
+other ends keep the one-second retry, and every opening check is unchanged.
+Retention steps for a failed accepted-policy read are also named now. The local
+Go gate for this commit passed.
+
+[Archive verification](../test/results/installed-journey-ci-66/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 65: ADR-209 withdrawn; retention refuses after eligibility (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39253398865)

@@ -194,13 +194,17 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 	type connection struct{ cancel context.CancelFunc }
 	active := make(map[fleetvalue.OwnerBinding]connection)
 	next := make(map[fleetvalue.OwnerBinding]time.Time)
-	ended := make(chan fleetvalue.OwnerBinding, 16)
+	type end struct {
+		owner fleetvalue.OwnerBinding
+		retry time.Duration
+	}
+	ended := make(chan end, 16)
 	defer func() {
 		for _, c := range active {
 			c.cancel()
 		}
 		for len(active) > 0 {
-			delete(active, <-ended)
+			delete(active, (<-ended).owner)
 		}
 	}()
 	ticker := time.NewTicker(time.Second)
@@ -241,8 +245,10 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 			owner := owner
 			go func() {
 				defer cancel()
-				defer func() { ended <- owner }()
+				retry := time.Second
+				defer func() { ended <- end{owner, retry} }()
 				exchange, e := s.Client.OpenDiscovered(call, owner, observed)
+				retry = openingRetry(e)
 				if e == nil {
 					if e = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local); e != nil {
 						s.reportFailure("exchange", e)
@@ -258,12 +264,25 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case owner := <-ended:
-			delete(active, owner)
-			next[owner] = s.Local.Now().Add(time.Second)
+		case e := <-ended:
+			delete(active, e.owner)
+			next[e.owner] = s.Local.Now().Add(e.retry)
 		case <-ticker.C:
 			poll()
 		}
 	}
 	return ctx.Err()
+}
+
+// openingRetry is one second, or thirty after a TLS refusal: a registered
+// owner process the hub no longer serves (for example before a restart) is
+// refused at TLS each time, and its full setup proof shares the connector's
+// coalesced proof with the live owner's opening (installed native 66). The
+// owner set, every check and the next opening's bounds are unchanged.
+func openingRetry(err error) time.Duration {
+	var fixed interface{ FixedStep() string }
+	if err != nil && errors.As(err, &fixed) && fixed.FixedStep() == "tls" {
+		return 30 * time.Second
+	}
+	return time.Second
 }

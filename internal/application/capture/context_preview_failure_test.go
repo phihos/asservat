@@ -133,3 +133,17 @@ func TestRetentionFailureClassesAreClosed(t *testing.T) {
 		}
 	}
 }
+
+type retentionReadFixture string
+
+func (retentionReadFixture) Error() string           { return "read" }
+func (e retentionReadFixture) RetentionRead() string { return string(e) }
+
+func TestRetentionReadStepsAreClosed(t *testing.T) {
+	if got := retentionFailure(retentionReadFixture("source-region")); got != "read/source-region" {
+		t.Fatal(got)
+	}
+	if got := retentionFailure(retentionReadFixture("private-text")); got != "read" {
+		t.Fatal("unknown read step must not be copied:", got)
+	}
+}
