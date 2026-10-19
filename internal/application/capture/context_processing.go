@@ -2,6 +2,7 @@ package capture
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -27,10 +28,22 @@ func (s ContextInvestigation) processingCoverage(ctx context.Context, p value.Co
 		return value.ProcessingCoverage{}, previewFailure("processing/current", value.ErrUnavailable)
 	}
 	if err != nil {
-		return value.ProcessingCoverage{}, previewFailure("processing/read", err)
+		return value.ProcessingCoverage{}, previewFailure("processing/read"+processingReadStep(err), err)
 	}
 	if o.Request != r || o.FreshUntil.After(until) || !o.Current(s.Now()) {
 		return value.ProcessingCoverage{}, previewFailure("processing/proof", value.ErrUnavailable)
 	}
 	return o, nil
+}
+
+// processingReadStep appends a closed coverage-read step for diagnostics.
+func processingReadStep(err error) string {
+	var step interface{ ProcessingStep() string }
+	if errors.As(err, &step) {
+		switch s := step.ProcessingStep(); s {
+		case "root", "rules", "root-changed", "fresh", "fresh-after", "root-invalid", "coverage", "current", "recovery-lock", "recovery-check", "expired":
+			return "/" + s
+		}
+	}
+	return ""
 }

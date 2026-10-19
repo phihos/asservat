@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"time"
 
@@ -57,33 +58,39 @@ func readProcessingCaptureCoverage(ctx context.Context, q *custodydb.Queries, in
 	var zero value.ProcessingCoverage
 	p, err := q.ReadProcessingRoot(ctx, id(in.RootID))
 	if err != nil {
-		return zero, value.ErrUnavailable
+		return zero, coverageStep("root")
 	}
 	rules, err := q.ReadProcessingRules(ctx, id(in.RootID))
 	if err != nil {
-		return zero, value.ErrUnavailable
+		return zero, coverageStep("rules")
 	}
 	last, err := q.ReadProcessingRoot(ctx, id(in.RootID))
 	if err != nil || !reflect.DeepEqual(last, p) {
-		return zero, value.ErrUnavailable
+		return zero, coverageStep("root-changed")
 	}
 	n, err := q.CurrentTime(ctx)
 	if err != nil || ctx.Err() != nil || !recovery.Valid(n.Time) || !identity.Fresh(started, until, n.Time, 5*time.Second) {
-		return zero, value.ErrUnavailable
+		return zero, coverageStep("fresh")
 	}
 	coverageErr := processingCaptureCoverage(last, rules, in, recovery.InstallationID, recovery.IssuerEpoch, n.Time)
 	// A bounded full inventory decode can cross the original cutoff too. Do not
 	// classify an expired observation as a current known coverage limitation.
 	n, err = q.CurrentTime(ctx)
-	if err != nil || ctx.Err() != nil || !recovery.Valid(n.Time) || !identity.Fresh(started, until, n.Time, 5*time.Second) || !processingRootValid(last, recovery.InstallationID, n.Time) {
-		return zero, value.ErrUnavailable
+	if err != nil || ctx.Err() != nil || !recovery.Valid(n.Time) || !identity.Fresh(started, until, n.Time, 5*time.Second) {
+		return zero, coverageStep("fresh-after")
+	}
+	if !processingRootValid(last, recovery.InstallationID, n.Time) {
+		return zero, coverageStep("root-invalid")
 	}
 	if coverageErr != nil {
+		if errors.Is(coverageErr, value.ErrUnavailable) {
+			return zero, coverageStep("coverage")
+		}
 		return zero, coverageErr
 	}
 	o := value.ProcessingCoverage{Request: in, ObservedAt: started, FreshUntil: identity.Earlier(until, p.ValidUntil.Time)}
 	if !o.Current(n.Time) {
-		return zero, value.ErrUnavailable
+		return zero, coverageStep("current")
 	}
 	return o, nil
 }
@@ -103,14 +110,14 @@ func (s *ProcessingReads) ContextProcessingCoverage(ctx context.Context, in valu
 	err := s.ledger.transaction(call, func(q *custodydb.Queries) error {
 		trust, err := s.recovery.lock(call, q, s.root, recovery)
 		if err != nil {
-			return err
+			return coverageStepWith("recovery-lock", err)
 		}
 		out, err = readProcessingCaptureCoverage(call, q, in, recovery, started, until)
 		if err != nil {
 			return err
 		}
 		if err = s.recovery.check(call, q, trust, s.root, recovery); err != nil {
-			return err
+			return coverageStepWith("recovery-check", err)
 		}
 		n, err := q.CurrentTime(call)
 		if err != nil || call.Err() != nil || !out.Current(n.Time) {
@@ -119,9 +126,13 @@ func (s *ProcessingReads) ContextProcessingCoverage(ctx context.Context, in valu
 		return nil
 	})
 	if call.Err() != nil || !time.Now().Before(until) {
-		return value.ProcessingCoverage{}, value.ErrUnavailable
+		return value.ProcessingCoverage{}, coverageStep("expired")
 	}
 	if err != nil {
+		var step coverageStepError
+		if errors.As(err, &step) {
+			return value.ProcessingCoverage{}, coverageStepError{step.step, captureError(step.err)}
+		}
 		return value.ProcessingCoverage{}, captureError(err)
 	}
 	if !out.Current(time.Now()) {
@@ -129,3 +140,18 @@ func (s *ProcessingReads) ContextProcessingCoverage(ctx context.Context, in valu
 	}
 	return out, nil
 }
+
+// coverageStepError keeps the classified error and names the closed step where
+// a processing coverage read stopped, for diagnostics only.
+type coverageStepError struct {
+	step string
+	err  error
+}
+
+func coverageStep(step string) error { return coverageStepError{step, value.ErrUnavailable} }
+func coverageStepWith(step string, err error) error {
+	return coverageStepError{step, err}
+}
+func (e coverageStepError) Error() string          { return e.err.Error() }
+func (e coverageStepError) Unwrap() error          { return e.err }
+func (e coverageStepError) ProcessingStep() string { return e.step }

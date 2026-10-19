@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+## Installed native 67: preview reaches processing coverage (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39265098434)
+on frozen `825466ad4753c3e819659496afded02c5bbb5a27` failed at preview. With the
+thirty-second retry after TLS refusals, openings refused at TLS fell from 32 or
+more to under 8 and at `setup-begin` from 8 or more to under 4. The first
+attempt passed target resolution, eligibility, retention and storage and was
+refused at `processing/read` with a retryable `NotAvailable` (no PostgreSQL
+error for the processing role, so an `ErrUnavailable` check rather than a
+known coverage limitation). The others found no idle standby, a broken hub
+query (`hub-query/unavailable`) or ran out of time at eligibility. Processing
+coverage reads now name their failing step. The local Go gate passed.
+
+[Archive verification](../test/results/installed-journey-ci-67/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 66: openings to unserved owners starve the live opening (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39257553144)
