@@ -61,7 +61,7 @@ type callTiming struct {
 	start, admitted, begin, call, finish time.Time
 }
 
-func (t callTiming) report(lane string, out func(string)) {
+func (t callTiming) report(lane string, steps *auditapp.StepTimes, out func(string)) {
 	if out == nil {
 		return
 	}
@@ -72,7 +72,11 @@ func (t callTiming) report(lane string, out func(string)) {
 	if !t.finish.IsZero() {
 		line += " finish" + durationBucket(t.finish, t.call)
 	}
-	out(line + " total" + durationBucket(time.Now(), t.start))
+	line += " total" + durationBucket(time.Now(), t.start)
+	if s := steps.String(); s != "" {
+		line += " [" + s + "]"
+	}
+	out(line)
 }
 
 // durationBucket keeps timing lines in a finite vocabulary.
@@ -241,9 +245,13 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	}
 	timing := callTiming{start: time.Now()}
 	lane := ""
+	var steps *auditapp.StepTimes
+	if s.Timing != nil {
+		ctx, steps = auditapp.WithStepTimes(ctx)
+	}
 	defer func() {
 		if lane != "" {
-			timing.report(lane, s.Timing)
+			timing.report(lane, steps, s.Timing)
 		}
 	}()
 	initial, err := current.ResolveIdentity(ctx)

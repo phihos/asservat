@@ -55,7 +55,9 @@ func (s *installedOperationAudit) storage(ctx context.Context, until time.Time) 
 		release()
 		return nil, nil, nil, mounts.ErrUnavailable
 	}
+	started := time.Now()
 	material, observedUntil, err := s.providers.ReadAuditCredentials(call)
+	auditapp.MarkStep(ctx, "credentials", started)
 	if err != nil || !auditOperationCurrent(call) || !time.Now().Before(observedUntil) {
 		finite()
 		end()

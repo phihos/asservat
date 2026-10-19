@@ -56,12 +56,16 @@ func (a *OperationAuditObjects) write(ctx context.Context, in audit.OperationInt
 	var b []byte
 	var err error
 	if create {
+		started := time.Now()
 		ciphertext, sealErr := seal(ctx)
+		app.MarkStep(ctx, "seal", started)
 		if sealErr != nil || len(ciphertext) > audit.OperationCipherLimit {
 			return audit.Receipt{}, objectStep("seal")
 		}
 		defer clear(ciphertext)
+		started = time.Now()
 		o, b, err = a.Store.putControlAudit(ctx, key, ciphertext, audit.OperationCipherLimit)
+		app.MarkStep(ctx, "put", started)
 		if err != nil {
 			return audit.Receipt{}, objectStep("put")
 		}
@@ -72,7 +76,10 @@ func (a *OperationAuditObjects) write(ctx context.Context, in audit.OperationInt
 		}
 	}
 	defer clear(b)
-	if err = verify(ctx, b); err != nil || ctx.Err() != nil {
+	started := time.Now()
+	err = verify(ctx, b)
+	app.MarkStep(ctx, "verify", started)
+	if err != nil || ctx.Err() != nil {
 		return audit.Receipt{}, objectStep("verify")
 	}
 	receipt := audit.Receipt{Key: key, Version: o.VersionID, ETag: o.ETag, Bytes: o.Bytes, SHA256: o.SHA256}

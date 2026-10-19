@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## Installed native 61: operation audits take over three of the five seconds (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39234310862)
+on frozen `4db57311e13ca977c280b81456ff589e095a7dd3` failed at preview. The new
+`mcp timing` lines show the audited call's opening audit Begin at 1–2 s and its
+closing Finish at 1–3 s; a call that failed at once still totalled over 3 s.
+Calls that resolved a target took 2–3 s or more, so eligibility met an expired
+request (`facts/eligibility/authority`); one attempt reached `facts/retention`.
+Audit SQL logins are pooled (four connections per audit role over the run), so
+the time is in the audit object path. Begin and Finish now also report bucketed
+reserve/claim/object/acknowledge steps, and the installed object path
+credential observation, seal, put and verify. The local Go gate for this commit
+passed.
+
+[Archive verification](../test/results/installed-journey-ci-61/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 60: targets resolve; preview runs out of its five seconds (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39227859804)
