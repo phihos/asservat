@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## Installed native 54: setup completes, hub self-authentication still refuses (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39179599368)
+on frozen `b955ecb0a142b932a4cfea8097306c2db76c9587` (separate regional context
+API clients) failed before capture at the same preview point. Setup-step
+refusals no longer appear apart from one at `setup-begin`, so the separate
+clients let setup complete; openings still reach `headers` after about 3.0–3.4
+seconds. Hub refusals are unchanged in kind: opening self-authentication
+`unavailable` with at least 2 seconds left (`route`, protection reads) and
+closing self-authentication with under 0.5 seconds left. The hub's ingress
+self-authentication may share the owner's API clients with its readiness and
+observer loops, as the regional context did; that, and why `route` fails with
+time remaining, are unmeasured.
+
+[Archive verification](../test/results/installed-journey-ci-54/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 53: setup reads queue on a shared API limiter (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39177467147)
