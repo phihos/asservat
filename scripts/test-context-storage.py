@@ -346,10 +346,10 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         exit_code = 1
         try:
             if runtime_provider_pair or direct_observation:
-                if shutil.disk_usage("/tmp").free < 4 * 1024**3:
+                if shutil.disk_usage(tempfile.gettempdir()).free < 4 * 1024**3:
                     raise RuntimeError("Selected in-Pod qualification requires 4 GiB free build scratch")
                 build_scope = "direct-observation" if direct_observation else "provider-pair"
-                build_scratch = Path(tempfile.mkdtemp(prefix="asservat-"+build_scope+"-build-", dir="/tmp"))
+                build_scratch = Path(tempfile.mkdtemp(prefix="asservat-"+build_scope+"-build-", dir=tempfile.gettempdir()))
                 report["buildScratch"] = str(build_scratch)
             report["goVersion"] = run(["go", "version"])
             report["sourceHashes"] = source_hashes()

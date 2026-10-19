@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+## Installed native 68: hub retention source not current; router waits for a standby (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39272153061)
+on frozen `0480509c864b4e5f02416166e42f6a93c5543292` failed at preview. The
+attempt that passed target and eligibility refused at
+`facts/retention/read/source-hub`: the hub's accepted retention source was not
+current when read. The others found no idle standby or a broken query stream.
+A target query that finds no idle standby now waits for the next registration
+within its original deadline, keeping 2.5 seconds for the query and the
+preview's later checks; without that room it fails at once as before. The
+harness's in-Pod build scratch now honours `TMPDIR` (CI is unchanged), so the
+suite also runs locally with `--keep-on-failure` on disk-backed scratch.
+
+[Archive verification](../test/results/installed-journey-ci-68/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 67: preview reaches processing coverage (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39265098434)

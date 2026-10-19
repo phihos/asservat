@@ -35,7 +35,14 @@ type Router struct {
 	standby  map[string]*Standby
 	captures map[string]*Attachment
 	serial   uint64
+	// registered is closed and replaced on every standby registration, so a
+	// query that found no idle standby can wait for the next one.
+	registered chan struct{}
 }
+
+// queryReserve is the part of a query's original deadline kept for the query
+// itself and the caller's later checks when waiting for a standby to register.
+const queryReserve = 2500 * time.Millisecond
 
 // ReceiverCheck rechecks the same actual TLS peer and accepted local process.
 // A successful fresh check may authorize attachment, never restore a lost human
@@ -107,7 +114,7 @@ func NewRouter(l RouterLimits) (*Router, error) {
 		return nil, fleet.ErrInvalid
 	}
 	l.Clusters = append([]ClusterLimit(nil), l.Clusters...)
-	return &Router{limits: l, clusters: clusters, standby: make(map[string]*Standby), captures: make(map[string]*Attachment)}, nil
+	return &Router{limits: l, clusters: clusters, standby: make(map[string]*Standby), captures: make(map[string]*Attachment), registered: make(chan struct{})}, nil
 }
 
 // RegisterStandby runs only after actual TLS authentication, before any human
@@ -129,6 +136,8 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 	s := &Standby{router: r, channel: receiver.Channel, check: check, order: r.serial, ctx: call, cancel: cancel, job: make(chan *captureJob, 1), query: make(chan *queryJob), done: make(chan struct{})}
 	r.standby[s.channel.ExchangeID] = s
 	cluster.standby++
+	close(r.registered)
+	r.registered = make(chan struct{})
 	return s, nil
 }
 func (s *Standby) Context() context.Context { return s.ctx }
@@ -211,19 +220,43 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	if !ok || !time.Now().Before(deadline) || deadline.After(time.Now().Add(5*time.Second)) {
 		return time.Time{}, fleet.ErrInvalid
 	}
-	r.mu.Lock()
+	// Between a standby's bounded residency and the region's next opening no
+	// standby may be idle. Wait for a registration within this query's original
+	// deadline, keeping queryReserve for the query and the caller (native 66).
 	var selected *Standby
-	for _, s := range r.standby {
-		if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && s.queries < contracts.APIContextMaximumQueries && s.ctx.Err() == nil && (selected == nil || s.order < selected.order) {
-			selected = s
+	for {
+		r.mu.Lock()
+		for _, s := range r.standby {
+			if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && s.queries < contracts.APIContextMaximumQueries && s.ctx.Err() == nil && (selected == nil || s.order < selected.order) {
+				selected = s
+			}
+		}
+		if r.closed {
+			r.mu.Unlock()
+			return time.Time{}, fleet.ErrUnavailable
+		}
+		if selected != nil {
+			selected.queries++
+			r.mu.Unlock()
+			break
+		}
+		registered := r.registered
+		r.mu.Unlock()
+		wait := time.Until(deadline.Add(-queryReserve))
+		if wait <= 0 {
+			return time.Time{}, fleet.ErrUnavailable
+		}
+		timer := time.NewTimer(wait)
+		select {
+		case <-registered:
+			timer.Stop()
+		case <-ctx.Done():
+			timer.Stop()
+			return time.Time{}, fleet.ErrUnavailable
+		case <-timer.C:
+			return time.Time{}, fleet.ErrUnavailable
 		}
 	}
-	if r.closed || selected == nil {
-		r.mu.Unlock()
-		return time.Time{}, fleet.ErrUnavailable
-	}
-	selected.queries++
-	r.mu.Unlock()
 	job := &queryJob{ctx: ctx, method: method, in: in, out: out, result: make(chan queryResult, 1)}
 	select {
 	case selected.query <- job:
