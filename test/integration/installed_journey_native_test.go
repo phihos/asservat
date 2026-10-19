@@ -92,6 +92,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			}
 			reply, err := installedJourneyReply(wire, name, result)
 			if err != nil {
+				diagnose()
 				t.Fatal("installed response contract", name, err)
 			}
 			return reply, err
@@ -378,7 +379,8 @@ func installedJourneyReply(wire *contracts.InvestigationContracts, name string, 
 			Code string `json:"code"`
 		}
 		if json.Unmarshal(out.Data, &failure) != nil || failure.Code != "NotAvailable" {
-			return installedJourneyEnvelope{}, errors.New("unexpected installed operation failure")
+			// The schema-validated public code is a closed enum, never input.
+			return installedJourneyEnvelope{}, fmt.Errorf("unexpected installed operation failure %q", failure.Code)
 		}
 	} else if out.Status != "ok" {
 		return installedJourneyEnvelope{}, errors.New("unexpected installed operation status")

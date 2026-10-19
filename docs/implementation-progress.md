@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+## Installed native 63: preview answers quickly with an unexpected public code (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39245953884)
+on frozen `b6d9eace5eed35c0cb7cf2aac2a1ab5f817126fd` (opening limiter for the
+audit credential reader) answered preview attempts in 3.5 s and then 410 ms.
+The third attempt returned a schema-valid public error whose code was not
+`NotAvailable`; the journey test failed on it without logging the code or
+collecting hub diagnostics. The test now names the closed public code and
+collects diagnostics before failing. The local Go gate failed once in
+`TestConfigurationWorkerDiagnosticBlockedReadKeepsOriginalDeadline`, which
+passed three of three isolated race runs and is in code this branch does not
+change.
+
+[Archive verification](../test/results/installed-journey-ci-63/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 62: audit credential reads take 1–3 s each (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39240209621)
