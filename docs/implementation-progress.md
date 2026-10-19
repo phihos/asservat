@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+## Installed native 62: audit credential reads take 1–3 s each (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39240209621)
+on frozen `3103ae9c1586343def69a337f35ed0ac1f38d92c` failed at preview with the
+same refusals. The audit step marks put the time in the installed audit
+credential observation: 1–3 s before each of the two audit object writes, while
+SQL reserve/claim/acknowledge, sealing, the PUT and verification each took under
+100 ms. That read re-verifies the owner identity, the credential Secret and the
+workload guard, about 50–70 sequential calls on clients limited to 20/20. Under
+ADR-208 its two clients now use the opening limiter; the proofs and the
+request's original five seconds are unchanged. The local Go gate for this
+commit passed.
+
+[Archive verification](../test/results/installed-journey-ci-62/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 61: operation audits take over three of the five seconds (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39234310862)

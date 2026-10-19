@@ -1,8 +1,9 @@
 # Decision records
 
 [ADR-208 — Opening limiter for context-start Kubernetes clients](208-context-opening-client-burst.md)
-gives only the dedicated opening clients 50 QPS/burst 100 (from 20/20); checks
-and deadlines are unchanged and installed qualification is pending.
+gives only the dedicated opening clients and the hub's audit credential reader
+50 QPS/burst 100 (from 20/20); checks and deadlines are unchanged and installed
+qualification is pending.
 
 [ADR-207 — One native proof bracket for context-start setup](207-context-setup-proof-bracket.md)
 records the original-bound setup composition under implementation. It preserves

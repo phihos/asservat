@@ -41,6 +41,17 @@ the kube-apiserver's API Priority and Fairness. The hub now reports the
 context-start clients' call count beside the other owner clients, so the
 measured rate can confirm or bound this choice.
 
+## Extension after native 62
+
+The hub's audit credential reader (ADR-173's own clients) re-verifies the
+installed owner identity, the audit credential Secret and the workload guard
+for every encrypted operation audit object, about 50–70 sequential calls. An
+audited request runs it twice (Begin and Finish) inside its original five
+seconds, and at 20/20 each read took 1–3 s (installed native 62), leaving the
+preview too little time. That reader's two clients now use the same opening
+limiter. Its proofs, identities and the request deadline are unchanged; the
+provider refresh reader and all other clients keep 20/20.
+
 ## Alternatives
 
 - Raising QPS (as the configuration worker's 40 QPS observer) increases

@@ -413,14 +413,17 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		// the shared observer they overran it, and every refresh failed at
 		// final-proof. They get their own clients, guard and reader; the proof is
 		// unchanged.
-		providerReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.providerStats)
+		providerReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.providerStats, false)
 		if err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
 		// Each audit object write reads its storage credential under a full
 		// native proof too. Behind a refresh's proofs on one client it ran out
 		// of its five seconds (credentials-verify/identity), so it gets its own.
-		credentialReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.credentialStats)
+		// Each read makes about 50–70 sequential calls and runs twice inside one
+		// audited request's original five seconds; at 20/20 it took 1–3 s
+		// (installed native 62), so it uses the opening limiter (ADR-208).
+		credentialReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.credentialStats, true)
 		if err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
@@ -544,8 +547,11 @@ func ownerReadinessProofs(in *ownerInputs, cluster string, control configuration
 
 // ownerProviderProofReader is the provider effects' own identity reader, on
 // separate observer and probe clients with the same guard plan and pins.
-func ownerProviderProofReader(in *ownerInputs, c contracts.OwnerDeployment, control configuration.NamespaceRef, guard *kube.OwnerWorkloadProtection, activation contracts.OwnerIdentityActivation, podUID string, stats *regionalAPIStats) (*kube.InstalledOwnerIdentityReader, error) {
+func ownerProviderProofReader(in *ownerInputs, c contracts.OwnerDeployment, control configuration.NamespaceRef, guard *kube.OwnerWorkloadProtection, activation contracts.OwnerIdentityActivation, podUID string, stats *regionalAPIStats, requestPath bool) (*kube.InstalledOwnerIdentityReader, error) {
 	observerConfig, probeConfig := in.kubernetes("kube-observer.token"), in.kubernetes("kube-probe.token")
+	if requestPath {
+		observerConfig, probeConfig = kube.WithOpeningBurst(observerConfig), kube.WithOpeningBurst(probeConfig)
+	}
 	observerConfig.Wrap(stats.wrap)
 	probeConfig.Wrap(stats.wrap)
 	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)
