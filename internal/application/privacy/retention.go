@@ -36,10 +36,18 @@ func (r RetentionResolver) Resolve(ctx context.Context, in value.Input) (value.R
 	defer cancel()
 	set, err := r.Policies.RetentionPolicies(ctx, in.Target)
 	if err != nil || ctx.Err() != nil {
-		return value.Resolution{}, value.ErrUnavailable
+		return value.Resolution{}, policyReadError{}
 	}
 	return value.Resolve(set, in, r.Now())
 }
+
+// policyReadError is ErrUnavailable from the current policy read, as opposed
+// to the domain resolution; only diagnostics distinguish them.
+type policyReadError struct{}
+
+func (policyReadError) Error() string       { return value.ErrUnavailable.Error() }
+func (policyReadError) Unwrap() error       { return value.ErrUnavailable }
+func (policyReadError) RetentionRead() bool { return true }
 
 // ResolveRetained consumes original ledger facts and current parent obligations.
 // Public callers cannot supply their own older/newer lifetime or classification.

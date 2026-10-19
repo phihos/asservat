@@ -29,12 +29,6 @@ import (
 // ContextStartClient has one installed pool and connector, no caller URL or
 // callback. Every Open is one outbound POST, never a retry of attached work.
 // Its reserved connection count is separate from the hub's capture admission.
-// ContextStartExchangesPerOwner bounds concurrent exchanges to one owner
-// process (ADR-209): a second standby keeps a target query possible while the
-// other is in use, expiring or reopening. The hub's per-cluster standby limit
-// still applies.
-const ContextStartExchangesPerOwner = 2
-
 type ContextStartClient struct {
 	root      context.Context
 	cancel    context.CancelFunc
@@ -52,7 +46,7 @@ type ContextStartClient struct {
 	mu        sync.Mutex
 	closed    bool
 	maximum   int
-	active    map[*ContextStartExchange]struct{}
+	active    map[value.OwnerBinding]*ContextStartExchange
 }
 
 // OwnerPeerAuthenticator authenticates the hub owner of an actual TLS session:
@@ -92,7 +86,7 @@ func newContextStartClient(ctx context.Context, rootID string, pool value.OwnerP
 		return nil, value.ErrInvalid
 	}
 	root, cancel := context.WithCancel(ctx)
-	return &ContextStartClient{root: root, cancel: cancel, rootID: rootID, pool: pool, roots: roots.Clone(), verifier: verifier, routes: routes, owners: owners, address: address, connector: connector, process: process, now: now, dial: (&net.Dialer{}).DialContext, maximum: maximum, active: make(map[*ContextStartExchange]struct{})}, nil
+	return &ContextStartClient{root: root, cancel: cancel, rootID: rootID, pool: pool, roots: roots.Clone(), verifier: verifier, routes: routes, owners: owners, address: address, connector: connector, process: process, now: now, dial: (&net.Dialer{}).DialContext, maximum: maximum, active: make(map[value.OwnerBinding]*ContextStartExchange)}, nil
 }
 
 // ContextStartExchange owns the actual one-socket HTTP/2 request. The transport
@@ -187,7 +181,9 @@ func (e *ContextStartExchange) Close() {
 			<-e.workDone
 		}
 		e.client.mu.Lock()
-		delete(e.client.active, e)
+		if e.client.active[e.owner] == e {
+			delete(e.client.active, e.owner)
+		}
 		e.client.mu.Unlock()
 		close(e.done)
 	})
@@ -201,7 +197,7 @@ func (c *ContextStartClient) Close() {
 	c.closed = true
 	c.cancel()
 	list := make([]*ContextStartExchange, 0, len(c.active))
-	for e := range c.active {
+	for _, e := range c.active {
 		list = append(list, e)
 	}
 	c.mu.Unlock()
@@ -355,19 +351,13 @@ func (c *ContextStartClient) open(ctx context.Context, owner value.OwnerBinding,
 		return nil, value.ErrInvalid
 	}
 	c.mu.Lock()
-	same := 0
-	for e := range c.active {
-		if e.owner == owner {
-			same++
-		}
-	}
-	if c.closed || c.root.Err() != nil || len(c.active) >= c.maximum || same >= ContextStartExchangesPerOwner {
+	if c.closed || c.root.Err() != nil || len(c.active) >= c.maximum || c.active[owner] != nil {
 		c.mu.Unlock()
 		return nil, value.ErrUnavailable
 	}
 	work, cancel := context.WithCancel(ctx)
 	exchange := &ContextStartExchange{client: c, owner: owner, ctx: work, cancel: cancel, opened: make(chan struct{}), done: make(chan struct{})}
-	c.active[exchange] = struct{}{}
+	c.active[owner] = exchange
 	c.mu.Unlock()
 	success := false
 	exchange.rootDone, exchange.workDone = make(chan struct{}), make(chan struct{})

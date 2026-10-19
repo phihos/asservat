@@ -192,15 +192,9 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 	}
 	defer s.Client.Close()
 	type connection struct{ cancel context.CancelFunc }
-	// ADR-209: up to mtls.ContextStartExchangesPerOwner slots per owner, each
-	// retried one second after it ends.
-	type slot struct {
-		owner fleetvalue.OwnerBinding
-		n     int
-	}
-	active := make(map[slot]connection)
-	next := make(map[slot]time.Time)
-	ended := make(chan slot, 16)
+	active := make(map[fleetvalue.OwnerBinding]connection)
+	next := make(map[fleetvalue.OwnerBinding]time.Time)
+	ended := make(chan fleetvalue.OwnerBinding, 16)
 	defer func() {
 		for _, c := range active {
 			c.cancel()
@@ -229,36 +223,34 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 			return false
 		}
 		for b, c := range active {
-			if !contains(b.owner) {
+			if !contains(b) {
 				c.cancel()
 			}
 		}
 		for b := range next {
-			if !contains(b.owner) {
+			if !contains(b) {
 				delete(next, b)
 			}
 		}
 		for _, owner := range observed.Owners {
-			for n := 0; n < mtls.ContextStartExchangesPerOwner; n++ {
-				key := slot{owner, n}
-				if _, exists := active[key]; exists || len(active) >= 16 || s.Local.Now().Before(next[key]) {
-					continue
-				}
-				call, cancel := context.WithTimeout(ctx, 30*time.Second)
-				active[key] = connection{cancel}
-				go func() {
-					defer cancel()
-					defer func() { ended <- key }()
-					exchange, e := s.Client.OpenDiscovered(call, owner, observed)
-					if e == nil {
-						if e = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local); e != nil {
-							s.reportFailure("exchange", e)
-						}
-					} else {
-						s.reportFailure("open", e)
-					}
-				}()
+			if _, exists := active[owner]; exists || len(active) >= 16 || s.Local.Now().Before(next[owner]) {
+				continue
 			}
+			call, cancel := context.WithTimeout(ctx, 30*time.Second)
+			active[owner] = connection{cancel}
+			owner := owner
+			go func() {
+				defer cancel()
+				defer func() { ended <- owner }()
+				exchange, e := s.Client.OpenDiscovered(call, owner, observed)
+				if e == nil {
+					if e = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local); e != nil {
+						s.reportFailure("exchange", e)
+					}
+				} else {
+					s.reportFailure("open", e)
+				}
+			}()
 		}
 	}
 	poll()
@@ -266,9 +258,9 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case key := <-ended:
-			delete(active, key)
-			next[key] = s.Local.Now().Add(time.Second)
+		case owner := <-ended:
+			delete(active, owner)
+			next[owner] = s.Local.Now().Add(time.Second)
 		case <-ticker.C:
 			poll()
 		}

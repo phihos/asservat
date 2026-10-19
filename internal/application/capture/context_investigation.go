@@ -3,6 +3,7 @@ package capture
 import (
 	"bytes"
 	"context"
+	"errors"
 	"reflect"
 	"slices"
 	"time"
@@ -155,7 +156,7 @@ func (s ContextInvestigation) facts(ctx context.Context, source identities.Curre
 	}
 	f.retention, err = s.Retention.Resolve(ctx, privacy.Input{Target: t, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: intent.RequestedSeconds, AnchorAt: anchor})
 	if err != nil {
-		return f, previewFailure("facts/retention", err)
+		return f, previewFailure("facts/retention/"+retentionFailure(err), err)
 	}
 	f.storage, err = s.Storage.ContextStorage(ctx, t)
 	if err != nil {
@@ -440,5 +441,24 @@ func (s ContextInvestigation) awaitStorage(ctx context.Context, target targets.P
 			return
 		case <-t.C:
 		}
+	}
+}
+
+// retentionFailure names a closed retention failure class for diagnostics.
+func retentionFailure(err error) string {
+	var read interface{ RetentionRead() bool }
+	switch {
+	case errors.As(err, &read):
+		return "read"
+	case errors.Is(err, privacy.ErrInvalid):
+		return "invalid"
+	case errors.Is(err, privacy.ErrConflict):
+		return "conflict"
+	case errors.Is(err, privacy.ErrExpired):
+		return "expired"
+	case errors.Is(err, privacy.ErrUnavailable):
+		return "unavailable"
+	default:
+		return "other"
 	}
 }

@@ -1,7 +1,7 @@
 # ADR-209 — Two context-start standbys per hub owner
 
-Date: 2026-10-19. Status: implemented with a unit test; installed qualification
-pending.
+Date: 2026-10-19. Status: withdrawn after installed native 65; the code change
+was reverted.
 Requirements: REQ-EXE-002, REQ-FED-001/003, S-02; TASK-03 / TASK-11.
 
 ## Context
@@ -29,3 +29,11 @@ often found none (`router`). The hub already accepts two standbys per cluster
 Opening load per owner doubles while both slots are reopening; both sides use
 the ADR-208 opening limiter. A third exchange to one owner is refused before
 any setup or I/O.
+
+## Withdrawal
+
+The premise was wrong: `installer-cluster join` reserves one standby per
+cluster by default (`--standby 1`); `Standby: 2` is the hub-wide total. In
+native 65 the hub refused the second exchange at `standby` registration and
+the concurrent setups refused each other at `setup-begin`, so openings failed
+more often. The region again keeps one exchange per owner.

@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Installed native 65: ADR-209 withdrawn; retention refuses after eligibility (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39253398865)
+on frozen `f6680d5cced3588664daced5cff2fa1b55203991` (ADR-209) failed at
+preview. One attempt passed target resolution and eligibility in under 3 s and
+refused at `facts/retention`, as in native 61; two found no idle standby.
+ADR-209 rested on a wrong limit: the cluster join reserves one standby per
+cluster by default, so the hub refused second exchanges at `standby` and the
+concurrent setups refused each other at `setup-begin` (32 or more). ADR-209 is
+withdrawn and its code reverted. Retention preview refusals now name a closed
+class (`read`, `invalid`, `conflict`, `expired`, `unavailable`, `other`). The
+local Go gate failed once in the browser test
+`TestInvestigationFinalIdentityShorteningReachesSocket`, which passed five of
+five isolated race runs on this commit and on the commit before the MCP timing
+change.
+
+[Archive verification](../test/results/installed-journey-ci-65/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 64: audits fast; previews wait for storage or find no standby (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39249314109)

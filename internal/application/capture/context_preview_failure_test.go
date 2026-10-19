@@ -79,8 +79,12 @@ func TestContextPreviewFailureReportsFixedDependencyAndPreservesCause(t *testing
 			var reports []string
 			f.svc.ReportPreviewFailure = func(step string) { reports = append(reports, step) }
 			_, err := f.svc.Preview(ctx, f.source(t, ctx), f.intent())
+			want := stage
+			if stage == "facts/retention" {
+				want += "/other" // not a privacy-domain error class
+			}
 			var step interface{ FixedStep() string }
-			if !errors.Is(err, value.ErrUnavailable) || !errors.Is(err, cause) || !errors.As(err, &step) || step.FixedStep() != stage || !slices.Equal(reports, []string{stage}) {
+			if !errors.Is(err, value.ErrUnavailable) || !errors.Is(err, cause) || !errors.As(err, &step) || step.FixedStep() != want || !slices.Equal(reports, []string{want}) {
 				t.Fatalf("lost exact private stage or original cause: reports=%v, error=%v", reports, err)
 			}
 			if strings.Contains(err.Error(), "private-") || len(f.previews) != 0 || f.admissions.Load() != 0 {
@@ -120,4 +124,12 @@ func TestContextPreviewSuccessDoesNotReportFailure(t *testing.T) {
 	f := newInvestigationFixture()
 	f.svc.ReportPreviewFailure = func(string) { t.Fatal("successful preview reported a refusal") }
 	f.preview(t)
+}
+
+func TestRetentionFailureClassesAreClosed(t *testing.T) {
+	for err, want := range map[error]string{privacy.ErrInvalid: "invalid", privacy.ErrConflict: "conflict", privacy.ErrExpired: "expired", privacy.ErrUnavailable: "unavailable", errors.New("private"): "other"} {
+		if got := retentionFailure(fmt.Errorf("wrapped: %w", err)); got != want {
+			t.Fatalf("%v: %q", err, got)
+		}
+	}
 }
