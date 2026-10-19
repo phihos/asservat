@@ -111,8 +111,8 @@ func storageCredentials(in *providerInputs, name string) aws.CredentialsProvider
 // process. Like regional capacity, its observer/probe are its own instances of
 // the regional account's identities, each with its own 20 QPS limiter:
 // sharing the lifecycle/source client let other regional reads starve the
-// opening setup's original five seconds (installed native 53). Their burst is
-// kube.OpeningBurst (ADR-208, installed native 55).
+// opening setup's original five seconds (installed native 53). They use the
+// kube.WithOpeningBurst limiter (ADR-208, installed native 55/57).
 func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in *providerInputs, podUID string, workload cfg.OwnerWorkloadAdministration, sourcePlan cfg.ConfigMapAdministration, binding value.PeerBinding, owners *RegionalLifecycle, credentials *mtls.ConnectorProcessCredentials) (*regionalContext, []func(), error) {
 	var closers []func()
 	a := *c.APIContext

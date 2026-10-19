@@ -6,11 +6,11 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func TestWithOpeningBurstKeepsRateAndRaisesOnlyBurst(t *testing.T) {
+func TestWithOpeningBurstSetsOpeningLimiter(t *testing.T) {
 	original := &rest.Config{Host: "https://example.invalid"}
 	c := WithOpeningBurst(original)
-	if original.RateLimiter != nil || c.RateLimiter == nil || c.RateLimiter.QPS() != 20 {
-		t.Fatal("opening limiter must be a copy at the fixed 20 QPS")
+	if original.RateLimiter != nil || c.RateLimiter == nil || c.RateLimiter.QPS() != OpeningQPS {
+		t.Fatal("opening limiter must be a copy at OpeningQPS")
 	}
 	for i := 0; i < OpeningBurst; i++ {
 		if !c.RateLimiter.TryAccept() {

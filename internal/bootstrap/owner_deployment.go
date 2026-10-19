@@ -41,19 +41,21 @@ type OwnerDeployment struct {
 	// providerStats and credentialStats count the provider proofs' and the
 	// audit credential reads' own clients (ADR-173).
 	providerStats, credentialStats regionalAPIStats
-	Runtime                        *OwnerRuntime
-	Router                         *evidence.WorkerEnrollmentRouter
-	inputs                         *ownerInputs
-	trust                          *mtls.WorkerTrustCatalog
-	root                           context.Context
-	cancel                         context.CancelFunc
-	closers                        []func()
-	mu                             sync.Mutex
-	closed                         bool
-	running                        bool
-	owners                         sync.WaitGroup
-	once                           sync.Once
-	catalogDigest                  [32]byte
+	// contextStartStats counts the context-start ingress clients (ADR-208).
+	contextStartStats regionalAPIStats
+	Runtime           *OwnerRuntime
+	Router            *evidence.WorkerEnrollmentRouter
+	inputs            *ownerInputs
+	trust             *mtls.WorkerTrustCatalog
+	root              context.Context
+	cancel            context.CancelFunc
+	closers           []func()
+	mu                sync.Mutex
+	closed            bool
+	running           bool
+	owners            sync.WaitGroup
+	once              sync.Once
+	catalogDigest     [32]byte
 	// public holds the ADR-180 public purpose pools, identity and context
 	// services; all nil without Public. shared is the native composition's
 	// retention topology and effect guards, reused by the public layer.
@@ -249,7 +251,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 			return nil, mounts.ErrUnavailable
 		}
 		nativeConfig.ContextStarts = d.publicContext.starts
-		if nativeConfig.ContextStarts.Authenticator, err = contextStartOwnerAuthenticator(in, c, guard, pool, configs, ledgers["registry"]); err != nil {
+		if nativeConfig.ContextStarts.Authenticator, err = contextStartOwnerAuthenticator(in, c, guard, pool, configs, ledgers["registry"], &d.contextStartStats); err != nil {
 			return nil, mounts.ErrUnavailable
 		}
 	}
@@ -439,8 +441,9 @@ func (d *OwnerDeployment) Run(listener net.Listener, additional ...net.Listener)
 					identity, identitySpent := d.identityStats.load()
 					provider, providerSpent := d.providerStats.load()
 					credential, credentialSpent := d.credentialStats.load()
-					fmt.Fprintf(os.Stderr, "owner observer %d calls %s, operation %d calls %s, readiness %d calls %s, identity %d calls %s, provider %d calls %s, credentials %d calls %s total\n", calls, spent.Round(10*time.Millisecond), operation, operationSpent.Round(10*time.Millisecond),
-						readiness, readinessSpent.Round(10*time.Millisecond), identity, identitySpent.Round(10*time.Millisecond), provider, providerSpent.Round(10*time.Millisecond), credential, credentialSpent.Round(10*time.Millisecond))
+					starts, startsSpent := d.contextStartStats.load()
+					fmt.Fprintf(os.Stderr, "owner observer %d calls %s, operation %d calls %s, readiness %d calls %s, identity %d calls %s, provider %d calls %s, credentials %d calls %s, context-start %d calls %s total\n", calls, spent.Round(10*time.Millisecond), operation, operationSpent.Round(10*time.Millisecond),
+						readiness, readinessSpent.Round(10*time.Millisecond), identity, identitySpent.Round(10*time.Millisecond), provider, providerSpent.Round(10*time.Millisecond), credential, credentialSpent.Round(10*time.Millisecond), starts, startsSpent.Round(10*time.Millisecond))
 				}
 			}
 			if _, err := d.refreshWorkerTrust(d.root); err != nil {
@@ -677,15 +680,19 @@ func (d *OwnerDeployment) clusterCatalogChanged(ctx context.Context) bool {
 // contextStartOwnerAuthenticator gives the context-start ingress self-checks
 // their own observer/probe clients with the same guard plan and pins: on the
 // owner's shared clients they queued behind other request paths and overran
-// the original five seconds (installed native 54). Their burst is
-// kube.OpeningBurst (ADR-208, installed native 55). Checks are unchanged.
-func contextStartOwnerAuthenticator(in *ownerInputs, c contracts.OwnerDeployment, guard *kube.OwnerWorkloadProtection, pool value.OwnerPool, configs *postgres.OwnerConfigurations, registry *postgres.OwnerEnrollments) (*app.OwnerAuthenticator, error) {
+// the original five seconds (installed native 54). They use the
+// kube.WithOpeningBurst limiter (ADR-208, installed native 55/57). Checks are
+// unchanged.
+func contextStartOwnerAuthenticator(in *ownerInputs, c contracts.OwnerDeployment, guard *kube.OwnerWorkloadProtection, pool value.OwnerPool, configs *postgres.OwnerConfigurations, registry *postgres.OwnerEnrollments, stats *regionalAPIStats) (*app.OwnerAuthenticator, error) {
 	control := configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
-	observer, err := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-observer.token")), c.ClusterID, control, time.Now)
+	observerConfig, probeConfig := kube.WithOpeningBurst(in.kubernetes("kube-observer.token")), kube.WithOpeningBurst(in.kubernetes("kube-probe.token"))
+	observerConfig.Wrap(stats.wrap)
+	probeConfig.Wrap(stats.wrap)
+	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)
 	if err != nil {
 		return nil, err
 	}
-	probe, err := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-probe.token")), c.ClusterID, control, time.Now)
+	probe, err := kube.NewPermissionClient(probeConfig, c.ClusterID, control, time.Now)
 	if err != nil {
 		return nil, err
 	}

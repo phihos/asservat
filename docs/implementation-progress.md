@@ -1,5 +1,29 @@
 # Sustained implementation progress
 
+## Installed native 57: target queries fail three ways; opening clients revised to 50 QPS (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39215209940)
+on frozen `60e6d45c4bf0846ef973755e72e0537e6e7a41ee` failed before capture.
+No target query succeeded. The new steps show `read/other` (stream broken,
+start at least 2 s, end under 2 s), `receive-peer/denied` (waiting for the
+regional answer until under 0.5 s remained) and `router` (no idle standby).
+Regional exchanges ended `passive-call/deadline`. One attempt stopped earlier
+at `audit-begin/reserve`. The restarted hub refused its own protection reads
+with at least 2 seconds left after about eight openings, which matches a
+drained 100-token bucket at 20 QPS. ADR-208 now gives the four opening clients
+50 QPS/burst 100, and the hub reports their call count. The single
+`permission_stream` denial for `permission-read` recurs once per run, as in
+earlier runs; its statement is not logged and it is not yet tied to a step.
+
+[Archive verification](../test/results/installed-journey-ci-57/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+The local Go gate failed once again in Kubernetes group 13
+(`TestOwnerProjectionSplitExactGraphsAndPrivateAdmission/launch-receipt`,
+`projection.provider-observe`), the same unmodified owner-projection fixture
+family as before.
+
 ## Installed native 56: openings reach exchanges, preview target queries fail (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39211173709)
