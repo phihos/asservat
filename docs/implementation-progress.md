@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Installed native 53: setup reads queue on a shared API limiter (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39177467147)
+on frozen `f42341db029fa14ea05a2992ed461f07702d9ff6` failed before capture at
+the same preview point, now with setup marks. Of the setup proof's own five
+seconds, the opening source read took 1.04–1.39 seconds and the process proof
+1.3–2.6 seconds; the owned-process check took about 10 milliseconds, the
+execution account 50–100 milliseconds and the six later checks about 1.5
+seconds together. The regional context start shared one fixed 20 QPS
+Kubernetes client with the regional source, workload guard and lifecycle
+readers, while regional capacity already uses its own client instances of the
+same identities after the same starvation (ADR-197 run 10). Context start now
+builds its own observer/probe instances and its own guard and source readers
+from the same plans: same identities, rights and fixed limits, separate
+buckets. That this removes the queueing is a hypothesis for the next run.
+
+[Archive verification](../test/results/installed-journey-ci-53/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 52: setup marks dropped by the producer re-wrap (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39175416010)
