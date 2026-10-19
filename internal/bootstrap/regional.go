@@ -244,13 +244,13 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	in := &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes}
 	r.closers = append(r.closers, in.closeHTTP)
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
-	observerConfig := in.kubernetes("kube-observer.token")
+	observerConfig := kube.WithOpeningBurst(in.kubernetes("kube-observer.token"))
 	observerConfig.Wrap(r.observerStats.wrap)
 	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	probeConfig := in.kubernetes("kube-probe.token")
+	probeConfig := kube.WithOpeningBurst(in.kubernetes("kube-probe.token"))
 	probeConfig.Wrap(r.probeStats.wrap)
 	probe, err := kube.NewPermissionClient(probeConfig, c.ClusterID, control, time.Now)
 	if err != nil {

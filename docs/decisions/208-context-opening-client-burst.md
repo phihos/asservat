@@ -68,6 +68,19 @@ against the binding's five seconds, so a refreshed binding had about 2 s left
 and previews waited for it. Those two clients now use the opening limiter;
 the observations and their bounds are unchanged.
 
+## Extension to the region's capacity and lifecycle clients
+
+Local holds 6 and 7 split the remaining time. The hub's claim (`c-post`) and
+the owner's `observe` step spend about 2.2 s waiting on the region, with every
+refresh between 2.16 and 2.25 s. One regional capacity cycle makes about 63
+API calls (open 19, reads 3/3/13/3/22) on clients limited to 20 QPS / burst 20,
+so about 43 calls wait 50 ms each (≈2.15 s); the region's kube-apiserver
+answers non-watch requests in about 1 ms on average. The region's target
+answers spend 1–3 s in the connector's local proof (`r-local`), which reads
+through the lifecycle observer and probe at the same 20/20. The regional
+capacity observer, metadata and probe clients and the lifecycle observer and
+probe now use the opening limiter. Checks, reads and deadlines are unchanged.
+
 ## Alternatives
 
 - Raising QPS (as the configuration worker's 40 QPS observer) increases
@@ -79,6 +92,6 @@ the observations and their bounds are unchanged.
 ## Consequences
 
 The kube-apiserver's API Priority and Fairness remains the server-side bound.
-Each of the four dedicated clients can send up to 100 calls at once and 50 per
+Each dedicated client can send up to 100 calls at once and 50 per
 second sustained. A further increase needs the measured context-start call
 rate first.
