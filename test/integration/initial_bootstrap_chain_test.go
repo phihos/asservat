@@ -65,6 +65,9 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	if os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") == "1" {
 		duration = 35 * time.Minute // the original 30-minute continuation window plus bootstrap
 	}
+	if os.Getenv("ASSERVAT_JOURNEY_HOLD") != "" {
+		duration += 90 * time.Minute // local debugging hold only (installedJourneyHold)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), duration)
 	defer cancel()
 	adminConfig, err := initialBootstrapAdminPoolConfig(f.Postgres)

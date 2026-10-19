@@ -12,6 +12,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
@@ -135,6 +137,11 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			t.Fatalf("installed %s: %v", name, failure)
 		}
 		target := map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload}
+		previewArguments := map[string]any{"target_ref": target,
+			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": installedJourneyRetention}
+		if dir := os.Getenv("ASSERVAT_JOURNEY_HOLD"); dir != "" {
+			installedJourneyHold(t, ctx, dir, wire, session, previewArguments, diagnose)
+		}
 		var preview struct {
 			PreviewID      string `json:"preview_id"`
 			CaptureEnabled bool   `json:"capture_enabled"`
@@ -142,8 +149,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 				UID string `json:"uid"`
 			} `json:"selected_pods"`
 		}
-		call(ctx, "preview_capture", map[string]any{"target_ref": target,
-			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": installedJourneyRetention}, &preview)
+		call(ctx, "preview_capture", previewArguments, &preview)
 		if !preview.CaptureEnabled || len(preview.SelectedPods) != 1 || preview.PreviewID == "" || preview.SelectedPods[0].UID == "" {
 			t.Fatal("installed preview did not pin the regional Pod", preview)
 		}
@@ -425,4 +431,61 @@ func installedJourneyEarlier(a, b time.Time) time.Time {
 		return a
 	}
 	return b
+}
+
+// installedJourneyHold is a local debugging aid, never set by CI: with
+// ASSERVAT_JOURNEY_HOLD=<dir> the journey pauses with the installation live and
+// runs commands written to <dir>/cmd one at a time: "preview" makes one
+// preview_capture call and appends its outcome to <dir>/out, "diagnose" logs
+// the hub processes, "continue" resumes the journey and "stop" fails the test.
+// The hold ends on its own ten minutes before the test context's deadline.
+func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *contracts.InvestigationContracts, session *sdk.ClientSession, preview map[string]any, diagnose func()) {
+	t.Helper()
+	out, err := os.OpenFile(filepath.Join(dir, "out"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal("journey hold output", err)
+	}
+	defer out.Close()
+	until := time.Now().Add(90 * time.Minute)
+	if d, ok := ctx.Deadline(); ok && d.Add(-10*time.Minute).Before(until) {
+		until = d.Add(-10 * time.Minute)
+	}
+	fmt.Fprintf(out, "%s hold ready until %s\n", time.Now().Format(time.TimeOnly), until.Format(time.TimeOnly))
+	for time.Now().Before(until) {
+		raw, err := os.ReadFile(filepath.Join(dir, "cmd"))
+		if err != nil {
+			if installedJourneyPause(ctx, 500*time.Millisecond) != nil {
+				return
+			}
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, "cmd"))
+		switch command := strings.TrimSpace(string(raw)); command {
+		case "preview":
+			started := time.Now()
+			call, end := context.WithTimeout(ctx, 30*time.Second)
+			result, err := session.CallTool(call, &sdk.CallToolParams{Name: "preview_capture", Arguments: preview})
+			end()
+			line := fmt.Sprintf("%s preview after %s: ", started.Format(time.TimeOnly), time.Since(started).Round(time.Millisecond))
+			if err != nil {
+				line += "transport " + err.Error()
+			} else if reply, e := installedJourneyReply(wire, "preview_capture", result); e != nil {
+				line += "contract " + e.Error()
+			} else {
+				line += reply.Status + " request " + reply.RequestID + " " + string(reply.Data)
+			}
+			fmt.Fprintln(out, line)
+		case "diagnose":
+			diagnose()
+			fmt.Fprintf(out, "%s diagnosed\n", time.Now().Format(time.TimeOnly))
+		case "continue":
+			fmt.Fprintf(out, "%s continuing\n", time.Now().Format(time.TimeOnly))
+			return
+		case "stop":
+			t.Fatal("journey hold stopped")
+		default:
+			fmt.Fprintf(out, "%s unknown command\n", time.Now().Format(time.TimeOnly))
+		}
+	}
+	fmt.Fprintf(out, "%s hold expired\n", time.Now().Format(time.TimeOnly))
 }

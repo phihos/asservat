@@ -586,6 +586,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             if test_pattern:
                 command += ["-run", test_pattern]
             aggregate_timeout = qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation)
+            if os.environ.get("ASSERVAT_JOURNEY_HOLD") and installer_continuation:
+                aggregate_timeout = "150m"  # local debugging hold only
             if aggregate_timeout:
                 command += ["-timeout", aggregate_timeout]
             command += [test_package]
