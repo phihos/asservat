@@ -186,8 +186,11 @@ func (s *Standby) Serve(stream Stream, now func() time.Time) error {
 			until, e := fs.query(call, q.method, q.in, q.out)
 			stop()
 			cancel()
-			q.result <- queryResult{until, e}
 			var answer errQueryAnswer
+			if e != nil && !errors.As(e, &answer) {
+				recordStreamDiagnostic(q.ctx, fs, e, streamHubQuery)
+			}
+			q.result <- queryResult{until, e}
 			if e != nil && !errors.As(e, &answer) {
 				return e
 			}

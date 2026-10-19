@@ -2,7 +2,10 @@ package contextstart
 
 import (
 	"context"
+	"errors"
 	"time"
+
+	fleetapp "asservat.local/asservat/internal/application/fleet"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
@@ -15,6 +18,9 @@ import (
 type Targets struct {
 	Router *Router
 	Now    func() time.Time
+	// Report receives a fixed query step and remaining-time buckets on
+	// failure only; it never sees targets, peers or error text.
+	Report func(string)
 }
 
 func (t Targets) query(ctx context.Context, cluster, method string, in any) (targets.PodResolution, error) {
@@ -24,8 +30,11 @@ func (t Targets) query(ctx context.Context, cluster, method string, in any) (tar
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	start := fleetapp.RemainingBucket(call, time.Now())
+	call, diagnostics := NewStreamDiagnosticContext(call)
 	until, err := t.Router.Query(call, cluster, method, in, &out)
 	if err != nil {
+		t.report(queryStep(err, diagnostics) + " start" + start + " end" + fleetapp.RemainingBucket(ctx, time.Now()))
 		return targets.PodResolution{}, err
 	}
 	out.FreshUntil = identity.Earlier(out.FreshUntil, until)
@@ -65,4 +74,23 @@ func (t Targets) ResolvePod(ctx context.Context, r targets.Request) (targets.Pod
 		return targets.PodResolution{}, targets.ErrUnavailable
 	}
 	return out, nil
+}
+
+func (t Targets) report(step string) {
+	if t.Report != nil {
+		t.Report(step)
+	}
+}
+
+// queryStep names where a failed query stopped: a closed regional answer, the
+// stream's first interruption, or the router (no idle standby or its wait).
+func queryStep(err error, d *StreamDiagnostics) string {
+	var answer errQueryAnswer
+	if errors.As(err, &answer) {
+		return "answer/" + queryFailureLabel(err)
+	}
+	if v := d.Interruption(); v.Present() {
+		return v.Stage() + "/" + v.Reason()
+	}
+	return "router"
 }

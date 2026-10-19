@@ -29,6 +29,10 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 			stage += "/" + step
 		}
 	}
+	var exchange interface{ ExchangeStep() string }
+	if stage == "exchange" && errors.As(cause, &exchange) {
+		stage += "/" + exchange.ExchangeStep()
+	}
 	if cause != nil {
 		stage += " (" + regionalCause(cause) + ")"
 	}

@@ -152,8 +152,23 @@ func ServeRegionalAPIContextExchange(exchange *mtls.ContextStartExchange, verifi
 		return e
 	}
 	defer stream.Close()
-	return contextstart.ServeRegionalOperations(exchange.Context(), stream, receiver, verifier, local, local.Now)
+	ctx, diagnostics := contextstart.NewStreamDiagnosticContext(exchange.Context())
+	if e = contextstart.ServeRegionalOperations(ctx, stream, receiver, verifier, local, local.Now); e != nil {
+		if v := diagnostics.Interruption(); v.Present() {
+			return exchangeStepError{e, v.Stage() + "/" + v.Reason()}
+		}
+	}
+	return e
 }
+
+// exchangeStepError carries only the stream's fixed stage/reason codes.
+type exchangeStepError struct {
+	error
+	step string
+}
+
+func (e exchangeStepError) Unwrap() error        { return e.error }
+func (e exchangeStepError) ExchangeStep() string { return e.step }
 
 // RegionalContextStartConnections supervises only outbound standby exchanges.
 // Each new conversation starts empty under fresh route/peer checks. It cannot

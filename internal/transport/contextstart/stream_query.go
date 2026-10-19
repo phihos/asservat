@@ -98,10 +98,12 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 	}
 	defer clear(payload)
 	if e = s.pullSource(call); e != nil {
+		s.record(streamHubQuerySource, streamErrorReason(e))
 		return time.Time{}, fleet.ErrUnavailable
 	}
 	receiver, e := s.check(call)
 	if e != nil || !receiver.Valid(time.Now()) || receiver.Channel != s.channel {
+		s.record(streamHubQueryCheck, queryCheckReason(e))
 		s.interruptAt(streamSendPeer, streamPeerInvalid)
 		return time.Time{}, fleet.ErrUnavailable
 	}
@@ -146,6 +148,7 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	defer cancel()
 	owner, e := s.check(call)
 	if e != nil || !owner.Valid(time.Now()) || owner.Channel != s.channel {
+		s.record(streamRegionalQueryOwner, queryCheckReason(e))
 		return fleet.ErrUnavailable
 	}
 	until, _ := call.Deadline()
@@ -179,5 +182,17 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		return e
 	}
 	defer clear(encoded)
-	return s.writeSourceFrame(bounded, contracts.APIContextFrame{Kind: contracts.APIContextAnswerFrame, Payload: encoded})
+	if e = s.writeSourceFrame(bounded, contracts.APIContextFrame{Kind: contracts.APIContextAnswerFrame, Payload: encoded}); e != nil {
+		s.record(streamRegionalQueryWrite, streamErrorReason(e))
+	}
+	return e
+}
+
+// queryCheckReason classifies a failed current check; a nil error means the
+// returned receiver itself was expired or for another channel.
+func queryCheckReason(e error) streamReason {
+	if e == nil {
+		return streamPeerInvalid
+	}
+	return streamErrorReason(e)
 }

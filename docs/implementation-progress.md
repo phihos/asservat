@@ -1,5 +1,29 @@
 # Sustained implementation progress
 
+## Installed native 56: openings reach exchanges, preview target queries fail (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39211173709)
+on frozen `9d074033fd6119d98fce9da4f44f16885a79b454` (ADR-208 burst-100 opening
+clients) failed before capture. Hub ingress refusals fell from about 25 to 4
+and regional standbys reached `exchange` for the first time, ending
+`unavailable`. Three of four preview calls ran to the five-second request bound
+(HTTP/2 `INTERNAL_ERROR`) and the fourth refused at `target` after 3.35 s. The
+hub restart (`phase=full-runtime reason=changed`) and `unknown-name` router
+counts were already present in native 54/55. Neither the hub target query nor
+the regional exchange reported a step, so query failures now report the
+stream's first fixed stage/reason (new `hub-query-source`, `hub-query-check`,
+`regional-query-owner`, `regional-query-write`), a closed regional `answer`
+label or `router`, with remaining-time buckets at start and end.
+
+[Archive verification](../test/results/installed-journey-ci-56/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+The local Go gate for this commit failed once in
+`TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults` (`unavailable
+after 760ms`); the test passed three of three isolated race runs and in the
+previous full gate. It is recorded as timing-sensitive under load, not fixed.
+
 ## Context-start opening clients get a burst of 100 (2026-10-19)
 
 [ADR-208](decisions/208-context-opening-client-burst.md): the regional context
