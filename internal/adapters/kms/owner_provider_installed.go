@@ -1,6 +1,7 @@
 package kms
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -409,13 +410,17 @@ func (s *InstalledOwnerProviderEffects) ReadAuditCredentials(ctx context.Context
 	}
 	defer release()
 	ctx = bounded
+	mark := time.Now()
 	first, err := s.configuration.ReadOwnerConfiguration(ctx)
+	auditapp.MarkStep(ctx, "credentials-configuration", mark)
 	if err != nil || !s.currentConfiguration(first) {
 		return zero, time.Time{}, auditCredentialStep("configuration", ErrKeyService)
 	}
 	call, end := context.WithDeadline(ctx, first.FreshUntil)
 	defer end()
+	mark = time.Now()
 	manifest, mounted, err := s.mounted(call)
+	auditapp.MarkStep(ctx, "credentials-mounted", mark)
 	if err != nil {
 		return zero, time.Time{}, auditCredentialStep("mounted", err)
 	}
@@ -429,14 +434,18 @@ func (s *InstalledOwnerProviderEffects) ReadAuditCredentials(ctx context.Context
 	if err != nil {
 		return zero, time.Time{}, auditCredentialStep("file", ErrKeyService)
 	}
+	mark = time.Now()
 	credential, until, err := s.credentials.ReadProviderAuditCredential(call, manifest, mounted, raw)
+	auditapp.MarkStep(ctx, "credentials-verify", mark)
 	until = identity.Earlier(until, first.FreshUntil)
 	if err != nil {
 		return zero, time.Time{}, auditCredentialStepFrom("verify", err)
 	}
 	call, narrow := context.WithDeadline(call, until)
 	defer narrow()
+	mark = time.Now()
 	last, err := s.configuration.ReadOwnerConfiguration(call)
+	auditapp.MarkStep(ctx, "credentials-final", mark)
 	until = identity.Earlier(until, last.FreshUntil)
 	if err != nil || !s.currentConfiguration(last) || !first.Configuration.Equal(last.Configuration) || call.Err() != nil || !time.Now().Before(until) {
 		return zero, time.Time{}, auditCredentialStep("final", ErrKeyService)

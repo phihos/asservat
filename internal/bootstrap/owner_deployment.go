@@ -245,7 +245,19 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		}
 		closers = nil
 		phase = startupPublicContext
-		d.publicContext, err = newPublicContext(startup, in, d.publicFiles, d.providers, d.public, observer, probe, d.shared, catalog, parts.audit, &closers)
+		// ADR-208: preview capability and catalog reads get their own clients
+		// with the opening limiter; on the owner's shared clients the capability
+		// read alone took 1-2 s of a preview's five seconds (local run 3).
+		control := configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+		publicObserver, e := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-observer.token")), c.ClusterID, control, time.Now)
+		if e != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		publicProbe, e := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-probe.token")), c.ClusterID, control, time.Now)
+		if e != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		d.publicContext, err = newPublicContext(startup, in, d.publicFiles, d.providers, d.public, publicObserver, publicProbe, d.shared, catalog, parts.audit, &closers)
 		d.closers = append(d.closers, closers...)
 		if err != nil {
 			return nil, mounts.ErrUnavailable

@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Local run 3 and native 71: preview stage timing (2026-10-19)
+
+Local run 3 (frozen `225444f`) and native 71 (`2c005fd`, preview `ErrChanged`
+mapped to retryable) failed at preview. Stage timing in local run 3: identity,
+recovery, storage wait, eligibility and storage under 100 ms; target 0.5–1 s;
+retention under 500 ms; capability 1–2 s. The capability source and catalog
+protection used the owner's shared 20/20 observer, so the public context now
+gets its own clients with the ADR-208 opening limiter. Later attempts spent 3 s
+or more in the audit credential read again; its configuration, mounted,
+verify and final steps now report their durations too. Native 71 refused at
+`processing/read`, at `router` after waiting, with a target query reaching its
+deadline (`receive-bound/deadline`), and at eligibility.
+
 ## Installed native 70: retention passes; processing step lost in the ledger (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39279970394)
