@@ -8,6 +8,7 @@ import (
 	"slices"
 	"time"
 
+	auditapp "asservat.local/asservat/internal/application/audit"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
@@ -144,21 +145,31 @@ func (s ContextInvestigation) facts(ctx context.Context, source identities.Curre
 		return f, previewFailure("facts/target", value.ErrChanged)
 	}
 	t := target.Target()
+	mark := time.Now()
 	s.awaitStorage(ctx, target)
+	auditapp.MarkStep(ctx, "p-await-storage", mark)
+	mark = time.Now()
 	f.eligibility = s.Eligibility.ContextEligibilityCurrent(ctx, source, t)
+	auditapp.MarkStep(ctx, "p-eligibility", mark)
 	if !f.eligibility.Eligible || f.eligibility.Target != t || f.eligibility.Principal != actor || f.eligibility.VerifiedIdentity.Principal != actor || !f.eligibility.VerifiedIdentity.Valid(s.Now()) || !s.Now().Before(f.eligibility.ValidUntil) {
 		return f, previewFailure(previewEligibilityFailure(f.eligibility.Reason), value.ErrDenied)
 	}
 	var err error
+	mark = time.Now()
 	f.capability, err = s.Capabilities.ContextCapability(ctx, t)
+	auditapp.MarkStep(ctx, "p-capability", mark)
 	if err != nil {
 		return f, previewFailure("facts/capability", err)
 	}
+	mark = time.Now()
 	f.retention, err = s.Retention.Resolve(ctx, privacy.Input{Target: t, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: intent.RequestedSeconds, AnchorAt: anchor})
+	auditapp.MarkStep(ctx, "p-retention", mark)
 	if err != nil {
 		return f, previewFailure("facts/retention/"+retentionFailure(err), err)
 	}
+	mark = time.Now()
 	f.storage, err = s.Storage.ContextStorage(ctx, t)
+	auditapp.MarkStep(ctx, "p-storage", mark)
 	if err != nil {
 		return f, previewFailure("facts/storage", err)
 	}
@@ -221,15 +232,21 @@ func (s ContextInvestigation) Preview(ctx context.Context, source identities.Cur
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	created := s.Now().UTC().Truncate(time.Microsecond)
+	mark := time.Now()
 	i, err := source.ResolveIdentity(ctx)
+	auditapp.MarkStep(ctx, "p-identity", mark)
 	if err != nil || !i.Valid(s.Now()) {
 		return zero, previewFailure("identity", value.ErrDenied)
 	}
+	mark = time.Now()
 	recovery, err := s.currentRecovery(ctx)
+	auditapp.MarkStep(ctx, "p-recovery", mark)
 	if err != nil {
 		return zero, previewFailure("recovery", err)
 	}
+	mark = time.Now()
 	target, err := s.Targets.ResolveWorkload(ctx, intent.Target)
+	auditapp.MarkStep(ctx, "p-target", mark)
 	if err != nil {
 		return zero, previewFailure("target", err)
 	}
@@ -243,7 +260,9 @@ func (s ContextInvestigation) Preview(ctx context.Context, source identities.Cur
 	if intent.Reason != nil {
 		p.Deadline = identity.Earlier(p.Deadline, intent.Reason.ExpiresAt)
 	}
+	processingStarted := time.Now()
 	coverage, err := s.processingCoverage(ctx, p, f, recovery, i.ValidUntil)
+	auditapp.MarkStep(ctx, "p-processing", processingStarted)
 	if err != nil {
 		return zero, previewFailure("processing", err)
 	}
@@ -264,7 +283,10 @@ func (s ContextInvestigation) Preview(ctx context.Context, source identities.Cur
 	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !recovery.Valid(s.Now()) {
 		return zero, previewFailure("before-store/current", value.ErrChanged)
 	}
-	if err = s.Previews.CreateContextPreview(ctx, p.Clone()); err != nil {
+	mark = time.Now()
+	err = s.Previews.CreateContextPreview(ctx, p.Clone())
+	auditapp.MarkStep(ctx, "p-store", mark)
+	if err != nil {
 		return zero, previewFailure("store", err)
 	}
 	// An uncertain draft write may consume one passive slot, never execution.
@@ -360,7 +382,9 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if err != nil {
 		return zero, err
 	}
+	processingStarted := time.Now()
 	coverage, err := s.processingCoverage(ctx, p, f, recovery, i.ValidUntil)
+	auditapp.MarkStep(ctx, "p-processing", processingStarted)
 	if err != nil {
 		return zero, err
 	}

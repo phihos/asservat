@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Local run 2: retention source current; previews still run out of time (2026-10-19)
+
+The local run on frozen `0dd887c` (separate retention follower clients)
+sampled the hub `retention_source` row once per second through installation
+and the journey: 425 of 456 samples were current, against about half before
+and about one in seven after a hub-worker restart. No preview refused at
+retention. Previews instead ran out of their five seconds at
+`facts/eligibility/authority` (twice), and the last call was refused with 401.
+The preview's own stages (identity, recovery, target, storage wait,
+eligibility, capability, retention, storage, processing, store) now add
+bucketed durations to the `mcp timing` line. The local run is not archived as
+CI qualification evidence.
+
 ## Installed native 69: a lapsed preview fact surfaced as ReviewChanged (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39277451723)

@@ -21,14 +21,14 @@ func WithStepTimes(ctx context.Context) (context.Context, *StepTimes) {
 	return context.WithValue(ctx, stepTimesKey{}, t), t
 }
 
-// MarkStep records step with the bucketed time since start, at most 16 marks.
+// MarkStep records step with the bucketed time since start, at most 32 marks.
 func MarkStep(ctx context.Context, step string, start time.Time) {
 	if ctx == nil {
 		return
 	}
 	if t, ok := ctx.Value(stepTimesKey{}).(*StepTimes); ok && t != nil {
 		t.mu.Lock()
-		if len(t.marks) < 16 {
+		if len(t.marks) < 32 {
 			t.marks = append(t.marks, step+DurationBucket(time.Since(start)))
 		}
 		t.mu.Unlock()
