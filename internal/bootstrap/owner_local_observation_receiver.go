@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -49,6 +50,7 @@ type OwnerLocalObservationReceiver struct {
 	joined                                       sync.WaitGroup
 	refusedMu                                    sync.Mutex
 	refusedLast                                  string
+	timing                                       func(string)
 }
 
 // refused logs one closed claim refusal stage, any nested fixed step and the
@@ -101,7 +103,11 @@ func NewOwnerLocalObservationReceiver(ctx context.Context, pin value.OwnerObserv
 	if registry == nil || native == nil {
 		return nil, value.ErrInvalid
 	}
-	return newOwnerLocalObservationReceiver(ctx, pin, server, registry, ownerLocalNativeReaderAdapter{native}, holder, maximum, now)
+	h, err := newOwnerLocalObservationReceiver(ctx, pin, server, registry, ownerLocalNativeReaderAdapter{native}, holder, maximum, now)
+	if h != nil {
+		h.timing = eventLog(os.Stderr, "owner local claim timing")
+	}
+	return h, err
 }
 func newOwnerLocalObservationReceiver(ctx context.Context, pin value.OwnerObservationPin, server *mtls.OwnerCredentials, registry app.OwnerCertificateRegistry, native ownerLocalNativeReader, holder *wire.HubObservationOperationHolder, maximum int, now func() time.Time) (*OwnerLocalObservationReceiver, error) {
 	if ctx == nil || ctx.Err() != nil || !pin.Valid() || pin.Pool.NativeCandidateLimit == 0 || server == nil || registry == nil || native == nil || holder == nil || maximum < 1 || maximum > 16 || now == nil {
@@ -485,6 +491,17 @@ func (h *OwnerLocalObservationReceiver) locate(w http.ResponseWriter, ctx contex
 	ownerOperationWrite(w, control, contracts.ClusterObservationLocalLocatorMedia, body)
 }
 func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context.Context, control *http.ResponseController, input value.ClusterObservationClaim, podUID string, token []byte, server value.OwnerCertificate) {
+	// Fixed step durations only, for operator diagnostics.
+	var steps []string
+	mark := func(step string, start time.Time) {
+		steps = append(steps, step+auditapp.DurationBucket(time.Since(start)))
+	}
+	defer func() {
+		if h.timing != nil {
+			h.timing(strings.Join(steps, " "))
+		}
+	}()
+	started := time.Now()
 	pending, err := h.pending.claim(ctx, input, podUID, token, server)
 	if err != nil {
 		h.refused("pending", err)
@@ -492,6 +509,8 @@ func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context
 		return
 	}
 	defer pending.Close()
+	mark("pending", started)
+	started = time.Now()
 	r, err := pending.registry.ReadOwnerRegistration(pending.call, server)
 	if err != nil {
 		h.refused("registration", err)
@@ -500,6 +519,8 @@ func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context
 	}
 	current, stopCurrent := context.WithDeadline(pending.call, r.FreshUntil)
 	defer stopCurrent()
+	mark("registration", started)
+	started = time.Now()
 	end, err := pending.native.Claim(current, token, podUID)
 	if err != nil {
 		h.refused("native-claim", err)
@@ -508,6 +529,8 @@ func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context
 	}
 	call, stop := context.WithDeadline(current, end)
 	defer stop()
+	mark("native-claim", started)
+	started = time.Now()
 	selected, err := pending.reservation.Select(call, input.Request)
 	if err != nil {
 		h.refused("select", err)
@@ -521,7 +544,10 @@ func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context
 		ownerOperationUnavailable(w)
 		return
 	}
+	mark("select", started)
+	started = time.Now()
 	result, err := selected.Observe()
+	mark("observe", started)
 	if err != nil {
 		h.refused("observe", err)
 		ownerOperationUnavailable(w)
@@ -530,7 +556,9 @@ func (h *OwnerLocalObservationReceiver) claim(w http.ResponseWriter, ctx context
 	end = identity.Earlier(end, result.Interval.FreshUntil)
 	final, stopFinal := context.WithDeadline(call, end)
 	defer stopFinal()
+	started = time.Now()
 	ownerEnd, err := pending.operation.CheckFinal(final)
+	mark("final", started)
 	if err != nil {
 		h.refused("final", err)
 		ownerOperationUnavailable(w)
