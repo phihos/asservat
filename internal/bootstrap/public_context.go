@@ -78,6 +78,7 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 		return nil, &fixedStepError{"mcp", e}
 	}
 	mcpHandler.Report = eventLog(os.Stderr, "mcp unavailable")
+	audited.Timing = eventLog(os.Stderr, "mcp timing")
 	// ADR-194 D1: a nil Native (no configured worker) serves no content; its
 	// paths answer 503 rather than falling through to the console.
 	var content http.Handler

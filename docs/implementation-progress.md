@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Installed native 60: targets resolve; preview runs out of its five seconds (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39227859804)
+on frozen `0be9901ce98621162fe21a585570f6c2f785f4c4` (regional target reads)
+resolved preview targets for the first time and then refused at
+`facts/eligibility/authority`. That reason means the request context had
+expired (permission stream failures report `PermissionUnavailable`). The
+alternating attempts refused at `router` after exactly 3.34 s: the MCP
+operation's original deadline (at most five seconds, set before its audit
+Begin) covers the opening audit, an identity recheck, the preview and the
+closing audit, and an earlier interrupted preview had consumed the standby.
+Audited MCP calls now report fixed duration buckets for preparation, audit
+Begin, the call and audit Finish (`mcp timing`) to locate the time; no
+deadline changed.
+
+The single `permission_stream` denial for `permission-read` recorded in earlier
+runs is the regional journey's own negative probe
+(`installedPermissionObserver` requires `42501` for `UPDATE ... WHERE false`),
+not a product failure. After the test's deliberate hub-worker restart the
+permission reconciler logs one `start/begin (changed)` while the crashed
+process's 30-second lease is live and retries after 31 s, as designed.
+
+The full local Go gate for this commit passed; an additional isolated rerun of
+the three load-sensitive owner fixture tests failed once under a load average
+of about 23.
+
+[Archive verification](../test/results/installed-journey-ci-60/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 59: regional target resolution denied by RBAC (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39222603037)

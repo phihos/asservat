@@ -51,6 +51,51 @@ type AuditedOperations struct {
 	mu        sync.Mutex
 	active    map[string]int
 	rate      map[string]auditRate
+	// Timing receives one fixed line per audited call: operation lane and
+	// duration buckets of each reached stage. No input, identity or result.
+	Timing func(string)
+}
+
+// callTiming marks stage ends of one audited call for Timing.
+type callTiming struct {
+	start, admitted, begin, call, finish time.Time
+}
+
+func (t callTiming) report(lane string, out func(string)) {
+	if out == nil {
+		return
+	}
+	line := lane + " pre" + durationBucket(t.admitted, t.start) + " begin" + durationBucket(t.begin, t.admitted)
+	if !t.call.IsZero() {
+		line += " call" + durationBucket(t.call, t.begin)
+	}
+	if !t.finish.IsZero() {
+		line += " finish" + durationBucket(t.finish, t.call)
+	}
+	out(line + " total" + durationBucket(time.Now(), t.start))
+}
+
+// durationBucket keeps timing lines in a finite vocabulary.
+func durationBucket(end, start time.Time) string {
+	if end.IsZero() {
+		return "@none"
+	}
+	switch d := end.Sub(start); {
+	case d < 100*time.Millisecond:
+		return "@<100ms"
+	case d < 250*time.Millisecond:
+		return "@<250ms"
+	case d < 500*time.Millisecond:
+		return "@<500ms"
+	case d < time.Second:
+		return "@<1s"
+	case d < 2*time.Second:
+		return "@<2s"
+	case d < 3*time.Second:
+		return "@<3s"
+	default:
+		return "@>=3s"
+	}
 }
 
 func NewAuditedOperations(c AuditedOperationsConfig, inner *InvestigationOperations, normal, resolution auditapp.OperationAuditor, mac *auditapp.OperationMAC) (*AuditedOperations, error) {
@@ -194,6 +239,13 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	if s == nil || ctx == nil || current == nil || ctx.Err() != nil || len(raw) > 32<<10 || len(name) > 8192 {
 		return OperationReply{}, auditapp.ErrUnavailable
 	}
+	timing := callTiming{start: time.Now()}
+	lane := ""
+	defer func() {
+		if lane != "" {
+			timing.report(lane, s.Timing)
+		}
+	}()
 	initial, err := current.ResolveIdentity(ctx)
 	checkedAt := s.config.Now()
 	now := checkedAt.UTC().Truncate(time.Microsecond)
@@ -284,7 +336,10 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 			cancel()
 		}
 	}()
-	if e := s.audit[audit.OperationLane(op)].Begin(ctx, intent); e != nil {
+	lane, timing.admitted = audit.OperationLane(op), time.Now()
+	e := s.audit[lane].Begin(ctx, intent)
+	timing.begin = time.Now()
+	if e != nil {
 		return OperationReply{}, stoppedAt("audit-begin", e, auditapp.ErrUnavailable)
 	}
 	var reply OperationReply
@@ -317,6 +372,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 				call.queryInvocation = newContextQueryInvocation(ctx, intent, s.mac, s.config.Now)
 			}
 			reply, callErr = s.inner.CallWithContext(ctx, current, call, name, raw)
+			timing.call = time.Now()
 			reply.boundCleanup(intent.WriteUntil)
 			// Only a private, proven pre-dispatch rejection can rule out an
 			// effect from this invocation. A service error or response timeout
@@ -338,6 +394,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	// request authority. This bounded synchronous completion never redispatches.
 	auditCtx, finishCancel := context.WithDeadline(context.WithoutCancel(ctx), intent.WriteUntil)
 	e = s.audit[audit.OperationLane(op)].Finish(auditCtx, out)
+	timing.finish = time.Now()
 	finishCancel()
 	if e != nil {
 		clearReply()
