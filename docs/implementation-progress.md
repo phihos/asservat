@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Hub context-start self-authentication gets its own API clients (2026-10-19)
+
+Native54's opening self-authentication refusals with at least 2 seconds left
+fit client-go's token bucket: `x/time/rate.Wait` fails at once when the wait
+for a token would pass the context deadline, and the owner's shared 20 QPS
+observer also serves the request paths (3429 calls over the run, average call
+about 1.3 ms). The context-start ingress now builds its owner authenticator
+from separate observer/probe clients through `OwnerWorkloadProtection.WithClients`
+with the same guard plan, pins, routes and registry, as ADR-173 did for
+readiness. The `route` refusal step now distinguishes `route-read` (read
+error) from `route` (mismatch or expiry). No deadline or check changed. Not
+yet qualified by an installed run.
+
 ## Installed native 54: setup completes, hub self-authentication still refuses (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39179599368)

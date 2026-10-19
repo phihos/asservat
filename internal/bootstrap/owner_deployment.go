@@ -249,6 +249,9 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 			return nil, mounts.ErrUnavailable
 		}
 		nativeConfig.ContextStarts = d.publicContext.starts
+		if nativeConfig.ContextStarts.Authenticator, err = contextStartOwnerAuthenticator(in, c, guard, pool, configs, ledgers["registry"]); err != nil {
+			return nil, mounts.ErrUnavailable
+		}
 	}
 	// ADR-190 decision 4: an installed promoted owner keeps serving the
 	// observation handler set, now beside the native handler on its port.
@@ -669,4 +672,29 @@ func (d *OwnerDeployment) clusterCatalogChanged(ctx context.Context) bool {
 	}
 	digest, err := clusterCatalogDigest(catalog)
 	return err == nil && digest != pc.clustersDigest
+}
+
+// contextStartOwnerAuthenticator gives the context-start ingress self-checks
+// their own observer/probe clients with the same guard plan and pins: on the
+// owner's shared clients they queued behind other request paths and overran
+// the original five seconds (installed native 54). Checks are unchanged.
+func contextStartOwnerAuthenticator(in *ownerInputs, c contracts.OwnerDeployment, guard *kube.OwnerWorkloadProtection, pool value.OwnerPool, configs *postgres.OwnerConfigurations, registry *postgres.OwnerEnrollments) (*app.OwnerAuthenticator, error) {
+	control := configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+	observer, err := kube.NewPermissionClient(in.kubernetes("kube-observer.token"), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, err
+	}
+	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, err
+	}
+	own, err := guard.WithClients(observer, probe)
+	if err != nil {
+		return nil, err
+	}
+	endpoints, err := kube.NewOwnerEndpoints(observer, pool)
+	if err != nil {
+		return nil, err
+	}
+	return &app.OwnerAuthenticator{Registry: registry, Routes: &app.OwnerRoutes{Configurations: configs, Endpoints: endpoints, Now: time.Now}, Protection: own, Now: time.Now}, nil
 }

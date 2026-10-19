@@ -38,6 +38,10 @@ type OwnerContextStartRuntimeConfig struct {
 	Router                 *contextstart.Router
 	Admissions             []mtls.ContextStartConnectorAdmission
 	Connections, Preflight int
+	// Authenticator, when set, serves the ingress's owner self-checks from
+	// API clients of its own (as regionalCapacityClients does) instead of the
+	// owner's shared readiness/observer clients. Checks are unchanged.
+	Authenticator *app.OwnerAuthenticator
 }
 type ownerNativeRuntime struct {
 	roots            *x509.CertPool
@@ -89,7 +93,11 @@ func newOwnerNativeRuntime(r *OwnerRuntime, c OwnerNativeRuntimeConfig, auth *ap
 			router.Close()
 			return nil, artifact.ErrInvalid
 		}
-		ingress, e := mtls.NewContextStartIngress(start.RootID, r.server, auth, start.Admissions, time.Now)
+		self := auth
+		if start.Authenticator != nil {
+			self = start.Authenticator
+		}
+		ingress, e := mtls.NewContextStartIngress(start.RootID, r.server, self, start.Admissions, time.Now)
 		if e != nil {
 			router.Close()
 			return nil, e

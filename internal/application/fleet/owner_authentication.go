@@ -136,7 +136,11 @@ func (s *OwnerAuthenticator) authenticate(ctx context.Context, certificateFrom f
 	}
 	route, err := s.Routes.CurrentOwnerRoute(ctx, certificate.Binding)
 	if err != nil || !route.Valid(s.Now()) || route.Endpoint.Binding != certificate.Binding || route.Endpoint.Pool != pool || route.Endpoint.Pod != first.Enrollment.Pod || route.Endpoint.ReplicaSetUID != first.Enrollment.ReplicaSetUID || !route.Configuration.Configuration.Equal(first.Configuration.Configuration) {
-		refusalStep(ctx, "route")
+		if err != nil {
+			refusalStep(ctx, "route-read")
+		} else {
+			refusalStep(ctx, "route")
+		}
 		return zero, value.ErrUnavailable
 	}
 	route.Configuration.Configuration = route.Configuration.Configuration.Clone()
