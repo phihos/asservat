@@ -1,5 +1,21 @@
 # Sustained implementation progress
 
+## Installed native 70: retention passes; processing step lost in the ledger (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39279970394)
+on frozen `0dd887c3a77217897264b52a71a6944578a73468` (separate retention
+clients, before the preview `ReviewChanged` mapping) failed at preview without
+a retention refusal: one attempt refused at `processing/read`, one ran out of
+time at eligibility, and the third ended `ReviewChanged` from `facts/current`,
+fixed in the following commit. The processing refusal carried no step because
+the ledger transaction normalizes errors returned through it; the coverage read
+now keeps its step beside the transaction and reports `tx` for pool, BEGIN or
+COMMIT failures.
+
+[Archive verification](../test/results/installed-journey-ci-70/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Local run 2: retention source current; previews still run out of time (2026-10-19)
 
 The local run on frozen `0dd887c` (separate retention follower clients)

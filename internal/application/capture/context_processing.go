@@ -41,7 +41,7 @@ func processingReadStep(err error) string {
 	var step interface{ ProcessingStep() string }
 	if errors.As(err, &step) {
 		switch s := step.ProcessingStep(); s {
-		case "root", "rules", "root-changed", "fresh", "fresh-after", "root-invalid", "coverage", "current", "recovery-lock", "recovery-check", "expired":
+		case "root", "rules", "root-changed", "fresh", "fresh-after", "root-invalid", "coverage", "current", "recovery-lock", "recovery-check", "expired", "tx", "other":
 			return "/" + s
 		}
 	}

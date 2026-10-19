@@ -107,7 +107,16 @@ func (s *ProcessingReads) ContextProcessingCoverage(ctx context.Context, in valu
 	}
 	call, end := context.WithDeadline(ctx, until)
 	defer end()
-	err := s.ledger.transaction(call, func(q *custodydb.Queries) error {
+	// The ledger normalizes errors returned through it; keep the closure's
+	// fixed step beside it for diagnostics.
+	failed := ""
+	err := s.ledger.transaction(call, func(q *custodydb.Queries) (err error) {
+		defer func() {
+			var step coverageStepError
+			if err != nil && errors.As(err, &step) {
+				failed = step.step
+			}
+		}()
 		trust, err := s.recovery.lock(call, q, s.root, recovery)
 		if err != nil {
 			return coverageStepWith("recovery-lock", err)
@@ -129,11 +138,14 @@ func (s *ProcessingReads) ContextProcessingCoverage(ctx context.Context, in valu
 		return value.ProcessingCoverage{}, coverageStep("expired")
 	}
 	if err != nil {
-		var step coverageStepError
-		if errors.As(err, &step) {
-			return value.ProcessingCoverage{}, coverageStepError{step.step, captureError(step.err)}
+		if failed == "" {
+			failed = "other"
+			var fixed interface{ FixedStep() string }
+			if errors.As(err, &fixed) {
+				failed = "tx" // pool acquisition, BEGIN or COMMIT
+			}
 		}
-		return value.ProcessingCoverage{}, captureError(err)
+		return value.ProcessingCoverage{}, coverageStepError{failed, captureError(err)}
 	}
 	if !out.Current(time.Now()) {
 		return value.ProcessingCoverage{}, value.ErrUnavailable
