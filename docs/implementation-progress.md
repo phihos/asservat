@@ -1,5 +1,29 @@
 # Sustained implementation progress
 
+## Installed native 58: capacity projection claimed with 3 ms left (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39219349203)
+on frozen `bb90c7d2b74a87db294b6eda73b700f5fd55cd6b` (50 QPS opening clients)
+stopped before preview, at `capacity/projection`, which took about 3.4 s in
+native 56/57. Its first attempt reached `claim-write` 155 ms in with 3 ms of
+original validity left, so it wrote a claim it could not complete. An attempted
+claim is lookup-only afterwards, so the remaining 33 attempts within the
+minute failed (last at `local-owner`). `capacity/initialize` also took 1m18s
+against about 35 s before. The hub's context-start clients had made no calls,
+so the limiter change was not involved. Capacity and permission projection
+claims now require at least one second of original validity before the claim
+write (`projectionClaimUntil`, as the worker admission floor); declining starts
+no effect and the original bounds are unchanged.
+
+Local Go gates for native 56–58 commits failed each time in one or two
+different timing-sensitive Kubernetes fixture tests while an unrelated build on
+this host held the load average near 60 on 16 cores; each failure is in code
+this branch does not change.
+
+[Archive verification](../test/results/installed-journey-ci-58/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 57: target queries fail three ways; opening clients revised to 50 QPS (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39215209940)

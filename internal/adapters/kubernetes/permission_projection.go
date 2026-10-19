@@ -242,9 +242,9 @@ func (s *PermissionRuntimeProjection) Publish(ctx context.Context, verified cont
 			}
 			at = "claim-write"
 			now := s.resources.now().UTC().Truncate(time.Microsecond)
-			until, _ = call.Deadline()
-			until = identity.Earlier(until, old.State.Until).UTC().Truncate(time.Microsecond)
-			if !now.Before(until) {
+			deadline, _ := call.Deadline()
+			var ok bool
+			if until, ok = projectionClaimUntil(now, deadline, old.State.Until); !ok {
 				return cfg.ErrUnavailable
 			}
 			id, e := prepUUID()
