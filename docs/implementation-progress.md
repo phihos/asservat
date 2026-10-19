@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## Installed native 55: opening self-authentication passes, both sides run out of time (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39206342897)
+on frozen `94798519bf9a4929c0de1f0cd32296a55a3e0ebb` (separate hub ingress API
+clients) failed before capture at the same preview point. Opening
+self-authentication refusals with time left are gone; every hub refusal is now
+closing (`final-local`, `final-source`) with under 0.5 seconds left. Connector
+setup marks show the opening source read at 540 ms, the process proof at 1.84 s
+and each later guard/settings check 150–350 ms, reaching 3.39 s; openings reach
+`headers` after 3.0–4.6 seconds. Individual API calls average about 1.3 ms, so
+the time fits the fixed 20 QPS/burst-20 client bucket (about 50 ms per call
+after the burst) rather than API latency. Changing that documented limit or the
+five-second window is a maintainer decision; neither was changed.
+
+[Archive verification](../test/results/installed-journey-ci-55/verification.json)
+matched all 2702 source hashes to the frozen commit; sources were unchanged,
+test exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Hub context-start self-authentication gets its own API clients (2026-10-19)
 
 Native54's opening self-authentication refusals with at least 2 seconds left
