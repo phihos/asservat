@@ -35,7 +35,10 @@ type CapacityReconciler struct {
 	// elapsed time and the guarded read's freshness left when it returned.
 	Demands      CapacityRefreshDemandReader
 	DemandReport func(err error, elapsed, left time.Duration, stages string)
-	running      atomic.Bool
+	// DemandContext optionally adds a diagnostic recorder to a demand
+	// refresh's context and returns its fixed stage marks.
+	DemandContext func(context.Context) (context.Context, func() string)
+	running       atomic.Bool
 }
 
 // CapacitySourceInvocation is only the existing source invocation boundary.
@@ -318,6 +321,10 @@ func (s *CapacityReconciler) runDemands(root context.Context, current *capacityC
 				continue
 			}
 			started := s.Work.Now()
+			observed := func() string { return "" }
+			if s.DemandContext != nil {
+				call, observed = s.DemandContext(call)
+			}
 			// Fixed stage names with each stage's duration, for diagnostics.
 			var stages []string
 			stage, at := "", started
@@ -329,6 +336,9 @@ func (s *CapacityReconciler) runDemands(root context.Context, current *capacityC
 			})
 			if stage != "" {
 				stages = append(stages, stage+"="+s.Work.Now().Sub(at).Round(10*time.Millisecond).String())
+			}
+			if o := observed(); o != "" {
+				stages = append(stages, o)
 			}
 			if s.DemandReport != nil {
 				s.DemandReport(err, s.Work.Now().Sub(started), left, strings.Join(stages, " "))

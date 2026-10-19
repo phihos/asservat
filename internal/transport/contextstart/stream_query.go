@@ -97,11 +97,16 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 		return time.Time{}, e
 	}
 	defer clear(payload)
+	defer markQuery(ctx, "q-total", time.Now())
+	pulled := time.Now()
 	if e = s.pullSource(call); e != nil {
 		s.record(streamHubQuerySource, streamErrorReason(e))
 		return time.Time{}, fleet.ErrUnavailable
 	}
+	markQuery(ctx, "q-source", pulled)
+	checked := time.Now()
 	receiver, e := s.check(call)
+	markQuery(ctx, "q-check", checked)
 	if e != nil || !receiver.Valid(time.Now()) || receiver.Channel != s.channel {
 		s.record(streamHubQueryCheck, queryCheckReason(e))
 		s.interruptAt(streamSendPeer, streamPeerInvalid)
@@ -110,7 +115,9 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 	if e = s.Send(call, contracts.APIContextFrame{Kind: contracts.APIContextQueryFrame, Payload: payload}); e != nil {
 		return time.Time{}, e
 	}
+	answered := time.Now()
 	f, e := s.Receive(call)
+	markQuery(ctx, "q-answer", answered)
 	if e != nil {
 		return time.Time{}, e
 	}

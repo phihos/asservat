@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"context"
 	"encoding/json"
 	"errors"
@@ -307,6 +308,10 @@ func newCapacityWorkerDeployment(ctx context.Context, files *os.Root, installed 
 		Work: &app.CapacityWorkReconciler{Qualification: q, Recovery: journal, Permissions: permissions, Processing: processing, Root: &app.RootBackingCoordinator{Store: general, Capture: capture, Now: time.Now}, Enrollment: &app.EnrollmentCoordinator{Store: enroll, Capture: captureEnroll, Accounts: accounts, Now: time.Now}, Bindings: enroll, Now: time.Now, Regional: regional}, Clusters: clusters,
 		SourceReport: capacitySourceReporter(),
 		Demands:      demands, DemandReport: capacityDemandReporter(),
+		DemandContext: func(ctx context.Context) (context.Context, func() string) {
+			ctx, marks := auditapp.WithStepTimes(ctx)
+			return ctx, marks.String
+		},
 		Stalled: func(cluster, stage string) {
 			fmt.Fprintf(os.Stderr, "capacity workload loop stalled: cluster %s in %s for over %s\n", cluster, stage, 2*app.CapacitySourceInterval)
 		}}

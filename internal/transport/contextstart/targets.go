@@ -3,6 +3,8 @@ package contextstart
 import (
 	"context"
 	"errors"
+	"strings"
+	"sync"
 	"time"
 
 	fleetapp "asservat.local/asservat/internal/application/fleet"
@@ -32,11 +34,14 @@ func (t Targets) query(ctx context.Context, cluster, method string, in any) (tar
 	defer cancel()
 	start := fleetapp.RemainingBucket(call, time.Now())
 	call, diagnostics := NewStreamDiagnosticContext(call)
+	marks := &queryMarks{}
+	call = context.WithValue(call, queryMarksKey{}, marks)
 	until, err := t.Router.Query(call, cluster, method, in, &out)
 	if err != nil {
-		t.report(queryStep(err, diagnostics) + " start" + start + " end" + fleetapp.RemainingBucket(ctx, time.Now()))
+		t.report(queryStep(err, diagnostics) + " start" + start + " end" + fleetapp.RemainingBucket(ctx, time.Now()) + " [" + marks.String() + "]")
 		return targets.PodResolution{}, err
 	}
+	t.report("ok start" + start + " end" + fleetapp.RemainingBucket(ctx, time.Now()) + " [" + marks.String() + "]")
 	out.FreshUntil = identity.Earlier(out.FreshUntil, until)
 	if out.ExecutionClass != artifact.ContextAPIExecution || out.Request.ClusterID != cluster || !out.Valid(t.Now()) {
 		return targets.PodResolution{}, targets.ErrUnavailable
@@ -93,4 +98,26 @@ func queryStep(err error, d *StreamDiagnostics) string {
 		return v.Stage() + "/" + v.Reason()
 	}
 	return "router"
+}
+
+// queryMarks collects fixed hub query stage durations for diagnostics only.
+type queryMarks struct {
+	mu    sync.Mutex
+	marks []string
+}
+type queryMarksKey struct{}
+
+func markQuery(ctx context.Context, stage string, start time.Time) {
+	if m, ok := ctx.Value(queryMarksKey{}).(*queryMarks); ok && m != nil {
+		m.mu.Lock()
+		if len(m.marks) < 8 {
+			m.marks = append(m.marks, stage+"="+time.Since(start).Round(10*time.Millisecond).String())
+		}
+		m.mu.Unlock()
+	}
+}
+func (m *queryMarks) String() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return strings.Join(m.marks, " ")
 }

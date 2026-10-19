@@ -1,5 +1,19 @@
 # Sustained implementation progress
 
+## Local journey hold 3: binding refresh is latency, not rate (2026-10-19)
+
+With the regional observation clients on the opening limiter (frozen
+`8ce7951`), eight live previews all failed on time. Demand refreshes were
+steady at 2.3 s, 2.2 s of it the guarded regional read, so that read is path
+latency rather than client throttling; each refreshed binding has about 2 s
+left. Target queries took 1 to over 3 s and the region's query check failed in
+its local process proof (`regional-query-local`). Other refusals
+(`facts/current`, `processing/read/root-invalid`, retention `topology`,
+`facts/storage`) are facts whose five-second windows lapsed during the
+preview. Hub target queries now report source, check, answer and total
+durations on every query, and the hub-worker's regional observation reports
+its candidates, routes, locate and claim stages in the demand line.
+
 ## Local journey hold: live previews (2026-10-19)
 
 `ASSERVAT_JOURNEY_HOLD` (local only) now pauses the installed journey with the

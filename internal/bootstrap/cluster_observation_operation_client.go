@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -132,7 +133,9 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	}()
 	// Fixed step labels name the failing stage for the operator diagnostic
 	// (ADR-197); every cause stays value.ErrUnavailable to callers.
+	mark := time.Now()
 	candidates, err := c.candidates.ReadOwnerObservationCandidates(call)
+	auditapp.MarkStep(ctx, "o-candidates", mark)
 	if err != nil || !candidates.Valid(c.now()) || candidates.Pool != c.pin.Pool || len(candidates.Owners) == 0 {
 		return zero, &fixedStepError{"candidates", value.ErrUnavailable}
 	}
@@ -142,7 +145,9 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	defer stopSQL()
 	nativeCandidates := candidates
 	nativeCandidates.Owners = slices.Clone(candidates.Owners)
+	mark = time.Now()
 	routes, err := c.ready.ReadOwnerObservationDialCandidates(sqlCall, nativeCandidates)
+	auditapp.MarkStep(ctx, "o-routes", mark)
 	if err != nil || !routes.Groups.Valid(c.now()) || !sameForwardCandidates(candidates, routes.Groups.Candidates) {
 		return zero, &fixedStepError{"routes", value.ErrUnavailable}
 	}
@@ -165,7 +170,9 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	end = identity.Earlier(end, routes.Groups.ValidUntil)
 	bounded, stopBounded := context.WithDeadline(sqlCall, end)
 	defer stopBounded()
+	mark = time.Now()
 	selected, err := c.locate(bounded, request.LocatorQuery(), routes)
+	auditapp.MarkStep(ctx, "o-locate", mark)
 	if err != nil || selected == nil {
 		return zero, &fixedStepError{"locate", value.ErrUnavailable}
 	}
@@ -173,7 +180,9 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	if bounded.Err() != nil || !routes.Groups.Valid(c.now()) || !selected.locator.Matches(request.LocatorQuery(), selected.leaf.Binding, c.now()) {
 		return zero, &fixedStepError{"locator", value.ErrUnavailable}
 	}
+	mark = time.Now()
 	result, err := c.claim(bounded, request, selected)
+	auditapp.MarkStep(ctx, "o-claim", mark)
 	if err != nil {
 		return zero, &fixedStepError{"claim", err}
 	}
