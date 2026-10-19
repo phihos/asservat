@@ -1,5 +1,30 @@
 # Sustained implementation progress
 
+## Local journey holds 4–6: claim and regional answer dominate (2026-10-19)
+
+Hold 4 produced no previews: the collector read hold 3's stale `out` file
+before the new run replaced it. After the 90-minute hold expired, the resumed
+journey's Keycloak refresh returned 400 (expected after a long pause; holds are
+ended with `stop`). Hold 5 stopped at `public/roles-projection` (unavailable,
+23 attempts), earlier seen once in `adr183-continuation-native-14`; not on the
+preview path and not yet explained.
+
+Hold 6 (`edbb701`) ran eight previews: five `NotAvailable`, two 5 s transport
+stream errors and one `audit-begin/reserve` 503. Measured, not inferred:
+
+- hub target query `q-answer` (waiting for the region's answer) 2–2.4 s of a
+  2.6–3.7 s query; `q-source`/`q-check` stay under 400 ms except one 1.04 s
+  source pull. One region check failed at its local source protection probe
+  (`source.probe-object-read` cancelled at its 960 ms bound).
+- capacity demand refresh: `o-claim` under 3 s bucket of a 2.2–3.2 s guarded
+  read; candidates/routes/locate stay under 250 ms (one locate under 2 s).
+  Refreshes with no located owner fail fast in 50–100 ms.
+
+`e0480b3`/`bd2b244` add region answer steps (`r-check` with `r-local`/`r-owner`,
+`r-resolve`, `r-write`), hub claim steps (`c-open`, `c-before`, `c-post`,
+`c-after`, `c-final`, `c-current`) and owner claim steps (pending,
+registration, native-claim, select, observe, final). Hold 7 runs on `bd2b244`.
+
 ## Local journey hold 3: binding refresh is latency, not rate (2026-10-19)
 
 With the regional observation clients on the opening limiter (frozen
