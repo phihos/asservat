@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	auditapp "asservat.local/asservat/internal/application/audit"
 	execution "asservat.local/asservat/internal/application/execution"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
@@ -272,7 +273,9 @@ func (c *ContextStartClient) currentWithOpeningDiagnostic(ctx context.Context, c
 	} else {
 		diagnostic.at("process-first")
 	}
+	localStart := time.Now()
 	_, _, until, e := c.localWithReader(call, &channel, reader)
+	auditapp.MarkStep(ctx, "r-local", localStart)
 	if e != nil {
 		return zero, receiverCheckStep{"local", e}
 	}
@@ -284,7 +287,9 @@ func (c *ContextStartClient) currentWithOpeningDiagnostic(ctx context.Context, c
 	} else {
 		diagnostic.at("owner-first")
 	}
+	ownerStart := time.Now()
 	owner, e := c.owners.AuthenticateOwner(call, remote)
+	auditapp.MarkStep(ctx, "r-owner", ownerStart)
 	if e != nil || !owner.Valid(c.now()) || owner.Certificate.Binding != channel.Hub || owner.Pool != c.pool {
 		return zero, receiverCheckStep{"owner", value.ErrDenied}
 	}

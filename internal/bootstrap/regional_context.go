@@ -238,7 +238,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	if err != nil {
 		return &fixedStepError{"start-client", err}
 	}
-	local := contextstart.RegionalLocal{Process: process, Targets: r.targets, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, eventLog(os.Stderr, "regional target answer")}, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
 	fmt.Fprintln(os.Stderr, "regional context start active")
 	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Verifier: r.verifier, Local: local, Report: eventLog(os.Stderr, "regional context standby refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
 }
@@ -264,3 +264,11 @@ func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.C
 	}
 	return producer.PrepareContext(ctx, e)
 }
+
+// reportedTargets logs the region's target-answer step durations.
+type reportedTargets struct {
+	*kube.PodTargets
+	report func(string)
+}
+
+func (t reportedTargets) ReportAnswer(steps string) { t.report(steps) }

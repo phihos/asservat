@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -25,6 +26,10 @@ type QueryTargets interface {
 	ResolveWorkload(context.Context, targets.WorkloadRequest) (targets.PodResolution, error)
 	ResolvePod(context.Context, targets.Request) (targets.PodResolution, error)
 }
+
+// answerReporter optionally receives the region's fixed answer step
+// durations; it never sees targets, peers or error text.
+type answerReporter interface{ ReportAnswer(string) }
 
 // Closed failure labels; raw errors never cross the exchange.
 var queryFailures = []struct {
@@ -153,7 +158,14 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	if r, ok := s.targets.(answerReporter); ok {
+		var times *auditapp.StepTimes
+		call, times = auditapp.WithStepTimes(call)
+		defer func() { r.ReportAnswer(times.String()) }()
+	}
+	checked := time.Now()
 	owner, e := s.check(call)
+	auditapp.MarkStep(call, "r-check", checked)
 	if e != nil || !owner.Valid(time.Now()) || owner.Channel != s.channel {
 		stage := streamRegionalQueryOwner
 		var step interface{ ReceiverCheckStep() string }
@@ -172,6 +184,7 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	bounded, stop := context.WithDeadline(call, identity.Earlier(until, owner.ValidUntil))
 	defer stop()
 	var out targets.PodResolution
+	resolved := time.Now()
 	switch q.Method {
 	case queryResolveWorkload:
 		var r targets.WorkloadRequest
@@ -188,6 +201,7 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	default:
 		return contracts.ErrAPIContextProtocol
 	}
+	auditapp.MarkStep(call, "r-resolve", resolved)
 	reply := contracts.APIContextOperationReply{Format: contracts.APIContextExchangeFormat, Sequence: seq, Method: q.Method}
 	if e != nil {
 		reply.Failure = queryFailureLabel(e)
@@ -199,7 +213,10 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		return e
 	}
 	defer clear(encoded)
-	if e = s.writeSourceFrame(bounded, contracts.APIContextFrame{Kind: contracts.APIContextAnswerFrame, Payload: encoded}); e != nil {
+	written := time.Now()
+	e = s.writeSourceFrame(bounded, contracts.APIContextFrame{Kind: contracts.APIContextAnswerFrame, Payload: encoded})
+	auditapp.MarkStep(call, "r-write", written)
+	if e != nil {
 		s.record(streamRegionalQueryWrite, streamErrorReason(e))
 	}
 	return e

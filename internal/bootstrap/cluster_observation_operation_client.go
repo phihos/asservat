@@ -467,7 +467,9 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 	if err != nil {
 		return zero, err
 	}
+	mark := time.Now()
 	socket, err := c.open(call, s.address, name)
+	auditapp.MarkStep(ctx, "c-open", mark)
 	if err != nil {
 		return zero, &fixedStepError{"open", err}
 	}
@@ -481,7 +483,9 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 	if err != nil || leaf != s.leaf {
 		return zero, &fixedStepError{"peer", value.ErrDenied}
 	}
+	mark = time.Now()
 	before, err := c.current(call, connection, &s.first)
+	auditapp.MarkStep(ctx, "c-before", mark)
 	if err != nil {
 		return zero, &fixedStepError{"before", err}
 	}
@@ -493,26 +497,34 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 		return zero, err
 	}
 	defer clear(body)
+	mark = time.Now()
 	data, err := socket.request(bounded, http.MethodPost, contracts.ClusterObservationLocalClaimPath, contracts.ClusterObservationLocalClaimMedia, body, s.token)
 	if err != nil {
 		return zero, &fixedStepError{"post", err}
 	}
+	auditapp.MarkStep(ctx, "c-post", mark)
 	defer clear(data)
+	mark = time.Now()
 	after, err := c.current(bounded, connection, &s.first)
+	auditapp.MarkStep(ctx, "c-after", mark)
 	if err != nil {
 		return zero, &fixedStepError{"after", err}
 	}
 	end = identity.Earlier(end, after.FreshUntil)
 	nativeCall, stopNative := context.WithDeadline(bounded, end)
 	defer stopNative()
+	mark = time.Now()
 	final, err := s.native.Final(nativeCall)
+	auditapp.MarkStep(ctx, "c-final", mark)
 	if err != nil || !final.Valid(c.now()) || !final.Final || !ownerLocalSameFacts(s.initial, final) || !ownerLocalNativePeer(final, after, s.address) {
 		return zero, &fixedStepError{"native-final", errors.Join(value.ErrUnavailable, err)}
 	}
 	end = identity.Earlier(end, final.FreshUntil)
 	finalCall, stopFinal := context.WithDeadline(nativeCall, end)
 	defer stopFinal()
+	mark = time.Now()
 	current, err := c.current(finalCall, connection, &s.first)
+	auditapp.MarkStep(ctx, "c-current", mark)
 	if err != nil {
 		return zero, &fixedStepError{"current", err}
 	}
