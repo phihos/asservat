@@ -274,7 +274,7 @@ func (c *ContextStartClient) currentWithOpeningDiagnostic(ctx context.Context, c
 	}
 	_, _, until, e := c.localWithReader(call, &channel, reader)
 	if e != nil {
-		return zero, e
+		return zero, receiverCheckStep{"local", e}
 	}
 	diagnostic.bound(until)
 	call, stopLocal := context.WithDeadline(call, until)
@@ -286,7 +286,7 @@ func (c *ContextStartClient) currentWithOpeningDiagnostic(ctx context.Context, c
 	}
 	owner, e := c.owners.AuthenticateOwner(call, remote)
 	if e != nil || !owner.Valid(c.now()) || owner.Certificate.Binding != channel.Hub || owner.Pool != c.pool {
-		return zero, value.ErrDenied
+		return zero, receiverCheckStep{"owner", value.ErrDenied}
 	}
 	until = identity.Earlier(until, owner.ValidUntil)
 	diagnostic.bound(until)
@@ -655,3 +655,15 @@ func encodeContextStartSourceFrame(observed value.ConnectorIdentitySource, excha
 	}
 	return contracts.EncodeAPIContextSource(contracts.APIContextSource{Format: contracts.APIContextExchangeFormat, ExchangeID: exchange, Sequence: 0, Source: raw})
 }
+
+// receiverCheckStep keeps the returned error and names which half of a current
+// receiver check failed (the local process proof or the owner authentication),
+// for the stream's fixed diagnostics only.
+type receiverCheckStep struct {
+	step string
+	err  error
+}
+
+func (e receiverCheckStep) Error() string             { return e.err.Error() }
+func (e receiverCheckStep) Unwrap() error             { return e.err }
+func (e receiverCheckStep) ReceiverCheckStep() string { return e.step }

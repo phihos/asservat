@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -33,7 +34,7 @@ type CapacityReconciler struct {
 	// back, while the demand lasts. DemandReport sees each outcome, its
 	// elapsed time and the guarded read's freshness left when it returned.
 	Demands      CapacityRefreshDemandReader
-	DemandReport func(err error, elapsed, left time.Duration)
+	DemandReport func(err error, elapsed, left time.Duration, stages string)
 	running      atomic.Bool
 }
 
@@ -317,9 +318,20 @@ func (s *CapacityReconciler) runDemands(root context.Context, current *capacityC
 				continue
 			}
 			started := s.Work.Now()
-			left, err := s.reconcileCandidate(call, current, c, d.Namespace, d.Workload, func(string) {})
+			// Fixed stage names with each stage's duration, for diagnostics.
+			var stages []string
+			stage, at := "", started
+			left, err := s.reconcileCandidate(call, current, c, d.Namespace, d.Workload, func(next string) {
+				if stage != "" {
+					stages = append(stages, stage+"="+s.Work.Now().Sub(at).Round(10*time.Millisecond).String())
+				}
+				stage, at = next, s.Work.Now()
+			})
+			if stage != "" {
+				stages = append(stages, stage+"="+s.Work.Now().Sub(at).Round(10*time.Millisecond).String())
+			}
 			if s.DemandReport != nil {
-				s.DemandReport(err, s.Work.Now().Sub(started), left)
+				s.DemandReport(err, s.Work.Now().Sub(started), left, strings.Join(stages, " "))
 			}
 			return
 		}

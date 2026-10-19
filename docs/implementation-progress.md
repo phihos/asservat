@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Local journey hold: live previews (2026-10-19)
+
+`ASSERVAT_JOURNEY_HOLD` (local only) now pauses the installed journey with the
+installation live and runs preview commands from a directory, so a preview
+takes seconds instead of a 22-minute run. Native 72 stopped before preview at
+the regional capacity demand check (`regional binding was not refreshed on
+demand`), with only a diagnostic change; native 73 (`b6aab94`) showed the
+capability read under 100 ms and refused at `processing/read/root-invalid`
+twice. The processing root is renewed only in its last ten seconds; one
+renewal landed at expiry, another 9 s before it.
+
+Six live previews on frozen `c8ed270` all failed on time: target queries took
+1–3 s and the region's current owner check during a query failed in about half
+of them (`exchange/regional-query-owner/unavailable|denied`, seen by the hub
+as `read/other`); the storage wait took 2–3 s because each demand refresh's
+guarded regional read takes 2.6–3.7 s (the region's own read about 0.45 s)
+and leaves the binding about 2 s of freshness. The region's check now names
+the failing half (`regional-query-local` or `regional-query-owner-auth`), and
+demand refreshes report their stage durations.
+
 ## Local run 3 and native 71: preview stage timing (2026-10-19)
 
 Local run 3 (frozen `225444f`) and native 71 (`2c005fd`, preview `ErrChanged`

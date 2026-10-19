@@ -148,7 +148,17 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	defer cancel()
 	owner, e := s.check(call)
 	if e != nil || !owner.Valid(time.Now()) || owner.Channel != s.channel {
-		s.record(streamRegionalQueryOwner, queryCheckReason(e))
+		stage := streamRegionalQueryOwner
+		var step interface{ ReceiverCheckStep() string }
+		if errors.As(e, &step) {
+			switch step.ReceiverCheckStep() {
+			case "local":
+				stage = streamRegionalQueryLocal
+			case "owner":
+				stage = streamRegionalQueryOwnerAuth
+			}
+		}
+		s.record(stage, queryCheckReason(e))
 		return fleet.ErrUnavailable
 	}
 	until, _ := call.Deadline()

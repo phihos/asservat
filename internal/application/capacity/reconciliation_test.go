@@ -222,7 +222,7 @@ func TestCapacityReconcilerDemandLaneReconcilesDemandedWorkload(t *testing.T) {
 		}
 		var reports atomic.Int32
 		runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{{ClusterID: cluster, Workloads: reader, Guard: reader, Pace: time.Hour}},
-			Demands: staticCapacityDemands{demand}, DemandReport: func(error, time.Duration, time.Duration) { reports.Add(1) }}
+			Demands: staticCapacityDemands{demand}, DemandReport: func(error, time.Duration, time.Duration, string) { reports.Add(1) }}
 		ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
 		_ = runner.Run(ctx)
 		cancel()
