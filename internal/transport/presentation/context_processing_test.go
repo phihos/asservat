@@ -26,3 +26,12 @@ func TestContextProcessingCoverageFailurePreservesUnknownEarlierRequest(t *testi
 		t.Fatal("transient read failure misclassified", unavailable)
 	}
 }
+
+func TestPreviewChangeIsRetryableButRequestChangeIsReviewChanged(t *testing.T) {
+	if f := publicCaptureFailure(value.ErrChanged, false); f.Code != "NotAvailable" || !f.Retryable {
+		t.Fatalf("preview: %+v", f)
+	}
+	if f := publicCaptureFailure(value.ErrChanged, true); f.Code != "ReviewChanged" || f.Retryable {
+		t.Fatalf("request: %+v", f)
+	}
+}

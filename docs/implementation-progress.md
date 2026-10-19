@@ -1,5 +1,21 @@
 # Sustained implementation progress
 
+## Installed native 69: a lapsed preview fact surfaced as ReviewChanged (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39277451723)
+on frozen `3b91ab707435bbbdbb1c55b5f9e1a231751ca727` (router waits for a
+standby) failed at preview. One attempt refused at
+`facts/retention/read/source-hub`, one at `target` (`read/other`), and the
+third at `facts/current`: an observation lapsed while the preview was being
+assembled. That `ErrChanged` reached MCP as the non-retryable `ReviewChanged`,
+which the journey rejects (the unexpected code in native 63 too). A preview has
+no earlier review to resolve, so preview `ErrChanged` now maps to the retryable
+`NotAvailable`; request and resolution keep `ReviewChanged`.
+
+[Archive verification](../test/results/installed-journey-ci-69/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Local reproduction: hub retention source current only about half the time (2026-10-19)
 
 A local `--keep-on-failure` run of the same suite (frozen `0480509`) sampled the
