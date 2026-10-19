@@ -200,7 +200,20 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 	w.publisher = auditapp.AuthorityPublisher{Ledger: oneAuthorityAudit{ledger}, Objects: &installedAuthorityAudit{root: c.RootID, audit: writer}}
 	w.admission = b.admission
 	if c.Retention != nil {
-		if w.retention, err = newRetentionWorker(startup, c, pools, observer, probe, writer); err != nil {
+		// ADR-208: the retention source follower gets its own clients with the
+		// opening limiter. Behind the permission reconciler on the shared 20/20
+		// clients it wrote each observation with 2-3 s of its five seconds left
+		// and the next one 3-6 s later, so the hub source was current about half
+		// the time and previews refused at retention (installed native 68).
+		retentionObserver, e := kube.NewPermissionClient(kube.WithOpeningBurst(local.kubernetes("kube-observer.token")), c.Control.ClusterID, control, time.Now)
+		if e != nil {
+			return nil, &fixedStepError{"retention/clients", e}
+		}
+		retentionProbe, e := kube.NewPermissionClient(kube.WithOpeningBurst(local.kubernetes("kube-probe.token")), c.Control.ClusterID, control, time.Now)
+		if e != nil {
+			return nil, &fixedStepError{"retention/clients", e}
+		}
+		if w.retention, err = newRetentionWorker(startup, c, pools, retentionObserver, retentionProbe, writer); err != nil {
 			return nil, &fixedStepError{"retention/open", err}
 		}
 	}

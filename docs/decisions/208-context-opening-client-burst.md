@@ -52,6 +52,14 @@ preview too little time. That reader's two clients now use the same opening
 limiter. Its proofs, identities and the request deadline are unchanged; the
 provider refresh reader and all other clients keep 20/20.
 
+## Extension to the hub retention follower
+
+The hub-worker's retention source follower kept the accepted hub source current
+only about half the time on the permission worker's shared 20/20 clients (local
+reproduction after native 68). Every preview reads that source twice inside
+its five seconds. The follower now has its own observer and probe clients with
+the opening limiter; observation content and freshness bounds are unchanged.
+
 ## Alternatives
 
 - Raising QPS (as the configuration worker's 40 QPS observer) increases

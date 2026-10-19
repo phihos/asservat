@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Local reproduction: hub retention source current only about half the time (2026-10-19)
+
+A local `--keep-on-failure` run of the same suite (frozen `0480509`) sampled the
+hub `retention_source` row once per second for 40 s during installation: each
+observation was written with 2–3 s of its five seconds left and the next one
+landed 3–6 s later, so `fresh_until` had passed for roughly half the samples
+while the 30-second lease stayed live. That explains native 68's
+`facts/retention/read/source-hub`. The retention follower shared the permission
+worker's 20/20 observer and probe clients with the permission reconciler; it
+now has its own clients with the ADR-208 opening limiter. Observation content,
+cadence rules and freshness bounds are unchanged; whether this restores
+continuous freshness is for the next run to show.
+
 ## Installed native 68: hub retention source not current; router waits for a standby (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39272153061)
