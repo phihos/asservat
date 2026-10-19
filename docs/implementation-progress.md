@@ -1,5 +1,13 @@
 # Sustained implementation progress
 
+## Context-start opening clients get a burst of 100 (2026-10-19)
+
+[ADR-208](decisions/208-context-opening-client-burst.md): the regional context
+and hub ingress self-authentication observer/probe clients keep 20 QPS with a
+burst of 100 instead of 20. Native 55 measured about 1.3 ms per API call while
+setup steps took 150–350 ms each, matching token waits past the burst. Checks
+and deadlines are unchanged. Not yet qualified by an installed run.
+
 ## Installed native 55: opening self-authentication passes, both sides run out of time (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39206342897)

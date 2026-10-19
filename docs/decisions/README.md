@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-208 — Burst-100 Kubernetes clients for context-start openings](208-context-opening-client-burst.md)
+raises only the burst of the dedicated opening clients to 100 at the unchanged
+20 QPS; checks and deadlines are unchanged and installed qualification is
+pending.
+
 [ADR-207 — One native proof bracket for context-start setup](207-context-setup-proof-bracket.md)
 records the original-bound setup composition under implementation. It preserves
 closing native checks and both owner authentications; native qualification is
