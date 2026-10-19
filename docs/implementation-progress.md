@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## Installed native 59: regional target resolution denied by RBAC (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39222603037)
+on frozen `91e0cd02ea37ccdaf648cf0e5ae091f40206cbc7` passed capacity projection
+and reached preview. Every target query now reached the region and got a closed
+`answer/denied`; two previews were therefore non-retryable. The region resolves
+the target through Pod → ReplicaSet → Deployment, but its installed ClusterRole
+only allowed ReplicaSet reads in its own namespace, so the API returned 403
+(ADR-179 had assumed this access existed for collection). The regional executor
+ClusterRole now grants read-only get on namespaces, Deployments, StatefulSets
+and ReplicaSets and get/list on Pods cluster-wide; a unit test failed before
+the change and passes after it. The hub's context-start clients made about
+1015 calls over the run (roughly 2–4 per second), well under the opening
+limiter. A one-time `publisher/catalog-changed` service restart was also
+logged.
+
+[Archive verification](../test/results/installed-journey-ci-59/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
 ## Installed native 58: capacity projection claimed with 3 ms left (2026-10-19)
 
 The [continuation](https://github.com/phihos/asservat/actions/runs/39219349203)

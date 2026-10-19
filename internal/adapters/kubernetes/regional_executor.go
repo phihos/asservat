@@ -53,7 +53,13 @@ type regionalExecutor struct {
 // capacity reservations (ADR-171/175), and the capacity account's own role.
 func regionalExecutorRBAC(namespace string) (cluster []rbac.PolicyRule, connector []rbac.PolicyRule, capacity *rbac.Role) {
 	settings, trust, start := regionalGuardNames(namespace)
-	cluster = []rbac.PolicyRule{{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{settings, trust, start}, Verbs: []string{"get"}}}
+	cluster = []rbac.PolicyRule{{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{settings, trust, start}, Verbs: []string{"get"}},
+		// ADR-179: delegated preview/request target resolution in this cluster
+		// reads the namespace, workload, Pods by selector and the Pod →
+		// ReplicaSet → Deployment chain (installed native 59: denied without).
+		{APIGroups: []string{""}, Resources: []string{"namespaces"}, Verbs: []string{"get"}},
+		{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get", "list"}},
+		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets", "replicasets"}, Verbs: []string{"get"}}}
 	connector = []rbac.PolicyRule{
 		// get for the settings/trust reads; update only for their dry-run probes.
 		{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{RegionalSettings, RegionalWorkTrust}, Verbs: []string{"get", "update"}},

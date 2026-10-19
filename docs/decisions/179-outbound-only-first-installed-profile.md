@@ -89,7 +89,10 @@ The first profile stores evidence in the hub's region. A user who needs
 evidence to stay in its workload region waits for the regional-local profile;
 the profile's declared locality makes this visible. Each preview costs one
 query on an idle standby. The connector needs read access to target
-workloads and Pods in its own cluster, which it already has for collection.
+workloads and Pods in its own cluster. Installed native 59 showed it lacked the
+ReplicaSet read outside its own namespace; the regional executor ClusterRole now
+grants get on namespaces, Deployments, StatefulSets and ReplicaSets and get/list
+on Pods cluster-wide, read-only.
 Selector-based retention and automatic namespace permission sources are
 explicitly unavailable in this profile, not silently approximated.
 
