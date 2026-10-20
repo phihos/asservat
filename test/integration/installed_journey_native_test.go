@@ -475,6 +475,36 @@ func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *c
 				line += reply.Status + " request " + reply.RequestID + " " + string(reply.Data)
 			}
 			fmt.Fprintln(out, line)
+		case "request":
+			// One preview, then a capture request on it under a fresh key.
+			started := time.Now()
+			call, end := context.WithTimeout(ctx, 30*time.Second)
+			result, err := session.CallTool(call, &sdk.CallToolParams{Name: "preview_capture", Arguments: preview})
+			end()
+			var reply installedJourneyEnvelope
+			if err == nil {
+				reply, err = installedJourneyReply(wire, "preview_capture", result)
+			}
+			var previewed struct {
+				PreviewID string `json:"preview_id"`
+			}
+			if err != nil || reply.Status != "ok" || json.Unmarshal(reply.Data, &previewed) != nil || previewed.PreviewID == "" {
+				fmt.Fprintf(out, "%s request: preview after %s failed: %v %s\n", started.Format(time.TimeOnly), time.Since(started).Round(time.Millisecond), err, reply.Status)
+				continue
+			}
+			requested := time.Now()
+			call, end = context.WithTimeout(ctx, 30*time.Second)
+			result, err = session.CallTool(call, &sdk.CallToolParams{Name: "request_capture", Arguments: map[string]string{"preview_id": previewed.PreviewID, "idempotency_key": "hold-" + requested.Format("150405.000")}})
+			end()
+			line := fmt.Sprintf("%s request after %s: ", requested.Format(time.TimeOnly), time.Since(requested).Round(time.Millisecond))
+			if err != nil {
+				line += "transport " + err.Error()
+			} else if reply, e := installedJourneyReply(wire, "request_capture", result); e != nil {
+				line += "contract " + e.Error()
+			} else {
+				line += reply.Status + " request " + reply.RequestID + " " + string(reply.Data)
+			}
+			fmt.Fprintln(out, line)
 		case "diagnose":
 			diagnose()
 			fmt.Fprintf(out, "%s diagnosed\n", time.Now().Format(time.TimeOnly))
