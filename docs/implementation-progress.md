@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Local holds 11–24: processing initialization and console login (2026-10-20)
+
+Hold 11 showed `processing_root.initialized_at` NULL: no installed path performs
+ADR-127's operator initialization, so every preview refused at
+`processing/read/root-invalid`. Holds 12–14 marked the root initialized by
+direct fixture SQL (experiment only, not a product path). Coverage then refused
+every preview as known insufficient coverage: the deletion date (600 s plus the
+3600 s deletion budget) lay after the processing root's end, which 60 s
+renewals keep about a minute ahead. With the journey profile's one-day
+`AdmissionSeconds` (`75a51df`), hold 14 returned four of seven previews `ok`.
+Hold 15 then ran the journey on to `request_capture`, which returned
+`OutcomeUnknown`.
+
+ADR-210 adds the installed path: the console route
+`POST /api/v1/processing/changes`, the hub SQL purpose `processing-decision`
+(ordinal 92, the component role's exact grants), the hub-api's guarded read of
+the capacity processing source with the joined clusters' derived paths, and the
+hub-worker's browser settings projection (ADR-184's open gap; no installed
+console login was possible before). Holds 17–23 each found one composition
+defect (nil paths, unmounted login, missing derived paths) or an intermittent
+install failure. Hold 24 (`adf3ce0`) logged "the processing operator
+initialized processing through the console".
+
+Hold 24's capture requests then took 3 s or more outside every marked preview
+step, one at the 5 s transport bound and one `OutcomeUnknown`. `1a09145`
+marks target resolution, admission, the intent read, the regional start's
+reads, attach, signing and run. Release changes and browser session cleanup
+remain unimplemented. Longer retention than the remaining processing root
+interval is refused by design (ADR-210 consequences).
+
 ## Local holds 7–10: regional limiter, then the processing root budget (2026-10-20)
 
 Hold 7 (`bd2b244`) split the remaining time. The region's target answer spent
