@@ -1,0 +1,28 @@
+=== RUN   TestIdentityPolicyObservationReusesOriginalIntervalAndRefreshesRevision
+    identity_policy_observation_test.go:91: unchanged original interval caused another policy read or renewed facts <nil> 2
+--- FAIL: TestIdentityPolicyObservationReusesOriginalIntervalAndRefreshesRevision (0.01s)
+=== RUN   TestIdentityPolicyObservationExpiryErrorHasNoStaleFallback
+--- PASS: TestIdentityPolicyObservationExpiryErrorHasNoStaleFallback (0.01s)
+=== RUN   TestIdentityPolicyObservationClonesAllReturnedSlices
+    identity_policy_observation_test.go:135: returned snapshot mutated retained policy or forced another read <nil>
+--- FAIL: TestIdentityPolicyObservationClonesAllReturnedSlices (0.01s)
+=== RUN   TestIdentityPolicyObservationConcurrentCallersShareOneRefresh
+    identity_policy_observation_test.go:195: concurrent callers reconstructed the same policy 8
+--- FAIL: TestIdentityPolicyObservationConcurrentCallersShareOneRefresh (0.21s)
+=== RUN   TestIdentityPolicyObservationCanceledRefreshIsNotRetained
+--- PASS: TestIdentityPolicyObservationCanceledRefreshIsNotRetained (0.01s)
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds/canceled-hit
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds/wrong-issuer
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds/clock-rollback
+    identity_policy_observation_test.go:261: invalid caller or clock obtained/reobserved retained policy <nil> 2
+--- FAIL: TestIdentityPolicyObservationCancellationAndClockBounds (0.03s)
+    --- PASS: TestIdentityPolicyObservationCancellationAndClockBounds/canceled-hit (0.01s)
+    --- PASS: TestIdentityPolicyObservationCancellationAndClockBounds/wrong-issuer (0.01s)
+    --- FAIL: TestIdentityPolicyObservationCancellationAndClockBounds/clock-rollback (0.01s)
+=== RUN   TestIdentityPolicyObservationCanceledWaiterDoesNotCancelRefresh
+2026/10/20 23:05:01 http: TLS handshake error from 127.0.0.1:42018: write tcp 127.0.0.1:39559->127.0.0.1:42018: use of closed network connection
+--- PASS: TestIdentityPolicyObservationCanceledWaiterDoesNotCancelRefresh (0.01s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.301s
+FAIL

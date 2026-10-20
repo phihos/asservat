@@ -51,10 +51,10 @@ func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r C
 	call, stop := context.WithDeadline(ctx, until)
 	defer stop()
 	p, e := s.Policies.DownloadPolicy(call)
-	if e != nil || !p.Valid(s.Now()) || p.RootID != s.RootID || p.InstallationID != s.InstallationID {
+	if e != nil || !p.DownloadValid(s.Now()) || p.RootID != s.RootID || p.InstallationID != s.InstallationID {
 		return zero, artifact.ErrDownloadUnavailable
 	}
-	path, ok := p.Select(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, "metadata", r.Retained.Input.PrivacyClass, r.Retained.Input.EvidenceType, s.Now())
+	path, ok := p.SelectDownload(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, "metadata", r.Retained.Input.PrivacyClass, r.Retained.Input.EvidenceType, s.Now())
 	if !ok {
 		return zero, artifact.ErrDownloadUnavailable
 	}
@@ -78,10 +78,10 @@ func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r C
 	call, stopProcessing := context.WithDeadline(call, until)
 	defer stopProcessing()
 	last, e := s.Policies.DownloadPolicy(call)
-	if e != nil || !last.Valid(s.Now()) || last.RootID != p.RootID || last.InstallationID != p.InstallationID || last.RecoveryEpoch != p.RecoveryEpoch || last.Revision != p.Revision || last.ProtectionDigest != p.ProtectionDigest {
+	if e != nil || !last.DownloadValid(s.Now()) || last.RootID != p.RootID || last.InstallationID != p.InstallationID || last.RecoveryEpoch != p.RecoveryEpoch || last.Revision != p.Revision || last.ProtectionDigest != p.ProtectionDigest {
 		return zero, artifact.ErrDownloadUnavailable
 	}
-	lastPath, ok := last.Select(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, "metadata", r.Retained.Input.PrivacyClass, r.Retained.Input.EvidenceType, s.Now())
+	lastPath, ok := last.SelectDownload(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, "metadata", r.Retained.Input.PrivacyClass, r.Retained.Input.EvidenceType, s.Now())
 	if !ok || lastPath != path {
 		return zero, artifact.ErrDownloadUnavailable
 	}
@@ -112,7 +112,7 @@ func (s CurrentDownloadEnvironment) DownloadEnvironment(ctx context.Context, r C
 	policy := p.Revision
 	policy.Digest = sha256.Sum256(b)
 	out := artifact.DownloadEnvironment{RootID: s.RootID, InstallationID: s.InstallationID, Region: path.AcquisitionRegion, StoreID: r.Retained.Registration.StoreID, RecoveryEpoch: recovery.IssuerEpoch, Location: r.Retained.Registration.Location, Principal: actor, Revision: policy, RecoveryRevision: recovery.Revision, Path: path, Processing: processing, ObservedAt: start, ValidUntil: until}
-	if call.Err() != nil || !out.CurrentValid(s.Now()) || !p.Valid(s.Now()) || !recovery.Valid(s.Now()) || !processing.Valid(s.Now()) {
+	if call.Err() != nil || !out.CurrentValid(s.Now()) || !p.DownloadValid(s.Now()) || !recovery.Valid(s.Now()) || !processing.Valid(s.Now()) {
 		return zero, artifact.ErrDownloadExpired
 	}
 	return out, nil

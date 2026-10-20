@@ -1,0 +1,13 @@
+Exact source snapshots (.txt suffix excludes them from Go package discovery).
+
+RED snapshots were saved before production edits; GREEN snapshots match the final focused and full-package source hashes.
+The failed intermediate run retains raw output, command, exit, and all four tested hashes; its old test-file snapshot was not retained.
+
+79954a1a1c6c56bfec4a5757efb0479c4836e142407f48285fe509f0ebf2a2b2  worker_current.go.red.txt
+e125fe1cf96a1265b1babc8c6f92f8db5b0c6b2fac544d6c832269c89250783a  context_native_runtime.go.red.txt
+6f006efd5401256b43c311f16c584aefc7f2ac0c12fd0278e3ec6a7bd8d53f85  context_native_response.go.red.txt
+f376828a05f0957ea73472d6c5016989113f1405c4a55869e6b4a55db1c3b46b  context_native_initial_authority_test.go.red.txt
+d799393527a3b3a67a316fcfde395a44e92421df0f0b6b89a8c2143a936ab4a9  worker_current.go.green.txt
+7624af5d1e3764646a8f7f7ea05cc7eed5805cd14c366de5591f7e6cabf5e314  context_native_runtime.go.green.txt
+f445451249d90db03981cba518faec99808625eda5d3217d771707f58cbe8bc6  context_native_response.go.green.txt
+7fc59a9fff91994a45bd62840b5d6b9bb07ca7c2d28b56cf451f6c6e5924ed56  context_native_initial_authority_test.go.green.txt

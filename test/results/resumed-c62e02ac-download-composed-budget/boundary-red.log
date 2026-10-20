@@ -1,0 +1,15 @@
+=== RUN   TestDownloadPreparationNearExpiredIdentityObservation
+    download_preparation_identity_budget_test.go:152: near_expiry=true initial_identity_remaining=247.617761ms original_request_remaining=4.990434848s
+    download_preparation_identity_budget_test.go:152: elapsed=257.276101ms original_interval=5s authority_checks=1 raw_policy_reads=0 completed_policy_reads=0 policy_observer=0 identity_observer=3 identity_policy_reads=1 token_checks=3 permissions=1 catalog=0 retention=0 probe=0 denied=0 created=false recorded=false job_pending=false continued=false err=download unavailable
+    download_preparation_identity_budget_test.go:152: production_path=[verify-token verify-token recovery lookup-key route verify-token]
+    download_preparation_identity_budget_test.go:152: first acknowledged Job Pending did not fit the original five-second request with actual identity and authority composition
+--- FAIL: TestDownloadPreparationNearExpiredIdentityObservation (0.27s)
+=== RUN   TestIdentityPolicyObservationNearExpiryRefreshHasNoStaleFallback
+    identity_policy_observation_test.go:176: failed near-expiry refresh returned the still-positive old policy <nil> 1
+--- FAIL: TestIdentityPolicyObservationNearExpiryRefreshHasNoStaleFallback (0.01s)
+=== RUN   TestIdentityPolicyObservationNearExpiryRefreshPreservesOwnedRequest
+    identity_policy_observation_test.go:198: new policy observation changed an already-owned request cutoff <nil> 1
+--- FAIL: TestIdentityPolicyObservationNearExpiryRefreshPreservesOwnedRequest (0.01s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.305s
+FAIL

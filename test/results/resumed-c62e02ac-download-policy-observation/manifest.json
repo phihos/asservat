@@ -1,0 +1,23 @@
+{
+  "README.md": "7b6fe34f0c1846cfe17018ee2f38cf1dd839a01053166d685e8a22b9a7ed437a",
+  "REVIEW.md": "e875e060c6a2a5ec492986a4b41dc016cefe1152082f8ffbc75b41200ec7c15b",
+  "contract-gates.log": "4fbcae8e93c23e9d741444bf3c538aa3df5b99fdbc84dc26a3cafa0303eab86e",
+  "contract-result.json": "958474d333ed37a57698c7e14e723a7ce1bd49fc39aac4c871056c06d5302b6e",
+  "final-green.json": "abc170a45f30406116b485f5ef9e533fd25733179c1bb5e5069ecd37f7d47d4c",
+  "final-green.log": "fb9c653ee26450975613ee107eecf5032533da3d6a1240fd29788aab8afc78c5",
+  "green.json": "23fb57994bcc7ab38804b6dd402b9c6224b0d643c15b08b705a930008355facc",
+  "green.log": "28ef45e0f59a1b0da52710376e1d595e499fe2bd38046e759dc9e1ffd4dbf851",
+  "headroom/README.md": "a900478907ee68ed3185a41f0784ab0a05a296dac86a812e8a4a904660705a7a",
+  "headroom/green.json": "de47a8031f4b2f7eaf76735a6fe44c0d18a19de73e0ea4202cd9b28bba7d6ee1",
+  "headroom/green.log": "ad37b573cc38507c607b3041579956380e1c39720d291ca4efdca6b917931a6f",
+  "headroom/manifest.json": "0e4e4b67fe3b63ea274da1b8a6fbee6b24e1afaf36931940a127ea3b505315a2",
+  "headroom/production-fix.patch": "367a850ae0bd7a987b8f6ad9c6c6cf50297eaf9eff3328218bc86ce48364b849",
+  "headroom/red-download_policy_observation.go.txt": "39809499c1f8f78ed2a6483400d781f61dfb6a5a778a7d07d985469852f126a9",
+  "headroom/red-download_policy_observation_test.go.txt": "cf43478f213c966e2da54fbc8ed91f39f7835396ca7aaa94c38e766d9ef19443",
+  "headroom/red.json": "09afddaf09bbb3b1a4f792f786620ab4819aad3b55717e7e2ea05f6a1cc37dd0",
+  "headroom/red.log": "c190241506a0009096a51740bc8e20b0e5fa1ce0efe96eb1cae376e7dad28c0d",
+  "red-test.go.txt": "6291967a0ce9d1f02ea6c7c25b9c44ded7a441442cc836b8be19d28789ab000d",
+  "red.json": "d5ff2ebdc0e9f962d8c867e08e01ea5a424fe5227858adb639d1859f42dab532",
+  "red.log": "c9f87d3155d31977aa3c37a0989b0e97744301a2d0055ab8d3d84732907d5cdc",
+  "result.json": "99282b1427239df30833d188321a4a6ed4a917c685d9a3cd9c6dc9b1719daac6"
+}

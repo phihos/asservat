@@ -1,0 +1,34 @@
+{
+  "cwd": "/home/phil/Projekte/asservat-resume-0450e73c",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "^TestIdentityPolicyObservation",
+    "-v",
+    "./internal/adapters/kubernetes"
+  ],
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "started_utc": "2026-10-20T21:04:45.776275+00:00",
+  "exit_code": 1,
+  "wall_seconds": 14.993186558014713,
+  "finished_utc": "2026-10-20T21:05:01.305408+00:00",
+  "source_hashes_unchanged": true,
+  "source_hash_manifest": "identity-cache-red-source-sha256.txt",
+  "source_hash_count": 2589,
+  "original_result_sha256": "d5082795a42a0e605b215883f72d339b2ce5acf9993b77ee8efa2f6c2b4e0a3b",
+  "original_result_cache_path": "/home/phil/.cache/asservat-build/recovered-c62e02ac/identity-policy-observation/red.json",
+  "hash_compaction": "Identical before/after maps stored once; original cache record unchanged.",
+  "terminal": {
+    "session_id": 91538,
+    "chunk_id": "33aef6",
+    "exit_code": 1
+  },
+  "go_package_seconds": 0.301
+}

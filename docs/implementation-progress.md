@@ -1,6 +1,113 @@
 # Sustained implementation progress
 
+## Applying the complexity review (2026-10-20)
+
+The maintainer approved the [whole-design review](reviews/complexity-2026-10-20/README.md)
+and its execution order. [ADR-214](decisions/214-bounded-download-policy-observation.md)
+first removes repeated protected-policy reads from download preparation. The
+installed download environment now reuses a successful observation for 60 seconds
+from its original read start. Administrative reads remain five-second observations;
+complete identity/authorization, SQL permission, retention, recovery, processing
+and spend decisions are not cached. The interval does not renew caller, session
+or evidence deadlines.
+
+The [narrow cache/domain/environment race selection](../test/results/resumed-c62e02ac-download-policy-observation/README.md)
+passes after a genuine failing baseline (exit 1, then exit 0; authorization 1.035
+seconds and privacy 1.008 seconds). Independent review found no blockers. The
+[composed first-Job regression](../test/results/resumed-c62e02ac-download-composed-budget/README.md)
+now passes in 6.884 milliseconds with
+one protected policy read (14 observer and three probe requests) across ten
+authority evaluations. Its other ports remain synthetic. This removes the
+previous 280-observer-request lower bound without raising QPS or the five-second
+operation deadline.
+
+A stronger regression then composes the actual identity service, bearer request,
+identity-settings reader and download authorizer. It fails in 4.958 seconds after
+119 identity API requests on that reader's separate 20-QPS/burst-20 client. The
+worker Job is created and observed Pending, but final identity validation exhausts
+the original request interval. Claims/signatures and SQL/catalog/retention remain
+synthetic. The combined command exits 1 with unchanged source hashes. The next
+correction reuses identity settings within their already existing 30-second
+observation; token/session and eligibility checks still run at every resolution.
+The final focused race selection passes (exit 0, package 3.060 seconds): the
+cold composed preparation reaches acknowledged Job Pending in 74.363 milliseconds
+with three identity API requests. It retains all 40 token checks, 20 permission
+reads, ten catalog reads and ten retention resolutions. Its near-expiry variant
+passes in 424.186 milliseconds, including a deliberate 350-millisecond permission
+read and one initial policy prime plus refresh. The corresponding failing case
+had inherited only 247.6 milliseconds despite a 4.99-second caller budget. All
+eight relevant source hashes remain unchanged. Independent review finds no
+blockers in either final cache change.
+
+The [download observation headroom regression](../test/results/resumed-c62e02ac-download-policy-observation/headroom/README.md)
+also reproduces an availability edge: a new request using a 59.9-second-old
+observation inherited roughly 100 milliseconds, so a 150-millisecond processing
+read failed despite its original five-second request budget (exit 1, package
+0.142 seconds). The reader now refreshes on demand when less than five seconds
+remain. Its focused race selection passes (exit 0; authorization 1.228 seconds,
+privacy 1.008 seconds), including preservation of an original 40-millisecond
+caller deadline. All five relevant source hashes stay unchanged. Successful
+refresh creates a new source observation; a cache hit never renews one.
+
+The [installed Stop fixture addition](../test/results/resumed-c62e02ac-installed-stop-fixture/README.md)
+uses a second nonterminal download within existing allocations, after the first
+native download succeeds. It then stops that session after accepted Deny,
+verifies exact-key receipt replay, and requires continued cancellation/content
+refusal after access returns. Focused journey race tests pass (exit 0, package
+1.150 seconds; both source hashes unchanged). This adds meaningful installed
+coverage without claiming active-stream interruption or recorded audit when its
+status is pending. The existing real-Kubernetes identity-settings fixture now
+waits for each original observation expiry before requiring group removal or
+same-name replacement to be detected. Full gates and external qualification are
+next; no new installed result is claimed here.
+
 ## Resumed review and installed qualification (2026-10-20)
+
+The focused investigation now exposes a composition budget problem before any
+further installed run. The
+[actual TLS policy-reader measurement](../test/results/resumed-c62e02ac-download-policy-budget/README.md)
+counts 14 observer requests and three independent probe requests per policy read.
+Each complete download-authority evaluation reads that policy twice. After the
+adjacent duplicate correction below, the new-worker path still requires ten full
+evaluations before its first acknowledged Job-pending response: 280 observer
+requests. At the unchanged 20 QPS/burst-20 client limit, even an otherwise idle
+full bucket requires at least `(280-20)/20 = 13` seconds. The owning request lasts
+at most five seconds. This is a lower bound derived from measured reader counts
+and the composed source path, not a measured complete operation or proof of the
+exact check that failed in native50.
+
+The
+[initial-authority handoff](../test/results/resumed-c62e02ac-download-initial-authority/README.md)
+removes one immediately duplicated evaluation before attachment SQL. Only local
+validation separates the original observation from that read; later checks after
+blocking work stay current. The genuine before-fix regression exits 1; focused
+race tests and the full evidence package race suite exit 0 in 1.047 and 3.896
+seconds respectively. All 2,582 Go source hashes stay unchanged during the full
+package run, and independent review finds no blockers. The TLS reader's separate
+focused race run exits 0 in 2.858 seconds with unchanged Kubernetes sources.
+These results qualify the narrow correction and establish the reader's request
+cost. They do not resolve the complete preparation budget or justify another
+full installed run by themselves.
+
+The [complete first-Job phase reproducer](../test/results/resumed-c62e02ac-download-whole-phase-budget/README.md)
+now fails with the actual coordinator, native runtime, dispatcher, current
+environment and TLS policy reader under one original five-second request.
+Identity/catalog/retention, SQL/audit, readiness and Job ports are explicitly
+synthetic and return without delay. The command exits 1 (package 4.977 seconds);
+the operation fails after 4.951 seconds, before audit acknowledgement or Job
+creation. It enters five authority evaluations and attempts nine policy reads,
+eight completed, with 119 observer requests and 27 probe requests. All 2,583 Go
+source hashes stay unchanged. The expected acknowledged Job-pending response is
+absent, and the regression remains intentionally failing. This reproduces the
+composed request-budget defect, not the precise failed native50 check.
+
+The maintainer clarified that permission changes interrupting downloads was not
+a user requirement. Existing permission-change handling should remain, with a
+relaxed, bounded recheck interval selected using actual runtime behavior.
+Agent-added security restrictions with unproven benefits must not stall delivery
+or cause performance problems. This supersedes the earlier pending decision and
+is recorded prominently in `AGENTS.md`; the exact interval and runtime correction
+remain to be implemented and qualified.
 
 The [latest frozen installed run `context-cqjvthn6`](../test/results/resumed-c62e02ac-native50/result.json)
 on `b4fbd37d` again completes installed acquisition, verification, publication and

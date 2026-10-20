@@ -1,0 +1,116 @@
+# ADR-214 — Reuse bounded policy observations in download preparation
+
+Date: 2026-10-20. Status: selected under the maintainer's explicit complexity-review
+continuation; implementation and qualification in progress.
+Requirements: REQ-DLD-002/003, TASK-03/11, S-02.
+
+## Problem
+
+One protected Kubernetes download-policy read makes 14 observer and three probe
+requests. The download environment repeats it before and after SQL reads, and the
+first worker-preparation phase evaluates that environment ten times. At the existing
+20 QPS/burst-20 rate, its 280 observer requests alone require at least 13 seconds
+inside a five-second request. The actual composed regression fails before Job creation.
+See the [recorded baseline](../../test/results/resumed-c62e02ac-download-whole-phase-budget/README.md)
+and [complexity review](../reviews/complexity-2026-10-20/README.md).
+
+The maintainer did not require immediate interruption when permissions change and
+explicitly authorized a relaxed bounded check interval. Repeated inspection of the
+same protected installation policy at every helper call has no demonstrated benefit
+that justifies this failure. The expensive policy observation is distinct from
+current SQL permissions, recovery, processing restrictions and transaction spend.
+
+## Decision
+
+1. The installed download authorizer shares one policy observation for at most
+   **60 seconds from the beginning of its original source read**. This is the
+   selected starting interval for qualification. Cache hits never reset it.
+   Each caller still evaluates its own principal/client, artifact class, purpose
+   and exact installed path against that observation.
+2. The raw Kubernetes source remains unchanged: its complete protection, two
+   source reads and closing guard must succeed within the caller's original
+   deadline and the existing five-second I/O limit. Only a successfully completed,
+   currently valid source observation can enter the download observation store.
+   The 60-second bound concerns reuse of the observed configuration; it does not
+   extend the source read, its caller, a human session or any evidence lifetime.
+3. Domain validation distinguishes this download observation from the raw
+   five-second policy used by privacy operators and capacity administration.
+   Administrative operations do not use the longer observation. The production
+   wrapper is installed only in the download environment.
+4. Keep one retained policy and one concurrent refresh per reader. Waiters honor
+   their own cancellation/deadline; refresh runs in its initiating request, with
+   no detached work, watch, periodic goroutine or new deployment/configuration.
+   Return independent copies of all policy slices. Expiry, failed refresh and
+   clock rollback never provide stale authority or renew the old observation.
+   Refresh on demand when less than the existing five-second operation budget
+   remains, so a new request does not inherit an avoidably tiny policy deadline.
+   Only another successful source read supplies a new observation interval;
+   an operation already bounded by an older observation keeps its deadline.
+5. Keep current SQL permission, retention, recovery, processing, worker/generation
+   and spend checks at their existing effect boundaries. Their shorter proof and
+   request bounds remain independent. Cheap checks may detect and enforce changes
+   earlier than 60 seconds. The entire `DownloadAuthority` is never cached.
+
+This amends ADR-127's repeated protected-policy observation requirement for the
+download path. It changes no persistent schema, wire format, grant scope, approval,
+native file bytes or processing-operator permission. It does not justify a blanket
+increase of all five-second timers.
+
+## Identity-policy reuse within its existing interval
+
+The stronger preparation regression composes the actual identity service, bearer
+request and download authority. With download-policy reuse in place, it still
+fails after 4.958 seconds: 40 identity checks attempt 119 Kubernetes requests on
+the identity reader's separate, unchanged 20-QPS/burst-20 client. Job creation and
+its Pending observation succeed; the final identity check exhausts the original
+request interval. Claims/signatures and SQL/catalog/retention remain synthetic
+in this regression, so this is still not installed-workflow qualification.
+
+`IdentityPolicyClient` already returns an observation valid for 30 seconds. Reuse
+that completed observation until its original `FreshUntil`, with one retained
+snapshot and one synchronous refresh per pinned reader. Do not increase its
+lifetime. Continue signature/token, session, subject/client and policy eligibility
+validation on every identity resolution. Copy returned slices, preserve issuer
+pinning and caller cancellation, and never serve an expired observation after
+refresh failure. A policy change is discovered by the next refresh within the
+existing 30-second bound; no watch or additional credential is introduced.
+Use the same demand-driven five-second refresh headroom as the download policy.
+Without it, a new request arriving at age 29.9 seconds would inherit roughly
+100 milliseconds from the otherwise valid cached policy. No periodic task or
+new timeout setting is needed to avoid that predictable availability gap.
+
+This replaces repeated reads of unchanged identity settings, not repeated identity
+validation. The installed browser, MCP and download services share that pinned
+reader; their independent session, token and request deadlines still apply.
+
+## Complexity check
+
+| Question | Answer |
+| --- | --- |
+| 1. Observed harm? | The actual preparation regression fails after 4.951 seconds; installed native50 also fails before worker creation. |
+| 2. Accepted risk? | Yes: bounded permission-change handling was explicitly authorized. Immediate/per-step revalidation was not a user requirement. |
+| 3. Typical path? | Every first context download currently repeats the policy reads. |
+| 4. Prior art? | Bounded reuse of configuration/identity observations is established; the review cites SPIRE's cached workload identities. This is not a claim of equivalent authorization semantics. |
+| 5. Added privileges? | None; the existing exact source, guard, clients and installed paths remain. |
+| 6. Failure states? | One retained observation and one transient refresh; no durable recovery state. Expired/unavailable data denies. |
+| 7. New knob? | None. A fixed 60-second download-only observation bound. |
+| 8. External coupling? | No new dependency; the same Kubernetes protection read and SQL effects. |
+| 9. Aggregate cost? | Under steady demand, refresh download policy after about 55 seconds (14 observer/3 probe requests) and identity policy after about 25 seconds (three observer requests). The five-second headroom avoids shortening a new request to the final fraction of an observation. Failures and other readers still consume their existing request budgets; complete-path cost must be measured. |
+| 10. Upgrade/rollback? | In-memory state only; restart drops it. Older code returns to more frequent reads. No migration or retained authority conversion. |
+| 11. Smaller solution? | Raising QPS or only increasing the operation deadline preserves unnecessary work. Reuse the policy observation while retaining existing effect checks. |
+
+## Qualification
+
+Require the existing five-second first-Job regression to reach acknowledged
+Preparing at the original rate, with one complete protected policy read. Exercise
+concurrent callers, original observation expiry, source changes at the next refresh,
+refresh failure, independent copies, cancellation and clock rollback. Preserve the
+raw source/admin five-second tests. A loopback policy test does not qualify the full
+installed identity, SQL, audit, worker and transfer composition.
+
+Measure remaining complete-path work before running the installed fixture; qualify
+native transfer, Stop, expiry and deletion separately from a successful preparation.
+Require the stronger identity/authority regression to pass at the unchanged client
+rates, with one identity-policy read (three observer requests) and continued token
+validation at each existing call site. Preserve the failed combined run as evidence.
+Actual commands and results belong in [implementation progress](../implementation-progress.md).

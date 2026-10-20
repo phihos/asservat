@@ -8,6 +8,16 @@ This C-14 implementation connects the existing dispatch/enrollment components to
 
 The hub holds one private current-check closure for the operation. Construction pins the principal, policy revision, group/scope sets, exact download scope and earliest original identity/request/authority deadline, capped at five seconds. Identity slices are copied. Every authority observation rechecks the same identity and can only shorten the deadline; a concurrently completing older read cannot restore a longer interval. Passing `Background` internally cannot detach the check from its owning request's cancellation.
 
+The native runtime passes the constructor's first authority observation directly
+to its immediately following attachment read. Only local validation and deadline
+narrowing intervene. Before that read, the observation is checked again for
+scope, current environment/profile, cancellation, clock rollback and the earliest
+original source/request cutoff. This removes a duplicate full authority read;
+it does not cache authority for later operations. The dispatcher still obtains
+current authority after attachment SQL, and later attachment reads and disclosure
+checks remain independent. The compatibility constructor retains its eager first
+check for other callers.
+
 Dispatch retains the current check through reserve, encrypted intent audit/acknowledgement, create claim, exact create-or-lookup, observed Job registration, Pod binding and final registry read. Enrollment retains it around Pod proof, immutable key claim, audit, signing spend, provider result storage, certificate audit and activation. Current SQL, configuration, recovery, retention and worker checks remain mandatory; the closure does not supply durable authority. Subsequent effect contexts inherit a newly shortened bound. Read/provider completion never resets the original interval.
 
 The operation constructor, local router, shared locator and final certificate delivery use the same closure. They do not call a new typed constructor at each hop. An expired or changed identity after a blocking registry/proof/provider call denies the next effect or response. A known exact locator claim that became too long is closed; an uncertain claim is not guessed or released. The registry continues to count registering and closing work until that work finishes. Certificate response ownership remains live until its mandatory `Close`, including original cancellation and the final shorter response deadline.

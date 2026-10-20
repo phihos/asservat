@@ -1,0 +1,1850 @@
+{
+  "captured_utc": "2026-10-20T20:26:32.475124+00:00",
+  "head": "c8fc5460a7b8892e1ddcb817e42138111921c2ee",
+  "records": [
+    {
+      "id": "ADR-001",
+      "number": 1,
+      "path": "docs/decisions/README.md",
+      "line": 605,
+      "inline": true,
+      "title": "| ADR-001 | Accepted | Preserve Asservat identifiers, no embedded AI/harness, MCP tools first, content-free CloudEvents, node-side encryption, Inspektor Gadget, own crash agent, restricted workload namespaces and no call-home. |"
+    },
+    {
+      "id": "ADR-002",
+      "number": 2,
+      "path": "docs/decisions/README.md",
+      "line": 606,
+      "inline": true,
+      "title": "| ADR-002 | Accepted by user | Central multi-cluster management in the first release. Use outbound cluster connectors, globally unique identities and per-cluster data locality. A single-cluster-only first production release is insufficient. |"
+    },
+    {
+      "id": "ADR-003",
+      "number": 3,
+      "path": "docs/decisions/README.md",
+      "line": 607,
+      "inline": true,
+      "title": "| ADR-003 | Accepted by user | Allow reviewed, expiring policy grants for automatic intrusive actions; keep per-execution approval for ad hoc actions. This explicitly supersedes the brief's per-execution requirement for every live dump. |"
+    },
+    {
+      "id": "ADR-004",
+      "number": 4,
+      "path": "docs/decisions/README.md",
+      "line": 608,
+      "inline": true,
+      "title": "| ADR-004 | Superseded by ADR-023 | No mandatory PostgreSQL/database/broker. Use Kubernetes for bounded control state and object storage for durable records. Search caches are disposable. Scale limits must be demonstrated. |"
+    },
+    {
+      "id": "ADR-005",
+      "number": 5,
+      "path": "docs/decisions/README.md",
+      "line": 609,
+      "inline": true,
+      "title": "| ADR-005 | Accepted by user | Explicit sharing may expand access to otherwise ineligible users/groups **within the organization**. No anonymous sharing or sharing across installations. Sharing and raw-operation grants remain independent. The earlier same-tenant wording is superseded by ADR-016. |"
+    },
+    {
+      "id": "ADR-006",
+      "number": 6,
+      "path": "docs/decisions/README.md",
+      "line": 610,
+      "inline": true,
+      "title": "| ADR-006 | Proposed | Go for services; small static Rust core-pipe helper. Rust is selected for a narrow native helper with no service runtime; comparative kernel-path behavior remains to be measured and it adds a second build toolchain. Prototype a Go helper only if Rust maintenance proves disproportionate, without changing behavior. |"
+    },
+    {
+      "id": "ADR-007",
+      "number": 7,
+      "path": "docs/decisions/README.md",
+      "line": 611,
+      "inline": true,
+      "title": "| ADR-007 | Proposed | Modular Markdown + scenarios + JSON Schema + ADRs + traceability, no mandatory spec-framework CLI. Rationale: [format research](../specification-format.md). |"
+    },
+    {
+      "id": "ADR-008",
+      "number": 8,
+      "path": "docs/decisions/README.md",
+      "line": 612,
+      "inline": true,
+      "title": "| ADR-008 | Proposed | Original three CRDs for the user collection model (extended by CaptureProfile in ADR-032): `DebugPolicy`, `EvidenceRecipe`, `DebugCapture`; reusable policies specify triggers, recipes specify actions, captures bind an immutable execution. Separate cluster administration and grants. |"
+    },
+    {
+      "id": "ADR-009",
+      "number": 9,
+      "path": "docs/decisions/README.md",
+      "line": 613,
+      "inline": true,
+      "title": "| ADR-009 | Refined by ADR-063 | OpenBao, Keycloak and Ceph RGW remain external reference integrations. The external-only assumption is superseded by planned internal/bundled alternatives; no mandatory storage operator. |"
+    },
+    {
+      "id": "ADR-010",
+      "number": 10,
+      "path": "docs/decisions/README.md",
+      "line": 614,
+      "inline": true,
+      "title": "| ADR-010 | Proposed | Real header sanitization before retention. Fixed snaplen alone is never described as payload-free. Unknown packet formats are dropped from the default ring with explicit loss accounting. |"
+    },
+    {
+      "id": "ADR-011",
+      "number": 11,
+      "path": "docs/decisions/README.md",
+      "line": 615,
+      "inline": true,
+      "title": "| ADR-011 | Proposed | Trusted analyzer images plus exact target root filesystems as inert data. Never execute an application image's entrypoint to analyze evidence. Separate acquisition and offline analysis Jobs. |"
+    },
+    {
+      "id": "ADR-012",
+      "number": 12,
+      "path": "docs/decisions/README.md",
+      "line": 616,
+      "inline": true,
+      "title": "| ADR-012 | Proposed | Structured debugger operations, no free-form debugger shell. Raw memory and pcap content remain bounded queries; no presigned evidence URLs. |"
+    },
+    {
+      "id": "ADR-013",
+      "number": 13,
+      "path": "docs/decisions/README.md",
+      "line": 617,
+      "inline": true,
+      "title": "| ADR-013 | Proposed | Apache-2.0 for Asservat-owned code and documentation; DCO contributions, transparent maintainer review, security reporting and SBOMs. Dependency notices remain separate. Do not publish a licence under an assumed copyright holder. |"
+    },
+    {
+      "id": "ADR-014",
+      "number": 14,
+      "path": "docs/decisions/README.md",
+      "line": 618,
+      "inline": true,
+      "title": "| ADR-014 | Proposed | Air-gap, identity, authorization, audit, retention and sharing are part of the first vertical slice, not final hardening phases. |"
+    },
+    {
+      "id": "ADR-015",
+      "number": 15,
+      "path": "docs/decisions/README.md",
+      "line": 619,
+      "inline": true,
+      "title": "| ADR-015 | Accepted by user | Pprof and similar runtime profiles are first-class evidence. Capture, store, analyze, share and expose bounded profile comparisons through MCP; no continuous-profiling service is required. |"
+    },
+    {
+      "id": "ADR-016",
+      "number": 16,
+      "path": "docs/decisions/README.md",
+      "line": 620,
+      "inline": true,
+      "title": "| ADR-016 | Accepted by user | One organization per installation; remove the unnecessary multi-tenancy requirement. Keep central multi-cluster management, team/workload ACLs and explicit sharing within the organization. No tenant entities, IDs, provisioning, routing or per-tenant storage/quota hierarchy. Unrelated organizations use separate installations. This supersedes the initial architectural assumption and clarifies ADR-005. |"
+    },
+    {
+      "id": "ADR-017",
+      "number": 17,
+      "path": "docs/decisions/README.md",
+      "line": 621,
+      "inline": true,
+      "title": "| ADR-017 | User-requested capability; mechanism proposed | Automate permission management with protected Kubernetes resources and automatic permission sources. The initially proposed duplicate HTTP CRUD interface is superseded by ADR-018. Support configurable inheritance from administrator-managed namespace metadata and existing Kubernetes permissions, including pod exec. Use exact access reviews and qualified identity/admission mappings; preserve intrusive-action approval and local ceilings. See [permission research](../research/permission-automation.md). |"
+    },
+    {
+      "id": "ADR-018",
+      "number": 18,
+      "path": "docs/decisions/README.md",
+      "line": 622,
+      "inline": true,
+      "title": "| ADR-018 | Accepted by user | Kubernetes CRDs/API are the only public permission-configuration CRUD surface. Keep effective-access explanation/preview in the existing browser query service; evidence, approvals, MCP and connector HTTP remain. Native RBAC does not replace custom-resource admission or execution authorization. |"
+    },
+    {
+      "id": "ADR-019",
+      "number": 19,
+      "path": "docs/decisions/README.md",
+      "line": 623,
+      "inline": true,
+      "title": "| ADR-019 | User priority; workflow proposed | Minimize recurring administrator/developer work with versioned presets, resolved defaults, inherited permissions, actionable capability checks, shared UI/GitOps semantics and bundled approvals. Preserve explicit high-impact approvals. See [ergonomics review](../ergonomics-review.md). |"
+    },
+    {
+      "id": "ADR-020",
+      "number": 20,
+      "path": "docs/decisions/README.md",
+      "line": 624,
+      "inline": true,
+      "title": "| ADR-020 | User-required capability; controls proposed | Enforce finite administrator retention maxima by privacy class, evidence type and workload scope. Derived data inherits deadlines; ordinary holds cannot bypass maxima. Privacy controls support operator obligations, not a blanket GDPR-compliance claim. See [privacy specification](../../specs/privacy.md). |"
+    },
+    {
+      "id": "ADR-021",
+      "number": 21,
+      "path": "docs/decisions/README.md",
+      "line": 625,
+      "inline": true,
+      "title": "| ADR-021 | User-required protection; mechanism proposed | Workload-wide storm and impact budgets, reserve capacity before acquisition, fair uploads/analysis, and unborrowable protected storage plus separate shared burst. Hub SQL transactions and local CAS/prepaid slices enforce bounded quota state (ADR-023 supersedes the original hub CAS mechanism); backend quota statistics alone are insufficient. Default full accounts preserve prior evidence and reject new expensive capture. See [capacity isolation](../../specs/capacity.md). |"
+    },
+    {
+      "id": "ADR-022",
+      "number": 22,
+      "path": "docs/decisions/README.md",
+      "line": 626,
+      "inline": true,
+      "title": "| ADR-022 | Accepted by user; contracts proposed | Owners may attach sharing to a capture request. Offer recurring-policy sharing only as an explicit reviewed revision with expiry and capture limit. A service-owned SharingIntent pins recipients/outputs and authorizes concrete EvidenceShare snapshot revisions after commit/provenance checks; raw-sharing and recipient raw-query approvals remain separate. Stop drains registered captures; revoke denies dependent shares. See [sharing requirements](../../specs/authorization.md#req-shr-004--share-results-when-requesting-collection). |"
+    },
+    {
+      "id": "ADR-023",
+      "number": 23,
+      "path": "docs/decisions/README.md",
+      "line": 627,
+      "inline": true,
+      "title": "| ADR-023 | Accepted by user; implementation pending | PostgreSQL is required for hub transactional state and catalog indexes; Kubernetes remains authoritative for declarative configuration and local control, with object storage for evidence/audit. Supersedes ADR-004; preserves ADR-018. See [persistence](../../specs/persistence.md) and [reassessment](../../specs/changes/postgresql-hub-state/proposal.md). |"
+    },
+    {
+      "id": "ADR-024",
+      "number": 24,
+      "path": "docs/decisions/README.md",
+      "line": 628,
+      "inline": true,
+      "title": "| ADR-024 | Accepted by user; contracts proposed | Separate immutable createdBy from one or more managing owner teams. Current group membership and pinned owner assignments govern management; changing managers never silently exposes historical evidence. See REQ-SHR-008. |"
+    },
+    {
+      "id": "ADR-025",
+      "number": 25,
+      "path": "docs/decisions/README.md",
+      "line": 629,
+      "inline": true,
+      "title": "| ADR-025 | Accepted by user; qualification pending | Add checked pcap expressions, live Service/Deployment/StatefulSet peers, segmented bounded rings and protocol profiles. HTTP headers require bounded parsing and projection, not a safe snaplen claim. Keep the Gadget engine and record update/loss limitations. See [packets](../../specs/packets.md). |"
+    },
+    {
+      "id": "ADR-026",
+      "number": 26,
+      "path": "docs/decisions/README.md",
+      "line": 643,
+      "inline": true,
+      "title": "- **ADR-026 \u2014 Accepted by user:** observe all authorized replicas within administrator limits by default; cap collection separately and prioritize contributing pods, including unready replicas."
+    },
+    {
+      "id": "ADR-027",
+      "number": 27,
+      "path": "docs/decisions/README.md",
+      "line": 644,
+      "inline": true,
+      "title": "- **ADR-027 \u2014 Accepted by user:** permit administrator-configured finite approval periods for stable automatic policies. Retain short permits, current authorization, independent review, nonrenewing budgets and immediate connected revocation; sharing expiry remains independent."
+    },
+    {
+      "id": "ADR-028",
+      "number": 28,
+      "path": "docs/decisions/README.md",
+      "line": 645,
+      "inline": true,
+      "title": "- **ADR-028 \u2014 Accepted by user:** the pod is the smallest public configuration, permission and filtering unit. Remove container selectors/ACLs/pickers; preserve runtime container/process identity internally for attribution and anti-reuse. Pod-wide fanout is bounded, and host namespaces never imply node-wide authority."
+    },
+    {
+      "id": "ADR-029",
+      "number": 29,
+      "path": "docs/decisions/README.md",
+      "line": 646,
+      "inline": true,
+      "title": "- **ADR-029 \u2014 Proposed mechanism, integrated for review:** separate authenticated submission, collection execution scope and sharing instruction digests. Add bounded MCP discovery/preview/status/cancellation; use storage-aware backup/index expiry and explicit temporal trigger semantics. See the [review](../reviews/design-review.md)."
+    },
+    {
+      "id": "ADR-030",
+      "number": 30,
+      "path": "docs/decisions/README.md",
+      "line": 648,
+      "inline": true,
+      "title": "- **ADR-030 \u2014 User-requested capability; mechanism proposed and integrated for review:** make goal-oriented diagnostic assistance first release. Use existing capture primitives for finite process/network/protocol discovery, deterministic local recommendation rules and shared browser/MCP plan handles. Provide filter/selector/ring recommendations with confidence and explicit limits; retain ordinary authorization, observation approvals, quotas and privacy. No embedded LLM or separate survey execution API. See [guidance](../../specs/guidance.md) and [feasibility evidence](../research/guided-diagnostics.md)."
+    },
+    {
+      "id": "ADR-031",
+      "number": 31,
+      "path": "docs/decisions/README.md",
+      "line": 650,
+      "inline": true,
+      "title": "- **ADR-031 \u2014 User-requested capability; mechanism proposed and integrated for review:** retain bounded, selector-scoped capture history and immutable encrypted parameter snapshots. Repeat restores settings into a new request with current checks, its own identity/approval and ordinary quota charges. Namespace/workload UIDs separate reincarnations; metadata versus evidence-derived parameter retention remains explicit. Reuse SQL/object storage and existing preview/submission; add no history CRD or execution API. See [capture history](../../specs/capture-history.md)."
+    },
+    {
+      "id": "ADR-032",
+      "number": 32,
+      "path": "docs/decisions/README.md",
+      "line": 652,
+      "inline": true,
+      "title": "- **ADR-032 \u2014 Accepted recommendation; implementation/qualification pending:** reusable capture profiles are first-release, versioned data-only CaptureProfile CRDs in explicit builtin/organization/namespace catalogs. Finite typed edits and flat composition compile into the existing bounded recipe, approvals, quotas, history and MCP preview. Ship process/network/HTTP1/Go CPU/syscall metadata definitions; permit authorized publication of materialized derivatives. No template language, nested executable profiles or new configuration service. See [capture profiles](../../specs/capture-profiles.md)."
+    },
+    {
+      "id": "ADR-033",
+      "number": 33,
+      "path": "docs/decisions/README.md",
+      "line": 653,
+      "inline": true,
+      "title": "- **ADR-033 \u2014 Accepted capability; adapter proposed:** add bounded syscall activity across current/new pod processes using the selected Gadget engine family. Metadata avoids user-memory reads; sensitive arguments/buffers require explicit reviewed acquisition and independent raw analysis/sharing. Traceloop is a feasibility candidate, not yet a qualified production implementation. See [syscalls](../../specs/syscalls.md) and [source evidence](../research/capture-profile-feasibility.md)."
+    },
+    {
+      "id": "ADR-034",
+      "number": 34,
+      "path": "docs/decisions/README.md",
+      "line": 655,
+      "inline": true,
+      "title": "- **ADR-034 \u2014 User-required distinction; lifecycle contracts integrated for review:** separate onTrigger actions from ongoing recording saved on trigger. Packet/syscall actions default ongoing; explicit onTrigger variants require zero lookback. Arm sources with authority/capacity across observation pods, reserve saves separately, and keep source identities/timeouts apart from incident jobs. Natural cores remain crash-event acquisitions with prepared interception; manual sessions remain finite. See [action lifecycles](../../specs/action-lifecycle.md)."
+    },
+    {
+      "id": "ADR-035",
+      "number": 35,
+      "path": "docs/decisions/README.md",
+      "line": 657,
+      "inline": true,
+      "title": "- **ADR-035 \u2014 User-required disclosure; assessment contracts integrated for review:** assess the combined selected capture mechanisms, expected workload effects and uncertainty before collection/arming. Show possible sensitive contents, effective automatic-deletion ages and handling guidance in browser/MCP/GitOps and scoped artifact views. Reuse the planner, capability rules, admission and privacy services; no embedded classifier, trial capture, generic consent checkbox or new approval role. Limits are not measured predictions, and managed deletion cannot recall external-agent copies. See [capture assessment](../../specs/capture-assessment.md) and [source research](../research/capture-assessment.md)."
+    },
+    {
+      "id": "ADR-036",
+      "number": 36,
+      "path": "docs/decisions/README.md",
+      "line": 659,
+      "inline": true,
+      "title": "- **ADR-036 \u2014 Accepted by maintainer; implementation/qualification pending:** require an operator-provided qualified encrypted scratch StorageClass for first-release offline analysis using separate acquisition/analyzer/publication Jobs. Per-analysis input/output PVCs need encryption, fenced nonoverlapping writers/read-only handoff, bounded capacity and verified copy-ledger cleanup. Job-private tmpfs is allowed within one phase; no cross-Job emptyDir or ordinary plaintext-PVC fallback. Collection remains usable with analysis explicitly unavailable until scratch is qualified. REQ-EVD-005/008 define isolation and privacy obligations; no particular CSI backend is assumed qualified."
+    },
+    {
+      "id": "ADR-037",
+      "number": 37,
+      "path": "docs/decisions/README.md",
+      "line": 661,
+      "inline": true,
+      "title": "- **ADR-037 \u2014 Correctness refinements integrated for review:** bind ad hoc execution digests to explicit pod/node/boot identities; retain stopped recorder contents briefly within existing authority/budgets for delayed exit events; distinguish prehistory from whole-window coverage; close tool-log and hostile-output publication paths. Remove the unimplemented manual policy-detector leaf while preserving DebugCapture. See [final review](../reviews/final-review.md)."
+    },
+    {
+      "id": "ADR-038",
+      "number": 38,
+      "path": "docs/decisions/README.md",
+      "line": 663,
+      "inline": true,
+      "title": "- **ADR-038 \u2014 Accepted feature; contracts integrated, implementation pending:** add Save existing recordings now as an explicitly enabled and reviewed policy capability. Current maintainers can snapshot only existing ongoing packet/syscall sources, without firing detectors or running onTrigger actions. Reuse policy authority/budgets, capture submission/status/cancellation, privacy and per-capture sharing; add passive inventory/preview MCP tools and a protected typed save scope. Save windows end at first acceptance, with no future acquisition or authority transfer. History repeat requires fresh source selection. See [recording saves](../../specs/recording-saves.md)."
+    },
+    {
+      "id": "ADR-039",
+      "number": 39,
+      "path": "docs/decisions/README.md",
+      "line": 665,
+      "inline": true,
+      "title": "- **ADR-039 \u2014 User-requested UX/interface/domain design; integrated for review:** originally use one role-aware console with 60 inventoried screens and Go templates/minimal JavaScript; the frontend technology is superseded by accepted ADR-046 and the inventory has since expanded. Define typed domain aggregates separately from SQL rows, CRD spec/status and transport DTOs. Reuse the 40 MCP operation contracts for browser equivalents; add explicit human review/operator boundaries without a second permission-configuration API. Local interactive mockups and schema consistency checks are design evidence only. No new runtime dependency, tenant model, embedded agent or collector implementation is introduced. See [UX](../ux/README.md), [domain](../domain/README.md) and [interfaces](../interfaces/README.md)."
+    },
+    {
+      "id": "ADR-040",
+      "number": 40,
+      "path": "docs/decisions/README.md",
+      "line": 667,
+      "inline": true,
+      "title": "- **ADR-040 \u2014 User-requested feature and approved content boundary; design integrated, qualification pending:** expose finite live views of existing ongoing packet/syscall sources through the console and five shared browser/MCP tools. The maintainer selected approved projections live, saving before raw inspection. Keep display filters independent from acquisition, preserve source/viewer authority and per-row privacy, use bounded batches with explicit gaps, and shed viewers before protected incident work. LiveWatch is minimized SQL control state; live rows are transient, not artifacts or a durable stream. No live sharing, raw-content grant, new CRD, websocket or mandatory broker. See [live watching](../../specs/live-watch.md) and [research](../research/live-watch.md)."
+    },
+    {
+      "id": "ADR-041",
+      "number": 41,
+      "path": "docs/decisions/README.md",
+      "line": 669,
+      "inline": true,
+      "title": "- **ADR-041 \u2014 User-requested minimalist GUI overhaul; design artifacts updated, usability qualification pending:** use a light neutral shell, stable section navigation, broad evidence tables, one emphasized next action per context and progressive disclosure for supplementary details. Remove the permanent mockup toolbar and technical screen IDs from ordinary page content. Keep impact, audience, sensitive-data handling, effective deadlines and gaps visible. Apply shared components to all 62 screens; preserve native accessible controls, whole-pod scope and existing browser/MCP/domain boundaries. No new frontend framework or service. See [source research](../ux/web-design-research.md), [design system](../ux/design-system.md) and [REQ-UI-007](../../specs/user-experience.md)."
+    },
+    {
+      "id": "ADR-042",
+      "number": 42,
+      "path": "docs/decisions/README.md",
+      "line": 671,
+      "inline": true,
+      "title": "- **ADR-042 \u2014 User accepted the implementation-architecture work; detailed design integrated for review:** retain a modular Go hub with separate API/worker roles, per-cluster connector, privileged node collector, minimal Rust host helper and isolated acquire/analyze/publish Jobs. Define a canonical package/dependency graph, component/entity/requirement ownership, named transaction facets, typed adapter ports, runtime failure walkthroughs and end-to-end implementation slices. Place regional evidence-text cache with the connector initially, subject to locality and independent resource bounds. No service per domain entity. See [architecture package](../architecture/README.md)."
+    },
+    {
+      "id": "ADR-043",
+      "number": 43,
+      "path": "docs/decisions/README.md",
+      "line": 672,
+      "inline": true,
+      "title": "- **ADR-043 \u2014 Internal protocol and effect-boundary refinement selected; qualification pending:** use collector-initiated private mTLS control to the connector and outbound connector polling to the hub, strict versioned purpose-specific JSON, standard JWS with Ed25519, stable effect identities and separate transient live-owner routing. Local start reservation/lookup is a narrow connector port over prepaid Kubernetes CAS state; lease expiry or new delivery fence does not justify repeating an ambiguous start. Keep the prepared natural-core path free of remote waits. Exact Gadget transport, signing-library support, old-process exclusion and fault behavior require the named runtime spikes. See [interfaces](../architecture/interfaces.md) and [research](../architecture/research.md)."
+    },
+    {
+      "id": "ADR-044",
+      "number": 44,
+      "path": "docs/decisions/README.md",
+      "line": 674,
+      "inline": true,
+      "title": "- **ADR-044 \u2014 Explicit maintainer correction; design integrated, runtime qualification pending:** require authenticated native download for all gathered evidence and saved derivatives, including packet captures for Wireshark and cores plus available exact companions for GDB. Supersede the original raw-file prohibition. Reuse current covering grants; ordinary approved artifacts need no new independent review, while full raw download needs explicit existing-artifact operation coverage. Stream from a separately scoped regional acquisition Job over bounded authenticated relays, preserving managed encryption, quotas/audit and cutoff. No presigned bearer URL, proprietary mandatory decryptor or claim of remotely deleting laptop copies. See [download contract](../../specs/artifact-downloads.md) and [review correction](../reviews/local-investigation.md)."
+    },
+    {
+      "id": "ADR-045",
+      "number": 45,
+      "path": "docs/decisions/README.md",
+      "line": 676,
+      "inline": true,
+      "title": "- **ADR-045 \u2014 Explicit maintainer selection; contracts and prototype integrated, implementation pending:** one independent human approval may cover a bounded one-off capture and the same developer's selected inspection/download. Bind exact capture/action scope, registered clients, absolute expiry and aggregate disclosure limits; create exact existing-artifact children only after verified commit. Keep acquisition and result counters distinct, current entitlement and parent revocation effective, and later/uncovered requests separately reviewed. This supersedes the separate-review limitation recorded in ADR-044's initial implementation. See [investigation approval](../../specs/investigation-approval.md) and [user-task review](../reviews/user-task-review.md)."
+    },
+    {
+      "id": "ADR-046",
+      "number": 46,
+      "path": "docs/decisions/README.md",
+      "line": 678,
+      "inline": true,
+      "title": "- **ADR-046 \u2014 Accepted by user:** React and TypeScript for the production console, compiled assets served by Go. This supersedes the Go-rendered templates/minimal-JS implementation choice in ADR-039 and the later visual-design documents; it preserves the minimalist visual system, workflows, same-origin session/API boundary and server authorization. Select unstyled React Aria primitives, library routing and bounded query state as engineering details. No production Node server or mockup rewrite is required by this planning decision. See [technology choices](../technology.md)."
+    },
+    {
+      "id": "ADR-047",
+      "number": 47,
+      "path": "docs/decisions/README.md",
+      "line": 679,
+      "inline": true,
+      "title": "- **ADR-047 \u2014 Engineering baseline selected for review; qualification pending:** use existing protocol/crypto/storage/diagnostic libraries with explicit Asservat-owned application rules. Native pgxpool + sqlc + SQL/goose migrations refine the earlier database/sql recommendation; Go net/http, official MCP SDK, local JSON Schema validation, explicit Go DTOs and generated TS types implement transport boundaries. Full Go OpenAPI generation is excluded from the baseline after failures on actual contracts. Prefer established, actively maintained dependencies; use Go 1.27 standard-library RFC 8785 canonicalization in place of the external JCS candidate. Real libpcap syntax is compiled through a qualified mechanism adapter; dynamic Gadget map integration and syscall metadata remain substantial implementation work. Keep the persistent large-artifact layout unfrozen until efficient native download/range qualification. See [build/reuse matrix](../architecture/build-or-reuse.md), [research](../research/technology-selection.md) and [experiment results](../../experiments/technology-selection/README.md). Six passing synthetic Go tests and a frontend build are not production qualification."
+    },
+    {
+      "id": "ADR-048",
+      "number": 48,
+      "path": "docs/decisions/README.md",
+      "line": 595,
+      "inline": true,
+      "title": "**ADR-048 \u2014 Artifact format selected for implementation under the maintainer's continuation:** use `asservat-framed/v1`, fixed 8 MiB native frames, complete library-managed Tink streams, a paged encrypted index and separately keyed detailed manifest. Native files are unchanged. Freeze the versioned layout and commit contract; backend/multipart/custody/authorization qualification remains open. Wrap-only collectors use explicit KMS sealing without Tink's decrypt self-check. Four immutable attempt objects are charged before writing and are not visible until verified hub commit. This resolves ADR-047's pre-implementation format gate without claiming S-01/S-02 complete. See [format and commit boundary](../architecture/artifact-format.md) and [implementation evidence](../research/artifact-foundation.md)."
+    },
+    {
+      "id": "ADR-049",
+      "number": 49,
+      "path": "docs/decisions/README.md",
+      "line": 593,
+      "inline": true,
+      "title": "Latest implementation refinement: **ADR-049 \u2014 Initial identity profile selected for qualification under the maintainer's continuation:** reuse go-oidc/go-jose with a bounded RFC 9068/RS256 access-token adapter, fixed trusted HTTPS key endpoint, finite key snapshots, explicit organization/client policy and current retained-audience evaluation. Additional profile constraints are one resource audience, complete stable group assertions and qualified separate human/workload client classes. These bounds describe an internal first adapter, not a requirement that all production IdPs change their token layout. Actual provider/discovery/group/session and Kubernetes authority integration remains pending; no ID-token fallback, new permission API, public effect or audit bypass is introduced. See [contract](../architecture/identity-eligibility.md) and [component results](../research/identity-foundation.md)."
+    },
+    {
+      "id": "ADR-050",
+      "number": 50,
+      "path": "docs/decisions/README.md",
+      "line": 681,
+      "inline": true,
+      "title": "- **ADR-050 \u2014 Engineering refinement under the authorized implementation:** use persistent SQL assignment identities and encrypted authority audit before activating new permissions; immediate deny/retirement remains independent of audit delivery. Native Kubernetes validating admission policies enforce administrator/delegation content boundaries alongside structural CRDs and RBAC. Exact source versions and verified transition continuity govern preservation across controller epochs; ordinary restart alone does not erase unchanged assignments. Qualification and runtime composition are tracked separately. See [permission acceptance](../architecture/permission-acceptance.md)."
+    },
+    {
+      "id": "ADR-051",
+      "number": 51,
+      "path": "docs/decisions/051-peer-certificate-profile.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-051 \u2014 Initial internal peer identity profile",
+      "words": 218
+    },
+    {
+      "id": "ADR-052",
+      "number": 52,
+      "path": "docs/decisions/README.md",
+      "line": 683,
+      "inline": true,
+      "title": "- **ADR-052 \u2014 Enrollment retry and activation refinement:** persist a maximum of two nonrefundable signing attempts per original bootstrap, each with at most five seconds to store its verified result. Require separate encrypted claim and certificate audit, then current atomic registration before delivery. Audit failure reuses the signed result; replay cannot revive revoked registration. See [audited activation](../architecture/enrollment-activation.md)."
+    },
+    {
+      "id": "ADR-053",
+      "number": 53,
+      "path": "docs/decisions/053-keycloak-access-profile.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-053 \u2014 Explicit Keycloak access-token profile",
+      "words": 287
+    },
+    {
+      "id": "ADR-054",
+      "number": 54,
+      "path": "docs/decisions/054-native-download-protocol.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-054 \u2014 Native download preparation and HTTP resume",
+      "words": 234
+    },
+    {
+      "id": "ADR-055",
+      "number": 55,
+      "path": "docs/decisions/055-retained-evidence-cutoffs.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-055 \u2014 Monotonic retained-evidence cutoffs and signed lifecycle journal",
+      "words": 440
+    },
+    {
+      "id": "ADR-056",
+      "number": 56,
+      "path": "docs/decisions/056-retention-watch-watermark.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-056 \u2014 Complete retention history before source availability",
+      "words": 590
+    },
+    {
+      "id": "ADR-057",
+      "number": 57,
+      "path": "docs/decisions/057-retention-topology-pins.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-057 \u2014 Exact installation retention topology",
+      "words": 236
+    },
+    {
+      "id": "ADR-058",
+      "number": 58,
+      "path": "docs/decisions/058-official-helm-installation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-058 \u2014 Official Helm installation",
+      "words": 300
+    },
+    {
+      "id": "ADR-059",
+      "number": 59,
+      "path": "docs/decisions/059-unattended-policy-authority.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-059 \u2014 Separate human SSO from recurring policy authority",
+      "words": 480
+    },
+    {
+      "id": "ADR-060",
+      "number": 60,
+      "path": "docs/decisions/060-bounded-browser-sessions.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-060 \u2014 Bounded server-side browser sessions",
+      "words": 402
+    },
+    {
+      "id": "ADR-061",
+      "number": 61,
+      "path": "docs/decisions/061-current-browser-configuration.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-061 \u2014 Current protected browser configuration",
+      "words": 409
+    },
+    {
+      "id": "ADR-062",
+      "number": 62,
+      "path": "docs/decisions/062-policy-submission-signatures.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-062 \u2014 Post-persistence policy submission signatures",
+      "words": 523
+    },
+    {
+      "id": "ADR-063",
+      "number": 63,
+      "path": "docs/decisions/063-small-deployment-alternatives.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-063 \u2014 Small deployments with internal dependency alternatives",
+      "words": 388
+    },
+    {
+      "id": "ADR-064",
+      "number": 64,
+      "path": "docs/decisions/064-local-key-material.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-064 \u2014 Versioned local key material and provider-neutral credential envelopes",
+      "words": 426
+    },
+    {
+      "id": "ADR-065",
+      "number": 65,
+      "path": "docs/decisions/065-local-key-service-boundary.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-065 \u2014 Private local key operations",
+      "words": 317
+    },
+    {
+      "id": "ADR-066",
+      "number": 66,
+      "path": "docs/decisions/066-download-key-authority.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-066 \u2014 Bind local unwrap to an audited download",
+      "words": 329
+    },
+    {
+      "id": "ADR-067",
+      "number": 67,
+      "path": "docs/decisions/067-protected-local-key-lifecycle.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-067 \u2014 Protected local key source and bounded lifecycle observations",
+      "words": 407
+    },
+    {
+      "id": "ADR-068",
+      "number": 68,
+      "path": "docs/decisions/068-download-worker-attestation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-068 \u2014 Kubernetes-bound download worker proofs",
+      "words": 378
+    },
+    {
+      "id": "ADR-069",
+      "number": 69,
+      "path": "docs/decisions/069-download-worker-dispatch.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-069 \u2014 Durable dispatch and retirement of download workers",
+      "words": 554
+    },
+    {
+      "id": "ADR-070",
+      "number": 70,
+      "path": "docs/decisions/070-protected-worker-configuration.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-070 \u2014 Protected worker configuration and rollout fencing",
+      "words": 460
+    },
+    {
+      "id": "ADR-071",
+      "number": 71,
+      "path": "docs/decisions/071-download-worker-enrollment.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-071 \u2014 Audited acquisition credentials and bounded renewal",
+      "words": 529
+    },
+    {
+      "id": "ADR-072",
+      "number": 72,
+      "path": "docs/decisions/072-worker-credential-channel.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-072 \u2014 Process-owned acquisition credentials and private enrollment channel",
+      "words": 522
+    },
+    {
+      "id": "ADR-073",
+      "number": 73,
+      "path": "docs/decisions/073-worker-startup.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-073 \u2014 Pinned worker startup and original-template cleanup",
+      "words": 391
+    },
+    {
+      "id": "ADR-074",
+      "number": 74,
+      "path": "docs/decisions/074-worker-request-routing.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-074 \u2014 Active worker request ownership",
+      "words": 320
+    },
+    {
+      "id": "ADR-075",
+      "number": 75,
+      "path": "docs/decisions/075-worker-owner-locator.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-075 \u2014 Shared worker request locator",
+      "words": 410
+    },
+    {
+      "id": "ADR-076",
+      "number": 76,
+      "path": "docs/decisions/076-hub-owner-discovery.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-076 \u2014 Exact hub owner discovery and TLS identity",
+      "words": 384
+    },
+    {
+      "id": "ADR-077",
+      "number": 77,
+      "path": "docs/decisions/077-protected-owner-configuration.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-077 \u2014 Protected hub owner configuration",
+      "words": 363
+    },
+    {
+      "id": "ADR-078",
+      "number": 78,
+      "path": "docs/decisions/078-owner-configuration-acceptance.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-078 \u2014 Durable owner configuration acceptance",
+      "words": 403
+    },
+    {
+      "id": "ADR-079",
+      "number": 79,
+      "path": "docs/decisions/079-owner-certificate-issuance.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-079 \u2014 Purpose-separated hub owner certificate issuance",
+      "words": 413
+    },
+    {
+      "id": "ADR-080",
+      "number": 80,
+      "path": "docs/decisions/080-private-hub-workload-protection.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-080 \u2014 Protect the private hub workload namespace",
+      "words": 380
+    },
+    {
+      "id": "ADR-081",
+      "number": 81,
+      "path": "docs/decisions/081-hub-owner-enrollment-proof.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-081 \u2014 Prove hub owner enrollment before readiness",
+      "words": 346
+    },
+    {
+      "id": "ADR-082",
+      "number": 82,
+      "path": "docs/decisions/082-durable-owner-enrollment.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-082 \u2014 Durable hub process enrollment",
+      "words": 549
+    },
+    {
+      "id": "ADR-083",
+      "number": 83,
+      "path": "docs/decisions/083-current-owner-authentication.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-083 \u2014 Current authentication of an enrolled hub peer",
+      "words": 450
+    },
+    {
+      "id": "ADR-084",
+      "number": 84,
+      "path": "docs/decisions/084-process-owned-owner-credentials.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-084 \u2014 Process-owned hub credentials and renewal",
+      "words": 442
+    },
+    {
+      "id": "ADR-085",
+      "number": 85,
+      "path": "docs/decisions/085-private-owner-enrollment-receiver.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-085 \u2014 Private owner enrollment receiver",
+      "words": 557
+    },
+    {
+      "id": "ADR-086",
+      "number": 86,
+      "path": "docs/decisions/086-outbound-owner-enrollment.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-086 \u2014 Outbound owner enrollment transfer",
+      "words": 603
+    },
+    {
+      "id": "ADR-087",
+      "number": 87,
+      "path": "docs/decisions/087-live-owner-delivery.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-087 \u2014 Live owner cancellation through worker delivery",
+      "words": 594
+    },
+    {
+      "id": "ADR-088",
+      "number": 88,
+      "path": "docs/decisions/088-owner-startup-readiness.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-088 \u2014 Owner startup readiness and runtime composition",
+      "words": 663
+    },
+    {
+      "id": "ADR-089",
+      "number": 89,
+      "path": "docs/decisions/089-multicluster-worker-routing.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-089 \u2014 Multi-cluster worker routing and exact issuer selection",
+      "words": 728
+    },
+    {
+      "id": "ADR-090",
+      "number": 90,
+      "path": "docs/decisions/090-protected-owner-deployment.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-090 \u2014 Protected owner deployment inputs and rotating credentials",
+      "words": 636
+    },
+    {
+      "id": "ADR-091",
+      "number": 91,
+      "path": "docs/decisions/091-protected-configuration-reconciliation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-091 \u2014 Protected fleet and owner configuration reconciliation",
+      "words": 750
+    },
+    {
+      "id": "ADR-092",
+      "number": 92,
+      "path": "docs/decisions/092-independent-source-admission-probes.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-092 \u2014 Independent source admission probes in the private hub namespace",
+      "words": 533
+    },
+    {
+      "id": "ADR-093",
+      "number": 93,
+      "path": "docs/decisions/093-bounded-hub-scheduling-permission.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-093 \u2014 Bounded scheduling permission inside the private hub namespace",
+      "words": 543
+    },
+    {
+      "id": "ADR-094",
+      "number": 94,
+      "path": "docs/decisions/094-native-hub-worker-projections.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-094 \u2014 Native hub-worker credentials and workload",
+      "words": 746
+    },
+    {
+      "id": "ADR-095",
+      "number": 95,
+      "path": "docs/decisions/095-hub-workload-garbage-collection.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-095 \u2014 Protected hub workload garbage collection",
+      "words": 596
+    },
+    {
+      "id": "ADR-096",
+      "number": 96,
+      "path": "docs/decisions/096-database-incarnation-fence.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-096 \u2014 Database incarnation fence before recovery activation",
+      "words": 619
+    },
+    {
+      "id": "ADR-097",
+      "number": 97,
+      "path": "docs/decisions/097-one-use-installation-witness.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-097 \u2014 One-use installation witness",
+      "words": 495
+    },
+    {
+      "id": "ADR-098",
+      "number": 98,
+      "path": "docs/decisions/098-first-installation-activation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-098 \u2014 Audited first-installation activation",
+      "words": 520
+    },
+    {
+      "id": "ADR-099",
+      "number": 99,
+      "path": "docs/decisions/099-protected-initial-installer.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-099 \u2014 Protected initial-installer execution",
+      "words": 557
+    },
+    {
+      "id": "ADR-100",
+      "number": 100,
+      "path": "docs/decisions/100-temporary-initial-sql-credentials.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-100 \u2014 Temporary initial-installation SQL credentials",
+      "words": 500
+    },
+    {
+      "id": "ADR-101",
+      "number": 101,
+      "path": "docs/decisions/101-installation-namespace-staging.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-101 \u2014 Protect installation staging before workload identities exist",
+      "words": 417
+    },
+    {
+      "id": "ADR-102",
+      "number": 102,
+      "path": "docs/decisions/102-initial-preparation-journal.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-102 \u2014 Persist bounded installation creation intent",
+      "words": 455
+    },
+    {
+      "id": "ADR-103",
+      "number": 103,
+      "path": "docs/decisions/103-durable-context-previews.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-103 \u2014 Durable manual context previews and accepted retries",
+      "words": 410
+    },
+    {
+      "id": "ADR-104",
+      "number": 104,
+      "path": "docs/decisions/104-regional-api-context-execution.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-104 \u2014 Regional Kubernetes API context execution",
+      "words": 359
+    },
+    {
+      "id": "ADR-105",
+      "number": 105,
+      "path": "docs/decisions/105-durable-context-progress.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-105 \u2014 Durable, authorized context capture progress",
+      "words": 476
+    },
+    {
+      "id": "ADR-106",
+      "number": 106,
+      "path": "docs/decisions/106-regional-api-context-start.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-106 \u2014 Regional API context start and completed-result provenance",
+      "words": 440
+    },
+    {
+      "id": "ADR-107",
+      "number": 107,
+      "path": "docs/decisions/107-atomic-context-request-resolution.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-107 \u2014 Atomic resolution of an uncertain manual capture request",
+      "words": 492
+    },
+    {
+      "id": "ADR-108",
+      "number": 108,
+      "path": "docs/decisions/108-backed-context-control-capacity.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-108: back context control records per workload",
+      "words": 686
+    },
+    {
+      "id": "ADR-109",
+      "number": 109,
+      "path": "docs/decisions/109-published-context-case-navigation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-109: Published context cases and ordinary navigation",
+      "words": 392
+    },
+    {
+      "id": "ADR-110",
+      "number": 110,
+      "path": "docs/decisions/110-bounded-public-operation-audit.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-110: Bounded public operation intent and result audit",
+      "words": 512
+    },
+    {
+      "id": "ADR-111",
+      "number": 111,
+      "path": "docs/decisions/111-positive-context-writer-deletion.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-111: Positive context writer completion and audited deletion",
+      "words": 456
+    },
+    {
+      "id": "ADR-112",
+      "number": 112,
+      "path": "docs/decisions/112-healthy-operation-audit-retirement.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-112: Healthy operation audit retirement and backed history",
+      "words": 520
+    },
+    {
+      "id": "ADR-113",
+      "number": 113,
+      "path": "docs/decisions/113-large-native-response-accounting.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-113: Whole native responses with bounded accounting windows",
+      "words": 1269
+    },
+    {
+      "id": "ADR-114",
+      "number": 114,
+      "path": "docs/decisions/114-download-owned-browser-refresh.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-114: Browser refresh owned by an active download",
+      "words": 1009
+    },
+    {
+      "id": "ADR-115",
+      "number": 115,
+      "path": "docs/decisions/115-overdue-operation-audit-erasure.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-115: Overdue original operation-audit erasure",
+      "words": 370
+    },
+    {
+      "id": "ADR-116",
+      "number": 116,
+      "path": "docs/decisions/116-context-native-exchange.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-116: purpose-specific regional native context exchange",
+      "words": 519
+    },
+    {
+      "id": "ADR-117",
+      "number": 117,
+      "path": "docs/decisions/117-resumable-initial-preparation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-117: Resume fixed declarative setup after a lost create reply",
+      "words": 513
+    },
+    {
+      "id": "ADR-118",
+      "number": 118,
+      "path": "docs/decisions/118-retained-private-installation-state.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-118: Retain initial private material and read historical completion",
+      "words": 379
+    },
+    {
+      "id": "ADR-119",
+      "number": 119,
+      "path": "docs/decisions/119-public-context-download-and-prepaid-stop.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-119: Public ordinary context downloads and prepaid Stop",
+      "words": 538
+    },
+    {
+      "id": "ADR-120",
+      "number": 120,
+      "path": "docs/decisions/120-gated-installation-preparation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-120: Explicit gated installation preparation and original credential binding",
+      "words": 432
+    },
+    {
+      "id": "ADR-121",
+      "number": 121,
+      "path": "docs/decisions/121-native-worker-startup.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-121: Explicit native acquisition worker startup",
+      "words": 869
+    },
+    {
+      "id": "ADR-122",
+      "number": 122,
+      "path": "docs/decisions/122-private-native-owner-listener.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-122: Separate private native owner listener",
+      "words": 357
+    },
+    {
+      "id": "ADR-123",
+      "number": 123,
+      "path": "docs/decisions/123-typed-initial-installation-inputs.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-123: Typed initial installation inputs and one-use handover",
+      "words": 276
+    },
+    {
+      "id": "ADR-124",
+      "number": 124,
+      "path": "docs/decisions/124-prepaid-stop-retirement.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-124: Retire prepaid Stop obligations with positive writer proof",
+      "words": 479
+    },
+    {
+      "id": "ADR-125",
+      "number": 125,
+      "path": "docs/decisions/125-prepaid-operation-certificate-verification.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-125: Spend a bounded allowance before operation-certificate verification",
+      "words": 565
+    },
+    {
+      "id": "ADR-126",
+      "number": 126,
+      "path": "docs/decisions/126-connector-process-identity-and-renewal.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-126: Bind connector identity to automatic process enrollment and bounded renewal",
+      "words": 592
+    },
+    {
+      "id": "ADR-127",
+      "number": 127,
+      "path": "docs/decisions/127-current-processing-and-download-placement.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-127: Current processing decisions and complete native placement",
+      "words": 561
+    },
+    {
+      "id": "ADR-128",
+      "number": 128,
+      "path": "docs/decisions/128-initial-provider-provisioning.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-128: Original installation provider credentials and projection",
+      "words": 421
+    },
+    {
+      "id": "ADR-129",
+      "number": 129,
+      "path": "docs/decisions/129-initial-activation-handover.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-129: Original installation handover and healthy retirement",
+      "words": 783
+    },
+    {
+      "id": "ADR-130",
+      "number": 130,
+      "path": "docs/decisions/130-bounded-initial-schema.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-130: Separate bounded first-installation schema administration",
+      "words": 346
+    },
+    {
+      "id": "ADR-131",
+      "number": 131,
+      "path": "docs/decisions/131-trusted-bootstrap-input-producer.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-131: Produce original installation pins from trusted static inputs",
+      "words": 487
+    },
+    {
+      "id": "ADR-132",
+      "number": 132,
+      "path": "docs/decisions/132-capture-intent-writer-lifecycle.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-132: Atomically backed capture-intent persistence",
+      "words": 368
+    },
+    {
+      "id": "ADR-133",
+      "number": 133,
+      "path": "docs/decisions/133-positive-bootstrap-copy-closure.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-133: Close managed setup copies after positive original retirement",
+      "words": 507
+    },
+    {
+      "id": "ADR-134",
+      "number": 134,
+      "path": "docs/decisions/134-explicit-capture-continuation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-134: Explicit continuation of an accepted capture",
+      "words": 440
+    },
+    {
+      "id": "ADR-135",
+      "number": 135,
+      "path": "docs/decisions/135-live-regional-api-context-start.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-135: live outbound regional API context start",
+      "words": 555
+    },
+    {
+      "id": "ADR-136",
+      "number": 136,
+      "path": "docs/decisions/136-first-context-native-content.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-136: First approved-context native HTTP composition",
+      "words": 615
+    },
+    {
+      "id": "ADR-137",
+      "number": 137,
+      "path": "docs/decisions/137-official-helm-bootstrap.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-137 \u2014 Package the fixed initial installer with Helm",
+      "words": 445
+    },
+    {
+      "id": "ADR-138",
+      "number": 138,
+      "path": "docs/decisions/138-public-context-endpoint-composition.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-138: compose public context endpoints through one audited backend",
+      "words": 217
+    },
+    {
+      "id": "ADR-139",
+      "number": 139,
+      "path": "docs/decisions/139-shared-native-context-start-listener.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-139: Share the accepted native port with live context start",
+      "words": 535
+    },
+    {
+      "id": "ADR-140",
+      "number": 140,
+      "path": "docs/decisions/140-installed-public-runtime-producers.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-140 \u2014 Protected producers for installed public runtime",
+      "words": 941
+    },
+    {
+      "id": "ADR-141",
+      "number": 141,
+      "path": "docs/decisions/141-protected-capacity-production.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-141 \u2014 Protected capacity production and managed renewal",
+      "words": 703
+    },
+    {
+      "id": "ADR-144",
+      "number": 144,
+      "path": "docs/decisions/144-cluster-local-observations.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-144 \u2014 Current cluster-local observation delegation",
+      "words": 3113
+    },
+    {
+      "id": "ADR-145",
+      "number": 145,
+      "path": "docs/decisions/145-independent-capacity-probe.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-145 \u2014 Independent capacity admission probe",
+      "words": 292
+    },
+    {
+      "id": "ADR-146",
+      "number": 146,
+      "path": "docs/decisions/146-processing-coverage-before-collection.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-146: Check prepaid processing coverage before collection",
+      "words": 532
+    },
+    {
+      "id": "ADR-147",
+      "number": 147,
+      "path": "docs/decisions/147-standard-owner-provider-authentication.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-147 \u2014 Standard owner provider authentication",
+      "words": 1162
+    },
+    {
+      "id": "ADR-148",
+      "number": 148,
+      "path": "docs/decisions/148-public-projection-enforcement.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-148 \u2014 One public projection enforcement interval",
+      "words": 631
+    },
+    {
+      "id": "ADR-149",
+      "number": 149,
+      "path": "docs/decisions/149-fresh-provider-installed-pair.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-149 \u2014 Fresh provider-installed worker and owner pair",
+      "words": 3461
+    },
+    {
+      "id": "ADR-150",
+      "number": 150,
+      "path": "docs/decisions/150-operation-owned-native-observation-proof.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-150 \u2014 Operation-owned native observation proof",
+      "words": 3295
+    },
+    {
+      "id": "ADR-151",
+      "number": 151,
+      "path": "docs/decisions/151-initial-audit-version-requirement.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-151: Required versions for initial installation audit",
+      "words": 909
+    },
+    {
+      "id": "ADR-152",
+      "number": 152,
+      "path": "docs/decisions/152-retention-current-audit-receipts.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-152: Current retention audit receipts",
+      "words": 815
+    },
+    {
+      "id": "ADR-153",
+      "number": 153,
+      "path": "docs/decisions/153-operation-owned-connector-enrollment.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-153: Bind connector enrollment and signing to one native operation",
+      "words": 1269
+    },
+    {
+      "id": "ADR-155",
+      "number": 155,
+      "path": "docs/decisions/155-unchanged-fleet-persistence-contention.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-155 \u2014 Unchanged fleet observation persistence contention",
+      "words": 775
+    },
+    {
+      "id": "ADR-156",
+      "number": 156,
+      "path": "docs/decisions/156-finite-owner-audit-epochs.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-156: Finite owner configuration audit epochs",
+      "words": 1292
+    },
+    {
+      "id": "ADR-157",
+      "number": 157,
+      "path": "docs/decisions/157-protected-observation-dial-endpoint.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-157: Separate protected observation dial ports from serving identity",
+      "words": 1007
+    },
+    {
+      "id": "ADR-158",
+      "number": 158,
+      "path": "docs/decisions/158-owner-startup-critical-sections.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-158 \u2014 Owner startup preflight before recovery locking",
+      "words": 748
+    },
+    {
+      "id": "ADR-159",
+      "number": 159,
+      "path": "docs/decisions/159-owner-projection-split-preflight.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-159 \u2014 Complete owner projection preflight across the SQL lock",
+      "words": 866
+    },
+    {
+      "id": "ADR-160",
+      "number": 160,
+      "path": "docs/decisions/160-public-context-service-assembly.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-160 \u2014 Purpose-separated context service assembly",
+      "words": 572
+    },
+    {
+      "id": "ADR-161",
+      "number": 161,
+      "path": "docs/decisions/161-fleet-observation-separation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-161 \u2014 Separate fleet freshness from restrictive authority locks",
+      "words": 1396
+    },
+    {
+      "id": "ADR-162",
+      "number": 162,
+      "path": "docs/decisions/162-owner-projection-read-only-finalization.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-162 \u2014 Read-only finalization of original owner projection effects",
+      "words": 1410
+    },
+    {
+      "id": "ADR-163",
+      "number": 163,
+      "path": "docs/decisions/163-original-work-transport-observation-lease.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-163: original-work transport observation lease",
+      "words": 664
+    },
+    {
+      "id": "ADR-164",
+      "number": 164,
+      "path": "docs/decisions/164-owner-launch-receipt-convergence.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-164 \u2014 Passive convergence of the original owner launch receipt",
+      "words": 506
+    },
+    {
+      "id": "ADR-165",
+      "number": 165,
+      "path": "docs/decisions/165-original-observation-capability-selection.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-165 \u2014 Original observation capability selection",
+      "words": 401
+    },
+    {
+      "id": "ADR-166",
+      "number": 166,
+      "path": "docs/decisions/166-bounded-streaming-custody.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-166 \u2014 Bounded streaming custody for larger native outputs",
+      "words": 804
+    },
+    {
+      "id": "ADR-167",
+      "number": 167,
+      "path": "docs/decisions/167-phase-bounded-download-continuation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-167 \u2014 Phase-bounded context download continuation",
+      "words": 815
+    },
+    {
+      "id": "ADR-168",
+      "number": 168,
+      "path": "docs/decisions/168-rotating-cluster-enrollment-credential.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-168 \u2014 Rotating cluster enrollment credential with outbound-only connectivity",
+      "words": 1487
+    },
+    {
+      "id": "ADR-169",
+      "number": 169,
+      "path": "docs/decisions/169-delegated-regional-lifecycle-channel.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-169 \u2014 Delegated regional lifecycle channel",
+      "words": 931
+    },
+    {
+      "id": "ADR-170",
+      "number": 170,
+      "path": "docs/decisions/170-federation-compartment.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-170 \u2014 Federation compartment for connector-facing hub duties",
+      "words": 861
+    },
+    {
+      "id": "ADR-171",
+      "number": 171,
+      "path": "docs/decisions/171-hub-run-context-execution.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-171 \u2014 Hub-run context execution with delegated regional operations",
+      "words": 918
+    },
+    {
+      "id": "ADR-172",
+      "number": 172,
+      "path": "docs/decisions/172-delegated-owner-discovery.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-172 \u2014 Delegated owner discovery and authentication for regional exchanges",
+      "words": 830
+    },
+    {
+      "id": "ADR-173",
+      "number": 173,
+      "path": "docs/decisions/173-work-scoped-process-observation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-173 \u2014 Work-scoped regional process observation",
+      "words": 716
+    },
+    {
+      "id": "ADR-174",
+      "number": 174,
+      "path": "docs/decisions/174-regional-context-start-composition.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-174 \u2014 Regional context-start composition in the connector process",
+      "words": 616
+    },
+    {
+      "id": "ADR-175",
+      "number": 175,
+      "path": "docs/decisions/175-capacity-token-request.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-175 \u2014 Capacity account token by admitted, Pod-bound TokenRequest",
+      "words": 903
+    },
+    {
+      "id": "ADR-176",
+      "number": 176,
+      "path": "docs/decisions/176-artifact-keys-local-key-service.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-176 \u2014 Artifact keys through the local key service with attempt-scoped wrap authority",
+      "words": 1045
+    },
+    {
+      "id": "ADR-177",
+      "number": 177,
+      "path": "docs/decisions/177-hub-sql-connection-governor.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-177 \u2014 Per-purpose logins under a process-wide SQL connection governor",
+      "words": 1122
+    },
+    {
+      "id": "ADR-178",
+      "number": 178,
+      "path": "docs/decisions/178-delegated-connector-source-on-context-start.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-178 \u2014 Delegated connector source on the context-start exchange",
+      "words": 1191
+    },
+    {
+      "id": "ADR-179",
+      "number": 179,
+      "path": "docs/decisions/179-outbound-only-first-installed-profile.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-179 \u2014 Outbound-only scope of the first installed investigation profile",
+      "words": 1007
+    },
+    {
+      "id": "ADR-180",
+      "number": 180,
+      "path": "docs/decisions/180-hub-api-public-composition.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-180 \u2014 hub-api public composition and its protected inputs",
+      "words": 1137
+    },
+    {
+      "id": "ADR-181",
+      "number": 181,
+      "path": "docs/decisions/181-asynchronous-publication-verifier.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-181 \u2014 Asynchronous publication in a dedicated verifier process",
+      "words": 838
+    },
+    {
+      "id": "ADR-182",
+      "number": 182,
+      "path": "docs/decisions/182-installed-owner-promotion.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-182 \u2014 Promoting the installed owner to native backend and public layers",
+      "words": 881
+    },
+    {
+      "id": "ADR-183",
+      "number": 183,
+      "path": "docs/decisions/183-installer-runtime-continuation.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-183 \u2014 Installer runtime continuation",
+      "words": 1282
+    },
+    {
+      "id": "ADR-184",
+      "number": 184,
+      "path": "docs/decisions/184-promoted-owner-first-launch.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-184 \u2014 Promoted owner on its first launch",
+      "words": 858
+    },
+    {
+      "id": "ADR-185",
+      "number": 185,
+      "path": "docs/decisions/185-public-sources-and-cluster-catalog.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-185 \u2014 Public sources and the cluster catalog",
+      "words": 868
+    },
+    {
+      "id": "ADR-186",
+      "number": 186,
+      "path": "docs/decisions/186-operation-scoped-public-role-proof.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-186 \u2014 Operation-scoped public role proof",
+      "words": 536
+    },
+    {
+      "id": "ADR-187",
+      "number": 187,
+      "path": "docs/decisions/187-replay-after-guard-bridge.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-187 \u2014 Replay after the guard bridge",
+      "words": 584
+    },
+    {
+      "id": "ADR-188",
+      "number": 188,
+      "path": "docs/decisions/188-configuration-role-post-lock-proof.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-188 \u2014 Configuration role proof after the SQL locks and the bridge",
+      "words": 433
+    },
+    {
+      "id": "ADR-189",
+      "number": 189,
+      "path": "docs/decisions/189-installed-permission-stream.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-189 \u2014 Installed permission stream",
+      "words": 849
+    },
+    {
+      "id": "ADR-190",
+      "number": 190,
+      "path": "docs/decisions/190-capacity-readiness-and-promoted-owner.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-190 \u2014 Capacity readiness around the promoted owner launch",
+      "words": 1287
+    },
+    {
+      "id": "ADR-191",
+      "number": 191,
+      "path": "docs/decisions/191-retained-bracket-projection-writes.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-191 \u2014 Worker projection writes under one retained bracket",
+      "words": 357
+    },
+    {
+      "id": "ADR-192",
+      "number": 192,
+      "path": "docs/decisions/192-capacity-before-download-paths.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-192 \u2014 Capacity readiness before download paths",
+      "words": 918
+    },
+    {
+      "id": "ADR-193",
+      "number": 193,
+      "path": "docs/decisions/193-installed-federation-and-regional-enrollment.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-193 \u2014 Installed federation and regional cluster enrollment",
+      "words": 3032
+    },
+    {
+      "id": "ADR-194",
+      "number": 194,
+      "path": "docs/decisions/194-promoted-owner-inputs.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-194 \u2014 Promoted owner inputs",
+      "words": 1507
+    },
+    {
+      "id": "ADR-195",
+      "number": 195,
+      "path": "docs/decisions/195-installed-hub-retention-source.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-195 \u2014 Installed hub retention source",
+      "words": 1298
+    },
+    {
+      "id": "ADR-196",
+      "number": 196,
+      "path": "docs/decisions/196-regional-cluster-join.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-196 \u2014 Regional cluster join",
+      "words": 2370
+    },
+    {
+      "id": "ADR-197",
+      "number": 197,
+      "path": "docs/decisions/197-regional-capacity.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-197 \u2014 Regional capacity",
+      "words": 4726
+    },
+    {
+      "id": "ADR-198",
+      "number": 198,
+      "path": "docs/decisions/198-installed-key-service.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-198 \u2014 Installed key service",
+      "words": 1506
+    },
+    {
+      "id": "ADR-199",
+      "number": 199,
+      "path": "docs/decisions/199-executor-proof-source-reads.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-199 \u2014 One source read at each end of the executor proof",
+      "words": 596
+    },
+    {
+      "id": "ADR-200",
+      "number": 200,
+      "path": "docs/decisions/200-on-demand-capacity-refresh.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-200 \u2014 On-demand capacity refresh",
+      "words": 1521
+    },
+    {
+      "id": "ADR-201",
+      "number": 201,
+      "path": "docs/decisions/201-ebpf-cpu-profiles.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-201 \u2014 eBPF CPU profiles for every runtime",
+      "words": 776
+    },
+    {
+      "id": "ADR-202",
+      "number": 202,
+      "path": "docs/decisions/202-public-api-exposure.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-202 \u2014 Public API exposure",
+      "words": 287
+    },
+    {
+      "id": "ADR-203",
+      "number": 203,
+      "path": "docs/decisions/203-installed-publisher.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-203 \u2014 Installed publisher",
+      "words": 1225
+    },
+    {
+      "id": "ADR-204",
+      "number": 204,
+      "path": "docs/decisions/204-installed-downloads.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-204 \u2014 Installed native downloads",
+      "words": 2019
+    },
+    {
+      "id": "ADR-205",
+      "number": 205,
+      "path": "docs/decisions/205-installed-context-deletion.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-205 \u2014 Installed context deletion",
+      "words": 1614
+    },
+    {
+      "id": "ADR-206",
+      "number": 206,
+      "path": "docs/decisions/206-bounded-context-projection.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-206 \u2014 Bounded approved pod-status projection reads",
+      "words": 1165
+    },
+    {
+      "id": "ADR-207",
+      "number": 207,
+      "path": "docs/decisions/207-context-setup-proof-bracket.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-207 \u2014 One native proof bracket for context-start setup",
+      "words": 1533
+    },
+    {
+      "id": "ADR-208",
+      "number": 208,
+      "path": "docs/decisions/208-context-opening-client-burst.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-208 \u2014 Opening limiter for context-start Kubernetes clients",
+      "words": 876
+    },
+    {
+      "id": "ADR-209",
+      "number": 209,
+      "path": "docs/decisions/209-two-context-start-standbys-per-owner.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-209 \u2014 Two context-start standbys per hub owner",
+      "words": 278
+    },
+    {
+      "id": "ADR-210",
+      "number": 210,
+      "path": "docs/decisions/210-installed-processing-changes.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-210 \u2014 Installed processing changes by a privacy operator",
+      "words": 793
+    },
+    {
+      "id": "ADR-211",
+      "number": 211,
+      "path": "docs/decisions/211-completed-query-standby-transition.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-211 \u2014 Return a completed target query to its original standby interval",
+      "words": 708
+    },
+    {
+      "id": "ADR-212",
+      "number": 212,
+      "path": "docs/decisions/212-api-preparation-remaining-interval.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-212 \u2014 Remaining interval before one-use API preparation",
+      "words": 572
+    },
+    {
+      "id": "ADR-213",
+      "number": 213,
+      "path": "docs/decisions/213-storage-readiness-at-consumption.md",
+      "line": 1,
+      "inline": false,
+      "title": "ADR-213 \u2014 Storage readiness at consumption",
+      "words": 670
+    }
+  ],
+  "missing_numbers": [
+    142,
+    143,
+    154
+  ]
+}

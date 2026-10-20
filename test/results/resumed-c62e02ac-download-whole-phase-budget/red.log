@@ -1,0 +1,8 @@
+=== RUN   TestDownloadPreparationFirstJobFitsOriginalPolicyBudget
+    download_preparation_phase_budget_test.go:243: elapsed=4.951148968s original_interval=5s authority_checks=5 policy_reads=9 completed_policy_reads=8 observer=119 probe=27 denied=9 created=false recorded=false job_pending=false continued=false err=download authority or session expired
+    download_preparation_phase_budget_test.go:244: production_path=[identity recovery lookup-key route recovery processing recovery processing authority runtime-ready configuration plan reserve-session source identity identity recovery processing recovery processing authority identity attachment identity recovery processing recovery processing authority identity reserve-worker read-intent-audit identity recovery processing recovery processing authority identity write-intent-audit identity]
+    download_preparation_phase_budget_test.go:246: first acknowledged Job Pending did not fit the original five-second request
+--- FAIL: TestDownloadPreparationFirstJobFitsOriginalPolicyBudget (4.97s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	4.977s
+FAIL

@@ -1,5 +1,11 @@
 # Decision records
 
+[ADR-214 — Reuse a bounded download policy observation](214-bounded-download-policy-observation.md)
+selects a 60-second download-only policy observation instead of repeating its
+Kubernetes protection read at each helper call. Raw administrative reads, original
+request deadlines and current SQL effect checks remain separate. Implementation
+and complete-path qualification are in progress.
+
 [ADR-213 — Storage readiness at consumption](213-storage-readiness-at-consumption.md)
 adds a bounded consumption phase to the same request-owned readiness wait:
 only a valid unchanged storage selection with insufficient margin may wait for

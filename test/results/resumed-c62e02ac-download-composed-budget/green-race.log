@@ -1,0 +1,80 @@
+=== RUN   TestDownloadPreparationFirstJobFitsOriginalIdentityAndPolicyBudget
+    download_preparation_identity_budget_test.go:148: near_expiry=false initial_identity_remaining=4.991222358s original_request_remaining=4.959235465s
+    download_preparation_identity_budget_test.go:148: elapsed=74.363306ms original_interval=5s authority_checks=10 raw_policy_reads=1 completed_policy_reads=1 policy_observer=14 identity_observer=3 identity_policy_reads=1 token_checks=40 permissions=20 catalog=10 retention=10 probe=3 denied=1 created=true recorded=true job_pending=true continued=true err=<nil>
+    download_preparation_identity_budget_test.go:148: production_path=[verify-token verify-token recovery lookup-key route verify-token permissions catalog retention recovery processing recovery processing verify-token permissions runtime-ready configuration plan reserve-session source verify-token verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token attachment verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token reserve-worker read-intent-audit verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token write-intent-audit verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token ack-intent-audit verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token claim-worker verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token create-job verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token record-job observe-job verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions observe-session verify-token]
+--- PASS: TestDownloadPreparationFirstJobFitsOriginalIdentityAndPolicyBudget (0.15s)
+=== RUN   TestDownloadPreparationNearExpiredIdentityObservation
+    download_preparation_identity_budget_test.go:152: near_expiry=true initial_identity_remaining=4.997742432s original_request_remaining=4.957324145s
+    download_preparation_identity_budget_test.go:152: elapsed=424.186316ms original_interval=5s authority_checks=10 raw_policy_reads=1 completed_policy_reads=1 policy_observer=14 identity_observer=6 identity_policy_reads=2 token_checks=40 permissions=20 catalog=10 retention=10 probe=3 denied=1 created=true recorded=true job_pending=true continued=true err=<nil>
+    download_preparation_identity_budget_test.go:152: production_path=[verify-token verify-token recovery lookup-key route verify-token permissions catalog retention recovery processing recovery processing verify-token permissions runtime-ready configuration plan reserve-session source verify-token verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token attachment verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token reserve-worker read-intent-audit verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token write-intent-audit verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token ack-intent-audit verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token claim-worker verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token create-job verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token record-job observe-job verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions observe-session verify-token]
+--- PASS: TestDownloadPreparationNearExpiredIdentityObservation (0.49s)
+=== RUN   TestDownloadPreparationFirstJobFitsOriginalPolicyBudget
+    download_preparation_phase_budget_test.go:253: elapsed=28.464802ms original_interval=5s authority_checks=10 policy_reads=1 completed_policy_reads=1 observer=14 probe=3 denied=1 created=true recorded=true job_pending=true continued=true err=<nil>
+    download_preparation_phase_budget_test.go:254: production_path=[identity recovery lookup-key route recovery processing recovery processing authority runtime-ready configuration plan reserve-session source identity identity recovery processing recovery processing authority identity attachment identity recovery processing recovery processing authority identity reserve-worker read-intent-audit identity recovery processing recovery processing authority identity write-intent-audit identity recovery processing recovery processing authority identity ack-intent-audit identity recovery processing recovery processing authority identity claim-worker identity recovery processing recovery processing authority identity create-job identity recovery processing recovery processing authority identity record-job observe-job identity recovery processing recovery processing authority identity recovery processing recovery processing authority observe-session identity]
+--- PASS: TestDownloadPreparationFirstJobFitsOriginalPolicyBudget (0.10s)
+=== RUN   TestIdentityPolicyObservationStillValidatesEveryCredential
+--- PASS: TestIdentityPolicyObservationStillValidatesEveryCredential (0.04s)
+=== RUN   TestIdentityPolicyObservationReusesOriginalIntervalAndRefreshesRevision
+--- PASS: TestIdentityPolicyObservationReusesOriginalIntervalAndRefreshesRevision (0.05s)
+=== RUN   TestIdentityPolicyObservationExpiryErrorHasNoStaleFallback
+--- PASS: TestIdentityPolicyObservationExpiryErrorHasNoStaleFallback (0.04s)
+=== RUN   TestIdentityPolicyObservationNearExpiryRefreshHasNoStaleFallback
+--- PASS: TestIdentityPolicyObservationNearExpiryRefreshHasNoStaleFallback (0.04s)
+=== RUN   TestIdentityPolicyObservationNearExpiryRefreshPreservesOwnedRequest
+--- PASS: TestIdentityPolicyObservationNearExpiryRefreshPreservesOwnedRequest (0.04s)
+=== RUN   TestIdentityPolicyObservationClonesAllReturnedSlices
+--- PASS: TestIdentityPolicyObservationClonesAllReturnedSlices (0.04s)
+=== RUN   TestIdentityPolicyObservationConcurrentCallersShareOneRefresh
+--- PASS: TestIdentityPolicyObservationConcurrentCallersShareOneRefresh (0.04s)
+=== RUN   TestIdentityPolicyObservationCanceledRefreshIsNotRetained
+--- PASS: TestIdentityPolicyObservationCanceledRefreshIsNotRetained (0.05s)
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds/canceled-hit
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds/wrong-issuer
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds/clock-rollback
+--- PASS: TestIdentityPolicyObservationCancellationAndClockBounds (0.13s)
+    --- PASS: TestIdentityPolicyObservationCancellationAndClockBounds/canceled-hit (0.04s)
+    --- PASS: TestIdentityPolicyObservationCancellationAndClockBounds/wrong-issuer (0.04s)
+    --- PASS: TestIdentityPolicyObservationCancellationAndClockBounds/clock-rollback (0.04s)
+=== RUN   TestIdentityPolicyObservationCanceledWaiterDoesNotCancelRefresh
+--- PASS: TestIdentityPolicyObservationCanceledWaiterDoesNotCancelRefresh (0.04s)
+=== RUN   TestIdentityPolicyPinnedConfigAndCurrentRevocation
+--- PASS: TestIdentityPolicyPinnedConfigAndCurrentRevocation (0.05s)
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unknown
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/case-alias
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/duplicate-client
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unqualified-client
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unqualified-groups
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/empty-eligible
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/overlong-age
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/control-character
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/wrong-issuer
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/null-groups
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/duplicate-json
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/oversize
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/binary-data
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/wrong-namespace
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/deleting
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/expired-io
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/clock-rollback
+--- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings (0.71s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unknown (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/case-alias (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/duplicate-client (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unqualified-client (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unqualified-groups (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/empty-eligible (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/overlong-age (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/control-character (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/wrong-issuer (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/null-groups (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/duplicate-json (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/oversize (0.05s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/binary-data (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/wrong-namespace (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/deleting (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/expired-io (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/clock-rollback (0.04s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	3.060s

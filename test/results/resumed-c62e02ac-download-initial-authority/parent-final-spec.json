@@ -1,0 +1,10 @@
+{
+  "argv": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "spec-check"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 4.9401559209800325,
+  "progress_sha256": "11447df4000e6d4b88aa76173f422ca025afb26c12b37c588449e1e7f9849bdd"
+}

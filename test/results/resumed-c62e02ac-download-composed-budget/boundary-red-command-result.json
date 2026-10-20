@@ -1,0 +1,49 @@
+{
+  "argv": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "^(TestDownloadPreparationNearExpiredIdentityObservation|TestIdentityPolicyObservationNearExpiry)",
+    "-v",
+    "./internal/adapters/kubernetes"
+  ],
+  "env": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "cwd": "/home/phil/Projekte/asservat-resume-0450e73c",
+  "started_at": 1792530724.5289,
+  "duration_seconds": 14.911120414733887,
+  "exit_code": 1,
+  "source_hashes_before": {
+    "internal/adapters/kubernetes/identity_policy.go": "e7980c598f5d7df2b5e8e34cbd5df6f72f1d3b50a1df134a05ced6d5d26e4c57",
+    "internal/adapters/kubernetes/identity_policy_test.go": "ff2204d6cb56c0275ff72bd35e728adaeffa06ff3eb3b9048a487e7fd0a91983",
+    "internal/adapters/kubernetes/identity_policy_observation_test.go": "3946db183f88c103e236cfbc36741e5ec10a6a36a0fd75188b83a9b5e8e7ab90",
+    "internal/adapters/kubernetes/download_preparation_phase_budget_test.go": "32bf3bce83978f8bc2206854e4c8a8315a4e82bcad87b45d8d404b726b674345",
+    "internal/adapters/kubernetes/download_preparation_identity_budget_test.go": "a6ed7138359344536fd394e10c25db717e831081137861ac3fc431323ab90c1c",
+    "internal/application/authorization/download_policy_observation.go": "b10fc00e724bafbe0e61bc0c8c66766ca2c5dac52ff4c0bf3013d8cf6ea664e2",
+    "internal/application/authorization/download_environment.go": "c0244c93f3f807d4726d5bcf0bc6ef5463d310c020f27a90c58cc5c7d8a8c3e6",
+    "internal/domain/privacy/download_environment.go": "9c97e7ce3a957d6ce5ec171305bcc46ba06a4f17018d6e1deaf8fc302ac1604c"
+  },
+  "source_hashes_after": {
+    "internal/adapters/kubernetes/identity_policy.go": "e7980c598f5d7df2b5e8e34cbd5df6f72f1d3b50a1df134a05ced6d5d26e4c57",
+    "internal/adapters/kubernetes/identity_policy_test.go": "ff2204d6cb56c0275ff72bd35e728adaeffa06ff3eb3b9048a487e7fd0a91983",
+    "internal/adapters/kubernetes/identity_policy_observation_test.go": "3946db183f88c103e236cfbc36741e5ec10a6a36a0fd75188b83a9b5e8e7ab90",
+    "internal/adapters/kubernetes/download_preparation_phase_budget_test.go": "32bf3bce83978f8bc2206854e4c8a8315a4e82bcad87b45d8d404b726b674345",
+    "internal/adapters/kubernetes/download_preparation_identity_budget_test.go": "a6ed7138359344536fd394e10c25db717e831081137861ac3fc431323ab90c1c",
+    "internal/application/authorization/download_policy_observation.go": "b10fc00e724bafbe0e61bc0c8c66766ca2c5dac52ff4c0bf3013d8cf6ea664e2",
+    "internal/application/authorization/download_environment.go": "c0244c93f3f807d4726d5bcf0bc6ef5463d310c020f27a90c58cc5c7d8a8c3e6",
+    "internal/domain/privacy/download_environment.go": "9c97e7ce3a957d6ce5ec171305bcc46ba06a4f17018d6e1deaf8fc302ac1604c"
+  },
+  "terminal": {
+    "session_id": 80487,
+    "chunk_id": "119209",
+    "exit_code": 1
+  },
+  "go_package_seconds": 0.305,
+  "original_result_sha256": "551487e5d0c88b1a97ebac9b55b480c09cd05bbad7663231072cd781c1ccd1af",
+  "original_result_cache_path": "/home/phil/.cache/asservat-build/recovered-c62e02ac/identity-policy-observation/boundary-red.json"
+}

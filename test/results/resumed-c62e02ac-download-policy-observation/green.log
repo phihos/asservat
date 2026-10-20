@@ -1,0 +1,78 @@
+=== RUN   TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery
+=== RUN   TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/client
+=== RUN   TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/purpose
+=== RUN   TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/processing-missing
+=== RUN   TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/processing-denied
+=== RUN   TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/processing-substitution
+=== RUN   TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/recovery
+=== RUN   TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/policy-change
+=== RUN   TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/recovery-change
+=== RUN   TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/processing-change
+--- PASS: TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/client (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/purpose (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/processing-missing (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/processing-denied (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/processing-substitution (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/recovery (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/policy-change (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/recovery-change (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentRequiresIndependentPolicyProcessingRecovery/processing-change (0.00s)
+=== RUN   TestCurrentDownloadEnvironmentPreservesEarliestDeadlineAfterBlockingWork
+=== RUN   TestCurrentDownloadEnvironmentPreservesEarliestDeadlineAfterBlockingWork/policy
+=== RUN   TestCurrentDownloadEnvironmentPreservesEarliestDeadlineAfterBlockingWork/processing
+=== RUN   TestCurrentDownloadEnvironmentPreservesEarliestDeadlineAfterBlockingWork/final-recovery
+--- PASS: TestCurrentDownloadEnvironmentPreservesEarliestDeadlineAfterBlockingWork (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentPreservesEarliestDeadlineAfterBlockingWork/policy (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentPreservesEarliestDeadlineAfterBlockingWork/processing (0.00s)
+    --- PASS: TestCurrentDownloadEnvironmentPreservesEarliestDeadlineAfterBlockingWork/final-recovery (0.00s)
+=== RUN   TestDownloadPolicyObservationRetainsOriginalInterval
+--- PASS: TestDownloadPolicyObservationRetainsOriginalInterval (0.00s)
+=== RUN   TestDownloadPolicyObservationSharesConcurrentRead
+--- PASS: TestDownloadPolicyObservationSharesConcurrentRead (0.00s)
+=== RUN   TestDownloadPolicyObservationWaiterCancellation
+--- PASS: TestDownloadPolicyObservationWaiterCancellation (0.00s)
+=== RUN   TestDownloadPolicyObservationOwnsReturnedSlices
+--- PASS: TestDownloadPolicyObservationOwnsReturnedSlices (0.00s)
+=== RUN   TestDownloadPolicyObservationRejectsClockRollback
+--- PASS: TestDownloadPolicyObservationRejectsClockRollback (0.00s)
+=== RUN   TestDownloadPolicyObservationFailureHasNoFallback
+--- PASS: TestDownloadPolicyObservationFailureHasNoFallback (0.00s)
+=== RUN   TestDownloadPolicyObservationRejectsInvalidLiveProof
+=== RUN   TestDownloadPolicyObservationRejectsInvalidLiveProof/expired
+=== RUN   TestDownloadPolicyObservationRejectsInvalidLiveProof/future
+=== RUN   TestDownloadPolicyObservationRejectsInvalidLiveProof/long
+=== RUN   TestDownloadPolicyObservationRejectsInvalidLiveProof/unprotected
+=== RUN   TestDownloadPolicyObservationRejectsInvalidLiveProof/invalid
+--- PASS: TestDownloadPolicyObservationRejectsInvalidLiveProof (0.00s)
+    --- PASS: TestDownloadPolicyObservationRejectsInvalidLiveProof/expired (0.00s)
+    --- PASS: TestDownloadPolicyObservationRejectsInvalidLiveProof/future (0.00s)
+    --- PASS: TestDownloadPolicyObservationRejectsInvalidLiveProof/long (0.00s)
+    --- PASS: TestDownloadPolicyObservationRejectsInvalidLiveProof/unprotected (0.00s)
+    --- PASS: TestDownloadPolicyObservationRejectsInvalidLiveProof/invalid (0.00s)
+=== RUN   TestDownloadPolicyObservationCanceledReadJoinsAndCannotPopulate
+--- PASS: TestDownloadPolicyObservationCanceledReadJoinsAndCannotPopulate (0.00s)
+=== RUN   TestDownloadPolicyObservationWaitingCallerKeepsOwnDeadline
+--- PASS: TestDownloadPolicyObservationWaitingCallerKeepsOwnDeadline (0.02s)
+=== RUN   TestDownloadPolicyObservationBoundsLiveReadAndRefreshesDenial
+--- PASS: TestDownloadPolicyObservationBoundsLiveReadAndRefreshesDenial (0.00s)
+=== RUN   TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences
+=== RUN   TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences/success
+=== RUN   TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences/recovery-change
+=== RUN   TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences/processing-change
+=== RUN   TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences/cancel
+--- PASS: TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences (0.00s)
+    --- PASS: TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences/success (0.00s)
+    --- PASS: TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences/recovery-change (0.00s)
+    --- PASS: TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences/processing-change (0.00s)
+    --- PASS: TestDownloadPolicyObservationKeepsCurrentEnvironmentBoundsAndFences/cancel (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/authorization	1.038s
+=== RUN   TestDownloadPolicyRequiresEveryActualProcessorAndExplicitClient
+--- PASS: TestDownloadPolicyRequiresEveryActualProcessorAndExplicitClient (0.00s)
+=== RUN   TestDownloadPolicyDoesNotChooseAmbiguousOrDifferentDataPaths
+--- PASS: TestDownloadPolicyDoesNotChooseAmbiguousOrDifferentDataPaths (0.00s)
+=== RUN   TestDownloadPolicyObservationIsDownloadOnlyAndNeverSliding
+--- PASS: TestDownloadPolicyObservationIsDownloadOnlyAndNeverSliding (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/privacy	1.007s

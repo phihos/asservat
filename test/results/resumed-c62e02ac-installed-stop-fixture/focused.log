@@ -1,0 +1,216 @@
+=== RUN   TestInstalledJourneyStopRetainsOriginalRequestAndAuditState
+=== RUN   TestInstalledJourneyStopRetainsOriginalRequestAndAuditState/pending-pending
+=== RUN   TestInstalledJourneyStopRetainsOriginalRequestAndAuditState/pending-recorded
+=== RUN   TestInstalledJourneyStopRetainsOriginalRequestAndAuditState/recorded-recorded
+=== RUN   TestInstalledJourneyStopRetainsOriginalRequestAndAuditState/overdue-overdue
+--- PASS: TestInstalledJourneyStopRetainsOriginalRequestAndAuditState (0.00s)
+    --- PASS: TestInstalledJourneyStopRetainsOriginalRequestAndAuditState/pending-pending (0.00s)
+    --- PASS: TestInstalledJourneyStopRetainsOriginalRequestAndAuditState/pending-recorded (0.00s)
+    --- PASS: TestInstalledJourneyStopRetainsOriginalRequestAndAuditState/recorded-recorded (0.00s)
+    --- PASS: TestInstalledJourneyStopRetainsOriginalRequestAndAuditState/overdue-overdue (0.00s)
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/lost-first
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/error-first
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/already-terminal
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/different-download
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/missing-request
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/invalid-audit
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/malformed
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/lost-replay
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/replacement-request
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/audit-regression
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/cancel-before
+=== RUN   TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/cancel-first
+--- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/lost-first (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/error-first (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/already-terminal (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/different-download (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/missing-request (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/invalid-audit (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/malformed (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/lost-replay (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/replacement-request (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/audit-regression (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/cancel-before (0.00s)
+    --- PASS: TestInstalledJourneyStopRejectsUnknownAndReplacementWithoutRetry/cancel-first (0.00s)
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/problem
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/native-200
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/native-206
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/native-type
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/native-body
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/additional-evidence
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/filename
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/etag
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/range
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/redirect
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/oversized
+=== RUN   TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/trailing
+--- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/problem (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/native-200 (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/native-206 (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/native-type (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/native-body (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/additional-evidence (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/filename (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/etag (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/range (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/redirect (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/oversized (0.00s)
+    --- PASS: TestInstalledJourneyStoppedContentRequiresBoundedNonDisclosure/trailing (0.00s)
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/first-request-succeeds
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/unaccepted-unknown
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/changed-review-needs-close
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/unavailable-needs-close
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/lost-resolution
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/missing-disposition
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-continues
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/successful-continuation-cannot-change
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/successful-continuation-needs-capture
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-changed-review
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/spent-preparation
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/closed-acquisition
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/known-acceptance-never-resolves-closed
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/known-acceptance-never-resolves-replacement
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-needs-identity
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/malformed-closure
+--- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/first-request-succeeds (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/unaccepted-unknown (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/changed-review-needs-close (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/unavailable-needs-close (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/lost-resolution (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/missing-disposition (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-continues (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/successful-continuation-cannot-change (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/successful-continuation-needs-capture (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-changed-review (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/spent-preparation (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/closed-acquisition (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/known-acceptance-never-resolves-closed (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/known-acceptance-never-resolves-replacement (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-needs-identity (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/malformed-closure (0.00s)
+=== RUN   TestInstalledJourneyBoundsAcceptedContinuationAndCancellation
+--- PASS: TestInstalledJourneyBoundsAcceptedContinuationAndCancellation (0.00s)
+=== RUN   TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots
+=== RUN   TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/immediate-success
+=== RUN   TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/first-continuation-success
+=== RUN   TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/second-continuation-success
+--- PASS: TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots (0.00s)
+    --- PASS: TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/immediate-success (0.00s)
+    --- PASS: TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/first-continuation-success (0.00s)
+    --- PASS: TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/second-continuation-success (0.00s)
+=== RUN   TestInstalledJourneyClosedReviewDoesNotConfirmReplacement
+--- PASS: TestInstalledJourneyClosedReviewDoesNotConfirmReplacement (0.00s)
+=== RUN   TestInstalledJourneySuccessfulContinuationStillChecksCancellation
+--- PASS: TestInstalledJourneySuccessfulContinuationStillChecksCancellation (0.00s)
+=== RUN   TestInstalledJourneyKnownCaptureUsesCurrentProgressWithinResolutionBudget
+--- PASS: TestInstalledJourneyKnownCaptureUsesCurrentProgressWithinResolutionBudget (0.00s)
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/running
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/finalizing
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/published
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/different-capture
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/empty-capture
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/missing-phase
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/not-a-progress-phase
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/failed
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/cancelled
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/partial
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/indeterminate
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/read-failed-with-stale-pending
+=== RUN   TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/read-failed-with-stale-success
+--- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/running (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/finalizing (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/published (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/different-capture (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/empty-capture (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/missing-phase (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/not-a-progress-phase (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/failed (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/cancelled (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/partial (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/indeterminate (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/read-failed-with-stale-pending (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureRequiresCurrentSameCaptureProgress/read-failed-with-stale-success (0.00s)
+=== RUN   TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops
+=== RUN   TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops/OutcomeUnknown
+=== RUN   TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops/AcquisitionUncertain
+=== RUN   TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops/AcquisitionClosed
+=== RUN   TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops/ReviewChanged
+=== RUN   TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops/NotAvailable
+--- PASS: TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops/OutcomeUnknown (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops/AcquisitionUncertain (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops/AcquisitionClosed (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops/ReviewChanged (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureFailedObservationAfterContinuationStops/NotAvailable (0.00s)
+=== RUN   TestInstalledJourneyKnownCaptureCancellationCannotHandoffOrContinue
+=== RUN   TestInstalledJourneyKnownCaptureCancellationCannotHandoffOrContinue/pending-read
+=== RUN   TestInstalledJourneyKnownCaptureCancellationCannotHandoffOrContinue/finalizing-read
+=== RUN   TestInstalledJourneyKnownCaptureCancellationCannotHandoffOrContinue/pause
+=== RUN   TestInstalledJourneyKnownCaptureCancellationCannotHandoffOrContinue/confirmation
+--- PASS: TestInstalledJourneyKnownCaptureCancellationCannotHandoffOrContinue (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureCancellationCannotHandoffOrContinue/pending-read (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureCancellationCannotHandoffOrContinue/finalizing-read (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureCancellationCannotHandoffOrContinue/pause (0.00s)
+    --- PASS: TestInstalledJourneyKnownCaptureCancellationCannotHandoffOrContinue/confirmation (0.00s)
+=== RUN   TestInstalledJourneyAcceptedReceiptRetainsEarliestAcknowledgement
+--- PASS: TestInstalledJourneyAcceptedReceiptRetainsEarliestAcknowledgement (0.00s)
+=== RUN   TestInstalledJourneyRefreshesOriginalIdentityBeforeTokenExpiry
+--- PASS: TestInstalledJourneyRefreshesOriginalIdentityBeforeTokenExpiry (0.00s)
+=== RUN   TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests
+=== RUN   TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/subject
+=== RUN   TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/audience
+=== RUN   TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/issuer
+=== RUN   TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/expired
+=== RUN   TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/malformed
+=== RUN   TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/missing-refresh
+--- PASS: TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests (0.00s)
+    --- PASS: TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/subject (0.00s)
+    --- PASS: TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/audience (0.00s)
+    --- PASS: TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/issuer (0.00s)
+    --- PASS: TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/expired (0.00s)
+    --- PASS: TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/malformed (0.00s)
+    --- PASS: TestInstalledJourneyRefusesChangedRefreshIdentityAndCancelledRequests/missing-refresh (0.00s)
+=== RUN   TestInstalledJourneyChecksCompleteWireFailureAndNeverRetainsMetadata
+--- PASS: TestInstalledJourneyChecksCompleteWireFailureAndNeverRetainsMetadata (0.08s)
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/immediate-link
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/published-before-current-link
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-link-stays-pending
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/progress-before-current-link
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/wrong-capture
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-capture
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/partial-is-failure
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/failed-is-failure
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/cancelled-is-failure
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/indeterminate-is-failure
+--- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/immediate-link (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/published-before-current-link (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-link-stays-pending (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/progress-before-current-link (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/wrong-capture (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-capture (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/partial-is-failure (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/failed-is-failure (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/cancelled-is-failure (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/indeterminate-is-failure (0.00s)
+=== RUN   TestInstalledJourneyCaseLinkRequiresFreshDecode
+--- PASS: TestInstalledJourneyCaseLinkRequiresFreshDecode (0.00s)
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation/expired
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled-after-read
+--- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation (0.00s)
+    --- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled (0.00s)
+    --- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation/expired (0.00s)
+    --- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled-after-read (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.150s

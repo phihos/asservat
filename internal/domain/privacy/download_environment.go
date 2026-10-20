@@ -9,6 +9,10 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
+// DownloadPolicyObservationInterval bounds download-only reuse of a protected
+// policy observation. It does not extend an operation or administrative proof.
+const DownloadPolicyObservationInterval = 60 * time.Second
+
 type DownloadPath = artifact.DownloadPath
 
 type DownloadClient struct {
@@ -35,6 +39,12 @@ type DownloadPolicy struct {
 
 func (p DownloadPolicy) Valid(now time.Time) bool {
 	return p.WellFormed() && p.ProtectionDigest != (artifact.Digest{}) && identity.Fresh(p.ObservedAt, p.FreshUntil, now, 5*time.Second)
+}
+
+// DownloadValid accepts the separately bounded download-policy observation.
+// Administrative and capacity consumers continue to require Valid.
+func (p DownloadPolicy) DownloadValid(now time.Time) bool {
+	return p.WellFormed() && p.ProtectionDigest != (artifact.Digest{}) && identity.Fresh(p.ObservedAt, p.FreshUntil, now, DownloadPolicyObservationInterval)
 }
 
 // WellFormed validates configuration only, never its current protection.
@@ -96,8 +106,18 @@ func (p DownloadPolicy) WellFormed() bool {
 // explicit denial; missing lists are invalid. Authentication allowlists are
 // deliberately not an input to this disclosure-policy evaluator.
 func (p DownloadPolicy) Select(principal identity.Principal, target, store, purpose, dataClass, privacyClass, evidenceType string, now time.Time) (DownloadPath, bool) {
+	return p.selectPath(principal, target, store, purpose, dataClass, privacyClass, evidenceType, p.Valid(now))
+}
+
+// SelectDownload evaluates each exact caller and path against a bounded
+// download observation; it never caches an authorization decision.
+func (p DownloadPolicy) SelectDownload(principal identity.Principal, target, store, purpose, dataClass, privacyClass, evidenceType string, now time.Time) (DownloadPath, bool) {
+	return p.selectPath(principal, target, store, purpose, dataClass, privacyClass, evidenceType, p.DownloadValid(now))
+}
+
+func (p DownloadPolicy) selectPath(principal identity.Principal, target, store, purpose, dataClass, privacyClass, evidenceType string, current bool) (DownloadPath, bool) {
 	var zero DownloadPath
-	if !p.Valid(now) || p.Suspended || !principal.Valid() || !authorization.UUID(target) || !authorization.UUID(store) {
+	if !current || p.Suspended || !principal.Valid() || !authorization.UUID(target) || !authorization.UUID(store) {
 		return zero, false
 	}
 	var client *DownloadClient

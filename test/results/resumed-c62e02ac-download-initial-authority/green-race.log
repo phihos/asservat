@@ -1,0 +1,60 @@
+=== RUN   TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation
+=== RUN   TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation/0s
+=== RUN   TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation/1.7s
+--- PASS: TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation (0.01s)
+    --- PASS: TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation/0s (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation/1.7s (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/caller
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/identity
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/authority
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/session
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/source
+--- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff (0.01s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/caller (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/identity (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/session (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/source (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/source-expired-during-authority
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/invalid-source
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/wrong-profile
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/authority-denied
+--- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead (0.01s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/source-expired-during-authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/invalid-source (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/wrong-profile (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/authority-denied (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/clock-rollback
+    context_native_initial_authority_test.go:164: test must distinguish owner rollback from proof expiry
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/proof-expired
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/caller-cancelled
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/scope-changed
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/current-path-missing
+--- FAIL: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges (0.01s)
+    --- FAIL: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/clock-rollback (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/proof-expired (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/caller-cancelled (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/scope-changed (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/current-path-missing (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityRechecksAfterAttachment
+=== RUN   TestContextRuntimeInitialAuthorityRechecksAfterAttachment/revoked
+=== RUN   TestContextRuntimeInitialAuthorityRechecksAfterAttachment/identity-changed
+=== RUN   TestContextRuntimeInitialAuthorityRechecksAfterAttachment/expired
+=== RUN   TestContextRuntimeInitialAuthorityRechecksAfterAttachment/cancelled
+--- PASS: TestContextRuntimeInitialAuthorityRechecksAfterAttachment (0.01s)
+    --- PASS: TestContextRuntimeInitialAuthorityRechecksAfterAttachment/revoked (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRechecksAfterAttachment/identity-changed (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRechecksAfterAttachment/expired (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRechecksAfterAttachment/cancelled (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/authority
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/attachment
+--- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/attachment (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.048s
+FAIL

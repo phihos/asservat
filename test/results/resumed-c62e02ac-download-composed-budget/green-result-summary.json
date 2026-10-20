@@ -1,0 +1,65 @@
+{
+  "status": "passed-local-composition-only",
+  "change": "Retain one identity policy within its original30s observation; shared demand refresh when less than existing5s request budget remains. No token/session cache, original request renewal, API rate change or stale fallback.",
+  "independent_review": "review_pr41 no blockers; independently matched all8 current dependency/owned hashes to final race before/after.",
+  "final_terminal": {
+    "session_id": 72913,
+    "chunk_id": "28ea84",
+    "exit_code": 0,
+    "go_package_seconds": 3.06,
+    "command_wall_seconds": 23.367263793945312
+  },
+  "measurements": {
+    "cold_composed": {
+      "elapsed_ms": 74.363306,
+      "authority_checks": 10,
+      "policy_observer_requests": 14,
+      "probe_requests": 3,
+      "identity_observer_requests": 3,
+      "identity_configmap_reads": 1,
+      "token_checks": 40,
+      "permission_reads": 20,
+      "catalog_reads": 10,
+      "retention_reads": 10,
+      "job_created_recorded_pending": true,
+      "continue_preparation": true
+    },
+    "near_expiry_composed": {
+      "elapsed_ms": 424.186316,
+      "synthetic_permission_delay_ms": 350,
+      "identity_observer_requests": 6,
+      "identity_configmap_reads": 2,
+      "token_checks": 40,
+      "permission_reads": 20,
+      "catalog_reads": 10,
+      "retention_reads": 10,
+      "job_created_recorded_pending": true,
+      "continue_preparation": true
+    },
+    "near_expiry_red": {
+      "elapsed_ms": 257.276101,
+      "initial_identity_remaining_ms": 247.617761,
+      "original_request_remaining_ms": 4990.434848,
+      "permission_reads": 1,
+      "job_effects": 0
+    }
+  },
+  "qualification": [
+    "Real loopback TLS and installed independent20QPS/burst20 API client topology.",
+    "Actual identity.Service/CurrentIdentity and ContextDownloadAuthority/coordinator/runtime/dispatcher ordering.",
+    "Synthetic token cryptography and SQL permission/catalog/retention/audit/Job ports.",
+    "One cold and one near-expiry local operation under race; not a sustained throughput benchmark or installed native qualification.",
+    "All eight final owned/dependency sources unchanged during the final run; unrelated source edits permitted by parent and excluded from this scoped qualification."
+  ],
+  "controls": [
+    "expiry/revision and malformed policy",
+    "every credential still verified",
+    "exact5s cache boundary",
+    "shared concurrent refresh and cancellation",
+    "all three returned slices copied",
+    "clock rollback refused",
+    "failed thin/expired refresh never falls back",
+    "already-owned request cannot be extended/revived by later policy refresh"
+  ],
+  "initial_green_note": "Credential-validation control was added after initial cache RED; its first qualification was initial-green-race. Boundary regressions were added and failed before headroom correction."
+}

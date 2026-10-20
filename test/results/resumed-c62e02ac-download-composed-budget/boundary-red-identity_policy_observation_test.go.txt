@@ -1,0 +1,406 @@
+package kubernetes
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"reflect"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+type identityObservationFixture struct {
+	api    permissionFixture
+	reader *IdentityPolicyClient
+	body   atomic.Value
+	status atomic.Int32
+	reads  atomic.Int32
+	mu     sync.Mutex
+	before func(http.ResponseWriter, *http.Request) bool
+}
+
+func newIdentityObservationFixture(t *testing.T) *identityObservationFixture {
+	t.Helper()
+	f := &identityObservationFixture{}
+	f.status.Store(http.StatusOK)
+	f.set(t, 1, "platform-developers")
+	f.api = newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
+		if r.URL.Path != "/api/v1/namespaces/asservat-system/configmaps/identity-observation" {
+			return false
+		}
+		f.reads.Add(1)
+		f.mu.Lock()
+		before := f.before
+		f.mu.Unlock()
+		if before != nil && before(w, r) {
+			return true
+		}
+		if code := int(f.status.Load()); code != http.StatusOK {
+			http.Error(w, "synthetic source failure", code)
+			return true
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write(f.body.Load().([]byte))
+		return true
+	})
+	var err error
+	f.reader, err = NewIdentityPolicyClient(f.api.client, "identity-observation", "identity-uid", "https://id.example.invalid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return f
+}
+
+func (f *identityObservationFixture) set(t *testing.T, revision int, group string) {
+	t.Helper()
+	settings := identitySettingsFixture(t)
+	settings["revision"] = revision
+	settings["eligibleGroups"] = []string{group}
+	settings["eligibleSubjects"] = []any{map[string]any{"id": "direct-user", "kind": "human"}}
+	raw, err := json.Marshal(settings)
+	if err != nil {
+		t.Fatal(err)
+	}
+	object := map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "identity-observation", "namespace": permissionControl.Name, "uid": "identity-uid", "resourceVersion": "policy-rv"}, "data": map[string]string{"identity.json": string(raw)}}
+	encoded, err := json.Marshal(object)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.body.Store(encoded)
+}
+
+func (f *identityObservationFixture) read(ctx context.Context) (identity.Policy, error) {
+	return f.reader.IdentityPolicy(ctx, "https://id.example.invalid")
+}
+
+type identityObservationVerifier func(context.Context, string) (identity.Claims, error)
+
+func (v identityObservationVerifier) Verify(ctx context.Context, token string) (identity.Claims, error) {
+	return v(ctx, token)
+}
+
+func TestIdentityPolicyObservationStillValidatesEveryCredential(t *testing.T) {
+	f := newIdentityObservationFixture(t)
+	checks := 0
+	service := identities.Service{Policies: f.reader, Now: f.api.client.now, Tokens: identityObservationVerifier(func(_ context.Context, token string) (identity.Claims, error) {
+		checks++
+		now := f.api.client.now()
+		claims := identity.Claims{Issuer: "https://id.example.invalid", Subject: "developer", ClientID: "asservat-console", Groups: []string{"platform-developers"}, IssuedAt: now.Add(-time.Second), ExpiresAt: now.Add(time.Minute), KeyUntil: now.Add(time.Minute)}
+		switch token {
+		case "valid":
+		case "removed-group":
+			claims.Groups = nil
+		case "expired-token":
+			claims.ExpiresAt = now
+		case "expired-key":
+			claims.KeyUntil = now
+		case "wrong-client":
+			claims.ClientID = "other-client"
+		default:
+			return identity.Claims{}, identity.ErrDenied
+		}
+		return claims, nil
+	})}
+	if _, err := service.Resolve(t.Context(), "valid"); err != nil {
+		t.Fatal("initial credential", err)
+	}
+	for _, token := range []string{"removed-group", "expired-token", "expired-key", "wrong-client", "invalid-signature"} {
+		if _, err := service.Resolve(t.Context(), token); !errors.Is(err, identity.ErrDenied) {
+			t.Fatal("retained policy bypassed current credential validation", token, err)
+		}
+	}
+	if checks != 6 || f.reads.Load() != 1 {
+		t.Fatal("credential verification was cached or policy was reconstructed", checks, f.reads.Load())
+	}
+}
+
+func TestIdentityPolicyObservationReusesOriginalIntervalAndRefreshesRevision(t *testing.T) {
+	f := newIdentityObservationFixture(t)
+	first, err := f.read(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.set(t, 2, "replacement-team")
+	f.api.clock.Add(int64(29 * time.Second))
+	again, err := f.read(t.Context())
+	if err != nil || !reflect.DeepEqual(again, first) || f.reads.Load() != 1 {
+		t.Fatal("unchanged original interval caused another policy read or renewed facts", err, f.reads.Load())
+	}
+	f.api.clock.Add(int64(time.Second))
+	changed, err := f.read(t.Context())
+	if err != nil || changed.Revision.Generation != 2 || changed.Revision.Digest == first.Revision.Digest || changed.ObservedAt != first.FreshUntil || changed.FreshUntil != first.FreshUntil.Add(30*time.Second) || f.reads.Load() != 2 {
+		t.Fatal("expired observation did not read the new revision under its own original interval", err)
+	}
+	claims := identity.Claims{Issuer: first.Issuer, Subject: "developer", ClientID: "asservat-console", Groups: []string{"platform-developers"}, IssuedAt: first.ObservedAt, ExpiresAt: first.ObservedAt.Add(time.Minute), KeyUntil: first.ObservedAt.Add(time.Minute)}
+	if _, err := identity.Admit(claims, changed, changed.ObservedAt); !errors.Is(err, identity.ErrDenied) {
+		t.Fatal("refresh did not apply removed group eligibility", err)
+	}
+}
+
+func TestIdentityPolicyObservationExpiryErrorHasNoStaleFallback(t *testing.T) {
+	f := newIdentityObservationFixture(t)
+	first, err := f.read(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.api.clock.Store(first.FreshUntil.UnixNano())
+	f.status.Store(http.StatusForbidden)
+	out, err := f.read(t.Context())
+	if err == nil || !reflect.DeepEqual(out, identity.Policy{}) || f.reads.Load() != 2 {
+		t.Fatal("failed expired refresh returned old policy or retried implicitly", err)
+	}
+	f.set(t, 3, "new-team")
+	f.status.Store(http.StatusOK)
+	out, err = f.read(t.Context())
+	if err != nil || out.Revision.Generation != 3 || f.reads.Load() != 3 {
+		t.Fatal("new explicit call did not recover from the failed source read", err)
+	}
+}
+
+func TestIdentityPolicyObservationNearExpiryRefreshHasNoStaleFallback(t *testing.T) {
+	f := newIdentityObservationFixture(t)
+	first, err := f.read(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.api.clock.Store(first.FreshUntil.Add(-5*time.Second + time.Nanosecond).UnixNano())
+	f.status.Store(http.StatusForbidden)
+	out, err := f.read(t.Context())
+	if err == nil || !reflect.DeepEqual(out, identity.Policy{}) || f.reads.Load() != 2 {
+		t.Fatal("failed near-expiry refresh returned the still-positive old policy", err, f.reads.Load())
+	}
+}
+
+func TestIdentityPolicyObservationNearExpiryRefreshPreservesOwnedRequest(t *testing.T) {
+	f := newIdentityObservationFixture(t)
+	first, err := f.read(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.api.clock.Store(first.FreshUntil.Add(-5 * time.Second).UnixNano())
+	service := identities.Service{Policies: f.reader, Now: f.api.client.now, Tokens: identityObservationVerifier(func(context.Context, string) (identity.Claims, error) {
+		now := f.api.client.now()
+		return identity.Claims{Issuer: first.Issuer, Subject: "developer", ClientID: "asservat-console", Groups: []string{"platform-developers"}, IssuedAt: now, ExpiresAt: now.Add(time.Minute), KeyUntil: now.Add(time.Minute)}, nil
+	})}
+	current, initial, err := identities.NewBearerRequest(t.Context(), service, "synthetic", f.api.client.now)
+	if err != nil || initial.ValidUntil != first.FreshUntil || f.reads.Load() != 1 {
+		t.Fatal("exact five-second cache boundary did not preserve the original observation", err)
+	}
+	f.api.clock.Add(int64(time.Second))
+	again, err := current.ResolveIdentity(t.Context())
+	if err != nil || again.ValidUntil != initial.ValidUntil || f.reads.Load() != 2 {
+		t.Fatal("new policy observation changed an already-owned request cutoff", err, f.reads.Load())
+	}
+	f.api.clock.Store(initial.ValidUntil.UnixNano())
+	if _, err := current.ResolveIdentity(t.Context()); !errors.Is(err, identity.ErrDenied) {
+		t.Fatal("fresh policy revived the expired original request", err)
+	}
+	_, fresh, err := identities.NewBearerRequest(t.Context(), service, "synthetic", f.api.client.now)
+	if err != nil || !fresh.ValidUntil.After(initial.ValidUntil) || f.reads.Load() != 2 {
+		t.Fatal("independent new request did not use the original refreshed observation", err)
+	}
+}
+
+func TestIdentityPolicyObservationClonesAllReturnedSlices(t *testing.T) {
+	f := newIdentityObservationFixture(t)
+	first, err := f.read(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	first.Clients[0].ID = "caller-mutated-client"
+	first.EligibleGroups[0] = "caller-mutated-group"
+	first.EligibleSubjects[0].ID = "caller-mutated-user"
+	again, err := f.read(t.Context())
+	if err != nil || again.Clients[0].ID != "asservat-console" || again.EligibleGroups[0] != "platform-developers" || again.EligibleSubjects[0].ID != "direct-user" || f.reads.Load() != 1 {
+		t.Fatal("returned snapshot mutated retained policy or forced another read", err)
+	}
+	again.EligibleGroups[0] = "another-mutation"
+	third, err := f.read(t.Context())
+	if err != nil || third.EligibleGroups[0] != "platform-developers" || f.reads.Load() != 1 {
+		t.Fatal("cache hit exposed mutable retained storage", err)
+	}
+}
+
+func TestIdentityPolicyObservationConcurrentCallersShareOneRefresh(t *testing.T) {
+	f := newIdentityObservationFixture(t)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	f.before = func(_ http.ResponseWriter, r *http.Request) bool {
+		once.Do(func() { close(entered) })
+		select {
+		case <-release:
+			return false
+		case <-r.Context().Done():
+			return true
+		}
+	}
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	type result struct {
+		policy identity.Policy
+		err    error
+	}
+	results := make(chan result, 8)
+	for range 8 {
+		go func() { p, err := f.read(t.Context()); results <- result{p, err} }()
+	}
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("shared refresh did not reach the API")
+	}
+	close(release)
+	var first identity.Policy
+	for range 8 {
+		select {
+		case r := <-results:
+			if r.err != nil {
+				t.Fatal("concurrent policy read", r.err)
+			}
+			if first.ObservedAt.IsZero() {
+				first = r.policy
+			} else if !reflect.DeepEqual(first, r.policy) {
+				t.Fatal("concurrent callers received different observations")
+			}
+		case <-time.After(2 * time.Second):
+			t.Fatal("concurrent refresh did not join")
+		}
+	}
+	if f.reads.Load() != 1 {
+		t.Fatal("concurrent callers reconstructed the same policy", f.reads.Load())
+	}
+}
+
+func TestIdentityPolicyObservationCanceledRefreshIsNotRetained(t *testing.T) {
+	f := newIdentityObservationFixture(t)
+	entered, joined := make(chan struct{}), make(chan struct{})
+	f.before = func(_ http.ResponseWriter, r *http.Request) bool {
+		close(entered)
+		<-r.Context().Done()
+		close(joined)
+		return true
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() { _, err := f.read(ctx); result <- err }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("refresh did not reach the API")
+	}
+	cancel()
+	select {
+	case err := <-result:
+		if err == nil {
+			t.Fatal("canceled refresh supplied policy")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("canceled refresh did not return")
+	}
+	select {
+	case <-joined:
+	case <-time.After(time.Second):
+		t.Fatal("policy HTTP request did not observe cancellation")
+	}
+	f.mu.Lock()
+	f.before = nil
+	f.mu.Unlock()
+	p, err := f.read(t.Context())
+	if err != nil || p.Validate(f.api.client.now()) != nil || f.reads.Load() != 2 {
+		t.Fatal("new call did not independently observe policy after canceled refresh", err)
+	}
+}
+
+func TestIdentityPolicyObservationCancellationAndClockBounds(t *testing.T) {
+	for _, mode := range []string{"canceled-hit", "wrong-issuer", "clock-rollback"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newIdentityObservationFixture(t)
+			first, err := f.read(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			issuer := first.Issuer
+			switch mode {
+			case "canceled-hit":
+				cancel()
+			case "wrong-issuer":
+				issuer = "https://other.invalid"
+			case "clock-rollback":
+				f.api.clock.Store(first.ObservedAt.Add(-time.Second).UnixNano())
+			}
+			out, err := f.reader.IdentityPolicy(ctx, issuer)
+			if err == nil || !reflect.DeepEqual(out, identity.Policy{}) || f.reads.Load() != 1 {
+				t.Fatal("invalid caller or clock obtained/reobserved retained policy", err, f.reads.Load())
+			}
+		})
+	}
+}
+
+func TestIdentityPolicyObservationCanceledWaiterDoesNotCancelRefresh(t *testing.T) {
+	f := newIdentityObservationFixture(t)
+	entered, release := make(chan struct{}), make(chan struct{})
+	var once sync.Once
+	f.before = func(_ http.ResponseWriter, r *http.Request) bool {
+		once.Do(func() { close(entered) })
+		select {
+		case <-release:
+			return false
+		case <-r.Context().Done():
+			return true
+		}
+	}
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+	owner := make(chan error, 1)
+	go func() { _, err := f.read(t.Context()); owner <- err }()
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("refresh did not reach API")
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	waiter := make(chan error, 1)
+	started := make(chan struct{})
+	go func() { close(started); _, err := f.read(ctx); waiter <- err }()
+	<-started
+	cancel()
+	select {
+	case err := <-waiter:
+		if err == nil {
+			t.Fatal("canceled waiter obtained policy")
+		}
+	case <-time.After(time.Second):
+		t.Fatal("canceled waiter waited for unrelated owner I/O")
+	}
+	close(release)
+	select {
+	case err := <-owner:
+		if err != nil {
+			t.Fatal("waiter cancellation stopped the owner's refresh", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("owner refresh did not join")
+	}
+	if f.reads.Load() != 1 {
+		t.Fatal("waiter created a competing refresh", f.reads.Load())
+	}
+}

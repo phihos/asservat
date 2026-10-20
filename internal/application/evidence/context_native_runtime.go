@@ -104,15 +104,16 @@ func (r *ContextNativeRuntime) CheckContextDownloadRuntime(ctx context.Context, 
 // Every callback remains under this actual request and the earliest observed
 // deadline. Beginning another HTTP request is the only way to get another
 // CurrentIdentity; polling cannot turn this closure into a renewable lease.
-func (r *ContextNativeRuntime) beginRequest(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession) (*ContextNativeRuntime, context.Context, context.CancelFunc, error) {
+func (r *ContextNativeRuntime) beginRequest(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession) (*ContextNativeRuntime, context.Context, context.CancelFunc, artifact.DownloadAuthority, error) {
+	var zero artifact.DownloadAuthority
 	if r == nil || ctx == nil || ctx.Err() != nil || current == nil || !session.Valid() || session.StopProtocol != artifact.DownloadStopProtocol || session.State.Terminal() {
-		return nil, nil, nil, artifact.ErrDownloadUnavailable
+		return nil, nil, nil, zero, artifact.ErrDownloadUnavailable
 	}
 	call, end := context.WithDeadline(ctx, session.Deadline)
-	check, e := newWorkerCurrentCheck(call, current, r.config.Authority, session.Scope, r.config.Now)
+	check, initial, e := newWorkerCurrentObservation(call, current, r.config.Authority, session.Scope, r.config.Now)
 	if e != nil {
 		end()
-		return nil, nil, nil, e
+		return nil, nil, nil, zero, e
 	}
 	narrow, stop := context.WithDeadline(call, check.Deadline())
 	c := r.config
@@ -123,11 +124,31 @@ func (r *ContextNativeRuntime) beginRequest(ctx context.Context, current identit
 	dispatcher.CurrentAuthority = gate
 	c.Dispatcher = &dispatcher
 	c.Native.Authority = gate
-	return &ContextNativeRuntime{config: c, bound: check, metadata: r.metadata, active: r.active}, narrow, func() { stop(); end() }, nil
+	return &ContextNativeRuntime{config: c, bound: check, metadata: r.metadata, active: r.active}, narrow, func() { stop(); end() }, initial, nil
 }
 func (r *ContextNativeRuntime) attachment(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession) (ContextDownloadAttachment, artifact.DownloadAuthority, error) {
 	a, e := r.config.Authority.CheckDownloadCurrent(ctx, current, session.Scope)
-	if e != nil || ctx.Err() != nil || !a.Valid(r.config.Now()) || a.Scope != session.Scope || !a.Environment.CurrentValid(r.config.Now()) || a.Environment.Path.AcquisitionClusterID != r.config.Profile.ClusterID || a.Environment.Path.WorkerConfiguration != r.config.Profile.Configuration {
+	if e != nil {
+		return ContextDownloadAttachment{}, a, artifact.ErrDownloadUnavailable
+	}
+	return r.attachmentWithAuthority(ctx, session, a)
+}
+
+// The first read consumes beginRequest's exact observation across local work
+// only. Later reads call attachment to recheck after blocking I/O. Reclip this
+// value after any narrower source bound without changing the original proof.
+func (r *ContextNativeRuntime) attachmentWithAuthority(ctx context.Context, session artifact.DownloadSession, a artifact.DownloadAuthority) (ContextDownloadAttachment, artifact.DownloadAuthority, error) {
+	if r == nil || ctx == nil || ctx.Err() != nil {
+		return ContextDownloadAttachment{}, a, artifact.ErrDownloadUnavailable
+	}
+	if r.bound != nil {
+		until, e := r.bound.narrow(a.ValidUntil)
+		if e != nil {
+			return ContextDownloadAttachment{}, a, artifact.ErrDownloadUnavailable
+		}
+		a.ValidUntil = until
+	}
+	if ctx.Err() != nil || !a.Valid(r.config.Now()) || a.Scope != session.Scope || !a.Environment.CurrentValid(r.config.Now()) || a.Environment.Path.AcquisitionClusterID != r.config.Profile.ClusterID || a.Environment.Path.WorkerConfiguration != r.config.Profile.Configuration {
 		return ContextDownloadAttachment{}, a, artifact.ErrDownloadUnavailable
 	}
 	call, end := context.WithDeadline(ctx, a.ValidUntil)
@@ -155,7 +176,7 @@ func (r *ContextNativeRuntime) native(en value.WorkerEnrollment) (*NativeAttachm
 }
 func (r *ContextNativeRuntime) ContinueContextDownload(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, source ContextDownloadSource) (ContextDownloadContinuation, error) {
 	var zero ContextDownloadContinuation
-	bound, call, end, e := r.beginRequest(ctx, current, session)
+	bound, call, end, initial, e := r.beginRequest(ctx, current, session)
 	if e != nil {
 		return zero, e
 	}
@@ -170,7 +191,7 @@ func (r *ContextNativeRuntime) ContinueContextDownload(ctx context.Context, curr
 		return zero, e
 	}
 	shorten()
-	observed, _, e := r.attachment(call, current, session)
+	observed, _, e := r.attachmentWithAuthority(call, session, initial)
 	if e != nil {
 		return zero, e
 	}
@@ -376,7 +397,7 @@ func (r *ContextNativeRuntime) ReadPreparedContextDownload(ctx context.Context, 
 func (r *ContextNativeRuntime) prepared(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, pin bool) (artifact.PreparedDownload, contextNativeMetadataKey, func(), error) {
 	var zero artifact.PreparedDownload
 	var key contextNativeMetadataKey
-	bound, call, end, e := r.beginRequest(ctx, current, session)
+	bound, call, end, initial, e := r.beginRequest(ctx, current, session)
 	if e != nil {
 		return zero, key, nil, e
 	}
@@ -384,7 +405,7 @@ func (r *ContextNativeRuntime) prepared(ctx context.Context, current identities.
 	r = bound
 	shorten, finish := workerEffectContext(&call, r.bound.Deadline)
 	defer finish()
-	observed, a, e := r.attachment(call, current, session)
+	observed, a, e := r.attachmentWithAuthority(call, session, initial)
 	if e != nil {
 		return zero, key, nil, e
 	}

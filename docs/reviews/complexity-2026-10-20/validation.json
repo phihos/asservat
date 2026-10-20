@@ -1,0 +1,73 @@
+{
+  "checked_utc": "2026-10-20T20:48:43.027123+00:00",
+  "head": "c8fc5460a7b8892e1ddcb817e42138111921c2ee",
+  "adr_records": 210,
+  "question_answers": 2310,
+  "missing_catalog_numbers": [
+    142,
+    143,
+    154
+  ],
+  "dispositions": {
+    "keep": 76,
+    "superseded": 8,
+    "simplify": 121,
+    "defer": 4,
+    "remove": 1
+  },
+  "duplicate_or_missing_evaluations": [],
+  "source_and_local_evidence_paths": "all exist; each ADR source matches inventory",
+  "frozen_files": 2888,
+  "changed_frozen_files": [],
+  "product_tests": "Not rerun: review documentation only; pre-existing failing budget reproduction preserved.",
+  "documentation_checks": [
+    {
+      "command": [
+        "make",
+        "-j1",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "spec-check"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 4.955,
+      "output": "spec-check.log"
+    },
+    {
+      "command": [
+        "make",
+        "-j1",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "architecture-check"
+      ],
+      "exit_code": 0,
+      "wall_seconds": 1.275,
+      "output": "architecture-check.log"
+    }
+  ],
+  "diff_check": {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  "review_artifact_hashes": {
+    "README.md": "0191ea99d04d23e10bebab62e7e0cdf31c576b0b7709775c96c6ff25c0e1a469",
+    "adr-001-095.json": "2c2da7cbecd38785fad6965d3890b7a5d1177a230300961b13ec2511ad09379e",
+    "adr-001-095.md": "ac1704aad056bc2e18177168f072177e16142dc9759bd72b01474b09aa275722",
+    "adr-096-164.json": "4721c358128ac7cda9903f8f69f0964a0ed0cb333021c0b0fb6a7cdd6bdfc585",
+    "adr-096-164.md": "23949400daf0562cc8abcd50093cbfda581064771afb5ea5af8192d315e3ad37",
+    "adr-165-213.json": "292624316d6469137a2d12c96bd7f750bd1ff928e2524f6f700da2b8f18aac47",
+    "adr-165-213.md": "255ec27e9130f27174ecd2f80a7591c72c860fe7faa11176316834b8238a9ecc",
+    "adr-index.md": "09a3102fa83874c01ea53adce5857a37e82062b24543eee88ccaa8d5a1adad90",
+    "architecture-check.json": "66ede0007caf604e557eb902532eba964fd12990f740c6d7a83f34b7d4914e6a",
+    "architecture-check.log": "8b143321e14dd497f86addc8047589a6e3c38abe317ea2d63269acc61e0d6650",
+    "design-metrics.json": "eebf41b8ccadb76781b2e460a2a46288ce548f1dbb08b8ae53930ed18db46e8c",
+    "inventory.json": "852d9e7baefb734a3a13b0bacb14c5976b19ab05b55a62be898bf72283ae144a",
+    "source-manifest.json": "56721e093389927dcdace0f354ebc0636e75a1e6f6eb6f54d17236819f274c99",
+    "spec-check.json": "a66df1df88d1ca98bd716197ac4d400587d1ac4e09ffa772c943bbcca22aa272",
+    "spec-check.log": "4b504bb4c2d0b212b7955ccc08734a06cca2b0f545ee75b44984c3703914f7ba"
+  },
+  "independent_synthesis_review": "All three ADR reviewers read the synthesis; concrete corrections incorporated; no unresolved blockers reported."
+}

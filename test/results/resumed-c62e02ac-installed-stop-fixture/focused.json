@@ -1,0 +1,37 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-timeout=90s",
+    "-run",
+    "^TestInstalledJourney",
+    "-v",
+    "./test/integration"
+  ],
+  "cwd": "/home/phil/Projekte/asservat-resume-0450e73c",
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exit": 0,
+  "wall_seconds": 43.58152081200387,
+  "before": {
+    "test/integration/installed_journey_native_test.go": "b8df7b6ff01adfbe20be1ae80e1a2baf492b6c4b1d48cedd705020e07ee10ee1",
+    "test/integration/installed_journey_stop_unit_test.go": "ab9ef146dbe462ff3af95802dea7900550aedef7007d6f7c28a3ec8580182007"
+  },
+  "after": {
+    "test/integration/installed_journey_native_test.go": "b8df7b6ff01adfbe20be1ae80e1a2baf492b6c4b1d48cedd705020e07ee10ee1",
+    "test/integration/installed_journey_stop_unit_test.go": "ab9ef146dbe462ff3af95802dea7900550aedef7007d6f7c28a3ec8580182007"
+  },
+  "unchanged": true,
+  "scope": "in-process journey helpers; installed Stop and provider behavior not executed",
+  "tool_terminal": {
+    "session": 2517,
+    "chunk": "45d7b5",
+    "exit": 0
+  }
+}

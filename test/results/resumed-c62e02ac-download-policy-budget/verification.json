@@ -1,0 +1,31 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-timeout=60s",
+    "./internal/adapters/kubernetes",
+    "-run",
+    "^TestDownloadPolicyRequestBudget",
+    "-v"
+  ],
+  "environment": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exit": 0,
+  "elapsed_seconds": 30.457083702087402,
+  "kubernetes_sources_unchanged": true,
+  "scope": "loopback TLS production policy reader; no external fixture",
+  "baseline_commit": "c8fc5460",
+  "actual_terminal_session": 20048,
+  "actual_terminal_chunk": "eda923",
+  "package_seconds": 2.858,
+  "source_count": 519,
+  "owned_source_sha256": "ca2db67fd504e44623c9eb41fd705bca87f8d30e0ee3b4eb5a1674cd0f56fd87",
+  "red_run": false,
+  "qualification": "production policy reader over loopback TLS with synthetic Kubernetes responses; no installed failure attribution"
+}

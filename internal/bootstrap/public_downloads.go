@@ -76,6 +76,13 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	// Reuse one protected policy observation across download checks. The raw
+	// reader remains independently current for privacy administration; this
+	// download-only view does not cache recovery, processing or human authority.
+	policies, err := authapp.NewDownloadPolicyObservations(environment, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
 	processing, err := d.public.open(ctx, "processing-read")
 	if err != nil {
 		return nil, err
@@ -85,7 +92,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		return nil, mounts.ErrUnavailable
 	}
 	gate := authapp.ContextDownloadAuthority{RootID: root, Identities: d.publicID.download, Permissions: pc.permissions, Catalog: pc.catalog, Retention: pc.retention,
-		Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: environment, Recovery: pc.recovery, Processing: processingReads, Now: time.Now}, Now: time.Now}
+		Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: pc.recovery, Processing: processingReads, Now: time.Now}, Now: time.Now}
 
 	makeDownloads := func(purpose string) (*postgres.Downloads, error) {
 		return postgres.NewDownloads(ctx, sql[purpose], root, g)

@@ -16,6 +16,16 @@ Given an authorized developer and saved packet, ELF core, pprof, log, syscall, f
 
 ## REQ-DLD-002 — Reuse authority; review only missing raw permission
 
+The maintainer accepts bounded permission-change handling during downloads;
+immediate/per-step reconstruction of external policy is not required.
+[ADR-214](../docs/decisions/214-bounded-download-policy-observation.md) permits the
+protected installation download policy to be observed once and reused for at most
+60 seconds from that original observation. Authentication, explicit expiry,
+cancellation and current SQL permission/retention/recovery/processing/spend checks
+remain independently enforced and may deny earlier. This observation bound does
+not extend a request or transfer deadline and does not apply to privacy-operator
+changes. The entire combined authorization decision is not reusable for 60 seconds.
+
 Download needs current retained-artifact entitlement or explicit share coverage, no deny/restriction, current authenticated principal/client, `evidence:download`, finite transfer resources and durable audit. Ordinary artifact readers may download the actual approved artifact they can read without independent human review. An extract view does not confer access to its hidden raw parent. Existing ordinary shares that authorize reading an explicit approved artifact also authorize its native download; raw shares require explicit download coverage.
 
 A current processing decision MUST cover ordinary metadata reads as well as native bytes. Missing initialization, unknown restored lineage, or unsupported ancestry denies; publication or a new artifact ID cannot clear an existing artifact/workload-time restriction. Installation capacity renewal MUST NOT extend existing processing-history dates or erase a restriction when its administrative coverage expires. Release requires separate current privacy-operator authority and the exact independently acknowledged decision, not an ordinary read or capture approval. The complete installed storage/acquisition/connector/hub route and client/purpose/class policy are checked under [ADR-127](../docs/decisions/127-current-processing-and-download-placement.md); an S3 region or successful SQL lookup is insufficient. Unrelated publication does not invalidate an existing proof. An unrelated restrictive decision may conservatively interrupt a transfer, which may resume the same session under its original authority, range and spent budgets after fresh checks; no recapture or implicit preparation is introduced.

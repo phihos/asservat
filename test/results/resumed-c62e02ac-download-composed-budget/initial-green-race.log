@@ -1,0 +1,62 @@
+=== RUN   TestIdentityPolicyObservationStillValidatesEveryCredential
+--- PASS: TestIdentityPolicyObservationStillValidatesEveryCredential (0.04s)
+=== RUN   TestIdentityPolicyObservationReusesOriginalIntervalAndRefreshesRevision
+--- PASS: TestIdentityPolicyObservationReusesOriginalIntervalAndRefreshesRevision (0.04s)
+=== RUN   TestIdentityPolicyObservationExpiryErrorHasNoStaleFallback
+--- PASS: TestIdentityPolicyObservationExpiryErrorHasNoStaleFallback (0.05s)
+=== RUN   TestIdentityPolicyObservationClonesAllReturnedSlices
+--- PASS: TestIdentityPolicyObservationClonesAllReturnedSlices (0.04s)
+=== RUN   TestIdentityPolicyObservationConcurrentCallersShareOneRefresh
+--- PASS: TestIdentityPolicyObservationConcurrentCallersShareOneRefresh (0.04s)
+=== RUN   TestIdentityPolicyObservationCanceledRefreshIsNotRetained
+--- PASS: TestIdentityPolicyObservationCanceledRefreshIsNotRetained (0.05s)
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds/canceled-hit
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds/wrong-issuer
+=== RUN   TestIdentityPolicyObservationCancellationAndClockBounds/clock-rollback
+--- PASS: TestIdentityPolicyObservationCancellationAndClockBounds (0.13s)
+    --- PASS: TestIdentityPolicyObservationCancellationAndClockBounds/canceled-hit (0.04s)
+    --- PASS: TestIdentityPolicyObservationCancellationAndClockBounds/wrong-issuer (0.04s)
+    --- PASS: TestIdentityPolicyObservationCancellationAndClockBounds/clock-rollback (0.04s)
+=== RUN   TestIdentityPolicyObservationCanceledWaiterDoesNotCancelRefresh
+--- PASS: TestIdentityPolicyObservationCanceledWaiterDoesNotCancelRefresh (0.04s)
+=== RUN   TestIdentityPolicyPinnedConfigAndCurrentRevocation
+--- PASS: TestIdentityPolicyPinnedConfigAndCurrentRevocation (0.07s)
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unknown
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/case-alias
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/duplicate-client
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unqualified-client
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unqualified-groups
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/empty-eligible
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/overlong-age
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/control-character
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/wrong-issuer
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/null-groups
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/duplicate-json
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/oversize
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/binary-data
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/wrong-namespace
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/deleting
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/expired-io
+=== RUN   TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/clock-rollback
+--- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings (0.71s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unknown (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/case-alias (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/duplicate-client (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unqualified-client (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/unqualified-groups (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/empty-eligible (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/overlong-age (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/control-character (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/wrong-issuer (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/null-groups (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/duplicate-json (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/oversize (0.05s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/binary-data (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/wrong-namespace (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/deleting (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/expired-io (0.04s)
+    --- PASS: TestIdentityPolicyRejectsMalformedAndUnqualifiedSettings/clock-rollback (0.04s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	2.269s

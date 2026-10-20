@@ -54,6 +54,17 @@ func (b installedJourneyBearer) RoundTrip(r *http.Request) (*http.Response, erro
 // wait for expiry.
 const installedJourneyRetention = 600
 
+type installedJourneyDownload struct {
+	DownloadID          string    `json:"download_id"`
+	ArtifactID          string    `json:"artifact_id"`
+	State               string    `json:"state"`
+	SizeBytes           *int64    `json:"size_bytes"`
+	SHA256              string    `json:"sha256"`
+	ContentPath         string    `json:"content_path"`
+	ContinuePreparation bool      `json:"continue_preparation"`
+	ExpiresAt           time.Time `json:"expires_at"`
+}
+
 func installedJourney(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func()) func(cluster, namespace, workload string, deny func(bool)) {
 	return func(cluster, namespace, workload string, deny func(bool)) {
 		t.Helper()
@@ -318,15 +329,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 		t.Logf("installed journey: the regional capture was collected, verified and published")
 		// A hub-local download worker (ADR-204) prepares the native file; the
 		// same MCP client fetches it with its download-route token.
-		var download struct {
-			DownloadID          string    `json:"download_id"`
-			State               string    `json:"state"`
-			SizeBytes           *int64    `json:"size_bytes"`
-			SHA256              string    `json:"sha256"`
-			ContentPath         string    `json:"content_path"`
-			ContinuePreparation bool      `json:"continue_preparation"`
-			ExpiresAt           time.Time `json:"expires_at"`
-		}
+		var download installedJourneyDownload
 		prepare := map[string]string{"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": "installed-journey-download"}
 		call(ctx, "prepare_artifact_download", prepare, &download)
 		originalDownload, downloadUntil := download.DownloadID, download.ExpiresAt
@@ -423,6 +426,26 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			}
 		}
 		healthy()
+		// The installed three-record backing admits two sessions without
+		// refunding the completed first one: 16 KiB output and 32 MiB read
+		// remain within its 24 KiB/36 MiB allocation. Stop needs a nonterminal
+		// session; stopping the completed first download proves AlreadyTerminal.
+		stopReply, err := readReply(ctx, "prepare_artifact_download", map[string]string{
+			"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": "installed-journey-stop-download",
+		})
+		var stopDownload installedJourneyDownload
+		if err != nil || stopReply.Status != "ok" || installedJourneyDecode(stopReply.Data, &stopDownload) != nil ||
+			stopDownload.DownloadID == "" || stopDownload.DownloadID == originalDownload || stopDownload.ArtifactID != investigation.Artifacts[0].ArtifactID ||
+			(stopDownload.State != "Preparing" && stopDownload.State != "Ready") || !time.Now().Before(stopDownload.ExpiresAt) || stopDownload.ExpiresAt.After(expires) {
+			diagnose()
+			t.Fatal("installed Stop requires one acknowledged distinct nonterminal download", stopReply.RequestID, err)
+		}
+		// Preparing need not advertise a content link. Retain the public route
+		// for this acknowledged ID; no second readiness/worker wait is needed.
+		stopContentPath := "/api/v1/downloads/" + stopDownload.DownloadID + "/content"
+		if stopDownload.ContentPath != "" && stopDownload.ContentPath != stopContentPath {
+			t.Fatal("installed Stop preparation changed its content route")
+		}
 		// The operator closure waits for a fresh accepted SQL Deny projection.
 		// Public errors deliberately conflate refusal and service failure; the
 		// independent projection and restored positive read establish controls,
@@ -430,9 +453,42 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 		deny(true)
 		until("the revocation", 2*time.Minute, false)
 		refused("installed-journey-revoked")
+		stopCtx, stopEnd := context.WithDeadline(ctx, stopDownload.ExpiresAt)
+		stopReceipts, err := installedJourneyStopTwice(stopCtx, readReply, stopDownload.DownloadID, "installed-journey-stop")
+		stopEnd()
+		for attempt, receipt := range stopReceipts {
+			if receipt.RequestID != "" {
+				t.Logf("installed Stop call %d: download %s request %s state %s audit %s", attempt+1, receipt.DownloadID, receipt.RequestID, receipt.State, receipt.AuditState)
+			}
+		}
+		if err != nil {
+			diagnose()
+			t.Fatal("installed Stop after accepted Deny", err)
+		}
 		deny(false)
 		until("the restored access", 2*time.Minute, true)
 		healthy()
+		var stopped installedJourneyDownload
+		call(ctx, "get_artifact_download", map[string]string{"download_id": stopDownload.DownloadID}, &stopped)
+		if stopped.DownloadID != stopDownload.DownloadID || stopped.ArtifactID != stopDownload.ArtifactID || stopped.State != "Cancelled" ||
+			!stopped.ExpiresAt.Equal(stopDownload.ExpiresAt) || stopped.ContentPath != "" || stopped.SizeBytes != nil || stopped.SHA256 != "" || stopped.ContinuePreparation {
+			t.Fatal("installed Stop changed identity/deadline or regained native delivery")
+		}
+		stoppedGet, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(origin, "/")+stopContentPath, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stoppedGet.Header.Set("Authorization", "Bearer "+identity.downloadToken())
+		stoppedResponse, err := (&http.Client{Transport: transport, Timeout: 2 * time.Minute, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}).Do(stoppedGet)
+		if err != nil {
+			diagnose()
+			t.Fatal("installed stopped content response", err)
+		}
+		if err = installedJourneyStoppedContent(stoppedResponse); err != nil {
+			diagnose()
+			t.Fatal("installed stopped content disclosed data", err)
+		}
+		t.Log("installed journey: Stop after accepted Deny remained Cancelled on exact-key replay and restored access; original content route returned only a bounded problem response (no active-stream interruption tested)")
 		t.Log("installed journey: accepted Deny accompanied refusal; removing it restored the original artifact")
 		if err := installedJourneyPause(ctx, time.Until(expires)); err != nil {
 			t.Fatal("installed expiry wait", err)
@@ -444,6 +500,58 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 		checkDeleted()
 		t.Log("installed journey: after original expiry, case and new preparation refused while current workload diagnostics succeeded; independent deletion verified")
 	}
+}
+
+type installedJourneyStopReceipt struct {
+	DownloadID string `json:"download_id"`
+	State      string `json:"state"`
+	AuditState string `json:"audit_state"`
+	RequestID  string `json:"-"`
+}
+
+// These are two explicit calls, not an uncertain-mutation retry loop. The
+// second verifies the original acknowledged Stop's identity and audit state.
+func installedJourneyStopTwice(ctx context.Context, read func(context.Context, string, any) (installedJourneyEnvelope, error), downloadID, key string) ([2]installedJourneyStopReceipt, error) {
+	var receipts [2]installedJourneyStopReceipt
+	for i := range receipts {
+		if err := ctx.Err(); err != nil {
+			return receipts, err
+		}
+		reply, err := read(ctx, "cancel_artifact_download", map[string]string{"download_id": downloadID, "idempotency_key": key})
+		if err != nil {
+			return receipts, err
+		}
+		if ctx.Err() != nil {
+			return receipts, ctx.Err()
+		}
+		if reply.Status != "ok" || reply.RequestID == "" || installedJourneyDecode(reply.Data, &receipts[i]) != nil ||
+			receipts[i].DownloadID != downloadID || receipts[i].State != "Cancelled" ||
+			(receipts[i].AuditState != "pending" && receipts[i].AuditState != "recorded" && receipts[i].AuditState != "overdue") {
+			return receipts, errors.New("Stop did not acknowledge the exact live download")
+		}
+		receipts[i].RequestID = reply.RequestID
+		if i > 0 && (receipts[i].RequestID != receipts[0].RequestID || receipts[0].AuditState == "recorded" && receipts[i].AuditState != "recorded") {
+			return receipts, errors.New("Stop replay changed the original request or lost recorded audit")
+		}
+	}
+	return receipts, nil
+}
+
+func installedJourneyStoppedContent(response *http.Response) error {
+	if response == nil || response.Body == nil {
+		return errors.New("missing stopped content response")
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, 1025))
+	closed := response.Body.Close()
+	var problem map[string]any
+	if err != nil || closed != nil || len(body) > 1024 || response.StatusCode != http.StatusServiceUnavailable ||
+		response.Header.Get("Content-Type") != "application/problem+json" || response.Header.Get("Content-Disposition") != "" ||
+		response.Header.Get("ETag") != "" || response.Header.Get("Content-Range") != "" ||
+		json.Unmarshal(body, &problem) != nil || len(problem) != 3 || problem["type"] != "about:blank" ||
+		problem["title"] != http.StatusText(response.StatusCode) || problem["status"] != float64(response.StatusCode) {
+		return errors.New("stopped route did not return the bounded public unavailable response")
+	}
+	return nil
 }
 
 type installedJourneyEnvelope struct {

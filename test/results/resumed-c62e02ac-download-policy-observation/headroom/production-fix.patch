@@ -1,0 +1,30 @@
+--- a/internal/application/authorization/download_policy_observation.go
++++ b/internal/application/authorization/download_policy_observation.go
+@@ -13,7 +13,8 @@
+ // DownloadPolicyObservations owns one protected policy per installed reader.
+ // Refresh is synchronous and belongs to its requesting caller; concurrent
+ // callers may wait for that read but retain their own cancellation. No stale
+-// observation survives expiry or a failed refresh.
++// observation survives expiry or a failed refresh. Reuse leaves a full
++// five-second request interval; a caller refreshes a thinner observation.
+ type DownloadPolicyObservations struct {
+ 	reader  DownloadPolicyReader
+ 	now     func() time.Time
+@@ -47,7 +48,7 @@
+ 		s.mu.Unlock()
+ 		return zero, err
+ 	}
+-	if s.policy.DownloadValid(now) {
++	if s.policy.DownloadValid(now) && s.policy.FreshUntil.Sub(now) >= 5*time.Second {
+ 		out := cloneDownloadPolicy(s.policy)
+ 		s.mu.Unlock()
+ 		return out, nil
+@@ -69,7 +70,7 @@
+ 		if read.err != nil {
+ 			return zero, read.err
+ 		}
+-		if !read.policy.DownloadValid(now) {
++		if !read.policy.DownloadValid(now) || read.policy.FreshUntil.Sub(now) < 5*time.Second {
+ 			return zero, privacy.ErrUnavailable
+ 		}
+ 		return cloneDownloadPolicy(read.policy), nil

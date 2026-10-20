@@ -110,13 +110,13 @@ func (s *ContextNativeResponse) ReadChunkCurrent(ctx context.Context, current id
 		return zero, artifact.ErrDownloadUnavailable
 	}
 	call, ownerEnd := s.owned(ctx)
-	bound, work, requestEnd, e := s.runtime.beginRequest(call, current, session)
+	bound, work, requestEnd, initial, e := s.runtime.beginRequest(call, current, session)
 	if e != nil {
 		ownerEnd()
 		return zero, e
 	}
 	end := func() { requestEnd(); ownerEnd() }
-	observed, a, e := bound.attachment(work, current, session)
+	observed, a, e := bound.attachmentWithAuthority(work, session, initial)
 	if e != nil {
 		end()
 		return zero, e

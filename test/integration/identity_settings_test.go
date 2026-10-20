@@ -82,6 +82,26 @@ func testIdentitySettings(t *testing.T, ctx context.Context, c *rest.Config, clu
 	if err != nil {
 		t.Fatal(err)
 	}
+	// ADR-214 reuses the original bounded observation. A configuration write
+	// does not invalidate a snapshot that the reader has not refreshed yet.
+	if time.Until(before.FreshUntil) <= 5*time.Second {
+		t.Fatal("identity fixture missed its original policy reuse interval")
+	}
+	retained, err := reader.IdentityPolicy(ctx, claims.Issuer)
+	if err != nil || retained.Revision != before.Revision || !retained.FreshUntil.Equal(before.FreshUntil) {
+		t.Fatal("identity reuse changed or renewed the original observation", err)
+	}
+	waitPolicyExpiry := func(policy identity.Policy) {
+		t.Helper()
+		timer := time.NewTimer(time.Until(policy.FreshUntil))
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			t.Fatal("identity observation expiry", ctx.Err())
+		case <-timer.C:
+		}
+	}
+	waitPolicyExpiry(before)
 	after, err := reader.IdentityPolicy(ctx, claims.Issuer)
 	if err != nil {
 		t.Fatal(err)
@@ -100,6 +120,7 @@ func testIdentitySettings(t *testing.T, ctx context.Context, c *rest.Config, clu
 	if _, err = admin.CoreV1().ConfigMaps(control.Name).Create(ctx, object, meta.CreateOptions{}); err != nil {
 		t.Fatal(err)
 	}
+	waitPolicyExpiry(after)
 	if _, err = reader.IdentityPolicy(ctx, claims.Issuer); err == nil {
 		t.Fatal("same-name policy replacement accepted")
 	}

@@ -26,8 +26,16 @@ type workerCurrentCheck struct {
 }
 
 func newWorkerCurrentCheck(ctx context.Context, source identities.CurrentIdentity, authority CurrentDownloadAuthority, scope artifact.DownloadScope, now func() time.Time) (*workerCurrentCheck, error) {
+	c, _, err := newWorkerCurrentObservation(ctx, source, authority, scope, now)
+	return c, err
+}
+
+// The initial observation can be consumed by an immediately following read.
+// It is not cached by Check: every later check still observes current authority.
+func newWorkerCurrentObservation(ctx context.Context, source identities.CurrentIdentity, authority CurrentDownloadAuthority, scope artifact.DownloadScope, now func() time.Time) (*workerCurrentCheck, artifact.DownloadAuthority, error) {
+	var zero artifact.DownloadAuthority
 	if ctx == nil || ctx.Err() != nil || source == nil || authority == nil || !scope.Valid() || now == nil {
-		return nil, artifact.ErrInvalid
+		return nil, zero, artifact.ErrInvalid
 	}
 	started := now()
 	until := started.Add(artifact.DownloadLease)
@@ -39,14 +47,15 @@ func newWorkerCurrentCheck(ctx context.Context, source identities.CurrentIdentit
 	callErr := call.Err()
 	cancel()
 	if err != nil || callErr != nil || ctx.Err() != nil || now().Before(started) || !initial.Valid(now()) || initial.Principal != scope.Principal || !slices.Contains(initial.Scopes, "evidence:read") || !slices.Contains(initial.Scopes, "evidence:download") {
-		return nil, artifact.ErrDownloadUnavailable
+		return nil, zero, artifact.ErrDownloadUnavailable
 	}
 	initial.Groups, initial.Scopes = slices.Clone(initial.Groups), slices.Clone(initial.Scopes)
 	c := &workerCurrentCheck{owner: ctx, source: source, authority: authority, initial: initial, scope: scope, started: started, until: identity.Earlier(until, initial.ValidUntil), now: now}
-	if _, err = c.Check(ctx); err != nil {
-		return nil, err
+	a, err := c.Check(ctx)
+	if err != nil {
+		return nil, zero, err
 	}
-	return c, nil
+	return c, a, nil
 }
 func (c *workerCurrentCheck) Deadline() time.Time {
 	c.mu.Lock()

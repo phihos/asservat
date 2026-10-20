@@ -1,5 +1,77 @@
 # Working on Asservat
 
+## Security proportionality and delivery
+
+Maintainer clarification (2026-10-20): the maintainer did not require permission
+changes to interrupt in-flight downloads. Retain the existing permission-change
+handling, but use a relaxed, bounded recheck interval. Select and document a
+practical interval using measured end-to-end runtime behavior. Immediate or
+per-step revalidation and the existing five-second interval are not immutable
+requirements. This clarification takes precedence over older instructions and
+ADRs that prescribe stricter download permission-check timing.
+
+Do not let overzealous security requirements with unproven security benefits
+stall development or cause runtime performance problems. Additional security
+mechanisms must address a concrete risk and justify their implementation and
+runtime costs. Prefer simple controls with demonstrated value; reconsider
+agent-added restrictions whose benefits are speculative.
+
+Distinguish explicit maintainer requirements from agent-authored design choices.
+Existing code, tests, ADRs or repeated instructions do not by themselves turn an
+agent-added restriction into a user requirement. Update affected contracts and
+tests when revising such a choice. Measure the combined cost of checks in the
+actual workflow and prioritize completing usable end-to-end outcomes.
+
+## Complexity must pay for itself
+
+Adapted for Asservat from [HAPTIC Rule #5](https://github.com/haproxy-haptic/HAPTIC/blob/0a8fba329ed100c56ef09c05a86e570c4770c0e4/CLAUDE.md#complexity-must-pay-for-itself-rule-5)
+and [its rationale](https://github.com/haproxy-haptic/HAPTIC/blob/0a8fba329ed100c56ef09c05a86e570c4770c0e4/docs/agents/complexity-gate.md).
+
+Assess the entire change against the observed problem. Individually correct
+steps can collectively produce an unjustified design. Before adding watches,
+API requests, permissions, background tasks, fallback behavior, configuration
+or component dependencies, record concise numeric or yes/no answers in the plan
+or PR. Reassess the cumulative change whenever its scope grows.
+
+1. How frequent and harmful is the observed problem? Flag purely hypothetical
+   or test-induced cases.
+2. Has the maintainer already accepted this risk? Do not reopen it implicitly.
+3. Does this help typical deployments, or mainly an uncommon path?
+4. What do comparable projects do? Investigate absent precedent before assuming
+   a novel mechanism is necessary.
+5. What privileges, credentials, network access or exposure are added,
+   especially on collectors and workers?
+6. How many failure, degraded or fallback states are added? Two or more need
+   scrutiny.
+7. Does it need configuration solely to tune or disable its own machinery?
+8. Does it depend on components or behavior outside Asservat's control?
+9. Estimate aggregate API, watch, memory, CPU and network costs as workload,
+   node and cluster counts grow.
+10. Are upgrades, rollback and disabling straightforward and tested?
+11. Would a smaller fix, documenting the limitation or doing nothing satisfy
+    the actual requirement?
+
+Items 1–4 and 11 assess benefit; 5–10 assess cost. When weak benefit coincides
+with questionable cost, pause that additional mechanism before implementation
+and present the observed problem, cumulative costs, cheaper alternatives and
+a recommendation. Otherwise proceed autonomously; routine engineering choices
+do not require another approval.
+
+Keep tests aligned with agreed product guarantees. Record maintainer-authorized
+contract changes explicitly; the relaxed download-check timing above is already
+authorized. Understand why existing mechanisms exist before removing them.
+
+## Implementation notes
+
+ADR-214 applies the accepted complexity review to download preparation. Reuse a
+completed protected download-policy observation for at most its original start
+plus 60 seconds; keep raw administration reads at five seconds. Reuse identity
+settings only within their existing 30-second observation, while still validating
+tokens, sessions and eligibility on each resolution. Neither cache contains a
+complete authorization decision or renews caller/evidence deadlines. Read
+docs/decisions/214-bounded-download-policy-observation.md and the latest
+docs/implementation-progress.md for measured request budgets and qualification.
+
 ADR-103 adds shared manual pod-status previews/requests and migration 00033's
 immutable passive blueprint store. Read docs/architecture/context-investigation.md,
 workload-target-resolution.md and context-assessment.md before changing this path.

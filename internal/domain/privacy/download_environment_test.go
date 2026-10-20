@@ -94,3 +94,33 @@ func TestDownloadPolicyDoesNotChooseAmbiguousOrDifferentDataPaths(t *testing.T) 
 		t.Fatal("workload gained human release authority")
 	}
 }
+
+func TestDownloadPolicyObservationIsDownloadOnlyAndNeverSliding(t *testing.T) {
+	p, actor, start := downloadPolicyFixture()
+	p.FreshUntil = start.Add(DownloadPolicyObservationInterval)
+	selectPath := func(now time.Time) bool {
+		_, ok := p.SelectDownload(actor, p.Paths[0].TargetClusterID, p.Paths[0].StoreID, "diagnostics", "metadata", "potentialPersonalData", "context", now)
+		return ok
+	}
+	for _, at := range []time.Time{start, start.Add(59 * time.Second)} {
+		if !p.DownloadValid(at) || !selectPath(at) {
+			t.Fatal("download observation refused", at)
+		}
+	}
+	i := identity.Identity{Principal: actor, Policy: p.Revision, Groups: []string{"privacy-operators"}, Scopes: []string{}, VerifiedAt: start, ValidUntil: start.Add(5 * time.Second)}
+	if p.Valid(start) || p.Operator(i, start) {
+		t.Fatal("download observation became administrative authority")
+	}
+	if _, ok := p.Select(actor, p.Paths[0].TargetClusterID, p.Paths[0].StoreID, "diagnostics", "metadata", "potentialPersonalData", "context", start); ok {
+		t.Fatal("strict selection accepted download observation")
+	}
+	for _, at := range []time.Time{start.Add(-time.Nanosecond), p.FreshUntil, p.FreshUntil.Add(time.Second)} {
+		if p.DownloadValid(at) || selectPath(at) {
+			t.Fatal("out-of-interval policy accepted", at)
+		}
+	}
+	p.FreshUntil = p.FreshUntil.Add(time.Nanosecond)
+	if p.DownloadValid(start) {
+		t.Fatal("observation exceeds fixed interval")
+	}
+}
