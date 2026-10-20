@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	privacydomain "asservat.local/asservat/internal/domain/privacy"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -347,7 +348,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		if out.processingPolicy, err = kube.NewDownloadEnvironmentSource(observer, guard, e.Source.Name, e.Source.UID, root, installation, nil); err != nil {
+		if out.processingPolicy, err = kube.NewDownloadEnvironmentSource(observer, guard, e.Source.Name, e.Source.UID, root, installation, []privacydomain.DownloadPath{}); err != nil {
 			return nil, mounts.ErrUnavailable
 		}
 	}
