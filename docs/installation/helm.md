@@ -211,11 +211,30 @@ cluster administrator's writes there are denied, so change them with
 `helm upgrade`.
 
 Without Helm, run the same command from a workstation, where the guard
-administrator is your own identity:
+administrator is your own identity. Apply the matching chart's CRDs in the
+regional cluster before issuing the five-minute bootstrap record, using the
+[existing administrator-owned CRD workflow](../../charts/asservat/README.md#install-the-current-foundation).
+From this source checkout:
+
+```sh
+kubectl --context REGION apply --server-side \
+  --field-manager=asservat-crd-upgrade -f ./charts/asservat/crds
+kubectl --context REGION wait --for=condition=Established --timeout=60s \
+  crd/capacityreservations.asservat.io
+```
+
+After obtaining the bootstrap record:
 
 ```sh
 asservat installer-cluster --context REGION --offer regional-offer.json   --bootstrap bootstrap.json
 ```
+
+An offer containing context execution requires the namespaced
+`CapacityReservation` API and its status subresource. The installer checks
+that the API is served before creating installation resources and reports
+`start-api` if the prerequisite is unavailable. This bounded discovery check
+does not validate the CRD schema or confer runtime authority. The operator
+or Helm retains CRD ownership; the installer creates or adopts no CRDs.
 
 The regional cluster needs outbound HTTPS to the federation endpoint in the
 offer. The hub operator can pin the federation's node port with

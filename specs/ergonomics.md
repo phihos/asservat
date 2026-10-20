@@ -10,6 +10,14 @@ Helm is the officially supported installation method under [ADR-058](../docs/dec
 
 A read-only installation/capability report MUST identify each missing prerequisite, its effect, responsible role and exact remedy. Inspect API reachability, identity mapping, declared deletion/versioning policy, encryption, region, metadata protection and node capabilities independently. Distinguish configured/inspected from actively verified; a read-only check cannot prove a DELETE, failover or runtime capture works. Offer a separate synthetic qualification action with bounded cleanup. Never exercise a live dump/custom command to prove basic readiness. Active synthetic diagnostics require explicit selection. Report support per action/node pool; unavailable kernel cores must not disable logs or profiles. Core-handler takeover remains an explicit administrator decision once per qualified node-pool configuration.
 
+Regional context-executor installation MUST require the operator-managed local
+start API before creating installation resources. Missing or conflicting
+served `CapacityReservation` discovery must identify the chart CRD prerequisite,
+preserve original caller cancellation/deadlines, and create no namespace or
+runtime objects. Discovery establishes availability only; it does not replace
+schema qualification, RBAC, protected admission or current execution authority.
+The installer must not create or adopt the cluster-scoped CRD.
+
 Source trust and retention-purpose setup belongs to administrators. Newly provisioned namespaces matching an approved source/ceiling inherit it automatically. No per-workload AccessBinding or consent checkbox is required in that path. Reusable budget profiles automatically allocate protected storage from the namespace envelope; show CapacityNotAllocated before arming if it cannot be backed, rather than requesting quota YAML from every maintainer. Application maintainers need no hub kubeconfig, node access, private registry credentials or separate per-cluster account to investigate already authorized evidence.
 
 ### SC-UX-001

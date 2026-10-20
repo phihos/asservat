@@ -96,6 +96,17 @@ PartialObjectMetadata limits returned data, not Kubernetes privileges. `dedicate
 
 The optional owner policy branch admits exact capacity-account CREATE on the main CapacityReservation and exact capacity/execution-account UPDATE on its status subresource. It grants no RBAC and no main UPDATE, deletion, Secret/token/input mutation or arbitrary CRD privilege. Independently pinned StartAdmission enforces the original immutable binding, Ready and one StartCommitted transition. Legacy bare-Pod and omitted owner-capability bytes are unchanged.
 
+The regional operator installs the matching chart CRDs before enrollment.
+For an executor offer, `installer-cluster` checks served API discovery before
+creating its namespace or installation objects: the namespaced
+`CapacityReservation` resource must advertise create/get and its status
+subresource must advertise update. The check preserves caller cancellation
+and the earlier original deadline within five seconds, with bounded response
+bytes and resource count. Missing or conflicting discovery fails at the closed
+`start-api` step. This proves API availability only, not schema compatibility,
+RBAC, admission protection or activation. The installer gains no CRD mutation
+rights or ownership; ordinary connector-only offers keep their existing path.
+
 ## SQL and components
 
 `OwnerEnrollments.ReadContextStartOwners` reuses the existing current owner read facet. It locks recovery before owner configuration, reads at most seventeen candidates, rejects overflow and returns no addresses or certificates. Only audited enrolled server-purpose processes with a current activated certificate are candidates. Exact route/TLS checks remain mandatory. The query adds no schema, role, durable row or authority producer.

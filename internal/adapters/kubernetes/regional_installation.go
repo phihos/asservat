@@ -146,6 +146,13 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 	if who.Status.UserInfo.Username == "system:serviceaccount:"+p.Namespace+":"+RegionalAccount {
 		return out, cfg.ErrInvalid
 	}
+	executor, _ := p.Offer.RegionalExecutorOffered()
+	if executor {
+		step = "start-api"
+		if err = regionalStartAPIAvailable(call, config); err != nil {
+			return out, err
+		}
+	}
 	admins := []cfg.KubernetesActor{{Kind: "User", Name: who.Status.UserInfo.Username}}
 	step = "namespace"
 	marker := p.Offer.InstallationID + "/" + p.Bootstrap.Binding.ClusterID
@@ -160,7 +167,6 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 		return out, err
 	}
 	out.Account = ref(account.ObjectMeta)
-	executor, _ := p.Offer.RegionalExecutorOffered()
 	var x regionalExecutor
 	if executor {
 		step = "capacity-account"
@@ -577,6 +583,9 @@ func (e *regionalInstallError) Error() string {
 		return strings.Replace(nested.Error(), "stopped at ", "stopped at "+e.step+"/", 1)
 	}
 	text := "regional installation stopped at " + e.step
+	if e.step == "start-api" {
+		return text + ": required CapacityReservation API unavailable; check the shipped regional CRD prerequisite"
+	}
 	var api *regionalAPIError
 	var source *configurationWorkerDiagnostic
 	var owner *ownerOperationDiagnostic

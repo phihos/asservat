@@ -165,6 +165,11 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "goose_db_version", "", "SELECT"},
 		{"table", "permission_stream", "", "SELECT"},
 		{"table", "permission_stream", "id", "UPDATE"},
+		{"table", "retention_catchup", "", "SELECT"},
+		{"table", "retention_catchup_effect", "", "SELECT"},
+		{"table", "retention_checkpoint", "", "SELECT"},
+		{"table", "retention_decision", "", "SELECT"},
+		{"table", "retention_source", "", "SELECT"},
 		{"table", "retention_source", "root_id", "UPDATE"},
 	},
 	"context-verification-audit": {
@@ -207,6 +212,11 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "goose_db_version", "", "SELECT"},
 		{"table", "permission_stream", "", "SELECT"},
 		{"table", "permission_stream", "id", "UPDATE"},
+		{"table", "retention_catchup", "", "SELECT"},
+		{"table", "retention_catchup_effect", "", "SELECT"},
+		{"table", "retention_checkpoint", "", "SELECT"},
+		{"table", "retention_decision", "", "SELECT"},
+		{"table", "retention_source", "", "SELECT"},
 		{"table", "retention_source", "root_id", "UPDATE"},
 	},
 	"download-session": {

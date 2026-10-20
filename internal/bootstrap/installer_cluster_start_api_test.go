@@ -29,8 +29,9 @@ func TestInstallerClusterRequiresStartAPIBeforeMutation(t *testing.T) {
 	for _, scenario := range []string{
 		"missing-api", "missing-main", "missing-status", "wrong-group-version",
 		"wrong-kind", "cluster-scoped", "missing-create", "missing-get",
-		"missing-status-update", "duplicate-main", "malformed", "trailing-data",
-		"oversized-body", "caller-cancellation", "caller-deadline", "ready", "plain-connector",
+		"missing-status-update", "duplicate-main", "duplicate-status", "status-cluster-scoped",
+		"wrong-resource-group", "wrong-resource-version", "too-many-resources", "malformed", "trailing-data",
+		"oversized-body", "oversized-error-body", "retry-after", "caller-cancellation", "caller-deadline", "ready", "plain-connector",
 	} {
 		t.Run(scenario, func(t *testing.T) {
 			resources := meta.APIResourceList{
@@ -60,6 +61,18 @@ func TestInstallerClusterRequiresStartAPIBeforeMutation(t *testing.T) {
 				resources.APIResources[1].Verbs = meta.Verbs{"get"}
 			case "duplicate-main":
 				resources.APIResources = append(resources.APIResources, resources.APIResources[0])
+			case "duplicate-status":
+				resources.APIResources = append(resources.APIResources, resources.APIResources[1])
+			case "status-cluster-scoped":
+				resources.APIResources[1].Namespaced = false
+			case "wrong-resource-group":
+				resources.APIResources[0].Group = "other.invalid"
+			case "wrong-resource-version":
+				resources.APIResources[1].Version = "v2"
+			case "too-many-resources":
+				for len(resources.APIResources) <= 256 {
+					resources.APIResources = append(resources.APIResources, meta.APIResource{Name: "unrelated"})
+				}
 			}
 			encoded, err := json.Marshal(resources)
 			if err != nil {
@@ -91,6 +104,21 @@ func TestInstallerClusterRequiresStartAPIBeforeMutation(t *testing.T) {
 					if scenario == "missing-api" {
 						w.WriteHeader(http.StatusNotFound)
 						_, _ = w.Write([]byte(`{"apiVersion":"v1","kind":"Status","status":"Failure","reason":"NotFound","code":404,"message":"private-provider-detail"}`))
+						return
+					}
+					if scenario == "oversized-error-body" {
+						w.WriteHeader(http.StatusServiceUnavailable)
+						_, _ = w.Write(bytes.Repeat([]byte(" "), 256<<10))
+						_ = http.NewResponseController(w).Flush()
+						// A bounded error-body reader closes before this original
+						// one-second request expires, without needing EOF.
+						<-r.Context().Done()
+						return
+					}
+					if scenario == "retry-after" {
+						w.Header().Set("Retry-After", "1")
+						w.WriteHeader(http.StatusTooManyRequests)
+						_, _ = w.Write([]byte(`{"apiVersion":"v1","kind":"Status","status":"Failure","reason":"TooManyRequests","code":429}`))
 						return
 					}
 					if scenario == "caller-cancellation" || scenario == "caller-deadline" {
@@ -139,6 +167,11 @@ func TestInstallerClusterRequiresStartAPIBeforeMutation(t *testing.T) {
 			if scenario == "caller-cancellation" || scenario == "caller-deadline" {
 				if ctx.Err() == nil || time.Since(started) > 500*time.Millisecond {
 					t.Fatal("discovery escaped original cancellation/deadline", ctx.Err(), time.Since(started))
+				}
+			}
+			if scenario == "oversized-error-body" || scenario == "retry-after" {
+				if ctx.Err() != nil || time.Since(started) > 500*time.Millisecond {
+					t.Fatal("discovery waited for an unbounded error body or retried", ctx.Err(), time.Since(started))
 				}
 			}
 		})

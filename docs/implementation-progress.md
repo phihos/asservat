@@ -25,8 +25,36 @@ Read-only review also found that the compiled `context-verify` and
 effect transactions. Existing fixture roles grant those reads separately,
 masking this installed-role defect. The run did not reach publication.
 A regression using the exact compiled roles and the new `PrepareStart`
-failure investigation are the next work; no grants or deadlines have been
-changed on the basis of this finding alone.
+failure investigation reproduced two independent defects. The
+[real SQL/S3 regression](../test/results/resumed-c62e02ac-publication-grants-red/result.json)
+on `67638285` failed both fresh compiled-role publication cases; PostgreSQL
+reported `permission denied for table retention_source` at each transaction's
+accepted-source read. Test and harness exited 1, all 2,713 source hashes
+matched, sources stayed unchanged and cleanup reported no failures.
+The grant correction adds only the five retention SELECTs to each purpose.
+PostgreSQL package race checks (2.111 seconds) and SQL generation checks
+(54 matching files) pass; real-service green qualification remains pending.
+
+The regional fixture also omitted the operator-installed
+`CapacityReservation` CRD required by `PrepareStart`. The existing Helm
+contract assigns CRDs to the operator in every cluster. A TLS CLI regression
+confirmed that the installer previously attempted namespace creation without
+checking this API. An executor-only bounded discovery preflight and canonical
+regional fixture prerequisite are implemented. All 24 preflight race scenarios
+pass, including oversized success/error bodies, retry suppression, original
+caller bounds and unchanged connector-only behavior. Independent review found
+no remaining production blockers. Discovery provides no
+schema or execution authority, and the installer gains no CRD mutation rights.
+Native42's closed `PrepareStart` error did not expose the underlying API status;
+the prerequisite gap is established from the fixture and request path, not a
+captured native 404 response.
+
+The full bootstrap race suite (33.140 seconds), focused existing regional
+Kubernetes race checks (1.056 seconds), integration compile check, `go vet ./...`,
+specification, architecture, dependency and embedded schema/CRD gates pass.
+An earlier combined bootstrap/Kubernetes race command was explicitly cancelled
+with exit 143 before the Kubernetes tests began; it is not passing evidence.
+The repository's full Kubernetes test sharding remains the CI gate.
 
 The subsequent storage-wait regression reproduced blocked independent facts
 reads and a duplicate request wait: Request performed two readiness reads

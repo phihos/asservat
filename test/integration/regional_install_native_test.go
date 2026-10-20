@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"net"
 	"net/http"
 	"net/url"
@@ -37,6 +36,7 @@ import (
 	authn "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -57,6 +57,24 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin 
 	if json.Unmarshal([]byte(offerJSON), &offer) != nil {
 		t.Fatal("offer")
 	}
+	executor, err := offer.RegionalExecutorOffered()
+	if err != nil {
+		t.Fatal("partial executor offer", err)
+	}
+	config, err := clientcmd.BuildConfigFromFlags("", f.Clusters[1].Config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	region, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if executor {
+		// Match the chart/operator prerequisite in each workload cluster,
+		// before issuing the short-lived bootstrap. The product installer
+		// reads discovery only and never installs or adopts a shared CRD.
+		installRegionalStartCRD(t, ctx, region)
+	}
 	record := issueInstalledBootstrap(t, ctx, admin, hub, namespace, providers, installation)
 	dir := t.TempDir()
 	offerFile, recordFile := filepath.Join(dir, "regional-offer.json"), filepath.Join(dir, "bootstrap.json")
@@ -68,10 +86,6 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin 
 	envelope, err := kms.DecodeBootstrapRecord(mustRead(t, recordFile))
 	if err != nil {
 		t.Fatal(err)
-	}
-	executor, err := offer.RegionalExecutorOffered()
-	if err != nil {
-		t.Fatal("partial executor offer", err)
 	}
 	if executor {
 		// ADR-196 decision 7: the operator's write-only evidence credential.
@@ -90,14 +104,6 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin 
 	var installed kube.RegionalInstallation
 	if json.Unmarshal(first.Bytes(), &installed) != nil || installed.Secret.UID == "" {
 		t.Fatal("installer-cluster result")
-	}
-	config, err := clientcmd.BuildConfigFromFlags("", f.Clusters[1].Config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	region, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		t.Fatal(err)
 	}
 	peer := envelope.Binding.PeerID
 	waitActive := func(except string) string {
@@ -155,6 +161,62 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin 
 		t.Fatal("non-administrator source write not denied", err)
 	}
 	t.Log("non-administrator source write denied by the source guard")
+}
+
+// installRegionalStartCRD is the owned fixture's operator setup, equivalent to
+// applying the canonical chart CRD before a regional Helm hook or CLI install.
+// The fresh regional cluster must not already contain a CRD to adopt.
+func installRegionalStartCRD(t *testing.T, ctx context.Context, api kubernetes.Interface) {
+	t.Helper()
+	data, err := os.ReadFile("../../charts/asservat/crds/capacityreservations.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "/apis/apiextensions.k8s.io/v1/customresourcedefinitions"
+	client := api.CoreV1().RESTClient()
+	call, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if err := client.Post().AbsPath(path).MaxRetries(0).Body(data).Do(call).Error(); err != nil {
+		t.Fatal("operator regional start CRD create", err)
+	}
+	path += "/capacityreservations.asservat.io"
+	// The harness removes this owned cluster after the runtime has stopped.
+	// Do not independently delete its start journal while producers may live.
+	for {
+		raw, err := client.Get().AbsPath(path).MaxRetries(0).DoRaw(call)
+		var crd struct {
+			Status struct {
+				Conditions []struct{ Type, Status string } `json:"conditions"`
+			} `json:"status"`
+		}
+		established := false
+		if err == nil && json.Unmarshal(raw, &crd) == nil {
+			for _, condition := range crd.Status.Conditions {
+				established = established || condition.Type == "Established" && condition.Status == "True"
+			}
+		}
+		if established {
+			// Established precedes discovery propagation on the API server.
+			var resources meta.APIResourceList
+			raw, err = client.Get().AbsPath("/apis/asservat.io/v1alpha1").MaxRetries(0).DoRaw(call)
+			if err == nil && json.Unmarshal(raw, &resources) == nil {
+				main, status := false, false
+				for _, resource := range resources.APIResources {
+					main = main || resource.Name == "capacityreservations"
+					status = status || resource.Name == "capacityreservations/status"
+				}
+				if main && status {
+					t.Log("operator installed canonical regional CapacityReservation CRD")
+					return
+				}
+			}
+		}
+		select {
+		case <-call.Done():
+			t.Fatal("operator regional start CRD was not established and served", call.Err())
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
 }
 
 // issueInstalledBootstrap issues one slot through the product BootstrapIssuer
