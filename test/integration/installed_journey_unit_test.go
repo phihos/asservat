@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -11,6 +13,84 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+func TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		code         string
+		dispositions []installedJourneyDisposition
+		nextCodes    []string
+		resolveErr   error
+		wantClosed   bool
+		wantErr      bool
+		wantCalls    []string
+	}{
+		{name: "first-request-succeeds"},
+		{name: "unaccepted-unknown", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "closed"}}, wantClosed: true, wantCalls: []string{"resolve"}},
+		{name: "changed-review-needs-close", code: "ReviewChanged", dispositions: []installedJourneyDisposition{{State: "closed"}}, wantClosed: true, wantCalls: []string{"resolve"}},
+		{name: "unavailable-needs-close", code: "NotAvailable", dispositions: []installedJourneyDisposition{{State: "closed"}}, wantClosed: true, wantCalls: []string{"resolve"}},
+		{name: "lost-resolution", code: "OutcomeUnknown", resolveErr: errors.New("lost response"), wantErr: true, wantCalls: []string{"resolve"}},
+		{name: "missing-disposition", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{}}, wantErr: true, wantCalls: []string{"resolve"}},
+		{name: "accepted-continues", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, nextCodes: []string{""}, wantCalls: []string{"resolve", "pause", "continue"}},
+		{name: "accepted-changed-review", code: "ReviewChanged", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, wantErr: true, wantCalls: []string{"resolve"}},
+		{name: "spent-preparation", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, nextCodes: []string{"AcquisitionUncertain"}, wantErr: true, wantCalls: []string{"resolve", "pause", "continue"}},
+		{name: "accepted-cannot-close", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}, {State: "closed"}}, nextCodes: []string{"OutcomeUnknown"}, wantErr: true, wantCalls: []string{"resolve", "pause", "continue", "resolve"}},
+		{name: "accepted-cannot-change", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}, {State: "accepted", CaptureID: "replacement"}}, nextCodes: []string{"OutcomeUnknown"}, wantErr: true, wantCalls: []string{"resolve", "pause", "continue", "resolve"}},
+		{name: "malformed-closure", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "closed", CaptureID: "original"}}, wantErr: true, wantCalls: []string{"resolve"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var calls []string
+			reads, continues := 0, 0
+			closed, err := installedJourneyRecoverCapture(t.Context(), tc.code, func() (installedJourneyDisposition, error) {
+				calls = append(calls, "resolve")
+				if tc.resolveErr != nil {
+					return installedJourneyDisposition{}, tc.resolveErr
+				}
+				if reads == len(tc.dispositions) {
+					t.Fatal("unexpected extra resolution")
+				}
+				out := tc.dispositions[reads]
+				reads++
+				return out, nil
+			}, func() string {
+				calls = append(calls, "continue")
+				if continues == len(tc.nextCodes) {
+					t.Fatal("continued without an accepted original")
+				}
+				out := tc.nextCodes[continues]
+				continues++
+				return out
+			}, func(context.Context, time.Duration) error {
+				calls = append(calls, "pause")
+				return nil
+			})
+			if closed != tc.wantClosed || (err != nil) != tc.wantErr || !reflect.DeepEqual(calls, tc.wantCalls) {
+				t.Fatalf("closed=%t err=%v calls=%v; want closed=%t error=%t calls=%v", closed, err, calls, tc.wantClosed, tc.wantErr, tc.wantCalls)
+			}
+		})
+	}
+}
+
+func TestInstalledJourneyBoundsAcceptedContinuationAndCancellation(t *testing.T) {
+	continued := 0
+	closed, err := installedJourneyRecoverCapture(t.Context(), "OutcomeUnknown", func() (installedJourneyDisposition, error) {
+		return installedJourneyDisposition{State: "accepted", CaptureID: "original"}, nil
+	}, func() string {
+		continued++
+		return "OutcomeUnknown"
+	}, func(context.Context, time.Duration) error { return nil })
+	if closed || err == nil || continued != 4 {
+		t.Fatal("unbounded or replaced accepted request", closed, err, continued)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	closed, err = installedJourneyRecoverCapture(ctx, "OutcomeUnknown", func() (installedJourneyDisposition, error) {
+		cancel()
+		return installedJourneyDisposition{State: "closed"}, nil
+	}, func() string { t.Fatal("continued after cancellation"); return "" }, installedJourneyPause)
+	if closed || !errors.Is(err, context.Canceled) {
+		t.Fatal("cancelled resolution allowed replacement", closed, err)
+	}
+}
 
 // These tokens are deliberately unsigned synthetic scheduling inputs. Only the
 // native journey exercises signature verification at the actual public server.

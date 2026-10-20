@@ -40,6 +40,12 @@ suppressed process logger. This adds no public result field, authority, retry or
 freshness interval. An acknowledged `NotAvailable` envelope remains distinct from
 an audit or transport failure that prevented any valid response.
 
+Regional target-query diagnostics report success only after decoded target,
+exact requested identity and original freshness validation. Fixed private
+labels distinguish the hub receiver cutoff from the regional resolution cutoff;
+successful transport alone is not a usable target observation. These diagnostics
+never refresh either interval or substitute another Pod.
+
 The passive `ContextPreview` holds server-generated preview, capture, case,
 occurrence, artifact, attempt and assessment IDs; original actor/client; exact
 authored intent; target pin; selected storage revisions; relative retention;

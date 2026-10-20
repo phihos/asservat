@@ -154,16 +154,15 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 		var accepted struct {
 			CaptureID string `json:"capture_id"`
 		}
-		// The client follows the public contract: OutcomeUnknown resumes the
-		// same preview and key with continue_acquisition, which cannot admit,
-		// renew or create anything; ReviewChanged and NotAvailable take a new
-		// preview and key. Both are bounded.
+		// Resolve failures under the original preview/key before continuing.
+		// Only an acknowledged close permits this fixture's next fresh review;
+		// continuation requires an acknowledged accepted capture.
 		requestCapture := func(arguments map[string]any) string {
 			t.Helper()
 			result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "request_capture", Arguments: arguments})
 			if err != nil {
 				t.Logf("installed request_capture transport: %v", err)
-				return "NotAvailable"
+				return "OutcomeUnknown"
 			}
 			reply, code, err := installedJourneyReplyCode(wire, "request_capture", result)
 			if err != nil {
@@ -185,19 +184,30 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 				t.Fatal("installed preview did not pin the regional Pod", preview)
 			}
 			request = map[string]any{"preview_id": preview.PreviewID, "idempotency_key": fmt.Sprintf("installed-journey-capture-%d", attempt)}
-			code := requestCapture(request)
-			for continued := 1; code == "OutcomeUnknown" && continued <= 4; continued++ {
-				if installedJourneyPause(ctx, 2*time.Second) != nil {
-					break
+			closed, err := installedJourneyRecoverCapture(ctx, requestCapture(request), func() (installedJourneyDisposition, error) {
+				reply, err := readReply(ctx, "resolve_capture_request", request)
+				if err != nil {
+					return installedJourneyDisposition{}, err
 				}
-				code = requestCapture(map[string]any{"preview_id": request["preview_id"], "idempotency_key": request["idempotency_key"], "continue_acquisition": true})
+				if reply.Status != "ok" {
+					return installedJourneyDisposition{}, errors.New("original capture request remains unresolved")
+				}
+				var disposition installedJourneyDisposition
+				err = installedJourneyDecode(reply.Data, &disposition)
+				return disposition, err
+			}, func() string {
+				return requestCapture(map[string]any{"preview_id": request["preview_id"], "idempotency_key": request["idempotency_key"], "continue_acquisition": true})
+			}, installedJourneyPause)
+			if err != nil {
+				diagnose()
+				t.Fatal("installed capture request was not accepted", err)
 			}
-			if code == "" {
+			if !closed {
 				break
 			}
-			if code != "ReviewChanged" && code != "NotAvailable" || attempt == 4 {
+			if attempt == 4 {
 				diagnose()
-				t.Fatal("installed capture request was not accepted", code)
+				t.Fatal("installed capture requests closed without admission after four reviews")
 			}
 			if installedJourneyPause(ctx, 2*time.Second) != nil {
 				t.Fatal("installed capture request", ctx.Err())
@@ -414,6 +424,58 @@ type installedJourneyEnvelope struct {
 	RequestID string          `json:"request_id"`
 	Status    string          `json:"status"`
 	Data      json.RawMessage `json:"data"`
+}
+
+type installedJourneyDisposition struct {
+	State     string `json:"state"`
+	CaptureID string `json:"capture_id"`
+}
+
+// Recovery never infers non-admission from a failed request. The resolver must
+// acknowledge closure before the fixture can review again. An accepted request
+// stays bound to its original identity, including across continuation failures.
+func installedJourneyRecoverCapture(ctx context.Context, code string, resolve func() (installedJourneyDisposition, error), continueCapture func() string, pause func(context.Context, time.Duration) error) (closed bool, err error) {
+	acceptedID := ""
+	for continued := 0; code != ""; {
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		switch code {
+		case "OutcomeUnknown", "ReviewChanged", "NotAvailable":
+		default:
+			return false, fmt.Errorf("original capture request failed: %s", code)
+		}
+		disposition, err := resolve()
+		if err != nil {
+			return false, err
+		}
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		switch disposition.State {
+		case "closed":
+			if disposition.CaptureID != "" || acceptedID != "" {
+				return false, errors.New("accepted capture changed to closed")
+			}
+			return true, nil
+		case "accepted":
+			if disposition.CaptureID == "" || (acceptedID != "" && disposition.CaptureID != acceptedID) {
+				return false, errors.New("original accepted capture identity changed")
+			}
+			acceptedID = disposition.CaptureID
+		default:
+			return false, errors.New("original capture request remains unresolved")
+		}
+		if code != "OutcomeUnknown" || continued == 4 {
+			return false, fmt.Errorf("original accepted capture remains unavailable: %s", code)
+		}
+		if err := pause(ctx, 2*time.Second); err != nil {
+			return false, err
+		}
+		code = continueCapture()
+		continued++
+	}
+	return false, nil
 }
 
 // installedJourneyReplyCode validates a reply like installedJourneyReply but

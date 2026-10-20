@@ -1,5 +1,43 @@
 # Sustained implementation progress
 
+## Recovered installed journey, hold 38 (2026-10-20)
+
+Claude session `c62e02ac-2970-4821-8f4d-d584e5ea4d8c` stopped before
+reading hold 38 on `007f1fb5`. The [recovered result](../test/results/resumed-c62e02ac-hold38/result.json)
+records the actual test exit 1; the local shell wrapper incorrectly returned 0.
+All 2,716 recorded source hashes match that commit. The harness retained its
+owned resources; an empty cleanup-failure list does not mean those resources
+were removed. The retained database had one preview, no capture and no
+execution. The first request and four accepted-only continuation calls returned
+`OutcomeUnknown`; no capture, publication, download or deletion was qualified.
+
+The journey now resolves the original preview/key after an uncertain or changed
+request. Only acknowledged closure permits another fixture review; only an
+acknowledged accepted capture permits continuation. Unknown resolution,
+changed accepted identity and spent preparation cannot create a replacement.
+Focused journey race regressions pass, including cancellation and finite
+continuation. This corrects the client fixture, not product acquisition authority.
+
+The target-query diagnostic previously logged `ok` before checking the
+decoded answer and its original receiver/target cutoffs. It now reports the
+final validation result, distinguishing receiver expiry, regional target expiry
+and an invalid result without exposing target metadata. The actual-router
+regression passes under the race detector. Hold 38 does not establish which
+cutoff expired; that remains a hypothesis until these diagnostics run natively.
+No original deadline or authorization check has been relaxed.
+
+PR #40's latest ordinary CI failed before Go tests because `gh pr diff` refused
+more than 300 changed files. The bounded file-list lookup now runs all code
+checks for a full page or any unavailable/incomplete result, and considers both
+paths of a rename. Seven detector regressions and the complete 53-test harness
+self-test step pass locally.
+
+[PR #41](https://github.com/phihos/asservat/pull/41) merged at
+`29a24582ebd46f66e4448ce48fb1d109a9e07690` after independent local review,
+verification of its archived source hashes and successful ordinary CI.
+That lands the scoped deletion composition; the installed end-to-end journey
+and S-02 remain incomplete on PR #40.
+
 ## Local holds 11–24: processing initialization and console login (2026-10-20)
 
 Hold 11 showed `processing_root.initialized_at` NULL: no installed path performs
