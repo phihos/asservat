@@ -90,6 +90,15 @@ retention policy provenance and current assessment rules. Material changes
 require a new review. Updated observation times do not change reviewed scope or
 extend a prior observation's deadline.
 
+Each call owns at most one non-authoritative capacity readiness wait.
+Request starts it beside exact-Pod resolution using the preview's pinned
+target; Preview and CheckDiagnostic start it after target resolution. The
+same wait overlaps eligibility, capability and retention reads in their
+existing order, then joins before the authoritative storage read. Early
+failure cancels and joins it before returning. Every fact retains its original
+cutoff across the wait; neither readiness nor a late positive result renews
+the selected target or permits an expired operation.
+
 Evidence retention starts at actual submission preparation, not at preview
 creation. A developer can review for two minutes and still request sixty seconds
 of evidence retention. The first admitted registration fixes its anchor and

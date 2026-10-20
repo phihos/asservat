@@ -36,8 +36,15 @@ Standby and capture reservations count closing owners until joined completion. E
 Router selection and attachment checks also observe the stream's own
 cancellation, even before the surrounding HTTP request notices it. A joined
 callback cancels the standby and active conversation; its reservation remains
-charged until the handler closes the stream and calls `Finish`. A completed
-query does not reset its retained socket read deadline. Withdrawal permits
+charged until the handler closes the stream and calls `Finish`.
+[ADR-211](../decisions/211-completed-query-standby-transition.md) separates a
+fully validated pre-work query from subsequent passive waiting: after its
+frame callbacks join, both hub socket deadlines return to the same original
+standby cutoff. Its target and receiver proofs retain their original bounds.
+Queries exclusively reserve their standby through completion, excluding
+other queries and attachment source pulls. Failure withdraws the standby
+before exposing the result. An attempted work lease, cancellation or expiry
+permanently prevents this passive transition. Withdrawal permits
 later operations to select another current standby; it never replays an
 uncertain query, capture or signed work.
 

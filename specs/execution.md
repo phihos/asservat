@@ -49,6 +49,13 @@ region answers while it still waits for work, from its own cluster, after a
 current check of the hub owner. The hub uses an answer only while the region
 receiver checked for that query remains valid. A query executes no operation
 and confers no capture authority. Each exchange answers at most four queries.
+Under [ADR-211](../docs/decisions/211-completed-query-standby-transition.md), a
+fully matched and completed hub query may return its socket deadlines to the
+original passive standby cutoff after joining its I/O callbacks. Its result
+retains the original target/receiver freshness. Queries exclusively reserve
+their standby until completion; capture attachment cannot interleave source
+reads. Failed, cancelled, expired or uncertain exchanges never regain time,
+and an attempted work lease permanently excludes this passive transition.
 
 The private API context exchange may reuse one complete exact transport peer
 observation for ordered regional operation request/response frames under

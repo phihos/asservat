@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-211 — Return a completed target query to its original standby interval](211-completed-query-standby-transition.md)
+separates a completed pre-work query's socket deadlines from the unchanged
+standby residence, with exclusive query ownership and permanent closure after
+failure. Implementation and installed qualification are in progress.
+
 [ADR-210 — Installed processing changes by a privacy operator](210-installed-processing-changes.md)
 adds the console route `POST /api/v1/processing/changes`, the hub SQL purpose
 `processing-decision` and the hub-api read of the capacity processing source,

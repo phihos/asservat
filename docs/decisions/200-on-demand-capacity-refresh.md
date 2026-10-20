@@ -62,6 +62,11 @@ always be refused.
   the investigation records a demand and rereads every 250 ms until the
   binding is fresh or its original deadline passes. No deadline is extended
   and no check is skipped; a timeout reports the existing retryable outcome.
+  The investigation owns one joined readiness wait per call. It overlaps
+  exact-Pod resolution for a request and the unchanged ordered
+  eligibility/capability/retention checks, then joins before the authoritative
+  storage read. It does not repeat the wait inside request facts, extend any
+  contributing observation, or survive cancellation/early refusal.
 - **Downloads** re-arm the demand (migration 00067): demand rows keep their
   names after they expire, and download preparation, which knows only its
   download allocation, calls `demand_capacity_refresh_for_download`

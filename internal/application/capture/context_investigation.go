@@ -140,15 +140,20 @@ func (s ContextInvestigation) currentIdentity(ctx context.Context, source identi
 }
 
 func (s ContextInvestigation) facts(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, intent value.ContextIntent, target targets.PodResolution, anchor time.Time) (contextFacts, error) {
+	return s.factsWithStorageWait(ctx, source, actor, intent, target, anchor, nil)
+}
+
+func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, intent value.ContextIntent, target targets.PodResolution, anchor time.Time, storageWait *contextStorageWait) (contextFacts, error) {
 	f := contextFacts{target: target}
 	if !target.Valid(s.Now()) {
 		return f, previewFailure("facts/target", value.ErrChanged)
 	}
+	if storageWait == nil {
+		storageWait = s.beginStorageWait(ctx, target)
+		defer storageWait.close()
+	}
 	t := target.Target()
 	mark := time.Now()
-	s.awaitStorage(ctx, target)
-	auditapp.MarkStep(ctx, "p-await-storage", mark)
-	mark = time.Now()
 	f.eligibility = s.Eligibility.ContextEligibilityCurrent(ctx, source, t)
 	auditapp.MarkStep(ctx, "p-eligibility", mark)
 	if !f.eligibility.Eligible || f.eligibility.Target != t || f.eligibility.Principal != actor || f.eligibility.VerifiedIdentity.Principal != actor || !f.eligibility.VerifiedIdentity.Valid(s.Now()) || !s.Now().Before(f.eligibility.ValidUntil) {
@@ -167,6 +172,10 @@ func (s ContextInvestigation) facts(ctx context.Context, source identities.Curre
 	if err != nil {
 		return f, previewFailure("facts/retention/"+retentionFailure(err), err)
 	}
+	// The readiness hint confers nothing and can overlap these independent
+	// reads. Only the ordinary storage read below supplies a usable observation.
+	// Preserve every original fact interval across this joined wait.
+	storageWait.wait()
 	mark = time.Now()
 	f.storage, err = s.Storage.ContextStorage(ctx, t)
 	auditapp.MarkStep(ctx, "p-storage", mark)
@@ -374,16 +383,8 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	// beside the target re-resolution instead of after it. It confers nothing:
 	// facts still read and check storage after both, and the wait is joined
 	// before the request returns.
-	storageCtx, stopStorage := context.WithCancel(ctx)
-	storageDone := make(chan struct{})
-	go func() {
-		defer close(storageDone)
-		s.awaitStorage(storageCtx, targets.PodResolution{Request: p.Target})
-	}()
-	defer func() {
-		stopStorage()
-		<-storageDone
-	}()
+	storageWait := s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target})
+	defer storageWait.close()
 	resolveStarted := time.Now()
 	target, err := s.Targets.ResolvePod(ctx, p.Target)
 	auditapp.MarkStep(ctx, "q-resolve", resolveStarted)
@@ -393,9 +394,8 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if target.Request != p.Target || target.Pin != p.Pin || target.ExecutionClass != p.ExecutionClass {
 		return zero, s.requestChanged("target")
 	}
-	<-storageDone
 	anchor := s.Now().UTC().Truncate(time.Microsecond)
-	f, err := s.facts(ctx, source, i.Principal, p.Intent, target, anchor)
+	f, err := s.factsWithStorageWait(ctx, source, i.Principal, p.Intent, target, anchor, storageWait)
 	if err != nil {
 		return zero, err
 	}
@@ -483,15 +483,50 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	return a, nil
 }
 
-// storageMargin is the binding freshness awaitStorage wants left, so the
-// remaining facts and the final storage read fit inside the same refresh.
+// storageMargin is the binding freshness awaitStorage wants left for the final
+// authoritative storage read and subsequent processing/admission checks.
 const storageMargin = time.Second
+
+// One non-authoritative readiness hint belongs to one call. Request starts it
+// beside exact-Pod resolution; Preview/CheckDiagnostic start it once the target
+// is known. It overlaps ordered facts reads and is always joined before return,
+// including when an earlier authority check fails.
+type contextStorageWait struct {
+	done   chan struct{}
+	cancel context.CancelFunc
+}
+
+func (s ContextInvestigation) beginStorageWait(ctx context.Context, target targets.PodResolution) *contextStorageWait {
+	call, cancel := context.WithCancel(ctx)
+	w := &contextStorageWait{done: make(chan struct{}), cancel: cancel}
+	started := time.Now()
+	if s.Refresh == nil || s.Storage == nil {
+		auditapp.MarkStep(ctx, "p-await-storage", started)
+		close(w.done)
+		return w
+	}
+	go func() {
+		defer close(w.done)
+		// Record actual hint time, even if it finishes before facts join it.
+		// StepTimes is synchronized; this measurement overlaps other facts.
+		defer auditapp.MarkStep(ctx, "p-await-storage", started)
+		s.awaitStorage(call, target)
+	}()
+	return w
+}
+
+func (w *contextStorageWait) wait() { <-w.done }
+
+func (w *contextStorageWait) close() {
+	w.cancel()
+	<-w.done
+}
 
 // awaitStorage waits, within the caller's original deadline, for a binding the
 // hub-worker refreshed recently enough to have storageMargin left (ADR-200).
 // Otherwise it records a refresh demand and rereads every 250 ms. It runs
-// before the other facts so their own freshness intervals are not spent
-// waiting. It returns nothing: the ordinary storage read still decides.
+// beside the other facts, retaining all their original intervals. It returns
+// nothing: the ordinary storage read still decides.
 func (s ContextInvestigation) awaitStorage(ctx context.Context, target targets.PodResolution) {
 	if s.Refresh == nil || s.Storage == nil {
 		return

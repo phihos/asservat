@@ -2,6 +2,37 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
+The subsequent storage-wait regression reproduced blocked independent facts
+reads and a duplicate request wait: Request performed two readiness reads
+before its authoritative storage read. A single cancellable wait now overlaps
+the unchanged eligibility/capability/retention sequence and joins before that
+authoritative read. Barrier tests cover overlap, one request wait, original
+target expiry and joined cancellation after early fact failure. The complete
+capture package passed the race detector (3.030 seconds). This addresses
+secondary latency pressure; native41's capture requests failed earlier, in
+their target exchanges.
+
+An actual HTTP/2 regression also reproduced a completed query's retained
+socket deadline cancelling the next query with more than three seconds left
+on its independent caller and a live original standby.
+[ADR-211](decisions/211-completed-query-standby-transition.md) records the
+implemented bounded phase transition and exclusive query reservation.
+The native log alone cannot attribute every stream failure to this mechanism.
+Only a complete matched answer under all original bounds restores both hub
+socket deadlines to the original standby cutoff. Returned facts retain the
+earliest contributing proof cutoff. A busy query excludes attachment and other
+queries through joined completion; a terminal failure withdraws the standby
+before publishing its result, without releasing closing capacity.
+
+Actual HTTP/2 regressions pass for a delayed next peer check, an idle gap and
+subsequent independently leased work. Negative component tests cover original
+expiry/cancellation, malformed answers, unknown failures, peer revocation,
+attempted work, failed deadline hooks and closure races. The full context-start
+and mTLS packages passed `go test -race -count=1 -timeout=180s` (2.783 and
+34.382 seconds); independent review found no remaining blockers. Specification,
+architecture, Go dependency, embedded schema/CRD gates and `go vet ./...` pass.
+These changes still require a fresh frozen installed qualification.
+
 The [next owned run `context--pw-gu20`](../test/results/resumed-c62e02ac-native41/result.json)
 on frozen `4db57af3` used the corrected 114 ordinary/118 total SQL connection
 budget. The test failed after 1,313.476 seconds; test and harness both exited 1.
@@ -17,8 +48,8 @@ Three capture requests failed their target exchanges (`receive-call/canceled`,
 acknowledged closure; the third resolution was refused at `audit-begin/reserve`.
 No accepted capture, publication, download, revocation or deletion was qualified.
 The earlier multi-second audit credential SQL reads did not recur, which does
-not establish their previous cause. Stream phase/deadline ownership and
-sequential preview storage waits remain under investigation; original authority
+not establish their previous cause. The subsequent stream phase/deadline
+and storage-wait fixes above have component evidence only; original authority
 cutoffs and finite audit budgets are unchanged.
 
 Final composition review reproduced two additional diagnostic defects.

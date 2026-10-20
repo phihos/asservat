@@ -35,8 +35,8 @@ type Router struct {
 	standby  map[string]*Standby
 	captures map[string]*Attachment
 	serial   uint64
-	// registered is closed and replaced on every standby registration, so a
-	// query that found no idle standby can wait for the next one.
+	// registered is closed and replaced when a standby registers or a query
+	// releases it, so a waiting query can retry within its original reserve.
 	registered chan struct{}
 }
 
@@ -49,18 +49,19 @@ const queryReserve = 2500 * time.Millisecond
 // owner. The channel identity must remain exactly the original registered one.
 type ReceiverCheck = app.APIContextReceiverCheck
 type Standby struct {
-	router   *Router
-	channel  fleet.APIContextChannel
-	check    ReceiverCheck
-	order    uint64
-	ctx      context.Context
-	cancel   context.CancelFunc
-	job      chan *captureJob
-	query    chan *queryJob
-	done     chan struct{}
-	attached bool
-	queries  int
-	once     sync.Once
+	router    *Router
+	channel   fleet.APIContextChannel
+	check     ReceiverCheck
+	order     uint64
+	ctx       context.Context
+	cancel    context.CancelFunc
+	job       chan *captureJob
+	query     chan *queryJob
+	done      chan struct{}
+	attached  bool
+	queryBusy bool
+	queries   int
+	once      sync.Once
 	// Protected by router.mu. Selection observes stream cancellation directly,
 	// including the interval before its cancellation callback runs.
 	streamDone <-chan struct{}
@@ -218,6 +219,7 @@ func (s *Standby) Serve(stream Stream, now func() time.Time) error {
 			// unless it broke the stream.
 			fs, ok := stream.(*frameStream)
 			if !ok {
+				s.cancel()
 				q.result <- queryResult{err: fleet.ErrUnavailable}
 				return fleet.ErrUnavailable
 			}
@@ -229,6 +231,9 @@ func (s *Standby) Serve(stream Stream, now func() time.Time) error {
 			var answer errQueryAnswer
 			if e != nil && !errors.As(e, &answer) {
 				recordStreamDiagnostic(q.ctx, fs, e, streamHubQuery)
+				// Withdraw before result publication releases query ownership.
+				// The handler still owns joined socket cleanup and Finish.
+				s.cancel()
 			}
 			q.result <- queryResult{until, e}
 			if e != nil && !errors.As(e, &answer) {
@@ -258,7 +263,7 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	for {
 		r.mu.Lock()
 		for _, s := range r.standby {
-			if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && s.queries < contracts.APIContextMaximumQueries && s.liveLocked() && (selected == nil || s.order < selected.order) {
+			if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && !s.queryBusy && s.queries < contracts.APIContextMaximumQueries && s.liveLocked() && (selected == nil || s.order < selected.order) {
 				selected = s
 			}
 		}
@@ -268,6 +273,7 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 		}
 		if selected != nil {
 			selected.queries++
+			selected.queryBusy = true
 			r.mu.Unlock()
 			break
 		}
@@ -288,6 +294,15 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 			return time.Time{}, fleet.ErrUnavailable
 		}
 	}
+	defer func() {
+		r.mu.Lock()
+		selected.queryBusy = false
+		if !r.closed && selected.liveLocked() {
+			close(r.registered)
+			r.registered = make(chan struct{})
+		}
+		r.mu.Unlock()
+	}()
 	job := &queryJob{ctx: ctx, method: method, in: in, out: out, result: make(chan queryResult, 1)}
 	select {
 	case selected.query <- job:
@@ -296,6 +311,8 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	case <-selected.ctx.Done():
 		return time.Time{}, fleet.ErrUnavailable
 	}
+	// After handoff, cancellation cannot release ownership before the actual
+	// query and its finite I/O callbacks have joined.
 	result := <-job.result
 	return result.until, result.err
 }
@@ -316,7 +333,7 @@ func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachme
 	}
 	var selected *Standby
 	for _, s := range r.standby {
-		if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && s.liveLocked() && (selected == nil || s.order < selected.order) {
+		if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && !s.queryBusy && s.liveLocked() && (selected == nil || s.order < selected.order) {
 			selected = s
 		}
 	}

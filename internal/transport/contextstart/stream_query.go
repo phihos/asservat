@@ -117,11 +117,12 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 		s.interruptAt(streamSendPeer, streamPeerInvalid)
 		return time.Time{}, fleet.ErrUnavailable
 	}
-	if e = s.Send(call, contracts.APIContextFrame{Kind: contracts.APIContextQueryFrame, Payload: payload}); e != nil {
+	sentUntil, e := s.send(call, contracts.APIContextFrame{Kind: contracts.APIContextQueryFrame, Payload: payload})
+	if e != nil {
 		return time.Time{}, e
 	}
 	answered := time.Now()
-	f, e := s.Receive(call)
+	f, receivedUntil, e := s.receive(call)
 	markQuery(ctx, "q-answer", answered)
 	if e != nil {
 		return time.Time{}, e
@@ -132,14 +133,78 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 		s.interruptAt(streamReceiveResult, streamProtocol)
 		return time.Time{}, contracts.ErrAPIContextProtocol
 	}
+	var answerError error
 	if reply.Failure != "" {
-		return time.Time{}, errQueryAnswer{queryFailureError(reply.Failure)}
+		for _, failure := range queryFailures {
+			if reply.Failure == failure.label {
+				answerError = errQueryAnswer{failure.err}
+				break
+			}
+		}
 	}
-	if decodeOperationBody(reply.Body, out) != nil {
+	if reply.Failure != "" && answerError == nil || reply.Failure == "" && decodeOperationBody(reply.Body, out) != nil {
 		s.interruptAt(streamReceiveResult, streamProtocol)
 		return time.Time{}, contracts.ErrAPIContextProtocol
 	}
-	return receiver.ValidUntil, nil
+	// Both finite frame calls have joined. A matched answer also acknowledges
+	// the outbound query; only now can either hub socket timer leave this phase.
+	until := identity.Earlier(receiver.ValidUntil, identity.Earlier(sentUntil, receivedUntil))
+	if e := s.completeQuery(call, until); e != nil {
+		return time.Time{}, e
+	}
+	if answerError != nil {
+		return time.Time{}, answerError
+	}
+	return until, nil
+}
+
+// completeQuery returns a semantically acknowledged hub query to the exact
+// original passive residence. It renews no answer, caller or work authority.
+// Holding mu excludes new logical frame/source I/O across both deadline hooks.
+// The sole bounded background reader remains active to detect EOF.
+func (s *frameStream) completeQuery(ctx context.Context, until time.Time) error {
+	s.mu.Lock()
+	passiveUntil, bounded := s.ctx.Deadline()
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	live := func() bool {
+		now := time.Now()
+		return bounded && s.sources != nil && !s.closed && s.first.Load() == nil &&
+			!s.leaseStarted && s.reads == 0 && s.writes == 0 &&
+			ctx.Err() == nil && s.ctx.Err() == nil &&
+			now.Before(until) && now.Before(passiveUntil)
+	}
+	stage, reason := streamReceiveResult, streamUnavailable
+	ok := live()
+	if ok {
+		stage = streamReceiveDeadline
+		if e := s.readDeadline(passiveUntil); e != nil {
+			ok, reason = false, streamErrorReason(e)
+		} else {
+			ok = live()
+		}
+	}
+	if ok {
+		stage = streamSendDeadline
+		if e := s.writeDeadline(passiveUntil); e != nil {
+			ok, reason = false, streamErrorReason(e)
+		} else {
+			ok = live()
+		}
+	}
+	if !ok {
+		// Mark terminal while still owning admission, including when a deadline
+		// hook fails or cancellation races the transition. Never revive a stream.
+		s.closed = true
+		s.cancel()
+	}
+	s.mu.Unlock()
+	if !ok {
+		s.interruptAt(stage, reason)
+		return fleet.ErrUnavailable
+	}
+	return nil
 }
 
 // answerQuery is the region's reply to one hub query while awaiting work. The
