@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	privacydomain "asservat.local/asservat/internal/domain/privacy"
 	"bytes"
 	"context"
 	"crypto/sha256"
@@ -348,7 +347,13 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
-		if out.processingPolicy, err = kube.NewDownloadEnvironmentSource(observer, guard, e.Source.Name, e.Source.UID, root, installation, []privacydomain.DownloadPath{}); err != nil {
+		// The join adds each cluster's derived path to both sources (ADR-192,
+		// ADR-204), so the reader pins the same derived paths.
+		paths, err := downloadEnvironmentPaths(installation, c.ClusterID, p.DownloadEnvironment.Paths, p.DownloadEnvironment.PathTemplate, catalogTargets(catalog.catalog))
+		if err != nil {
+			return nil, err
+		}
+		if out.processingPolicy, err = kube.NewDownloadEnvironmentSource(observer, guard, e.Source.Name, e.Source.UID, root, installation, paths); err != nil {
 			return nil, mounts.ErrUnavailable
 		}
 	}
