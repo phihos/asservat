@@ -151,9 +151,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 				UID string `json:"uid"`
 			} `json:"selected_pods"`
 		}
-		var accepted struct {
-			CaptureID string `json:"capture_id"`
-		}
+		var accepted installedJourneyAcceptedReceipt
 		// Resolve failures under the original preview/key before continuing.
 		// Only an acknowledged close permits this fixture's next fresh review;
 		// continuation requires an acknowledged accepted capture.
@@ -170,16 +168,22 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 				t.Fatal("installed response contract request_capture", err)
 			}
 			if code == "" {
-				if err = installedJourneyDecode(reply.Data, &accepted); err != nil {
+				var current struct {
+					CaptureID string `json:"capture_id"`
+				}
+				if err = installedJourneyDecode(reply.Data, &current); err != nil {
 					t.Fatal("installed response data request_capture", err)
+				}
+				if err = accepted.remember(current.CaptureID, time.Now()); err != nil {
+					t.Fatal(err)
 				}
 			}
 			t.Logf("installed request_capture %s request %s", map[bool]string{true: "ok", false: code}[code == ""], reply.RequestID)
 			return code
 		}
 		var request map[string]any
-		var acceptedAt time.Time
 		for attempt := 1; ; attempt++ {
+			accepted = installedJourneyAcceptedReceipt{}
 			call(ctx, "preview_capture", previewArguments, &preview)
 			if !preview.CaptureEnabled || len(preview.SelectedPods) != 1 || preview.PreviewID == "" || preview.SelectedPods[0].UID == "" {
 				t.Fatal("installed preview did not pin the regional Pod", preview)
@@ -195,19 +199,32 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 				}
 				var disposition installedJourneyDisposition
 				err = installedJourneyDecode(reply.Data, &disposition)
+				if err == nil && disposition.State == "accepted" {
+					err = accepted.remember(disposition.CaptureID, time.Now())
+				}
 				return disposition, err
 			}, func() (string, string) {
 				code := requestCapture(map[string]any{"preview_id": request["preview_id"], "idempotency_key": request["idempotency_key"], "continue_acquisition": true})
 				return code, accepted.CaptureID
 			}, func() error {
-				acceptedAt = time.Now()
 				var resolved installedJourneyDisposition
 				call(ctx, "resolve_capture_request", request, &resolved)
 				if accepted.CaptureID == "" || resolved.State != "accepted" || resolved.CaptureID != accepted.CaptureID {
 					return errors.New("installed request was not accepted once")
 				}
 				return nil
-			}, installedJourneyPause)
+			}, installedJourneyPause, func(id string) (installedJourneyCaptureProgress, error) {
+				var current installedJourneyCaptureProgress
+				reply, err := readReply(ctx, "get_capture", map[string]string{"capture_id": id})
+				if err != nil {
+					return current, err
+				}
+				if reply.Status != "ok" {
+					return current, errors.New("original accepted capture progress is unavailable")
+				}
+				err = installedJourneyDecode(reply.Data, &current)
+				return current, err
+			})
 			if err != nil {
 				diagnose()
 				t.Fatal("installed capture request was not accepted", err)
@@ -223,17 +240,14 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 				t.Fatal("installed capture request", ctx.Err())
 			}
 		}
-		if acceptedAt.IsZero() {
-			acceptedAt = time.Now()
+		if accepted.CaptureID == "" || accepted.AcceptedAt.IsZero() {
+			t.Fatal("installed capture lost its acknowledged original receipt")
 		}
 		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture as the Keycloak user")
 		// The regional executor collects; the publisher verifies and publishes
 		// (ADR-203). Poll the capture until it is terminal, then its case until
 		// the published artifact is listed, within bounded time.
-		var progress struct {
-			Phase  string `json:"phase"`
-			CaseID string `json:"case_id"`
-		}
+		var progress installedJourneyCaptureProgress
 		terminal := map[string]bool{"Succeeded": true, "Partial": true, "Failed": true, "Cancelled": true, "Indeterminate": true}
 		wait := func(what string, until time.Time, done func(context.Context) bool) {
 			t.Helper()
@@ -264,7 +278,13 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			return true
 		}
 		wait("a terminal capture", time.Now().Add(5*time.Minute), func(poll context.Context) bool {
-			return observe(poll, "get_capture", map[string]string{"capture_id": accepted.CaptureID}, &progress) && terminal[progress.Phase]
+			if !observe(poll, "get_capture", map[string]string{"capture_id": accepted.CaptureID}, &progress) {
+				return false
+			}
+			if progress.CaptureID != accepted.CaptureID {
+				t.Fatal("installed progress changed the original capture identity")
+			}
+			return terminal[progress.Phase]
 		})
 		if progress.Phase != "Succeeded" || progress.CaseID == "" {
 			diagnose()
@@ -283,7 +303,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			t.Fatal("installed case lists more than the one pod-status artifact", investigation.Artifacts)
 		}
 		expires := investigation.Artifacts[0].ExpiresAt
-		if expires.IsZero() || !time.Now().Before(expires) || expires.After(acceptedAt.Add(installedJourneyRetention*time.Second)) {
+		if expires.IsZero() || !time.Now().Before(expires) || expires.After(accepted.AcceptedAt.Add(installedJourneyRetention*time.Second)) {
 			t.Fatal("installed capture returned an invalid original retention deadline", expires)
 		}
 		if deletionCheck == nil {
@@ -435,12 +455,39 @@ type installedJourneyDisposition struct {
 	CaptureID string `json:"capture_id"`
 }
 
+type installedJourneyCaptureProgress struct {
+	CaptureID string `json:"capture_id"`
+	Phase     string `json:"phase"`
+	CaseID    string `json:"case_id"`
+}
+
+// The retained receipt selects the original operation; each public read and
+// continuation still supplies fresh authorization. Its first acknowledgement
+// time remains the conservative upper bound used by the retention assertion.
+type installedJourneyAcceptedReceipt struct {
+	CaptureID  string
+	AcceptedAt time.Time
+}
+
+func (r *installedJourneyAcceptedReceipt) remember(id string, now time.Time) error {
+	if id == "" || now.IsZero() || (r.CaptureID != "" && r.CaptureID != id) {
+		return errors.New("installed accepted capture identity changed")
+	}
+	r.CaptureID = id
+	if r.AcceptedAt.IsZero() {
+		r.AcceptedAt = now
+	}
+	return nil
+}
+
 // Recovery never infers non-admission from a failed request. The resolver must
 // acknowledge closure before the fixture can review again. An accepted request
 // stays bound to its original identity, including across continuation failures.
-// A successful same-ID continuation confirms that resolved receipt; only
-// immediate success needs a separate admission confirmation.
-func installedJourneyRecoverCapture(ctx context.Context, code string, resolve func() (installedJourneyDisposition, error), continueCapture func() (code, captureID string), confirmAccepted func() error, pause func(context.Context, time.Duration) error) (closed bool, err error) {
+// Once acceptance is known, a fresh current progress read determines whether
+// another explicit continuation is appropriate. Progress past Pending hands
+// off to the unchanged terminal/publication checks; it is not success here.
+// Only immediate success needs a separate admission confirmation.
+func installedJourneyRecoverCapture(ctx context.Context, code string, resolve func() (installedJourneyDisposition, error), continueCapture func() (code, captureID string), confirmAccepted func() error, pause func(context.Context, time.Duration) error, observe func(string) (installedJourneyCaptureProgress, error)) (closed bool, err error) {
 	acceptedID := ""
 	for continued := 0; code != ""; {
 		if err := ctx.Err(); err != nil {
@@ -451,31 +498,56 @@ func installedJourneyRecoverCapture(ctx context.Context, code string, resolve fu
 		default:
 			return false, fmt.Errorf("original capture request failed: %s", code)
 		}
-		disposition, err := resolve()
+		if acceptedID == "" {
+			disposition, err := resolve()
+			if err != nil {
+				return false, err
+			}
+			if err := ctx.Err(); err != nil {
+				return false, err
+			}
+			switch disposition.State {
+			case "closed":
+				if disposition.CaptureID != "" {
+					return false, errors.New("closed capture request contains an accepted identity")
+				}
+				return true, nil
+			case "accepted":
+				if disposition.CaptureID == "" {
+					return false, errors.New("original accepted capture identity is missing")
+				}
+				acceptedID = disposition.CaptureID
+			default:
+				return false, errors.New("original capture request remains unresolved")
+			}
+		}
+		if code != "OutcomeUnknown" {
+			return false, fmt.Errorf("original accepted capture remains unavailable: %s", code)
+		}
+		current, err := observe(acceptedID)
 		if err != nil {
 			return false, err
 		}
 		if err := ctx.Err(); err != nil {
 			return false, err
 		}
-		switch disposition.State {
-		case "closed":
-			if disposition.CaptureID != "" || acceptedID != "" {
-				return false, errors.New("accepted capture changed to closed")
-			}
-			return true, nil
-		case "accepted":
-			if disposition.CaptureID == "" || (acceptedID != "" && disposition.CaptureID != acceptedID) {
-				return false, errors.New("original accepted capture identity changed")
-			}
-			acceptedID = disposition.CaptureID
-		default:
-			return false, errors.New("original capture request remains unresolved")
+		if current.CaptureID != acceptedID {
+			return false, errors.New("current progress changed the original accepted capture identity")
 		}
-		if code != "OutcomeUnknown" || continued == 4 {
-			return false, fmt.Errorf("original accepted capture remains unavailable: %s", code)
+		switch current.Phase {
+		case "Running", "Finalizing", "Succeeded":
+			return false, nil
+		case "Pending":
+			if continued == 4 {
+				return false, errors.New("original accepted capture remains pending after four continuations")
+			}
+		default:
+			return false, fmt.Errorf("original accepted capture cannot continue in phase %s", current.Phase)
 		}
 		if err := pause(ctx, 2*time.Second); err != nil {
+			return false, err
+		}
+		if err := ctx.Err(); err != nil {
 			return false, err
 		}
 		var captureID string
@@ -491,7 +563,10 @@ func installedJourneyRecoverCapture(ctx context.Context, code string, resolve fu
 	if acceptedID != "" {
 		return false, nil
 	}
-	return false, confirmAccepted()
+	if err := confirmAccepted(); err != nil {
+		return false, err
+	}
+	return false, ctx.Err()
 }
 
 // installedJourneyReplyCode validates a reply like installedJourneyReply but

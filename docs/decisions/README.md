@@ -4,14 +4,17 @@
 adds a bounded consumption phase to the same request-owned readiness wait:
 only a valid unchanged storage selection with insufficient margin may wait for
 a fresh observation, within all original authority cutoffs and one demand
-attempt. Implementation and complete capture race checks pass; installed
-qualification remains pending.
+attempt. Implementation and complete capture race checks pass. Native48 included
+the change and reached acquisition/publication, without establishing that
+consumption polling caused that success; complete installed qualification remains open.
 
 [ADR-212 — Remaining interval before one-use API preparation](212-api-preparation-remaining-interval.md)
 requires one second remaining before the first preparation insert and preserves
 expired prepared rows as passive no-create uncertainty. No authority interval,
-key attempt or acquisition is renewed. Implementation and real PostgreSQL/S3
-boundary checks pass; installed start/acquisition qualification remains open.
+key attempt or acquisition is renewed. Real PostgreSQL/S3 boundary checks pass.
+Native48 observed a headroom refusal followed by a later first preparation and
+acquisition before its original deadline; public result recovery and the complete
+installed lifecycle remain unqualified.
 
 [ADR-211 — Return a completed target query to its original standby interval](211-completed-query-standby-transition.md)
 separates a completed pre-work query's socket deadlines from the unchanged
@@ -63,8 +66,9 @@ download and its installed lifecycle remain unqualified.
 deploys the publication verifier from `installer-continue`: its own OpenBao Kubernetes login for a
 private audit Transit key and a verifier PKI role, an in-process verifier certificate, operator
 evidence-read and audit credentials, and topology pins read from the guarded cluster catalog.
-Installed provisioning and scoped SQL/S3 publication checks pass; publication
-by the installed publisher remains unqualified.
+Scoped SQL/S3 checks pass. Native48 also records installed verification,
+audit acknowledgement and catalog publication; fresh public retrieval and the
+subsequent installed lifecycle were not reached.
 
 [ADR-202 — Public API exposure](202-public-api-exposure.md)
 lets the operator expose the promoted hub-api's public port on its own NodePort or LoadBalancer Service,

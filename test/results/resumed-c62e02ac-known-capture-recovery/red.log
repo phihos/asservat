@@ -1,0 +1,5 @@
+--- FAIL: TestInstalledJourneyKnownCaptureUsesCurrentProgressWithinResolutionBudget (0.00s)
+    installed_journey_unit_test.go:218: known accepted capture spent resolution budget instead of observing current progress false resolution audit budget exhausted 3 2 0 [resolve pause continue resolve pause continue resolve]
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.018s
+FAIL

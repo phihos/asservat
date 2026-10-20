@@ -81,3 +81,9 @@ failed before implementation. The full capture race suite then passed
 and one-demand cases. Independent review found no blockers. The integration
 package compiled with no tests selected; no installed result is inferred
 from that compile check.
+
+[Native48](../../test/results/resumed-c62e02ac-native48/result.json) includes
+this correction and reaches installed admission, acquisition and publication.
+Its timing logs do not establish whether a consumption-phase poll was
+required. The complete test failed in subsequent client recovery before
+public retrieval/download and expiry/deletion qualification.

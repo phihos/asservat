@@ -2,7 +2,68 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
-The [latest frozen installed run `context-4b2d6czv`](../test/results/resumed-c62e02ac-native47/result.json)
+The [latest frozen installed run `context-siix2l2z`](../test/results/resumed-c62e02ac-native48/result.json)
+on `d6dabdab` passed bootstrap, exact regional join replay, capacity readiness
+and console processing initialization. Capacity supplied six distinct
+observations and 25 usable samples over 15 seconds. The first reviewed request
+admitted one capture; two explicit continuations retained that same capture.
+Test and harness still exited 1 after 1,242.527 seconds. All 2,762 source hashes
+match the frozen commit and stayed unchanged. Owned cleanup exited 0, all
+twelve recorded Docker resources were independently confirmed absent, and
+build scratch was removed.
+
+The first continuation refused preparation at the new headroom check. Its
+outer request still had at least two seconds, but that diagnostic does not
+include the earlier retained target, eligibility, capability, retention,
+recovery or process cutoff used by preparation. The exact winning observation
+was not recorded. The second continuation became the first preparation winner
+with 1.095163 seconds remaining, committed the regional start, acquired and
+stored the artifact before its original cutoff. Its
+[execution row](../test/results/resumed-c62e02ac-native48/postmortem-execution.log)
+is `stored`, and the exact
+[CapacityReservation](../test/results/resumed-c62e02ac-native48/postmortem-regional-capacity.json)
+is `StartCommitted`. No preparation was renewed or repeated.
+
+Independent publication also completed. The
+[read-only SQL transaction](../test/results/resumed-c62e02ac-native48/postmortem-publication.log)
+records verification at `18:09:05.706456Z`, acknowledged audit at
+`18:09:05.728939Z` and catalog publication at `18:09:06.234647Z`, matching the
+installed publisher's log. Generic custody remains `stored_unpublished`;
+the separate verification/audit/catalog rows establish semantic publication.
+There were no download sessions. This is evidence of installed acquisition
+and publication, not a completed public retrieval or lifecycle test.
+
+All three outward request replies remained `OutcomeUnknown`. The last outcome
+was recorded about 3.3 ms after the execution's original cutoff, although its
+outer caller was still live. Stored completion preceded that cutoff by
+166.710 ms. The remaining current-source/peer checks and final stream exchange
+retain their own original bounds; these timestamps do not prove the exact
+last failing frame or winning cutoff. The unavailable outward reply cannot
+erase completed work or authorize its repetition.
+
+The fixture then required a third admission-resolution record, exceeding its
+unchanged two-record reservation. Both earlier resolutions had already
+acknowledged the same accepted capture. Re-resolving admission cannot determine
+execution progress. The product retains that accepted ID and offers a fresh,
+independently authorized `get_capture` read; the fixture must use that path
+before considering another explicit continuation.
+
+The [known-capture recovery regression](../test/results/resumed-c62e02ac-known-capture-recovery/verification.json)
+reproduces the third redundant resolution before correction (exit 1), then
+passes the focused race suite (1.068 seconds) and the full in-process integration
+race suite (6.250 seconds), both exit 0. The corrected fixture retains the
+first accepted identity and acknowledgement time, reads fresh same-capture
+progress after unknown replies, and permits another explicit continuation
+only from `Pending`, within the unchanged four-call bound. `Running`,
+`Finalizing` and `Succeeded` enter the existing independent terminal/publication
+checks; this recovery helper does not declare success. Failed progress reads,
+replacement identities, uncertain spent preparation and cancellation stop it.
+Independent review found no blockers. The source hashes stayed unchanged
+during the full suite. Installed qualification of this correction is next;
+terminal success, authorized case, native bytes, revocation, expiry and
+independent deletion checks remain required.
+
+The preceding [frozen installed run `context-4b2d6czv`](../test/results/resumed-c62e02ac-native47/result.json)
 on `f7d3fe14` passed bootstrap, exact regional join replay, capacity readiness
 and console processing initialization. Capacity supplied six distinct
 observations and 37 usable samples over 15 seconds. Test and harness exited 1
@@ -54,7 +115,8 @@ eligibility recheck; no extra facts refresh or admission retry is introduced.
 The full capture race suite passes in 10.066 seconds, and the integration
 package compiles with no tests selected. Independent review found no blockers.
 [Specification, architecture, design and Go vet checks](../test/results/resumed-c62e02ac-storage-consumption-gates/result.json)
-pass; this is component evidence, with the next frozen installed run pending.
+pass. Native48 above includes the correction and reaches admission; its timing
+logs do not establish whether a consumption-phase poll was required.
 
 The [scoped storage-reader SQL regression](../test/results/resumed-c62e02ac-storage-diagnostic-sql/result.json)
 on `f7d3fe14` passes with the actual compiled read-only role: original binding

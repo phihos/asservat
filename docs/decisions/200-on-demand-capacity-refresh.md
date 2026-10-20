@@ -16,8 +16,12 @@ Refresh sampling does not guarantee sufficient freshness at a later read.
 [ADR-213](213-storage-readiness-at-consumption.md) adds bounded readiness at
 consumption within the same owned wait. Its implementation and
 [complete capture race checks](../../test/results/resumed-c62e02ac-storage-consumption/verification.json)
-pass; installed qualification remains pending. Installed acquisition and
-download qualification remain open.
+pass. [Resumed native48](../../test/results/resumed-c62e02ac-native48/result.json)
+included that change, passed demand readiness with six distinct observations
+and 25 usable samples over 15 seconds, and reached acquisition and publication.
+The evidence does not establish that consumption polling caused that success.
+The overall test failed before fresh public status/case retrieval and download;
+the complete installed lifecycle remains unqualified.
 
 ## Context
 

@@ -1,6 +1,6 @@
 # ADR-203 — Installed publisher
 
-Date: 2026-10-18. Status: accepted; implemented; installed provisioning and scoped SQL/S3 publication checks pass.
+Date: 2026-10-18. Status: accepted; implemented; installed verification, audit acknowledgement and catalog publication observed.
 Requirements: S-02 (encrypted publication in the installed journey); REQ-DEP-003,
 REQ-FED-002; TASK-03.
 Completes [ADR-181](181-asynchronous-publication-verifier.md) (the `asservat
@@ -13,9 +13,19 @@ its provider setup, credentials and protected inputs.
 [Independent fresh lifecycles](../../test/results/resumed-c62e02ac-publication-grants-green/result.json)
 using the compiled verifier and publisher roles pass publication, historical
 replay and purpose-isolation checks, with synthetic current authority.
-[Resumed native47](../../test/results/resumed-c62e02ac-native47/context-storage.log)
-completed publisher provisioning but did not complete acquisition. Publication
-by the installed publisher therefore remains unqualified.
+[Resumed native48](../../test/results/resumed-c62e02ac-native48/result.json)
+completed acquisition and storage, followed by installed verification, encrypted
+verification-audit acknowledgement and catalog publication. The
+[SQL postmortem](../../test/results/resumed-c62e02ac-native48/postmortem-publication.log)
+records publication at `2026-10-20T18:09:06.234647Z`. The generic custody row
+remains `stored_unpublished`; the separate verification, audit and catalog
+records establish publication.
+
+The overall installed test still exited 1. Its public capture response remained
+`OutcomeUnknown`, and an exhausted admission-resolution reservation stopped the
+fixture before fresh capture/case reads or download. This establishes the
+installed publisher boundary, not the complete S-02 workflow; public retrieval,
+download, revocation, expiry and deletion remain unqualified.
 
 ## Context
 

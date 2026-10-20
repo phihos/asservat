@@ -7,6 +7,8 @@ Actual commands, source snapshots, failures and subsequent corrections remain in
 
 **Packaged initial bootstrap, protected owner startup, regional capacity and
 console processing initialization have passed their named native checks.
+Installed native48 also completed context acquisition, verification and catalog
+publication.
 The complete installed developer investigation workflow is unfinished.** Significant identity,
 permissions, encrypted storage, audit, context capture and download components exist.
 Their component tests do not establish delivery of the broader debugging platform.
@@ -41,7 +43,7 @@ the features that depend on them.
 | --- | --- | --- |
 | Bootstrap with Helm | Packaged native reference tests cover replay, managed setup cleanup, uninstall preservation and the protected runtime handover. The continuation now deploys the hub API/console/MCP, worker, federation, regional connector, key service and publisher with protected inputs. | Complete and qualify the supported installed developer workflow and operational lifecycle. The chart still rejects direct runtime enablement. |
 | Sign in through browser/MCP | Keycloak, session/refresh/logout and browser/MCP components have real integration evidence. The installed fixture signs in through the console, initializes processing and makes authenticated MCP preview/request calls. | Broader installed session lifecycle, reviewer step-up and the internal-user alternative. |
-| Request and browse workload context | The bounded pod-status diagnostic, shared UI/MCP controls, SQL admission and encrypted publication have component/native evidence. Earlier regional fixtures complete collection, publication, case lookup, native download, Stop and revocation with synthetic authority inputs. Installed runs now reach admission and capture-intent persistence. | Complete installed two-cluster preparation, acquisition and request-to-case flow. Resumed native47 stopped before preparation under an inherited deadline; it also recorded an earlier storage-margin refusal. The diagnostic remains limited to 4,096 native bytes and is not generic file/log/command collection. |
+| Request and browse workload context | The bounded pod-status diagnostic, shared UI/MCP controls, SQL admission and encrypted publication have component/native evidence. Earlier regional fixtures complete collection, publication, case lookup, native download, Stop and revocation with synthetic authority inputs. Installed native48 completed acquisition and storage, then verification, audit acknowledgement and catalog publication. | Qualify public result recovery and the installed request-to-case flow: native48 still returned `OutcomeUnknown`, and the fixture stopped before fresh capture/case reads. The diagnostic remains limited to 4,096 native bytes and is not generic file/log/command collection. |
 | Download, Stop and deliberately retry | The combined real-service run passes content, range resume, interrupted original/new sessions, control negatives, exactly-one-winner admission, native exchange and retention-observation expiry. Authenticated ranges reconstruct a 352-byte artifact without budget refill. Browser restart and cancellation/denial boundaries pass. Installed hub-local worker/profile provisioning and configuration acceptance also pass. | Completed installed transfer, Stop, revocation/expiry, sustained availability and large-artifact qualification remain pending. The component fixture's synthetic authority inputs and earlier failures remain explicit in the chronological tracker. |
 | Download every evidence type for local tools | Persistent framed format and bounded decoder exist; a separate earlier feasibility lab transferred 2 GiB. | Generic large-object publication, full native transfer/window lifecycle, interruption, throughput/memory and local-tool qualification for product cores, PCAPs and derivatives. |
 | Automatic suspicious-event collection | Policy source, automation identity and acceptance components exist. | Resolved policy/trigger engine, logs/resources/probes/external triggers, all-replica observation, correlation, storm controls and fair incident dispatch. |
@@ -85,25 +87,33 @@ passing targeted real-Kubernetes test with one startup input and synthetic
 connector source/issuer/registry facts. It does not include the complete
 installed TLS opening and both delegated owner authentications.
 
-[Resumed native47](../test/results/resumed-c62e02ac-native47/result.json) on
-`f7d3fe14` passed regional enrollment, capacity readiness and console processing
-initialization. The demand lane supplied six distinct observations and 37 samples
-with at least one second remaining over 15 seconds. The installed test and
-harness nevertheless exited 1. Its first capture request was refused for
-insufficient storage margin, and its second failed at target-query routing.
-The third admitted one capture intent but stopped before preparation/acquisition
-under the inherited deadline. SQL contained no execution row, so this run does
-not establish a preparation-floor refusal. Two earlier review closures had
-already spent the unchanged two-record resolution reservation; the next
-resolution was refused, so the run did not reach a continuation for that
-accepted capture.
+[Resumed native48](../test/results/resumed-c62e02ac-native48/result.json) on
+`d6dabdab` passed bootstrap, regional capacity readiness and console processing
+initialization. The demand lane supplied six distinct observations and 25 samples
+with at least one second remaining over 15 seconds. One accepted capture then
+reached acquisition and storage on its second continuation. Its preparation
+had 1.095163 seconds remaining; start, acquisition and completion occurred before
+the original deadline. The installed publisher independently verified the
+artifact, acknowledged its verification audit and
+[published it in the catalog](../test/results/resumed-c62e02ac-native48/postmortem-publication.log).
+This run included ADR-213's bounded storage consumption wait, but does not
+establish that consumption polling caused the successful acquisition.
 
-All recorded source hashes matched and owned cleanup completed. Current work
-addresses readiness at consumption while preserving every original authority
-cutoff, and investigates the remaining pre-preparation failure. Completed
-installed acquisition, publication, native download, revocation and managed
-deletion remain unqualified. Neither component passes nor a healthy capacity
-channel establish this workflow.
+The original request and both continuations nevertheless returned
+`OutcomeUnknown`. The last public outcome was recorded about 3.3 ms after the
+preparation's original deadline; the exact response-limiting transport cutoff
+is not established. The fixture then attempted a redundant third admission
+resolution for the already acknowledged capture identity, exceeding its
+unchanged two-record reservation. It stopped before fresh capture/case reads
+or download, with zero download sessions. Test and harness exited 1; all
+2,762 recorded source hashes matched and owned cleanup completed.
+
+The fixture now recovers the already acknowledged capture through fresh
+ordinary status reads under their own original authority bounds. Its focused
+and complete in-process integration race suites pass; installed qualification
+of that correction is next. Public result/case retrieval, native download,
+revocation, expiry and managed deletion remain unqualified. Acquisition and
+catalog publication in this run do not complete S-02.
 Most collector, recording, analysis and sharing work follows or reuses these
 foundations; it has not been declared complete.
 

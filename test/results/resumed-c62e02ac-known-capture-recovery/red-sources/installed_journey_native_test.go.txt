@@ -1,0 +1,675 @@
+package integration
+
+import (
+	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+)
+
+type installedJourneyBearer struct {
+	inner http.RoundTripper
+	token func(context.Context) (string, error)
+}
+
+func (b installedJourneyBearer) RoundTrip(r *http.Request) (*http.Response, error) {
+	token, err := b.token(r.Context())
+	if err != nil {
+		return nil, err
+	}
+	r = r.Clone(r.Context())
+	r.Header.Set("Authorization", "Bearer "+token)
+	return b.inner.RoundTrip(r)
+}
+
+// installedJourney returns the first installed S-02 slice: as the owned
+// Keycloak user, over MCP through the public API's NodePort Service
+// (ADR-202), preview, request and resolve a pod-status capture of the
+// regional workload, download it, then see access end when the operator
+// revokes it and again when the capture expires. deny adds (true) or removes
+// (false) the operator's Deny binding for the user's group. Every authority
+// input is the installed product's own:
+// the operator's AccessBinding, the permission stream, the regional capacity
+// binding refreshed on demand (ADR-200) and the federation; nothing is seeded.
+// diagnose prints the hub processes' logs before a failure ends the test.
+// installedJourneyRetention is the requested evidence access lifetime in
+// seconds: long enough to collect, publish and download, short enough to
+// wait for expiry.
+const installedJourneyRetention = 600
+
+func installedJourney(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func()) func(cluster, namespace, workload string, deny func(bool)) {
+	return func(cluster, namespace, workload string, deny func(bool)) {
+		t.Helper()
+		if identity == nil {
+			t.Fatal("installed journey requires the harness identity provider")
+		}
+		cert, err := x509.ParseCertificate(publicRoot)
+		if err != nil {
+			t.Fatal("public listener root", err)
+		}
+		roots := x509.NewCertPool()
+		roots.AddCert(cert)
+		dial := &net.Dialer{Timeout: 5 * time.Second}
+		transport := &http.Transport{Proxy: nil, ForceAttemptHTTP2: true, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13},
+			DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+				return dial.DialContext(ctx, network, address)
+			}}
+		defer transport.CloseIdleConnections()
+		wire, err := contracts.NewInvestigationContracts()
+		if err != nil {
+			t.Fatal("installed wire contracts", err)
+		}
+		// ADR-210: processing is initialized once, before any preview.
+		identity.initializeProcessing(t, ctx, cert, address, origin, diagnose)
+		tokens := identity.mcpTokenSource(origin)
+		client := sdk.NewClient(&sdk.Implementation{Name: "installed-journey", Version: "1"}, &sdk.ClientOptions{Capabilities: &sdk.ClientCapabilities{}})
+		session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, tokens.Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
+		if err != nil {
+			t.Fatal("installed MCP session", err)
+		}
+		defer session.Close()
+		// Discovery/status calls may retry, and capture requests retain their
+		// original preview and idempotency key. An uncertain download prepare
+		// never retries automatically: only its acknowledged continuation flag
+		// below permits another call under the exact original key.
+		readReply := func(callCtx context.Context, name string, arguments any) (installedJourneyEnvelope, error) {
+			result, err := session.CallTool(callCtx, &sdk.CallToolParams{Name: name, Arguments: arguments})
+			if err != nil {
+				return installedJourneyEnvelope{}, err
+			}
+			reply, err := installedJourneyReply(wire, name, result)
+			if err != nil {
+				diagnose()
+				t.Fatal("installed response contract", name, err)
+			}
+			return reply, err
+		}
+		call := func(callCtx context.Context, name string, arguments any, data any) {
+			t.Helper()
+			tries := 4
+			if name == "prepare_artifact_download" {
+				tries = 1
+			}
+			var failure error
+			for attempt := 1; attempt <= tries; attempt++ {
+				started := time.Now()
+				reply, err := readReply(callCtx, name, arguments)
+				if err == nil && reply.Status == "ok" {
+					if err = installedJourneyDecode(reply.Data, data); err != nil {
+						t.Fatal("installed response data", name, err)
+					}
+					return
+				}
+				failure = err
+				if failure == nil {
+					// The validated public error deliberately exposes no private
+					// dependency stage. Retain its existing retryability distinction
+					// and request correlation without logging inputs or credentials.
+					var unavailable struct {
+						Retryable bool `json:"retryable"`
+					}
+					if json.Unmarshal(reply.Data, &unavailable) != nil {
+						t.Fatal("installed unavailable response")
+					}
+					failure = fmt.Errorf("acknowledged operation unavailable (retryable=%t)", unavailable.Retryable)
+				}
+				t.Logf("installed %s attempt %d after %s request %s: %v", name, attempt, time.Since(started).Round(time.Millisecond), reply.RequestID, failure)
+				if attempt < tries && installedJourneyPause(callCtx, 2*time.Second) != nil {
+					break
+				}
+			}
+			diagnose()
+			t.Fatalf("installed %s: %v", name, failure)
+		}
+		target := map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload}
+		previewArguments := map[string]any{"target_ref": target,
+			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": installedJourneyRetention}
+		if dir := os.Getenv("ASSERVAT_JOURNEY_HOLD"); dir != "" {
+			installedJourneyHold(t, ctx, dir, wire, session, previewArguments, diagnose)
+		}
+		var preview struct {
+			PreviewID      string `json:"preview_id"`
+			CaptureEnabled bool   `json:"capture_enabled"`
+			SelectedPods   []struct {
+				UID string `json:"uid"`
+			} `json:"selected_pods"`
+		}
+		var accepted struct {
+			CaptureID string `json:"capture_id"`
+		}
+		// Resolve failures under the original preview/key before continuing.
+		// Only an acknowledged close permits this fixture's next fresh review;
+		// continuation requires an acknowledged accepted capture.
+		requestCapture := func(arguments map[string]any) string {
+			t.Helper()
+			result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "request_capture", Arguments: arguments})
+			if err != nil {
+				t.Logf("installed request_capture transport: %v", err)
+				return "OutcomeUnknown"
+			}
+			reply, code, err := installedJourneyReplyCode(wire, "request_capture", result)
+			if err != nil {
+				diagnose()
+				t.Fatal("installed response contract request_capture", err)
+			}
+			if code == "" {
+				if err = installedJourneyDecode(reply.Data, &accepted); err != nil {
+					t.Fatal("installed response data request_capture", err)
+				}
+			}
+			t.Logf("installed request_capture %s request %s", map[bool]string{true: "ok", false: code}[code == ""], reply.RequestID)
+			return code
+		}
+		var request map[string]any
+		var acceptedAt time.Time
+		for attempt := 1; ; attempt++ {
+			call(ctx, "preview_capture", previewArguments, &preview)
+			if !preview.CaptureEnabled || len(preview.SelectedPods) != 1 || preview.PreviewID == "" || preview.SelectedPods[0].UID == "" {
+				t.Fatal("installed preview did not pin the regional Pod", preview)
+			}
+			request = map[string]any{"preview_id": preview.PreviewID, "idempotency_key": fmt.Sprintf("installed-journey-capture-%d", attempt)}
+			closed, err := installedJourneyRecoverCapture(ctx, requestCapture(request), func() (installedJourneyDisposition, error) {
+				reply, err := readReply(ctx, "resolve_capture_request", request)
+				if err != nil {
+					return installedJourneyDisposition{}, err
+				}
+				if reply.Status != "ok" {
+					return installedJourneyDisposition{}, errors.New("original capture request remains unresolved")
+				}
+				var disposition installedJourneyDisposition
+				err = installedJourneyDecode(reply.Data, &disposition)
+				return disposition, err
+			}, func() (string, string) {
+				code := requestCapture(map[string]any{"preview_id": request["preview_id"], "idempotency_key": request["idempotency_key"], "continue_acquisition": true})
+				return code, accepted.CaptureID
+			}, func() error {
+				acceptedAt = time.Now()
+				var resolved installedJourneyDisposition
+				call(ctx, "resolve_capture_request", request, &resolved)
+				if accepted.CaptureID == "" || resolved.State != "accepted" || resolved.CaptureID != accepted.CaptureID {
+					return errors.New("installed request was not accepted once")
+				}
+				return nil
+			}, installedJourneyPause)
+			if err != nil {
+				diagnose()
+				t.Fatal("installed capture request was not accepted", err)
+			}
+			if !closed {
+				break
+			}
+			if attempt == 4 {
+				diagnose()
+				t.Fatal("installed capture requests closed without admission after four reviews")
+			}
+			if installedJourneyPause(ctx, 2*time.Second) != nil {
+				t.Fatal("installed capture request", ctx.Err())
+			}
+		}
+		if acceptedAt.IsZero() {
+			acceptedAt = time.Now()
+		}
+		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture as the Keycloak user")
+		// The regional executor collects; the publisher verifies and publishes
+		// (ADR-203). Poll the capture until it is terminal, then its case until
+		// the published artifact is listed, within bounded time.
+		var progress struct {
+			Phase  string `json:"phase"`
+			CaseID string `json:"case_id"`
+		}
+		terminal := map[string]bool{"Succeeded": true, "Partial": true, "Failed": true, "Cancelled": true, "Indeterminate": true}
+		wait := func(what string, until time.Time, done func(context.Context) bool) {
+			t.Helper()
+			bounded, stop := context.WithDeadline(ctx, until)
+			defer stop()
+			for bounded.Err() == nil {
+				if done(bounded) && bounded.Err() == nil {
+					return
+				}
+				if installedJourneyPause(bounded, 2*time.Second) != nil {
+					break
+				}
+			}
+			diagnose()
+			t.Fatal("installed journey: timed out waiting for", what)
+		}
+		// Unpublished cases are intentionally unavailable. Read polls may
+		// remain pending for their whole phase budget; four short call retries
+		// must not turn an otherwise healthy delayed publication into failure.
+		observe := func(poll context.Context, name string, arguments any, data any) bool {
+			reply, err := readReply(poll, name, arguments)
+			if err != nil || reply.Status != "ok" {
+				return false
+			}
+			if installedJourneyDecode(reply.Data, data) != nil {
+				t.Fatal("installed status data", name)
+			}
+			return true
+		}
+		wait("a terminal capture", time.Now().Add(5*time.Minute), func(poll context.Context) bool {
+			return observe(poll, "get_capture", map[string]string{"capture_id": accepted.CaptureID}, &progress) && terminal[progress.Phase]
+		})
+		if progress.Phase != "Succeeded" || progress.CaseID == "" {
+			diagnose()
+			t.Fatal("installed capture was not collected", progress.Phase, progress.CaseID)
+		}
+		var investigation struct {
+			Artifacts []struct {
+				ArtifactID string    `json:"artifact_id"`
+				ExpiresAt  time.Time `json:"expires_at"`
+			} `json:"artifacts"`
+		}
+		wait("the published artifact", time.Now().Add(5*time.Minute), func(poll context.Context) bool {
+			return observe(poll, "get_case", map[string]string{"case_id": progress.CaseID}, &investigation) && len(investigation.Artifacts) > 0
+		})
+		if len(investigation.Artifacts) != 1 {
+			t.Fatal("installed case lists more than the one pod-status artifact", investigation.Artifacts)
+		}
+		expires := investigation.Artifacts[0].ExpiresAt
+		if expires.IsZero() || !time.Now().Before(expires) || expires.After(acceptedAt.Add(installedJourneyRetention*time.Second)) {
+			t.Fatal("installed capture returned an invalid original retention deadline", expires)
+		}
+		if deletionCheck == nil {
+			t.Fatal("installed journey requires independent deletion verification")
+		}
+		checkDeleted := deletionCheck(investigation.Artifacts[0].ArtifactID)
+		if checkDeleted == nil {
+			t.Fatal("installed deletion verification missing")
+		}
+		t.Logf("installed journey: the regional capture was collected, verified and published")
+		// A hub-local download worker (ADR-204) prepares the native file; the
+		// same MCP client fetches it with its download-route token.
+		var download struct {
+			DownloadID          string    `json:"download_id"`
+			State               string    `json:"state"`
+			SizeBytes           *int64    `json:"size_bytes"`
+			SHA256              string    `json:"sha256"`
+			ContentPath         string    `json:"content_path"`
+			ContinuePreparation bool      `json:"continue_preparation"`
+			ExpiresAt           time.Time `json:"expires_at"`
+		}
+		prepare := map[string]string{"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": "installed-journey-download"}
+		call(ctx, "prepare_artifact_download", prepare, &download)
+		originalDownload, downloadUntil := download.DownloadID, download.ExpiresAt
+		if originalDownload == "" || downloadUntil.IsZero() || downloadUntil.After(expires) {
+			t.Fatal("installed download deadline", downloadUntil)
+		}
+		wait("a prepared download", installedJourneyEarlier(downloadUntil, time.Now().Add(5*time.Minute)), func(poll context.Context) bool {
+			if download.State == "Preparing" {
+				// GET cannot start or continue a worker. Only an acknowledged
+				// prepare with this flag permits another same-key prepare.
+				name, args := "get_artifact_download", map[string]string{"download_id": originalDownload}
+				if download.ContinuePreparation {
+					name, args = "prepare_artifact_download", prepare
+				}
+				call(poll, name, args, &download)
+			}
+			if download.DownloadID != originalDownload || !download.ExpiresAt.Equal(downloadUntil) {
+				t.Fatal("installed download changed its original identity/deadline")
+			}
+			return download.State != "Preparing"
+		})
+		if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes == nil || *download.SizeBytes < 1 || *download.SizeBytes > artifact.MaxContextBytes || download.SHA256 == "" {
+			diagnose()
+			t.Fatal("installed download was not prepared", download.State, download.ContentPath)
+		}
+		get, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(origin, "/")+download.ContentPath, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		get.Header.Set("Authorization", "Bearer "+identity.downloadToken())
+		response, err := (&http.Client{Transport: transport, Timeout: 2 * time.Minute}).Do(get)
+		if err != nil {
+			diagnose()
+			t.Fatal("installed download content", err)
+		}
+		native, err := io.ReadAll(io.LimitReader(response.Body, artifact.MaxContextBytes+1))
+		response.Body.Close()
+		digest := sha256.Sum256(native)
+		size := int64(len(native))
+		var projected struct {
+			Format string `json:"format"`
+			PodUID string `json:"podUID"`
+		}
+		if err != nil || response.StatusCode != http.StatusOK || size != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 ||
+			json.Unmarshal(native, &projected) != nil || projected.Format != artifact.ContextFormat || projected.PodUID != preview.SelectedPods[0].UID {
+			diagnose()
+			t.Fatal("installed native download differs from its metadata or selected Pod", response.StatusCode, size, err)
+		}
+		t.Logf("installed journey: the Keycloak user downloaded the native pod-status file (%d bytes) through the hub-local worker", size)
+		// Revocation: with the Deny binding the case is no longer available;
+		// without it, it is again. Expiry: once the artifact's access ends,
+		// the case no longer offers it and a new preparation is refused.
+		available := func(callCtx context.Context) (bool, time.Time) {
+			t.Helper()
+			reply, err := readReply(callCtx, "get_case", map[string]string{"case_id": progress.CaseID})
+			if err != nil {
+				t.Fatal("installed get_case", err)
+			}
+			if reply.Status == "error" {
+				return false, time.Time{}
+			}
+			var data struct {
+				Artifacts []struct {
+					ArtifactID string    `json:"artifact_id"`
+					ExpiresAt  time.Time `json:"expires_at"`
+				} `json:"artifacts"`
+			}
+			if installedJourneyDecode(reply.Data, &data) != nil || len(data.Artifacts) != 1 || data.Artifacts[0].ArtifactID != investigation.Artifacts[0].ArtifactID || !data.Artifacts[0].ExpiresAt.Equal(expires) {
+				t.Fatal("installed case changed its original artifact/deadline")
+			}
+			return true, data.Artifacts[0].ExpiresAt
+		}
+		until := func(what string, limit time.Duration, want bool) {
+			t.Helper()
+			wait(what, time.Now().Add(limit), func(poll context.Context) bool { got, _ := available(poll); return got == want })
+		}
+		refused := func(key string) {
+			t.Helper()
+			reply, err := readReply(ctx, "prepare_artifact_download", map[string]string{"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": key})
+			if err != nil || reply.Status != "error" {
+				t.Fatal("installed journey: new preparation was not refused", key, err)
+			}
+		}
+		healthy := func() {
+			t.Helper()
+			var diagnostics struct {
+				Diagnostics []struct {
+					Available bool `json:"available"`
+				} `json:"diagnostics"`
+			}
+			call(ctx, "list_diagnostics", map[string]any{"target_ref": target}, &diagnostics)
+			if len(diagnostics.Diagnostics) != 1 || !diagnostics.Diagnostics[0].Available {
+				t.Fatal("installed authorized diagnostic is unavailable")
+			}
+		}
+		healthy()
+		// The operator closure waits for a fresh accepted SQL Deny projection.
+		// Public errors deliberately conflate refusal and service failure; the
+		// independent projection and restored positive read establish controls,
+		// not a private explanation of the individual wire error.
+		deny(true)
+		until("the revocation", 2*time.Minute, false)
+		refused("installed-journey-revoked")
+		deny(false)
+		until("the restored access", 2*time.Minute, true)
+		healthy()
+		t.Log("installed journey: accepted Deny accompanied refusal; removing it restored the original artifact")
+		if err := installedJourneyPause(ctx, time.Until(expires)); err != nil {
+			t.Fatal("installed expiry wait", err)
+		}
+		healthy()
+		until("the expiry", 2*time.Minute, false)
+		refused("installed-journey-expired")
+		healthy()
+		checkDeleted()
+		t.Log("installed journey: after original expiry, case and new preparation refused while current workload diagnostics succeeded; independent deletion verified")
+	}
+}
+
+type installedJourneyEnvelope struct {
+	RequestID string          `json:"request_id"`
+	Status    string          `json:"status"`
+	Data      json.RawMessage `json:"data"`
+}
+
+type installedJourneyDisposition struct {
+	State     string `json:"state"`
+	CaptureID string `json:"capture_id"`
+}
+
+type installedJourneyCaptureProgress struct {
+	CaptureID string `json:"capture_id"`
+	Phase     string `json:"phase"`
+	CaseID    string `json:"case_id"`
+}
+
+// Recovery never infers non-admission from a failed request. The resolver must
+// acknowledge closure before the fixture can review again. An accepted request
+// stays bound to its original identity, including across continuation failures.
+// A successful same-ID continuation confirms that resolved receipt; only
+// immediate success needs a separate admission confirmation.
+func installedJourneyRecoverCapture(ctx context.Context, code string, resolve func() (installedJourneyDisposition, error), continueCapture func() (code, captureID string), confirmAccepted func() error, pause func(context.Context, time.Duration) error, _ ...func(string) (installedJourneyCaptureProgress, error)) (closed bool, err error) {
+	acceptedID := ""
+	for continued := 0; code != ""; {
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		switch code {
+		case "OutcomeUnknown", "ReviewChanged", "NotAvailable":
+		default:
+			return false, fmt.Errorf("original capture request failed: %s", code)
+		}
+		disposition, err := resolve()
+		if err != nil {
+			return false, err
+		}
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
+		switch disposition.State {
+		case "closed":
+			if disposition.CaptureID != "" || acceptedID != "" {
+				return false, errors.New("accepted capture changed to closed")
+			}
+			return true, nil
+		case "accepted":
+			if disposition.CaptureID == "" || (acceptedID != "" && disposition.CaptureID != acceptedID) {
+				return false, errors.New("original accepted capture identity changed")
+			}
+			acceptedID = disposition.CaptureID
+		default:
+			return false, errors.New("original capture request remains unresolved")
+		}
+		if code != "OutcomeUnknown" || continued == 4 {
+			return false, fmt.Errorf("original accepted capture remains unavailable: %s", code)
+		}
+		if err := pause(ctx, 2*time.Second); err != nil {
+			return false, err
+		}
+		var captureID string
+		code, captureID = continueCapture()
+		if code == "" && captureID != acceptedID {
+			return false, errors.New("successful continuation changed the original accepted capture identity")
+		}
+		continued++
+	}
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	if acceptedID != "" {
+		return false, nil
+	}
+	return false, confirmAccepted()
+}
+
+// installedJourneyReplyCode validates a reply like installedJourneyReply but
+// returns any schema-valid public failure code instead of refusing it.
+func installedJourneyReplyCode(wire *contracts.InvestigationContracts, name string, result *sdk.CallToolResult) (installedJourneyEnvelope, string, error) {
+	var out installedJourneyEnvelope
+	if result == nil {
+		return out, "", errors.New("missing installed reply")
+	}
+	raw, err := json.Marshal(result.StructuredContent)
+	if err != nil || wire.ValidateOutput(name, raw) != nil || json.Unmarshal(raw, &out) != nil || result.IsError != (out.Status == "error") {
+		return installedJourneyEnvelope{}, "", errors.New("invalid installed response schema/status")
+	}
+	if out.Status == "error" {
+		var failure struct {
+			Code string `json:"code"`
+		}
+		if json.Unmarshal(out.Data, &failure) != nil || failure.Code == "" {
+			return installedJourneyEnvelope{}, "", errors.New("installed failure without code")
+		}
+		return out, failure.Code, nil
+	} else if out.Status != "ok" {
+		return installedJourneyEnvelope{}, "", errors.New("unexpected installed operation status")
+	}
+	return out, "", nil
+}
+
+func installedJourneyReply(wire *contracts.InvestigationContracts, name string, result *sdk.CallToolResult) (installedJourneyEnvelope, error) {
+	var out installedJourneyEnvelope
+	if result == nil {
+		return out, errors.New("missing installed reply")
+	}
+	raw, err := json.Marshal(result.StructuredContent)
+	if err != nil || wire.ValidateOutput(name, raw) != nil || json.Unmarshal(raw, &out) != nil || result.IsError != (out.Status == "error") {
+		return installedJourneyEnvelope{}, errors.New("invalid installed response schema/status")
+	}
+	if out.Status == "error" {
+		var failure struct {
+			Code string `json:"code"`
+		}
+		if json.Unmarshal(out.Data, &failure) != nil || failure.Code != "NotAvailable" {
+			// The schema-validated public code is a closed enum, never input.
+			return installedJourneyEnvelope{}, fmt.Errorf("unexpected installed operation failure %q", failure.Code)
+		}
+	} else if out.Status != "ok" {
+		return installedJourneyEnvelope{}, errors.New("unexpected installed operation status")
+	}
+	return out, nil
+}
+
+// Decode into a fresh value: omitted fields must never retain a previous Ready
+// response's native metadata or continuation permission.
+func installedJourneyDecode(raw []byte, target any) error {
+	v := reflect.ValueOf(target)
+	if v.Kind() != reflect.Pointer || v.IsNil() {
+		return errors.New("invalid installed response destination")
+	}
+	next := reflect.New(v.Elem().Type())
+	if err := json.Unmarshal(raw, next.Interface()); err != nil {
+		return err
+	}
+	v.Elem().Set(next.Elem())
+	return nil
+}
+
+func installedJourneyPause(ctx context.Context, delay time.Duration) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if delay <= 0 {
+		return nil
+	}
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return ctx.Err()
+	}
+}
+
+func installedJourneyEarlier(a, b time.Time) time.Time {
+	if a.Before(b) {
+		return a
+	}
+	return b
+}
+
+// installedJourneyHold is a local debugging aid, never set by CI: with
+// ASSERVAT_JOURNEY_HOLD=<dir> the journey pauses with the installation live and
+// runs commands written to <dir>/cmd one at a time: "preview" makes one
+// preview_capture call and appends its outcome to <dir>/out, "diagnose" logs
+// the hub processes, "continue" resumes the journey and "stop" fails the test.
+// The hold ends on its own ten minutes before the test context's deadline.
+func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *contracts.InvestigationContracts, session *sdk.ClientSession, preview map[string]any, diagnose func()) {
+	t.Helper()
+	out, err := os.OpenFile(filepath.Join(dir, "out"), os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatal("journey hold output", err)
+	}
+	defer out.Close()
+	until := time.Now().Add(90 * time.Minute)
+	if d, ok := ctx.Deadline(); ok && d.Add(-10*time.Minute).Before(until) {
+		until = d.Add(-10 * time.Minute)
+	}
+	fmt.Fprintf(out, "%s hold ready until %s\n", time.Now().Format(time.TimeOnly), until.Format(time.TimeOnly))
+	for time.Now().Before(until) {
+		raw, err := os.ReadFile(filepath.Join(dir, "cmd"))
+		if err != nil {
+			if installedJourneyPause(ctx, 500*time.Millisecond) != nil {
+				return
+			}
+			continue
+		}
+		_ = os.Remove(filepath.Join(dir, "cmd"))
+		switch command := strings.TrimSpace(string(raw)); command {
+		case "preview":
+			started := time.Now()
+			call, end := context.WithTimeout(ctx, 30*time.Second)
+			result, err := session.CallTool(call, &sdk.CallToolParams{Name: "preview_capture", Arguments: preview})
+			end()
+			line := fmt.Sprintf("%s preview after %s: ", started.Format(time.TimeOnly), time.Since(started).Round(time.Millisecond))
+			if err != nil {
+				line += "transport " + err.Error()
+			} else if reply, e := installedJourneyReply(wire, "preview_capture", result); e != nil {
+				line += "contract " + e.Error()
+			} else {
+				line += reply.Status + " request " + reply.RequestID + " " + string(reply.Data)
+			}
+			fmt.Fprintln(out, line)
+		case "request":
+			// One preview, then a capture request on it under a fresh key.
+			started := time.Now()
+			call, end := context.WithTimeout(ctx, 30*time.Second)
+			result, err := session.CallTool(call, &sdk.CallToolParams{Name: "preview_capture", Arguments: preview})
+			end()
+			var reply installedJourneyEnvelope
+			if err == nil {
+				reply, err = installedJourneyReply(wire, "preview_capture", result)
+			}
+			var previewed struct {
+				PreviewID string `json:"preview_id"`
+			}
+			if err != nil || reply.Status != "ok" || json.Unmarshal(reply.Data, &previewed) != nil || previewed.PreviewID == "" {
+				fmt.Fprintf(out, "%s request: preview after %s failed: %v %s\n", started.Format(time.TimeOnly), time.Since(started).Round(time.Millisecond), err, reply.Status)
+				continue
+			}
+			requested := time.Now()
+			call, end = context.WithTimeout(ctx, 30*time.Second)
+			result, err = session.CallTool(call, &sdk.CallToolParams{Name: "request_capture", Arguments: map[string]string{"preview_id": previewed.PreviewID, "idempotency_key": "hold-" + requested.Format("150405.000")}})
+			end()
+			line := fmt.Sprintf("%s request after %s: ", requested.Format(time.TimeOnly), time.Since(requested).Round(time.Millisecond))
+			if err != nil {
+				line += "transport " + err.Error()
+			} else if reply, e := installedJourneyReply(wire, "request_capture", result); e != nil {
+				line += "contract " + e.Error()
+			} else {
+				line += reply.Status + " request " + reply.RequestID + " " + string(reply.Data)
+			}
+			fmt.Fprintln(out, line)
+		case "diagnose":
+			diagnose()
+			fmt.Fprintf(out, "%s diagnosed\n", time.Now().Format(time.TimeOnly))
+		case "continue":
+			fmt.Fprintf(out, "%s continuing\n", time.Now().Format(time.TimeOnly))
+			return
+		case "stop":
+			t.Fatal("journey hold stopped")
+		default:
+			fmt.Fprintf(out, "%s unknown command\n", time.Now().Format(time.TimeOnly))
+		}
+	}
+	fmt.Fprintf(out, "%s hold expired\n", time.Now().Format(time.TimeOnly))
+}

@@ -1,0 +1,10 @@
+BEGIN
+SET
+              capture_id              |              attempt_id              |          verified_at          |     audit_acknowledged_at     |             artifact_id              |         published_at          |   custody_state    |     effective_expires_at      |      effective_delete_by      
+--------------------------------------+--------------------------------------+-------------------------------+-------------------------------+--------------------------------------+-------------------------------+--------------------+-------------------------------+-------------------------------
+ 370ec934-8a57-4651-ad62-c66fdcb0b6a9 | edcc287f-4c79-41d9-b527-b8f6db2d4efa | 2026-10-20 18:09:05.706456+00 | 2026-10-20 18:09:05.728939+00 | d9760a45-87a6-403a-a4f2-92ff5bc1d676 | 2026-10-20 18:09:06.234647+00 | stored_unpublished | 2026-10-20 18:18:51.879281+00 | 2026-10-20 19:18:51.879281+00
+(1 row)
+
+ERROR:  relation "context_download_session" does not exist
+LINE 1: SELECT count(*) AS download_sessions FROM context_download_s...
+                                                  ^

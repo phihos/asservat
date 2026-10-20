@@ -1,0 +1,45 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "asservat.io/v1alpha1",
+            "kind": "CapacityReservation",
+            "metadata": {
+                "creationTimestamp": "2026-10-20T18:09:03Z",
+                "generation": 1,
+                "name": "start-edcc287f-4c79-41d9-b527-b8f6db2d4efa",
+                "namespace": "asservat-connector",
+                "resourceVersion": "2474",
+                "uid": "cf8c3244-4b26-48a5-86d3-9d6a8614e3c0"
+            },
+            "spec": {
+                "actionID": "pod-status",
+                "attemptID": "edcc287f-4c79-41d9-b527-b8f6db2d4efa",
+                "auditDigest": "d32e754a8b65d6f828e603aed662c47648b165647081688767c926457419354c",
+                "authorityDigest": "f2974a1dcfc95ec213f86b8d854f97aa30613242e27784d0b4e429772f7006cd",
+                "budgetDigest": "e3bfb7fbe5b47fd436986c17490aa0d1135f3fe2bb70b4da3bc1a46b06ef1c80",
+                "captureID": "370ec934-8a57-4651-ad62-c66fdcb0b6a9",
+                "clusterID": "5cde0b63-8de9-4c90-9a46-5fe14299950f",
+                "collectorEpoch": "4779109a-23c9-45e0-8b61-bc3e7c68a2c2",
+                "executorAccountUID": "435a94a4-8cba-462e-8876-aae15d59d3be",
+                "executorPodUID": "856de161-9be6-48ce-a4d2-d46a06799767",
+                "issuerEpoch": "f747e75a-b7db-43b0-b899-afe2f9b4389b",
+                "nativeBytes": 4096,
+                "notAfter": "2026-10-20T18:09:04.536648Z",
+                "notBefore": "2026-10-20T18:09:02.266091Z",
+                "operationID": "370ec934-8a57-4651-ad62-c66fdcb0b6a9",
+                "podUID": "d4bfb108-7b3b-44d0-9d5a-b92ea7c7753f",
+                "profile": "apiContextStart/v1",
+                "scopeDigest": "777947a6d0ec9bc73c9223ea6f49467da5695a7752800df302dabf11ce5adf2d"
+            },
+            "status": {
+                "committedAt": "2026-10-20T18:09:04.198657Z",
+                "phase": "StartCommitted"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}
