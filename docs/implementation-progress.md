@@ -2,6 +2,32 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
+The [frozen run `context-thfmy2s8`](../test/results/resumed-c62e02ac-native42/result.json)
+on `4110072f` progressed beyond the previous target-query failures. The preview
+and exact-Pod request queries completed in 840 ms and 1.1 seconds. The request
+reached SQL admission and capture-intent handling; two acknowledged original-key
+resolutions retained the same accepted capture identity and permitted
+continuation. The first dispatch failed its final local-route check with less
+than 0.5 seconds left on the original start bound. A later continuation failed
+`execute/PrepareStart` with at least two seconds left. The third resolution
+exhausted the unchanged two-record audit reservation. Acquisition, publication,
+native download, revocation and deletion remain unqualified.
+
+The test failed after 1,287.109 seconds; test and harness both exited 1.
+All 2,740 source hashes match the commit, sources stayed unchanged, cleanup
+reported no failures, build scratch was removed and owned resources were absent.
+The regional refresh lane produced six distinct observations and 31 usable
+samples in 15 seconds. [CI on the same source](https://github.com/phihos/asservat/actions/runs/39426520951)
+passed all checks, including all ten Go shards and console browser checks.
+
+Read-only review also found that the compiled `context-verify` and
+`context-publish` roles omit five retention-table reads required inside their
+effect transactions. Existing fixture roles grant those reads separately,
+masking this installed-role defect. The run did not reach publication.
+A regression using the exact compiled roles and the new `PrepareStart`
+failure investigation are the next work; no grants or deadlines have been
+changed on the basis of this finding alone.
+
 The subsequent storage-wait regression reproduced blocked independent facts
 reads and a duplicate request wait: Request performed two readiness reads
 before its authoritative storage read. A single cancellable wait now overlaps
