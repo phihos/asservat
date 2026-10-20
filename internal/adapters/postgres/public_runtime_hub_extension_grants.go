@@ -48,6 +48,8 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "context_execution", "object_uid", "UPDATE"},
 		{"table", "context_execution", "process_json", "INSERT"},
 		{"table", "context_execution", "root_id", "INSERT"},
+		// SQL39: the positive writer protocol every new execution records.
+		{"table", "context_execution", "writer_protocol", "INSERT"},
 		{"table", "custody_allocation", "", "SELECT"},
 		{"table", "custody_allocation", "id", "UPDATE"},
 		{"table", "custody_attempt", "", "SELECT"},
