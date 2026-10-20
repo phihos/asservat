@@ -1,0 +1,23 @@
+{
+  "runId": "context-sagzb681",
+  "clusters": [
+    "asservat-context-sagzb681-0",
+    "asservat-context-sagzb681-1"
+  ],
+  "containers": [
+    "asservat-context-sagzb681-s3",
+    "asservat-context-sagzb681-kms",
+    "asservat-context-sagzb681-postgres",
+    "asservat-context-sagzb681-tls",
+    "asservat-context-sagzb681-keycloak",
+    "asservat-context-sagzb681-0-seed"
+  ],
+  "volumes": [
+    "asservat-context-sagzb681-0-var"
+  ],
+  "image": "asservat-context-worker:context-sagzb681",
+  "networks": [
+    "asservat-context-sagzb681",
+    "asservat-context-sagzb681-kind"
+  ]
+}

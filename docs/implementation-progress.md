@@ -2,7 +2,62 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
-The [latest frozen installed run `context-siix2l2z`](../test/results/resumed-c62e02ac-native48/result.json)
+The [latest frozen installed run `context-sagzb681`](../test/results/resumed-c62e02ac-native49/result.json)
+on `62bfc0bb` reaches installed acquisition, independent publication and fresh
+authorized public capture/case retrieval. Bootstrap, exact regional join replay,
+console processing initialization and capacity readiness pass; the demand lane
+supplies six distinct observations and 26 usable samples over 15 seconds.
+Test and harness still exit 1 after 1,211.891 seconds. All 2,762 source hashes
+match and stayed unchanged. Cleanup exits 0, all twelve owned Docker resources
+are independently absent, and build scratch and private postmortem kubeconfigs
+are removed.
+
+The first review is acknowledged closed before a second review admits one
+capture. Its accepted identity survives an unknown continuation reply: fresh
+`get_capture` reads recover progress without another resolution record.
+Preparation retains 1.858338 seconds, and start, acquisition and stored completion
+precede its original cutoff. Verification, audit acknowledgement and publication
+complete independently; a fresh `get_case` succeeds and returns the one artifact.
+The [operation audit](../test/results/resumed-c62e02ac-native49/postmortem-requests.log)
+records three successful capture reads and one successful case read. These
+ordinary reads do not renew acquisition or infer success from `OutcomeUnknown`.
+
+The next failure is in the deletion fixture's setup, before download or fault
+injection. Its original writer, four current/versioned objects and retained
+allocation checks pass, but strict bucket-policy equality rejects the provider's
+JSON representation. The
+[read-only policy response](../test/results/resumed-c62e02ac-native49/postmortem-bucket-policy.json)
+returns `DenyEvidenceWrite.Action` as `"s3:PutObject"`; the fixture builder emits
+the one-element array `["s3:PutObject"]`. All other policy fields match.
+The correction emits the provider's scalar form and adds strict PUT/GET
+read-back qualification; generic equality, permission scope and fault restoration
+remain unchanged. There are zero download sessions. Native download, revocation,
+expiry, failed-cleanup recovery and deletion charge release remain unqualified
+in the installed journey.
+
+The [bucket-policy regression](../test/results/resumed-c62e02ac-bucket-policy/result.json)
+uses the exact provider response retained above. It fails with the original
+builder (exit 1, 0.015 seconds), then passes the focused race selection after
+the one-action scalar correction (exit 0, 1.068 seconds). The combined in-process
+integration race suite also passes (exit 0, 6.262 seconds), covering both fixture
+corrections. All 2,582 recorded Go/module hashes stay unchanged during each
+phase. Strict scalar/array distinction, scope and uncertain restoration controls
+remain passing. Independent review found no blockers. The real object-store
+round trip and installed rerun are next.
+
+Read-only review also found that the fixture ends its terminal wait too early
+when `Succeeded` omits its independently authorized case link. The service
+intentionally permits that response when current navigation is unavailable.
+The [separate regression](../test/results/resumed-c62e02ac-case-link/README.md)
+fails on the original immediate refusal (exit 1, 0.016 seconds), then passes
+the focused race suite with the correction (exit 0, 1.063 seconds). Capture and
+case waits share one original five-minute deadline. Exact identity, cancellation,
+fresh decoding and independent case authorization remain required. Independent
+review found no blockers; source hashes stayed unchanged during the passing
+selection. Native49 did receive an authorized link, so it does not reproduce
+that separate fixture defect. Installed qualification of the correction is next.
+
+The [preceding frozen installed run `context-siix2l2z`](../test/results/resumed-c62e02ac-native48/result.json)
 on `d6dabdab` passed bootstrap, exact regional join replay, capacity readiness
 and console processing initialization. Capacity supplied six distinct
 observations and 25 usable samples over 15 seconds. The first reviewed request
@@ -59,9 +114,9 @@ only from `Pending`, within the unchanged four-call bound. `Running`,
 checks; this recovery helper does not declare success. Failed progress reads,
 replacement identities, uncertain spent preparation and cancellation stop it.
 Independent review found no blockers. The source hashes stayed unchanged
-during the full suite. Installed qualification of this correction is next;
-terminal success, authorized case, native bytes, revocation, expiry and
-independent deletion checks remain required.
+during the full suite. Native49 subsequently qualifies this correction through
+terminal success and an authorized case read, as recorded above. Native bytes,
+revocation, expiry and independent deletion checks remain required.
 
 The preceding [frozen installed run `context-4b2d6czv`](../test/results/resumed-c62e02ac-native47/result.json)
 on `f7d3fe14` passed bootstrap, exact regional join replay, capacity readiness

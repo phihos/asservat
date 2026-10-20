@@ -13,8 +13,9 @@ requires one second remaining before the first preparation insert and preserves
 expired prepared rows as passive no-create uncertainty. No authority interval,
 key attempt or acquisition is renewed. Real PostgreSQL/S3 boundary checks pass.
 Native48 observed a headroom refusal followed by a later first preparation and
-acquisition before its original deadline; public result recovery and the complete
-installed lifecycle remain unqualified.
+acquisition before its original deadline. Native49 also recovered the accepted
+capture through fresh authorized capture/case reads; native download and the
+complete installed lifecycle remain unqualified.
 
 [ADR-211 — Return a completed target query to its original standby interval](211-completed-query-standby-transition.md)
 separates a completed pre-work query's socket deadlines from the unchanged
@@ -34,14 +35,16 @@ was withdrawn: the installed per-cluster standby limit is one, so a second
 regional exchange per owner was refused; the change was reverted.
 
 [ADR-208 — Opening limiter for context-start Kubernetes clients](208-context-opening-client-burst.md)
-gives only the dedicated opening clients and the hub's audit credential reader
-50 QPS/burst 100 (from 20/20); checks and deadlines are unchanged and installed
-qualification is pending.
+gives the explicitly selected opening, audit, retention, capacity and lifecycle
+clients 50 QPS/burst 100 (from 20/20); checks and deadlines are unchanged.
+Native48/49 reached installed acquisition and publication; sustained availability
+and the complete installed lifecycle remain unqualified.
 
 [ADR-207 — One native proof bracket for context-start setup](207-context-setup-proof-bracket.md)
-records the original-bound setup composition under implementation. It preserves
-closing native checks and both owner authentications; native qualification is
-pending.
+implements setup composition within the original bounds, preserving closing
+native checks and both owner authentications. Native48/49 exercised it through
+installed acquisition and publication; successful opening latency, sustained
+availability and the complete installed lifecycle remain unqualified.
 
 [ADR-206 — Bounded approved pod-status projection reads](206-bounded-context-projection.md)
 defines the accepted implementation contract for ordinary browser/MCP reads of
@@ -66,9 +69,10 @@ download and its installed lifecycle remain unqualified.
 deploys the publication verifier from `installer-continue`: its own OpenBao Kubernetes login for a
 private audit Transit key and a verifier PKI role, an in-process verifier certificate, operator
 evidence-read and audit credentials, and topology pins read from the guarded cluster catalog.
-Scoped SQL/S3 checks pass. Native48 also records installed verification,
-audit acknowledgement and catalog publication; fresh public retrieval and the
-subsequent installed lifecycle were not reached.
+Scoped SQL/S3 checks pass. Native48/49 record installed verification,
+audit acknowledgement and catalog publication. Native49 also recovered the
+accepted capture and completed fresh authorized capture/case reads; native
+download and the subsequent installed lifecycle remain unqualified.
 
 [ADR-202 — Public API exposure](202-public-api-exposure.md)
 lets the operator expose the promoted hub-api's public port on its own NodePort or LoadBalancer Service,

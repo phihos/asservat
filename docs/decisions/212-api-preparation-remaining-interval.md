@@ -1,6 +1,6 @@
 # ADR-212 — Remaining interval before one-use API preparation
 
-Date: 2026-10-20. Status: accepted; implemented; SQL boundary checks pass; installed headroom refusal and later acquisition observed.
+Date: 2026-10-20. Status: accepted; implemented; SQL boundary checks pass; installed headroom refusal, later acquisition and accepted-result recovery observed.
 Qualification is recorded in [implementation progress](../implementation-progress.md).
 Requirements: REQ-EXE-002, REQ-DB-003–004; S-02.
 
@@ -20,9 +20,19 @@ seconds remaining. The preparation floor uses the earlier checked interval and
 caller deadline, so the parent bucket alone does not establish usable headroom.
 The last public outcome remained `OutcomeUnknown`, recorded 3.308 ms after the
 stored `NotAfter`. That timing does not identify the exact response-limiting
-transport cutoff. The installed test failed before fresh status/case retrieval
-and download; the complete lifecycle remains unqualified. Native47's earlier
-zero-execution-row failure did not reach this preparation floor.
+transport cutoff. Native48 failed before fresh status/case retrieval and
+download. Native47's earlier zero-execution-row failure did not reach this
+preparation floor.
+
+[Resumed native49](../../test/results/resumed-c62e02ac-native49/result.json)
+again completed start, acquisition and storage before the original preparation
+deadline, followed by installed publication. It recovered the accepted capture
+through fresh authorized `get_capture` and `get_case` reads despite
+`OutcomeUnknown` capture replies. The fixture failed at its bucket-policy
+comparison before deletion fault injection or native download; no download
+session was created. This extends the observed installed path without renewing
+the preparation or its original interval. It does not establish sustained
+availability or complete lifecycle qualification.
 
 Native45 inserted the first API execution preparation with 433.731 ms remaining
 before its original deadline. The local start object reached `Ready`, but no

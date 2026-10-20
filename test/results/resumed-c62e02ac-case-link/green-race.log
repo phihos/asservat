@@ -1,0 +1,34 @@
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/immediate-link
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/published-before-current-link
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-link-stays-pending
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/progress-before-current-link
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/wrong-capture
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-capture
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/partial-is-failure
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/failed-is-failure
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/cancelled-is-failure
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/indeterminate-is-failure
+--- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/immediate-link (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/published-before-current-link (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-link-stays-pending (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/progress-before-current-link (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/wrong-capture (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-capture (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/partial-is-failure (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/failed-is-failure (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/cancelled-is-failure (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/indeterminate-is-failure (0.00s)
+=== RUN   TestInstalledJourneyCaseLinkRequiresFreshDecode
+--- PASS: TestInstalledJourneyCaseLinkRequiresFreshDecode (0.00s)
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation/expired
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled-after-read
+--- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation (0.00s)
+    --- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled (0.00s)
+    --- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation/expired (0.00s)
+    --- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled-after-read (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.063s

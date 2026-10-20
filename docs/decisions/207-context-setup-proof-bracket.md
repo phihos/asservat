@@ -1,9 +1,20 @@
 # ADR-207 — One native proof bracket for context-start setup
 
 Date: 2026-10-18. Status: registration source handoff and private setup operation
-implemented with component and selected native tests; installed qualification
-remains pending.
+implemented with component and selected native tests; installed openings reached
+acquisition and publication. Sustained availability remains unqualified.
 Requirements: REQ-EXE-002, REQ-FED-001/003, S-02; TASK-03 / TASK-11.
+
+Current qualification (2026-10-20):
+[resumed native48](../../test/results/resumed-c62e02ac-native48/result.json)
+and [native49](../../test/results/resumed-c62e02ac-native49/result.json) exercised
+the compiled setup composition through regional acquisition, storage and
+installed publication. Native49 also recovered the accepted capture and completed
+fresh authorized `get_capture` and `get_case` reads. This establishes completed
+installed openings in those runs, not a measured successful opening latency,
+sustained availability or a causal attribution to this change. Native49 still
+exited 1 at a deletion-fixture policy comparison before fault injection or native
+download; the complete installed lifecycle remains unqualified.
 
 ## Context
 
@@ -74,8 +85,8 @@ within one original observation interval; no instantaneous revocation is claimed
 The combined-reader regression has failing-before limiter evidence and passing
 component races, including exact credential ownership, copy isolation, original
 cutoffs, cancellation and expiry. The setup operation and whole-opening
-component tests now exist; selected native setup passes as recorded below, while
-an installed rerun remains pending.
+component tests and selected native setup passed as recorded below. These
+historical checkpoints preceded the installed results above.
 The registration dispatch regression fails on unchanged dispatch. Its corrected
 selection passes nine top-level / 19 named race tests, including real
 TLS1.3/HTTP2/exporter-bound presentation with synthetic registry/source authority.
@@ -122,7 +133,8 @@ checks 0.699 seconds, and actual work admission/start 2.572 seconds within its
 original five seconds. Changed-input refusal occurred before original expiry.
 All 2,695 source hashes matched, source stayed unchanged and cleanup had no
 failures. This one-input fixture retains synthetic connector source, issuer and
-registry facts; full installed source and owner composition remain unqualified.
+registry facts; that fixture did not qualify full installed source and owner
+composition.
 Both runs are retained in
 [implementation progress](../implementation-progress.md).
 
@@ -146,7 +158,9 @@ native Finish, closing owner/local checks and joined close are distinct. The
 reported stage locates the refusal; it is not proof of a particular remote wire
 error. Existing error chains and all authority reads/checks remain unchanged.
 Timing values are formatted outside the finite event counter key and do not
-drive any authority decision. The final installed diagnostic run is pending.
+drive any authority decision. Subsequent installed results are recorded above;
+they do not establish successful opening latency or isolate the cause of the
+earlier refusal.
 
 A smaller complete-opening native reproducer would need the actual protected
 `ConnectorIdentitySource`, the exporter-bound `RegionalLifecycle` conversation

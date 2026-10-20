@@ -1,0 +1,86 @@
+[
+  {
+    "kind": "container",
+    "name": "asservat-context-sagzb681-s3",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-sagzb681-s3\n"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-sagzb681-kms",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-sagzb681-kms\n"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-sagzb681-postgres",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-sagzb681-postgres\n"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-sagzb681-tls",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-sagzb681-tls\n"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-sagzb681-keycloak",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-sagzb681-keycloak\n"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-sagzb681-0-seed",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-sagzb681-0-seed\n"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-sagzb681-0-control-plane",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-sagzb681-0-control-plane\n"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-sagzb681-1-control-plane",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-sagzb681-1-control-plane\n"
+  },
+  {
+    "kind": "volume",
+    "name": "asservat-context-sagzb681-0-var",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: get asservat-context-sagzb681-0-var: no such volume\n"
+  },
+  {
+    "kind": "image",
+    "name": "asservat-context-worker:context-sagzb681",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such image: asservat-context-worker:context-sagzb681\n"
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-sagzb681",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: network asservat-context-sagzb681 not found\n"
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-sagzb681-kind",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: network asservat-context-sagzb681-kind not found\n"
+  }
+]

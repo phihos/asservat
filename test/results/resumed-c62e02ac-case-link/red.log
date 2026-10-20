@@ -1,0 +1,39 @@
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/immediate-link
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/published-before-current-link
+    installed_journey_unit_test.go:567: ready=false err=installed capture succeeded without an authorized case link reads=1; want ready=true error=false reads=2
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-link-stays-pending
+    installed_journey_unit_test.go:567: ready=false err=installed capture succeeded without an authorized case link reads=1; want ready=false error=false reads=2
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/progress-before-current-link
+    installed_journey_unit_test.go:567: ready=false err=installed capture succeeded without an authorized case link reads=4; want ready=true error=false reads=5
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/wrong-capture
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-capture
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/partial-is-failure
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/failed-is-failure
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/cancelled-is-failure
+=== RUN   TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/indeterminate-is-failure
+--- FAIL: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/immediate-link (0.00s)
+    --- FAIL: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/published-before-current-link (0.00s)
+    --- FAIL: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-link-stays-pending (0.00s)
+    --- FAIL: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/progress-before-current-link (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/wrong-capture (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/missing-capture (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/partial-is-failure (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/failed-is-failure (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/cancelled-is-failure (0.00s)
+    --- PASS: TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink/indeterminate-is-failure (0.00s)
+=== RUN   TestInstalledJourneyCaseLinkRequiresFreshDecode
+    installed_journey_unit_test.go:583: omitted current navigation reused an earlier DTO or ended the wait false installed capture succeeded without an authorized case link {original Succeeded }
+--- FAIL: TestInstalledJourneyCaseLinkRequiresFreshDecode (0.00s)
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation/expired
+=== RUN   TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled-after-read
+--- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation (0.00s)
+    --- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled (0.00s)
+    --- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation/expired (0.00s)
+    --- PASS: TestInstalledJourneyCaseLinkHonorsOriginalCancellation/cancelled-after-read (0.00s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.016s
+FAIL

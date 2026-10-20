@@ -1,0 +1,34 @@
+{
+  "baseCommit": "62bfc0bbab4d7a5be1c79495039ecbe894cb8d4d",
+  "uncommittedOverlay": true,
+  "checks": {
+    "contracts": {
+      "command": [
+        "make",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "spec-check",
+        "architecture-check",
+        "go-architecture-check",
+        "design-check"
+      ],
+      "exit": 0,
+      "elapsedSeconds": 10.738660138042178
+    },
+    "fixture-vet": {
+      "command": [
+        "go",
+        "vet",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "elapsedSeconds": 1.4889526009792462
+    }
+  },
+  "sourceFileCount": 2582,
+  "sourceUnchanged": true,
+  "terminal": {
+    "session": 72563,
+    "chunk": "ca16e3",
+    "actualExit": 0
+  }
+}

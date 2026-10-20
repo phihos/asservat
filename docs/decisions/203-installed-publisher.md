@@ -21,11 +21,20 @@ records publication at `2026-10-20T18:09:06.234647Z`. The generic custody row
 remains `stored_unpublished`; the separate verification, audit and catalog
 records establish publication.
 
-The overall installed test still exited 1. Its public capture response remained
+Native48's overall installed test exited 1. Its public capture response remained
 `OutcomeUnknown`, and an exhausted admission-resolution reservation stopped the
-fixture before fresh capture/case reads or download. This establishes the
-installed publisher boundary, not the complete S-02 workflow; public retrieval,
-download, revocation, expiry and deletion remain unqualified.
+fixture before fresh capture/case reads or download.
+
+[Resumed native49](../../test/results/resumed-c62e02ac-native49/result.json)
+again reached installed verification, audit acknowledgement and catalog
+publication, then recovered the accepted capture and completed fresh authorized
+`get_capture` and `get_case` reads with one published artifact. Its outward
+capture replies remained `OutcomeUnknown`; the fresh reads independently
+established the result. The overall test still exited 1 at the deletion fixture's
+strict bucket-policy comparison: the provider returned a singleton `Action` as a
+scalar rather than an array. No deletion fault was applied and no download
+session was created. Native download, revocation, expiry, deletion and the
+complete S-02 workflow remain unqualified.
 
 ## Context
 

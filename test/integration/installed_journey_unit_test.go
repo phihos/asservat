@@ -526,3 +526,94 @@ func TestInstalledJourneyChecksCompleteWireFailureAndNeverRetainsMetadata(t *tes
 		t.Fatal("terminal response retained previous native metadata")
 	}
 }
+
+// Succeeded is durable capture status; its optional case link is independently
+// authorized. The fixture must wait for that link without another effect.
+func TestInstalledJourneyPublishedCaptureWaitsForCurrentCaseLink(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		progress  []string
+		wantReads int
+		wantReady bool
+		wantErr   bool
+	}{
+		{name: "immediate-link", progress: []string{`{"capture_id":"original","phase":"Succeeded","case_id":"case"}`}, wantReads: 1, wantReady: true},
+		{name: "published-before-current-link", progress: []string{`{"capture_id":"original","phase":"Succeeded"}`, `{"capture_id":"original","phase":"Succeeded","case_id":"case"}`}, wantReads: 2, wantReady: true},
+		{name: "missing-link-stays-pending", progress: []string{`{"capture_id":"original","phase":"Succeeded"}`, `{"capture_id":"original","phase":"Succeeded"}`}, wantReads: 2},
+		{name: "progress-before-current-link", progress: []string{`{"capture_id":"original","phase":"Pending"}`, `{"capture_id":"original","phase":"Running"}`, `{"capture_id":"original","phase":"Finalizing"}`, `{"capture_id":"original","phase":"Succeeded"}`, `{"capture_id":"original","phase":"Succeeded","case_id":"case"}`}, wantReads: 5, wantReady: true},
+		{name: "wrong-capture", progress: []string{`{"capture_id":"replacement","phase":"Succeeded","case_id":"case"}`}, wantReads: 1, wantErr: true},
+		{name: "missing-capture", progress: []string{`{"phase":"Succeeded","case_id":"case"}`}, wantReads: 1, wantErr: true},
+		{name: "partial-is-failure", progress: []string{`{"capture_id":"original","phase":"Partial","case_id":"case"}`}, wantReads: 1, wantErr: true},
+		{name: "failed-is-failure", progress: []string{`{"capture_id":"original","phase":"Failed","case_id":"case"}`}, wantReads: 1, wantErr: true},
+		{name: "cancelled-is-failure", progress: []string{`{"capture_id":"original","phase":"Cancelled","case_id":"case"}`}, wantReads: 1, wantErr: true},
+		{name: "indeterminate-is-failure", progress: []string{`{"capture_id":"original","phase":"Indeterminate","case_id":"case"}`}, wantReads: 1, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var progress installedJourneyCaptureProgress
+			var ready bool
+			var err error
+			reads := 0
+			for _, raw := range tc.progress {
+				reads++
+				if err = installedJourneyDecode([]byte(raw), &progress); err != nil {
+					t.Fatal(err)
+				}
+				ready, err = installedJourneyCaptureCaseReady(t.Context(), "original", progress)
+				if ready || err != nil {
+					break
+				}
+			}
+			if ready != tc.wantReady || (err != nil) != tc.wantErr || reads != tc.wantReads {
+				t.Fatalf("ready=%t err=%v reads=%d; want ready=%t error=%t reads=%d", ready, err, reads, tc.wantReady, tc.wantErr, tc.wantReads)
+			}
+			if ready && progress.CaseID != "case" {
+				t.Fatal("the selected case was not the current authorized link")
+			}
+		})
+	}
+}
+
+func TestInstalledJourneyCaseLinkRequiresFreshDecode(t *testing.T) {
+	progress := installedJourneyCaptureProgress{CaptureID: "original", Phase: "Succeeded", CaseID: "previously-disclosed"}
+	if err := installedJourneyDecode([]byte(`{"capture_id":"original","phase":"Succeeded"}`), &progress); err != nil {
+		t.Fatal(err)
+	}
+	ready, err := installedJourneyCaptureCaseReady(t.Context(), "original", progress)
+	if err != nil || ready || progress.CaseID != "" {
+		t.Fatal("omitted current navigation reused an earlier DTO or ended the wait", ready, err, progress)
+	}
+}
+
+func TestInstalledJourneyCaseLinkHonorsOriginalCancellation(t *testing.T) {
+	for _, name := range []string{"cancelled", "expired", "cancelled-after-read"} {
+		t.Run(name, func(t *testing.T) {
+			until := time.Now().Add(time.Minute)
+			if name == "expired" {
+				until = time.Now().Add(-time.Second)
+			}
+			ctx, cancel := context.WithDeadline(t.Context(), until)
+			defer cancel()
+			originalUntil, hasDeadline := ctx.Deadline()
+			if !hasDeadline {
+				t.Fatal("missing original passive deadline")
+			}
+			if name == "cancelled" {
+				cancel()
+			}
+			var progress installedJourneyCaptureProgress
+			if err := installedJourneyDecode([]byte(`{"capture_id":"original","phase":"Succeeded","case_id":"case"}`), &progress); err != nil {
+				t.Fatal(err)
+			}
+			if name == "cancelled-after-read" {
+				cancel()
+			}
+			ready, err := installedJourneyCaptureCaseReady(ctx, "original", progress)
+			if ready || !errors.Is(err, ctx.Err()) || err == nil {
+				t.Fatal("a cancelled original read selected a case", ready, err)
+			}
+			if got, ok := ctx.Deadline(); !ok || !got.Equal(originalUntil) {
+				t.Fatal("the original passive deadline changed")
+			}
+		})
+	}
+}

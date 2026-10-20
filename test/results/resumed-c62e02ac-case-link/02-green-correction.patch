@@ -1,0 +1,42 @@
+diff --git a/test/integration/installed_journey_native_test.go b/test/integration/installed_journey_native_test.go
+--- a/test/integration/installed_journey_native_test.go
++++ b/test/integration/installed_journey_native_test.go
+@@ -245,8 +245,9 @@
+ 		}
+ 		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture as the Keycloak user")
+ 		// The regional executor collects; the publisher verifies and publishes
+-		// (ADR-203). Poll the capture until it is terminal, then its case until
+-		// the published artifact is listed, within bounded time.
++		// (ADR-203). A successful capture may omit its independently authorized
++		// case link. Keep both passive waits inside one original phase deadline.
++		publicationUntil := time.Now().Add(5 * time.Minute)
+ 		var progress installedJourneyCaptureProgress
+ 		wait := func(what string, until time.Time, done func(context.Context) bool) {
+ 			t.Helper()
+@@ -276,7 +277,7 @@
+ 			}
+ 			return true
+ 		}
+-		wait("a terminal capture", time.Now().Add(5*time.Minute), func(poll context.Context) bool {
++		wait("a successful capture with a current case link", publicationUntil, func(poll context.Context) bool {
+ 			if !observe(poll, "get_capture", map[string]string{"capture_id": accepted.CaptureID}, &progress) {
+ 				return false
+ 			}
+@@ -297,7 +298,7 @@
+ 				ExpiresAt  time.Time `json:"expires_at"`
+ 			} `json:"artifacts"`
+ 		}
+-		wait("the published artifact", time.Now().Add(5*time.Minute), func(poll context.Context) bool {
++		wait("the published artifact", publicationUntil, func(poll context.Context) bool {
+ 			return observe(poll, "get_case", map[string]string{"case_id": progress.CaseID}, &investigation) && len(investigation.Artifacts) > 0
+ 		})
+ 		if len(investigation.Artifacts) != 1 {
+@@ -475,7 +476,7 @@
+ 	switch progress.Phase {
+ 	case "Succeeded":
+ 		if progress.CaseID == "" {
+-			return false, errors.New("installed capture succeeded without an authorized case link")
++			return false, nil
+ 		}
+ 		return true, nil
+ 	case "Partial", "Failed", "Cancelled", "Indeterminate":

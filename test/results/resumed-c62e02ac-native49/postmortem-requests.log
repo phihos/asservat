@@ -1,0 +1,29 @@
+BEGIN
+SET
+                  id                  |          created_at           |           deadline            |           closed_at           
+--------------------------------------+-------------------------------+-------------------------------+-------------------------------
+ 26938d68-4bb3-4207-ac45-31899a5ba37d | 2026-10-20 18:45:15.229579+00 | 2026-10-20 18:47:15.229579+00 | 2026-10-20 18:45:21.437959+00
+ c6687a79-7e8b-4edc-97de-889e653b0d3f | 2026-10-20 18:45:24.077986+00 | 2026-10-20 18:47:24.077986+00 | 
+(2 rows)
+
+                  id                  |        operation_name        |   status    |        reason         |  effect  |         recorded_at         |       metadata_until        
+--------------------------------------+------------------------------+-------------+-----------------------+----------+-----------------------------+-----------------------------
+ 577bd496-92eb-47c4-900c-b6c5e3561fb2 | connector_process_enrollment | success     | prepared              | accepted | 2026-10-20T18:40:43.274095Z | 2026-10-20T18:40:47.350582Z
+ 7f0b0a49-068a-49ed-a143-16fad254a573 | connector_client_certificate | success     | prepared              | accepted | 2026-10-20T18:40:44.070593Z | 2026-10-20T18:40:48.364495Z
+ ecd91c34-417e-41f7-9757-64eb90eed23e | connector_server_certificate | success     | prepared              | accepted | 2026-10-20T18:40:45.708169Z | 2026-10-20T18:40:50.033386Z
+ 4c87dc87-5a00-4253-b3a8-09beb91a9173 | initialize_processing        | success     | prepared              | unknown  | 2026-10-20T18:45:14.514389Z | 2026-10-20T18:45:19.089738Z
+ ce3a1d4e-cb29-4273-8107-d74b7aa51a45 | preview_capture              | success     | prepared              | none     | 2026-10-20T18:45:19.208696Z | 2026-10-20T18:45:19.988983Z
+ b4a68dd4-0a2d-4ead-b269-be278e72f559 | request_capture              | unavailable | authority_unavailable | unknown  | 2026-10-20T18:45:21.141925Z | 2026-10-20T18:45:24.306559Z
+ 284b444e-ca20-4297-8773-88984af8d6aa | resolve_capture_request      | success     | prepared              | none     | 2026-10-20T18:45:21.640429Z | 2026-10-20T18:45:26.188368Z
+ f52a3060-179a-4ac6-87d7-5c6ab732c857 | preview_capture              | success     | prepared              | none     | 2026-10-20T18:45:25.020303Z | 2026-10-20T18:45:26.84832Z
+ 606799e6-c5b7-47d0-82d9-a6c99c9b9b20 | request_capture              | unavailable | authority_unavailable | unknown  | 2026-10-20T18:45:28.876651Z | 2026-10-20T18:45:30.119219Z
+ 06617376-02e8-41fe-9c96-4f5a794cab79 | persist_capture_intent       | success     | prepared              | accepted | 2026-10-20T18:45:28.025094Z | 2026-10-20T18:45:28.87454Z
+ 2edcb5fc-17fa-4648-9128-1a7fca71d68a | resolve_capture_request      | success     | prepared              | accepted | 2026-10-20T18:45:29.376088Z | 2026-10-20T18:45:33.312729Z
+ e1513b7b-13cd-45f0-8d31-f1003ccd44dc | get_capture                  | success     | prepared              | none     | 2026-10-20T18:45:31.018653Z | 2026-10-20T18:45:35.151129Z
+ 1f8bbbe2-7b21-4f5d-b6fd-b5a4f52a3e7e | request_capture              | unavailable | authority_unavailable | unknown  | 2026-10-20T18:45:38.315313Z | 2026-10-20T18:45:38.831114Z
+ ba4dc1ef-7532-4c9c-92b6-952a1dbdaa9f | get_capture                  | success     | prepared              | none     | 2026-10-20T18:45:38.814718Z | 2026-10-20T18:45:43.312562Z
+ 3c14c2fe-77b4-44a3-be64-0cd4a8a1e853 | get_capture                  | success     | prepared              | none     | 2026-10-20T18:45:40.709162Z | 2026-10-20T18:45:43.557425Z
+ 9f17f434-cb7f-409c-9e1d-94960b885bc8 | get_case                     | success     | prepared              | none     | 2026-10-20T18:45:42.114476Z | 2026-10-20T18:45:44.571442Z
+(16 rows)
+
+COMMIT

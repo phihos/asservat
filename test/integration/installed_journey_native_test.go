@@ -245,10 +245,10 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 		}
 		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture as the Keycloak user")
 		// The regional executor collects; the publisher verifies and publishes
-		// (ADR-203). Poll the capture until it is terminal, then its case until
-		// the published artifact is listed, within bounded time.
+		// (ADR-203). A successful capture may omit its independently authorized
+		// case link. Keep both passive waits inside one original phase deadline.
+		publicationUntil := time.Now().Add(5 * time.Minute)
 		var progress installedJourneyCaptureProgress
-		terminal := map[string]bool{"Succeeded": true, "Partial": true, "Failed": true, "Cancelled": true, "Indeterminate": true}
 		wait := func(what string, until time.Time, done func(context.Context) bool) {
 			t.Helper()
 			bounded, stop := context.WithDeadline(ctx, until)
@@ -277,14 +277,16 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			}
 			return true
 		}
-		wait("a terminal capture", time.Now().Add(5*time.Minute), func(poll context.Context) bool {
+		wait("a successful capture with a current case link", publicationUntil, func(poll context.Context) bool {
 			if !observe(poll, "get_capture", map[string]string{"capture_id": accepted.CaptureID}, &progress) {
 				return false
 			}
-			if progress.CaptureID != accepted.CaptureID {
-				t.Fatal("installed progress changed the original capture identity")
+			ready, err := installedJourneyCaptureCaseReady(poll, accepted.CaptureID, progress)
+			if err != nil {
+				diagnose()
+				t.Fatal("installed capture was not collected", err)
 			}
-			return terminal[progress.Phase]
+			return ready
 		})
 		if progress.Phase != "Succeeded" || progress.CaseID == "" {
 			diagnose()
@@ -296,7 +298,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 				ExpiresAt  time.Time `json:"expires_at"`
 			} `json:"artifacts"`
 		}
-		wait("the published artifact", time.Now().Add(5*time.Minute), func(poll context.Context) bool {
+		wait("the published artifact", publicationUntil, func(poll context.Context) bool {
 			return observe(poll, "get_case", map[string]string{"case_id": progress.CaseID}, &investigation) && len(investigation.Artifacts) > 0
 		})
 		if len(investigation.Artifacts) != 1 {
@@ -459,6 +461,29 @@ type installedJourneyCaptureProgress struct {
 	CaptureID string `json:"capture_id"`
 	Phase     string `json:"phase"`
 	CaseID    string `json:"case_id"`
+}
+
+// A terminal failure ends the passive wait. Successful collection must also
+// supply a currently authorized navigation link before the case is selected;
+// the subsequent get_case still performs its own fresh authorization.
+func installedJourneyCaptureCaseReady(ctx context.Context, captureID string, progress installedJourneyCaptureProgress) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	if captureID == "" || progress.CaptureID != captureID {
+		return false, errors.New("installed progress changed the original capture identity")
+	}
+	switch progress.Phase {
+	case "Succeeded":
+		if progress.CaseID == "" {
+			return false, nil
+		}
+		return true, nil
+	case "Partial", "Failed", "Cancelled", "Indeterminate":
+		return false, fmt.Errorf("installed capture was not collected: %s", progress.Phase)
+	default:
+		return false, nil
+	}
 }
 
 // The retained receipt selects the original operation; each public read and
