@@ -1,0 +1,24 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/expired-prepared-is-passive-and-runner-uncertain
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-observation-headroom
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-caller-headroom
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/short-caller-reaches-no-runner-effects
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier/due-pages-pass-persistent-failures-and-wrap
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher/due-pages-pass-persistent-failures-and-wrap
+--- PASS: TestContextAdmissionWithRealServices (12.57s)
+    --- PASS: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries (5.60s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/expired-prepared-is-passive-and-runner-uncertain (2.46s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-observation-headroom (1.30s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-caller-headroom (1.34s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/short-caller-reaches-no-runner-effects (0.50s)
+    --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication (6.59s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier (3.34s)
+            --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier/due-pages-pass-persistent-failures-and-wrap (0.04s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher (3.25s)
+            --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher/due-pages-pass-persistent-failures-and-wrap (0.04s)
+PASS
+ok  	asservat.local/asservat/test/integration	13.645s

@@ -1,0 +1,51 @@
+{
+  "sourceCommit": "899f6433af1fb00f6df83fe57d6d56b81d01e1bd",
+  "harnessExit": 0,
+  "terminalToolSession": 10480,
+  "terminalToolChunk": "1fbd76",
+  "goTestSeconds": 13.645,
+  "scope": "real PostgreSQL/S3, compiled narrow roles, synthetic current authority: all4 preparation-boundary cases and existing verifier/publisher execution/publication lifecycles passed; no installed qualification",
+  "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 GOFLAGS='-buildvcs=false -p=1' python3 scripts/test-custody.py --run '^TestContextAdmissionWithRealServices$/^api-execution'",
+  "sourceHashesVerified": 2727,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "cleanupReadback": [
+    {
+      "resource": "asservat-custody-ctc31knv-postgres",
+      "kind": "container",
+      "exit": 1,
+      "stderr": "Error response from daemon: No such container: asservat-custody-ctc31knv-postgres",
+      "absent": true
+    },
+    {
+      "resource": "asservat-custody-ctc31knv-s3",
+      "kind": "container",
+      "exit": 1,
+      "stderr": "Error response from daemon: No such container: asservat-custody-ctc31knv-s3",
+      "absent": true
+    },
+    {
+      "resource": "asservat-custody-ctc31knv",
+      "kind": "network",
+      "exit": 1,
+      "stderr": "Error response from daemon: network asservat-custody-ctc31knv not found",
+      "absent": true
+    }
+  ],
+  "sha256": {
+    "custody.log": "547df3cb4bad4757f779ca85131eda3d94fe6ca5bb355065a07f9319283b9819",
+    "custody-environment.json": "0d77ceb3771578a55f1640c26d7367b6649db557e6b1c4bb9f05ffec1d3a8aa4",
+    "runner.log": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373",
+    "native46-contract-gates-final.log": "05d25bbef104ca0dd7f62c07c2d0171389a3452721eb4f8c07cb82bc681448dc",
+    "native46-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "subsequentLocalGates": {
+    "specArchitectureGoArchitectureExit": 0,
+    "contractSession": 73504,
+    "contractTerminalChunk": "e8945d",
+    "goVetAllExit": 0,
+    "goVetSession": 37191,
+    "goVetTerminalChunk": "2d47b0",
+    "note": "Same Go sources; documentation now records the completed SQL result."
+  }
+}

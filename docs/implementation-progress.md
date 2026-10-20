@@ -50,7 +50,8 @@ stored interval. Current authority and exact identity/scope checks still run
 before and after that result. The [local race suites](../test/results/resumed-c62e02ac-preparation-local/result.json)
 pass for PostgreSQL (2.454 seconds), execution (1.146 seconds) and the in-process
 integration package (6.488 seconds); independent review found no blockers.
-Real-service green and installed qualification remain pending.
+The final real-service green result is recorded below; installed qualification
+remains pending.
 
 The first [real-service correction run](../test/results/resumed-c62e02ac-api-preparation-classification/result.json)
 on `e19738c8` passed expired-row uncertainty, zero-effect headroom refusal
@@ -62,12 +63,22 @@ source hashes matched and stayed unchanged, and owned teardown was verified.
 The follow-up preserves only that explicit headroom refusal across the adapter
 boundary; it does not change generic SQL error handling or the regression tests.
 The post-lock classification assertions stopped those cases before their fresh
-first-winner and exact-replay checks; that qualification remains pending.
+first-winner and exact-replay checks in that failed run.
 Review also identified cancellation during rollback as a distinct normalized
 deadline cause. A focused failing regression now requires that original cause
 and error chain to survive; only the explicitly recorded headroom/client
 combination becomes execution-unavailable. The full PostgreSQL race suite
 passes in 2.466 seconds with identical before/after source hashes.
+
+The [final real PostgreSQL/S3 run](../test/results/resumed-c62e02ac-api-preparation-green/result.json)
+on `899f6433` passes all four preparation-boundary cases, including a fresh
+first winner and unchanged replay after each post-lock refusal, and both
+compiled verifier/publisher execution and historical-publication lifecycles.
+Go and harness exits are 0 (13.645 seconds); all 2,727 source hashes match the
+commit and stayed unchanged. Cleanup reported no failures, and independent
+read-back confirmed both owned containers and their network absent. This
+qualifies the affected SQL composition with synthetic current authority; it
+does not replace the full installed journey.
 
 The installed fixture also spent a redundant resolution record after a
 successful continuation. A deterministic regression reproduced a third
