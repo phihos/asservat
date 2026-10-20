@@ -797,11 +797,13 @@ func installShippedPermissionCRDs(t *testing.T, ctx context.Context, api kuberne
 }
 
 // nativeCapacityProfile is the operator's synthetic capacity profile; its
-// footprints and sizes mirror the capacity SQL fixture (ADR-190). Each
-// sixty-second root renewal spends one processing root transition and one
-// configuration transition for the installation's lifetime, so both budgets
-// cover the journey plus a local hold (about 150 renewals); 8 and 100
-// expired the processing root about nine minutes after install (local hold 10).
+// footprints and sizes mirror the capacity SQL fixture (ADR-190). Processing
+// coverage (ADR-146) requires a capture's deletion date (retention plus the
+// deletion budget, about 4200 s here) before the processing root's current
+// end, which root renewal sets AdmissionSeconds ahead, so the profile uses the
+// one-day maximum (local hold 12). Each renewal also spends one lifetime
+// processing root transition and one configuration transition; 8 and 100 with
+// 60 s renewals expired the root nine minutes after install (local hold 10).
 func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	f := func(row, wal int64) contracts.InstallerCapacityFootprint {
 		return contracts.InstallerCapacityFootprint{RowBytes: row, TransitionWALBytes: wal}
@@ -809,7 +811,7 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	lane := func(accounts, records int64) contracts.InstallerCapacityLane {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
-	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 3, AdmissionSeconds: 60,
+	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 3, AdmissionSeconds: 86400,
 		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 7), Resolution: lane(4, 2), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
