@@ -82,6 +82,21 @@ func (w APIContextWork) Matches(r APIContextReceiver, now time.Time) bool {
 	return r.Valid(now) && w.Valid(now) && w.Channel == r.Channel
 }
 
+// MismatchStep names the first failed Matches condition, for diagnostics.
+func (w APIContextWork) MismatchStep(r APIContextReceiver, now time.Time) string {
+	switch {
+	case !r.Valid(now):
+		return "receiver"
+	case !w.Valid(now) && !now.Before(w.NotAfter):
+		return "expired"
+	case !w.Valid(now):
+		return "work"
+	case w.Channel != r.Channel:
+		return "channel"
+	}
+	return "none"
+}
+
 type APIContextWorkTrust struct {
 	RootID, InstallationID, ClusterID, IssuerEpoch string
 	Trust                                          WorkTrust

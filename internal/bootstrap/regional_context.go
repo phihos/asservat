@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -240,7 +241,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	}
 	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, eventLog(os.Stderr, "regional target answer")}, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
 	fmt.Fprintln(os.Stderr, "regional context start active")
-	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Verifier: r.verifier, Local: local, Report: eventLog(os.Stderr, "regional context standby refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
+	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Verifier: reportedWorkVerifier{r.verifier, eventLog(os.Stderr, "regional work refused")}, Local: local, Report: eventLog(os.Stderr, "regional context standby refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
 }
 
 // regionalArtifactOutput prepares each attempt's output with a key sealer
@@ -272,3 +273,22 @@ type reportedTargets struct {
 }
 
 func (t reportedTargets) ReportAnswer(steps string) { t.report(steps) }
+
+// reportedWorkVerifier logs a refused work verification's fixed step.
+type reportedWorkVerifier struct {
+	verifier *jose.APIContextWorkSignatures
+	report   func(string)
+}
+
+func (v reportedWorkVerifier) VerifyAPIContextWork(ctx context.Context, encoded []byte, receiver value.APIContextReceiver) (value.AuthenticatedAPIContextWork, error) {
+	out, err := v.verifier.VerifyAPIContextWork(ctx, encoded, receiver)
+	if err != nil {
+		step := "other"
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			step = fixed.FixedStep()
+		}
+		v.report(step)
+	}
+	return out, err
+}
