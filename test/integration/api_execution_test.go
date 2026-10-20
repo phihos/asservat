@@ -31,279 +31,308 @@ import (
 func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario) {
 	t.Helper()
 	t.Run("api-execution-one-preparation-exact-result-historical-publication", func(t *testing.T) {
-		s := create(t, 1)
-		in := s.a.Plan.Input
-		in.CaseID = s.a.CaseID
-		in.Target.ExecutionClass = artifact.ContextAPIExecution
-		in.Capability.ExecutionClass = artifact.ContextAPIExecution
-		in.Target.NodeUID = ""
-		in.Target.NodeBootID = ""
-		in.Target.Pin.NodeName = ""
-		var err error
-		s.a.Plan, err = planning.CompileContext(in, s.a.Plan.CompiledAt)
-		if err != nil {
-			t.Fatal(err)
-		}
-		accepted, err := s.s.AdmitContext(ctx, s.a)
-		if err != nil {
-			t.Fatal(err)
-		}
-		initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, accepted.Expectation)
-		pool := func(user, password string) *pgxpool.Pool { p := poolFor(user, password); t.Cleanup(p.Close); return p }
-		preparePool := pool("api_execution_prepare_runtime", "synthetic-api-execution-prepare")
-		executePool := pool("api_execution_runtime", "synthetic-api-execution")
-		readPool := pool("api_execution_read_runtime", "synthetic-api-execution-read")
-		for _, p := range []*pgxpool.Pool{preparePool, executePool, readPool} {
-			for _, query := range []string{"DELETE FROM context_execution", "UPDATE context_execution SET binding_json=binding_json", "UPDATE context_capture SET expectation_json=expectation_json", "UPDATE fleet_trust SET recovery_blocked=false", "INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0"} {
-				if _, err = p.Exec(ctx, query); err == nil {
-					t.Fatal("execution role acquired unrelated authority", query)
+		// Qualify each compiled publication role independently. Each child gets
+		// a fresh execution and reaches its first publication effects without a
+		// successful fixture-role fallback or a previously recorded verdict.
+		for _, roleCase := range []struct{ name, purpose string }{
+			{"compiled-verifier", "context-verify"},
+			{"compiled-publisher", "context-publish"},
+		} {
+			t.Run(roleCase.name, func(t *testing.T) {
+				s := create(t, 1)
+				in := s.a.Plan.Input
+				in.CaseID = s.a.CaseID
+				in.Target.ExecutionClass = artifact.ContextAPIExecution
+				in.Capability.ExecutionClass = artifact.ContextAPIExecution
+				in.Target.NodeUID = ""
+				in.Target.NodeBootID = ""
+				in.Target.Pin.NodeName = ""
+				var err error
+				s.a.Plan, err = planning.CompileContext(in, s.a.Plan.CompiledAt)
+				if err != nil {
+					t.Fatal(err)
 				}
-			}
-		}
-		if _, err = preparePool.Exec(ctx, "UPDATE context_execution SET phase=phase"); err == nil {
-			t.Fatal("preparation can start")
-		}
-		if _, err = executePool.Exec(ctx, "INSERT INTO context_execution(capture_id) SELECT id FROM context_capture LIMIT 0"); err == nil {
-			t.Fatal("execution can prepare identity")
-		}
-		guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
-		newExecution := func(p *pgxpool.Pool) *postgres.APIContextExecutions {
-			x, e := postgres.NewAPIContextExecutions(ctx, p, s.a.RootID, guards)
-			if e != nil {
-				t.Fatal(e)
-			}
-			return x
-		}
-		prepare, execute, read := newExecution(preparePool), newExecution(executePool), newExecution(readPool)
-		intents, err := postgres.NewCaptureIntentAudits(ctx, pool("capture_audit_runtime", "synthetic-capture-audit"), s.a.RootID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
-			t.Fatal(err)
-		}
-		// ADR-176: the executor Pod is also the connector process whose client
-		// leaf wraps this attempt's keysets.
-		executorPod := custodyID()
-		refresh := func() executionapp.APIExecutionCheck {
-			n := time.Now().UTC().Truncate(time.Microsecond)
-			s.batch.ObservedAt = n
-			s.batch.FreshUntil = n.Add(5 * time.Second)
-			s.batch.Initial = nil
-			if err := s.p.RefreshPermissions(ctx, s.batch); err != nil {
-				t.Fatal(err)
-			}
-			identity := s.a.Eligibility.VerifiedIdentity
-			identity.VerifiedAt = n
-			identity.ValidUntil = n.Add(5 * time.Second)
-			recovery, err := s.recovery.reader.RecoveryState(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			work, err := read.ReadAPIContextWork(ctx, accepted.CaptureID, identity, recovery)
-			if err != nil {
-				t.Fatal(err)
-			}
-			projection, err := s.p.Permissions(ctx, s.a.Eligibility.Target)
-			if err != nil {
-				t.Fatal(err)
-			}
-			eligible := authorization.ContextEligibility(identity, projection, s.a.Eligibility.Target, time.Now())
-			policies, err := s.retention.policies(ctx)
-			if err != nil {
-				t.Fatal(err)
-			}
-			retention, err := privacy.Resolve(policies, privacy.Input{Target: s.a.Eligibility.Target, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: accepted.Expectation.RequestedAgeSeconds, AnchorAt: accepted.Expectation.Registration.AnchorAt}, time.Now())
-			if err != nil {
-				t.Fatal(err)
-			}
-			input := s.a.Plan.Input
-			input.Target.ObservedAt = n
-			input.Target.FreshUntil = n.Add(5 * time.Second)
-			input.Capability.ObservedAt = n
-			input.Capability.FreshUntil = n.Add(5 * time.Second)
-			input.Retention = retention
-			plan, err := planning.CompileContext(input, time.Now())
-			if err != nil {
-				t.Fatal(err)
-			}
-			process := value.APIProcessObservation{Binding: value.APIProcessBinding{InstallationID: recovery.InstallationID, ClusterID: input.Target.Target().ClusterID, IssuerEpoch: recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: executorPod, ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: accepted.Expectation.CollectorImageDigest}, CheckedAt: n, ValidUntil: n.Add(5 * time.Second)}
-			until := n.Add(5 * time.Second)
-			for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, recovery.FreshUntil, process.ValidUntil} {
-				if d.Before(until) {
-					until = d
+				accepted, err := s.s.AdmitContext(ctx, s.a)
+				if err != nil {
+					t.Fatal(err)
 				}
-			}
-			return executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Recovery: recovery, Process: process, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
+				initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, accepted.Expectation)
+				pool := func(user, password string) *pgxpool.Pool { p := poolFor(user, password); t.Cleanup(p.Close); return p }
+				preparePool := pool("api_execution_prepare_runtime", "synthetic-api-execution-prepare")
+				executePool := pool("api_execution_runtime", "synthetic-api-execution")
+				readPool := pool("api_execution_read_runtime", "synthetic-api-execution-read")
+				for _, p := range []*pgxpool.Pool{preparePool, executePool, readPool} {
+					for _, query := range []string{"DELETE FROM context_execution", "UPDATE context_execution SET binding_json=binding_json", "UPDATE context_capture SET expectation_json=expectation_json", "UPDATE fleet_trust SET recovery_blocked=false", "INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0"} {
+						if _, err = p.Exec(ctx, query); err == nil {
+							t.Fatal("execution role acquired unrelated authority", query)
+						}
+					}
+				}
+				if _, err = preparePool.Exec(ctx, "UPDATE context_execution SET phase=phase"); err == nil {
+					t.Fatal("preparation can start")
+				}
+				if _, err = executePool.Exec(ctx, "INSERT INTO context_execution(capture_id) SELECT id FROM context_capture LIMIT 0"); err == nil {
+					t.Fatal("execution can prepare identity")
+				}
+				guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
+				newExecution := func(p *pgxpool.Pool) *postgres.APIContextExecutions {
+					x, e := postgres.NewAPIContextExecutions(ctx, p, s.a.RootID, guards)
+					if e != nil {
+						t.Fatal(e)
+					}
+					return x
+				}
+				prepare, execute, read := newExecution(preparePool), newExecution(executePool), newExecution(readPool)
+				intents, err := postgres.NewCaptureIntentAudits(ctx, pool("capture_audit_runtime", "synthetic-capture-audit"), s.a.RootID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err = (auditapp.CaptureIntentPublisher{Ledger: intents, Objects: &objectstore.CaptureIntentObjects{Store: store, Seal: keys, Open: keys}}).PublishCaptureIntents(ctx); err != nil {
+					t.Fatal(err)
+				}
+				// ADR-176: the executor Pod is also the connector process whose client
+				// leaf wraps this attempt's keysets.
+				executorPod := custodyID()
+				refresh := func() executionapp.APIExecutionCheck {
+					n := time.Now().UTC().Truncate(time.Microsecond)
+					s.batch.ObservedAt = n
+					s.batch.FreshUntil = n.Add(5 * time.Second)
+					s.batch.Initial = nil
+					if err := s.p.RefreshPermissions(ctx, s.batch); err != nil {
+						t.Fatal(err)
+					}
+					identity := s.a.Eligibility.VerifiedIdentity
+					identity.VerifiedAt = n
+					identity.ValidUntil = n.Add(5 * time.Second)
+					recovery, err := s.recovery.reader.RecoveryState(ctx)
+					if err != nil {
+						t.Fatal(err)
+					}
+					work, err := read.ReadAPIContextWork(ctx, accepted.CaptureID, identity, recovery)
+					if err != nil {
+						t.Fatal(err)
+					}
+					projection, err := s.p.Permissions(ctx, s.a.Eligibility.Target)
+					if err != nil {
+						t.Fatal(err)
+					}
+					eligible := authorization.ContextEligibility(identity, projection, s.a.Eligibility.Target, time.Now())
+					policies, err := s.retention.policies(ctx)
+					if err != nil {
+						t.Fatal(err)
+					}
+					retention, err := privacy.Resolve(policies, privacy.Input{Target: s.a.Eligibility.Target, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: accepted.Expectation.RequestedAgeSeconds, AnchorAt: accepted.Expectation.Registration.AnchorAt}, time.Now())
+					if err != nil {
+						t.Fatal(err)
+					}
+					input := s.a.Plan.Input
+					input.Target.ObservedAt = n
+					input.Target.FreshUntil = n.Add(5 * time.Second)
+					input.Capability.ObservedAt = n
+					input.Capability.FreshUntil = n.Add(5 * time.Second)
+					input.Retention = retention
+					plan, err := planning.CompileContext(input, time.Now())
+					if err != nil {
+						t.Fatal(err)
+					}
+					process := value.APIProcessObservation{Binding: value.APIProcessBinding{InstallationID: recovery.InstallationID, ClusterID: input.Target.Target().ClusterID, IssuerEpoch: recovery.IssuerEpoch, NamespaceUID: custodyID(), AccountUID: custodyID(), PodUID: executorPod, ProcessEpoch: custodyID(), StartupDigest: artifact.Digest{1}, ImageDigest: accepted.Expectation.CollectorImageDigest}, CheckedAt: n, ValidUntil: n.Add(5 * time.Second)}
+					until := n.Add(5 * time.Second)
+					for _, d := range []time.Time{eligible.ValidUntil, plan.ValidUntil, recovery.FreshUntil, process.ValidUntil} {
+						if d.Before(until) {
+							until = d
+						}
+					}
+					return executionapp.APIExecutionCheck{Work: work, Plan: plan, Eligibility: eligible, Recovery: recovery, Process: process, CheckedAt: n, ValidUntil: until.Truncate(time.Microsecond)}
+				}
+				c := refresh()
+				if !c.Valid(time.Now()) {
+					t.Fatal("invalid synthetic preparation observation")
+				}
+				var wg sync.WaitGroup
+				results := make(chan value.APIExecution, 8)
+				fresh := make(chan bool, 8)
+				errs := make(chan error, 8)
+				for range 8 {
+					wg.Go(func() { r, first, e := prepare.PrepareAPIExecution(ctx, c); results <- r; fresh <- first; errs <- e })
+				}
+				wg.Wait()
+				close(results)
+				close(fresh)
+				close(errs)
+				for e := range errs {
+					if e != nil {
+						t.Fatal(e)
+					}
+				}
+				count := 0
+				for b := range fresh {
+					if b {
+						count++
+					}
+				}
+				if count != 1 {
+					t.Fatal("multiple first acknowledgements", count)
+				}
+				var execution value.APIExecution
+				for r := range results {
+					if execution.Phase != "" && execution != r {
+						t.Fatal("replay changed immutable start")
+					}
+					execution = r
+				}
+				other := c
+				other.Process.Binding.ProcessEpoch = custodyID()
+				if _, _, err = prepare.PrepareAPIExecution(ctx, other); err == nil {
+					t.Fatal("new process inherited old preparation")
+				}
+				wraps := qualifyContextKeyWraps(t, ctx, admin, poolFor, store, keys, s, accepted.Expectation, c.Process.Binding)
+				execution, err = prepare.BindAPIStart(ctx, c, execution, value.PreparedStart{ObjectUID: custodyID(), ResourceVersion: "1"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = wraps.resolve(ctx, "index-key"); err == nil {
+					t.Fatal("wrap after the start object was bound")
+				}
+				d := value.Disposition{ObjectUID: execution.ObjectUID, ResourceVersion: "2", Phase: value.StartCommitted, CommittedAt: time.Now().UTC().Truncate(time.Microsecond), MayStart: true, ValidUntil: execution.Binding.NotAfter}
+				execution, err = execute.RecordAPIStart(ctx, c, execution, d)
+				if err != nil {
+					t.Fatal(err)
+				}
+				bound, err := store.ForCustody(accepted.Expectation.Registration.StoreID)
+				if err != nil {
+					t.Fatal(err)
+				}
+				producer, err := objectstore.NewContextProducer(bound, keys, time.Now)
+				if err != nil {
+					t.Fatal(err)
+				}
+				prepared, err := producer.PrepareContext(ctx, accepted.Expectation)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer prepared.Close()
+				acquired := time.Now().UTC().Truncate(time.Microsecond)
+				native, err := json.Marshal(map[string]any{"format": artifact.ContextFormat, "namespaceUID": accepted.Expectation.NamespaceUID, "podUID": accepted.Expectation.PodUID, "resourceVersion": "10", "observedAt": acquired, "phase": "Pending", "ready": "Unknown", "initialized": "Unknown", "scheduled": "False", "runtimeInstances": 0, "running": 0, "waiting": 0, "terminated": 0, "restarts": 0})
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer clear(native)
+				execution.Copies, err = prepared.StoreContext(ctx, native, execution.StartedAt, acquired)
+				if err != nil {
+					t.Fatal(err)
+				}
+				execution.Phase = "stored"
+				execution.AcquiredAt = acquired
+				completion, err := prepared.(evidence.StoredContextCloser).CompleteStored()
+				if err != nil {
+					t.Fatal(err)
+				}
+				execution.CompletedAt = completion.StoredAt
+				currentRecovery, err := s.recovery.reader.RecoveryState(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				c.Process.CheckedAt = time.Now().UTC().Truncate(time.Microsecond)
+				c.Process.ValidUntil = c.Process.CheckedAt.Add(5 * time.Second)
+				if _, err = execute.RecordAPIOutcome(ctx, execution, c.Process); err == nil {
+					t.Fatal("generic stored result bypassed joined producer completion")
+				}
+				badCompletion := completion
+				badCompletion.ExpectationDigest[0]++
+				if _, err = execute.RecordAPIStoredCompletion(ctx, execution, badCompletion, c.Process, currentRecovery); err == nil {
+					t.Fatal("foreign producer completion accepted")
+				}
+				execution, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, c.Process, currentRecovery)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, c.Process, currentRecovery); err != nil {
+					t.Fatal("immutable outcome replay", err)
+				}
+				expiredProcess := c.Process
+				expiredProcess.CheckedAt = time.Now().Add(-time.Second).UTC().Truncate(time.Microsecond)
+				expiredProcess.ValidUntil = expiredProcess.CheckedAt.Add(time.Millisecond)
+				if _, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, expiredProcess, currentRecovery); err == nil {
+					t.Fatal("outcome replay extended original process observation")
+				}
+				changed := execution
+				changed.Copies[0].SHA256[0]++
+				if _, err = execute.RecordAPIStoredCompletion(ctx, changed, completion, c.Process, currentRecovery); err == nil {
+					t.Fatal("completed result rewritten")
+				}
+				publication := func(user, password string) *postgres.ContextPublications {
+					p, e := postgres.NewContextPublications(ctx, pool(user, password), s.a.RootID, guards)
+					if e != nil {
+						t.Fatal(e)
+					}
+					return p
+				}
+				const compiledPassword = "synthetic-compiled-publication"
+				compiledRole := narrowRole(t, ctx, admin, "api_"+strings.ReplaceAll(roleCase.purpose, "-", "_")+"_", compiledPassword, func(role string) []string {
+					grants, ok := postgres.PublicRuntimeRoleGrantSQL(roleCase.purpose, role)
+					if !ok {
+						t.Fatal("missing compiled publication grants", roleCase.purpose)
+					}
+					return grants
+				})
+				verifyRole, verifyPassword := "context_verify_runtime", "synthetic-context-verify"
+				publishRole, publishPassword := "context_publish_runtime", "synthetic-context-publish"
+				if roleCase.purpose == "context-verify" {
+					verifyRole, verifyPassword = compiledRole, compiledPassword
+				} else {
+					publishRole, publishPassword = compiledRole, compiledPassword
+				}
+				verify := publication(verifyRole, verifyPassword)
+				audit := publication("context_verification_audit_runtime", "synthetic-context-audit")
+				publish := publication(publishRole, publishPassword)
+				gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
+				if err != nil {
+					t.Fatal(err)
+				}
+				verifier, err := objectstore.NewContextVerifier(bound, keys)
+				if err != nil {
+					t.Fatal(err)
+				}
+				p := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: verify, ContextVerificationRecorder: verify, ContextVerificationAuditor: audit, ContextCatalogPublisher: publish}, Authority: gate, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}, Now: time.Now}
+				s.batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+				s.batch.FreshUntil = s.batch.ObservedAt.Add(5 * time.Second)
+				if err = s.p.RefreshPermissions(ctx, s.batch); err != nil {
+					t.Fatal(err)
+				}
+				// No live target or original human request is supplied to the real gate.
+				authority, err := gate.CheckContextPublication(ctx, accepted.Expectation)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = verify.RecordContextVerification(ctx, accepted.Expectation, changed.Copies, authority); err == nil {
+					t.Fatal("publication accepted unrecorded copies")
+				}
+				var verificationRecords, catalogRecords int
+				if err = admin.QueryRow(ctx, "SELECT (SELECT count(*) FROM context_verification WHERE capture_id=$1), (SELECT count(*) FROM context_catalog WHERE capture_id=$1)", accepted.CaptureID).Scan(&verificationRecords, &catalogRecords); err != nil || verificationRecords != 0 || catalogRecords != 0 {
+					t.Fatal("compiled publication regression would only exercise replay", verificationRecords, catalogRecords, err)
+				}
+				unwraps := qualifyContextKeyUnwraps(t, ctx, admin, poolFor, s, accepted.Expectation, accepted.CaptureID)
+				published, err := p.Publish(ctx, accepted.CaptureID, execution.Copies)
+				if err != nil {
+					t.Fatal(roleCase.purpose, "first publication with compiled grants", err)
+				}
+				unwraps.afterPublication(ctx, accepted.CaptureID)
+				reader, err := objectstore.NewContextNativeReader(bound, keys)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := reader.ReadContext(ctx, published.Expectation, published.Copies, time.Now().Add(5*time.Second))
+				defer clear(got)
+				if err != nil || !bytes.Equal(got, native) {
+					t.Fatal("native evidence changed", err)
+				}
+				var records int
+				if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_execution WHERE root_id=$1", s.a.RootID).Scan(&records); err != nil || records != 1 {
+					t.Fatal("execution identity duplicated", records, err)
+				}
+				qualifyPositiveContextDeletion(t, ctx, admin, poolFor, store, bound, keys, s, accepted)
+			})
 		}
-		c := refresh()
-		if !c.Valid(time.Now()) {
-			t.Fatal("invalid synthetic preparation observation")
-		}
-		var wg sync.WaitGroup
-		results := make(chan value.APIExecution, 8)
-		fresh := make(chan bool, 8)
-		errs := make(chan error, 8)
-		for range 8 {
-			wg.Go(func() { r, first, e := prepare.PrepareAPIExecution(ctx, c); results <- r; fresh <- first; errs <- e })
-		}
-		wg.Wait()
-		close(results)
-		close(fresh)
-		close(errs)
-		for e := range errs {
-			if e != nil {
-				t.Fatal(e)
-			}
-		}
-		count := 0
-		for b := range fresh {
-			if b {
-				count++
-			}
-		}
-		if count != 1 {
-			t.Fatal("multiple first acknowledgements", count)
-		}
-		var execution value.APIExecution
-		for r := range results {
-			if execution.Phase != "" && execution != r {
-				t.Fatal("replay changed immutable start")
-			}
-			execution = r
-		}
-		other := c
-		other.Process.Binding.ProcessEpoch = custodyID()
-		if _, _, err = prepare.PrepareAPIExecution(ctx, other); err == nil {
-			t.Fatal("new process inherited old preparation")
-		}
-		wraps := qualifyContextKeyWraps(t, ctx, admin, poolFor, store, keys, s, accepted.Expectation, c.Process.Binding)
-		execution, err = prepare.BindAPIStart(ctx, c, execution, value.PreparedStart{ObjectUID: custodyID(), ResourceVersion: "1"})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = wraps.resolve(ctx, "index-key"); err == nil {
-			t.Fatal("wrap after the start object was bound")
-		}
-		d := value.Disposition{ObjectUID: execution.ObjectUID, ResourceVersion: "2", Phase: value.StartCommitted, CommittedAt: time.Now().UTC().Truncate(time.Microsecond), MayStart: true, ValidUntil: execution.Binding.NotAfter}
-		execution, err = execute.RecordAPIStart(ctx, c, execution, d)
-		if err != nil {
-			t.Fatal(err)
-		}
-		bound, err := store.ForCustody(accepted.Expectation.Registration.StoreID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		producer, err := objectstore.NewContextProducer(bound, keys, time.Now)
-		if err != nil {
-			t.Fatal(err)
-		}
-		prepared, err := producer.PrepareContext(ctx, accepted.Expectation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer prepared.Close()
-		acquired := time.Now().UTC().Truncate(time.Microsecond)
-		native, err := json.Marshal(map[string]any{"format": artifact.ContextFormat, "namespaceUID": accepted.Expectation.NamespaceUID, "podUID": accepted.Expectation.PodUID, "resourceVersion": "10", "observedAt": acquired, "phase": "Pending", "ready": "Unknown", "initialized": "Unknown", "scheduled": "False", "runtimeInstances": 0, "running": 0, "waiting": 0, "terminated": 0, "restarts": 0})
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer clear(native)
-		execution.Copies, err = prepared.StoreContext(ctx, native, execution.StartedAt, acquired)
-		if err != nil {
-			t.Fatal(err)
-		}
-		execution.Phase = "stored"
-		execution.AcquiredAt = acquired
-		completion, err := prepared.(evidence.StoredContextCloser).CompleteStored()
-		if err != nil {
-			t.Fatal(err)
-		}
-		execution.CompletedAt = completion.StoredAt
-		currentRecovery, err := s.recovery.reader.RecoveryState(ctx)
-		if err != nil {
-			t.Fatal(err)
-		}
-		c.Process.CheckedAt = time.Now().UTC().Truncate(time.Microsecond)
-		c.Process.ValidUntil = c.Process.CheckedAt.Add(5 * time.Second)
-		if _, err = execute.RecordAPIOutcome(ctx, execution, c.Process); err == nil {
-			t.Fatal("generic stored result bypassed joined producer completion")
-		}
-		badCompletion := completion
-		badCompletion.ExpectationDigest[0]++
-		if _, err = execute.RecordAPIStoredCompletion(ctx, execution, badCompletion, c.Process, currentRecovery); err == nil {
-			t.Fatal("foreign producer completion accepted")
-		}
-		execution, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, c.Process, currentRecovery)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, c.Process, currentRecovery); err != nil {
-			t.Fatal("immutable outcome replay", err)
-		}
-		expiredProcess := c.Process
-		expiredProcess.CheckedAt = time.Now().Add(-time.Second).UTC().Truncate(time.Microsecond)
-		expiredProcess.ValidUntil = expiredProcess.CheckedAt.Add(time.Millisecond)
-		if _, err = execute.RecordAPIStoredCompletion(ctx, execution, completion, expiredProcess, currentRecovery); err == nil {
-			t.Fatal("outcome replay extended original process observation")
-		}
-		changed := execution
-		changed.Copies[0].SHA256[0]++
-		if _, err = execute.RecordAPIStoredCompletion(ctx, changed, completion, c.Process, currentRecovery); err == nil {
-			t.Fatal("completed result rewritten")
-		}
-		publication := func(user, password string) *postgres.ContextPublications {
-			p, e := postgres.NewContextPublications(ctx, pool(user, password), s.a.RootID, guards)
-			if e != nil {
-				t.Fatal(e)
-			}
-			return p
-		}
-		verify := publication("context_verify_runtime", "synthetic-context-verify")
-		audit := publication("context_verification_audit_runtime", "synthetic-context-audit")
-		publish := publication("context_publish_runtime", "synthetic-context-publish")
-		gate, err := postgres.NewAPIContextPublicationGate(ctx, pool("api_publication_gate_runtime", "synthetic-api-publication-gate"), s.a.RootID, guards, privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, s.recovery.reader)
-		if err != nil {
-			t.Fatal(err)
-		}
-		verifier, err := objectstore.NewContextVerifier(bound, keys)
-		if err != nil {
-			t.Fatal(err)
-		}
-		p := evidence.ContextPublisher{Ledger: evidence.ContextPublicationFacets{ContextAcceptanceReader: verify, ContextVerificationRecorder: verify, ContextVerificationAuditor: audit, ContextCatalogPublisher: publish}, Authority: gate, Verifier: verifier, Audit: &objectstore.ContextVerificationObjects{Store: store, Seal: keys, Open: keys}, Now: time.Now}
-		s.batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
-		s.batch.FreshUntil = s.batch.ObservedAt.Add(5 * time.Second)
-		if err = s.p.RefreshPermissions(ctx, s.batch); err != nil {
-			t.Fatal(err)
-		}
-		// No live target or original human request is supplied to the real gate.
-		authority, err := gate.CheckContextPublication(ctx, accepted.Expectation)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = verify.RecordContextVerification(ctx, accepted.Expectation, changed.Copies, authority); err == nil {
-			t.Fatal("publication accepted unrecorded copies")
-		}
-		unwraps := qualifyContextKeyUnwraps(t, ctx, admin, poolFor, s, accepted.Expectation, accepted.CaptureID)
-		published, err := p.Publish(ctx, accepted.CaptureID, execution.Copies)
-		if err != nil {
-			t.Fatal(err)
-		}
-		unwraps.afterPublication(ctx, accepted.CaptureID)
-		reader, err := objectstore.NewContextNativeReader(bound, keys)
-		if err != nil {
-			t.Fatal(err)
-		}
-		got, err := reader.ReadContext(ctx, published.Expectation, published.Copies, time.Now().Add(5*time.Second))
-		defer clear(got)
-		if err != nil || !bytes.Equal(got, native) {
-			t.Fatal("native evidence changed", err)
-		}
-		var records int
-		if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_execution WHERE root_id=$1", s.a.RootID).Scan(&records); err != nil || records != 1 {
-			t.Fatal("execution identity duplicated", records, err)
-		}
-		qualifyPositiveContextDeletion(t, ctx, admin, poolFor, store, bound, keys, s, accepted)
 	})
 }
 
