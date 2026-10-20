@@ -321,7 +321,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		port(x)
 	}
-	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router}
+	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
 
 	progress, err := postgres.NewContextProgressReads(ctx, sql["progress-read"], root, recovery)
 	if err != nil {

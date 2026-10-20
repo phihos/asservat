@@ -157,35 +157,35 @@ func (s APIContextRunner) check(ctx context.Context, current identities.CurrentI
 func (s APIContextRunner) Execute(ctx context.Context, current identities.CurrentIdentity, captureID string) (ContextResult, error) {
 	var zero ContextResult
 	if ctx == nil || current == nil || s.Read == nil || s.Prepare == nil || s.Record == nil || s.Process == nil || s.Local == nil || s.Starts == nil || s.Targets == nil || s.Eligibility == nil || s.Capabilities == nil || s.Retention == nil || s.Recovery == nil || s.Output == nil || s.Collector == nil || s.Now == nil || !authorization.UUID(captureID) {
-		return zero, value.ErrInvalid
+		return zero, executeStep{"start", value.ErrInvalid}
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	i, err := current.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) {
-		return zero, value.ErrDenied
+		return zero, executeStep{"start", value.ErrDenied}
 	}
 	original := identity.Earlier(i.ValidUntil, s.Now().Add(5*time.Second))
 	startCtx, stop := context.WithDeadline(ctx, original)
 	defer stop()
 	recovery, err := s.Recovery.RecoveryState(startCtx)
 	if err != nil {
-		return zero, err
+		return zero, executeStep{"RecoveryState", err}
 	}
 	w, err := s.Read.ReadAPIContextWork(startCtx, captureID, i, recovery)
 	if err != nil {
-		return zero, err
+		return zero, executeStep{"ReadAPIContextWork", err}
 	}
 	check, err := s.check(startCtx, current, w, original)
 	if err != nil {
-		return zero, err
+		return zero, executeStep{"ReadAPIContextWork", err}
 	}
 	r, mayCreate, err := s.Prepare.PrepareAPIExecution(startCtx, check)
 	if err != nil {
-		return zero, err
+		return zero, executeStep{"PrepareAPIExecution", err}
 	}
 	if !r.Valid() || r.Process != check.Process.Binding || r.ExpectationDigest != evidence.ContextExpectationDigest(w.Accepted.Expectation) {
-		return zero, value.ErrConflict
+		return zero, executeStep{"PrepareAPIExecution", value.ErrConflict}
 	}
 	if r.Phase != "prepared" {
 		return ContextResult{State: "AlreadyStarted"}, nil
@@ -202,47 +202,47 @@ func (s APIContextRunner) Execute(ctx context.Context, current identities.Curren
 		return ContextResult{State: "Indeterminate"}, value.ErrExpired
 	}
 	if r.WriterProtocol != artifact.ContextWriterProtocol {
-		return zero, value.ErrUnavailable
+		return zero, executeStep{"PrepareAPIExecution", value.ErrUnavailable}
 	}
 	completionRecorder, ok := s.Record.(APIStoredCompletionRecorder)
 	if !ok {
-		return zero, value.ErrUnavailable
+		return zero, executeStep{"PrepareAPIExecution", value.ErrUnavailable}
 	}
 	prepared, err := s.Output.PrepareContext(startCtx, w.Accepted.Expectation)
 	if err != nil {
-		return zero, err
+		return zero, executeStep{"PrepareContext", err}
 	}
 	if prepared == nil {
-		return zero, value.ErrUnavailable
+		return zero, executeStep{"PrepareContext", value.ErrUnavailable}
 	}
 	defer prepared.Close()
 	closer, ok := prepared.(evidence.StoredContextCloser)
 	if !ok {
-		return zero, value.ErrUnavailable
+		return zero, executeStep{"PrepareContext", value.ErrUnavailable}
 	}
 	fresh, err := s.check(startCtx, current, w, original)
 	if err != nil {
-		return zero, err
+		return zero, executeStep{"PrepareContext", err}
 	}
 	if fresh.Process.Binding != check.Process.Binding || fresh.Plan.ScopeDigest != check.Plan.ScopeDigest || !reflect.DeepEqual(fresh.Plan.Input.Target.Pin, check.Plan.Input.Target.Pin) {
-		return zero, value.ErrConflict
+		return zero, executeStep{"PrepareContext", value.ErrConflict}
 	}
 	c := value.PreparationCheck{Binding: r.Binding, CheckedAt: fresh.CheckedAt, ValidUntil: identity.Earlier(fresh.ValidUntil, r.Binding.NotAfter), MayCreate: mayCreate}
 	object, err := s.Local.PrepareStart(startCtx, c)
 	if err != nil {
-		return zero, err
+		return zero, executeStep{"PrepareStart", err}
 	}
 	r, err = s.Prepare.BindAPIStart(startCtx, fresh, r, object)
 	if err != nil {
-		return zero, err
+		return zero, executeStep{"BindAPIStart", err}
 	}
 	request := value.Request{Binding: r.Binding, ObjectUID: r.ObjectUID, CheckedAt: c.CheckedAt, ValidUntil: c.ValidUntil}
 	ready, err := s.Local.ReadyStart(startCtx, request)
 	if err != nil {
-		return zero, err
+		return zero, executeStep{"ReadyStart", err}
 	}
 	if ready.MayStart || ready.ObjectUID != r.ObjectUID {
-		return zero, value.ErrDenied
+		return zero, executeStep{"ReadyStart", value.ErrDenied}
 	}
 	if ready.Phase == value.StartCommitted {
 		return ContextResult{State: "AlreadyStarted"}, nil
@@ -251,10 +251,10 @@ func (s APIContextRunner) Execute(ctx context.Context, current identities.Curren
 	// deadlines and still require the same process, exact target and reviewed scope.
 	fresh, err = s.check(startCtx, current, w, original)
 	if err != nil {
-		return zero, err
+		return zero, executeStep{"ReadyStart", err}
 	}
 	if fresh.Process.Binding != r.Process {
-		return zero, value.ErrConflict
+		return zero, executeStep{"ReadyStart", value.ErrConflict}
 	}
 	request.CheckedAt = fresh.CheckedAt
 	request.ValidUntil = identity.Earlier(fresh.ValidUntil, r.Binding.NotAfter)
@@ -359,3 +359,14 @@ func (s APIContextRunner) finishAcquisition(ctx context.Context, w APIContextWor
 	}
 	return ContextResult{State: "StoredPendingVerification", Copies: result.Copies}, nil
 }
+
+// executeStep names the call before a failed execution, for operator
+// diagnostics; its class is the wrapped error.
+type executeStep struct {
+	step string
+	err  error
+}
+
+func (e executeStep) Error() string     { return "api context execution " + e.step }
+func (e executeStep) Unwrap() error     { return e.err }
+func (e executeStep) FixedStep() string { return e.step }

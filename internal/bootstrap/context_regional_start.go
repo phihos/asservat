@@ -31,6 +31,9 @@ type RegionalAPIContextStart struct {
 	Signer fleetapp.APIContextWorkSigner
 	Router *contextstart.Router
 	Now    func() time.Time
+	// Report receives a failed run's fixed step and error class; diagnostics
+	// only, nil leaves it silent.
+	Report func(string)
 }
 
 var _ captureapp.ContextAcceptedStart = RegionalAPIContextStart{}
@@ -127,6 +130,14 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		r := s.Runner
 		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
 		result, err := r.Execute(ctx, current, id)
+		if err != nil && s.Report != nil {
+			step := "execute"
+			var fixed interface{ FixedStep() string }
+			if errors.As(err, &fixed) {
+				step += "/" + fixed.FixedStep()
+			}
+			s.Report(step + " (" + regionalOutcome(err) + ")")
+		}
 		switch {
 		case err == nil && (result.State == "StoredPendingVerification" || result.State == "AlreadyStarted"):
 			return result.State, nil
@@ -137,6 +148,9 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	})
 	auditapp.MarkStep(ctx, "st-run", mark)
 	if e != nil && state == "" {
+		if s.Report != nil {
+			s.Report("dispatch (" + regionalOutcome(e) + ")")
+		}
 		return execution.ErrUnavailable
 	}
 	switch state {
