@@ -187,7 +187,7 @@ func (s *installedJourneyTokenSource) Token(ctx context.Context) (string, error)
 // processing before the first preview. One Idempotency-Key names the change;
 // a 503 is retried under that same key, so a lost reply resumes, never
 // repeats, the audited change. The console origin is dialled at address.
-func (i *installedIdentity) initializeProcessing(t *testing.T, ctx context.Context, publicRoot *x509.Certificate, address, origin string) {
+func (i *installedIdentity) initializeProcessing(t *testing.T, ctx context.Context, publicRoot *x509.Certificate, address, origin string, diagnose func()) {
 	t.Helper()
 	roots := x509.NewCertPool()
 	roots.AddCert(publicRoot)
@@ -267,6 +267,7 @@ func (i *installedIdentity) initializeProcessing(t *testing.T, ctx context.Conte
 			return
 		}
 		if status != http.StatusServiceUnavailable || !time.Now().Before(until) {
+			diagnose()
 			t.Fatal("processing initialization", status, string(b))
 		}
 		select {

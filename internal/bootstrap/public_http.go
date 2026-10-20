@@ -127,7 +127,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		if err != nil {
 			return nil, &fixedStepError{"processing-sql", mounts.ErrUnavailable}
 		}
-		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, recovery: pc.recovery, decisions: decisions, audit: normal, mac: pc.mac}
+		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, recovery: pc.recovery, decisions: decisions, audit: normal, mac: pc.mac, refused: eventLog(os.Stderr, "processing change refused")}
 	}
 	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: settings.Issuer, Version: p.Version,
 		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxDuration: time.Duration(p.DownloadMaxSeconds) * time.Second,
