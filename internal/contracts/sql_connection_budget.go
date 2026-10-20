@@ -82,20 +82,18 @@ func (e *SQLConnectionBudgetError) Unwrap() error { return ErrSQLConnectionBudge
 // the public hub and owner identity per hub process, and configuration,
 // capacity and capture-cleanup purposes per hub-worker process. The worst case
 // includes the downloads logins of ADR-204 (worker configuration acceptance
-// and acquisition unwraps) and the context deletion logins of ADR-205, which
-// open only with their deployment sections. One continuation may overlap the
-// retained runtime graph: four administrator pools and an accepted-owner reader
-// remain separately budgeted, without spending verifier or maintenance headroom.
+// and acquisition unwraps), the context deletion logins of ADR-205 and the
+// browser settings observer of ADR-210, which open only with their deployment
+// sections. One continuation may overlap the retained runtime graph: four
+// administrator pools and an accepted-owner reader remain separately budgeted,
+// without spending verifier or maintenance headroom.
 func InstalledSQLConnectionPlan(hubProcesses int) (SQLConnectionPlan, error) {
 	if hubProcesses < 1 || hubProcesses > PublicRuntimeRetainedHubProcesses {
 		return SQLConnectionPlan{}, ErrSQLConnectionBudget
 	}
 	hub := append(PublicRuntimeHubRolePurposes(), OwnerIdentityRolePurposes()...)
 	worker := append(ConfigurationRuntimeRolePurposes(), "capacity", "capacity-capture")
-	worker = append(worker, PublicRuntimePermissionPurposes()...)
-	worker = append(worker, PublicRuntimeRetentionPurposes()...)
-	worker = append(worker, PublicRuntimeWorkerConfigurationPurposes()...)
-	worker = append(worker, PublicRuntimeContextDeletionPurposes()...)
+	worker = append(worker, PermissionProjectionPurposes(true, true, true, true)...)
 	worker = append(worker, PublicRuntimeCaptureCleanupPurposes()...)
 	return SQLConnectionPlan{Compartments: []SQLConnectionCompartment{
 		{Name: "hub", Purposes: hub, RetainedProcesses: hubProcesses, MaxOpen: SQLConnectionsPerHubReplica, Hub: true},

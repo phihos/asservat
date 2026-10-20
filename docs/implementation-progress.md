@@ -1,5 +1,52 @@
 # Sustained implementation progress
 
+## Resumed review and installed qualification (2026-10-20)
+
+Ordinary [CI on `5675db4b`](https://github.com/phihos/asservat/actions/runs/39416417613)
+passes all checks, including console browser tests and all ten Go test shards.
+The first resumed CI exposed a stale pointer-equality assertion in the regional
+diagnostic fixture: errors now carry a fixed stage while preserving their cause.
+The assertion now uses `errors.Is`; the complete in-process integration package
+passes under the race detector. This is not external fixture qualification.
+
+Independent review found two composition defects. The processing route's
+context timeout did not interrupt a stalled body read, and principal accounting
+started only after that read. The handler now installs socket deadlines, owns
+the principal slot before body parsing, joins cancellation before releasing
+slots, and retains the earliest original request/session/receipt deadline
+through response flush. Real TLS regressions first reproduced the stalled
+body, duplicate principal and lost response-bound failures; the full browser
+package passes with the race detector. The diagnostic nil-handler panic also
+has a failing-then-passing regression and passing package tests.
+
+The second defect omitted each worker's browser-settings connection from the
+installed SQL inventory. The budget now derives its permission purposes from
+the same selection as the worker: 20 purposes per worker, 114 ordinary product
+connections, or 117 total with three superuser-reserved connections. The
+unchanged fixture helper adds its independent observer and derives 118 total.
+No role ceiling or individual pool limit changes. Contract/PostgreSQL race
+tests, six fixture-selection tests and specification/architecture gates pass.
+This corrects a declared maximum, not a measured connection leak.
+
+The [owned two-cluster run `context-9vds9lz9`](../test/results/resumed-c62e02ac-native40/result.json)
+failed at `534b0735`, before these review fixes, with its original
+116-connection fixture budget. The test and harness both exited 1. All 2,731
+recorded source hashes match the commit; sources stayed unchanged, build
+scratch was removed, cleanup reported no failures, and owned containers and
+clusters were absent afterward. It cannot qualify the corrected budget or
+processing transport.
+
+Bootstrap, cluster join, sustained regional capacity demand, console processing
+initialization and preview succeeded. The preview's target exchange took
+800 ms and its decoded result passed final validation. The capture request's
+target exchange then failed at `read/other` after 100 ms. Its outcome audit and
+the original-key resolution audit spent at least three seconds in
+`credentials-configuration`, and both client calls ended with transport errors.
+No accepted capture result was obtained. Capture, publication, native download,
+revocation and deletion remain unqualified. The shared configuration SQL read
+is under investigation; these timings alone do not establish its blocking
+cause, and no authority interval has been extended.
+
 ## Recovered installed journey, hold 38 (2026-10-20)
 
 Claude session `c62e02ac-2970-4821-8f4d-d584e5ea4d8c` stopped before
@@ -2144,12 +2191,14 @@ unit-tested only. The [installed SQL budget correction](research/installed-sql-b
 now wires the compiled one-hub plan into the promoted continuation before
 runtime resource creation, against actual non-reserved server capacity. The
 ADR-205 graph plus five overlapping installer pools, a separate verifier and
-four maintenance slots requires 112 ordinary slots. The continuation's passive
+four maintenance slots required 112 ordinary slots. The continuation's passive
 history reader closes before bridge opening and is limited to one connection.
-Only its installed fixture derives 116 total slots: 112 product, one independent
+At that checkpoint its installed fixture derived 116 total slots: 112 product, one independent
 fixture observer, and three superuser-reserved. Ordinary component fixtures
 remain at 48; early superuser sessions are not treated as isolated reserved
-capacity.
+capacity. ADR-210's browser-settings observer adds two retained worker
+connections; the corrected current plan requires 114 product slots and derives
+118 total fixture slots, as recorded in the resumed review above.
 Native installed qualification of this correction remains pending.
 
 ## Regional investigation journey passes end to end (native36/37)

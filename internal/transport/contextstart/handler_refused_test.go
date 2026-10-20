@@ -18,6 +18,15 @@ func (refusingIngress) AuthenticateContextStart(context.Context, *tls.Connection
 	return fleet.APIContextReceiver{}, nil, fleet.ErrDenied
 }
 
+func TestNilHandlerReturnsUnavailable(t *testing.T) {
+	var h *Handler
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, httptest.NewRequest(http.MethodPost, contracts.APIContextStartPath, nil))
+	if w.Code != http.StatusNotFound || w.Header().Get("Cache-Control") != "no-store" || w.Body.String() != "Unavailable\n" {
+		t.Fatalf("code=%d headers=%v body=%q", w.Code, w.Header(), w.Body.String())
+	}
+}
+
 func TestHandlerReportsRefusalStage(t *testing.T) {
 	router, e := NewRouter(RouterLimits{Standby: 1, Captures: 1})
 	if e != nil {

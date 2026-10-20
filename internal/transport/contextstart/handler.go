@@ -42,7 +42,7 @@ func privateUnavailable(w http.ResponseWriter) {
 	http.Error(w, "Unavailable", http.StatusNotFound)
 }
 func (h *Handler) refuse(w http.ResponseWriter, stage string) {
-	if h.Refused != nil {
+	if h != nil && h.Refused != nil {
 		h.Refused(stage)
 	}
 	privateUnavailable(w)

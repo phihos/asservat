@@ -1,0 +1,17 @@
+{
+  "sourceCommit": "534b0735e17d72049e01917ccfcf6c94632677c6",
+  "run": "context-9vds9lz9",
+  "command": "python3 scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "runnerExit": 1,
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "sourceHashesVerified": 2731,
+  "sourceHashMismatches": [],
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "scope": "Failed installed journey; successful bootstrap, cluster join, processing initialization and preview do not qualify capture, publication, native download or deletion. Request and original-key resolution failed at their transport/audit boundaries. The run used the original116-connection budget before the reviewed inventory fix.",
+  "files": {
+    "context-storage-environment.json": "73ae34f6bcc27203c8602547f3c704e4f45f4a20ad7fe8cef061b1c590ee9a0b",
+    "context-storage.log": "cb3768c5355445b46e0494bc5ff029573ad0ee8ef1bc5f26205d0fb835cc3dbc"
+  }
+}

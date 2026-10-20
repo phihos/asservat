@@ -41,20 +41,29 @@ Every non-hub purpose owns one `MaxConns=1` pool. The hub's identity and public
 purposes share its existing 32-connection governor, with 18 dedicated hot slots
 and cold connections closed after release.
 
-| Process | One process, ADR-204 | One process, ADR-205 | Retained processes in the selected plan |
-| --- | ---: | ---: | ---: |
-| Hub | 32 | 32 | 1 |
-| Hub worker | 16 | 19 | 2 |
-| Federation | 6 | 6 | 2 |
-| Publisher | 6 | 6 | 2 |
-| Key service | 4 | 4 | 2 |
+| Process | One process, ADR-204 | One process, ADR-205 | One process, ADR-210 | Retained processes in the selected plan |
+| --- | ---: | ---: | ---: | ---: |
+| Hub | 32 | 32 | 32 | 1 |
+| Hub worker | 16 | 19 | 20 | 2 |
+| Federation | 6 | 6 | 6 | 2 |
+| Publisher | 6 | 6 | 6 | 2 |
+| Key service | 4 | 4 | 4 | 2 |
 
 The worker's original 16 purposes are three configuration, two capacity, two
 permission, four retention, two worker-configuration and three capture-cleanup
-purposes. ADR-205 adds three context-deletion purposes. Even one process of each
-kind allows 64/67 physical connections before verifier and maintenance headroom,
-above the fixture's 45 ordinary slots. These are source-derived upper bounds,
-not observed concurrent usage.
+purposes. ADR-205 adds three context-deletion purposes, and ADR-210 adds the
+browser-settings observer. Even one process of each kind allows 64/67/68 physical
+connections before verifier and maintenance headroom, above the original
+fixture's 45 ordinary slots. These are source-derived upper bounds, not
+observed concurrent usage.
+
+Review found that ADR-210's browser observer opened its one-connection pool in
+each retained worker while the installed budget still counted 19 worker
+purposes. The budget now uses the same fully enabled
+`PermissionProjectionPurposes` selection as the permission worker. These two
+additional connections are independent of the hub governor, even though the
+purpose is also listed in the hub credential inventory. The correction changes
+no SQL role ceiling, pool limit or retained-process count.
 
 The runtime-only inventory plus one verifier and four ordinary maintenance
 slots was 101 under ADR-204 and 107 under ADR-205. Review found that this omitted
@@ -97,9 +106,9 @@ opening phase uses the same one-slot allowance as the later serialized login
 checks. Other bootstrap history readers retain their selected limits. No
 history or administrator observation substitutes for current bridge authority.
 
-The selected full plan is therefore 102 retained runtime connections, five
-installer connections, one verifier and four maintenance slots: **112 ordinary
-slots**, or 115 total with three superuser slots and no other reserved slots.
+The selected full plan is therefore 104 retained runtime connections, five
+installer connections, one verifier and four maintenance slots: **114 ordinary
+slots**, or 117 total with three superuser slots and no other reserved slots.
 Maintenance still means one DDL, two backup/restore and one operator/monitoring
 connection. This is a conservative configured maximum for the selected graph,
 not an observed simultaneous count or permission for concurrent continuations.
@@ -112,7 +121,7 @@ setting, SQL role or runtime pool/governor limit.
 
 Only the installed continuation fixture obtains its server allowance from a
 Go helper using that same plan. It adds its independent one-connection test
-observer to ordinary capacity, then three superuser slots: **116 total**. This
+observer to ordinary capacity, then three superuser slots: **118 total**. This
 remains sufficient regardless of whether the observer connected before the
 runtime. The fixture's short retention reader runs only after the continuation
 Pod has finished and reuses the now-free verifier allowance. Other bootstrap
@@ -138,5 +147,9 @@ profile interface and passes with explicit installed sizing; unchanged component
 selection is asserted. Regressions for the installer allowance and fixture arithmetic fail against the
 earlier 107/110 plan. The activation-reader regression covers closure before
 runtime work on accepted, refused and failed observations. Native qualification
-of the corrected 112-slot product plan and 116-slot fixture remains required;
-a run using the earlier 110-slot profile cannot qualify this source change.
+of the corrected 114-slot product plan and 118-slot fixture remains required.
+The browser-observer regression fails against the earlier inventory both for
+the missing purpose and for accepting only 112 ordinary slots. The previous
+116-slot fixture allowance is two slots short of the corrected full graph;
+a run using it cannot qualify this source change. That mismatch alone does
+not establish that a particular run exhausted connections or leaked a pool.

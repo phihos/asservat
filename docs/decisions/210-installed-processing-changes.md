@@ -26,7 +26,11 @@ coverage verdict.
    request per principal and two in total. The `Idempotency-Key` header is the
    change's `RequestID` (a UUID), so a retry resumes the same audited change.
    The body carries the change's action and, for rules, its rule ID, expected
-   revision and scope. The reply is the processing receipt.
+   revision and scope. The principal's slot is held before body parsing.
+   Request reads and response writes keep the original finite context deadline;
+   a successful receipt write is also capped by the receipt's original
+   `ValidUntil`. Cancellation joins before the request releases either slot.
+   The reply is the processing receipt.
 2. The route calls the existing `privacy.ProcessingChanges.Change` with the
    request's current identity. Operator membership, recovery, original
    five-second bounds, encrypted audit and SQL serialization stay as they are;
@@ -63,6 +67,14 @@ coverage verdict.
 The installed journey adds a step in which the configured operator initializes
 processing through the console route before the first preview. The journey's
 operator entry must match an identity the fixture's Keycloak issues.
+
+The browser observer adds one independent SQL connection per retained worker,
+bringing each worker's full inventory to 20 purposes. With two retained workers,
+the [installed SQL budget](../research/installed-sql-budget.md) is 114 ordinary
+slots, or 117 total with three superuser-reserved slots and no other reserved
+slots. The installed fixture's independent observer makes its total 118.
+The budget derives permission-worker purposes from the same projection selection
+as the runtime; SQL role ceilings and individual pool limits stay unchanged.
 
 Coverage also needs a capture's deletion date before the processing root's
 current end. Root renewal sets that end `AdmissionSeconds` ahead (at most one

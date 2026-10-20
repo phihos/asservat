@@ -25,10 +25,11 @@ the already verified bridge, in the original five-second transaction. It uses
 the compiled one-hub connection plan, including retained worker processes,
 five simultaneous installer pools, separate verifier and maintenance headroom, before creating runtime resources.
 The helper never exposes the administrator transaction to native callbacks and
-never changes runtime pool limits or SQL settings. The retained ADR-205 runtime
-needs 102 connections. Four administrator installer pools and one accepted
+never changes runtime pool limits or SQL settings. The retained runtime,
+including ADR-210's browser-settings observer in each worker, needs 104
+connections. Four administrator installer pools and one accepted
 owner-source pool add five, independently of one serialized verifier and four
-maintenance slots: 112 ordinary slots, or 115 total with three superuser slots.
+maintenance slots: 114 ordinary slots, or 117 total with three superuser slots.
 The passive history reader is limited to one connection and closed immediately
 after activation observation, before the bridge opens. Serial acceptance-reader
 and configuration-producer phases share only allowances whose prior pool has

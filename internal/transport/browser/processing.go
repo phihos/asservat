@@ -13,6 +13,7 @@ import (
 
 	app "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 	value "asservat.local/asservat/internal/domain/privacy"
 )
 
@@ -90,15 +91,53 @@ func (h *ProcessingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		sessionProblem(w, 429)
 		return
 	}
+	principal := ""
+	defer func() {
+		if principal != "" {
+			h.mu.Lock()
+			delete(h.active, principal)
+			h.mu.Unlock()
+		}
+	}()
 	// The change keeps its own original five-second bounds; this only caps
 	// the request so a stalled body read cannot hold a slot.
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
+	controller := http.NewResponseController(w)
+	deadline, _ := ctx.Deadline()
+	if controller.SetReadDeadline(deadline) != nil || controller.SetWriteDeadline(deadline) != nil {
+		sessionProblem(w, 503)
+		return
+	}
+	interrupted := make(chan struct{})
+	var socketMu sync.Mutex
+	stop := context.AfterFunc(ctx, func() {
+		defer close(interrupted)
+		socketMu.Lock()
+		defer socketMu.Unlock()
+		_ = controller.SetReadDeadline(time.Now())
+		_ = controller.SetWriteDeadline(time.Now())
+	})
+	defer func() {
+		if !stop() {
+			<-interrupted
+		}
+	}()
 	current, view, err := h.sessions.AuthenticateCurrent(w, r.WithContext(ctx))
 	if err != nil {
 		sessionFailure(w, err)
 		return
 	}
+	account := view.Identity.Principal.Issuer + "\x00" + view.Identity.Principal.Subject
+	h.mu.Lock()
+	if h.active[account] {
+		h.mu.Unlock()
+		sessionProblem(w, 429)
+		return
+	}
+	h.active[account] = true
+	principal = account
+	h.mu.Unlock()
 	body, err := io.ReadAll(io.LimitReader(r.Body, 4097))
 	var in processingChangeInput
 	d := json.NewDecoder(bytes.NewReader(body))
@@ -115,23 +154,31 @@ func (h *ProcessingHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		sessionProblem(w, 400)
 		return
 	}
-	principal := view.Identity.Principal.Issuer + "\x00" + view.Identity.Principal.Subject
-	h.mu.Lock()
-	if h.active[principal] {
-		h.mu.Unlock()
-		sessionProblem(w, 429)
+	receipt, err := h.service.Change(ctx, current, change)
+	until := identity.Earlier(deadline, identity.Earlier(view.Identity.ValidUntil, receipt.ValidUntil))
+	if err != nil || ctx.Err() != nil || !receipt.Valid(time.Now()) || !time.Now().Before(until) {
+		sessionProblem(w, 503)
 		return
 	}
-	h.active[principal] = true
-	h.mu.Unlock()
-	defer func() { h.mu.Lock(); delete(h.active, principal); h.mu.Unlock() }()
-	receipt, err := h.service.Change(ctx, current, change)
-	if err != nil {
+	// Change already performed its final current-authority read. Preserve
+	// that receipt's original bound through the socket flush without a new
+	// observation. Cancellation cannot be overwritten by a later deadline.
+	socketMu.Lock()
+	if ctx.Err() != nil || !time.Now().Before(until) {
+		err = context.Canceled
+	} else {
+		err = controller.SetWriteDeadline(until)
+	}
+	socketMu.Unlock()
+	if err != nil || ctx.Err() != nil || !time.Now().Before(until) {
 		sessionProblem(w, 503)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(processingChangeReply{RootID: receipt.RootID, Epoch: receipt.Epoch, RequestID: receipt.RequestID, RuleID: receipt.RuleID, OperationID: receipt.OperationID,
+	err = json.NewEncoder(w).Encode(processingChangeReply{RootID: receipt.RootID, Epoch: receipt.Epoch, RequestID: receipt.RequestID, RuleID: receipt.RuleID, OperationID: receipt.OperationID,
 		State: receipt.State, Revision: receipt.Revision, Sequence: receipt.Sequence, ObservedAt: receipt.ObservedAt, ValidUntil: receipt.ValidUntil})
+	if err != nil || controller.Flush() != nil || ctx.Err() != nil || !time.Now().Before(until) {
+		panic(http.ErrAbortHandler)
+	}
 }
