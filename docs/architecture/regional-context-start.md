@@ -33,6 +33,14 @@ Work and independently current peer/trust observations may overlap without havin
 
 Standby and capture reservations count closing owners until joined completion. Each discovered owner has an independent thirty-second conversation with at least one second before a fresh empty standby; after a TLS refusal (a registered owner process the hub no longer serves) the next attempt to that owner waits thirty seconds, so its setup proofs do not contend with the live owner's opening. A hub target query that finds no idle standby waits for the next registration only within its own original deadline, keeping 2.5 seconds for the query and the caller. A retry never carries a capture or signed work from a prior connection. SQL52/ADR134 determine whether an explicit current continuation can proceed; transport failure is not proof of non-admission or no effect.
 
+Router selection and attachment checks also observe the stream's own
+cancellation, even before the surrounding HTTP request notices it. A joined
+callback cancels the standby and active conversation; its reservation remains
+charged until the handler closes the stream and calls `Finish`. A completed
+query does not reset its retained socket read deadline. Withdrawal permits
+later operations to select another current standby; it never replays an
+uncertain query, capture or signed work.
+
 The installed regional supervisor reports failed candidate observation, an empty
 candidate set, failed connection setup and failed exchange service using fixed
 private labels and the existing exponentially suppressed logger. Optional nested

@@ -214,7 +214,7 @@ func (s *InstalledOwnerProviderEffects) current(ctx context.Context) (time.Time,
 	}
 	first, err := s.configuration.ReadOwnerConfiguration(ctx)
 	if err != nil || !s.currentConfiguration(first) {
-		return time.Time{}, ErrKeyService
+		return time.Time{}, ownerProviderConfigurationFailure("configuration", err)
 	}
 	call, end := context.WithDeadline(ctx, first.FreshUntil)
 	defer end()
@@ -238,7 +238,7 @@ func (s *InstalledOwnerProviderEffects) current(ctx context.Context) (time.Time,
 	last, err := s.configuration.ReadOwnerConfiguration(call)
 	until = identity.Earlier(until, last.FreshUntil)
 	if err != nil || !s.currentConfiguration(last) || !first.Configuration.Equal(last.Configuration) || call.Err() != nil || !time.Now().Before(until) {
-		return time.Time{}, ErrKeyService
+		return time.Time{}, ownerProviderConfigurationFailure("configuration-final", err)
 	}
 	return until, nil
 }
@@ -414,7 +414,7 @@ func (s *InstalledOwnerProviderEffects) ReadAuditCredentials(ctx context.Context
 	first, err := s.configuration.ReadOwnerConfiguration(ctx)
 	auditapp.MarkStep(ctx, "credentials-configuration", mark)
 	if err != nil || !s.currentConfiguration(first) {
-		return zero, time.Time{}, auditCredentialStep("configuration", ErrKeyService)
+		return zero, time.Time{}, auditCredentialStepFrom("configuration", err)
 	}
 	call, end := context.WithDeadline(ctx, first.FreshUntil)
 	defer end()
@@ -448,7 +448,7 @@ func (s *InstalledOwnerProviderEffects) ReadAuditCredentials(ctx context.Context
 	auditapp.MarkStep(ctx, "credentials-final", mark)
 	until = identity.Earlier(until, last.FreshUntil)
 	if err != nil || !s.currentConfiguration(last) || !first.Configuration.Equal(last.Configuration) || call.Err() != nil || !time.Now().Before(until) {
-		return zero, time.Time{}, auditCredentialStep("final", ErrKeyService)
+		return zero, time.Time{}, auditCredentialStepFrom("final", err)
 	}
 	return credential, until, nil
 }

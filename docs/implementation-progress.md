@@ -47,6 +47,21 @@ revocation and deletion remain unqualified. The shared configuration SQL read
 is under investigation; these timings alone do not establish its blocking
 cause, and no authority interval has been extended.
 
+The subsequent diagnostic regression reproduces lost SQL failure detail at
+both audit credential reads and provider refresh. Closed labels now preserve
+transaction-entry deadline, statement failure and rejected original-interval
+distinctions. Focused failing-before tests and full PostgreSQL/KMS package race
+tests pass. This instrumentation does not establish native40's blocking cause.
+
+The router regression also reproduced selection of a cancelled stream while
+socket cleanup remained blocked. Router selection/current checks now inspect
+the stream's cancellation directly, and a joined callback cancels its standby.
+Both standby and capture reservations stay charged until operation and socket
+cleanup join. The original retained read deadline is unchanged. Full
+context-start race tests and actual HTTP/2 context-start tests pass; independent
+review found no blocker. This is a demonstrated lifecycle defect, not proof
+that it caused native40's request failure.
+
 ## Recovered installed journey, hold 38 (2026-10-20)
 
 Claude session `c62e02ac-2970-4821-8f4d-d584e5ea4d8c` stopped before

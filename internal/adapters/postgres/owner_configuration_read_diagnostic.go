@@ -107,6 +107,33 @@ func (e *OwnerConfigurationReadFailure) Unwrap() error                        { 
 func (e *OwnerConfigurationReadFailure) Check() OwnerConfigurationReadCheck   { return e.check }
 func (e *OwnerConfigurationReadFailure) Reason() OwnerConfigurationReadReason { return e.reason }
 
+// FixedStep makes the already-sanitized statement/predicate available to
+// installed diagnostics. Only an unclassified transaction failure may inherit
+// a known ledger cause; unknown hook text and SQLSTATEs never become labels.
+func (e *OwnerConfigurationReadFailure) FixedStep() string {
+	reason := e.reason.String()
+	var cause ledgerCause
+	if e.check == ownerReadTransaction && e.reason == ownerReadUnspecified && errors.As(e.cause, &cause) {
+		switch cause.cause {
+		case "begin-deadline", "begin-credential", "begin-dial", "begin-tls", "begin-server", "begin-connect", "begin-acquire", "deadline", "client", "retries":
+			reason = cause.cause
+		case "sql-55P03":
+			reason = "lock-timeout"
+		case "sql-57014":
+			reason = "query-cancelled"
+		case "sql-42501":
+			reason = "permission"
+		case "sql-53300":
+			reason = "connection-limit"
+		case "sql-40001":
+			reason = "serialization"
+		case "sql-40P01":
+			reason = "deadlock"
+		}
+	}
+	return e.check.String() + "/" + reason
+}
+
 type ownerConfigurationReadDiagnostic struct {
 	check  OwnerConfigurationReadCheck
 	reason OwnerConfigurationReadReason

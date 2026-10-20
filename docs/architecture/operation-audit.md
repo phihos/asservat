@@ -122,6 +122,14 @@ That cost still needs installed qualification. Legacy non-provider layouts keep
 their existing adapters; the installed layout exposes no shared dynamic SDK
 credential store.
 
+Installed credential and provider-refresh diagnostics retain the SQL
+configuration reader's closed statement/predicate labels. They distinguish
+expiry before transaction entry, known SQL failures and rejected original
+observation intervals without exposing query text, row values or credentials.
+A `transaction/begin-deadline` result alone does not identify whether acquiring
+or establishing a connection consumed the caller's interval. These labels
+change no reads, pool limits, authority predicates or deadlines.
+
 Known scope/target denials and unsupported inputs retain their private typed
 classification through the nondisclosing public error envelope. The audit does
 not interpret the public `NotAvailable` code as proof of a denial: provider

@@ -149,7 +149,7 @@ func (s *ownerProviderLifetime) refreshOwned(ctx context.Context, worker *Instal
 	finalUntil := bound
 	cause := "" // the closed step a failed refresh reports
 	if proofErr != nil || bound.IsZero() || !s.control.now().Before(bound) || call.Err() != nil {
-		cause = "proof"
+		cause = ownerProviderProofFailure("proof", proofErr)
 		cancel()
 	} else {
 		var boundCancel context.CancelFunc
@@ -213,7 +213,7 @@ func (s *ownerProviderLifetime) refreshOwned(ctx context.Context, worker *Instal
 		}
 		if e != nil || final.IsZero() || !s.control.now().Before(final) || call.Err() != nil {
 			err = ErrKeyService
-			cause = "final-proof"
+			cause = ownerProviderProofFailure("final-proof", e)
 		}
 	}
 	if login && next != nil && err != nil && (old == nil || !bytes.Equal(next.token, old.value.token)) {
