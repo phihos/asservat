@@ -52,7 +52,7 @@ func TestPermissionInputsWorkerConfigurationSectionIsOptionalAndClosed(t *testin
 	if err != nil || got.WorkerConfiguration != nil {
 		t.Fatal("permission inputs without the section", err)
 	}
-	if purposes := contracts.PermissionProjectionPurposes(got.Retention != nil, got.WorkerConfiguration != nil); slices.ContainsFunc(purposes, func(p string) bool { return slices.Contains(contracts.PublicRuntimeWorkerConfigurationPurposes(), p) }) {
+	if purposes := contracts.PermissionProjectionPurposes(got.Retention != nil, got.WorkerConfiguration != nil, got.ContextDeletion); slices.ContainsFunc(purposes, func(p string) bool { return slices.Contains(contracts.PublicRuntimeWorkerConfigurationPurposes(), p) }) {
 		t.Fatal("worker configuration login selected without the section", purposes)
 	}
 	// Absent: no child and no dependency touched, even with none supplied.

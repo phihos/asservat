@@ -30,13 +30,19 @@ func TestOwnerProviderArtifactNamesEvidenceDeleteCredential(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		// The section is the only difference.
+		// The section and one inspected path, the deletion signing key the
+		// installer reads back (ADR-205 decision 6), are the only differences.
 		var with, without map[string]json.RawMessage
 		if json.Unmarshal(b, &with) != nil || json.Unmarshal(base, &without) != nil {
 			t.Fatal("artifact is not an object")
 		}
 		section := with["evidenceDeleteStorage"]
 		delete(with, "evidenceDeleteStorage")
+		var inspect []string
+		if json.Unmarshal(with["inspect"], &inspect) != nil || len(inspect) < 1 || inspect[len(inspect)-1] != in.KeyService.AuditMount+"/keys/"+contracts.ContextDeletionSigningKeyName(in.InstallationID) {
+			t.Fatal("deletion did not inspect its signing key", inspect)
+		}
+		with["inspect"], _ = json.Marshal(inspect[:len(inspect)-1])
 		stripped, err := ownerProviderCanonical(with)
 		if err != nil || !bytes.Equal(stripped, base) {
 			t.Fatal("deletion changed more than its own section")

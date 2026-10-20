@@ -195,6 +195,10 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 						Bucket string `json:"bucket"`
 					} `json:"evidenceReadStorage"`
 				} `json:"publisher"`
+				EvidenceDeleteStorage *struct {
+					Bucket   string   `json:"bucket"`
+					Prefixes []string `json:"prefixes"`
+				} `json:"evidenceDeleteStorage"`
 				Public bool `json:"public"`
 			}
 			if json.Unmarshal(outbox.Recipe, &artifact) != nil {
@@ -232,6 +236,19 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					t.Fatal(e)
 				}
 				args = append(args, "--download-evidence-credential", file)
+			}
+			if a := artifact.EvidenceDeleteStorage; a != nil {
+				// ADR-205 decision 4: qualify the deletion child's exact
+				// list/delete scope, without SeaweedFS's coarse Write grant.
+				if a.Bucket != evidenceBucket || len(a.Prefixes) != 1 || a.Prefixes[0] != "v1/" {
+					t.Fatal("evidence delete storage section", a.Bucket, a.Prefixes)
+				}
+				users = append(users, "evidence-delete")
+				file := filepath.Join(work, "evidence-delete.json")
+				if e = os.WriteFile(file, installerEvidenceDeleteCredential(t, limit, providers, evidenceBucket, users), 0o600); e != nil {
+					t.Fatal(e)
+				}
+				args = append(args, "--evidence-delete-credential", file)
 			}
 			if a := artifact.Publisher; a != nil {
 				// ADR-203: the publisher's audit writer under its own prefix and a
@@ -586,9 +603,9 @@ func installerEvidenceCredential(t *testing.T, ctx context.Context, p *initialRu
 		clear(output)
 		t.Fatal("owned exact IAM provisioning command unavailable", e)
 	}
-	policy, _ := json.Marshal(map[string]any{"Version": "2012-10-17", "Statement": []any{map[string]any{"Sid": "DenyRegionalDeletion", "Effect": "Deny", "Principal": map[string]any{"AWS": []string{"arn:aws:iam::000000000000:user/regional-evidence"}}, "Action": []string{"s3:DeleteObject", "s3:DeleteObjectVersion"}, "Resource": "arn:aws:s3:::" + bucket + "/*"}}})
+	policy := installerEvidenceBucketPolicy(bucket)
 	store := s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: aws.String(p.desired.AuditStore.Endpoint), UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: p.client, RetryMaxAttempts: 1})
-	if _, err = store.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &bucket, Policy: aws.String(string(policy))}); err != nil {
+	if _, err = store.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &bucket, Policy: &policy}); err != nil {
 		t.Fatal("regional deletion denial", err)
 	}
 	out, _ := json.Marshal(contracts.OwnerStorageCredential{AccessKeyID: key, SecretAccessKey: secret})
