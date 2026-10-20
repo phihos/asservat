@@ -2,6 +2,24 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
+Final composition review reproduced two additional diagnostic defects.
+Processing refusal diagnostics detached from request cancellation and could
+perform three new dependency reads after cancellation. They now retain the
+original caller's deadline/cancellation and a five-second child cap, checking
+cancellation between reads. Diagnostic timing values also became permanent
+log-count keys: 32 timing variants emitted 32 first-occurrence lines. Stable
+event keys now remain separate from timing payloads; each logger retains at
+most 128 keys and one overflow counter, with finite text and saturating counts.
+Focused failing-before regressions and affected diagnostic race tests pass.
+These changes are separate from the frozen installed run on `4db57af3`.
+
+[CI on `4db57af3`](https://github.com/phihos/asservat/actions/runs/39420452650)
+passed every check except test shard zero and the aggregate gate. The sole
+test failure was the bootstrap stop-message assertion still expecting 112
+ordinary connections after the inventory correction to 114. That assertion
+now matches the compiled budget; the focused bootstrap/contract tests pass.
+The other nine test shards, console, build and static checks passed.
+
 Ordinary [CI on `5675db4b`](https://github.com/phihos/asservat/actions/runs/39416417613)
 passes all checks, including console browser tests and all ten Go test shards.
 The first resumed CI exposed a stale pointer-equality assertion in the regional

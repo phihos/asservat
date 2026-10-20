@@ -239,7 +239,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	if err != nil {
 		return &fixedStepError{"start-client", err}
 	}
-	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, eventLog(os.Stderr, "regional target answer")}, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer")}, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
 	fmt.Fprintln(os.Stderr, "regional context start active")
 	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Verifier: reportedWorkVerifier{r.verifier, eventLog(os.Stderr, "regional work refused")}, Local: local, Report: eventLog(os.Stderr, "regional context standby refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
 }
@@ -269,10 +269,10 @@ func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.C
 // reportedTargets logs the region's target-answer step durations.
 type reportedTargets struct {
 	*kube.PodTargets
-	report func(string)
+	report func(string, string)
 }
 
-func (t reportedTargets) ReportAnswer(steps string) { t.report(steps) }
+func (t reportedTargets) ReportAnswer(steps string) { t.report("answer", steps) }
 
 // reportedWorkVerifier logs a refused work verification's fixed step.
 type reportedWorkVerifier struct {

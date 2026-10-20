@@ -105,7 +105,8 @@ func NewOwnerLocalObservationReceiver(ctx context.Context, pin value.OwnerObserv
 	}
 	h, err := newOwnerLocalObservationReceiver(ctx, pin, server, registry, ownerLocalNativeReaderAdapter{native}, holder, maximum, now)
 	if h != nil {
-		h.timing = eventLog(os.Stderr, "owner local claim timing")
+		log := timedEventLog(os.Stderr, "owner local claim timing")
+		h.timing = func(timing string) { log("claim", timing) }
 	}
 	return h, err
 }

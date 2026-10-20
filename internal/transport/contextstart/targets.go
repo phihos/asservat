@@ -20,9 +20,9 @@ import (
 type Targets struct {
 	Router *Router
 	Now    func() time.Time
-	// Report receives fixed query outcome labels and timing buckets; it
-	// never sees targets, peers or error text.
-	Report func(string)
+	// Report receives a fixed query outcome key separately from timing text.
+	// Neither argument contains targets, peers or error text.
+	Report func(event, timing string)
 }
 
 func (t Targets) query(ctx context.Context, cluster, method string, in any, matches func(targets.PodResolution) bool) (targets.PodResolution, error) {
@@ -37,7 +37,7 @@ func (t Targets) query(ctx context.Context, cluster, method string, in any, matc
 	marks := &queryMarks{}
 	call = context.WithValue(call, queryMarksKey{}, marks)
 	report := func(step string) {
-		t.report(step + " start" + start + " end" + fleetapp.RemainingBucket(ctx, time.Now()) + " [" + marks.String() + "]")
+		t.report(step, "start"+start+" end"+fleetapp.RemainingBucket(ctx, time.Now())+" ["+marks.String()+"]")
 	}
 	until, err := t.Router.Query(call, cluster, method, in, &out)
 	if err != nil {
@@ -105,9 +105,9 @@ func (t Targets) ResolvePod(ctx context.Context, r targets.Request) (targets.Pod
 	})
 }
 
-func (t Targets) report(step string) {
+func (t Targets) report(step, timing string) {
 	if t.Report != nil {
-		t.Report(step)
+		t.Report(step, timing)
 	}
 }
 

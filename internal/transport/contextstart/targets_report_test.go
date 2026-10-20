@@ -78,8 +78,11 @@ func TestTargetQueryReportsFinalValidationInsteadOfTransportSuccess(t *testing.T
 				t.Fatal(err)
 			}
 			defer standby.Finish()
-			var reports []string
-			hub := Targets{Router: router, Now: func() time.Time { return now }, Report: func(step string) { reports = append(reports, step) }}
+			var reports, timings []string
+			hub := Targets{Router: router, Now: func() time.Time { return now }, Report: func(step, timing string) {
+				reports = append(reports, step)
+				timings = append(timings, timing)
+			}}
 			type resolution struct {
 				pod targets.PodResolution
 				err error
@@ -120,7 +123,7 @@ func TestTargetQueryReportsFinalValidationInsteadOfTransportSuccess(t *testing.T
 			} else if !errors.Is(got.err, targets.ErrUnavailable) || got.pod != (targets.PodResolution{}) {
 				t.Fatal("invalid resolution was accepted", got)
 			}
-			if len(reports) != 1 || !strings.HasPrefix(reports[0], tc.label+" start") {
+			if len(reports) != 1 || reports[0] != tc.label || len(timings) != 1 || !strings.HasPrefix(timings[0], "start") {
 				t.Fatalf("final result %q reported %q", tc.label, reports)
 			}
 		})

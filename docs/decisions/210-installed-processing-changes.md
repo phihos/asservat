@@ -36,6 +36,9 @@ coverage verdict.
    five-second bounds, encrypted audit and SQL serialization stay as they are;
    the route adds no evaluator. MCP gets no processing tool: operators are bound
    to a configured client, and the installed operator client is the console.
+   Refusal diagnostics retain the original caller's cancellation and deadline,
+   add at most a five-second child cap, and stop between dependency reads.
+   They cannot detach from an expired request.
 3. `initialize_processing` and `restrict_processing` use the normal audit lane
    through the existing selected auditor. Its policy and retained seconds come
    from the current capacity audit profiles for each call, so a profile renewal

@@ -54,17 +54,28 @@ func (s publicProcessingChanges) refuse(step string) {
 
 // refusedStep repeats the authority reads after a refusal, for a fixed step
 // name only: the change has already failed and nothing here is authority.
+// Diagnostics retain the original request lifetime, keep their five-second
+// ceiling, and stop between reads.
 func (s publicProcessingChanges) refusedStep(ctx context.Context, current identities.CurrentIdentity) string {
 	if s.refused == nil {
 		return ""
 	}
-	call, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	if ctx == nil || ctx.Err() != nil {
+		return "request"
+	}
+	call, stop := context.WithTimeout(ctx, 5*time.Second)
 	defer stop()
 	i, err := current.ResolveIdentity(call)
+	if call.Err() != nil {
+		return "request"
+	}
 	if err != nil || !i.Valid(time.Now()) {
 		return "identity"
 	}
 	p, err := s.policies.DownloadPolicy(call)
+	if call.Err() != nil {
+		return "request"
+	}
 	if err != nil {
 		var step interface{ FixedStep() string }
 		if errors.As(err, &step) {
@@ -75,7 +86,11 @@ func (s publicProcessingChanges) refusedStep(ctx context.Context, current identi
 	if p.RootID != s.root || p.InstallationID != s.installation || !p.Operator(i, time.Now()) {
 		return "operator"
 	}
-	if _, err = s.recovery.RecoveryState(call); err != nil {
+	_, err = s.recovery.RecoveryState(call)
+	if call.Err() != nil {
+		return "request"
+	}
+	if err != nil {
 		return "recovery"
 	}
 	return "change"

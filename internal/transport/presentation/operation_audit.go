@@ -51,9 +51,9 @@ type AuditedOperations struct {
 	mu        sync.Mutex
 	active    map[string]int
 	rate      map[string]auditRate
-	// Timing receives one fixed line per audited call: operation lane and
-	// duration buckets of each reached stage. No input, identity or result.
-	Timing func(string)
+	// Timing receives a fixed operation lane separately from stage durations.
+	// No input, identity or result enters either argument.
+	Timing func(event, timing string)
 }
 
 // callTiming marks stage ends of one audited call for Timing.
@@ -61,11 +61,11 @@ type callTiming struct {
 	start, admitted, begin, call, finish time.Time
 }
 
-func (t callTiming) report(lane string, steps *auditapp.StepTimes, out func(string)) {
+func (t callTiming) report(lane string, steps *auditapp.StepTimes, out func(string, string)) {
 	if out == nil {
 		return
 	}
-	line := lane + " pre" + durationBucket(t.admitted, t.start) + " begin" + durationBucket(t.begin, t.admitted)
+	line := "pre" + durationBucket(t.admitted, t.start) + " begin" + durationBucket(t.begin, t.admitted)
 	if !t.call.IsZero() {
 		line += " call" + durationBucket(t.call, t.begin)
 	}
@@ -76,7 +76,7 @@ func (t callTiming) report(lane string, steps *auditapp.StepTimes, out func(stri
 	if s := steps.String(); s != "" {
 		line += " [" + s + "]"
 	}
-	out(line)
+	out(lane, line)
 }
 
 // durationBucket keeps timing lines in a finite vocabulary.

@@ -130,6 +130,13 @@ A `transaction/begin-deadline` result alone does not identify whether acquiring
 or establishing a connection consumed the caller's interval. These labels
 change no reads, pool limits, authority predicates or deadlines.
 
+Process-local diagnostic logging separates stable event keys from timing
+payloads. Each logger retains at most 128 keys plus one overflow counter;
+counters saturate and output occurs only at powers of two. Keys and timing
+payloads have finite byte limits and contain only single-line ASCII. Timing
+values are never retained in the count map. These diagnostic logs do not
+replace encrypted operation audit.
+
 Known scope/target denials and unsupported inputs retain their private typed
 classification through the nondisclosing public error envelope. The audit does
 not interpret the public `NotAvailable` code as proof of a denial: provider

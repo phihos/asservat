@@ -288,7 +288,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	out.investigation = captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: previews, Replay: admissionsSQL, Admission: admissionsSQL, Resolution: resolution,
 		ReportPreviewFailure: eventLog(os.Stderr, "public preview refused"),
-		Targets:              contextstart.Targets{Router: router, Now: time.Now, Report: eventLog(os.Stderr, "context target query refused")}, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Recovery: out.recovery,
+		Targets:              contextstart.Targets{Router: router, Now: time.Now, Report: timedEventLog(os.Stderr, "context target query refused")}, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Recovery: out.recovery,
 		Lifetime: time.Duration(p.PreviewSeconds) * time.Second}
 
 	completed, err := postgres.NewCaptureOperationIntents(ctx, sql["capture-intent-read"], root)

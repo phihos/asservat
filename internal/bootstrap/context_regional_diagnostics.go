@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sync"
 	"time"
 )
 
@@ -59,17 +58,11 @@ func (s RegionalContextStartConnections) reportFailure(stage string, cause error
 // The event is already restricted by reportFailure. Durations never enter the
 // count map: many differently timed refusals still share one bounded key.
 func contextStartOpeningLog(out io.Writer) func(string, time.Duration, time.Duration, string) {
-	var mu sync.Mutex
-	counts := map[string]uint64{}
+	log := timedEventLog(out, "regional context standby refused")
 	return func(event string, elapsed, remaining time.Duration, trace string) {
-		mu.Lock()
-		defer mu.Unlock()
-		counts[event]++
-		if n := counts[event]; n&(n-1) == 0 {
-			if trace != "" {
-				trace = " setup=[" + trace + "]"
-			}
-			fmt.Fprintf(out, "regional context standby refused: %s (%d), elapsed=%s remaining=%s%s\n", event, n, elapsed.Round(10*time.Millisecond), remaining.Round(10*time.Millisecond), trace)
+		if trace != "" {
+			trace = " setup=[" + trace + "]"
 		}
+		log(event, fmt.Sprintf("elapsed=%s remaining=%s%s", elapsed.Round(10*time.Millisecond), remaining.Round(10*time.Millisecond), trace))
 	}
 }
