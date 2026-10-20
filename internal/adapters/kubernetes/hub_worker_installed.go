@@ -57,6 +57,9 @@ func BuildInstalledHubWorkerWorkload(p HubWorkerWorkloadPlan, installationID str
 		// ADR-205: the context deletion logins, present only with the
 		// projection's context deletion section.
 		"sql-context-cleanup.json", "sql-context-cleanup-audit.json", "sql-context-cleanup-finalize.json",
+		// ADR-210: the browser settings login, present only with the
+		// projection's browser section.
+		"sql-browser-settings.json",
 	})
 	// ADR-205 decision 4: the operator's evidence delete credential, in its
 	// own immutable Secret; absent without a context deletion section.
