@@ -368,7 +368,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 		return zero, value.ErrPreviewExpired
 	}
 	if p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != compiler.ContextAssessmentRulesDigestForClass(p.ExecutionClass) {
-		return zero, value.ErrChanged
+		return zero, s.requestChanged("epoch")
 	}
 	resolveStarted := time.Now()
 	target, err := s.Targets.ResolvePod(ctx, p.Target)
@@ -377,7 +377,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 		return zero, err
 	}
 	if target.Request != p.Target || target.Pin != p.Pin || target.ExecutionClass != p.ExecutionClass {
-		return zero, value.ErrChanged
+		return zero, s.requestChanged("target")
 	}
 	anchor := s.Now().UTC().Truncate(time.Microsecond)
 	f, err := s.facts(ctx, source, i.Principal, p.Intent, target, anchor)
@@ -396,12 +396,21 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if err != nil {
 		return zero, err
 	}
-	if plan.ScopeDigest != p.ScopeDigest || !bytes.Equal(plan.CanonicalScope, p.CanonicalScope) || f.storage.Selection != p.Storage || !reflect.DeepEqual(retentionReview(f.retention), p.Retention) || !slices.Equal(f.eligibility.DefaultAudience, p.Audience) {
-		return zero, value.ErrChanged
+	if plan.ScopeDigest != p.ScopeDigest || !bytes.Equal(plan.CanonicalScope, p.CanonicalScope) {
+		return zero, s.requestChanged("scope")
+	}
+	if f.storage.Selection != p.Storage {
+		return zero, s.requestChanged("storage")
+	}
+	if !reflect.DeepEqual(retentionReview(f.retention), p.Retention) {
+		return zero, s.requestChanged("retention")
+	}
+	if !slices.Equal(f.eligibility.DefaultAudience, p.Audience) {
+		return zero, s.requestChanged("audience")
 	}
 	assessment, err := compiler.AssessContext(plan, p.AssessmentID, s.Now())
 	if err != nil || assessment.RulesDigest != p.AssessmentRulesDigest {
-		return zero, value.ErrChanged
+		return zero, s.requestChanged("assessment")
 	}
 	// The evidence interval starts at actual request preparation, not preview.
 	// A concurrent request can win with another anchor; SQL replay returns its
@@ -414,7 +423,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	final.ValidUntil = identity.Earlier(final.ValidUntil, f.eligibility.ValidUntil)
 	final.VerifiedIdentity.ValidUntil = identity.Earlier(final.VerifiedIdentity.ValidUntil, i.ValidUntil)
 	if !final.Eligible || final.Target != target.Target() || final.Principal != p.Actor || final.VerifiedIdentity.Principal != p.Actor || !final.VerifiedIdentity.Valid(s.Now()) || !slices.Equal(final.DefaultAudience, p.Audience) || !s.Now().Before(final.ValidUntil) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !p.Current(s.Now()) || !recovery.Valid(s.Now()) || ctx.Err() != nil {
-		return zero, value.ErrChanged
+		return zero, s.requestChanged("eligibility")
 	}
 	admitStarted := time.Now()
 	a, err := s.Admission.AdmitReviewedContext(ctx, p.ID, value.Admission{Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})
@@ -493,4 +502,12 @@ func retentionFailure(err error) string {
 	default:
 		return "other"
 	}
+}
+
+// requestChanged reports a request's changed-review stage, a fixed label.
+func (s ContextInvestigation) requestChanged(stage string) error {
+	if s.ReportPreviewFailure != nil {
+		s.ReportPreviewFailure("request/changed/" + stage)
+	}
+	return value.ErrChanged
 }
