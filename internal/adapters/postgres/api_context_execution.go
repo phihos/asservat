@@ -276,21 +276,21 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 				first = err == nil
 			}
 			if err != nil {
-				return err
+				return sqlStep{map[bool]string{true: "insert", false: "lock"}[first || errors.Is(err, pgx.ErrNoRows)], err}
 			}
 			out, err = apiExecution(row)
 			if err != nil {
-				return err
+				return sqlStep{"read", err}
 			}
 			if out.Process != c.Process.Binding || out.ExpectationDigest != evidence.ContextExpectationDigest(c.Work.Accepted.Expectation) || out.Binding.ScopeDigest != c.Plan.ScopeDigest {
-				return value.ErrConflict
+				return sqlStep{"conflict", value.ErrConflict}
 			}
 			now, err := q.CurrentTime(ctx)
 			if err != nil {
 				return err
 			}
 			if !now.Time.Before(out.Binding.NotAfter) {
-				return value.ErrExpired
+				return sqlStep{"expired", value.ErrExpired}
 			}
 			return nil
 		})
@@ -538,4 +538,10 @@ type sqlStep struct {
 
 func (e sqlStep) Error() string     { return "api execution " + e.step }
 func (e sqlStep) Unwrap() error     { return e.err }
-func (e sqlStep) FixedStep() string { return e.step }
+func (e sqlStep) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
+}
