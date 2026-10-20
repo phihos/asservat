@@ -56,10 +56,13 @@ func TestProviderInstalledOwnerSeparatesSQLStorageAndNativeAuthentication(t *tes
 	// update for the dry-run probe), the two settings and the immutable slot
 	// topologies (ADR-196 decision 7), and their guards.
 	public := contracts.OwnerPublicGuardedSources(p.InstallationID)
-	guards := make([]string, 0, len(public))
+	guards := make([]string, 0, len(public)+1)
 	for _, name := range public {
 		guards = append(guards, name+"-guard")
 	}
+	// ADR-210: and the capacity processing source with its own guard.
+	_, _, _, processing, processingGuard := CapacitySourceNames(p.InstallationID)
+	public, guards = append(public, processing), append(guards, processingGuard)
 	extra := w.Role.Rules[len(v1.Role.Rules):]
 	if len(extra) != 3 || !reflect.DeepEqual(extra[1].ResourceNames, public) || !reflect.DeepEqual(extra[1].Verbs, []string{"get", "update"}) || !reflect.DeepEqual(extra[2].ResourceNames, append([]string{contracts.OwnerBrowserSettingsName(p.InstallationID), contracts.OwnerIdentitySettingsName(p.InstallationID)}, contracts.OwnerClusterTopologyNames(p.InstallationID)...)) || !reflect.DeepEqual(extra[2].Verbs, []string{"get"}) {
 		t.Fatal("unexpected provider privilege graph")
