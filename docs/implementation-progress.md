@@ -42,8 +42,16 @@ the one-action scalar correction (exit 0, 1.068 seconds). The combined in-proces
 integration race suite also passes (exit 0, 6.262 seconds), covering both fixture
 corrections. All 2,582 recorded Go/module hashes stay unchanged during each
 phase. Strict scalar/array distinction, scope and uncertain restoration controls
-remain passing. Independent review found no blockers. The real object-store
-round trip and installed rerun are next.
+remain passing. Independent review found no blockers.
+
+The [exact real-provider qualification](../test/results/resumed-c62e02ac-bucket-policy-native/result.json)
+on frozen `ddfcbd0f` now passes: the selected
+`TestInstalledEvidenceDeleteCredentialWithRealServices` test takes 0.26 seconds
+(race package 1.321 seconds), and the harness exits 0. Strict policy PUT/GET
+read-back and the existing deletion credential controls pass against the pinned
+S3 provider. All 2,735 source hashes match and stay unchanged; both owned
+containers and their network are independently absent after cleanup.
+The complete installed journey still needs a passing rerun.
 
 Read-only review also found that the fixture ends its terminal wait too early
 when `Succeeded` omits its independently authorized case link. The service

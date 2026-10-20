@@ -1,0 +1,51 @@
+{
+  "sourceCommit": "ddfcbd0f3a7994c64df12e8bf936279735b15e1b",
+  "command": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestInstalledEvidenceDeleteCredentialWithRealServices$"
+  ],
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "terminal": {
+    "session": 29564,
+    "chunk": "5ebfe1",
+    "exit": 0
+  },
+  "sourceVerification": {
+    "sourceCommit": "ddfcbd0f3a7994c64df12e8bf936279735b15e1b",
+    "sourceHashesVerified": 2735,
+    "sourceHashMismatches": [],
+    "sourceUnchangedDuringTest": true,
+    "testExit": 0,
+    "cleanupFailures": [],
+    "buildScratchRemoved": null
+  },
+  "cleanupReadback": "two owned containers and network independently absent",
+  "passedTestNames": [
+    "TestInstalledEvidenceDeleteCredentialWithRealServices"
+  ],
+  "scope": "Exact policy PUT/GET and deletion credential behavior with real pinned S3 provider; no installed lifecycle claim",
+  "files": {
+    "installed-evidence-delete.log": "4a1d3f2739878b3c892b370e9acef41b3e0832d3b8c5cc7f491ed465430fb2f5",
+    "installed-evidence-delete-environment.json": "07dcfe643397b22afe49471cace2bcdcb8bd9adde5825d629418f33faae53156",
+    "runner.log": "c9fded768ae6ad3685086ec93091b63a7c08a4ad7a4e3d45abc7827885c4b2bd",
+    "source-verification.json": "a84948b2abe4d2cb8bfbaa9861652ba118a06890a2d9adc4296bcbb50b40657c",
+    "source-verification.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "cleanup-readback.json": "c645bbf5297fd92f7ef23db86f4ec574bf34d549c5cf29ef937466c44306f882"
+  },
+  "finalSpec": {
+    "command": [
+      "make",
+      "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "spec-check"
+    ],
+    "exit": 0,
+    "elapsedSeconds": 5.027395999990404
+  }
+}

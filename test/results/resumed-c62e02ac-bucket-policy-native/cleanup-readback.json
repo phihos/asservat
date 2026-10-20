@@ -1,0 +1,35 @@
+[
+  {
+    "command": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-custody-iw2prqiy-postgres"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: No such container: asservat-custody-iw2prqiy-postgres\n"
+  },
+  {
+    "command": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-custody-iw2prqiy-s3"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: No such container: asservat-custody-iw2prqiy-s3\n"
+  },
+  {
+    "command": [
+      "docker",
+      "network",
+      "inspect",
+      "asservat-custody-iw2prqiy"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: network asservat-custody-iw2prqiy not found\n"
+  }
+]

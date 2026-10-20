@@ -1,0 +1,4 @@
+=== RUN   TestInstalledEvidenceDeleteCredentialWithRealServices
+--- PASS: TestInstalledEvidenceDeleteCredentialWithRealServices (0.26s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.321s
