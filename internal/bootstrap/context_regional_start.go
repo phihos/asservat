@@ -52,7 +52,12 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 			cancels[i]()
 		}
 	}()
-	narrow := func(d time.Time) {
+	// bound names the input that last shortened the start, for diagnostics.
+	bound := "start"
+	narrow := func(name string, d time.Time) {
+		if d.Before(until) {
+			bound = name
+		}
 		until = identity.Earlier(until, d)
 		var stop context.CancelFunc
 		call, stop = context.WithDeadline(call, until)
@@ -64,12 +69,12 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if e != nil || !caller.Valid(s.Now()) {
 		return execution.ErrDenied
 	}
-	narrow(caller.ValidUntil)
+	narrow("identity", caller.ValidUntil)
 	recovery, e := s.Runner.Recovery.RecoveryState(call)
 	if e != nil || !recovery.Valid(s.Now()) {
 		return execution.ErrUnavailable
 	}
-	narrow(recovery.FreshUntil)
+	narrow("recovery", recovery.FreshUntil)
 	mark = time.Now()
 	accepted, e := s.Runner.Read.ReadAPIContextWork(call, id, caller, recovery)
 	auditapp.MarkStep(ctx, "st-read", mark)
@@ -80,8 +85,8 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if accepted.Actor != caller.Principal || a.CaptureID != id || a.State != capturevalue.IntentAudited || accepted.Target.ClusterID != a.Expectation.Registration.Location.ClusterID {
 		return execution.ErrDenied
 	}
-	narrow(a.Deadline)
-	narrow(a.Expectation.Registration.WriteUntil)
+	narrow("deadline", a.Deadline)
+	narrow("write-until", a.Expectation.Registration.WriteUntil)
 	target := authorization.Target{ClusterID: accepted.Target.ClusterID, NamespaceUID: accepted.Target.Namespace.UID, WorkloadUID: accepted.Target.Workload.UID, PodUID: accepted.Target.PodUID}
 	mark = time.Now()
 	capability, e := s.Runner.Capabilities.ContextCapability(call, target)
@@ -89,7 +94,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if e != nil || !capability.Valid(s.Now()) {
 		return execution.ErrUnavailable
 	}
-	narrow(capability.FreshUntil)
+	narrow("capability", capability.FreshUntil)
 	// Reservation happens before signing/attachment. A closing old exchange stays
 	// charged until its original socket and human owner have actually joined.
 	mark = time.Now()
@@ -105,7 +110,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if e != nil {
 		return execution.ErrUnavailable
 	}
-	narrow(receiver.ValidUntil)
+	narrow("receiver", receiver.ValidUntil)
 	if receiver.Channel.Connector.Binding.InstallationID != recovery.InstallationID || receiver.Channel.Connector.Binding.IssuerEpoch != recovery.IssuerEpoch {
 		return execution.ErrDenied
 	}
@@ -136,7 +141,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 			if errors.As(err, &fixed) {
 				step += "/" + fixed.FixedStep()
 			}
-			s.Report(step + " (" + regionalOutcome(err) + ") left" + fleetapp.RemainingBucket(ctx, s.Now()) + " start-left" + fleetapp.RemainingBucket(call, s.Now()))
+			s.Report(step + " (" + regionalOutcome(err) + ") left" + fleetapp.RemainingBucket(ctx, s.Now()) + " start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
 		}
 		switch {
 		case err == nil && (result.State == "StoredPendingVerification" || result.State == "AlreadyStarted"):
