@@ -1,0 +1,6 @@
+{
+  "frozenCommit": "7fcc30fd0bd4d1896cbe843d555f37b2b211767c",
+  "command": "env GOMAXPROCS=2 GOFLAGS=-p=2 TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp go test -race -count=1 ./internal/application/evidence",
+  "exit": 0,
+  "elapsedPackageSeconds": 3.857
+}

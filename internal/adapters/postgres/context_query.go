@@ -113,6 +113,14 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 			if e != nil {
 				return e
 			}
+			// The original installed root and immutable residual reservation are
+			// mandatory, including when a backing callback reports success.
+			// Lock source/anchor before query backing and allocation; missing or
+			// negative protected state never falls back to caller-supplied facts.
+			accepted, e := tx.LockContextQueryCapacity(callback, custodydb.LockContextQueryCapacityParams{RootID: id(s.root), AcceptanceID: id(query.Plan.AcceptanceID)})
+			if e != nil || !accepted {
+				return value.ErrUnavailable
+			}
 			backing, e := tx.LockContextQueryBacking(callback, id(s.root))
 			if e != nil {
 				return e
@@ -189,6 +197,13 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 	}
 	if e = s.recovery.check(ctx, tx, recovery, s.root, a.Environment.Recovery); e != nil {
 		return e
+	}
+	// The same root can acquire a restrictive workload/source change. Compare
+	// the exact original allocation to current protected base capacity at the
+	// end of both the pre-effect and post-effect fence, after blocking reads.
+	current, e := tx.ContextQueryCapacityAllocationCurrent(ctx, custodydb.ContextQueryCapacityAllocationCurrentParams{RootID: id(s.root), AllocationID: id(q.Plan.AllocationID)})
+	if e != nil || !current {
+		return value.ErrUnavailable
 	}
 	now, e = tx.CurrentTime(ctx)
 	if e != nil || ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time) || !now.Time.Before(published.EffectiveExpiresAt.Time) || !now.Time.Before(topology.FreshUntil) || !now.Time.Before(b.FreshUntil.Time) || !now.Time.Before(p.FreshUntil.Time) || !now.Time.Before(p.LeaseUntil.Time) {

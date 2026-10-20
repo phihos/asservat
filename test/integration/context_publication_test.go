@@ -630,15 +630,6 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		return f.scenario, p
 	})
 	releaseBurstConnections()
-	qualifyContextQueries(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, artifact.PublishedContext) {
-		f := setup(t)
-		p, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return f.scenario, p
-	})
-	releaseBurstConnections()
 	qualifyRetentionLifecycle(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, artifact.PublishedContext) {
 		f := setup(t)
 		p, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies)

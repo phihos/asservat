@@ -20,6 +20,7 @@ func TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement(t *testi
 		code         string
 		dispositions []installedJourneyDisposition
 		nextCodes    []string
+		nextID       string
 		resolveErr   error
 		wantClosed   bool
 		wantErr      bool
@@ -31,7 +32,9 @@ func TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement(t *testi
 		{name: "unavailable-needs-close", code: "NotAvailable", dispositions: []installedJourneyDisposition{{State: "closed"}}, wantClosed: true, wantCalls: []string{"resolve"}},
 		{name: "lost-resolution", code: "OutcomeUnknown", resolveErr: errors.New("lost response"), wantErr: true, wantCalls: []string{"resolve"}},
 		{name: "missing-disposition", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{}}, wantErr: true, wantCalls: []string{"resolve"}},
-		{name: "accepted-continues", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, nextCodes: []string{""}, wantCalls: []string{"resolve", "pause", "continue"}},
+		{name: "accepted-continues", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, nextCodes: []string{""}, nextID: "original", wantCalls: []string{"resolve", "pause", "continue"}},
+		{name: "successful-continuation-cannot-change", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, nextCodes: []string{""}, nextID: "replacement", wantErr: true, wantCalls: []string{"resolve", "pause", "continue"}},
+		{name: "successful-continuation-needs-capture", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, nextCodes: []string{""}, wantErr: true, wantCalls: []string{"resolve", "pause", "continue"}},
 		{name: "accepted-changed-review", code: "ReviewChanged", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, wantErr: true, wantCalls: []string{"resolve"}},
 		{name: "spent-preparation", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, nextCodes: []string{"AcquisitionUncertain"}, wantErr: true, wantCalls: []string{"resolve", "pause", "continue"}},
 		{name: "accepted-cannot-close", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}, {State: "closed"}}, nextCodes: []string{"OutcomeUnknown"}, wantErr: true, wantCalls: []string{"resolve", "pause", "continue", "resolve"}},
@@ -52,14 +55,14 @@ func TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement(t *testi
 				out := tc.dispositions[reads]
 				reads++
 				return out, nil
-			}, func() string {
+			}, func() (string, string) {
 				calls = append(calls, "continue")
 				if continues == len(tc.nextCodes) {
 					t.Fatal("continued without an accepted original")
 				}
 				out := tc.nextCodes[continues]
 				continues++
-				return out
+				return out, tc.nextID
 			}, func(context.Context, time.Duration) error {
 				calls = append(calls, "pause")
 				return nil
@@ -75,9 +78,9 @@ func TestInstalledJourneyBoundsAcceptedContinuationAndCancellation(t *testing.T)
 	continued := 0
 	closed, err := installedJourneyRecoverCapture(t.Context(), "OutcomeUnknown", func() (installedJourneyDisposition, error) {
 		return installedJourneyDisposition{State: "accepted", CaptureID: "original"}, nil
-	}, func() string {
+	}, func() (string, string) {
 		continued++
-		return "OutcomeUnknown"
+		return "OutcomeUnknown", ""
 	}, func(context.Context, time.Duration) error { return nil })
 	if closed || err == nil || continued != 4 {
 		t.Fatal("unbounded or replaced accepted request", closed, err, continued)
@@ -86,7 +89,7 @@ func TestInstalledJourneyBoundsAcceptedContinuationAndCancellation(t *testing.T)
 	closed, err = installedJourneyRecoverCapture(ctx, "OutcomeUnknown", func() (installedJourneyDisposition, error) {
 		cancel()
 		return installedJourneyDisposition{State: "closed"}, nil
-	}, func() string { t.Fatal("continued after cancellation"); return "" }, installedJourneyPause)
+	}, func() (string, string) { t.Fatal("continued after cancellation"); return "", "" }, installedJourneyPause)
 	if closed || !errors.Is(err, context.Canceled) {
 		t.Fatal("cancelled resolution allowed replacement", closed, err)
 	}

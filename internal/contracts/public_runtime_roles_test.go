@@ -31,11 +31,11 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 		}
 	}
 	if !slices.Equal(PermissionProjectionPurposes(false, true, false, false), []string{"permission-accept", "permission-audit", "worker-config-observe", "worker-config-audit"}) || slices.Contains(PermissionProjectionPurposes(true, false, false, false), "worker-config-observe") || !slices.Contains(PublicRuntimeKeyServicePurposes(), "key-acquisition") {
+		t.Fatal("download logins left their projections")
+	}
 	// ADR-210: a browser section adds the hub-worker's settings login last.
 	if got := PermissionProjectionPurposes(false, false, false, true); !slices.Equal(got, []string{"permission-accept", "permission-audit", "browser-settings"}) {
 		t.Fatal("browser section logins changed", got)
-	}
-		t.Fatal("download logins left their projections")
 	}
 	seen := map[int]bool{}
 	for _, purpose := range all {

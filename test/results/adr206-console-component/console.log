@@ -1,0 +1,58 @@
+npm notice run @asservat/console@0.0.0 check
+npm notice run npm run contracts && node scripts/validator-test.mjs && tsc --noEmit && vitest run
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+Native ESM auth and all five capture operation validators passed positive and negative checks.
+Native ESM case and download validators passed positive and negative checks.
+Native ESM download terminal-only status and complete native metadata guards passed for all three operations.
+Native ESM approved projection and pending query validators passed canonical examples and invalid timing checks.
+
+ RUN  v5.0.3 /home/phil/Projekte/asservat-projection-console-0450e73c/web
+
+
+ Test Files  11 passed (11)
+      Tests  157 passed (157)
+   Start at  17:09:15
+   Duration  2.06s (environment 44%, tests 23%, transform 20%, import 13%)
+
+
+cd web && npm run build
+npm notice run @asservat/console@0.0.0 build
+npm notice run npm run contracts && tsc --noEmit && vite build
+npm notice run @asservat/console@0.0.0 contracts
+npm notice run node scripts/contracts.mjs
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 1350 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                              0.51 kB │ gzip:   0.31 kB
+dist/assets/index-8wPE5Nwz.css               3.42 kB │ gzip:   1.26 kB
+dist/assets/EvidenceWorkspace-CufPzd4Q.js  191.39 kB │ gzip:  22.96 kB
+dist/assets/index-B1WslHP-.js              871.48 kB │ gzip: 148.32 kB
+
+✓ built in 192ms
+[plugin builtin:vite-reporter] 
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+ASSERVAT_CONSOLE_BROWSER_TEST=1 TMPDIR="/home/phil/.cache/asservat-build/tmp" go test -count=1 -run '^TestConsole(Browser|NativeRestart)WithBuiltPackage$' -v ./test/integration
+=== RUN   TestConsoleNativeRestartWithBuiltPackage
+2026/10/18 17:10:47 http: TLS handshake error from 127.0.0.1:36346: remote error: tls: unknown certificate
+2026/10/18 17:10:47 http: TLS handshake error from 127.0.0.1:36366: remote error: tls: unknown certificate
+2026/10/18 17:10:48 http: TLS handshake error from 127.0.0.1:36374: remote error: tls: unknown certificate
+2026/10/18 17:10:48 http: TLS handshake error from 127.0.0.1:36390: remote error: tls: unknown certificate
+2026/10/18 17:10:48 http: TLS handshake error from 127.0.0.1:36412: remote error: tls: unknown certificate
+2026/10/18 17:10:48 http: TLS handshake error from 127.0.0.1:36428: remote error: tls: unknown certificate
+    console_native_restart_test.go:183: Synthetic C14/session/file source; actual built React, HTTPS, CSRF, canonical operations and browser download failure:
+        Built native-restart checks passed: 4 boundaries,2 accessibility scans, actual failed browser attachment and explicit fresh full-file download.
+--- PASS: TestConsoleNativeRestartWithBuiltPackage (2.13s)
+=== RUN   TestConsoleBrowserWithBuiltPackage
+2026/10/18 17:10:49 http: TLS handshake error from 127.0.0.1:41802: remote error: tls: unknown certificate
+2026/10/18 17:10:49 http: TLS handshake error from 127.0.0.1:41816: remote error: tls: unknown certificate
+    console_test.go:132: Synthetic current identity, capture and C16 case data; actual Go TLS/static/session/operations and built React console:
+        Console browser checks passed: 19 journeys, 15 accessibility scans, no external requests or CSP/runtime errors.
+--- PASS: TestConsoleBrowserWithBuiltPackage (17.06s)
+PASS
+ok  	asservat.local/asservat/test/integration	19.209s

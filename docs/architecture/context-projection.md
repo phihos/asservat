@@ -332,8 +332,14 @@ so time spent making the request is not added to the view lifetime. Reject an
 invalid, nonpositive or greater-than-sixty-second interval; retain the earliest
 known bound for the same handle. Clear on scope loss, closure and suspension.
 This avoids assuming synchronized client wall clocks and does not promise
-revocation of external copies. The existing metadata console has no clock-offset
-facility; the approved projection view remains pending implementation.
+revocation of external copies. The `web/src/projection` controller and optional
+text view implement these bounds using the canonical generated schemas. The
+client caps complete responses at 64 KiB, requests at five seconds and never
+automatically retries or polls. Pending-result checks require an explicit user
+action after the server retry delay. Scope loss, closure and the earliest
+monotonic cutoff clear the managed result; unknown replies retain no invented
+query handle. The component remains unregistered until protected runtime
+composition and installed query qualification pass.
 
 C-20's private reply owner is shared across `OperationReply` value copies. It
 binds the serialized body to the exact application delivery, requires the
@@ -575,3 +581,15 @@ advertises a public operation when one of those capabilities is absent.
    default query lifetime under normal background work. Record source/image
    identities, actual exits and terminal cleanup. Component tests and offline
    document gates do not complete this installed qualification or all of S-02.
+
+## Protected query backing and environment component
+
+The [C-07 producer and C-03 environment](context-query-capacity.md) now have
+private compiler/source/read/write components. The optional original-install
+extension preserves omitted bytes and reserves additional capacity without
+changing the base graph. Separate measured deployment limits, immutable
+report/profile provenance, exact original dates and four independent guards
+are required. Their production native composition and the SQL ledger's mandatory
+anchor hook remain separate work. The C-03 environment consumes query policy,
+recovery and purpose-neutral processing state; no download permission or static
+region fallback is introduced. No public tool is enabled.

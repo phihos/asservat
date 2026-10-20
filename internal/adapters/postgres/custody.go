@@ -25,7 +25,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const currentSchemaVersion = 68
+const currentSchemaVersion = 69
 
 type Ledger struct{ pool *pgxpool.Pool }
 

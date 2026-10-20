@@ -1,0 +1,37 @@
+{
+  "date": "2026-10-18",
+  "baseRevision": "2573439baf3e53a7dadba096399dba2a2bcba2ad",
+  "scope": "Unregistered saved pod-status React component; synthetic component data. Browser gates cover existing registered flows through actual Go HTTPS and built assets, not installed queries.",
+  "commands": [
+    {
+      "command": "npm run check (web), then make console-browser-check (repository root)",
+      "exit": 0,
+      "unitTestFiles": 11,
+      "unitTests": 157,
+      "browserJourneys": 19,
+      "browserAccessibilityScans": 15,
+      "nativeRestartBoundaries": 4,
+      "nativeRestartAccessibilityScans": 2
+    },
+    {
+      "command": "make spec-check architecture-check PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "exit": 0
+    }
+  ],
+  "knownWarning": "Existing production bundle exceeds 500 kB.",
+  "regression": "Old detach callback erased a newer attached scope; regression failed before fix. Local review also found replacement rendering exposed an old excerpt before passive effects; a layout observation failed before exact attachment gating.",
+  "sourceHashes": {
+    "web/scripts/contracts.mjs": "ac8a90e87731d4c1d254e46513d69c62f46dae7280220c249489f2ccac17d081",
+    "web/scripts/validator-test.mjs": "13c4618363bd79a141b759ab3589a4debacdcbccf8298cec0060478757e193a6",
+    "web/src/generated/projection.d.ts": "c0d48b4402869682f589c4f5374995e0391435641be8f21f30fcfc0de4cf6e8d",
+    "web/src/generated/validate-projection.d.ts": "edcd398a46d770e63f9530f895b2f8f632b06ae66a12060ac6a3822af0c11fda",
+    "web/src/generated/validate-projection.js": "0464a6e26bade36e2eee8763f0f5319e49a812344ce95508f83c8eb8e5ecec13",
+    "web/src/projection/ContextProjectionView.test.tsx": "b15c0c44822a35a07e7df5ade8bcd99505c355c2cd58bc653b1dcf13f5cf3b23",
+    "web/src/projection/ContextProjectionView.tsx": "a2a4e8b25d8907dfcf6aec53ab0e9f411d621e4f3727e7075d628eba906ccfb5",
+    "web/src/projection/http.test.ts": "25325b6b9e40b6f3096481e727ab01c10740cd86f4a74fd9d9acb9dd9c60bb9e",
+    "web/src/projection/http.ts": "180f6cad3b50a9269017f82822954c213b757207fcce4d1d1ec9ffb73b99acb4",
+    "web/src/projection/projection.test.ts": "4d4a51fcb146f9db6e42b67ae1e01214be96d766e6fc3f7109b631582f882112",
+    "web/src/projection/projection.ts": "04959ecd41f61dc6c03629b1cce018ee9ec520ea5241e44a9f5bb44dec153834",
+    "web/src/projection/test-fixtures.ts": "a5455249d5e5c8f9415d6a14f49fa0b4af33190f6093f39529382967d6a6db58"
+  }
+}

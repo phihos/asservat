@@ -195,8 +195,9 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 				var disposition installedJourneyDisposition
 				err = installedJourneyDecode(reply.Data, &disposition)
 				return disposition, err
-			}, func() string {
-				return requestCapture(map[string]any{"preview_id": request["preview_id"], "idempotency_key": request["idempotency_key"], "continue_acquisition": true})
+			}, func() (string, string) {
+				code := requestCapture(map[string]any{"preview_id": request["preview_id"], "idempotency_key": request["idempotency_key"], "continue_acquisition": true})
+				return code, accepted.CaptureID
 			}, installedJourneyPause)
 			if err != nil {
 				diagnose()
@@ -434,7 +435,7 @@ type installedJourneyDisposition struct {
 // Recovery never infers non-admission from a failed request. The resolver must
 // acknowledge closure before the fixture can review again. An accepted request
 // stays bound to its original identity, including across continuation failures.
-func installedJourneyRecoverCapture(ctx context.Context, code string, resolve func() (installedJourneyDisposition, error), continueCapture func() string, pause func(context.Context, time.Duration) error) (closed bool, err error) {
+func installedJourneyRecoverCapture(ctx context.Context, code string, resolve func() (installedJourneyDisposition, error), continueCapture func() (code, captureID string), pause func(context.Context, time.Duration) error) (closed bool, err error) {
 	acceptedID := ""
 	for continued := 0; code != ""; {
 		if err := ctx.Err(); err != nil {
@@ -472,7 +473,11 @@ func installedJourneyRecoverCapture(ctx context.Context, code string, resolve fu
 		if err := pause(ctx, 2*time.Second); err != nil {
 			return false, err
 		}
-		code = continueCapture()
+		var captureID string
+		code, captureID = continueCapture()
+		if code == "" && captureID != acceptedID {
+			return false, errors.New("successful continuation changed the original accepted capture identity")
+		}
 		continued++
 	}
 	return false, nil
