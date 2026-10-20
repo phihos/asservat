@@ -1,0 +1,3 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-specs.py
+PASS: 121 schemas, 49 MCP tools, 178 examples, 176 requirements, 177 scenarios, 11 tasks, 4378 local links, 729 rejected invalid examples (11535 assertions).
+Documentation/contract validation only; no Kubernetes/runtime feasibility claim.

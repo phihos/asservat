@@ -1,0 +1,8 @@
+HTTP/1.1 200 OK
+Content-Type: application/json
+Server: SeaweedFS 30GB 4.48
+Vary: Origin
+X-Amz-Request-Id: 18E05380A557E15D430FB69D
+Date: Tue, 20 Oct 2026 19:27:43 GMT
+Content-Length: 1964
+

@@ -2,7 +2,32 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
-The [latest frozen installed run `context-sagzb681`](../test/results/resumed-c62e02ac-native49/result.json)
+The [latest frozen installed run `context-cqjvthn6`](../test/results/resumed-c62e02ac-native50/result.json)
+on `b4fbd37d` again completes installed acquisition, verification, publication and
+authorized capture/case retrieval. The request eventually receives an acknowledged
+success for its original capture. The corrected deletion fixture also establishes
+the exact cleaner inventory denial while preserving the independent-prefix control.
+The first `prepare_artifact_download` then returns acknowledged unavailable after
+4.433 seconds. The test exits 1 after 1,226.986 seconds.
+
+The [read-only download state](../test/results/resumed-c62e02ac-native50/postmortem-download.log)
+contains one `Preparing` session, created at `19:24:29.457101Z`, with its original
+`19:29:29.374261Z` deadline and reserved output/read/session allocation. There is
+no worker, batch, response or native owner, and no emitted bytes. Failure is after
+reservation and before successful worker reservation; the public response does
+not identify the exact failed check. Its generic retry flag does not acknowledge
+pending preparation or authorize automatic continuation. Deliberate same-key
+recovery is a separate supported user action.
+
+All 2,763 source hashes match and stayed unchanged. The 33-command postmortem
+collection and extra bounded read-only queries pass. Independent read-back confirms
+the original bucket policy was restored exactly. Cleanup exits 0, all twelve owned
+Docker resources are absent, and build scratch/private control files are removed.
+Native download, revocation/expiry and failed-deletion recovery remain unqualified.
+Current work isolates the pre-worker preparation path; another installed run must
+follow a focused defect/reproduction, not a larger retry or authority interval.
+
+The [preceding frozen installed run `context-sagzb681`](../test/results/resumed-c62e02ac-native49/result.json)
 on `62bfc0bb` reaches installed acquisition, independent publication and fresh
 authorized public capture/case retrieval. Bootstrap, exact regional join replay,
 console processing initialization and capacity readiness pass; the demand lane

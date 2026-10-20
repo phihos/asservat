@@ -7,7 +7,7 @@ Actual commands, source snapshots, failures and subsequent corrections remain in
 
 **Packaged initial bootstrap, protected owner startup, regional capacity and
 console processing initialization have passed their named native checks.
-Installed native49 also completed context acquisition, verification, catalog
+Installed native49 and native50 also completed context acquisition, verification, catalog
 publication and fresh public capture/case retrieval.
 The complete installed developer investigation workflow is unfinished.** Significant identity,
 permissions, encrypted storage, audit, context capture and download components exist.
@@ -109,12 +109,19 @@ one-element array. The fault had not been injected, and there were zero download
 sessions. All 2,762 source hashes matched and stayed unchanged; all twelve owned
 Docker resources were independently confirmed absent after cleanup.
 
-Current work corrects that fixed statement's representation while retaining
-strict policy read-back and all permission tests. A separately identified
-fixture correction waits within one original passive deadline when successful
-capture status omits its independently authorized case link. Native download,
-revocation, expiry and managed deletion remain unqualified in this installed
-journey. Approved context projection composition remains pending under ADR-206;
+[Native50](../test/results/resumed-c62e02ac-native50/result.json) on `b4fbd37d`
+qualifies the policy correction and again completes acquisition, publication and
+current capture/case reads. It establishes the exact deletion fault, but its first
+download-preparation request returns unavailable after 4.433 seconds. One original
+session and its allocation are reserved; no worker, transfer batch or native bytes
+exist. The test exits 1 after 1,226.986 seconds. All 2,763 source hashes match and stay
+unchanged; the original policy is restored and all twelve owned resources are
+independently absent after cleanup.
+
+Current work isolates that preparation failure before worker reservation. The
+delivery boundary is the installed context request, published result, native file
+and revocation/expiry/deletion lifecycle. Native download and that remaining
+lifecycle are still unqualified. Approved context projection composition remains pending under ADR-206;
 public case metadata is not approved-content inspection. S-02 is incomplete.
 Most collector, recording, analysis and sharing work follows or reuses these
 foundations; it has not been declared complete.
