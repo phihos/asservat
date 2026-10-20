@@ -47,6 +47,17 @@ coverage verdict.
    the owner account's denied dry-run probe added to the owner's guarded
    sources. The owner download environment remains the download path's policy.
 
+6. Console login itself had no installed producer: nothing projected the
+   protected browser settings into SQL, so `browser_session_root` never
+   existed and every login was denied (ADR-184 lists the hub-worker's
+   browser-settings role as an open gap; local hold 18). The hub-worker's
+   permission projection gains a browser section: the existing
+   `browser-settings` login and the existing ADR-061 observer, which reads the
+   settings ConfigMap by name and UID once per second and fences the
+   projection when a read fails. The hub-worker's Role gets `get` on exactly
+   that ConfigMap. Browser session cleanup (`browser-cleanup`) stays an open
+   gap; expired logins and sessions are only pruned on new logins.
+
 ## Consequences
 
 The installed journey adds a step in which the configured operator initializes

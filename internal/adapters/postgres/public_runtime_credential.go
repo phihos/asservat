@@ -79,14 +79,16 @@ func VerifyPermissionRuntimeCredential(ctx context.Context, pool *pgxpool.Pool, 
 	}
 	// The ordered list is exact; a retention section adds its four logins, a
 	// worker configuration section its two (ADR-204) and a context deletion
-	// section its three (ADR-205). A manifest naming any of a section's logins
-	// must carry exactly that section's ordered list.
-	var retention, worker, deletion bool
+	// section its three (ADR-205), a browser section its one (ADR-210). A
+	// manifest naming any of a section's logins must carry exactly that
+	// section's ordered list.
+	var retention, worker, deletion, browser bool
 	for _, r := range m.Roles {
 		retention = retention || slices.Contains(contracts.PublicRuntimeRetentionPurposes(), r.Purpose)
 		worker = worker || slices.Contains(contracts.PublicRuntimeWorkerConfigurationPurposes(), r.Purpose)
 		deletion = deletion || slices.Contains(contracts.PublicRuntimeContextDeletionPurposes(), r.Purpose)
+		browser = browser || r.Purpose == "browser-settings"
 	}
-	purposes := contracts.PermissionProjectionPurposes(retention, worker, deletion)
+	purposes := contracts.PermissionProjectionPurposes(retention, worker, deletion, browser)
 	return verifyRuntimeCredential(ctx, pool, contracts.PublicRuntimeCredentialManifest{Format: contracts.PublicRuntimeCredentialManifestFormat, Input: m.Input, RootUID: m.RootUID, SetupID: m.SetupID, Roles: m.Roles}, purpose, purposes)
 }

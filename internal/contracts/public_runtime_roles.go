@@ -38,8 +38,9 @@ func PublicRuntimeRolePurposes() []string {
 // in order: the permission stream's, then, with a retention section
 // (ADR-195), the retention source's, then, with a worker configuration
 // section (ADR-204), the worker configuration acceptance logins, then, with a
-// context deletion section (ADR-205), the deletion logins.
-func PermissionProjectionPurposes(retention, workerConfiguration, contextDeletion bool) []string {
+// context deletion section (ADR-205), the deletion logins, then, with a
+// browser section (ADR-210), the browser settings login.
+func PermissionProjectionPurposes(retention, workerConfiguration, contextDeletion, browser bool) []string {
 	out := PublicRuntimePermissionPurposes()
 	if retention {
 		out = append(out, PublicRuntimeRetentionPurposes()...)
@@ -49,6 +50,9 @@ func PermissionProjectionPurposes(retention, workerConfiguration, contextDeletio
 	}
 	if contextDeletion {
 		out = append(out, PublicRuntimeContextDeletionPurposes()...)
+	}
+	if browser {
+		out = append(out, "browser-settings")
 	}
 	return out
 }

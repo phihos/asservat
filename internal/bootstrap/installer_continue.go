@@ -1309,7 +1309,7 @@ func (k *InstallerContinuation) Permission(ctx context.Context, resources *kube.
 			if projection == nil {
 				deployment := contracts.PermissionDeployment{Format: contracts.PermissionDeploymentFormat, InstallationID: k.record.Scope.InstallationID, RootID: owner.PermissionRootID,
 					RoleRootUID: verified.UID, RoleSetupID: verified.State.OperationID, Postgres: owner.Postgres, Control: control,
-					Retention: &contracts.RetentionDeployment{Guard: retention}, WorkerConfiguration: workers, ContextDeletion: k.contextDeletionEnabled()}
+					Retention: &contracts.RetentionDeployment{Guard: retention}, WorkerConfiguration: workers, ContextDeletion: k.contextDeletionEnabled(), Browser: k.browserSection()}
 				if projection, e = kube.NewPermissionRuntimeProjection(bridge, resources, k.publicRoot, deployment); e != nil {
 					return e
 				}
@@ -1318,6 +1318,15 @@ func (k *InstallerContinuation) Permission(ctx context.Context, resources *kube.
 			return e
 		})
 	})
+}
+
+// browserSection is the installed browser settings the hub-worker projects
+// into SQL (ADR-210), or nil without public sources.
+func (k *InstallerContinuation) browserSection() *contracts.PermissionBrowserSettings {
+	if k.sources == nil || k.sources.BrowserSettings.Name == "" {
+		return nil
+	}
+	return &contracts.PermissionBrowserSettings{RootID: k.sources.BrowserRootID, Settings: k.sources.BrowserSettings}
 }
 
 // installedCapacity is what the capacity projection needs after the launch.

@@ -134,7 +134,7 @@ func permissionProjectionMaterial(c contracts.PermissionDeployment, original con
 			clearRuntimeProjection(data)
 		}
 	}()
-	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil, c.WorkerConfiguration != nil, c.ContextDeletion) {
+	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil, c.WorkerConfiguration != nil, c.ContextDeletion, c.Browser != nil) {
 		i := slices.IndexFunc(v.Roles, func(r contracts.PublicRuntimeRoleMaterial) bool { return r.Purpose == purpose })
 		if i < 0 || slices.IndexFunc(v.Roles[i+1:], func(r contracts.PublicRuntimeRoleMaterial) bool { return r.Purpose == purpose }) >= 0 {
 			return nil, "", cfg.ErrChanged
