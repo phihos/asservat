@@ -1,0 +1,10 @@
+--- FAIL: TestAPIPreparationRefusalPreservesRollbackDeadline (0.00s)
+    --- FAIL: TestAPIPreparationRefusalPreservesRollbackDeadline/deadline-during-rollback (0.00s)
+        api_context_execution_error_test.go:41: normalization replaced the original cause or error chain local start state unavailable
+    --- FAIL: TestAPIPreparationRefusalPreservesRollbackDeadline/wrapped-deadline-during-rollback (0.00s)
+        api_context_execution_error_test.go:41: normalization replaced the original cause or error chain local start state unavailable
+    --- FAIL: TestAPIPreparationRefusalPreservesRollbackDeadline/bare-custody-sentinel (0.00s)
+        api_context_execution_error_test.go:41: normalization replaced the original cause or error chain local start state unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	0.010s
+FAIL

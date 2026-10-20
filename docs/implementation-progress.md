@@ -52,6 +52,23 @@ pass for PostgreSQL (2.454 seconds), execution (1.146 seconds) and the in-proces
 integration package (6.488 seconds); independent review found no blockers.
 Real-service green and installed qualification remain pending.
 
+The first [real-service correction run](../test/results/resumed-c62e02ac-api-preparation-classification/result.json)
+on `e19738c8` passed expired-row uncertainty, zero-effect headroom refusal
+and both compiled execution/publication role cases. Three assertions still
+failed because custody normalized the new
+headroom refusal to its own unavailable sentinel rather than the execution
+contract's sentinel. Test and harness exited 1 after 12.368 seconds; all 2,726
+source hashes matched and stayed unchanged, and owned teardown was verified.
+The follow-up preserves only that explicit headroom refusal across the adapter
+boundary; it does not change generic SQL error handling or the regression tests.
+The post-lock classification assertions stopped those cases before their fresh
+first-winner and exact-replay checks; that qualification remains pending.
+Review also identified cancellation during rollback as a distinct normalized
+deadline cause. A focused failing regression now requires that original cause
+and error chain to survive; only the explicitly recorded headroom/client
+combination becomes execution-unavailable. The full PostgreSQL race suite
+passes in 2.466 seconds with identical before/after source hashes.
+
 The installed fixture also spent a redundant resolution record after a
 successful continuation. A deterministic regression reproduced a third
 resolution exceeding its unchanged two-record reservation after the second

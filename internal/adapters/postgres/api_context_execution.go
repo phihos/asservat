@@ -255,9 +255,11 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 	}
 	// The ledger normalizes errors returned through it; keep the step beside it.
 	failed := ""
+	headroomRefused := false
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		out = value.APIExecution{}
 		first = false
+		headroomRefused = false
 		err := s.checked(ctx, q, c, topology, func(accepted custodydb.ContextCapture) error {
 			row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: accepted.ID})
 			if errors.Is(err, pgx.ErrNoRows) {
@@ -289,7 +291,8 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 					return err
 				}
 				if until.Sub(now.Time) < time.Second {
-					return sqlStep{"headroom", value.ErrUnavailable}
+					headroomRefused = true
+					return sqlStep{"headroom", privacyapp.ErrUnavailable}
 				}
 				row, err = q.InsertAPIExecution(ctx, custodydb.InsertAPIExecutionParams{RootID: id(s.root), CaptureID: accepted.ID, AttemptID: accepted.AttemptID, BindingJson: bj, ProcessJson: pj, ExpectationDigest: ed[:], NotBefore: ts(b.NotBefore), NotAfter: ts(b.NotAfter), WriterProtocol: pgtype.Text{String: artifact.ContextWriterProtocol, Valid: true}})
 				first = err == nil
@@ -324,6 +327,7 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 		return err
 	})
 	if err != nil {
+		err = apiPreparationRefusalError(err, headroomRefused)
 		if failed != "" {
 			return value.APIExecution{}, false, sqlStep{failed, err}
 		}
@@ -331,6 +335,17 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 	}
 	return out, first, nil
 }
+
+func apiPreparationRefusalError(err error, headroomRefused bool) error {
+	// Ordinary custody normalization of this known refusal is "client".
+	// Expiry during rollback instead reports "deadline" and must survive.
+	var cause ledgerCause
+	if headroomRefused && errors.As(err, &cause) && cause.cause == "client" {
+		return value.ErrUnavailable
+	}
+	return err
+}
+
 func (s *APIContextExecutions) BindAPIStart(ctx context.Context, c app.APIExecutionCheck, r value.APIExecution, p value.PreparedStart) (value.APIExecution, error) {
 	return s.changeAPIStart(ctx, c, r, func(q *custodydb.Queries, old value.APIExecution) (custodydb.ContextExecution, error) {
 		if !authorization.UUID(p.ObjectUID) || !identity.Text(p.ResourceVersion, 128) {

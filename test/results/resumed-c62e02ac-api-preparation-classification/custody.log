@@ -1,0 +1,28 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/expired-prepared-is-passive-and-runner-uncertain
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-observation-headroom
+    api_execution_preparation_test.go:266: insufficient headroom was not unavailable api execution effect/headroom
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-caller-headroom
+    api_execution_preparation_test.go:266: insufficient headroom was not unavailable api execution effect/headroom
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/short-caller-reaches-no-runner-effects
+    api_execution_preparation_test.go:289: short caller was not refused as unavailable api context execution PrepareAPIExecution
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier/due-pages-pass-persistent-failures-and-wrap
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher/due-pages-pass-persistent-failures-and-wrap
+--- FAIL: TestContextAdmissionWithRealServices (12.29s)
+    --- FAIL: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries (5.49s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/expired-prepared-is-passive-and-runner-uncertain (2.48s)
+        --- FAIL: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-observation-headroom (1.28s)
+        --- FAIL: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-caller-headroom (1.23s)
+        --- FAIL: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/short-caller-reaches-no-runner-effects (0.51s)
+    --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication (6.41s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier (3.26s)
+            --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier/due-pages-pass-persistent-failures-and-wrap (0.04s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher (3.14s)
+            --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher/due-pages-pass-persistent-failures-and-wrap (0.04s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	12.368s
+FAIL
