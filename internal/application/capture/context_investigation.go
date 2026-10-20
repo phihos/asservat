@@ -370,7 +370,9 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != compiler.ContextAssessmentRulesDigestForClass(p.ExecutionClass) {
 		return zero, value.ErrChanged
 	}
+	resolveStarted := time.Now()
 	target, err := s.Targets.ResolvePod(ctx, p.Target)
+	auditapp.MarkStep(ctx, "q-resolve", resolveStarted)
 	if err != nil {
 		return zero, err
 	}
@@ -414,7 +416,9 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if !final.Eligible || final.Target != target.Target() || final.Principal != p.Actor || final.VerifiedIdentity.Principal != p.Actor || !final.VerifiedIdentity.Valid(s.Now()) || !slices.Equal(final.DefaultAudience, p.Audience) || !s.Now().Before(final.ValidUntil) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !p.Current(s.Now()) || !recovery.Valid(s.Now()) || ctx.Err() != nil {
 		return zero, value.ErrChanged
 	}
+	admitStarted := time.Now()
 	a, err := s.Admission.AdmitReviewedContext(ctx, p.ID, value.Admission{Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})
+	auditapp.MarkStep(ctx, "q-admit", admitStarted)
 	if err != nil {
 		return zero, err
 	}

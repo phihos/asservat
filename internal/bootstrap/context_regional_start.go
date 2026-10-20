@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"context"
 	"errors"
 
@@ -54,6 +55,8 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		call, stop = context.WithDeadline(call, until)
 		cancels = append(cancels, stop)
 	}
+	// Fixed step durations for the operation's timing line; diagnostics only.
+	var mark time.Time
 	caller, e := current.ResolveIdentity(call)
 	if e != nil || !caller.Valid(s.Now()) {
 		return execution.ErrDenied
@@ -64,7 +67,9 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		return execution.ErrUnavailable
 	}
 	narrow(recovery.FreshUntil)
+	mark = time.Now()
 	accepted, e := s.Runner.Read.ReadAPIContextWork(call, id, caller, recovery)
+	auditapp.MarkStep(ctx, "st-read", mark)
 	if e != nil {
 		return e
 	}
@@ -75,19 +80,25 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	narrow(a.Deadline)
 	narrow(a.Expectation.Registration.WriteUntil)
 	target := authorization.Target{ClusterID: accepted.Target.ClusterID, NamespaceUID: accepted.Target.Namespace.UID, WorkloadUID: accepted.Target.Workload.UID, PodUID: accepted.Target.PodUID}
+	mark = time.Now()
 	capability, e := s.Runner.Capabilities.ContextCapability(call, target)
+	auditapp.MarkStep(ctx, "st-capability", mark)
 	if e != nil || !capability.Valid(s.Now()) {
 		return execution.ErrUnavailable
 	}
 	narrow(capability.FreshUntil)
 	// Reservation happens before signing/attachment. A closing old exchange stays
 	// charged until its original socket and human owner have actually joined.
+	mark = time.Now()
 	attachment, e := s.Router.Attach(call, target.ClusterID, id)
+	auditapp.MarkStep(ctx, "st-attach", mark)
 	if e != nil {
 		return execution.ErrUnavailable
 	}
 	defer attachment.Close()
+	mark = time.Now()
 	receiver, e := attachment.Receiver(call)
+	auditapp.MarkStep(ctx, "st-receiver", mark)
 	if e != nil {
 		return execution.ErrUnavailable
 	}
@@ -99,7 +110,9 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if e != nil {
 		return e
 	}
+	mark = time.Now()
 	signed, e := s.Signer.SignAPIContextWork(call, work)
+	auditapp.MarkStep(ctx, "st-sign", mark)
 	if e != nil {
 		return e
 	}
@@ -109,6 +122,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if call.Err() != nil || !s.Now().Before(until) {
 		return execution.ErrUnavailable
 	}
+	mark = time.Now()
 	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
 		r := s.Runner
 		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
@@ -121,6 +135,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		}
 		return "Unavailable", err
 	})
+	auditapp.MarkStep(ctx, "st-run", mark)
 	if e != nil && state == "" {
 		return execution.ErrUnavailable
 	}

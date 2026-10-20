@@ -1,6 +1,7 @@
 package capture
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -143,7 +144,9 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if err = narrow(identity.Earlier(a.Deadline, a.Expectation.Registration.WriteUntil)); err != nil {
 		return a, err
 	}
+	intentStarted := time.Now()
 	r, err := s.Intents.AcknowledgedCaptureIntent(call, a.CaptureID)
+	auditapp.MarkStep(call, "s-intent", intentStarted)
 	b, encodeErr := json.Marshal(a.Expectation)
 	if err != nil || encodeErr != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != a.CaptureID || r.Actor != i.Principal || r.ScopeDigest != a.ScopeDigest || r.SubmissionDigest != a.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(b)) || !r.Deadline.Equal(a.Deadline) {
 		return a, value.ErrUnavailable
@@ -151,7 +154,10 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if err = check(); err != nil {
 		return a, err
 	}
-	if err = s.Start.StartContext(call, current, a.CaptureID); err != nil {
+	startStarted := time.Now()
+	err = s.Start.StartContext(call, current, a.CaptureID)
+	auditapp.MarkStep(call, "s-start", startStarted)
+	if err != nil {
 		return a, err
 	}
 	if err = check(); err != nil {
