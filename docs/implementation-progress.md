@@ -2,6 +2,77 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
+An independent deterministic regression reproduced admission with only 50 ms
+left on the final storage observation after the early readiness hint succeeded.
+The authoritative read now requires the existing one-second margin, refusing
+before admission when it is insufficient. It adds no read, refresh demand or
+deadline extension. The exact one-second boundary, original identity/target
+expiry and joined cancellation pass; the full capture race suite passed in
+3.038 seconds. This selection-time readiness correction is not an attribution
+of native43 or native44.
+
+The MCP diagnostic regression also reproduced an audit-begin failure being
+hidden when the final identity check found the original deadline expired.
+The existing private, closed failure is now reported before that check;
+the public response, current identity read, socket deadlines and single audit
+attempt are unchanged. Both supported protocol revisions pass the focused
+race tests, including private-error redaction; the full MCP race suite passed
+in 12.214 seconds. A separate fixture-only SQL activity snapshot now runs
+before journey Pod diagnostics and owner removal. It reads the existing
+administrator pool under the original context capped at two seconds, selects
+only this installation's runtime roles and emits at most 64 rows of state,
+wait type/event and ages. It emits no query text, credentials or provider
+errors and creates no pool or retry. Its focused race tests passed in
+1.065 seconds. Such a server snapshot cannot show client-side pool waiters
+and is supporting evidence only.
+
+Start diagnostics now distinguish the inherited caller cutoff from the
+start's own five-second cap. Native protection failures retain closed
+namespace/guard/probe phases and the original error class; the authenticator
+separates read failure, invalid proof, pool mismatch and changed digest.
+An actual TLS/HTTP2 regression composes successful attachment with refusal at
+the work-send check's closing protection read, preserving the inherited
+deadline, one connection, zero execution effects and joined cancellation.
+Its injected proof failure is component evidence, not native API performance
+qualification. The complete fleet and mTLS race suites passed in 15.962 and
+35.028 seconds; focused Kubernetes/bootstrap race checks passed in 7.775 and
+1.057 seconds. Independent review found no blockers. Specification,
+architecture, embedded contracts and `go vet ./...` gates passed, as did the
+full in-process integration race suite (6.286 seconds). The next installed
+qualification remains pending; local limiter versus network failure and
+client-side SQL contention are not established causes.
+
+The [frozen diagnostic run `context-5ngvkl2b`](../test/results/resumed-c62e02ac-native44/result.json)
+on `ccdde1a3` passed bootstrap, regional join/replay, processing initialization
+and preview. The demand lane produced six distinct observations and 27 usable
+samples in 15 seconds. Unlike native43, capture-intent persistence completed.
+The retained fixture's [read-only SQL postmortem](../test/results/resumed-c62e02ac-native44/postmortem-sql.log)
+shows its original intent interval was 1.578494 seconds from capture insertion,
+the encrypted intent was stored after 157 ms, both audit phases were acknowledged,
+and the capture remained `intent_audited` with one reserved custody attempt and
+no execution row.
+
+The first start failed the closing local protection check during dispatch with
+less than 0.5 seconds left. That diagnostic still represents positive remaining
+time; it does not identify expiry as the underlying cause. The original
+`bound=start` label also conflates an inherited earlier request cutoff with
+the start's own five-second cap. After one acknowledged resolution, the next
+same-identity request and its resolution ended in HTTP/2 transport errors.
+Their SQL audit intents were started but never acknowledged. The visible
+resolution timing spent at least three seconds reading the provider's current
+configuration, before mounted credentials or provider access. Its single
+registry SQL pool is under investigation; the logs do not establish pool
+exhaustion or justify increasing connection limits. Acquisition, publication,
+native download, revocation and deletion remain unqualified.
+
+Test and harness exited 1 after 1,236.374 seconds. All 2,745 source hashes
+match the commit and stayed unchanged. The failed fixture was retained only
+for read-only inspection; subsequent owned cleanup exited 0 with no failures.
+Independent Docker read-back confirmed both clusters, six service containers,
+the owned volume, image and two networks absent. Build scratch was removed.
+The first postmortem query used an incorrect table name and exited 3; the
+corrected read-only query exited 0. Both outputs remain in the local full archive.
+
 The [subsequent frozen run `context-mcw3di7n`](../test/results/resumed-c62e02ac-native43/result.json)
 on `a565c2db` includes the canonical regional start CRD prerequisite and
 corrected publication grants. Bootstrap, exact regional join replay, readiness,
@@ -32,8 +103,8 @@ reconciliation reads; it never recreates a missing object or starts acquisition.
 Focused race tests and the full audit/capture/objectstore race suites pass
 (1.172, 3.026 and 4.516 seconds). Specification, architecture, dependency,
 embedded schema/CRD and `go vet ./...` gates pass. These diagnostics do not fix
-or establish the underlying native43 failure; the next installed run will retain
-its owned fixture on failure for bounded postmortem inspection and cleanup.
+or establish the underlying native43 failure. Native44 above includes them
+and its retained-fixture postmortem.
 
 The [frozen run `context-thfmy2s8`](../test/results/resumed-c62e02ac-native42/result.json)
 on `4110072f` progressed beyond the previous target-query failures. The preview

@@ -50,6 +50,7 @@ type contextStartTLSFixture struct {
 	pool       value.OwnerPool
 	roots      *x509.CertPool
 	owners     *app.OwnerAuthenticator
+	ingress    *ContextStartIngress
 	credential *ConnectorProcessCredentials
 	listener   string
 	// targets answers ADR-179 queries on regional streams opened by open.
@@ -128,6 +129,7 @@ func newContextStartTLSFixture(t *testing.T) *contextStartTLSFixture {
 	if e != nil {
 		t.Fatal(e)
 	}
+	fixture.ingress = ingress
 	fixture.router, e = contextstart.NewRouter(contextstart.RouterLimits{Standby: 1, Captures: 1, Clusters: []contextstart.ClusterLimit{{ClusterID: api.ClusterID, Standby: 1, Captures: 1}}})
 	if e != nil {
 		t.Fatal(e)

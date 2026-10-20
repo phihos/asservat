@@ -182,6 +182,11 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 	if err != nil {
 		return f, previewFailure("facts/storage", err)
 	}
+	// Readiness may have completed before the ordered facts reads. Consume
+	// this authoritative observation only while the same margin still remains.
+	if f.storage.Binding.FreshUntil.Before(s.Now().Add(storageMargin)) {
+		return f, previewFailure("facts/storage", value.ErrUnavailable)
+	}
 	if intent.Reason != nil {
 		if s.Reasons == nil {
 			return f, previewFailure("facts/reason", value.ErrUnavailable)
@@ -483,8 +488,8 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	return a, nil
 }
 
-// storageMargin is the binding freshness awaitStorage wants left for the final
-// authoritative storage read and subsequent processing/admission checks.
+// storageMargin is the binding freshness required by both the readiness hint
+// and the authoritative read before subsequent processing/admission checks.
 const storageMargin = time.Second
 
 // One non-authoritative readiness hint belongs to one call. Request starts it

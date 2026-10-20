@@ -314,30 +314,45 @@ func (g *OwnerWorkloadProtection) prove(ctx context.Context, start time.Time) er
 func (g *OwnerWorkloadProtection) Current(ctx context.Context) (artifact.Digest, time.Time, error) {
 	var zero artifact.Digest
 	if g == nil || ctx == nil || g.observer == nil || g.probe == nil {
-		return zero, time.Time{}, cfg.ErrInvalid
+		return zero, time.Time{}, ownerProtectionError("entry", cfg.ErrInvalid, nil)
 	}
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	start := g.observer.now()
 	ns, err := g.observer.namespace(ctx, g.plan.ControlNamespace)
-	if err != nil || ns.Deleting {
-		return zero, time.Time{}, cfg.ErrChanged
+	if err != nil {
+		return zero, time.Time{}, ownerProtectionError("namespace-first", cfg.ErrChanged, err)
+	}
+	if ns.Deleting {
+		return zero, time.Time{}, ownerProtectionError("namespace-first-deleting", cfg.ErrChanged, nil)
 	}
 	before, err := checkAdmissionGuard(ctx, g.observer, g.plan.Name, g.pin, g.policy, g.binding)
 	if err != nil {
-		return zero, time.Time{}, err
+		return zero, time.Time{}, ownerProtectionError("guard-first", err, err)
 	}
 	if err = g.prove(ctx, start); err != nil {
-		return zero, time.Time{}, err
+		return zero, time.Time{}, ownerProtectionError("probe", err, err)
 	}
 	after, err := checkAdmissionGuard(ctx, g.observer, g.plan.Name, g.pin, g.policy, g.binding)
-	if err != nil || before != after || g.observer.current(ctx, start, 5*time.Second) != nil {
-		return zero, time.Time{}, cfg.ErrChanged
+	if err != nil {
+		return zero, time.Time{}, ownerProtectionError("guard-last", cfg.ErrChanged, err)
+	}
+	if before != after {
+		return zero, time.Time{}, ownerProtectionError("guard-changed", cfg.ErrChanged, nil)
+	}
+	if err = g.observer.current(ctx, start, 5*time.Second); err != nil {
+		return zero, time.Time{}, ownerProtectionError("original-interval", cfg.ErrChanged, err)
 	}
 	// Namespace replacement/deletion during the proof cannot keep it current.
 	ns, err = g.observer.namespace(ctx, g.plan.ControlNamespace)
-	if err != nil || ns.Deleting || g.observer.current(ctx, start, 5*time.Second) != nil {
-		return zero, time.Time{}, cfg.ErrChanged
+	if err != nil {
+		return zero, time.Time{}, ownerProtectionError("namespace-last", cfg.ErrChanged, err)
+	}
+	if ns.Deleting {
+		return zero, time.Time{}, ownerProtectionError("namespace-last-deleting", cfg.ErrChanged, nil)
+	}
+	if err = g.observer.current(ctx, start, 5*time.Second); err != nil {
+		return zero, time.Time{}, ownerProtectionError("final-interval", cfg.ErrChanged, err)
 	}
 	return g.digest, start.Add(5 * time.Second), nil
 }

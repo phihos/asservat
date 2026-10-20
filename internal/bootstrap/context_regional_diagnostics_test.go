@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,6 +11,35 @@ import (
 
 	fleet "asservat.local/asservat/internal/domain/fleet"
 )
+
+func TestRegionalContextStartNamesInheritedDeadline(t *testing.T) {
+	started := time.Now().UTC().Truncate(time.Microsecond)
+	for _, tc := range []struct {
+		name string
+		end  time.Time
+		want string
+	}{
+		{"unbounded-parent", time.Time{}, "start"},
+		{"earlier-parent", started.Add(1500 * time.Millisecond), "parent"},
+		{"equal-parent", started.Add(5 * time.Second), "start"},
+		{"later-parent", started.Add(6 * time.Second), "start"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			if !tc.end.IsZero() {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithDeadline(ctx, tc.end)
+				defer cancel()
+			}
+			if got := regionalStartInitialBound(ctx, started); got != tc.want {
+				t.Fatalf("inherited cutoff misidentified: got %q, want %q", got, tc.want)
+			}
+			if d, _ := ctx.Deadline(); d != tc.end || ctx.Err() != nil {
+				t.Fatal("diagnostic changed its context")
+			}
+		})
+	}
+}
 
 func TestRegionalContextDiagnosticsKeepClosedVocabulary(t *testing.T) {
 	var out bytes.Buffer

@@ -65,7 +65,10 @@ always be refused.
   The investigation owns one joined readiness wait per call. It overlaps
   exact-Pod resolution for a request and the unchanged ordered
   eligibility/capability/retention checks, then joins before the authoritative
-  storage read. It does not repeat the wait inside request facts, extend any
+  storage read. That final result must still have the existing one-second
+  freshness margin; otherwise admission returns unavailable. This is a check
+  at selection, not a guarantee of time remaining after later SQL waits.
+  It does not repeat the wait inside request facts, extend any
   contributing observation, or survive cancellation/early refusal.
 - **Downloads** re-arm the demand (migration 00067): demand rows keep their
   names after they expire, and download preparation, which knows only its

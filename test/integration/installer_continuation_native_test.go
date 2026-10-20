@@ -485,6 +485,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	publicAddress := net.JoinHostPort(nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID), "31450")
 	journey := func(cluster, namespace, workload string, deny func(bool)) {
 		diagnose := func() {
+			installedSQLActivityDiagnostics(ctx, admin.Query, installation, t.Logf)
 			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-owner", prefix+"-worker", contracts.PublisherName(installation))
 			c, end := context.WithTimeout(ctx, 20*time.Second)
 			defer end()

@@ -67,8 +67,8 @@ type Handler struct {
 	operations   presentation.Operations
 	audited      *presentation.AuditedOperations
 	security     presentation.IngressCounters
-	// Report, when set before serving, receives a closed reason for each 503;
-	// it carries no request content. The
+	// Report, when set before serving, receives closed operation failures and
+	// 503 reasons; it carries no request content. The
 	// installed journey's first MCP call ended in a bare 503. Diagnostics only.
 	Report func(reason string)
 }
@@ -597,6 +597,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.unavailable(w, "response-overflow")
 		return
 	}
+	// Preserve the operation's existing closed cause even when its original
+	// deadline expired during audit and the final identity check must refuse.
+	// This report grants no response authority and performs no additional read.
+	failure := delivery.failed()
+	if failure != "" && h.Report != nil {
+		h.Report("operation-failed " + failure)
+	}
 	// Even discovery/list output cannot survive identity/policy revocation while
 	// SDK work blocked. A refreshed observation never extends the original lease.
 	// Workload/recovery authorization may expire earlier than identity, including
@@ -606,9 +613,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.authFailure(w, err, "final-identity")
 		return
 	}
-	if failure := delivery.failed(); failure != "" {
-		// A failed call leaves no delivery deadline; report it as what it is.
-		h.unavailable(w, "operation-failed "+failure)
+	if failure != "" {
+		// A failed call leaves no delivery deadline. Its cause was already
+		// reported before the final identity read; keep the same wire refusal.
+		problem(w, http.StatusServiceUnavailable)
 		return
 	}
 	if !delivery.restrict(finalIdentity.ValidUntil) {

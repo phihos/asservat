@@ -52,8 +52,9 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 			cancels[i]()
 		}
 	}()
-	// bound names the input that last shortened the start, for diagnostics.
-	bound := "start"
+	// The initial context may already be shorter than this start's five seconds.
+	// Later names identify only an input that actually shortens that bound.
+	bound := regionalStartInitialBound(ctx, started)
 	narrow := func(name string, d time.Time) {
 		if d.Before(until) {
 			bound = name
@@ -166,6 +167,14 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	default:
 		return execution.ErrUnavailable
 	}
+}
+
+// Diagnostic only: a retained caller deadline is not a fresh start interval.
+func regionalStartInitialBound(ctx context.Context, started time.Time) string {
+	if deadline, ok := ctx.Deadline(); ok && deadline.Before(started.Add(5*time.Second)) {
+		return "parent"
+	}
+	return "start"
 }
 
 // ServeRegionalAPIContextExchange owns one outbound exchange until all regional

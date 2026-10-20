@@ -6,6 +6,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -50,12 +51,16 @@ func TestOwnerServingRequiresAllCurrentBoundaries(t *testing.T) {
 func testOwnerCurrentBoundaries(t *testing.T, kind string) {
 	const id = "11111111-1111-4111-8111-111111111111"
 	const other = "22222222-2222-4222-8222-222222222222"
-	for _, mode := range []string{"valid", "expired-first-registry", "cached-first-registry", "retired-during-route", "changed-config", "changed-enrollment", "wrong-registry-certificate", "wrong-route-process", "wrong-route-pool", "wrong-pod-name", "wrong-replica", "protection-missing", "protection-changed", "protection-wrong-pool", "removed-root", "connection-changed", "cancelled", "expired-during-crypto"} {
+	for _, mode := range []string{"valid", "expired-first-registry", "cached-first-registry", "retired-during-route", "changed-config", "changed-enrollment", "wrong-registry-certificate", "wrong-route-process", "wrong-route-pool", "wrong-pod-name", "wrong-replica", "protection-missing", "protection-changed", "protection-wrong-pool", "protection-invalid", "protection-after-invalid", "protection-after-wrong-pool", "protection-native-step", "protection-private-step", "protection-deadline", "protection-canceled", "protection-unreported", "removed-root", "connection-changed", "cancelled", "expired-during-crypto"} {
 		t.Run(mode, func(t *testing.T) {
 			now := time.Now().UTC()
 			start := now
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+			var reports []string
+			if mode != "protection-unreported" {
+				ctx = WithRefusalSteps(ctx, func(step string) { reports = append(reports, step) })
+			}
 			pool := value.OwnerPool{InstallationID: id, ClusterID: id, IssuerEpoch: id, Namespace: "hub", NamespaceUID: id, Service: "hub", ServiceUID: id, Deployment: "hub", DeploymentUID: id, ServiceAccount: "hub", AccountUID: id, Port: 8443}
 			binding := value.OwnerBinding{InstallationID: id, ClusterID: id, IssuerEpoch: id, PodUID: id, ProcessEpoch: id}
 			cert := value.OwnerCertificate{Binding: binding, Usage: "client", Digest: artifact.Digest{1}, NotBefore: start.Add(-time.Minute), NotAfter: start.Add(10 * time.Minute)}
@@ -105,6 +110,26 @@ func testOwnerCurrentBoundaries(t *testing.T, kind string) {
 					return out, errors.New("missing")
 				case "protection-wrong-pool":
 					out.Pool.NamespaceUID = other
+				case "protection-invalid":
+					out.FreshUntil = now
+				case "protection-after-invalid":
+					if guards > 1 {
+						out.FreshUntil = now
+					}
+				case "protection-after-wrong-pool":
+					if guards > 1 {
+						out.Pool.NamespaceUID = other
+					}
+				case "protection-native-step":
+					return out, ownerProtectionDiagnosticError{"source.guard-policy-read", false}
+				case "protection-private-step":
+					return out, ownerProtectionDiagnosticError{"source.guard-policy-read: private-token-host", false}
+				case "protection-unreported":
+					return out, ownerProtectionDiagnosticError{"", true}
+				case "protection-deadline":
+					return out, context.DeadlineExceeded
+				case "protection-canceled":
+					return out, context.Canceled
 				case "protection-changed":
 					if guards > 1 {
 						out.Digest[0]++
@@ -158,6 +183,21 @@ func testOwnerCurrentBoundaries(t *testing.T, kind string) {
 				got, err = s.AuthenticateOwner(ctx, connection)
 				deadline = got.ValidUntil
 			}
+			wantReport := map[string]string{
+				"protection-missing":          "protection-before/read/other",
+				"protection-wrong-pool":       "protection-before/pool",
+				"protection-invalid":          "protection-before/invalid",
+				"protection-after-invalid":    "protection-after/invalid",
+				"protection-after-wrong-pool": "protection-after/pool",
+				"protection-changed":          "protection-after/digest",
+				"protection-native-step":      "protection-before/read/source.guard-policy-read",
+				"protection-private-step":     "protection-before/read/other",
+				"protection-deadline":         "protection-before/read/deadline",
+				"protection-canceled":         "protection-before/read/canceled",
+			}[mode]
+			if wantReport != "" && (len(reports) != 1 || !strings.HasPrefix(reports[0], wantReport+"@") || !errors.Is(err, value.ErrUnavailable)) {
+				t.Fatalf("protection refusal lost its closed reason or error class: %v, %v", reports, err)
+			}
 			if mode != "valid" && mode != "cached-first-registry" {
 				if err == nil || got != (value.AuthenticatedOwner{}) || !deadline.IsZero() {
 					t.Fatal("invalid peer accepted", got)
@@ -173,6 +213,19 @@ func testOwnerCurrentBoundaries(t *testing.T, kind string) {
 			}
 		})
 	}
+}
+
+type ownerProtectionDiagnosticError struct {
+	step      string
+	forbidden bool
+}
+
+func (ownerProtectionDiagnosticError) Error() string { panic("private error text inspected") }
+func (e ownerProtectionDiagnosticError) FixedStep() string {
+	if e.forbidden {
+		panic("unreported dependency inspected")
+	}
+	return e.step
 }
 
 type servingIdentityFixture struct{ ownerConnectionFixture }

@@ -95,7 +95,11 @@ Request starts it beside exact-Pod resolution using the preview's pinned
 target; Preview and CheckDiagnostic start it after target resolution. The
 same wait overlaps eligibility, capability and retention reads in their
 existing order, then joins before the authoritative storage read. Early
-failure cancels and joins it before returning. Every fact retains its original
+failure cancels and joins it before returning. The authoritative result must
+still have the same one-second freshness margin; an early successful hint
+cannot satisfy that check after other work consumes the margin. An insufficient
+result returns the existing unavailable outcome before admission, without
+another wait or renewed observation. Every fact retains its original
 cutoff across the wait; neither readiness nor a late positive result renews
 the selected target or permits an expired operation.
 

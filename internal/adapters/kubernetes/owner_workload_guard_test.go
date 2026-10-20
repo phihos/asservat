@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -25,7 +26,7 @@ import (
 )
 
 func TestOwnerWorkloadProtectionRequiresActualCurrentDenial(t *testing.T) {
-	for _, mode := range []string{"valid", "conflict-once", "conflict-always", "conflict-foreign", "conflict-then-replaced", "conflict-then-late", "ordinary-rbac-denial", "admin-probe", "controller-probe", "changed-binding", "changed-policy", "type-warning", "missing-policy", "foreign-deployment", "namespace-replaced", "namespace-replaced-after", "late", "wrong-cause", "wrong-kind", "accepted-dry-run", "changed-during-proof"} {
+	for _, mode := range []string{"valid", "conflict-once", "conflict-always", "conflict-foreign", "conflict-then-replaced", "conflict-then-late", "ordinary-rbac-denial", "admin-probe", "controller-probe", "changed-binding", "changed-policy", "type-warning", "missing-policy", "missing-policy-after", "foreign-deployment", "namespace-replaced", "namespace-replaced-after", "namespace-read-after", "late", "wrong-cause", "wrong-kind", "accepted-dry-run", "changed-during-proof"} {
 		t.Run(mode, func(t *testing.T) {
 			start := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 			var clock atomic.Int64
@@ -41,12 +42,17 @@ func TestOwnerWorkloadProtectionRequiresActualCurrentDenial(t *testing.T) {
 			policy.Status.TypeChecking = &admission.TypeChecking{}
 			binding.UID, binding.ResourceVersion = types.UID(pin.BindingUID), "20"
 			deployment := apps.Deployment{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, ObjectMeta: meta.ObjectMeta{Name: plan.Deployment, Namespace: plan.ControlNamespace.Name, UID: types.UID(plan.DeploymentUID), ResourceVersion: "30"}}
-			var policyReads, namespaceReads, deploymentReads, writes atomic.Int32
+			var policyReads, namespaceReads, deploymentReads, writes, requests atomic.Int32
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
 				switch r.URL.Path {
 				case "/api/v1/namespaces/owners":
 					uid := plan.ControlNamespace.UID
 					n := namespaceReads.Add(1)
+					if mode == "namespace-read-after" && n > 1 {
+						http.Error(w, "private native API message", http.StatusInternalServerError)
+						return
+					}
 					if mode == "namespace-replaced" || mode == "namespace-replaced-after" && n > 1 {
 						uid = ownerID(99)
 					}
@@ -54,7 +60,7 @@ func TestOwnerWorkloadProtectionRequiresActualCurrentDenial(t *testing.T) {
 				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/owner-workload":
 					n := policyReads.Add(1)
 					p := policy.DeepCopy()
-					if mode == "missing-policy" {
+					if mode == "missing-policy" || mode == "missing-policy-after" && n > 1 {
 						http.NotFound(w, r)
 						return
 					}
@@ -202,6 +208,26 @@ func TestOwnerWorkloadProtectionRequiresActualCurrentDenial(t *testing.T) {
 				}
 			} else if e == nil {
 				t.Fatal("unsafe proof accepted")
+			}
+			expected := map[string]struct {
+				step     string
+				class    error
+				requests int32
+			}{
+				"namespace-replaced":       {"protection.namespace-first", cfg.ErrChanged, 1},
+				"namespace-replaced-after": {"protection.namespace-last", cfg.ErrChanged, 10},
+				"namespace-read-after":     {"protection.namespace-last", cfg.ErrChanged, 10},
+				"missing-policy":           {"protection.guard-first/source.guard-policy-read", cfg.ErrChanged, 2},
+				"missing-policy-after":     {"protection.guard-last/source.guard-policy-read", cfg.ErrChanged, 8},
+				"ordinary-rbac-denial":     {"protection.probe/source.probe-access-verdict", cfg.ErrUnavailable, 5},
+				"changed-during-proof":     {"protection.guard-changed", cfg.ErrChanged, 9},
+				"late":                     {"protection.original-interval", cfg.ErrChanged, 9},
+			}[mode]
+			if expected.step != "" {
+				var fixed interface{ FixedStep() string }
+				if !errors.Is(e, expected.class) || !errors.As(e, &fixed) || fixed.FixedStep() != expected.step || requests.Load() != expected.requests {
+					t.Fatalf("native protection lost phase/class or changed reads: error=%v requests=%d want=%+v", e, requests.Load(), expected)
+				}
 			}
 			if mode == "conflict-always" && writes.Load() != 3 {
 				t.Fatalf("conflict retries not bounded: %d", writes.Load())
