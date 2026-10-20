@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 
@@ -162,7 +163,7 @@ func capturePublisher(t *testing.T) (CaptureOperationPublication, *capturePublic
 func TestCaptureOperationUnknownWriteReceiptNeverManufacturesClosure(t *testing.T) {
 	s, f, in := capturePublisher(t)
 	f.lose = true
-	if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); e != ErrUnavailable {
+	if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); !errors.Is(e, ErrUnavailable) {
 		t.Fatal("lost PUT accepted", e)
 	}
 	if f.writes != 1 || f.finds != 0 || f.saved["intent"].Protocol != "" {
@@ -184,7 +185,7 @@ func TestCaptureOperationReconciliationIsFiniteAndKeepsUnknownSpend(t *testing.T
 	f.snap.IntentStarted = true
 	f.failRead = true
 	for i := 0; i < 5; i++ {
-		if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); e != ErrUnavailable {
+		if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); !errors.Is(e, ErrUnavailable) {
 			t.Fatal("missing uncertain object accepted")
 		}
 	}
@@ -196,7 +197,7 @@ func TestCaptureOperationPreservesOriginalDeadlineAfterRead(t *testing.T) {
 	s, f, in := capturePublisher(t)
 	f.snap.IntentStarted = true
 	f.afterRead = func() { f.now = in.WriteUntil }
-	if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); e != ErrUnavailable || f.acks != 0 || f.paired != 0 {
+	if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); !errors.Is(e, ErrUnavailable) || f.acks != 0 || f.paired != 0 {
 		t.Fatal("late read acknowledged", e)
 	}
 }
@@ -204,7 +205,7 @@ func TestCaptureOperationCancellationDoesNotDetachWrites(t *testing.T) {
 	s, f, in := capturePublisher(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	if _, e := s.AcknowledgedCaptureIntent(ctx, in.ID); e != ErrUnavailable || f.writes != 0 || f.finds != 0 {
+	if _, e := s.AcknowledgedCaptureIntent(ctx, in.ID); !errors.Is(e, ErrUnavailable) || f.writes != 0 || f.finds != 0 {
 		t.Fatal("canceled caller acquired work", e)
 	}
 }
@@ -312,7 +313,7 @@ func (f *capturePublicationFixture) ClaimCaptureWrite(ctx context.Context, in va
 func TestCaptureOperationWriteClaimKeepsShorterRecoveryDeadline(t *testing.T) {
 	s, f, in := capturePublisher(t)
 	f.writeUntil = in.CreatedAt.Add(-time.Microsecond)
-	if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); e != ErrUnavailable || f.writes != 0 || f.paired != 0 {
+	if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); !errors.Is(e, ErrUnavailable) || f.writes != 0 || f.paired != 0 {
 		t.Fatal("expired recovery write claim performed I/O", e)
 	}
 }
@@ -322,7 +323,7 @@ func TestCaptureOperationReadClaimDoesNotRenewDuringAcknowledgement(t *testing.T
 	first := in.CreatedAt.Add(time.Second)
 	f.readUntil = first
 	f.afterRead = func() { f.now = first; f.readUntil = in.CreatedAt.Add(2 * time.Second) }
-	if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); e != ErrUnavailable || f.acks != 0 || f.paired != 0 {
+	if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); !errors.Is(e, ErrUnavailable) || f.acks != 0 || f.paired != 0 {
 		t.Fatal("later read interval renewed first acknowledgement", e)
 	}
 }
@@ -337,7 +338,7 @@ func (f *capturePublicationFixture) AcknowledgeOperation(ctx context.Context, in
 func TestCaptureOperationFinalAcknowledgementRetainsFirstWriteDeadline(t *testing.T) {
 	s, f, in := capturePublisher(t)
 	f.afterAck = func() { f.now = in.RequestUntil }
-	if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); e != ErrUnavailable || f.paired != 0 || f.snap.Outcome != nil {
+	if _, e := s.AcknowledgedCaptureIntent(context.Background(), in.ID); !errors.Is(e, ErrUnavailable) || f.paired != 0 || f.snap.Outcome != nil {
 		t.Fatal("intent acknowledgement continued after original write claim", e)
 	}
 }
@@ -415,7 +416,7 @@ func TestCaptureOperationCompletedReadFailureNeverFallsThrough(t *testing.T) {
 				out.Receipt = nil
 				f.now = in.WriteUntil
 			}
-			if _, e := s.AcknowledgedCaptureIntent(ctx, in.ID); e != ErrUnavailable {
+			if _, e := s.AcknowledgedCaptureIntent(ctx, in.ID); !errors.Is(e, ErrUnavailable) {
 				t.Fatal("invalid retained acknowledgement accepted", e)
 			}
 			if mode != "pending-expired" && f.journalReads != 0 {

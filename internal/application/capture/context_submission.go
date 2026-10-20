@@ -148,7 +148,16 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	r, err := s.Intents.AcknowledgedCaptureIntent(call, a.CaptureID)
 	auditapp.MarkStep(call, "s-intent", intentStarted)
 	b, encodeErr := json.Marshal(a.Expectation)
-	if err != nil || encodeErr != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != a.CaptureID || r.Actor != i.Principal || r.ScopeDigest != a.ScopeDigest || r.SubmissionDigest != a.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(b)) || !r.Deadline.Equal(a.Deadline) {
+	if err != nil {
+		if s.ReportPreviewFailure != nil {
+			s.ReportPreviewFailure("request/intent/" + auditapp.CaptureOperationFailureStage(err))
+		}
+		return a, value.ErrUnavailable
+	}
+	if encodeErr != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != a.CaptureID || r.Actor != i.Principal || r.ScopeDigest != a.ScopeDigest || r.SubmissionDigest != a.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(b)) || !r.Deadline.Equal(a.Deadline) {
+		if s.ReportPreviewFailure != nil {
+			s.ReportPreviewFailure("request/intent/record")
+		}
 		return a, value.ErrUnavailable
 	}
 	if err = check(); err != nil {

@@ -3,6 +3,8 @@ package audit
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"strings"
 	"time"
 
 	value "asservat.local/asservat/internal/domain/audit"
@@ -82,6 +84,73 @@ type CaptureOperationPublication struct {
 	Now              func() time.Time
 }
 
+// CaptureOperationFailureStage exposes only this publisher's finite private
+// diagnostic. It never copies a dependency's error text or arbitrary label.
+func CaptureOperationFailureStage(err error) string {
+	var failure *captureOperationFailure
+	if errors.As(err, &failure) {
+		return failure.stage
+	}
+	return "unavailable"
+}
+
+type captureOperationFailure struct{ stage string }
+
+func (e *captureOperationFailure) Error() string     { return ErrUnavailable.Error() }
+func (e *captureOperationFailure) Unwrap() error     { return ErrUnavailable }
+func (e *captureOperationFailure) FixedStep() string { return e.stage }
+
+func captureOperationStep(stage string, cause ...error) *captureOperationFailure {
+	if len(cause) == 1 {
+		if detail := captureOperationDependencyStep(cause[0]); detail != "" {
+			stage += "/" + detail
+		}
+	}
+	return &captureOperationFailure{stage}
+}
+
+func captureOperationCallStep(ctx context.Context, stage string, cause ...error) error {
+	failure := captureOperationStep(stage, cause...)
+	state := "live"
+	until, bounded := ctx.Deadline()
+	switch {
+	case errors.Is(ctx.Err(), context.DeadlineExceeded) || bounded && !time.Now().Before(until):
+		state = "deadline"
+	case ctx.Err() != nil:
+		state = "canceled"
+	}
+	// Observe only the existing phase context, without creating work or a bound.
+	failure.stage += "/" + state
+	return failure
+}
+
+func captureOperationDependencyStep(err error) string {
+	var named interface{ FixedStep() string }
+	if !errors.As(err, &named) {
+		return ""
+	}
+	head, tail, nested := strings.Cut(named.FixedStep(), "/")
+	switch head {
+	case "credentials", "credentials-configuration", "credentials-mounted", "credentials-verify", "credentials-final", "credentials-expired":
+		// Provider-specific substeps are not part of this diagnostic contract.
+		return head
+	case "expired", "seal", "put", "read", "verify", "receipt", "completion":
+		if !nested {
+			return head
+		}
+	}
+	if head == "put" || head == "read" {
+		switch tail {
+		case "http-400", "http-401", "http-403", "http-404", "http-405", "http-408", "http-409", "http-410",
+			"http-412", "http-413", "http-415", "http-422", "http-425", "http-429",
+			"http-500", "http-501", "http-502", "http-503", "http-504",
+			"mismatch", "transport", "deadline", "unversioned":
+			return head + "/" + tail
+		}
+	}
+	return ""
+}
+
 func (s CaptureOperationPublication) current(ctx context.Context, since, until time.Time) error {
 	n := s.Now()
 	if ctx.Err() != nil || n.Before(since) || !n.Before(until) {
@@ -92,7 +161,7 @@ func (s CaptureOperationPublication) current(ctx context.Context, since, until t
 func (s CaptureOperationPublication) AcknowledgedCaptureIntent(ctx context.Context, captureID string) (value.CaptureIntent, error) {
 	var zero value.CaptureIntent
 	if ctx == nil || ctx.Err() != nil || s.Completed == nil || s.Now == nil || !authorization.UUID(s.RootID) || !authorization.UUID(captureID) {
-		return zero, ErrUnavailable
+		return zero, captureOperationStep("configuration")
 	}
 	// Observe the independently acknowledged accepted row before opening the
 	// active write path. This read may outlive audit object retention but grants
@@ -106,27 +175,33 @@ func (s CaptureOperationPublication) AcknowledgedCaptureIntent(ctx context.Conte
 	completed, err := s.Completed.ReadCaptureOperationIntent(observed, captureID)
 	current := s.current(observed, started, until)
 	endRead()
-	if err != nil || current != nil || !completed.Intent.Valid() || completed.OperationID != captureID || completed.Intent.CaptureID != captureID || completed.Intent.RootID != s.RootID {
-		return zero, ErrUnavailable
+	if err != nil {
+		return zero, captureOperationStep("completed-read")
+	}
+	if current != nil || !completed.Intent.Valid() || completed.OperationID != captureID || completed.Intent.CaptureID != captureID || completed.Intent.RootID != s.RootID {
+		return zero, captureOperationStep("completed-record")
 	}
 	if completed.Receipt != nil {
 		if !completed.Receipt.ValidOperation(s.RootID, captureID, "intent") {
-			return zero, ErrUnavailable
+			return zero, captureOperationStep("completed-receipt")
 		}
 		return completed.Intent, nil
 	}
 	if s.Journal == nil || s.Acknowledgements == nil || s.Writer == nil || s.Reader == nil || s.MAC == nil {
-		return zero, ErrUnavailable
+		return zero, captureOperationStep("configuration")
 	}
 	snap, err := s.Journal.ReadCaptureOperation(ctx, captureID)
 	in := snap.Intent
-	if err != nil || !in.Valid() || in.Name != value.CaptureOperationName || in.ID != captureID || in.Capture == nil || !sameOperationRecord(*in.Capture, completed.Intent) || in.Lifecycle == nil || !value.CaptureOperationPolicy(in.Lifecycle.Policy) || in.MACVersion != s.MAC.Version() {
-		return zero, ErrUnavailable
+	if err != nil {
+		return zero, captureOperationStep("journal-read")
+	}
+	if !in.Valid() || in.Name != value.CaptureOperationName || in.ID != captureID || in.Capture == nil || !sameOperationRecord(*in.Capture, completed.Intent) || in.Lifecycle == nil || !value.CaptureOperationPolicy(in.Lifecycle.Policy) || in.MACVersion != s.MAC.Version() {
+		return zero, captureOperationStep("journal-record")
 	}
 	live, end := context.WithDeadline(ctx, in.WriteUntil)
 	defer end()
 	if err = s.current(live, in.CreatedAt, in.WriteUntil); err != nil {
-		return zero, err
+		return zero, captureOperationStep("journal-current")
 	}
 	if snap.IntentReceipt == nil {
 		if err = s.phase(live, snap, "intent"); err != nil {
@@ -134,47 +209,47 @@ func (s CaptureOperationPublication) AcknowledgedCaptureIntent(ctx context.Conte
 		}
 		snap, err = s.Journal.ReadCaptureOperation(live, captureID)
 		if err != nil || !sameOperationRecord(snap.Intent, in) || snap.IntentReceipt == nil {
-			return zero, ErrUnavailable
+			return zero, captureOperationStep("intent-readback")
 		}
 	}
 	if !snap.IntentReceipt.ValidOperation(in.RootID, in.ID, "intent") {
-		return zero, ErrUnavailable
+		return zero, captureOperationStep("intent-receipt")
 	}
 	if snap.Outcome == nil {
 		at := s.Now().UTC().Truncate(time.Microsecond)
 		raw, err := json.Marshal(struct{ Format, CaptureID string }{"capture-intent-result/v1", in.ID})
 		if err != nil {
-			return zero, ErrUnavailable
+			return zero, captureOperationStep("outcome-record")
 		}
 		d, err := s.MAC.Digest("capture-intent-result/v1", raw)
 		clear(raw)
 		if err != nil {
-			return zero, ErrUnavailable
+			return zero, captureOperationStep("outcome-record")
 		}
 		out := value.OperationOutcome{Intent: in, Status: "success", Reason: "prepared", Effect: "accepted", ClientReceipt: "unknown", CaptureIDs: []string{in.ID}, OutputDigest: d, MetadataUntil: in.RequestUntil, RecordedAt: at}
 		if !out.Valid() {
-			return zero, ErrUnavailable
+			return zero, captureOperationStep("outcome-record")
 		}
 		snap, err = s.Journal.FreezeOperationOutcome(live, out)
 		if err != nil || !sameOperationRecord(snap.Intent, in) || snap.Outcome == nil {
-			return zero, ErrUnavailable
+			return zero, captureOperationStep("outcome-freeze")
 		}
 	}
 	if !snap.Outcome.Valid() || !sameOperationRecord(snap.Outcome.Intent, in) {
-		return zero, ErrUnavailable
+		return zero, captureOperationStep("outcome-record")
 	}
 	if snap.OutcomeReceipt == nil {
 		if err = s.phase(live, snap, "outcome"); err != nil {
 			return zero, err
 		}
 	} else if !snap.OutcomeReceipt.ValidOperation(in.RootID, in.ID, "outcome") {
-		return zero, ErrUnavailable
+		return zero, captureOperationStep("outcome-receipt")
 	}
 	if err = s.Acknowledgements.AcknowledgeCapturePair(live, in); err != nil {
-		return zero, ErrUnavailable
+		return zero, captureOperationStep("pair-acknowledge")
 	}
 	if err = s.current(live, in.CreatedAt, in.WriteUntil); err != nil {
-		return zero, err
+		return zero, captureOperationStep("pair-current")
 	}
 	return *in.Capture, nil
 }
@@ -182,7 +257,7 @@ func (s CaptureOperationPublication) phase(ctx context.Context, snap value.Opera
 	in := snap.Intent
 	writeClaim, err := s.Journal.ClaimCaptureWrite(ctx, in, phase)
 	if err != nil || !writeClaim.Valid() || writeClaim.Until.After(in.WriteUntil) {
-		return ErrUnavailable
+		return captureOperationStep(phase + "/claim")
 	}
 	var receipt value.Receipt
 	phaseCtx := ctx
@@ -198,7 +273,7 @@ func (s CaptureOperationPublication) phase(ctx context.Context, snap value.Opera
 		phaseCtx = live
 		phaseUntil = until
 		if err = s.current(live, in.CreatedAt, until); err != nil {
-			return err
+			return captureOperationStep(phase + "/current")
 		}
 		var c value.OperationWriteCompletion
 		var record any = in
@@ -206,22 +281,25 @@ func (s CaptureOperationPublication) phase(ctx context.Context, snap value.Opera
 			c, err = s.Writer.CreateClosedOperationIntent(live, in)
 		} else {
 			if snap.Outcome == nil {
-				return ErrUnavailable
+				return captureOperationStep(phase + "/record")
 			}
 			record = *snap.Outcome
 			c, err = s.Writer.CreateClosedOperationOutcome(live, *snap.Outcome)
 		}
-		if err != nil || s.current(live, in.CreatedAt, until) != nil || !c.Valid(in.RootID, in.ID, in.Lifecycle.Policy.StoreID, phase, in.CreatedAt, until) || c.RecordDigest != OperationLifecycleDigest(record) {
-			return ErrUnavailable
+		if err != nil {
+			return captureOperationCallStep(live, phase+"/write", err)
+		}
+		if s.current(live, in.CreatedAt, until) != nil || !c.Valid(in.RootID, in.ID, in.Lifecycle.Policy.StoreID, phase, in.CreatedAt, until) || c.RecordDigest != OperationLifecycleDigest(record) {
+			return captureOperationCallStep(live, phase+"/write-completion")
 		}
 		if err = s.Acknowledgements.RecordOperationCompletion(live, in, phase, c); err != nil {
-			return ErrUnavailable
+			return captureOperationStep(phase + "/completion")
 		}
 		receipt = c.Receipt
 	} else {
 		claim, err := s.Journal.ClaimCaptureReconciliation(ctx, in, phase)
 		if err != nil || !claim.Valid() || claim.Until.After(in.WriteUntil) {
-			return ErrUnavailable
+			return captureOperationStep(phase + "/reconcile-claim")
 		}
 		readClaim = claim
 		until := claim.Until
@@ -230,22 +308,25 @@ func (s CaptureOperationPublication) phase(ctx context.Context, snap value.Opera
 		phaseCtx = live
 		phaseUntil = until
 		if err = s.current(live, in.CreatedAt, until); err != nil {
-			return err
+			return captureOperationStep(phase + "/reconcile-current")
 		}
 		if phase == "intent" {
 			receipt, err = s.Reader.FindOperationIntent(live, in)
 		} else {
 			if snap.Outcome == nil {
-				return ErrUnavailable
+				return captureOperationStep(phase + "/record")
 			}
 			receipt, err = s.Reader.FindOperationOutcome(live, *snap.Outcome)
 		}
-		if err != nil || s.current(live, in.CreatedAt, until) != nil {
-			return ErrUnavailable
+		if err != nil {
+			return captureOperationCallStep(live, phase+"/reconcile-read", err)
+		}
+		if s.current(live, in.CreatedAt, until) != nil {
+			return captureOperationStep(phase + "/reconcile-current")
 		}
 	}
 	if !receipt.ValidOperation(in.RootID, in.ID, phase) || s.current(phaseCtx, in.CreatedAt, phaseUntil) != nil {
-		return ErrUnavailable
+		return captureOperationStep(phase + "/receipt")
 	}
 	if readClaim.Valid() {
 		err = s.Acknowledgements.AcknowledgeReconciledCapture(phaseCtx, in, phase, receipt, readClaim)
@@ -253,7 +334,7 @@ func (s CaptureOperationPublication) phase(ctx context.Context, snap value.Opera
 		err = s.Acknowledgements.AcknowledgeOperation(phaseCtx, in, phase, receipt)
 	}
 	if err != nil || s.current(phaseCtx, in.CreatedAt, phaseUntil) != nil {
-		return ErrUnavailable
+		return captureOperationStep(phase + "/acknowledge")
 	}
 	return nil
 }

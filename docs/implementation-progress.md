@@ -22,6 +22,19 @@ passed all 15 jobs, including ten Go shards and browser checks. Independent
 review found no further blockers in the regional prerequisite and publication
 grant changes; this does not supersede the failed installed qualification.
 
+The subsequent diagnostic regressions reproduced lost capture-intent failure
+stages, absent submission diagnostics and discarded HTTP read status. Fixed
+private labels now distinguish persistence stages, allowlisted dependency
+results and the original phase call's live/cancelled/expired state. Actual TLS
+read tests retain exactly one GET and no PUT for 403, 404 and 503 responses.
+The partial-write regression preserves the spent claim and two finite
+reconciliation reads; it never recreates a missing object or starts acquisition.
+Focused race tests and the full audit/capture/objectstore race suites pass
+(1.172, 3.026 and 4.516 seconds). Specification, architecture, dependency,
+embedded schema/CRD and `go vet ./...` gates pass. These diagnostics do not fix
+or establish the underlying native43 failure; the next installed run will retain
+its owned fixture on failure for bounded postmortem inspection and cleanup.
+
 The [frozen run `context-thfmy2s8`](../test/results/resumed-c62e02ac-native42/result.json)
 on `4110072f` progressed beyond the previous target-query failures. The preview
 and exact-Pod request queries completed in 840 ms and 1.1 seconds. The request

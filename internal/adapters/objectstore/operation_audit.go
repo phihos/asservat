@@ -72,6 +72,12 @@ func (a *OperationAuditObjects) write(ctx context.Context, in audit.OperationInt
 	} else {
 		o, b, err = a.Store.readControlAudit(ctx, key, audit.OperationCipherLimit)
 		if err != nil {
+			// Only the adapter's concrete HTTP classification may cross this
+			// boundary; a credential provider's arbitrary label is not copied.
+			var status storageStatus
+			if errors.As(err, &status) {
+				return audit.Receipt{}, objectStepWith("read", status)
+			}
 			return audit.Receipt{}, objectStep("read")
 		}
 	}
