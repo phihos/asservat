@@ -1,0 +1,21 @@
+{
+  "sourceCommit": "4db57af361c2c55882029fcec15b53a6ec70db1f",
+  "run": "context--pw-gu20",
+  "command": "python3 scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "runnerExit": 1,
+  "testExit": 1,
+  "testSeconds": 1313.476,
+  "sourceUnchangedDuringTest": true,
+  "sourceHashesVerified": 2735,
+  "sourceHashMismatches": [],
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "ownedResourcesAbsent": true,
+  "postgresqlOrdinaryConnections": 114,
+  "postgresqlFixtureTotalConnections": 118,
+  "scope": "Failed installed journey. Bootstrap, cluster join, sustained regional capacity, processing initialization and successful previews passed. Three capture requests failed their regional target exchanges; two original-key resolutions acknowledged closure, and the third resolution was refused at audit-begin/reserve. No accepted capture, publication, native download, revocation or deletion was qualified. Earlier multi-second SQL audit credential reads did not recur; this does not establish their prior cause. Later diagnostic-only changes at 6af54cfb were not part of this frozen run.",
+  "files": {
+    "context-storage-environment.json": "56f9aa066c7b2ac66168d37047230aba7a774efcb8e23f6e66a9c44939765fab",
+    "context-storage.log": "7cc7add64599c0a060b2d99e30d726abe95cb67bc59ab5c97d2f3d18ddb8fa16"
+  }
+}

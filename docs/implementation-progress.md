@@ -2,6 +2,25 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
+The [next owned run `context--pw-gu20`](../test/results/resumed-c62e02ac-native41/result.json)
+on frozen `4db57af3` used the corrected 114 ordinary/118 total SQL connection
+budget. The test failed after 1,313.476 seconds; test and harness both exited 1.
+All 2,735 recorded source hashes match the commit, sources stayed unchanged,
+cleanup reported no failures, build scratch was removed and owned resources
+were absent afterward.
+
+Bootstrap, cluster join/replay, hub restart, processing initialization and
+multiple previews passed. The regional demand lane produced six distinct
+binding observations and 22 samples with at least one second left in 15 seconds.
+Three capture requests failed their target exchanges (`receive-call/canceled`,
+`read/other` and `owner/canceled`). The first two original-key resolutions
+acknowledged closure; the third resolution was refused at `audit-begin/reserve`.
+No accepted capture, publication, download, revocation or deletion was qualified.
+The earlier multi-second audit credential SQL reads did not recur, which does
+not establish their previous cause. Stream phase/deadline ownership and
+sequential preview storage waits remain under investigation; original authority
+cutoffs and finite audit budgets are unchanged.
+
 Final composition review reproduced two additional diagnostic defects.
 Processing refusal diagnostics detached from request cancellation and could
 perform three new dependency reads after cancellation. They now retain the
@@ -12,6 +31,9 @@ event keys now remain separate from timing payloads; each logger retains at
 most 128 keys and one overflow counter, with finite text and saturating counts.
 Focused failing-before regressions and affected diagnostic race tests pass.
 These changes are separate from the frozen installed run on `4db57af3`.
+The complete bootstrap, context-start and presentation packages subsequently
+passed `go test -race -count=1 -timeout=3m` (31.562, 2.186 and 13.277 seconds).
+Specification, architecture and Go dependency gates also passed.
 
 [CI on `4db57af3`](https://github.com/phihos/asservat/actions/runs/39420452650)
 passed every check except test shard zero and the aggregate gate. The sole
