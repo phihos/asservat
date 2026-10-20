@@ -33,7 +33,13 @@ accepted-source read. Test and harness exited 1, all 2,713 source hashes
 matched, sources stayed unchanged and cleanup reported no failures.
 The grant correction adds only the five retention SELECTs to each purpose.
 PostgreSQL package race checks (2.111 seconds) and SQL generation checks
-(54 matching files) pass; real-service green qualification remains pending.
+(54 matching files) pass. The [corrected real SQL/S3 run](../test/results/resumed-c62e02ac-publication-grants-green/result.json)
+on `45e509cc` passes both independent fresh compiled-role lifecycles, including
+publication, historical replay, purpose isolation and deletion assertions.
+The test package completed in 8.673 seconds; test and harness exited 0, all
+2,714 source hashes matched, sources stayed unchanged, cleanup reported no
+failures and owned containers were absent. Authority inputs remain explicit
+synthetic fixtures; installed publication still requires native qualification.
 
 The regional fixture also omitted the operator-installed
 `CapacityReservation` CRD required by `PrepareStart`. The existing Helm

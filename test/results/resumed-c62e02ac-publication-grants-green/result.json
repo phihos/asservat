@@ -1,0 +1,19 @@
+{
+  "sourceCommit": "45e509cc37c082ab48cc211f924c6fa5c8ac8e3a",
+  "sourceHashesVerified": 2714,
+  "sourceHashMismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "testExit": 0,
+  "cleanupFailures": [],
+  "command": "python3 scripts/test-custody.py --run '^TestContextAdmissionWithRealServices$/^api-execution-one-preparation-exact-result-historical-publication$'",
+  "runnerExit": 0,
+  "testSeconds": 8.673,
+  "harnessTestElapsedSeconds": 37.627619731996674,
+  "ownedContainersAbsent": true,
+  "files": {
+    "custody-environment.json": "2ed5914d68afe80cf535443d64649cdc3edc5553a6ce1381b1c4930a99486c91",
+    "custody-postgres.log": "0098692f23601200a9757fae1b797a9e075b28172007cffbfbfb2a8c9e8b00fc",
+    "custody.log": "16ffd4c0dc15c0a65a6b15162b54ac4d37e9fc3d3264a6dabb52af7c21477834"
+  },
+  "scope": "Real SQL/S3 regression with synthetic authority fixtures. Each independent fresh lifecycle uses one exact compiled production role, context-verify or context-publish, with no prior verification/catalog replay. Both complete publication, historical replay, purpose-isolation and deletion assertions. This does not qualify the installed workflow."
+}
