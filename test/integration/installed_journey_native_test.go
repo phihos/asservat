@@ -151,15 +151,58 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 				UID string `json:"uid"`
 			} `json:"selected_pods"`
 		}
-		call(ctx, "preview_capture", previewArguments, &preview)
-		if !preview.CaptureEnabled || len(preview.SelectedPods) != 1 || preview.PreviewID == "" || preview.SelectedPods[0].UID == "" {
-			t.Fatal("installed preview did not pin the regional Pod", preview)
-		}
-		request := map[string]string{"preview_id": preview.PreviewID, "idempotency_key": "installed-journey-capture"}
 		var accepted struct {
 			CaptureID string `json:"capture_id"`
 		}
-		call(ctx, "request_capture", request, &accepted)
+		// The client follows the public contract: OutcomeUnknown resumes the
+		// same preview and key with continue_acquisition, which cannot admit,
+		// renew or create anything; ReviewChanged and NotAvailable take a new
+		// preview and key. Both are bounded.
+		requestCapture := func(arguments map[string]any) string {
+			t.Helper()
+			result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "request_capture", Arguments: arguments})
+			if err != nil {
+				t.Logf("installed request_capture transport: %v", err)
+				return "NotAvailable"
+			}
+			reply, code, err := installedJourneyReplyCode(wire, "request_capture", result)
+			if err != nil {
+				diagnose()
+				t.Fatal("installed response contract request_capture", err)
+			}
+			if code == "" {
+				if err = installedJourneyDecode(reply.Data, &accepted); err != nil {
+					t.Fatal("installed response data request_capture", err)
+				}
+			}
+			t.Logf("installed request_capture %s request %s", map[bool]string{true: "ok", false: code}[code == ""], reply.RequestID)
+			return code
+		}
+		var request map[string]any
+		for attempt := 1; ; attempt++ {
+			call(ctx, "preview_capture", previewArguments, &preview)
+			if !preview.CaptureEnabled || len(preview.SelectedPods) != 1 || preview.PreviewID == "" || preview.SelectedPods[0].UID == "" {
+				t.Fatal("installed preview did not pin the regional Pod", preview)
+			}
+			request = map[string]any{"preview_id": preview.PreviewID, "idempotency_key": fmt.Sprintf("installed-journey-capture-%d", attempt)}
+			code := requestCapture(request)
+			for continued := 1; code == "OutcomeUnknown" && continued <= 4; continued++ {
+				if installedJourneyPause(ctx, 2*time.Second) != nil {
+					break
+				}
+				code = requestCapture(map[string]any{"preview_id": request["preview_id"], "idempotency_key": request["idempotency_key"], "continue_acquisition": true})
+			}
+			if code == "" {
+				break
+			}
+			if code != "ReviewChanged" && code != "NotAvailable" || attempt == 4 {
+				diagnose()
+				t.Fatal("installed capture request was not accepted", code)
+			}
+			if installedJourneyPause(ctx, 2*time.Second) != nil {
+				t.Fatal("installed capture request", ctx.Err())
+			}
+		}
 		acceptedAt := time.Now()
 		var resolved struct {
 			State     string `json:"state"`
@@ -371,6 +414,31 @@ type installedJourneyEnvelope struct {
 	RequestID string          `json:"request_id"`
 	Status    string          `json:"status"`
 	Data      json.RawMessage `json:"data"`
+}
+
+// installedJourneyReplyCode validates a reply like installedJourneyReply but
+// returns any schema-valid public failure code instead of refusing it.
+func installedJourneyReplyCode(wire *contracts.InvestigationContracts, name string, result *sdk.CallToolResult) (installedJourneyEnvelope, string, error) {
+	var out installedJourneyEnvelope
+	if result == nil {
+		return out, "", errors.New("missing installed reply")
+	}
+	raw, err := json.Marshal(result.StructuredContent)
+	if err != nil || wire.ValidateOutput(name, raw) != nil || json.Unmarshal(raw, &out) != nil || result.IsError != (out.Status == "error") {
+		return installedJourneyEnvelope{}, "", errors.New("invalid installed response schema/status")
+	}
+	if out.Status == "error" {
+		var failure struct {
+			Code string `json:"code"`
+		}
+		if json.Unmarshal(out.Data, &failure) != nil || failure.Code == "" {
+			return installedJourneyEnvelope{}, "", errors.New("installed failure without code")
+		}
+		return out, failure.Code, nil
+	} else if out.Status != "ok" {
+		return installedJourneyEnvelope{}, "", errors.New("unexpected installed operation status")
+	}
+	return out, "", nil
 }
 
 func installedJourneyReply(wire *contracts.InvestigationContracts, name string, result *sdk.CallToolResult) (installedJourneyEnvelope, error) {
