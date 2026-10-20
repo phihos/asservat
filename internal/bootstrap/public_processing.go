@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -65,6 +66,10 @@ func (s publicProcessingChanges) refusedStep(ctx context.Context, current identi
 	}
 	p, err := s.policies.DownloadPolicy(call)
 	if err != nil {
+		var step interface{ FixedStep() string }
+		if errors.As(err, &step) {
+			return "policy/" + step.FixedStep()
+		}
 		return "policy"
 	}
 	if p.RootID != s.root || p.InstallationID != s.installation || !p.Operator(i, time.Now()) {

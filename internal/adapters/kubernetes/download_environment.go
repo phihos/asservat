@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"errors"
 	"net/url"
 	"time"
 
@@ -139,20 +140,21 @@ func (s *DownloadEnvironmentSource) DownloadPolicy(ctx context.Context) (privacy
 	start := s.client.now()
 	call, stop := context.WithTimeout(ctx, 5*time.Second)
 	defer stop()
+	// Fixed stage names for diagnostics; the classes are unchanged.
 	guard, until, e := s.protection.current(call)
 	if e != nil {
-		return zero, privacy.ErrUnavailable
+		return zero, connectorAPIStage("protection", errors.Join(privacy.ErrUnavailable, e))
 	}
 	p, e := s.snapshot(call)
 	if e != nil {
-		return zero, e
+		return zero, connectorAPIStage("snapshot", e)
 	}
 	again, e := s.snapshot(call)
 	if e != nil || again.Revision != p.Revision {
-		return zero, privacy.ErrUnavailable
+		return zero, connectorAPIStage("snapshot-again", privacy.ErrUnavailable)
 	}
 	if _, e = checkAdmissionGuard(call, s.client, s.protection.plan.Name, s.protection.pin, s.protection.policy, s.protection.binding); e != nil {
-		return zero, privacy.ErrUnavailable
+		return zero, connectorAPIStage("guard", errors.Join(privacy.ErrUnavailable, e))
 	}
 	p.ProtectionDigest = artifact.Digest(guard)
 	p.ObservedAt = start
