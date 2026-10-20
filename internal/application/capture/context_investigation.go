@@ -370,6 +370,20 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if p.IssuerEpoch != recovery.IssuerEpoch || p.AssessmentRulesDigest != compiler.ContextAssessmentRulesDigestForClass(p.ExecutionClass) {
 		return zero, s.requestChanged("epoch")
 	}
+	// The storage wait needs only the preview's pinned target, so it runs
+	// beside the target re-resolution instead of after it. It confers nothing:
+	// facts still read and check storage after both, and the wait is joined
+	// before the request returns.
+	storageCtx, stopStorage := context.WithCancel(ctx)
+	storageDone := make(chan struct{})
+	go func() {
+		defer close(storageDone)
+		s.awaitStorage(storageCtx, targets.PodResolution{Request: p.Target})
+	}()
+	defer func() {
+		stopStorage()
+		<-storageDone
+	}()
 	resolveStarted := time.Now()
 	target, err := s.Targets.ResolvePod(ctx, p.Target)
 	auditapp.MarkStep(ctx, "q-resolve", resolveStarted)
@@ -379,6 +393,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if target.Request != p.Target || target.Pin != p.Pin || target.ExecutionClass != p.ExecutionClass {
 		return zero, s.requestChanged("target")
 	}
+	<-storageDone
 	anchor := s.Now().UTC().Truncate(time.Microsecond)
 	f, err := s.facts(ctx, source, i.Principal, p.Intent, target, anchor)
 	if err != nil {
