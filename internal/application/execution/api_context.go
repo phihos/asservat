@@ -369,4 +369,10 @@ type executeStep struct {
 
 func (e executeStep) Error() string     { return "api context execution " + e.step }
 func (e executeStep) Unwrap() error     { return e.err }
-func (e executeStep) FixedStep() string { return e.step }
+func (e executeStep) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
+}

@@ -119,41 +119,50 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 	if !authorization.UUID(captureID) || !i.Valid(i.VerifiedAt) || !recovery.Valid(recovery.ObservedAt) {
 		return out, value.ErrInvalid
 	}
+	// The ledger normalizes errors returned through it; keep the step beside it.
+	failed := ""
+	fail := func(step string, e error) error { failed = step; return e }
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		trust, err := s.guards.Recovery.lock(ctx, q, s.root, recovery)
 		if err != nil {
-			return err
+			return fail("recovery-lock", err)
 		}
 		stream, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
-			return err
+			return fail("permission-lock", err)
 		}
 		row, err := q.ReadPublicationCapture(ctx, custodydb.ReadPublicationCaptureParams{ID: id(captureID), RootID: id(s.root)})
 		if err != nil {
-			return value.ErrDenied
+			return fail("capture", value.ErrDenied)
 		}
 		out, err = apiWork(row)
 		if err != nil {
-			return err
+			return fail("work", err)
 		}
 		projection, err := permissionProjection(ctx, q, stream, authorization.Target{ClusterID: out.Target.ClusterID, NamespaceUID: out.Target.Namespace.UID, WorkloadUID: out.Target.Workload.UID, PodUID: out.Target.PodUID})
 		if err != nil {
-			return value.ErrDenied
+			return fail("permission", value.ErrDenied)
 		}
 		if err = s.guards.Recovery.check(ctx, q, trust, s.root, recovery); err != nil {
-			return err
+			return fail("recovery-check", err)
 		}
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
-			return err
+			return fail("time", err)
 		}
 		eligible := authorization.ContextEligibility(i, projection, projection.Target, now.Time)
-		if !eligible.Eligible || i.Principal != out.Actor || !now.Time.Before(out.Accepted.Deadline) {
-			return value.ErrDenied
+		if !eligible.Eligible {
+			return fail("eligibility", value.ErrDenied)
+		}
+		if i.Principal != out.Actor || !now.Time.Before(out.Accepted.Deadline) {
+			return fail("actor-deadline", value.ErrDenied)
 		}
 		return ctx.Err()
 	})
 	if err != nil {
+		if failed != "" {
+			return app.APIContextWork{}, sqlStep{failed, err}
+		}
 		return app.APIContextWork{}, err
 	}
 	return out, nil
@@ -164,72 +173,72 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries, c app.APIExecutionCheck, topology privacyvalue.PolicyTopology, fn func(custodydb.ContextCapture) error) error {
 	trust, err := s.guards.Recovery.lock(ctx, q, s.root, c.Recovery)
 	if err != nil {
-		return err
+		return sqlStep{"recovery-lock", err}
 	}
 	stream, err := q.LockPermissionStream(ctx, id(s.root))
 	if err != nil {
-		return err
+		return sqlStep{"permission-lock", err}
 	}
 	e := c.Work.Accepted.Expectation
 	pool, allocation, err := lockAllocation(ctx, q, e.Registration.AllocationID)
 	if err != nil {
-		return err
+		return sqlStep{"allocation", err}
 	}
 	attempt, err := q.LockAttempt(ctx, id(e.Registration.Location.AttemptID))
 	if err != nil {
-		return err
+		return sqlStep{"attempt", err}
 	}
 	accepted, err := q.LockContextCapture(ctx, custodydb.LockContextCaptureParams{ID: id(e.CaptureUID), RootID: id(s.root)})
 	if err != nil {
-		return err
+		return sqlStep{"capture", err}
 	}
 	w, err := apiWork(accepted)
 	if err != nil {
-		return err
+		return sqlStep{"work", err}
 	}
 	if w.Actor != c.Work.Actor || w.Target != c.Work.Target || w.IntentDigest != c.Work.IntentDigest || w.Accepted.Pin != c.Work.Accepted.Pin || !bytes.Equal(digest(w.Accepted.Expectation), digest(e)) {
-		return value.ErrConflict
+		return sqlStep{"conflict", value.ErrConflict}
 	}
 
 	if !bytes.Equal(attempt.RequestDigest, digest(normalized(e.Registration))) || attempt.State != artifact.Reserved {
-		return value.ErrDenied
+		return sqlStep{"attempt-state", value.ErrDenied}
 	}
 	check := func() error {
 		if err := s.guards.Recovery.check(ctx, q, trust, s.root, c.Recovery); err != nil {
-			return err
+			return sqlStep{"recovery-check", err}
 		}
 		if err := s.guards.Retention.check(ctx, q, topology, c.Plan.Input.Retention.Proof, c.Plan.Input.Target.Target()); err != nil {
-			return err
+			return sqlStep{"retention-check", err}
 		}
 		projection, err := permissionProjection(ctx, q, stream, c.Eligibility.Target)
 		if err != nil {
-			return err
+			return sqlStep{"permission", err}
 		}
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
-			return err
+			return sqlStep{"time", err}
 		}
 		eligible := authorization.ContextEligibility(c.Eligibility.VerifiedIdentity, projection, c.Eligibility.Target, now.Time)
 		if !c.Valid(now.Time) || !eligible.Eligible || eligible.Principal != w.Actor || eligible.PermissionRevision != c.Eligibility.PermissionRevision || eligible.IdentityRevision != c.Eligibility.IdentityRevision || !slices.Equal(eligible.DefaultAudience, e.Audience) {
-			return value.ErrDenied
+			return sqlStep{"eligibility", value.ErrDenied}
 		}
 		if err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
-			return err
+			return sqlStep{"storage-current", err}
 		}
 		now, err = q.CurrentTime(ctx)
 		if err != nil {
-			return err
+			return sqlStep{"time", err}
 		}
 		if !c.Valid(now.Time) || !now.Time.Before(eligible.ValidUntil) {
-			return value.ErrExpired
+			return sqlStep{"expired", value.ErrExpired}
 		}
 		return ctx.Err()
 	}
 	if err = check(); err != nil {
-		return err
+		return sqlStep{"expired", err}
 	}
 	if err = fn(accepted); err != nil {
-		return err
+		return sqlStep{"effect", err}
 	}
 	return check()
 }
@@ -243,10 +252,12 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 	if err != nil {
 		return out, false, err
 	}
+	// The ledger normalizes errors returned through it; keep the step beside it.
+	failed := ""
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		out = value.APIExecution{}
 		first = false
-		return s.checked(ctx, q, c, topology, func(accepted custodydb.ContextCapture) error {
+		err := s.checked(ctx, q, c, topology, func(accepted custodydb.ContextCapture) error {
 			row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: accepted.ID})
 			if errors.Is(err, pgx.ErrNoRows) {
 				e := c.Work.Accepted.Expectation
@@ -283,8 +294,16 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 			}
 			return nil
 		})
+		var st sqlStep
+		if errors.As(err, &st) {
+			failed = st.step
+		}
+		return err
 	})
 	if err != nil {
+		if failed != "" {
+			return value.APIExecution{}, false, sqlStep{failed, err}
+		}
 		return value.APIExecution{}, false, err
 	}
 	return out, first, nil
@@ -509,3 +528,14 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 var _ app.APIExecutionReader = (*APIContextExecutions)(nil)
 var _ app.APIExecutionPreparer = (*APIContextExecutions)(nil)
 var _ app.APIExecutionRecorder = (*APIContextExecutions)(nil)
+
+// sqlStep names where an execution transaction stopped, for operator
+// diagnostics; its class is the wrapped error.
+type sqlStep struct {
+	step string
+	err  error
+}
+
+func (e sqlStep) Error() string     { return "api execution " + e.step }
+func (e sqlStep) Unwrap() error     { return e.err }
+func (e sqlStep) FixedStep() string { return e.step }
