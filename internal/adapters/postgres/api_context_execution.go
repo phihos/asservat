@@ -296,7 +296,7 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 		})
 		var st sqlStep
 		if errors.As(err, &st) {
-			failed = st.step
+			failed = st.FixedStep()
 		}
 		return err
 	})
