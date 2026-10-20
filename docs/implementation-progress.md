@@ -2,6 +2,26 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
+The [subsequent frozen run `context-mcw3di7n`](../test/results/resumed-c62e02ac-native43/result.json)
+on `a565c2db` includes the canonical regional start CRD prerequisite and
+corrected publication grants. Bootstrap, exact regional join replay, readiness,
+processing initialization and preview passed. The regional demand lane returned
+six distinct observations and 24 usable samples in 15 seconds. The original
+capture and two acknowledged same-identity continuations returned
+`OutcomeUnknown`; the next resolution exhausted the unchanged two-record audit
+reservation. The visible continuation timing stops at capture-intent handling,
+before the start call. Its underlying failure remains under investigation;
+the unsampled first request's missing timing line is not evidence that admission
+was skipped. No acquisition, publication, download, revocation or deletion is
+qualified by this run.
+
+Test and harness exited 1 after 1,223.896 seconds. All 2,742 source hashes match
+the commit, sources stayed unchanged, cleanup reported no failures, build
+scratch was removed and owned resources were absent. [CI on this exact candidate](https://github.com/phihos/asservat/actions/runs/39433014527)
+passed all 15 jobs, including ten Go shards and browser checks. Independent
+review found no further blockers in the regional prerequisite and publication
+grant changes; this does not supersede the failed installed qualification.
+
 The [frozen run `context-thfmy2s8`](../test/results/resumed-c62e02ac-native42/result.json)
 on `4110072f` progressed beyond the previous target-query failures. The preview
 and exact-Pod request queries completed in 840 ms and 1.1 seconds. The request
