@@ -131,3 +131,17 @@ func TestConnectorBackingDerivation(t *testing.T) {
 		}
 	}
 }
+
+// The installed journey's profile (test/integration nativeCapacityProfile):
+// one-day admission, room for about 150 root renewals and enough normal-lane
+// records for repeated hold previews must still compile.
+func TestCapacityQualificationJourneySizing(t *testing.T) {
+	p := capacityProfileFixture()
+	p.AdmissionSeconds = 86400
+	p.Lanes.Normal.Records = 64
+	p.Processing.MaxRootTransitions = 512
+	p.Metadata.ConfigurationTransitions = 4096
+	if _, err := buildCapacityQualification(p, capacityDerivedFixture(), sequentialIDs()); err != nil {
+		t.Fatal("journey capacity profile does not compile", err)
+	}
+}
