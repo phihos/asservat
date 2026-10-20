@@ -7,6 +7,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/application/evidence"
@@ -272,6 +273,24 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 				bj, _ := json.Marshal(b)
 				pj, _ := json.Marshal(p)
 				ed := evidence.ContextExpectationDigest(e)
+				// ADR-212: spend the first preparation only with at least one
+				// second left after the blocking authority/storage locks. The
+				// caller may be shorter than the original checked interval;
+				// neither interval nor the stored binding is renewed here.
+				now, timeErr := q.CurrentTime(ctx)
+				if timeErr != nil {
+					return sqlStep{"time", timeErr}
+				}
+				until := c.ValidUntil
+				if deadline, ok := ctx.Deadline(); ok {
+					until = identity.Earlier(until, deadline)
+				}
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				if until.Sub(now.Time) < time.Second {
+					return sqlStep{"headroom", value.ErrUnavailable}
+				}
 				row, err = q.InsertAPIExecution(ctx, custodydb.InsertAPIExecutionParams{RootID: id(s.root), CaptureID: accepted.ID, AttemptID: accepted.AttemptID, BindingJson: bj, ProcessJson: pj, ExpectationDigest: ed[:], NotBefore: ts(b.NotBefore), NotAfter: ts(b.NotAfter), WriterProtocol: pgtype.Text{String: artifact.ContextWriterProtocol, Valid: true}})
 				first = err == nil
 			}
@@ -289,7 +308,11 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 			if err != nil {
 				return err
 			}
-			if !now.Time.Before(out.Binding.NotAfter) {
+			// Exact existing preparation is passive even after its original
+			// interval: the runner must classify it uncertain without keys or
+			// another start. checked still requires current authority before
+			// and after this result, and every active effect keeps its cutoff.
+			if (first || out.Phase != "prepared") && !now.Time.Before(out.Binding.NotAfter) {
 				return sqlStep{"expired", value.ErrExpired}
 			}
 			return nil
@@ -536,8 +559,8 @@ type sqlStep struct {
 	err  error
 }
 
-func (e sqlStep) Error() string     { return "api execution " + e.step }
-func (e sqlStep) Unwrap() error     { return e.err }
+func (e sqlStep) Error() string { return "api execution " + e.step }
+func (e sqlStep) Unwrap() error { return e.err }
 func (e sqlStep) FixedStep() string {
 	var inner interface{ FixedStep() string }
 	if errors.As(e.err, &inner) {

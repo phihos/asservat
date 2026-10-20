@@ -1,0 +1,38 @@
+{
+  "sourceCommit": "815c42db1ce493379d7a12e47e2753c66b063469",
+  "harnessExit": 1,
+  "goTestSeconds": 5.971,
+  "scope": "real PostgreSQL/S3 with compiled narrow grants, synthetic current authority and refused runner effect ports; all four new preparation-boundary cases reproduced defects",
+  "sourceHashesVerified": 2726,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "cleanupReadback": [
+    {
+      "resource": "asservat-custody-w25gq94r-postgres",
+      "kind": "container",
+      "exit": 1,
+      "stderr": "Error response from daemon: No such container: asservat-custody-w25gq94r-postgres",
+      "absent": true
+    },
+    {
+      "resource": "asservat-custody-w25gq94r-s3",
+      "kind": "container",
+      "exit": 1,
+      "stderr": "Error response from daemon: No such container: asservat-custody-w25gq94r-s3",
+      "absent": true
+    },
+    {
+      "resource": "asservat-custody-w25gq94r",
+      "kind": "network",
+      "exit": 1,
+      "stderr": "Error response from daemon: network asservat-custody-w25gq94r not found",
+      "absent": true
+    }
+  ],
+  "sha256": {
+    "custody.log": "a8718761b62ed064bfd98743af0582a1aa166292c0d0dc34bd5bb6322017aabe",
+    "custody-environment.json": "74ab09db91d531279329635f4c8c25893f81fd8c943eee37656710f55ad747ed",
+    "custody-postgres.log": "14379c9e15382dbba46323f73c88091d14f0f51252bc50757020e27995cc5c36",
+    "runner.log": "101a69dc57362988434067fdc5eb76ab12807d21922f9f6dc683d2360437661c"
+  }
+}

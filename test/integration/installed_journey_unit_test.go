@@ -26,7 +26,7 @@ func TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement(t *testi
 		wantErr      bool
 		wantCalls    []string
 	}{
-		{name: "first-request-succeeds"},
+		{name: "first-request-succeeds", wantCalls: []string{"confirm"}},
 		{name: "unaccepted-unknown", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "closed"}}, wantClosed: true, wantCalls: []string{"resolve"}},
 		{name: "changed-review-needs-close", code: "ReviewChanged", dispositions: []installedJourneyDisposition{{State: "closed"}}, wantClosed: true, wantCalls: []string{"resolve"}},
 		{name: "unavailable-needs-close", code: "NotAvailable", dispositions: []installedJourneyDisposition{{State: "closed"}}, wantClosed: true, wantCalls: []string{"resolve"}},
@@ -63,6 +63,9 @@ func TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement(t *testi
 				out := tc.nextCodes[continues]
 				continues++
 				return out, tc.nextID
+			}, func() error {
+				calls = append(calls, "confirm")
+				return nil
 			}, func(context.Context, time.Duration) error {
 				calls = append(calls, "pause")
 				return nil
@@ -81,7 +84,7 @@ func TestInstalledJourneyBoundsAcceptedContinuationAndCancellation(t *testing.T)
 	}, func() (string, string) {
 		continued++
 		return "OutcomeUnknown", ""
-	}, func(context.Context, time.Duration) error { return nil })
+	}, func() error { t.Fatal("confirmed an uncertain capture"); return nil }, func(context.Context, time.Duration) error { return nil })
 	if closed || err == nil || continued != 4 {
 		t.Fatal("unbounded or replaced accepted request", closed, err, continued)
 	}
@@ -89,9 +92,89 @@ func TestInstalledJourneyBoundsAcceptedContinuationAndCancellation(t *testing.T)
 	closed, err = installedJourneyRecoverCapture(ctx, "OutcomeUnknown", func() (installedJourneyDisposition, error) {
 		cancel()
 		return installedJourneyDisposition{State: "closed"}, nil
-	}, func() (string, string) { t.Fatal("continued after cancellation"); return "", "" }, installedJourneyPause)
+	}, func() (string, string) { t.Fatal("continued after cancellation"); return "", "" }, func() error { t.Fatal("confirmed after cancellation"); return nil }, installedJourneyPause)
 	if closed || !errors.Is(err, context.Canceled) {
 		t.Fatal("cancelled resolution allowed replacement", closed, err)
+	}
+}
+
+func TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		firstCode    string
+		nextCodes    []string
+		wantResolves int
+		wantConfirms int
+	}{
+		{"immediate-success", "", nil, 1, 1},
+		{"first-continuation-success", "OutcomeUnknown", []string{""}, 1, 0},
+		{"second-continuation-success", "OutcomeUnknown", []string{"OutcomeUnknown", ""}, 2, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resolves, continuations, confirms := 0, 0, 0
+			resolve := func() (installedJourneyDisposition, error) {
+				resolves++
+				if resolves > 2 {
+					return installedJourneyDisposition{}, errors.New("resolution audit budget exhausted")
+				}
+				return installedJourneyDisposition{State: "accepted", CaptureID: "original"}, nil
+			}
+			closed, err := installedJourneyRecoverCapture(t.Context(), tc.firstCode, resolve, func() (string, string) {
+				if continuations >= len(tc.nextCodes) {
+					t.Fatal("unexpected continuation")
+				}
+				code := tc.nextCodes[continuations]
+				continuations++
+				return code, "original"
+			}, func() error {
+				confirms++
+				disposition, err := resolve()
+				if err == nil && (disposition.State != "accepted" || disposition.CaptureID != "original") {
+					return errors.New("confirmation changed the accepted capture")
+				}
+				return err
+			}, func(context.Context, time.Duration) error { return nil })
+			if err != nil || closed || resolves != tc.wantResolves || confirms != tc.wantConfirms || continuations != len(tc.nextCodes) {
+				t.Fatalf("closed=%t error=%v resolves=%d confirms=%d continuations=%d; want %d/%d/%d",
+					closed, err, resolves, confirms, continuations, tc.wantResolves, tc.wantConfirms, len(tc.nextCodes))
+			}
+		})
+	}
+}
+
+func TestInstalledJourneyClosedReviewDoesNotConfirmReplacement(t *testing.T) {
+	confirms := 0
+	confirm := func() error { confirms++; return nil }
+	noContinue := func() (string, string) { t.Fatal("unexpected continuation"); return "", "" }
+	noPause := func(context.Context, time.Duration) error { t.Fatal("unexpected pause"); return nil }
+	closed, err := installedJourneyRecoverCapture(t.Context(), "OutcomeUnknown", func() (installedJourneyDisposition, error) {
+		return installedJourneyDisposition{State: "closed"}, nil
+	}, noContinue, confirm, noPause)
+	if !closed || err != nil || confirms != 0 {
+		t.Fatal("closed review was confirmed", closed, err, confirms)
+	}
+	// The next review has a different preview/key. Its immediate success must
+	// still confirm its own admission, regardless of the previous closure.
+	closed, err = installedJourneyRecoverCapture(t.Context(), "", func() (installedJourneyDisposition, error) {
+		t.Fatal("immediate success entered uncertain recovery")
+		return installedJourneyDisposition{}, nil
+	}, noContinue, confirm, noPause)
+	if closed || err != nil || confirms != 1 {
+		t.Fatal("replacement review skipped its own confirmation", closed, err, confirms)
+	}
+}
+
+func TestInstalledJourneySuccessfulContinuationStillChecksCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	closed, err := installedJourneyRecoverCapture(ctx, "OutcomeUnknown", func() (installedJourneyDisposition, error) {
+		return installedJourneyDisposition{State: "accepted", CaptureID: "original"}, nil
+	}, func() (string, string) {
+		cancel()
+		return "", "original"
+	}, func() error { t.Fatal("confirmed after cancellation"); return nil }, func(context.Context, time.Duration) error { return nil })
+	if closed || !errors.Is(err, context.Canceled) {
+		t.Fatal("successful continuation ignored original cancellation", closed, err)
 	}
 }
 

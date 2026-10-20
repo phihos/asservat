@@ -178,6 +178,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			return code
 		}
 		var request map[string]any
+		var acceptedAt time.Time
 		for attempt := 1; ; attempt++ {
 			call(ctx, "preview_capture", previewArguments, &preview)
 			if !preview.CaptureEnabled || len(preview.SelectedPods) != 1 || preview.PreviewID == "" || preview.SelectedPods[0].UID == "" {
@@ -198,6 +199,14 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			}, func() (string, string) {
 				code := requestCapture(map[string]any{"preview_id": request["preview_id"], "idempotency_key": request["idempotency_key"], "continue_acquisition": true})
 				return code, accepted.CaptureID
+			}, func() error {
+				acceptedAt = time.Now()
+				var resolved installedJourneyDisposition
+				call(ctx, "resolve_capture_request", request, &resolved)
+				if accepted.CaptureID == "" || resolved.State != "accepted" || resolved.CaptureID != accepted.CaptureID {
+					return errors.New("installed request was not accepted once")
+				}
+				return nil
 			}, installedJourneyPause)
 			if err != nil {
 				diagnose()
@@ -214,14 +223,8 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 				t.Fatal("installed capture request", ctx.Err())
 			}
 		}
-		acceptedAt := time.Now()
-		var resolved struct {
-			State     string `json:"state"`
-			CaptureID string `json:"capture_id"`
-		}
-		call(ctx, "resolve_capture_request", request, &resolved)
-		if accepted.CaptureID == "" || resolved.State != "accepted" || resolved.CaptureID != accepted.CaptureID {
-			t.Fatal("installed request was not accepted once", accepted, resolved)
+		if acceptedAt.IsZero() {
+			acceptedAt = time.Now()
 		}
 		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture as the Keycloak user")
 		// The regional executor collects; the publisher verifies and publishes
@@ -435,7 +438,9 @@ type installedJourneyDisposition struct {
 // Recovery never infers non-admission from a failed request. The resolver must
 // acknowledge closure before the fixture can review again. An accepted request
 // stays bound to its original identity, including across continuation failures.
-func installedJourneyRecoverCapture(ctx context.Context, code string, resolve func() (installedJourneyDisposition, error), continueCapture func() (code, captureID string), pause func(context.Context, time.Duration) error) (closed bool, err error) {
+// A successful same-ID continuation confirms that resolved receipt; only
+// immediate success needs a separate admission confirmation.
+func installedJourneyRecoverCapture(ctx context.Context, code string, resolve func() (installedJourneyDisposition, error), continueCapture func() (code, captureID string), confirmAccepted func() error, pause func(context.Context, time.Duration) error) (closed bool, err error) {
 	acceptedID := ""
 	for continued := 0; code != ""; {
 		if err := ctx.Err(); err != nil {
@@ -480,7 +485,13 @@ func installedJourneyRecoverCapture(ctx context.Context, code string, resolve fu
 		}
 		continued++
 	}
-	return false, nil
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+	if acceptedID != "" {
+		return false, nil
+	}
+	return false, confirmAccepted()
 }
 
 // installedJourneyReplyCode validates a reply like installedJourneyReply but

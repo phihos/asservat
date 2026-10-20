@@ -30,6 +30,37 @@ resolution exhausted the unchanged two-record audit reservation. A fix is
 being qualified separately; existing preparation must never acquire a new
 deadline, key attempt or start authority.
 
+The [real PostgreSQL/S3 preparation regression](../test/results/resumed-c62e02ac-api-preparation-red/result.json)
+on `815c42db` reproduces both defects with the compiled narrow runtime grants.
+Both observation and caller deadlines started above one second; an independently
+observed capture-row lock consumed headroom, yet the old code inserted a
+preparation below that floor. A short-caller runner also reached its first
+effect port. An expired preparation failed exact passive replay and the real
+runner's uncertainty classification. All four cases failed in 5.971 seconds;
+all 2,726 source hashes match the frozen commit, cleanup reported no failures,
+and independent inspection confirmed both containers and their network absent.
+The first attempted run failed only on duplicate fixture role names; it is
+retained separately and supplies no defect evidence. Current authority inputs
+remain synthetic, and the later runner ports refuse effects. ADR-212 defines
+the new first-insert floor and the unchanged no-create replay contract.
+
+The correction checks database time immediately before a first insert and
+returns exact existing `prepared` rows without creation, including after their
+stored interval. Current authority and exact identity/scope checks still run
+before and after that result. The [local race suites](../test/results/resumed-c62e02ac-preparation-local/result.json)
+pass for PostgreSQL (2.454 seconds), execution (1.146 seconds) and the in-process
+integration package (6.488 seconds); independent review found no blockers.
+Real-service green and installed qualification remain pending.
+
+The installed fixture also spent a redundant resolution record after a
+successful continuation. A deterministic regression reproduced a third
+resolution exceeding its unchanged two-record reservation after the second
+continuation succeeded. It now uses the accepted receipt for that exact request
+and the successful same-capture response; immediate success still performs
+its separate resolution. Closure, replacement-ID and cancellation checks remain.
+The focused race suite passes in 1.065 seconds, and independent review found
+no blockers. This changes neither product budgets nor continuation authority.
+
 The new SQL activity diagnostic captured 30 installation-scoped rows before
 owner removal, with no lock wait in that snapshot. It cannot establish earlier
 waits or client-side pool state. The fixture was retained for read-only SQL and
