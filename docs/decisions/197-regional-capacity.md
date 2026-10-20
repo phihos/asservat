@@ -1,11 +1,18 @@
 # ADR-197 — Regional capacity
 
-Date: 2026-10-17. Status: accepted; spike done (parts A and B, below); implementation code complete, SQL and native qualification in progress.
+Date: 2026-10-17. Status: accepted; implemented; installed regional capacity checks pass.
 Requirements: REQ-CAP-001/002/003, REQ-FED-001/002, REQ-DEP-003, S-02; TASK-03.
 Gap 4 of [ADR-196](196-regional-cluster-join.md). Builds on
 [ADR-190](190-capacity-readiness-and-promoted-owner.md) (hub capacity),
 [ADR-150](150-operation-owned-native-observation-proof.md) (the v2 observation path) and
 [ADR-193](193-installed-federation-and-regional-enrollment.md).
+
+Current qualification (2026-10-20): regional qualification, additive pool
+extension and v2 workload enrollment have passed the named two-cluster tests.
+[Resumed native47](../../test/results/resumed-c62e02ac-native47/result.json)
+also passed regional enrollment and ADR-200's demand-refresh check. These
+results qualify those capacity boundaries; the complete installed
+investigation workflow remains unfinished.
 
 ## Context
 
@@ -153,6 +160,8 @@ regional slot.
 9. Native run: a regional workload reaches `ready_at` with a fresh binding.
 
 ## Progress
+
+Historical checkpoints recorded before the 2026-10-20 status refresh above:
 
 - **Spike part A** ([run 2](../../test/results/adr197-spike-direct-2/environment.json);
   [run 1](../../test/results/adr197-spike-direct-1/environment.json) is

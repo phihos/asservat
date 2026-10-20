@@ -1,11 +1,19 @@
 # ADR-205 — Installed context deletion
 
-Date: 2026-10-18. Status: accepted; implementation in progress.
+Date: 2026-10-18. Status: accepted; implemented and merged; installed deletion qualification pending.
 Requirements: S-02 (expiry and deletion in the installed journey); REQ-EVD-006,
 REQ-PRV-004, REQ-DEP-003; TASK-03.
 Composes [ADR-111](111-positive-context-writer-deletion.md) into the installed
 layout. Follows ADR-204 (installed downloads), whose worker configuration
 child is the pattern used here.
+
+Current qualification (2026-10-20): the deletion composition merged in PR #41
+at `29a24582`. SQL deletion and finite paging, provider/signing composition and
+the [focused evidence-delete credential test](../research/installed-evidence-deletion-permissions.md)
+pass. The installed expiry, failed-cleanup recovery, acknowledged audit and
+charge-release journey remains unqualified. Capture-operation audit cleanup
+and installation upgrades remain separate gaps. The exact evidence and limits
+are recorded in [implementation progress](../implementation-progress.md).
 
 ## Context
 
@@ -128,6 +136,8 @@ and its storage charge is never released.
   image replacement or upgrade protocol.
 
 ## Progress
+
+Historical checkpoints recorded before the 2026-10-20 status refresh above:
 
 - **SQL** (#35, unit tests and `sql-check`): purposes 89–91 with the fixture
   grants, the worst-case plan at 107 connections, and

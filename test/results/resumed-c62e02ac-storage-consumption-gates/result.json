@@ -1,0 +1,43 @@
+{
+  "sourceBaseCommit": "f7d3fe142b693eb7a1c29b4dd32b7492792982f0",
+  "uncommittedSourceOverlay": true,
+  "contractGates": {
+    "command": [
+      "make",
+      "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "spec-check",
+      "architecture-check",
+      "go-architecture-check",
+      "design-check"
+    ],
+    "exit": 0,
+    "elapsedSeconds": 11.210143806994893
+  },
+  "contractTerminalSession": 49161,
+  "contractTerminalChunk": "e8f5f5",
+  "vetExit": 0,
+  "vetDurationSeconds": 22.57395735499449,
+  "vetSourceHashesVerified": 2554,
+  "vetSourceUnchanged": true,
+  "vetTerminalSession": 58870,
+  "vetTerminalChunk": "b06127",
+  "qualification": "Specification, architecture, design, Go import boundaries and vet only; no installed runtime qualification. Later status/link-only documentation updates require a final spec check.",
+  "fileSHA256": {
+    "storage-consumption-contract-gates.log": "4f32a5ee92d64023df0a825bee0dfbc7b2139b9f213adc98ac5dba7a05a32eea",
+    "storage-consumption-contract-gates.json": "685621c537e93023b658adc29a31fbe086779db894851df2aa1ec436f40ad4bc",
+    "storage-consumption-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "storage-consumption-vet.json": "0f8a4f3a0351c9a9de3d919915a071806d6f246c7d26daaa92bec5200001ee51",
+    "final-spec.log": "13874d2b4654d34377d1a8db29aae718c49a15c8df4cfebdd2b013eb10318a2f",
+    "final-spec.json": "3034bdd4520f880e11673ca7d9bc7e9ccb2fea0650d0c6974e0fb074b1bde20f"
+  },
+  "finalSpec": {
+    "command": [
+      "make",
+      "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "spec-check"
+    ],
+    "exit": 0,
+    "elapsedSeconds": 5.405581414990593
+  },
+  "independentReview": "Capture consumption and runner diagnostics reviewed separately; no blockers. Same owner, original deadlines, one demand, exact selection, accepted replay, cancellation joins, no extra facts/effect retries and error privacy checked."
+}

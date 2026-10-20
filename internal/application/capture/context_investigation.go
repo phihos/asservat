@@ -139,18 +139,19 @@ func (s ContextInvestigation) currentIdentity(ctx context.Context, source identi
 	return i, nil
 }
 
-func (s ContextInvestigation) facts(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, intent value.ContextIntent, target targets.PodResolution, anchor time.Time) (contextFacts, error) {
-	return s.factsWithStorageWait(ctx, source, actor, intent, target, anchor, nil)
+func (s ContextInvestigation) facts(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, intent value.ContextIntent, target targets.PodResolution, anchor, originalUntil time.Time) (contextFacts, error) {
+	if !target.Valid(s.Now()) {
+		return contextFacts{target: target}, previewFailure("facts/target", value.ErrChanged)
+	}
+	wait := s.beginStorageWait(ctx, target, originalUntil, value.ContextStorageSelection{})
+	defer wait.close()
+	return s.factsWithStorageWait(ctx, source, actor, intent, target, anchor, wait)
 }
 
 func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, intent value.ContextIntent, target targets.PodResolution, anchor time.Time, storageWait *contextStorageWait) (contextFacts, error) {
 	f := contextFacts{target: target}
 	if !target.Valid(s.Now()) {
 		return f, previewFailure("facts/target", value.ErrChanged)
-	}
-	if storageWait == nil {
-		storageWait = s.beginStorageWait(ctx, target)
-		defer storageWait.close()
 	}
 	t := target.Target()
 	mark := time.Now()
@@ -172,20 +173,13 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 	if err != nil {
 		return f, previewFailure("facts/retention/"+retentionFailure(err), err)
 	}
-	// The readiness hint confers nothing and can overlap these independent
-	// reads. Only the ordinary storage read below supplies a usable observation.
-	// Preserve every original fact interval across this joined wait.
-	storageWait.wait()
+	// The one readiness owner joins its early hint and consumes a fresh,
+	// independently read binding within every retained non-storage bound.
 	mark = time.Now()
-	f.storage, err = s.Storage.ContextStorage(ctx, t)
+	f.storage, err = s.consumeStorage(ctx, f, intent, storageWait)
 	auditapp.MarkStep(ctx, "p-storage", mark)
 	if err != nil {
-		return f, previewFailure("facts/storage", err)
-	}
-	// Readiness may have completed before the ordered facts reads. Consume
-	// this authoritative observation only while the same margin still remains.
-	if f.storage.Binding.FreshUntil.Before(s.Now().Add(storageMargin)) {
-		return f, previewFailure("facts/storage", contextStorageMarginRefusal{})
+		return f, err
 	}
 	if intent.Reason != nil {
 		if s.Reasons == nil {
@@ -207,8 +201,17 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 }
 
 func (s ContextInvestigation) factsCurrent(f contextFacts, now time.Time) bool {
-	t, b, p := f.target.Target(), f.storage.Binding, f.retention.Proof
-	return f.target.Valid(now) && f.capability.Valid(now) && f.target.ExecutionClass == f.capability.ExecutionClass && f.capability.ProjectionDigest == compiler.ProjectionDigest() && b.Valid(now) && b.RootID == s.RootID && b.Matches(t) && f.storage.Selection.Valid() && b.AllocationID == f.storage.Selection.AllocationID && b.Revision == f.storage.Selection.BindingRevision && p.Valid(now) && p.Matches(s.RootID, t.ClusterID, t.NamespaceUID, t.WorkloadUID, t.PodUID) && p.Policy == f.retention.PolicyRevision && !f.retention.ValidUntil.After(p.ValidUntil) && now.Before(f.retention.ValidUntil) && now.Before(f.eligibility.ValidUntil) && f.eligibility.VerifiedIdentity.Valid(now) && (f.reasonUntil.IsZero() || now.Before(f.reasonUntil))
+	return s.nonStorageFactsCurrent(f, now) && s.storageCurrent(f.storage, f.target.Target(), now)
+}
+
+func (s ContextInvestigation) nonStorageFactsCurrent(f contextFacts, now time.Time) bool {
+	t, p := f.target.Target(), f.retention.Proof
+	return f.target.Valid(now) && f.capability.Valid(now) && f.target.ExecutionClass == f.capability.ExecutionClass && f.capability.ProjectionDigest == compiler.ProjectionDigest() && p.Valid(now) && p.Matches(s.RootID, t.ClusterID, t.NamespaceUID, t.WorkloadUID, t.PodUID) && p.Policy == f.retention.PolicyRevision && !f.retention.ValidUntil.After(p.ValidUntil) && now.Before(f.retention.ValidUntil) && now.Before(f.eligibility.ValidUntil) && f.eligibility.VerifiedIdentity.Valid(now) && (f.reasonUntil.IsZero() || now.Before(f.reasonUntil))
+}
+
+func (s ContextInvestigation) storageCurrent(v ContextStorageObservation, t authorization.Target, now time.Time) bool {
+	b := v.Binding
+	return b.Valid(now) && b.RootID == s.RootID && b.Matches(t) && v.Selection.Valid() && b.AllocationID == v.Selection.AllocationID && b.Revision == v.Selection.BindingRevision
 }
 
 func retentionReview(r privacy.Resolution) value.ContextRetentionReview {
@@ -264,7 +267,7 @@ func (s ContextInvestigation) Preview(ctx context.Context, source identities.Cur
 	if err != nil {
 		return zero, previewFailure("target", err)
 	}
-	f, err := s.facts(ctx, source, i.Principal, intent, target, created)
+	f, err := s.facts(ctx, source, i.Principal, intent, target, created, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
 	if err != nil {
 		return zero, previewFailure("facts", err)
 	}
@@ -389,7 +392,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	// beside the target re-resolution instead of after it. It confers nothing:
 	// facts still read and check storage after both, and the wait is joined
 	// before the request returns.
-	storageWait := s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target})
+	storageWait := s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, identity.Earlier(p.Deadline, identity.Earlier(i.ValidUntil, recovery.FreshUntil)), p.Storage)
 	defer storageWait.close()
 	resolveStarted := time.Now()
 	target, err := s.Targets.ResolvePod(ctx, p.Target)
@@ -403,6 +406,10 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	anchor := s.Now().UTC().Truncate(time.Microsecond)
 	f, err := s.factsWithStorageWait(ctx, source, i.Principal, p.Intent, target, anchor, storageWait)
 	if err != nil {
+		var changed contextStorageSelectionChange
+		if errors.As(err, &changed) {
+			return zero, s.requestChanged("storage")
+		}
 		return zero, err
 	}
 	processingStarted := time.Now()
@@ -524,68 +531,6 @@ func (s ContextInvestigation) reportRequestFailure(err error) {
 // storageMargin is the binding freshness required by both the readiness hint
 // and the authoritative read before subsequent processing/admission checks.
 const storageMargin = time.Second
-
-// One non-authoritative readiness hint belongs to one call. Request starts it
-// beside exact-Pod resolution; Preview/CheckDiagnostic start it once the target
-// is known. It overlaps ordered facts reads and is always joined before return,
-// including when an earlier authority check fails.
-type contextStorageWait struct {
-	done   chan struct{}
-	cancel context.CancelFunc
-}
-
-func (s ContextInvestigation) beginStorageWait(ctx context.Context, target targets.PodResolution) *contextStorageWait {
-	call, cancel := context.WithCancel(ctx)
-	w := &contextStorageWait{done: make(chan struct{}), cancel: cancel}
-	started := time.Now()
-	if s.Refresh == nil || s.Storage == nil {
-		auditapp.MarkStep(ctx, "p-await-storage", started)
-		close(w.done)
-		return w
-	}
-	go func() {
-		defer close(w.done)
-		// Record actual hint time, even if it finishes before facts join it.
-		// StepTimes is synchronized; this measurement overlaps other facts.
-		defer auditapp.MarkStep(ctx, "p-await-storage", started)
-		s.awaitStorage(call, target)
-	}()
-	return w
-}
-
-func (w *contextStorageWait) wait() { <-w.done }
-
-func (w *contextStorageWait) close() {
-	w.cancel()
-	<-w.done
-}
-
-// awaitStorage waits, within the caller's original deadline, for a binding the
-// hub-worker refreshed recently enough to have storageMargin left (ADR-200).
-// Otherwise it records a refresh demand and rereads every 250 ms. It runs
-// beside the other facts, retaining all their original intervals. It returns
-// nothing: the ordinary storage read still decides.
-func (s ContextInvestigation) awaitStorage(ctx context.Context, target targets.PodResolution) {
-	if s.Refresh == nil || s.Storage == nil {
-		return
-	}
-	ready := func() bool {
-		v, err := s.Storage.ContextStorage(ctx, target.Target())
-		return err == nil && !v.Binding.FreshUntil.Before(s.Now().Add(storageMargin))
-	}
-	if ready() || s.Refresh.DemandCapacityRefresh(ctx, target.Request) != nil {
-		return
-	}
-	for !ready() {
-		t := time.NewTimer(250 * time.Millisecond)
-		select {
-		case <-ctx.Done():
-			t.Stop()
-			return
-		case <-t.C:
-		}
-	}
-}
 
 // retentionFailure names a closed retention failure class for diagnostics.
 func retentionFailure(err error) string {

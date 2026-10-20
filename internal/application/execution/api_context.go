@@ -114,40 +114,43 @@ func (s APIContextRunner) check(ctx context.Context, current identities.CurrentI
 	start := s.Now().UTC().Truncate(time.Microsecond)
 	t, err := s.Targets.ResolvePod(ctx, w.Target)
 	if err != nil {
-		return out, err
+		return out, apiCheckStep{"ResolvePod", err}
 	}
 	eligible := s.Eligibility.ContextEligibilityCurrent(ctx, current, t.Target())
 	if !eligible.Eligible {
-		return out, value.ErrDenied
+		return out, apiCheckStep{"Eligibility", value.ErrDenied}
 	}
 	cap, err := s.Capabilities.ContextCapability(ctx, t.Target())
 	if err != nil {
-		return out, err
+		return out, apiCheckStep{"Capability", err}
 	}
 	e := w.Accepted.Expectation
 	retention, err := s.Retention.Resolve(ctx, privacy.Input{Target: t.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: e.Registration.AnchorAt})
 	if err != nil {
-		return out, err
+		return out, apiCheckStep{"Retention", err}
 	}
 	plan, err := compiler.CompileContext(planning.ContextInput{CaptureID: e.CaptureUID, CaseID: e.CaseID, Executor: w.Actor, Deadline: w.Accepted.Deadline, Target: t, Capability: cap, Retention: retention}, s.Now())
 	if err != nil {
-		return out, err
+		return out, apiCheckStep{"Compile", err}
 	}
 	recovery, err := s.Recovery.RecoveryState(ctx)
 	if err != nil {
-		return out, err
+		return out, apiCheckStep{"Recovery", err}
 	}
 	process, err := s.Process.ReadAPIProcess(ctx)
 	if err != nil {
-		return out, err
+		return out, apiCheckStep{"Process", err}
 	}
 	until := identity.Earlier(original, start.Add(5*time.Second))
 	for _, d := range []time.Time{plan.ValidUntil, eligible.ValidUntil, recovery.FreshUntil, process.ValidUntil, e.Registration.WriteUntil} {
 		until = identity.Earlier(until, d)
 	}
 	out = APIExecutionCheck{w, plan, eligible, recovery, process, start, until.UTC().Truncate(time.Microsecond)}
-	if !out.Valid(s.Now()) || ctx.Err() != nil {
-		return APIExecutionCheck{}, value.ErrDenied
+	if !out.Valid(s.Now()) {
+		return APIExecutionCheck{}, apiCheckStep{"Current", value.ErrDenied}
+	}
+	if ctx.Err() != nil {
+		return APIExecutionCheck{}, apiCheckStep{"Context", value.ErrDenied}
 	}
 	return out, nil
 }
@@ -178,7 +181,7 @@ func (s APIContextRunner) Execute(ctx context.Context, current identities.Curren
 	}
 	check, err := s.check(startCtx, current, w, original)
 	if err != nil {
-		return zero, executeStep{"ReadAPIContextWork", err}
+		return zero, executeStep{"Check", err}
 	}
 	r, mayCreate, err := s.Prepare.PrepareAPIExecution(startCtx, check)
 	if err != nil {
@@ -367,8 +370,8 @@ type executeStep struct {
 	err  error
 }
 
-func (e executeStep) Error() string     { return "api context execution " + e.step }
-func (e executeStep) Unwrap() error     { return e.err }
+func (e executeStep) Error() string { return "api context execution " + e.step }
+func (e executeStep) Unwrap() error { return e.err }
 func (e executeStep) FixedStep() string {
 	var inner interface{ FixedStep() string }
 	if errors.As(e.err, &inner) {

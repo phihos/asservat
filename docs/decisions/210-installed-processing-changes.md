@@ -1,7 +1,14 @@
 # ADR-210 — Installed processing changes by a privacy operator
 
-Date: 2026-10-20. Status: proposed; implementation in progress.
+Date: 2026-10-20. Status: accepted; initialization/restriction route and browser-settings composition implemented; installed initialization passes.
 Requirements: REQ-CAP-005, REQ-EXE-002, S-02; ADR-127, ADR-146, ADR-192, ADR-194.
+
+Current qualification (2026-10-20): the configured operator initializes
+processing through the authenticated console route before preview, including
+in [resumed native47](../../test/results/resumed-c62e02ac-native47/context-storage.log).
+Original request and receipt deadlines remain binding. The release audit lane
+and browser-session cleanup remain unimplemented. Installed initialization
+does not qualify restriction changes or the complete capture lifecycle.
 
 ## Context
 

@@ -1,19 +1,30 @@
 # Decision records
 
+[ADR-213 — Storage readiness at consumption](213-storage-readiness-at-consumption.md)
+adds a bounded consumption phase to the same request-owned readiness wait:
+only a valid unchanged storage selection with insufficient margin may wait for
+a fresh observation, within all original authority cutoffs and one demand
+attempt. Implementation and complete capture race checks pass; installed
+qualification remains pending.
+
 [ADR-212 — Remaining interval before one-use API preparation](212-api-preparation-remaining-interval.md)
 requires one second remaining before the first preparation insert and preserves
 expired prepared rows as passive no-create uncertainty. No authority interval,
-key attempt or acquisition is renewed.
+key attempt or acquisition is renewed. Implementation and real PostgreSQL/S3
+boundary checks pass; installed start/acquisition qualification remains open.
 
 [ADR-211 — Return a completed target query to its original standby interval](211-completed-query-standby-transition.md)
 separates a completed pre-work query's socket deadlines from the unchanged
 standby residence, with exclusive query ownership and permanent closure after
-failure. Implementation and installed qualification are in progress.
+failure. Implementation and actual HTTP/2/race checks pass; the complete
+installed investigation lifecycle remains unqualified.
 
 [ADR-210 — Installed processing changes by a privacy operator](210-installed-processing-changes.md)
 adds the console route `POST /api/v1/processing/changes`, the hub SQL purpose
 `processing-decision` and the hub-api read of the capacity processing source,
 so the configured operator initializes processing before the first capture.
+Installed initialization passes; the release lane and browser-session cleanup
+remain unimplemented.
 
 [ADR-209 — Two context-start standbys per hub owner](209-two-context-start-standbys-per-owner.md)
 was withdrawn: the installed per-cluster standby limit is one, so a second
@@ -32,22 +43,28 @@ pending.
 [ADR-206 — Bounded approved pod-status projection reads](206-bounded-context-projection.md)
 defines the accepted implementation contract for ordinary browser/MCP reads of
 captured status: fixed text projection, independent read authority, original query
-deadlines and separately charged acquisition batches. Implementation and native
-qualification remain pending.
+deadlines and separately charged acquisition batches. Component foundations are
+implemented; production composition and installed qualification remain pending.
 
 [ADR-205 — Installed context deletion](205-installed-context-deletion.md)
 deletes expired context evidence from the hub-worker: three SQL logins, a due list, the operator's
 own evidence delete credential, a deletion signing key in Transit and the acknowledged deletion record.
+The composition merged in PR #41; installed expiry, failed-cleanup recovery and
+charge release remain unqualified.
 
 [ADR-204 — Installed native downloads](204-installed-downloads.md)
 runs download workers in their own hub-cluster namespace with the profile source beside them, pins
 one hub-local path in the owner input, gives workers their own evidence read credential, accepts
 worker configuration in the hub-worker and adds acquisition unwraps and a downloads token.
+Provisioning and configuration acceptance pass in the installed test; native
+download and its installed lifecycle remain unqualified.
 
 [ADR-203 — Installed publisher](203-installed-publisher.md)
 deploys the publication verifier from `installer-continue`: its own OpenBao Kubernetes login for a
 private audit Transit key and a verifier PKI role, an in-process verifier certificate, operator
 evidence-read and audit credentials, and topology pins read from the guarded cluster catalog.
+Installed provisioning and scoped SQL/S3 publication checks pass; publication
+by the installed publisher remains unqualified.
 
 [ADR-202 — Public API exposure](202-public-api-exposure.md)
 lets the operator expose the promoted hub-api's public port on its own NodePort or LoadBalancer Service,
@@ -62,6 +79,8 @@ output, and leaves allocation and lock profiles to Go pprof and JVM JFR.
 keeps the five-second binding freshness bound and refreshes a workload's binding when a capture preview,
 request or download needs it: admission records a short demand, the hub-worker reconciles demanded
 workloads first, and admission waits within its original deadline.
+SQL and installed refresh checks pass; later storage reads still require their
+original freshness and selection margin.
 
 [ADR-199 — One source read at each end of the executor proof](199-executor-proof-source-reads.md)
 reads the guarded connector source once when the executor's cold proof opens and once when it closes,
@@ -76,7 +95,9 @@ instead of startup pins, and the regional offer carries the key-service endpoint
 [ADR-197 — Regional capacity](197-regional-capacity.md)
 admits a regional cluster into capacity through append-only per-cluster qualification rows and an
 additive pool revision, uses the v2 holder observation path for regional clusters only, and installs the
-region's probe namespace and selector guard before ungating; it starts with a v2 latency spike.
+region's probe namespace and selector guard before ungating. The spike and
+installed regional capacity checks pass; the complete investigation workflow
+remains unfinished.
 
 [ADR-196 — Regional cluster join](196-regional-cluster-join.md)
 adds a hub-side join command fed by a public join record from `installer-cluster`, a hub-api process

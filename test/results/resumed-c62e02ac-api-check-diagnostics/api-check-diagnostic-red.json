@@ -1,0 +1,31 @@
+{
+  "cwd": "/home/phil/Projekte/asservat-resume-0450e73c",
+  "argv": [
+    "go",
+    "test",
+    "./internal/application/execution",
+    "-run",
+    "^TestAPIContextCheckDiagnostics",
+    "-count=1",
+    "-v"
+  ],
+  "env": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1",
+    "GOCACHE": "/home/phil/.cache/asservat-build/recovered-c62e02ac/native41-full"
+  },
+  "head": "f7d3fe142b693eb7a1c29b4dd32b7492792982f0",
+  "startUTC": "2026-10-20T17:34:49.335664+00:00",
+  "sourceBefore": {
+    "internal/application/execution/api_context.go": "f870445249e22c04223d88150a6b85431f7c9a95a8f02b88aa8294941b216033",
+    "internal/application/execution/api_check_diagnostic_test.go": "a7f8f17201b46903ea18f35823643c4a9c49db589bc27636d26edf738681a50e"
+  },
+  "exitCode": 1,
+  "elapsedSeconds": 0.9365999829606153,
+  "sourceAfter": {
+    "internal/application/execution/api_context.go": "f870445249e22c04223d88150a6b85431f7c9a95a8f02b88aa8294941b216033",
+    "internal/application/execution/api_check_diagnostic_test.go": "a7f8f17201b46903ea18f35823643c4a9c49db589bc27636d26edf738681a50e"
+  }
+}

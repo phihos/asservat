@@ -95,13 +95,27 @@ Request starts it beside exact-Pod resolution using the preview's pinned
 target; Preview and CheckDiagnostic start it after target resolution. The
 same wait overlaps eligibility, capability and retention reads in their
 existing order, then joins before the authoritative storage read. Early
-failure cancels and joins it before returning. The authoritative result must
-still have the same one-second freshness margin; an early successful hint
-cannot satisfy that check after other work consumes the margin. An insufficient
-result returns the existing unavailable outcome before admission, without
-another wait or renewed observation. Every fact retains its original
-cutoff across the wait; neither readiness nor a late positive result renews
-the selected target or permits an expired operation.
+failure cancels and joins it before returning. Under
+[ADR-213](../decisions/213-storage-readiness-at-consumption.md), this same
+owned operation retains its original upper bound and single demand-attempt
+state through consumption. A valid same-selection result below the existing
+one-second freshness margin may poll every 250 ms for an independently
+refreshed binding, while every retained non-storage fact remains current.
+It may use the sole demand attempt only if the hint has not already spent it.
+An early successful hint cannot satisfy the final margin check.
+
+Request pins the preview's exact storage selection; Preview and
+CheckDiagnostic pin their first valid authoritative selection. Read errors,
+invalid/expired bindings, changed selections and cancellation refuse
+consumption. Missing refresh or a failed demand prevents polling for a thin
+result; a valid final read with sufficient margin can still succeed.
+The wait uses the earliest original
+caller, initial identity/recovery, preview, target, eligibility/identity,
+capability, retention/proof/expiry and optional reason cutoff. It never
+refreshes those facts or extends a binding's timestamps. Target resolution,
+ordered initial fact reads and admission remain single operations, with the
+existing final eligibility recheck retained. The bounded early hint behavior
+for a missing/stale binding remains unchanged.
 
 Evidence retention starts at actual submission preparation, not at preview
 creation. A developer can review for two minutes and still request sixty seconds

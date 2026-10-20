@@ -26,6 +26,15 @@ waits within its original deadline. The worker's demand lane
 back to back through the same guarded path as discovery. A demand names a
 workload and confers no authority.
 
+[ADR-213](../decisions/213-storage-readiness-at-consumption.md) carries the
+same owned readiness operation from its early hint into final storage
+selection. If a valid binding has lost the required one-second margin,
+the consumer may wait at the existing 250 ms interval for an independently
+refreshed binding with the same selection. One demand attempt and all
+original non-storage authority deadlines bound both phases. Changed storage,
+invalid observations, errors or expired retained facts stop consumption;
+neither the demand nor the wait supplies authority or retries admission.
+
 `capacity-root-setup.json` is a private generated administrator input. It binds
 original installation/activation, permission root, public role-root UID/setup,
 control namespace/guard, account-key version and a closed qualified backing

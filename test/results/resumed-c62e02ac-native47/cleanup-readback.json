@@ -1,0 +1,86 @@
+[
+  {
+    "kind": "container",
+    "name": "asservat-context-4b2d6czv-s3",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-4b2d6czv-s3"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-4b2d6czv-kms",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-4b2d6czv-kms"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-4b2d6czv-postgres",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-4b2d6czv-postgres"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-4b2d6czv-tls",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-4b2d6czv-tls"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-4b2d6czv-keycloak",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-4b2d6czv-keycloak"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-4b2d6czv-0-seed",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-4b2d6czv-0-seed"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-4b2d6czv-0-control-plane",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-4b2d6czv-0-control-plane"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-4b2d6czv-1-control-plane",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-4b2d6czv-1-control-plane"
+  },
+  {
+    "kind": "volume",
+    "name": "asservat-context-4b2d6czv-0-var",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: get asservat-context-4b2d6czv-0-var: no such volume"
+  },
+  {
+    "kind": "image",
+    "name": "asservat-context-worker:context-4b2d6czv",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such image: asservat-context-worker:context-4b2d6czv"
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-4b2d6czv",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: network asservat-context-4b2d6czv not found"
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-4b2d6czv-kind",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: network asservat-context-4b2d6czv-kind not found"
+  }
+]

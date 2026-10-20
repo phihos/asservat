@@ -1,12 +1,21 @@
 # ADR-203 — Installed publisher
 
-Date: 2026-10-18. Status: accepted; implementation in progress.
+Date: 2026-10-18. Status: accepted; implemented; installed provisioning and scoped SQL/S3 publication checks pass.
 Requirements: S-02 (encrypted publication in the installed journey); REQ-DEP-003,
 REQ-FED-002; TASK-03.
 Completes [ADR-181](181-asynchronous-publication-verifier.md) (the `asservat
 publisher` process); follows [ADR-198](198-installed-key-service.md) (installed
 key service) and [ADR-196](196-regional-cluster-join.md) decision 7 (catalog
 topology pins).
+
+Current qualification (2026-10-20): the installer deploys the publisher with
+its provider setup, credentials and protected inputs.
+[Independent fresh lifecycles](../../test/results/resumed-c62e02ac-publication-grants-green/result.json)
+using the compiled verifier and publisher roles pass publication, historical
+replay and purpose-isolation checks, with synthetic current authority.
+[Resumed native47](../../test/results/resumed-c62e02ac-native47/context-storage.log)
+completed publisher provisioning but did not complete acquisition. Publication
+by the installed publisher therefore remains unqualified.
 
 ## Context
 
@@ -116,6 +125,8 @@ that the installed layout cannot supply:
   hub-api.
 
 ## Progress
+
+Historical checkpoints recorded before the 2026-10-20 status refresh above:
 
 - **Implementation** (unit tests pass): the publisher's projection claim and
   Secret, account and credential Secrets, Service-less workload and RBAC,

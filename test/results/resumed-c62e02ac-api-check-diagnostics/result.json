@@ -1,0 +1,54 @@
+{
+  "scope": "Local APIContextRunner current-check diagnostics only; synthetic application ports; no external fixture or installed lifecycle qualification.",
+  "sourceBaseCommit": "f7d3fe142b693eb7a1c29b4dd32b7492792982f0",
+  "uncommittedSourceOverlay": true,
+  "sourceHashCoverage": "Owned runner implementation, diagnostic helper and regression tests only; not a whole-repository source manifest.",
+  "red": {
+    "exit": 1,
+    "packageDurationSeconds": 0.004,
+    "elapsedSeconds": 0.9365999829606153,
+    "terminalTool": "functions.exec_command",
+    "terminalChunk": "0fc85f",
+    "metadataFile": "api-check-diagnostic-red.json",
+    "logFile": "api-check-diagnostic-red.log",
+    "result": "Actual SQL-read control passed. Eleven initial current-check cases and two later effect-boundary cases failed missing fixed substeps. Earlier error-chain, caller-deadline, read-order and effect assertions passed."
+  },
+  "green": {
+    "exit": 0,
+    "packageDurationSeconds": 1.169,
+    "elapsedSeconds": 2.6720003669615835,
+    "terminalTool": "functions.write_stdin",
+    "terminalSession": 23529,
+    "terminalChunk": "1c1123",
+    "metadataFile": "api-check-diagnostic-green-race.json",
+    "logFile": "api-check-diagnostic-green-race.log",
+    "result": "Complete execution package passed with race detection, including both new diagnostic tests."
+  },
+  "redOwnedSourcesUnchanged": true,
+  "greenOwnedSourcesUnchanged": true,
+  "greenSourceSHA256": {
+    "internal/application/execution/api_context.go": "8ad319f3b4272acbfc899d12fa4e1c8c23d903f504342e8d2db4c2de22d87282",
+    "internal/application/execution/api_check_diagnostic.go": "569056ff3f8f90e9751abaa79c2771c93630609bec673decb592e1a5a78efc7c",
+    "internal/application/execution/api_check_diagnostic_test.go": "a7f8f17201b46903ea18f35823643c4a9c49db589bc27636d26edf738681a50e"
+  },
+  "greenSourcesMatchAtArchive": true,
+  "qualification": [
+    "Actual SQL work-read failures retain ReadAPIContextWork; initial current checks emit distinct fixed Check substeps.",
+    "Initial failure cases preserve errors.Is chains, the original caller deadline and ordered short-circuit reads, with no execution preparation, key preparation, start consumption, capture or store effects.",
+    "Later PrepareContext and ReadyStart checks retain their effect-boundary prefixes; already prepared keys close once and no start/capture/store follows the failed check.",
+    "Dependency error text and FixedStep values do not enter the new closed check labels.",
+    "Authority reads, original-bound arithmetic and reuse policy are unchanged; no schema, permission, quota or public response changes."
+  ],
+  "limitations": [
+    "These local regressions do not identify which specific current read failed in native47.",
+    "No external harness, native qualification, deployment or commit was performed for this archive.",
+    "No tests were rerun to produce this archive; log and metadata copies are byte-identical to the recorded cache evidence."
+  ],
+  "fileSHA256": {
+    "api-check-diagnostic-red.log": "4faba985e8bf9595406f084cd9bfd711ba9a26615cb7ad52a2d005de843686e9",
+    "api-check-diagnostic-red.json": "31fa66420da5c5a5d21b50547ef739218a01535e012ab9fb7dc0f8b1979d3d5e",
+    "api-check-diagnostic-green-race.log": "168ac026575d811671477de35a70d4e7a509ac992eb9346179b06cbf21c4524c",
+    "api-check-diagnostic-green-race.json": "8e789a5a00f3c5f3e6d7ca4fa6617e54e8b2a7fd4feb1d570ab19c79c2f07878",
+    "api-check-diagnostic-verification-transcript.txt": "478919b01edd2ee9b63e26fa327925ee55a816f7339e34cbadf996fbccf12db5"
+  }
+}

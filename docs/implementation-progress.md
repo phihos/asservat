@@ -2,7 +2,69 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
-The [latest frozen installed run `context-hsp75ign`](../test/results/resumed-c62e02ac-native46/result.json)
+The [latest frozen installed run `context-4b2d6czv`](../test/results/resumed-c62e02ac-native47/result.json)
+on `f7d3fe14` passed bootstrap, exact regional join replay, capacity readiness
+and console processing initialization. Capacity supplied six distinct
+observations and 37 usable samples over 15 seconds. Test and harness exited 1
+after 1,263.415 seconds; all 2,758 source hashes match the frozen commit and
+stayed unchanged. Owned cleanup subsequently exited 0, independent read-back
+confirmed all twelve recorded Docker resources absent, and build scratch was
+removed.
+
+The first request's new private diagnostic identifies
+`request/facts/storage/margin`: the final authoritative storage selection had
+less than one second remaining. Its early readiness hint did not preserve
+headroom through the intervening work. The second request failed at target
+query routing. Both original reviews were resolved closed, using the unchanged
+two-record resolution reservation. [ADR-213](decisions/213-storage-readiness-at-consumption.md)
+defines a bounded consumption phase for the same owned storage wait. Its
+implementation and component checks now pass; native47 did not test it.
+
+The third request admitted one capture and acknowledged its intent. Its
+[SQL postmortem](../test/results/resumed-c62e02ac-native47/postmortem-execution.log)
+shows `intent_audited`, one reserved custody row, zero execution rows and no
+regional CapacityReservation. The original intent interval was 1.370169 seconds,
+with 1.095886 seconds remaining after acknowledgement. Execution stopped under
+an inherited deadline before preparation. The old `ReadAPIContextWork` diagnostic
+also covered subsequent current-authority checks, so it cannot identify the
+specific dependency. This run did not reach ADR-212's preparation floor.
+The next resolution exceeded the already-spent two-record reservation;
+same-capture continuation was not reached. No quota or deadline was enlarged.
+Acquisition, publication, native download, revocation and deletion remain
+unqualified in the complete installed journey.
+
+The [execution diagnostic regression](../test/results/resumed-c62e02ac-api-check-diagnostics/result.json)
+first reproduces the ambiguous check labels, then passes the full execution
+package under race detection (1.169 seconds, exit 0). Actual SQL reads retain
+`ReadAPIContextWork`; subsequent checks distinguish exact target, eligibility,
+capability, retention, compilation, recovery, process, validity and cancellation.
+Later checks keep their preparation/start boundary prefixes. Original error
+chains, ordered reads, deadlines and effect counts remain unchanged.
+Independent review found no blockers. These synthetic component cases do not
+identify the specific dependency that failed in native47.
+
+The [storage consumption regression](../test/results/resumed-c62e02ac-storage-consumption/verification.json)
+first fails against the old immediate margin refusal, then passes with the
+same owned hint transferring into consumption. It retains the one demand
+attempt, 250 ms cadence, exact storage selection and all original non-storage
+authority bounds. Tests cover independent binding timestamps, every original
+cutoff, invalid or changed storage, failed demands, joined cancellation and
+the exact one-second margin. Successful Request retains its existing final
+eligibility recheck; no extra facts refresh or admission retry is introduced.
+The full capture race suite passes in 10.066 seconds, and the integration
+package compiles with no tests selected. Independent review found no blockers.
+[Specification, architecture, design and Go vet checks](../test/results/resumed-c62e02ac-storage-consumption-gates/result.json)
+pass; this is component evidence, with the next frozen installed run pending.
+
+The [scoped storage-reader SQL regression](../test/results/resumed-c62e02ac-storage-diagnostic-sql/result.json)
+on `f7d3fe14` passes with the actual compiled read-only role: original binding
+freshness is preserved, a missing exact workload emits the closed diagnostic,
+and writes remain denied. Test and harness exited 0 in 1.989 seconds; all 2,730
+source hashes match and stayed unchanged. Both owned containers and their
+network were independently confirmed absent. Synthetic authority in this
+component fixture does not qualify the installed lifecycle.
+
+The preceding [frozen installed run `context-hsp75ign`](../test/results/resumed-c62e02ac-native46/result.json)
 on `8b153eb2` includes the preparation and pool-cleanup corrections below.
 Bootstrap, exact regional join replay, capacity readiness and processing
 initialization passed. Capacity supplied six distinct observations and 30 usable
@@ -39,7 +101,7 @@ current-result/cancellation checks without changing their order or result.
 The full capture and fleet race packages pass in 3.078 and 15.961 seconds.
 The PostgreSQL adapter, Go vet, specification, architecture and SQL generation
 checks also pass. The existing scoped SQL-reader regression now requires the
-missing-target diagnostic; its next real-service qualification remains pending.
+missing-target diagnostic; its subsequent real-service pass is recorded above.
 
 The fixture was retained for read-only SQL and Kubernetes inspection, then its
 owned cleanup exited 0 with no failures. Independent read-back confirmed all

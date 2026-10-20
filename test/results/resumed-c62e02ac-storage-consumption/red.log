@@ -1,0 +1,5 @@
+--- FAIL: TestContextStorageConsumptionWaitsForIndependentBinding (0.00s)
+    context_storage_consumption_test.go:92: early ready binding lost its margin instead of waiting within original bounds context preview unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/application/capture	0.003s
+FAIL

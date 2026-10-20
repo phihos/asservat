@@ -1,9 +1,23 @@
 # ADR-200 — On-demand capacity refresh
 
-Date: 2026-10-17. Status: accepted; implementation in progress.
+Date: 2026-10-17. Status: accepted; implemented; SQL and installed demand-refresh checks pass.
 Requirements: REQ-CAP-001/002/003, REQ-FED-001, S-02; TASK-03.
 Follows [ADR-197](197-regional-capacity.md) (regional capacity) and
 [ADR-190](190-capacity-readiness-and-promoted-owner.md) (hub capacity).
+
+Current qualification (2026-10-20): the capture readiness wait overlaps
+independent facts work and joins before the authoritative storage read. Both
+retain the one-second selection margin and original deadlines. Download demand
+rearming is implemented and SQL-tested. In
+[resumed native47](../../test/results/resumed-c62e02ac-native47/result.json),
+the demand lane supplied six distinct observations and 37 usable samples over
+15 seconds, but a later request was refused at the final storage margin.
+Refresh sampling does not guarantee sufficient freshness at a later read.
+[ADR-213](213-storage-readiness-at-consumption.md) adds bounded readiness at
+consumption within the same owned wait. Its implementation and
+[complete capture race checks](../../test/results/resumed-c62e02ac-storage-consumption/verification.json)
+pass; installed qualification remains pending. Installed acquisition and
+download qualification remain open.
 
 ## Context
 
@@ -65,11 +79,21 @@ always be refused.
   The investigation owns one joined readiness wait per call. It overlaps
   exact-Pod resolution for a request and the unchanged ordered
   eligibility/capability/retention checks, then joins before the authoritative
-  storage read. That final result must still have the existing one-second
-  freshness margin; otherwise admission returns unavailable. This is a check
-  at selection, not a guarantee of time remaining after later SQL waits.
-  It does not repeat the wait inside request facts, extend any
-  contributing observation, or survive cancellation/early refusal.
+  storage read. Under [ADR-213](213-storage-readiness-at-consumption.md), a valid
+  result for the same selected storage with less than the existing one-second
+  margin may continue into a consumption phase of that same owned wait.
+  With refresh configured, it polls every 250 ms and may use the call's single
+  demand attempt if it has not already been spent. Each candidate retains its
+  own original timestamps; only a separately observed result with sufficient
+  margin may be consumed. The original caller, initial identity/recovery,
+  preview, target, eligibility/identity, capability, retention/proof/expiry and
+  optional reason cutoffs bound this phase. Missing refresh or an earlier
+  failed demand refuses a thin result that would require polling; an already
+  valid result with sufficient margin may still pass. Read errors, invalid or
+  changed storage, cancellation and expired original facts refuse the
+  operation. No second owned wait, target selection, facts refresh or
+  side-effect retry is added. The margin remains a check at selection, not a
+  guarantee of time remaining after later SQL waits.
 - **Downloads** re-arm the demand (migration 00067): demand rows keep their
   names after they expire, and download preparation, which knows only its
   download allocation, calls `demand_capacity_refresh_for_download`
@@ -88,6 +112,8 @@ always be refused.
   regional binding fresh, rather than polling for a discovery window.
 
 ## Progress
+
+Historical checkpoints recorded before the 2026-10-20 status refresh above:
 
 - **Implementation** (unit tests pass): migration 00066 with the demand table
   and two functions, schema 66, the role grants (`capture-preview`: demand;

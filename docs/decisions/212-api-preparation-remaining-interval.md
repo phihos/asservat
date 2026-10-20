@@ -1,8 +1,18 @@
 # ADR-212 — Remaining interval before one-use API preparation
 
-Status: accepted for implementation under the resumed installed-context work.
+Date: 2026-10-20. Status: accepted; implemented; real PostgreSQL/S3 preparation-boundary checks pass.
 Qualification is recorded in [implementation progress](../implementation-progress.md).
 Requirements: REQ-EXE-002, REQ-DB-003–004; S-02.
+
+Current qualification (2026-10-20): the
+[real-service regression](../../test/results/resumed-c62e02ac-api-preparation-green/result.json)
+passes post-lock headroom refusal, zero new effects, a later fresh first winner
+and exact expired prepared-row replay into uncertainty, with synthetic current
+authority. Installed start and acquisition qualification remain open.
+[Resumed native47](../../test/results/resumed-c62e02ac-native47/result.json)
+admitted one capture intent but created no execution row: it stopped before
+preparation under the inherited deadline. That run does not demonstrate a
+preparation-floor refusal.
 
 Native45 inserted the first API execution preparation with 433.731 ms remaining
 before its original deadline. The local start object reached `Ready`, but no

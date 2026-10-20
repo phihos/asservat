@@ -20,13 +20,18 @@ type marginStorageRead struct {
 	elapsed   time.Duration
 	until     time.Time
 	finalRead func(context.Context) error
+	readAt    int32
 }
 
 func (s *marginStorageRead) ContextStorage(ctx context.Context, target authorization.Target) (ContextStorageObservation, error) {
 	n := s.reads.Add(1)
 	out, err := s.investigationFixture.ContextStorage(ctx, target)
 	out.Binding.FreshUntil = s.until
-	if n == 2 {
+	readAt := s.readAt
+	if readAt == 0 {
+		readAt = 2
+	}
+	if n == readAt {
 		// The final read happens only after the early hint has finished.
 		// Observe elapsed time without changing the binding's original cutoff.
 		s.advance.Store(int64(s.elapsed))
@@ -50,6 +55,13 @@ func TestContextStorageMarginIsRequiredAtAuthoritativeRead(t *testing.T) {
 				elapsed: time.Second - left, until: f.now.Add(time.Second)}
 			refresh := &countingRefresh{}
 			f.svc.Storage, f.svc.Refresh = storage, refresh
+			expectedReads := int32(2)
+			if left < time.Second {
+				// Without a configured refresher, a thin authoritative
+				// result still refuses immediately; there is no early hint.
+				f.svc.Refresh = nil
+				storage.readAt, expectedReads = 1, 1
+			}
 			var reports []string
 			f.svc.ReportPreviewFailure = func(stage string) { reports = append(reports, stage) }
 			accepted, err := f.svc.Request(t.Context(), f.source(t, t.Context()), p.ID, "original")
@@ -67,7 +79,7 @@ func TestContextStorageMarginIsRequiredAtAuthoritativeRead(t *testing.T) {
 					t.Fatal("request omitted its distinct storage-margin diagnostic", reports)
 				}
 			}
-			if storage.reads.Load() != 2 || refresh.demands.Load() != 0 || !storage.until.Equal(f.now.Add(time.Second)) {
+			if storage.reads.Load() != expectedReads || refresh.demands.Load() != 0 || !storage.until.Equal(f.now.Add(time.Second)) {
 				t.Fatal("final margin check repeated readiness, demanded refresh or renewed the binding", storage.reads.Load(), refresh.demands.Load())
 			}
 		})

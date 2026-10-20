@@ -1,13 +1,13 @@
 # Product implementation status
 
-Baseline reviewed on 2026-10-12; runtime-profile, owner-startup and regional-collection updates on 2026-10-14; installed-workflow qualification updated on 2026-10-18. This tracks the accepted first-release scope in
+Baseline reviewed on 2026-10-12; runtime-profile, owner-startup and regional-collection updates on 2026-10-14; installed-workflow qualification updated on 2026-10-20. This tracks the accepted first-release scope in
 [product](product.md) and the [implementation slices](architecture/implementation-slices.md).
 Actual commands, source snapshots, failures and subsequent corrections remain in
 [implementation progress](implementation-progress.md).
 
-**The packaged initial bootstrap and protected observation-mode owner startup
-have passed their native reference tests. The complete installed developer
-investigation workflow is unfinished.** Significant identity,
+**Packaged initial bootstrap, protected owner startup, regional capacity and
+console processing initialization have passed their named native checks.
+The complete installed developer investigation workflow is unfinished.** Significant identity,
 permissions, encrypted storage, audit, context capture and download components exist.
 Their component tests do not establish delivery of the broader debugging platform.
 
@@ -39,10 +39,10 @@ the features that depend on them.
 
 | Developer or operator outcome | Established evidence | Work still required |
 | --- | --- | --- |
-| Bootstrap with Helm | Packaged native reference test passes, including replay, managed setup cleanup and uninstall preservation. The separate full bootstrap-to-runtime guard handover also passes with nineteen inert resources and lost-response recovery. | Deploy the actual hub/console/MCP/collector services with qualified protected inputs. The chart still rejects runtime enablement. |
-| Sign in through browser/MCP | Keycloak, session/refresh/logout and browser/MCP components have real integration evidence. | Installed identity/source/provider composition, reviewer step-up and the internal-user alternative. |
-| Request and browse workload context | The bounded pod-status diagnostic, shared UI/MCP controls, SQL admission and encrypted publication have component/native evidence. The regional real-service fixture journey now completes collection, publication, case lookup, native download, Stop and revocation (native36/37). | Complete installed two-cluster request-to-case flow. Native45 still fails at preview target resolution before capture, with repeated first owner-authentication refusals; the targeted native setup pass does not qualify the installed composition. The current diagnostic is limited to 4,096 native bytes and is not generic file/log/command collection. |
-| Download, Stop and deliberately retry | The corrected combined real-service run passes ordinary content, range resume, interrupted original/new sessions, control negatives, exactly-one-winner admission, native exchange and real retention-observation expiry. Authenticated ranges reconstruct a 352-byte artifact without budget refill. Browser restart and cancellation/denial boundaries also pass. | Installed identity/provider composition, sustained availability and large-artifact qualification remain pending. The native fixture uses explicit synthetic identity/bootstrap facts; earlier failures and the correction of its write-on-read retention source remain in the chronological tracker. |
+| Bootstrap with Helm | Packaged native reference tests cover replay, managed setup cleanup, uninstall preservation and the protected runtime handover. The continuation now deploys the hub API/console/MCP, worker, federation, regional connector, key service and publisher with protected inputs. | Complete and qualify the supported installed developer workflow and operational lifecycle. The chart still rejects direct runtime enablement. |
+| Sign in through browser/MCP | Keycloak, session/refresh/logout and browser/MCP components have real integration evidence. The installed fixture signs in through the console, initializes processing and makes authenticated MCP preview/request calls. | Broader installed session lifecycle, reviewer step-up and the internal-user alternative. |
+| Request and browse workload context | The bounded pod-status diagnostic, shared UI/MCP controls, SQL admission and encrypted publication have component/native evidence. Earlier regional fixtures complete collection, publication, case lookup, native download, Stop and revocation with synthetic authority inputs. Installed runs now reach admission and capture-intent persistence. | Complete installed two-cluster preparation, acquisition and request-to-case flow. Resumed native47 stopped before preparation under an inherited deadline; it also recorded an earlier storage-margin refusal. The diagnostic remains limited to 4,096 native bytes and is not generic file/log/command collection. |
+| Download, Stop and deliberately retry | The combined real-service run passes content, range resume, interrupted original/new sessions, control negatives, exactly-one-winner admission, native exchange and retention-observation expiry. Authenticated ranges reconstruct a 352-byte artifact without budget refill. Browser restart and cancellation/denial boundaries pass. Installed hub-local worker/profile provisioning and configuration acceptance also pass. | Completed installed transfer, Stop, revocation/expiry, sustained availability and large-artifact qualification remain pending. The component fixture's synthetic authority inputs and earlier failures remain explicit in the chronological tracker. |
 | Download every evidence type for local tools | Persistent framed format and bounded decoder exist; a separate earlier feasibility lab transferred 2 GiB. | Generic large-object publication, full native transfer/window lifecycle, interruption, throughput/memory and local-tool qualification for product cores, PCAPs and derivatives. |
 | Automatic suspicious-event collection | Policy source, automation identity and acceptance components exist. | Resolved policy/trigger engine, logs/resources/probes/external triggers, all-replica observation, correlation, storm controls and fair incident dispatch. |
 | Files, logs, processes and commands | Designed; pod-status is the implemented narrow exception. | Confined whole-pod adapters, bounded execution, partial/error handling, native output and platform qualification. |
@@ -51,7 +51,7 @@ the features that depend on them.
 | Core dumps and compatible debugger workflows | Disposable-VM helper/crash/local-debugger feasibility exists. | Product helper lifecycle, prepaid crash path, live/process selection, exact companions, large downloads and supported node/runtime qualification. |
 | Combined approval and evidence sharing | Designed; ordinary eligibility/authority foundations exist. | Independent reviewer flow, bounded collection/result grants, multiple owner-team management, future/concrete shares, recipient access and revocation. |
 | Capture profiles, guidance, history and repeat | Designed; the single context preset has narrow implemented preview/recovery flows. | Versioned profile composition, useful recommendations, selector history, repeat with fresh checks and complete investigation navigation. |
-| Permission/privacy administration | Substantial protected-source, retention, restriction and deletion backend subsets have native tests. | Installed supervision, administration UX, previews/overdue reporting and complete managed-copy/backup/history lifetime closure. |
+| Permission/privacy administration | Protected-source, retention, restriction and deletion backend subsets have native tests. Installed console processing initialization passes. Deletion supervision is implemented and merged in PR #41, with SQL paging and focused backend-permission checks. | Processing release, browser-session cleanup, administration UX, previews/overdue reporting and complete managed-copy/backup/history lifetime closure. Installed expiry, failed-cleanup recovery and deletion charge release remain unqualified. |
 | Incident notification and recurrence investigation | Designed, with narrow context case/navigation components. | Trigger-to-case grouping, notification delivery, timelines, findings and recurrence comparison. |
 | Small deployment alternatives | Local wrapping/signing/key-service components exist. | Installed internal accounts, local PKI lifecycle, bundled PostgreSQL/pgBackRest/evidence store and provider lifecycle qualification. |
 | Recover, upgrade and operate production | Initial bootstrap and database-incarnation fencing have native evidence. | Supported restart/restore activation, failover, partitions, upgrades, sustained operation, support matrices and complete production acceptance. |
@@ -70,9 +70,9 @@ browser and MCP, collect and publish encrypted evidence, inspect/download it, th
 verify denial on expiry/revocation and deletion of managed copies. Authority and
 capacity must come from product-provisioned accepted sources, not fixture seeding.
 
-The regional fixture journey (capture → publication → case → phase-bounded
+Earlier regional fixture runs complete the journey (capture → publication → case → phase-bounded
 download continuation per [ADR-167](decisions/167-phase-bounded-download-continuation.md)
-→ native bytes → Stop → revocation) now passes twice, with explicit synthetic
+→ native bytes → Stop → revocation), with explicit synthetic
 authority inputs. Outbound-only regional enrollment now runs in product
 processes: the ADR-168 cluster credential, the ADR-169 delegated channel and
 ADR-170's `hub-federation`/`connector` binaries pass as Pods in two clusters with
@@ -85,15 +85,25 @@ passing targeted real-Kubernetes test with one startup input and synthetic
 connector source/issuer/registry facts. It does not include the complete
 installed TLS opening and both delegated owner authentications.
 
-[Installed native45](implementation-progress.md#installed-native-45-first-owner-authentication-refusal-2026-10-18)
-failed four preview requests at target resolution, before capture. New context
-opening diagnostics identify repeated first owner-authentication refusals with
-time still remaining, alongside separate setup/TLS failures. The separate capacity
-observation channel remained active. Exact tested source hashes matched and fixture
-cleanup completed. Current work is to reproduce the owner-authentication refusal
-while preserving original authority deadlines, then qualify the complete installed capture,
-publication, native download and revocation/expiry/deletion path. Neither the
-component pass nor a healthy capacity channel establishes this workflow.
+[Resumed native47](../test/results/resumed-c62e02ac-native47/result.json) on
+`f7d3fe14` passed regional enrollment, capacity readiness and console processing
+initialization. The demand lane supplied six distinct observations and 37 samples
+with at least one second remaining over 15 seconds. The installed test and
+harness nevertheless exited 1. Its first capture request was refused for
+insufficient storage margin, and its second failed at target-query routing.
+The third admitted one capture intent but stopped before preparation/acquisition
+under the inherited deadline. SQL contained no execution row, so this run does
+not establish a preparation-floor refusal. Two earlier review closures had
+already spent the unchanged two-record resolution reservation; the next
+resolution was refused, so the run did not reach a continuation for that
+accepted capture.
+
+All recorded source hashes matched and owned cleanup completed. Current work
+addresses readiness at consumption while preserving every original authority
+cutoff, and investigates the remaining pre-preparation failure. Completed
+installed acquisition, publication, native download, revocation and managed
+deletion remain unqualified. Neither component passes nor a healthy capacity
+channel establish this workflow.
 Most collector, recording, analysis and sharing work follows or reuses these
 foundations; it has not been declared complete.
 
