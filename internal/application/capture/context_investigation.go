@@ -422,8 +422,26 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	final := s.Eligibility.ContextEligibilityCurrent(ctx, source, target.Target())
 	final.ValidUntil = identity.Earlier(final.ValidUntil, f.eligibility.ValidUntil)
 	final.VerifiedIdentity.ValidUntil = identity.Earlier(final.VerifiedIdentity.ValidUntil, i.ValidUntil)
-	if !final.Eligible || final.Target != target.Target() || final.Principal != p.Actor || final.VerifiedIdentity.Principal != p.Actor || !final.VerifiedIdentity.Valid(s.Now()) || !slices.Equal(final.DefaultAudience, p.Audience) || !s.Now().Before(final.ValidUntil) || !s.factsCurrent(f, s.Now()) || !coverage.Current(s.Now()) || !p.Current(s.Now()) || !recovery.Valid(s.Now()) || ctx.Err() != nil {
-		return zero, s.requestChanged("eligibility")
+	// One label per failed condition; the outcome is the same ReviewChanged.
+	now := s.Now()
+	for _, c := range []struct {
+		failed bool
+		stage  string
+	}{
+		{!final.Eligible, "eligibility/denied"},
+		{final.Target != target.Target() || final.Principal != p.Actor || final.VerifiedIdentity.Principal != p.Actor, "eligibility/subject"},
+		{!final.VerifiedIdentity.Valid(now), "eligibility/identity"},
+		{!slices.Equal(final.DefaultAudience, p.Audience), "eligibility/audience"},
+		{!now.Before(final.ValidUntil), "eligibility/expired"},
+		{!s.factsCurrent(f, now), "eligibility/facts"},
+		{!coverage.Current(now), "eligibility/coverage"},
+		{!p.Current(now), "eligibility/preview"},
+		{!recovery.Valid(now), "eligibility/recovery"},
+		{ctx.Err() != nil, "eligibility/deadline"},
+	} {
+		if c.failed {
+			return zero, s.requestChanged(c.stage)
+		}
 	}
 	admitStarted := time.Now()
 	a, err := s.Admission.AdmitReviewedContext(ctx, p.ID, value.Admission{Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})

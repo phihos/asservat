@@ -136,7 +136,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 			if errors.As(err, &fixed) {
 				step += "/" + fixed.FixedStep()
 			}
-			s.Report(step + " (" + regionalOutcome(err) + ")")
+			s.Report(step + " (" + regionalOutcome(err) + ") left" + fleetapp.RemainingBucket(ctx, s.Now()) + " start-left" + fleetapp.RemainingBucket(call, s.Now()))
 		}
 		switch {
 		case err == nil && (result.State == "StoredPendingVerification" || result.State == "AlreadyStarted"):
@@ -149,7 +149,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	auditapp.MarkStep(ctx, "st-run", mark)
 	if e != nil && state == "" {
 		if s.Report != nil {
-			s.Report("dispatch (" + regionalOutcome(e) + ")")
+			s.Report("dispatch (" + regionalOutcome(e) + ") start-left" + fleetapp.RemainingBucket(call, s.Now()))
 		}
 		return execution.ErrUnavailable
 	}
