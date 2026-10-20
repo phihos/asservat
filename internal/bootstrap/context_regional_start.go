@@ -154,7 +154,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	auditapp.MarkStep(ctx, "st-run", mark)
 	if e != nil && state == "" {
 		if s.Report != nil {
-			s.Report("dispatch (" + regionalOutcome(e) + ") start-left" + fleetapp.RemainingBucket(call, s.Now()))
+			s.Report("dispatch (" + regionalOutcome(e) + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
 		}
 		return execution.ErrUnavailable
 	}
