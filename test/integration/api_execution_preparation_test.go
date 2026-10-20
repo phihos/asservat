@@ -51,8 +51,8 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 				t.Cleanup(p.Close)
 				return p
 			}
-			newExecution := func(purpose string) (*postgres.APIContextExecutions, string) {
-				role := narrowRole(t, ctx, admin, "api_preparation_", "synthetic-api-preparation", func(role string) []string {
+			newExecution := func(purpose, prefix string) (*postgres.APIContextExecutions, string) {
+				role := narrowRole(t, ctx, admin, prefix, "synthetic-api-preparation", func(role string) []string {
 					grants, ok := postgres.PublicRuntimeRoleGrantSQL(purpose, role)
 					if !ok {
 						t.Fatal("missing compiled execution role", purpose)
@@ -66,8 +66,8 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 				}
 				return a, role
 			}
-			prepare, role := newExecution("api-execution-prepare")
-			read, _ := newExecution("api-execution-read")
+			prepare, role := newExecution("api-execution-prepare", "api_preparation_")
+			read, _ := newExecution("api-execution-read", "api_preparation_read_")
 			intents, err := postgres.NewCaptureIntentAudits(ctx, open("capture_audit_runtime", "synthetic-capture-audit"), s.a.RootID)
 			if err != nil {
 				t.Fatal(err)
