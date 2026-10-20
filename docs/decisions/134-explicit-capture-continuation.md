@@ -31,6 +31,11 @@ is uncertain and cannot prepare again. Started or stored rows remain passive.
 This preserves the one-attempt boundary and makes continuation useful before
 execution preparation; it does not recover a spent or unknown key attempt.
 
+[ADR-212](212-api-preparation-remaining-interval.md) adds a conservative
+one-second floor before the first preparation insert. An exact existing
+prepared row remains a passive no-create observation after expiry, so the
+runner can report the same known preparation uncertainty without renewing it.
+
 The console offers an explicit Continue collection action for currently observed
 Pending work only while it retains the original receipt. Polling, session refresh,
 reload and pasted capture URLs never invoke it. Unknown responses preserve the

@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-212 — Remaining interval before one-use API preparation](212-api-preparation-remaining-interval.md)
+requires one second remaining before the first preparation insert and preserves
+expired prepared rows as passive no-create uncertainty. No authority interval,
+key attempt or acquisition is renewed.
+
 [ADR-211 — Return a completed target query to its original standby interval](211-completed-query-standby-transition.md)
 separates a completed pre-work query's socket deadlines from the unchanged
 standby residence, with exclusive query ownership and permanent closure after

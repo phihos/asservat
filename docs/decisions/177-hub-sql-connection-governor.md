@@ -82,8 +82,8 @@ limit (SQLSTATE 53300). Acquisition retries that within the request's
 original deadline, never beyond it.
 
 The governor must never be acquired while the caller already holds another
-purpose's transaction, or it could deadlock. It detects a nested acquisition
-in the same call chain and returns an error instead of waiting.
+purpose's transaction, or it could deadlock. Callers must avoid that nesting;
+the current socket governor does not detect acquisition call chains.
 
 `MaxConns=1` still serializes each purpose per process. Hot-path concurrency
 is a separate, measured follow-up.
@@ -95,7 +95,7 @@ is a separate, measured follow-up.
    owner `routing` and `native-read` pools.
 2. **Governor:** `postgres.SQLConnectionGovernor`, with governed pool
    construction (`MaxConns=1`, `MinConns=0`, close-after-release for cold
-   purposes, token release in `BeforeClose`) and the post-connect identity
+   purposes, token release after the physical socket closes) and the post-connect identity
    check.
 3. **Roles:** ordinals and grant plans for the new purposes; the role matrix
    on real PostgreSQL.
@@ -105,8 +105,9 @@ is a separate, measured follow-up.
 
 Tests:
 
-- The governor never exceeds its cap, releases its token on cancellation,
-  detects nested acquisition and honors reserved tokens.
+- The governor never exceeds its cap, releases a token only after the physical
+  socket closes, and honors reserved tokens. Nested-acquisition detection is
+  not implemented or qualified.
 - The budget plan keeps the hub at or below 32.
 
 ## Progress
@@ -117,6 +118,21 @@ Tests:
   rest and close after release. hub-api's owner pools are governed at 32. The
   budget plan counts the governor cap and includes the owner `routing` and
   `native-read` pools.
+- **Failed pooled connection cleanup.** pgx cancellation cleanup opens a
+  second socket before closing the failed connection. With one dedicated slot,
+  that can wait on the slot held by the same connection while the pool waits
+  for cleanup. The governor chains the pool's existing `BeforeClose` hook and
+  closes the underlying governed socket only when pgx already marks the
+  connection closed. This happens before the pool joins cleanup and returns
+  the slot only after the actual close. The default cancellation watcher,
+  typed errors, healthy reuse, graceful shutdown and connection limits remain
+  unchanged. Installed factories perform credential verification after pool
+  construction; arbitrary custom post-authentication constructor callbacks
+  outside pooled ownership are not qualified by this fix. A slow cancellation
+  endpoint or shared-slot contention can still consume the existing cleanup
+  bound. Pool acquisition retains its caller deadline; pgx may finish a
+  connection constructor after that acquisition is cancelled, within the
+  configured connection timeout.
 - **Hub extension purposes.** There are 22, at ordinals 21–29, 35–39 and
   57–64:
   - API execution read, prepare and record;

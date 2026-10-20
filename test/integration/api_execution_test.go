@@ -30,6 +30,7 @@ import (
 // qualification is mandatory before this runner can be deployed.
 func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario) {
 	t.Helper()
+	qualifyAPIExecutionPreparationBoundaries(t, ctx, admin, poolFor, store, keys, create)
 	t.Run("api-execution-one-preparation-exact-result-historical-publication", func(t *testing.T) {
 		// Qualify each compiled publication role independently. Each child gets
 		// a fresh execution and reaches its first publication effects without a

@@ -6,6 +6,15 @@ REQ-EVD-001–003 and the S-02 context workflow. It allows the fixed Pod status
 snapshot to inspect a Pod that has not been scheduled. It does not enable a
 public collector or complete regional execution/start authority.
 
+The first durable execution preparation follows
+[ADR-212](../decisions/212-api-preparation-remaining-interval.md): after current
+authority and storage locks, database time must leave at least one second
+within the earlier checked/caller cutoff before insertion. This is a
+conservative availability rule, not a new deadline or performance guarantee.
+Refusal leaves no execution row or key permission. Exact existing prepared
+rows are passive no-create results even after expiry, allowing the runner's
+existing `PreparationUncertain` classification without repeating effects.
+
 ## Exact class and target
 
 `artifact.ContextExecutionClass` has two supported values. The empty value is

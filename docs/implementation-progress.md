@@ -2,6 +2,58 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
+The [latest frozen installed run `context-boqlf6my`](../test/results/resumed-c62e02ac-native45/result.json)
+on `a6546de8` passed bootstrap, exact regional join replay, processing
+initialization and preview. The demand lane produced six distinct observations
+and 32 usable samples in 15 seconds. [CI on this commit](https://github.com/phihos/asservat/actions/runs/39446523599)
+passed all 15 jobs, including ten Go test shards and console browser checks.
+The installed test and harness nevertheless exited 1 after 1,222.530 seconds.
+All 2,752 source hashes match the commit and stayed unchanged.
+
+The first capture reached execution preparation and `ReadyStart`. Its
+[read-only SQL postmortem](../test/results/resumed-c62e02ac-native45/postmortem-execution.log)
+shows only 433.731 ms remained between the preparation insert and its immutable
+`NotAfter`. The exact regional
+[CapacityReservation](../test/results/resumed-c62e02ac-native45/postmortem-regional-capacity.json)
+reached `Ready`, with no `StartCommitted` status; SQL remained `prepared` with
+no start, acquisition or completion timestamps. The first invocation's inherited
+cutoff was preserved. Its equality with the capture-intent deadline reflects a
+shared original bound, not proof that storage was the limiting observation.
+The capture intent and all three request audit outcomes were acknowledged.
+
+Both continuations failed at `PrepareAPIExecution/effect/expired/client`:
+the existing preparation had expired. The final `client` label comes from
+generic SQL error normalization; it does not identify a network failure.
+Rejecting this historical row before the runner can observe its no-create
+result bypasses the existing `PreparationUncertain` classification. The next
+resolution exhausted the unchanged two-record audit reservation. A fix is
+being qualified separately; existing preparation must never acquire a new
+deadline, key attempt or start authority.
+
+The new SQL activity diagnostic captured 30 installation-scoped rows before
+owner removal, with no lock wait in that snapshot. It cannot establish earlier
+waits or client-side pool state. The fixture was retained for read-only SQL and
+Kubernetes inspection, then owned cleanup exited 0 with no failures.
+Independent Docker read-back confirmed all 12 recorded resources absent;
+private postmortem kubeconfigs and build scratch were removed. Acquisition,
+publication, native download, revocation and deletion remain unqualified.
+
+An independent [TCP/TLS protocol regression](../test/results/resumed-c62e02ac-sql-governor/result.json)
+reproduced a separate SQL pool cleanup defect. pgx's asynchronous cancellation
+attempted another governed socket while the failed connection retained its
+sole dedicated slot. All four explicit-cancellation/deadline cases failed the
+next transaction's unchanged one-second deadline on the original code.
+The conditional `BeforeClose` correction closes only a connection already
+marked discarded by pgx, after any existing hook and before joining driver
+cleanup. Physical slot accounting, default cancellation/error behavior,
+healthy reuse and graceful closure remain unchanged. The corrected regression
+passes under race detection in 1.402 seconds, and the full PostgreSQL adapter
+race suite passes in 2.493 seconds. Independent review found no blockers.
+These are actual pgxpool tests against a synthetic PostgreSQL protocol server,
+not a native PostgreSQL or installed lifecycle qualification. Native44 has a
+plausible initiating cancellation path, but its logs cannot prove attribution;
+native45's preparation-expiry failure is separate.
+
 An independent deterministic regression reproduced admission with only 50 ms
 left on the final storage observation after the early readiness hint succeeded.
 The authoritative read now requires the existing one-second margin, refusing
@@ -38,9 +90,9 @@ qualification. The complete fleet and mTLS race suites passed in 15.962 and
 35.028 seconds; focused Kubernetes/bootstrap race checks passed in 7.775 and
 1.057 seconds. Independent review found no blockers. Specification,
 architecture, embedded contracts and `go vet ./...` gates passed, as did the
-full in-process integration race suite (6.286 seconds). The next installed
-qualification remains pending; local limiter versus network failure and
-client-side SQL contention are not established causes.
+full in-process integration race suite (6.286 seconds). Native45 above
+qualifies these sources only to its recorded failure; local limiter versus
+network failure and client-side SQL contention are not established causes.
 
 The [frozen diagnostic run `context-5ngvkl2b`](../test/results/resumed-c62e02ac-native44/result.json)
 on `ccdde1a3` passed bootstrap, regional join/replay, processing initialization

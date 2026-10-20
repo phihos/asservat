@@ -30,6 +30,18 @@ Given an approved policy, when its eligible grant handle is renewed or only reci
 
 ## REQ-EXE-002 — Acceptance, deadlines and progress
 
+For the fixed API pod-status execution, require at least one second remaining
+before its first irreversible execution-preparation insert, as specified in
+[ADR-212](../docs/decisions/212-api-preparation-remaining-interval.md).
+Use database time after blocking authority/storage locks and the earlier
+original check/caller cutoff. Refusal creates no execution row or key permit;
+the accepted capture and its accounting remain unchanged. This conservative
+floor does not guarantee completion. A later explicit continuation may become
+the first winner under current request-owned authority and unchanged capture
+and write deadlines. An exact existing prepared row remains passive no-create
+uncertainty after its original expiry; it cannot renew keys, start authority,
+charges or the target.
+
 The private regional transport in
 [ADR-135](../docs/decisions/135-live-regional-api-context-start.md) preserves the
 same accepted API snapshot and original start interval. A connector-originated
@@ -139,6 +151,15 @@ Before starting, revalidate identity, authority, current grant, source freshness
 A summary phase is a projection of action states: Running while any action runs, AwaitingApproval only when no runnable action is active and some remain eligible pending review, Finalizing after acquisition ends. Terminate Succeeded only when every required action succeeds; Partial when useful artifacts exist with missing/failed work; Failed when required evidence failed without usable output. Report cancellation and uncertain execution explicitly. No successful artifact is hidden by a waiting optional action.
 
 ### SC-EXE-002
+
+Given an accepted API context capture with no execution preparation, hold a
+required SQL lock until fewer than one second remains in its original
+check/caller interval. Preparation must refuse with no execution row or key
+permit. An explicit fresh continuation for the same accepted identity can
+then produce only one first-preparation winner. Given an existing exact
+prepared row whose start interval has expired, current-authorized replay must
+retain its original binding and produce no-create preparation uncertainty,
+without another key effect, start or acquisition.
 
 Given cheap context and a required intrusive action, when approval takes longer than the capture deadline, then context runs once and becomes visible immediately, the intrusive start never occurs and the terminal result explains partial evidence. A refreshed page or repeated MCP request returns the same capture without resetting its clock or counters.
 
