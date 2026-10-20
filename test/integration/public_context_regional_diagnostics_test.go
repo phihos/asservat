@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 	"time"
@@ -337,7 +338,9 @@ func TestPublicJourneyDiagnosticsOriginalRegionalRunner(t *testing.T) {
 			if stopAt == "target" {
 				expectedStage = journeyRunnerTarget
 			}
-			if e != private || !reflect.DeepEqual(result, executionapp.ContextResult{}) || identityCalls != 1 || trace.first != expectedStage+1 || trace.reasons[expectedStage] != 9 || trace.calls[journeyRunnerRecovery] != 1 || trace.calls[journeyRunnerRead] != 1 || trace.calls[journeyRunnerPrepare] != 0 || trace.calls[journeyRunnerKeys] != 0 {
+			// The runner's fixed-step wrapper must retain this exact private
+			// cause, not erase it or require an unwrapped top-level error.
+			if !errors.Is(e, private) || !reflect.DeepEqual(result, executionapp.ContextResult{}) || identityCalls != 1 || trace.first != expectedStage+1 || trace.reasons[expectedStage] != 9 || trace.calls[journeyRunnerRecovery] != 1 || trace.calls[journeyRunnerRead] != 1 || trace.calls[journeyRunnerPrepare] != 0 || trace.calls[journeyRunnerKeys] != 0 {
 				t.Fatal("actual runner changed original stopping behavior")
 			}
 			if (trace.calls[journeyRunnerTarget] == 1) != (stopAt == "target") {
