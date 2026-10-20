@@ -65,10 +65,14 @@ func BuildProviderOwnerWorkload(p OwnerWorkloadPlan, clusterID string, selection
 	// public source's own denial with a dry-run UPDATE, so it holds update on
 	// exactly those sources and get on their guards.
 	sources := contracts.OwnerPublicGuardedSources(p.InstallationID)
-	guards := make([]string, 0, len(sources))
+	guards := make([]string, 0, len(sources)+1)
 	for _, name := range sources {
 		guards = append(guards, name+"-guard")
 	}
+	// ADR-210: the capacity processing source, whose guard is named by
+	// capacity, for the operator's processing decisions.
+	_, _, _, processingSource, processingGuard := CapacitySourceNames(p.InstallationID)
+	sources, guards = append(sources, processingSource), append(guards, processingGuard)
 	w.Role.Rules = append(w.Role.Rules,
 		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: sources, Verbs: []string{"get", "update"}},
 		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: append([]string{contracts.OwnerBrowserSettingsName(p.InstallationID), contracts.OwnerIdentitySettingsName(p.InstallationID)}, contracts.OwnerClusterTopologyNames(p.InstallationID)...), Verbs: []string{"get"}})

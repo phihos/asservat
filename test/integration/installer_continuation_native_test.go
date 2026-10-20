@@ -123,7 +123,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			EligibleGroups: []string{"synthetic-group"}, GroupMaxAgeSeconds: 300,
 			// ADR-190: the operator's synthetic capacity profile and release operator.
 			Capacity:            nativeCapacityProfile(),
-			ProcessingOperators: []contracts.ProcessingOperator{{ClientID: "console", Issuer: issuer, Kind: "User", ID: "synthetic-operator"}},
+			// ADR-210: the synthetic group's console users are the processing
+			// operators, so the journey's one user initializes processing.
+			ProcessingOperators: []contracts.ProcessingOperator{{ClientID: "console", Issuer: issuer, Kind: "Group", ID: installedIdentityGroup}},
 			// ADR-193: the federation's operator choices.
 			Federation: &contracts.InstallerFederationSettings{ConnectorPKIMount: connectorPKI, ConnectorIssuerRootsPEM: connectorRoots,
 				Endpoint: federationEndpoint, ServerName: "federation.synthetic.invalid", ServiceType: "NodePort", NodePort: 31446,

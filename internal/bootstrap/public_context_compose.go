@@ -82,6 +82,9 @@ type publicContext struct {
 	clustersDigest [32]byte
 	// fleet is the ADR-193 bootstrap issuance; nil without Public.Fleet.
 	fleet *fleetapp.FleetBootstrapIssuance
+	// processingPolicy is the capacity processing source that processing
+	// decisions bind to (ADR-210); nil without Public.Processing.
+	processingPolicy *kube.DownloadEnvironmentSource
 }
 
 func decodeAuditPolicy(raw json.RawMessage, lane, root, installation string) (audit.OperationLifecyclePolicy, error) {
@@ -335,6 +338,18 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing}
 	if out.fleet, err = newPublicFleet(ctx, c, providers, pools, observer, probe, a); err != nil {
 		return nil, err
+	}
+	// ADR-210: the processing source has no download paths; it is read only
+	// as the policy that names the processing operators.
+	if e := p.Processing; e != nil {
+		pa, pp := capacityWorkerGuard(e.Guard)
+		guard, err := kube.NewDownloadEnvironmentProtection(observer, probe, cfg.ConfigMapAdministration{Name: e.Guard.Name, SourceName: e.Source.Name, ControlNamespace: control, Administrators: pa}, pp)
+		if err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		if out.processingPolicy, err = kube.NewDownloadEnvironmentSource(observer, guard, e.Source.Name, e.Source.UID, root, installation, nil); err != nil {
+			return nil, mounts.ErrUnavailable
+		}
 	}
 	if ctx.Err() != nil {
 		return nil, mounts.ErrUnavailable

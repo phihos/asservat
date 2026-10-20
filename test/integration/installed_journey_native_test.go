@@ -76,6 +76,8 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 		if err != nil {
 			t.Fatal("installed wire contracts", err)
 		}
+		// ADR-210: processing is initialized once, before any preview.
+		identity.initializeProcessing(t, ctx, cert, address, origin)
 		tokens := identity.mcpTokenSource(origin)
 		client := sdk.NewClient(&sdk.Implementation{Name: "installed-journey", Version: "1"}, &sdk.ClientOptions{Capabilities: &sdk.ClientCapabilities{}})
 		session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, tokens.Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)

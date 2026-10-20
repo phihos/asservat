@@ -1,18 +1,26 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"html"
+	"io"
+	"net"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // installedIdentityGroup is the stable group ID the installed continuation's
@@ -172,4 +180,99 @@ func (s *installedJourneyTokenSource) Token(ctx context.Context) (string, error)
 	}
 	s.tokens, s.subject, s.until = next, claims.Subject, until
 	return next.Access, nil
+}
+
+// initializeProcessing logs the synthetic user in through the console client
+// and, as the configured processing operator (ADR-210), initializes
+// processing before the first preview. One Idempotency-Key names the change;
+// a 503 is retried under that same key, so a lost reply resumes, never
+// repeats, the audited change. The console origin is dialled at address.
+func (i *installedIdentity) initializeProcessing(t *testing.T, ctx context.Context, publicRoot *x509.Certificate, address, origin string) {
+	t.Helper()
+	roots := x509.NewCertPool()
+	roots.AddCert(publicRoot)
+	if !roots.AppendCertsFromPEM([]byte(i.RootPEM)) {
+		t.Fatal("console login roots")
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		t.Fatal("console origin", err)
+	}
+	dial := &net.Dialer{Timeout: 5 * time.Second}
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar, Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		Transport: &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12},
+			DialContext: func(ctx context.Context, network, target string) (net.Conn, error) {
+				if host, _, e := net.SplitHostPort(target); e == nil && host == u.Hostname() {
+					target = address
+				}
+				return dial.DialContext(ctx, network, target)
+			}}}
+	defer client.CloseIdleConnections()
+	base := strings.TrimSuffix(origin, "/")
+	request := func(method, target, media string, body []byte, header map[string]string) (int, []byte, http.Header) {
+		t.Helper()
+		r, _ := http.NewRequestWithContext(ctx, method, target, bytes.NewReader(body))
+		if media != "" {
+			r.Header.Set("Content-Type", media)
+		}
+		for k, v := range header {
+			r.Header.Set(k, v)
+		}
+		response, e := client.Do(r)
+		if e != nil {
+			t.Fatal("console HTTP", method, e)
+		}
+		defer response.Body.Close()
+		b, _ := io.ReadAll(io.LimitReader(response.Body, 256<<10))
+		return response.StatusCode, b, response.Header
+	}
+	status, _, headers := request("GET", base+"/auth/login?return_to=%2Finvestigations", "", nil, nil)
+	if status != http.StatusSeeOther {
+		t.Fatal("console login start", status)
+	}
+	status, page, _ := request("GET", headers.Get("Location"), "", nil, nil)
+	match := regexp.MustCompile(`<form[^>]*id="kc-form-login"[^>]*action="([^"]+)"`).FindSubmatch(page)
+	if status != http.StatusOK || len(match) != 2 {
+		t.Fatal("console login form", status)
+	}
+	action := html.UnescapeString(string(match[1]))
+	if !strings.HasPrefix(action, i.Issuer+"/login-actions/") {
+		t.Fatal("console login form escaped the issuer")
+	}
+	status, _, headers = request("POST", action, "application/x-www-form-urlencoded", []byte(url.Values{"username": {"developer"}, "password": {i.kc.UserPassword}}.Encode()), nil)
+	if status != http.StatusFound {
+		t.Fatal("console provider login", status)
+	}
+	if status, _, _ = request("GET", headers.Get("Location"), "", nil, nil); status != http.StatusSeeOther {
+		t.Fatal("console callback", status)
+	}
+	status, b, _ := request("GET", base+"/api/v1/session", "", nil, nil)
+	var view struct {
+		CSRF string `json:"csrf_token"`
+	}
+	if status != http.StatusOK || json.Unmarshal(b, &view) != nil || len(view.CSRF) != 43 {
+		t.Fatal("console session", status)
+	}
+	key := uuid.NewString()
+	header := map[string]string{"Origin": base, "X-CSRF-Token": view.CSRF, "Idempotency-Key": key}
+	for until := time.Now().Add(time.Minute); ; {
+		status, b, _ = request("POST", base+"/api/v1/processing/changes", "application/json", []byte(`{"action":"initialize_processing"}`), header)
+		var receipt struct {
+			State     string `json:"state"`
+			RequestID string `json:"requestID"`
+		}
+		if status == http.StatusOK && json.Unmarshal(b, &receipt) == nil && receipt.State == "initialized" && receipt.RequestID == key {
+			t.Log("installed journey: the processing operator initialized processing through the console")
+			return
+		}
+		if status != http.StatusServiceUnavailable || !time.Now().Before(until) {
+			t.Fatal("processing initialization", status, string(b))
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatal("processing initialization", ctx.Err())
+		case <-time.After(2 * time.Second):
+		}
+	}
 }

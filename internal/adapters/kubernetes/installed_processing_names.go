@@ -26,6 +26,8 @@ func ownerPublicSourceProbes(installationID, ownerAccount string) []cfg.OwnerCon
 	for _, name := range names {
 		out = append(out, cfg.OwnerConfigurationProbe{ConfigMap: name, ServiceAccount: ownerAccount})
 	}
+	// ADR-210: the owner also proves the processing source's own denial.
+	out = append(out, cfg.OwnerConfigurationProbe{ConfigMap: installedProcessingSource(installationID), ServiceAccount: ownerAccount})
 	catalog := contracts.OwnerClusterCatalogName(installationID)
 	return append(out, cfg.OwnerConfigurationProbe{ConfigMap: catalog, ServiceAccount: contracts.PublisherName(installationID)},
 		cfg.OwnerConfigurationProbe{ConfigMap: catalog, ServiceAccount: contracts.KeyServiceName(installationID)})

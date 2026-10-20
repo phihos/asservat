@@ -682,6 +682,30 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"function", "qualify_capacity_cluster(uuid,uuid,uuid,uuid,bytea,jsonb)", "", "EXECUTE"},
 		{"function", "read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb)", "", "EXECUTE"},
 	},
+	// ADR-210: a privacy operator's processing decisions, exactly the
+	// component role processing_decision_runtime: decision and rule rows and
+	// the lock order recovery, permission, processing root (ADR-127).
+	"processing-decision": {
+		{"schema", "public", "", "USAGE"},
+		{"table", "context_catalog", "", "SELECT"},
+		{"table", "context_processing", "", "SELECT"},
+		{"table", "fleet_current_trust", "", "SELECT"},
+		{"table", "fleet_current_trust", "installation_id", "UPDATE"},
+		{"table", "goose_db_version", "", "SELECT"},
+		{"table", "operation_audit", "", "SELECT"},
+		{"table", "permission_stream", "", "SELECT"},
+		{"table", "permission_stream", "id", "UPDATE"},
+		{"table", "processing_decision", "", "INSERT"},
+		{"table", "processing_decision", "", "SELECT"},
+		{"table", "processing_decision", "applied_at", "UPDATE"},
+		{"table", "processing_decision", "audit_digest", "UPDATE"},
+		{"table", "processing_decision", "id", "UPDATE"},
+		{"table", "processing_root", "", "SELECT"},
+		{"table", "processing_root", "root_id", "UPDATE"},
+		{"table", "processing_rule", "", "INSERT"},
+		{"table", "processing_rule", "", "SELECT"},
+		{"table", "processing_rule", "id", "UPDATE"},
+	},
 	// ADR-193 step 4: audited bootstrap issuance keeps four separate duties:
 	// reservation, credential recording, audit acknowledgement, activation.
 	"fleet-bootstrap-reserve": {

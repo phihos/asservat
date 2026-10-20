@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-210 — Installed processing changes by a privacy operator](210-installed-processing-changes.md)
+adds the console route `POST /api/v1/processing/changes`, the hub SQL purpose
+`processing-decision` and the hub-api read of the capacity processing source,
+so the configured operator initializes processing before the first capture.
+
 [ADR-209 — Two context-start standbys per hub owner](209-two-context-start-standbys-per-owner.md)
 was withdrawn: the installed per-cluster standby limit is one, so a second
 regional exchange per owner was refused; the change was reverted.

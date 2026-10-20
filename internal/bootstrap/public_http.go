@@ -117,6 +117,18 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	if pc.fleet != nil {
 		services.Fleet = pc.fleet
 	}
+	// ADR-210: the privacy operator's processing changes on the normal lane.
+	if pc.processingPolicy != nil {
+		pool, err := d.public.open(ctx, "processing-decision")
+		if err != nil {
+			return nil, &fixedStepError{"processing-sql", err}
+		}
+		decisions, err := postgres.NewProcessingDecisions(ctx, pool, root, d.shared.guards.Recovery)
+		if err != nil {
+			return nil, &fixedStepError{"processing-sql", mounts.ErrUnavailable}
+		}
+		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, recovery: pc.recovery, decisions: decisions, audit: normal, mac: pc.mac}
+	}
 	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: settings.Issuer, Version: p.Version,
 		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxDuration: time.Duration(p.DownloadMaxSeconds) * time.Second,
 		Audit: presentation.AuditedOperationsConfig{RootID: root, Retention: time.Duration(o.RetentionSeconds) * time.Second, NormalConcurrency: o.NormalConcurrency, ResolutionConcurrency: o.ResolutionConcurrency, PerPrincipalConcurrency: o.PerPrincipalConcurrency, NormalPerSecond: o.NormalPerSecond, ResolutionPerSecond: o.ResolutionPerSecond, Now: time.Now, NewID: ownerRandomID}},

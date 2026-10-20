@@ -103,7 +103,9 @@ func PublicRuntimeHubExtensionPurposes() []string {
 		"fleet-bootstrap-reserve", "fleet-bootstrap-record", "fleet-bootstrap-audit", "fleet-bootstrap-activate",
 		// ADR-197: regional capacity's activated-leaf reads and cluster
 		// qualification writes (ordinal 85).
-		"regional-capacity"}
+		"regional-capacity",
+		// ADR-210: a privacy operator's processing decisions (ordinal 92).
+		"processing-decision"}
 }
 
 // Permanent role identities are not positions in a configurable or growing
@@ -287,6 +289,9 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 90, true
 	case "context-cleanup-finalize":
 		return 91, true
+	// ADR-210: the hub-api's privacy-operator processing decisions.
+	case "processing-decision":
+		return 92, true
 	default:
 		return 0, false
 	}

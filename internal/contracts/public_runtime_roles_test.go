@@ -7,9 +7,9 @@ import (
 
 func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
-	// ADR-204 added three logins outside the hub projection (80 to 83), and
-	// ADR-205 three more (86).
-	if len(all) != 86 || len(hub) != 51 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
+	// ADR-204 added three logins outside the hub projection (80 to 83),
+	// ADR-205 three more (86) and ADR-210 one hub login (87, 52 in the hub).
+	if len(all) != 87 || len(hub) != 52 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
 		t.Fatal("unreviewed compartment expansion")
 	}
 	// ADR-205 decision 2: the hub-worker's deletion logins, in this order.

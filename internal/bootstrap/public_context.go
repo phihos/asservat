@@ -41,6 +41,8 @@ type PublicContextServices struct {
 	Transfer                      evidence.DownloadResponseTransfer
 	// Fleet is the ADR-193 issuance route's service; nil leaves it absent.
 	Fleet browser.FleetBootstrapService
+	// Processing is the ADR-210 operator change service; nil leaves it absent.
+	Processing browser.ProcessingChangeService
 }
 
 // NewPublicContextHandler composes the original HTTP handlers directly. It
@@ -97,8 +99,14 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 			return nil, &fixedStepError{"fleet", e}
 		}
 	}
+	var processing http.Handler
+	if s.Processing != nil {
+		if processing, e = browser.NewProcessingHandler(sessions, s.Processing); e != nil {
+			return nil, &fixedStepError{"processing", e}
+		}
+	}
 	return &publicContextRoutes{
-		host: host, sessions: sessions, investigations: investigations, fleet: fleet,
+		host: host, sessions: sessions, investigations: investigations, fleet: fleet, processing: processing,
 		mcp: mcpHandler, content: content, console: static,
 		mcpPath: mcp.Path, mcpMetadata: mcp.MetadataPath,
 		contentPrefix:   browser.DownloadContentPrefix,

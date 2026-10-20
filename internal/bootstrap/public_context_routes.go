@@ -17,6 +17,7 @@ type publicContextRoutes struct {
 	host                                                 string
 	sessions, investigations, mcp, content, console      http.Handler // content nil without a configured worker
 	fleet                                                http.Handler // nil without issuance
+	processing                                           http.Handler // nil without a capacity processing source
 	mcpPath, mcpMetadata, contentPrefix, contentMetadata string
 }
 
@@ -86,6 +87,8 @@ func (h *publicContextRoutes) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.investigations.ServeHTTP(w, r)
 	case path == browser.FleetBootstrapPath && h.fleet != nil:
 		h.fleet.ServeHTTP(w, r)
+	case path == browser.ProcessingChangesPath && h.processing != nil:
+		h.processing.ServeHTTP(w, r)
 	case path == "/" || strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/captures/") || strings.HasPrefix(path, "/cases/"):
 		// The bounded console handler validates its exact asset/UUID route set.
 		h.console.ServeHTTP(w, r)

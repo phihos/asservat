@@ -125,7 +125,11 @@ func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
 	}
 	// The additions are reads only: no hub extension purpose writes a
 	// processing table or a retention table beyond the root_id lock column.
+	// ADR-210's processing-decision is the one processing writer.
 	for _, purpose := range contracts.PublicRuntimeHubExtensionPurposes() {
+		if purpose == "processing-decision" {
+			continue
+		}
 		got, _ := publicRuntimeRoleGrants(purpose)
 		for _, g := range got {
 			lock := g.object == "retention_source" && g.column == "root_id" && g.privilege == "UPDATE"

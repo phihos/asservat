@@ -1128,7 +1128,8 @@ func (k *InstallerContinuation) promote(ctx context.Context, inventory kube.Init
 		return input, err
 	}
 	promoted, err := derivePromotedOwner(input, promotedOwnerParts{Settings: *k.input.Public, Sources: *k.sources, Qualification: k.capacity.qualification, ConnectorRoots: connectorRoots,
-		IssuerEpoch: k.record.Scope.IssuerEpoch, Signing: readback.Signing, WorkerRoots: readback.WorkerRoots, Projection: k.publicProjection, Downloads: downloads}, time.Now())
+		IssuerEpoch: k.record.Scope.IssuerEpoch, Signing: readback.Signing, WorkerRoots: readback.WorkerRoots, Projection: k.publicProjection, Downloads: downloads,
+		Processing: k.capacity.processingEnvironment()}, time.Now())
 	if err != nil {
 		return input, err
 	}
@@ -1324,6 +1325,15 @@ type installedCapacity struct {
 	sources       kube.CapacitySources
 	qualification capacityapp.CapacityQualification
 	setup         contracts.CapacityRootSetup
+}
+
+// processingEnvironment is the processing source the hub-api reads for
+// processing decisions (ADR-210), or nil without a capacity profile.
+func (c *installedCapacity) processingEnvironment() *contracts.OwnerPublicEnvironment {
+	if c == nil || c.sources.ProcessingSource.Name == "" {
+		return nil
+	}
+	return &contracts.OwnerPublicEnvironment{Source: c.sources.ProcessingSource, Guard: c.sources.ProcessingGuard, Paths: []contracts.DownloadEnvironmentPath{}}
 }
 
 // Capacity is the ADR-190 initialization before the owner launch: the

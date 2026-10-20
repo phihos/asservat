@@ -106,6 +106,9 @@ type OwnerPublicDeployment struct {
 	WorkerConfiguration OwnerPublicGuardedSource `json:"workerConfiguration"`
 	WorkerPKI           OwnerPublicWorkerPKI     `json:"workerPKI"`
 	DownloadEnvironment OwnerPublicEnvironment   `json:"downloadEnvironment"`
+	// Processing, when set, is the capacity processing source and its guard:
+	// the policy that processing decisions bind to (ADR-210). Paths are empty.
+	Processing *OwnerPublicEnvironment `json:"processing,omitempty"`
 	DownloadPlan        OwnerPublicDownloadPlan  `json:"downloadPlan"`
 	// HTTPS (ADR-180 P5). hub-api terminates TLS itself with the fixed files
 	// OwnerPublicTLSCertificate/OwnerPublicTLSKey; forwarded headers confer no
