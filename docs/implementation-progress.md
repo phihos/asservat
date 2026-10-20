@@ -2,7 +2,51 @@
 
 ## Resumed review and installed qualification (2026-10-20)
 
-The [latest frozen installed run `context-boqlf6my`](../test/results/resumed-c62e02ac-native45/result.json)
+The [latest frozen installed run `context-hsp75ign`](../test/results/resumed-c62e02ac-native46/result.json)
+on `8b153eb2` includes the preparation and pool-cleanup corrections below.
+Bootstrap, exact regional join replay, capacity readiness and processing
+initialization passed. Capacity supplied six distinct observations and 30 usable
+samples over 15 seconds. The installed test and harness exited 1 after
+1,257.556 seconds; all 2,755 source hashes match the frozen commit and stayed
+unchanged.
+
+Three original capture requests, each following a fresh review, returned
+`OutcomeUnknown`. Their [retained audit outcomes](../test/results/resumed-c62e02ac-native46/postmortem-requests.log)
+are acknowledged `authority_unavailable` results. The first two resolutions
+acknowledged closure of their reviews; the third resolution exhausted the
+unchanged two-record audit reservation. These were not same-capture
+continuations. [SQL inspection](../test/results/resumed-c62e02ac-native46/postmortem-sql.log)
+found no capture, execution or custody rows, so this run did not reach
+preparation or exercise its new floor/passive replay.
+
+The [first request's timing](../test/results/resumed-c62e02ac-native46/context-storage.log)
+reaches the final storage read, then stops before processing/admission. Its
+private error stage was not reported, so storage-read failure and insufficient
+remaining storage margin cannot be distinguished. The second request failed
+earlier at target-query closing route lookup. The third request's timing was
+suppressed by the existing sampling. Successful capacity refresh samples do
+not establish the remaining interval at any later authoritative request read.
+No new deadline, quota or refresh relaxation follows from these observations.
+
+[Closed diagnostic regressions](../test/results/resumed-c62e02ac-request-route-diagnostics/result.json)
+reproduce the missing request and route labels, then pass under race detection.
+Request distinguishes storage-read failure, insufficient margin and stale
+current facts while retaining the existing preview stages and error causes.
+Optional storage-read detail accepts only fixed query/clock/observation/
+transaction labels; SQL errors remain sanitized. Route diagnostics distinguish
+the first configuration read, endpoint read, final configuration read and
+current-result/cancellation checks without changing their order or result.
+The full capture and fleet race packages pass in 3.078 and 15.961 seconds.
+The PostgreSQL adapter, Go vet, specification, architecture and SQL generation
+checks also pass. The existing scoped SQL-reader regression now requires the
+missing-target diagnostic; its next real-service qualification remains pending.
+
+The fixture was retained for read-only SQL and Kubernetes inspection, then its
+owned cleanup exited 0 with no failures. Independent read-back confirmed all
+12 recorded Docker resources absent, and build scratch was removed. Acquisition,
+publication, native download, revocation and deletion remain unqualified.
+
+The preceding [frozen installed run `context-boqlf6my`](../test/results/resumed-c62e02ac-native45/result.json)
 on `a6546de8` passed bootstrap, exact regional join replay, processing
 initialization and preview. The demand lane produced six distinct observations
 and 32 usable samples in 15 seconds. [CI on this commit](https://github.com/phihos/asservat/actions/runs/39446523599)
@@ -26,8 +70,8 @@ the existing preparation had expired. The final `client` label comes from
 generic SQL error normalization; it does not identify a network failure.
 Rejecting this historical row before the runner can observe its no-create
 result bypasses the existing `PreparationUncertain` classification. The next
-resolution exhausted the unchanged two-record audit reservation. A fix is
-being qualified separately; existing preparation must never acquire a new
+resolution exhausted the unchanged two-record audit reservation. The separate
+correction and its qualification follow; existing preparation must never acquire a new
 deadline, key attempt or start authority.
 
 The [real PostgreSQL/S3 preparation regression](../test/results/resumed-c62e02ac-api-preparation-red/result.json)

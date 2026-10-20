@@ -3,6 +3,7 @@ package capture
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -49,9 +50,11 @@ func TestContextStorageMarginIsRequiredAtAuthoritativeRead(t *testing.T) {
 				elapsed: time.Second - left, until: f.now.Add(time.Second)}
 			refresh := &countingRefresh{}
 			f.svc.Storage, f.svc.Refresh = storage, refresh
+			var reports []string
+			f.svc.ReportPreviewFailure = func(stage string) { reports = append(reports, stage) }
 			accepted, err := f.svc.Request(t.Context(), f.source(t, t.Context()), p.ID, "original")
 			if left == time.Second {
-				if err != nil || accepted.CaptureID != p.CaptureID || f.admissions.Load() != 1 {
+				if err != nil || accepted.CaptureID != p.CaptureID || f.admissions.Load() != 1 || len(reports) != 0 {
 					t.Fatal("exact original one-second margin was rejected", err, f.admissions.Load())
 				}
 			} else {
@@ -59,6 +62,9 @@ func TestContextStorageMarginIsRequiredAtAuthoritativeRead(t *testing.T) {
 				if !errors.Is(err, value.ErrUnavailable) || !errors.As(err, &stage) || stage.FixedStep() != "facts/storage" ||
 					accepted.CaptureID != "" || f.admissions.Load() != 0 || len(f.accepted) != 0 {
 					t.Fatal("thin final storage result reached admission", err, accepted.CaptureID, f.admissions.Load())
+				}
+				if !slices.Equal(reports, []string{"request/facts/storage/margin"}) {
+					t.Fatal("request omitted its distinct storage-margin diagnostic", reports)
 				}
 			}
 			if storage.reads.Load() != 2 || refresh.demands.Load() != 0 || !storage.until.Equal(f.now.Add(time.Second)) {
@@ -87,6 +93,8 @@ func TestContextStorageMarginDoesNotRenewEarlierAuthority(t *testing.T) {
 				elapsed: 200 * time.Millisecond, until: f.now.Add(1200 * time.Millisecond)}
 			refresh := &countingRefresh{}
 			f.svc.Storage, f.svc.Refresh = storage, refresh
+			var reports []string
+			f.svc.ReportPreviewFailure = func(stage string) { reports = append(reports, stage) }
 			source := f.source(t, t.Context())
 			if earlier == "identity" {
 				source = &shortenedContinuationIdentity{source: source, until: f.now.Add(100 * time.Millisecond)}
@@ -98,6 +106,9 @@ func TestContextStorageMarginDoesNotRenewEarlierAuthority(t *testing.T) {
 			if !errors.Is(err, value.ErrChanged) || !errors.As(err, &stage) || stage.FixedStep() != "facts/current" ||
 				f.admissions.Load() != 0 || len(f.accepted) != 0 || storage.reads.Load() != 2 || refresh.demands.Load() != 0 {
 				t.Fatal("storage margin revived earlier authority or repeated readiness", err, f.admissions.Load(), storage.reads.Load(), refresh.demands.Load())
+			}
+			if !slices.Equal(reports, []string{"request/facts/current"}) {
+				t.Fatal("request omitted its distinct expired-facts diagnostic", reports)
 			}
 		})
 	}

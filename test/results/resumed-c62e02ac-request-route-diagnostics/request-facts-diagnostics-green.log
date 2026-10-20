@@ -1,0 +1,108 @@
+=== RUN   TestContextPreviewPassiveAndAssessment
+--- PASS: TestContextPreviewPassiveAndAssessment (0.00s)
+=== RUN   TestContextPreviewExpiryOwnershipAndAdmissionKey
+=== RUN   TestContextPreviewExpiryOwnershipAndAdmissionKey/expiry
+=== RUN   TestContextPreviewExpiryOwnershipAndAdmissionKey/client
+=== RUN   TestContextPreviewExpiryOwnershipAndAdmissionKey/changed_preview_same_key
+=== RUN   TestContextPreviewExpiryOwnershipAndAdmissionKey/same_preview_another_key
+--- PASS: TestContextPreviewExpiryOwnershipAndAdmissionKey (0.02s)
+    --- PASS: TestContextPreviewExpiryOwnershipAndAdmissionKey/expiry (0.00s)
+    --- PASS: TestContextPreviewExpiryOwnershipAndAdmissionKey/client (0.00s)
+    --- PASS: TestContextPreviewExpiryOwnershipAndAdmissionKey/changed_preview_same_key (0.01s)
+    --- PASS: TestContextPreviewExpiryOwnershipAndAdmissionKey/same_preview_another_key (0.01s)
+=== RUN   TestContextPreviewIntegrityAndSerializedBounds
+=== RUN   TestContextPreviewIntegrityAndSerializedBounds/altered_scope
+=== RUN   TestContextPreviewIntegrityAndSerializedBounds/valid_JSON_wrong_digest
+=== RUN   TestContextPreviewIntegrityAndSerializedBounds/invalid_JSON_matching_digest
+=== RUN   TestContextPreviewIntegrityAndSerializedBounds/expanded_minimized_blueprint
+--- PASS: TestContextPreviewIntegrityAndSerializedBounds (0.01s)
+    --- PASS: TestContextPreviewIntegrityAndSerializedBounds/altered_scope (0.00s)
+    --- PASS: TestContextPreviewIntegrityAndSerializedBounds/valid_JSON_wrong_digest (0.00s)
+    --- PASS: TestContextPreviewIntegrityAndSerializedBounds/invalid_JSON_matching_digest (0.00s)
+    --- PASS: TestContextPreviewIntegrityAndSerializedBounds/expanded_minimized_blueprint (0.01s)
+=== RUN   TestContextPreviewRetainsShorterStorageObservation
+--- PASS: TestContextPreviewRetainsShorterStorageObservation (0.00s)
+=== RUN   TestContextPreviewFailureReportsFixedDependencyAndPreservesCause
+=== RUN   TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/recovery
+=== RUN   TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/target
+=== RUN   TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/facts/capability
+=== RUN   TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/facts/retention
+=== RUN   TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/facts/storage
+=== RUN   TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/processing/read
+=== RUN   TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/store
+--- PASS: TestContextPreviewFailureReportsFixedDependencyAndPreservesCause (0.00s)
+    --- PASS: TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/recovery (0.00s)
+    --- PASS: TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/target (0.00s)
+    --- PASS: TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/facts/capability (0.00s)
+    --- PASS: TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/facts/retention (0.00s)
+    --- PASS: TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/facts/storage (0.00s)
+    --- PASS: TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/processing/read (0.00s)
+    --- PASS: TestContextPreviewFailureReportsFixedDependencyAndPreservesCause/store (0.00s)
+=== RUN   TestContextPreviewFailureDoesNotTrustEligibilityReason
+=== RUN   TestContextPreviewFailureDoesNotTrustEligibilityReason/PermissionUnavailable
+=== RUN   TestContextPreviewFailureDoesNotTrustEligibilityReason/ExplicitDeny
+=== RUN   TestContextPreviewFailureDoesNotTrustEligibilityReason/private-target
+--- PASS: TestContextPreviewFailureDoesNotTrustEligibilityReason (0.00s)
+    --- PASS: TestContextPreviewFailureDoesNotTrustEligibilityReason/PermissionUnavailable (0.00s)
+    --- PASS: TestContextPreviewFailureDoesNotTrustEligibilityReason/ExplicitDeny (0.00s)
+    --- PASS: TestContextPreviewFailureDoesNotTrustEligibilityReason/private-target (0.00s)
+=== RUN   TestContextPreviewFailureReportsExpiryAfterDraftWithoutUndoingIt
+--- PASS: TestContextPreviewFailureReportsExpiryAfterDraftWithoutUndoingIt (0.00s)
+=== RUN   TestContextPreviewSuccessDoesNotReportFailure
+--- PASS: TestContextPreviewSuccessDoesNotReportFailure (0.00s)
+=== RUN   TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview
+=== RUN   TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview/request
+=== RUN   TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview/preview
+--- PASS: TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview (0.01s)
+    --- PASS: TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview/request (0.00s)
+    --- PASS: TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview/preview (0.00s)
+=== RUN   TestContextRequestChangedDiagnosticIsNotDuplicated
+--- PASS: TestContextRequestChangedDiagnosticIsNotDuplicated (0.00s)
+=== RUN   TestContextPreviewStorageMarginStageRemainsUnchanged
+--- PASS: TestContextPreviewStorageMarginStageRemainsUnchanged (0.00s)
+=== RUN   TestContextRequestStorageReadDetailsAreClosed
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/transaction
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/observation
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/query/no-row
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/query/deadline
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/query/canceled
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/query/unavailable
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/clock/no-row
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/clock/deadline
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/clock/canceled
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/clock/unavailable
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/#00
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/private-provider-token
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/query/sql-42501
+=== RUN   TestContextRequestStorageReadDetailsAreClosed/query/unavailable/private
+--- PASS: TestContextRequestStorageReadDetailsAreClosed (0.03s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/transaction (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/observation (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/query/no-row (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/query/deadline (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/query/canceled (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/query/unavailable (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/clock/no-row (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/clock/deadline (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/clock/canceled (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/clock/unavailable (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/#00 (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/private-provider-token (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/query/sql-42501 (0.00s)
+    --- PASS: TestContextRequestStorageReadDetailsAreClosed/query/unavailable/private (0.00s)
+=== RUN   TestContextStorageMarginIsRequiredAtAuthoritativeRead
+=== RUN   TestContextStorageMarginIsRequiredAtAuthoritativeRead/50ms
+=== RUN   TestContextStorageMarginIsRequiredAtAuthoritativeRead/1s
+--- PASS: TestContextStorageMarginIsRequiredAtAuthoritativeRead (0.01s)
+    --- PASS: TestContextStorageMarginIsRequiredAtAuthoritativeRead/50ms (0.00s)
+    --- PASS: TestContextStorageMarginIsRequiredAtAuthoritativeRead/1s (0.00s)
+=== RUN   TestContextStorageMarginDoesNotRenewEarlierAuthority
+=== RUN   TestContextStorageMarginDoesNotRenewEarlierAuthority/identity
+=== RUN   TestContextStorageMarginDoesNotRenewEarlierAuthority/target
+--- PASS: TestContextStorageMarginDoesNotRenewEarlierAuthority (0.00s)
+    --- PASS: TestContextStorageMarginDoesNotRenewEarlierAuthority/identity (0.00s)
+    --- PASS: TestContextStorageMarginDoesNotRenewEarlierAuthority/target (0.00s)
+=== RUN   TestContextStorageMarginCancellationJoinsAuthoritativeRead
+--- PASS: TestContextStorageMarginCancellationJoinsAuthoritativeRead (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/capture	1.104s

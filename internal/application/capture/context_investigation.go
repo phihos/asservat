@@ -185,7 +185,7 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 	// Readiness may have completed before the ordered facts reads. Consume
 	// this authoritative observation only while the same margin still remains.
 	if f.storage.Binding.FreshUntil.Before(s.Now().Add(storageMargin)) {
-		return f, previewFailure("facts/storage", value.ErrUnavailable)
+		return f, previewFailure("facts/storage", contextStorageMarginRefusal{})
 	}
 	if intent.Reason != nil {
 		if s.Reasons == nil {
@@ -334,7 +334,8 @@ func acceptedContext(a value.Accepted, digest artifact.Digest) bool {
 // Request resolves accepted idempotency before touching a preview. Existing
 // operation lookup never needs a live pod or fresh acquisition facts. Only a
 // missing original key may refresh the reviewed blueprint and enter admission.
-func (s ContextInvestigation) Request(ctx context.Context, source identities.CurrentIdentity, previewID, key string) (value.Accepted, error) {
+func (s ContextInvestigation) Request(ctx context.Context, source identities.CurrentIdentity, previewID, key string) (result value.Accepted, failure error) {
+	defer func() { s.reportRequestFailure(failure) }()
 	var zero value.Accepted
 	if !s.configured() || ctx == nil || source == nil || ctx.Err() != nil {
 		return zero, value.ErrUnavailable
@@ -486,6 +487,38 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 		return zero, value.ErrDenied
 	}
 	return a, nil
+}
+
+// This private marker distinguishes the final margin refusal without changing
+// the existing preview stage or public error classification.
+type contextStorageMarginRefusal struct{}
+
+func (contextStorageMarginRefusal) Error() string { return "context storage margin unavailable" }
+func (contextStorageMarginRefusal) Unwrap() error { return value.ErrUnavailable }
+
+func (s ContextInvestigation) reportRequestFailure(err error) {
+	var failure *contextPreviewFailure
+	if s.ReportPreviewFailure == nil || !errors.As(err, &failure) {
+		return
+	}
+	stage := failure.stage
+	if stage == "facts/storage" {
+		if _, margin := failure.cause.(contextStorageMarginRefusal); margin {
+			stage += "/margin"
+		} else {
+			stage += "/read"
+			var read interface{ ContextStorageRead() string }
+			if errors.As(failure.cause, &read) {
+				switch detail := read.ContextStorageRead(); detail {
+				case "transaction", "observation",
+					"query/no-row", "query/deadline", "query/canceled", "query/unavailable",
+					"clock/no-row", "clock/deadline", "clock/canceled", "clock/unavailable":
+					stage += "/" + detail
+				}
+			}
+		}
+	}
+	s.ReportPreviewFailure("request/" + stage)
 }
 
 // storageMargin is the binding freshness required by both the readiness hint

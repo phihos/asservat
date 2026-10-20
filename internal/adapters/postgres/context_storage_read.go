@@ -2,6 +2,8 @@ package postgres
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -10,6 +12,8 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -66,25 +70,64 @@ func (s *ContextStorageReader) ContextStorage(ctx context.Context, target author
 	if s == nil || s.ledger == nil || !target.Valid() {
 		return out, value.ErrInvalid
 	}
+	stage := "transaction"
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		stage = "transaction" // A definitely aborted transaction may retry.
 		// One MVCC statement observes the binding, allocation and pool together.
 		// Admission independently locks/rechecks those exact revisions later.
 		row, err := q.ObserveContextStorage(ctx, custodydb.ObserveContextStorageParams{RootID: id(s.root), ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, WorkloadUid: target.WorkloadUID})
 		if err != nil {
+			stage = "query/" + storageReadCause(err)
 			return value.ErrUnavailable
 		}
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
+			stage = "clock/" + storageReadCause(err)
+			var sql *pgconn.PgError
+			if errors.As(err, &sql) && (sql.Code == "40001" || sql.Code == "40P01") {
+				// A later retry may fail before the callback runs again.
+				stage = "transaction"
+			}
 			return err
 		}
 		out, err = contextStorageObservation(row, s.root, target, now.Time)
 		if err != nil {
+			stage = "observation"
 			return err
 		}
 		return ctx.Err()
 	})
 	if err != nil {
-		return app.ContextStorageObservation{}, captureError(err)
+		var transaction ledgerCause
+		if errors.As(err, &transaction) && strings.HasPrefix(transaction.cause, "begin-") {
+			// A retry can fail before its callback resets the prior phase.
+			stage = "transaction"
+		}
+		return app.ContextStorageObservation{}, &contextStorageReadFailure{stage: stage, cause: captureError(err)}
 	}
 	return out, nil
+}
+
+// Only a fixed private phase survives the transaction's existing error
+// normalization. SQL text, identifiers and dependency error strings do not.
+type contextStorageReadFailure struct {
+	stage string
+	cause error
+}
+
+func (e *contextStorageReadFailure) Error() string              { return "context storage unavailable" }
+func (e *contextStorageReadFailure) Unwrap() error              { return e.cause }
+func (e *contextStorageReadFailure) ContextStorageRead() string { return e.stage }
+
+func storageReadCause(err error) string {
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		return "no-row"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "deadline"
+	case errors.Is(err, context.Canceled):
+		return "canceled"
+	default:
+		return "unavailable"
+	}
 }

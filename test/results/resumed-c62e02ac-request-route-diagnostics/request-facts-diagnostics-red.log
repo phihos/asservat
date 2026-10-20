@@ -1,0 +1,29 @@
+=== RUN   TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview
+=== RUN   TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview/request
+    context_request_diagnostic_test.go:53: lost original cause or closed stage: error=context preview unavailable reports=[]
+=== RUN   TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview/preview
+--- FAIL: TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview (0.01s)
+    --- FAIL: TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview/request (0.00s)
+    --- PASS: TestContextRequestReportsOwnedStorageReadFailureWithoutChangingPreview/preview (0.00s)
+=== RUN   TestContextRequestChangedDiagnosticIsNotDuplicated
+--- PASS: TestContextRequestChangedDiagnosticIsNotDuplicated (0.00s)
+=== RUN   TestContextStorageMarginIsRequiredAtAuthoritativeRead
+=== RUN   TestContextStorageMarginIsRequiredAtAuthoritativeRead/50ms
+    context_storage_margin_test.go:67: request omitted its distinct storage-margin diagnostic []
+=== RUN   TestContextStorageMarginIsRequiredAtAuthoritativeRead/1s
+--- FAIL: TestContextStorageMarginIsRequiredAtAuthoritativeRead (0.01s)
+    --- FAIL: TestContextStorageMarginIsRequiredAtAuthoritativeRead/50ms (0.00s)
+    --- PASS: TestContextStorageMarginIsRequiredAtAuthoritativeRead/1s (0.00s)
+=== RUN   TestContextStorageMarginDoesNotRenewEarlierAuthority
+=== RUN   TestContextStorageMarginDoesNotRenewEarlierAuthority/identity
+    context_storage_margin_test.go:111: request omitted its distinct expired-facts diagnostic []
+=== RUN   TestContextStorageMarginDoesNotRenewEarlierAuthority/target
+    context_storage_margin_test.go:111: request omitted its distinct expired-facts diagnostic []
+--- FAIL: TestContextStorageMarginDoesNotRenewEarlierAuthority (0.01s)
+    --- FAIL: TestContextStorageMarginDoesNotRenewEarlierAuthority/identity (0.00s)
+    --- FAIL: TestContextStorageMarginDoesNotRenewEarlierAuthority/target (0.00s)
+=== RUN   TestContextStorageMarginCancellationJoinsAuthoritativeRead
+--- PASS: TestContextStorageMarginCancellationJoinsAuthoritativeRead (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/capture	0.031s
+FAIL

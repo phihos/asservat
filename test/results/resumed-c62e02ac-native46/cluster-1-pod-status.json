@@ -1,0 +1,156 @@
+[
+  {
+    "name": "connector-69dbc54cf9-rszwh",
+    "namespace": "asservat-connector",
+    "uid": "7a42e0bb-ec4a-45c1-ba49-2f13247d4d7b",
+    "phase": "Running",
+    "containers": [
+      {
+        "allocatedResources": {
+          "cpu": "100m",
+          "memory": "64Mi"
+        },
+        "containerID": "containerd://9f41b1234d5f6fe63fd5e15694f811a46abb037832a89750c89913e34667ff7c",
+        "image": "docker.io/library/asservat-context-worker:context-hsp75ign",
+        "imageID": "docker.io/library/asservat-context-worker@sha256:abf9e29be1503ddd95b34a6710e3b23c236c96f4a956ee2d0b8b37d9fc5bbf38",
+        "lastState": {},
+        "name": "connector",
+        "ready": true,
+        "resources": {
+          "limits": {
+            "cpu": "500m",
+            "memory": "256Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "64Mi"
+          }
+        },
+        "restartCount": 0,
+        "started": true,
+        "state": {
+          "running": {
+            "startedAt": "2026-10-20T16:36:59Z"
+          }
+        },
+        "user": {
+          "linux": {
+            "gid": 65532,
+            "supplementalGroups": [
+              65532
+            ],
+            "uid": 65532
+          }
+        },
+        "volumeMounts": [
+          {
+            "mountPath": "/run/asservat/regional",
+            "name": "inputs",
+            "readOnly": true,
+            "recursiveReadOnly": "Disabled"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "regional-app-85c884d957-g9hcz",
+    "namespace": "regional-apps",
+    "uid": "339c72be-9fdd-4ed0-bb3c-6675b8addc18",
+    "phase": "Running",
+    "containers": [
+      {
+        "allocatedResources": {
+          "cpu": "5m",
+          "memory": "16Mi"
+        },
+        "containerID": "containerd://4728e773322f98efd283545d6a787abf7a567cbb4fdb2c2904d48ec32c66aaa4",
+        "image": "docker.io/library/asservat-context-worker:context-hsp75ign",
+        "imageID": "docker.io/library/asservat-context-worker@sha256:abf9e29be1503ddd95b34a6710e3b23c236c96f4a956ee2d0b8b37d9fc5bbf38",
+        "lastState": {},
+        "name": "app",
+        "ready": true,
+        "resources": {
+          "limits": {
+            "cpu": "100m",
+            "memory": "64Mi"
+          },
+          "requests": {
+            "cpu": "5m",
+            "memory": "16Mi"
+          }
+        },
+        "restartCount": 0,
+        "started": true,
+        "state": {
+          "running": {
+            "startedAt": "2026-10-20T16:37:19Z"
+          }
+        },
+        "user": {
+          "linux": {
+            "gid": 0,
+            "supplementalGroups": [
+              0
+            ],
+            "uid": 65532
+          }
+        }
+      }
+    ]
+  },
+  {
+    "name": "fixture-5464c7465c-4rg76",
+    "namespace": "synthetic",
+    "uid": "9b3a0456-c41b-4dc9-a05d-959a11753789",
+    "phase": "Running",
+    "containers": [
+      {
+        "allocatedResources": {
+          "cpu": "5m",
+          "memory": "8Mi"
+        },
+        "containerID": "containerd://3442b60c01f0386bf294fc05016e89a23d7a04c42a0c000f745e361d7fd8b496",
+        "image": "registry.k8s.io/pause:3.10",
+        "imageID": "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a",
+        "lastState": {},
+        "name": "fixture",
+        "ready": true,
+        "resources": {
+          "limits": {
+            "cpu": "50m",
+            "memory": "32Mi"
+          },
+          "requests": {
+            "cpu": "5m",
+            "memory": "8Mi"
+          }
+        },
+        "restartCount": 0,
+        "started": true,
+        "state": {
+          "running": {
+            "startedAt": "2026-10-20T16:21:10Z"
+          }
+        },
+        "user": {
+          "linux": {
+            "gid": 0,
+            "supplementalGroups": [
+              0
+            ],
+            "uid": 65532
+          }
+        },
+        "volumeMounts": [
+          {
+            "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+            "name": "kube-api-access-452md",
+            "readOnly": true,
+            "recursiveReadOnly": "Disabled"
+          }
+        ]
+      }
+    ]
+  }
+]

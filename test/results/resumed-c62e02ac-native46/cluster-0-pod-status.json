@@ -1,0 +1,298 @@
+[
+  {
+    "name": "asservat-8dc96f93f71944baa3d4cd7171c06b69-federation-689dftmpd6",
+    "namespace": "bootstrap-chain-10000000-target",
+    "uid": "cf211441-cd19-478a-986d-8d9d7bb1bf42",
+    "phase": "Running",
+    "containers": [
+      {
+        "allocatedResources": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        },
+        "containerID": "containerd://4ca90810dfe809b897b14ad588f57fe64a39b3e3eb8c2d0166ae93c126a5afc1",
+        "image": "docker.io/library/asservat-context-worker:context-hsp75ign",
+        "imageID": "docker.io/library/asservat-context-worker@sha256:abf9e29be1503ddd95b34a6710e3b23c236c96f4a956ee2d0b8b37d9fc5bbf38",
+        "lastState": {},
+        "name": "federation",
+        "ready": true,
+        "resources": {
+          "limits": {
+            "cpu": "1",
+            "memory": "512Mi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "128Mi"
+          }
+        },
+        "restartCount": 0,
+        "started": true,
+        "state": {
+          "running": {
+            "startedAt": "2026-10-20T16:35:46Z"
+          }
+        },
+        "user": {
+          "linux": {
+            "gid": 65532,
+            "supplementalGroups": [
+              65532
+            ],
+            "uid": 65532
+          }
+        },
+        "volumeMounts": [
+          {
+            "mountPath": "/run/asservat/federation",
+            "name": "inputs",
+            "readOnly": true,
+            "recursiveReadOnly": "Disabled"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "asservat-8dc96f93f71944baa3d4cd7171c06b69-key-service-f7b4sqlk7",
+    "namespace": "bootstrap-chain-10000000-target",
+    "uid": "b1afb028-ad04-4e0e-963e-2d9b48de514a",
+    "phase": "Running",
+    "containers": [
+      {
+        "allocatedResources": {
+          "cpu": "50m",
+          "memory": "64Mi"
+        },
+        "containerID": "containerd://c691a49d14f9f9b22e4145abb304818faa2a5dbdec6a089f5702e6a4c860e508",
+        "image": "docker.io/library/asservat-context-worker:context-hsp75ign",
+        "imageID": "docker.io/library/asservat-context-worker@sha256:abf9e29be1503ddd95b34a6710e3b23c236c96f4a956ee2d0b8b37d9fc5bbf38",
+        "lastState": {
+          "terminated": {
+            "containerID": "containerd://f63034195a0cc0a89a791a813deaafd21dbea0b885d9fdfdbcf60175a7ce6a5b",
+            "exitCode": 1,
+            "finishedAt": "2026-10-20T16:37:07Z",
+            "reason": "Error",
+            "startedAt": "2026-10-20T16:35:51Z"
+          }
+        },
+        "name": "key-service",
+        "ready": true,
+        "resources": {
+          "limits": {
+            "cpu": "500m",
+            "memory": "256Mi"
+          },
+          "requests": {
+            "cpu": "50m",
+            "memory": "64Mi"
+          }
+        },
+        "restartCount": 1,
+        "started": true,
+        "state": {
+          "running": {
+            "startedAt": "2026-10-20T16:37:07Z"
+          }
+        },
+        "user": {
+          "linux": {
+            "gid": 65532,
+            "supplementalGroups": [
+              65532
+            ],
+            "uid": 65532
+          }
+        },
+        "volumeMounts": [
+          {
+            "mountPath": "/run/asservat/key-service",
+            "name": "inputs",
+            "readOnly": true,
+            "recursiveReadOnly": "Disabled"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "asservat-8dc96f93f71944baa3d4cd7171c06b69-publisher-7458987qsrx",
+    "namespace": "bootstrap-chain-10000000-target",
+    "uid": "da35f092-d026-456d-9662-bd8166a72b07",
+    "phase": "Running",
+    "containers": [
+      {
+        "allocatedResources": {
+          "cpu": "50m",
+          "memory": "128Mi"
+        },
+        "containerID": "containerd://68985c92796af9056788ba2921bbf63a5fdbe11356df06d14789938bf63c92a4",
+        "image": "docker.io/library/asservat-context-worker:context-hsp75ign",
+        "imageID": "docker.io/library/asservat-context-worker@sha256:abf9e29be1503ddd95b34a6710e3b23c236c96f4a956ee2d0b8b37d9fc5bbf38",
+        "lastState": {
+          "terminated": {
+            "containerID": "containerd://d8bdbf5051c3efc11998cd4e8478a2e08fc0c3c375f61a2d1b7ae8e4d9333fc1",
+            "exitCode": 1,
+            "finishedAt": "2026-10-20T16:37:14Z",
+            "reason": "Error",
+            "startedAt": "2026-10-20T16:35:57Z"
+          }
+        },
+        "name": "publisher",
+        "ready": true,
+        "resources": {
+          "limits": {
+            "cpu": "1",
+            "memory": "512Mi"
+          },
+          "requests": {
+            "cpu": "50m",
+            "memory": "128Mi"
+          }
+        },
+        "restartCount": 1,
+        "started": true,
+        "state": {
+          "running": {
+            "startedAt": "2026-10-20T16:37:14Z"
+          }
+        },
+        "user": {
+          "linux": {
+            "gid": 65532,
+            "supplementalGroups": [
+              65532
+            ],
+            "uid": 65532
+          }
+        },
+        "volumeMounts": [
+          {
+            "mountPath": "/run/asservat/publisher",
+            "name": "inputs",
+            "readOnly": true,
+            "recursiveReadOnly": "Disabled"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "installer-continuation",
+    "namespace": "bootstrap-chain-10000000",
+    "uid": "a84cf411-3eda-4eef-bab8-070954a66fc6",
+    "phase": "Succeeded",
+    "containers": [
+      {
+        "allocatedResources": {
+          "cpu": "20m",
+          "memory": "32Mi"
+        },
+        "containerID": "containerd://a6acae6fadc758f2bef1bfc7d3b23b8568475c1edd4f39457e0ccdace60fe5ff",
+        "image": "docker.io/library/asservat-context-worker:context-hsp75ign",
+        "imageID": "docker.io/library/asservat-context-worker@sha256:abf9e29be1503ddd95b34a6710e3b23c236c96f4a956ee2d0b8b37d9fc5bbf38",
+        "lastState": {},
+        "name": "continue",
+        "ready": false,
+        "resources": {
+          "limits": {
+            "cpu": "1",
+            "memory": "256Mi"
+          },
+          "requests": {
+            "cpu": "20m",
+            "memory": "32Mi"
+          }
+        },
+        "restartCount": 0,
+        "started": false,
+        "state": {
+          "terminated": {
+            "containerID": "containerd://a6acae6fadc758f2bef1bfc7d3b23b8568475c1edd4f39457e0ccdace60fe5ff",
+            "exitCode": 0,
+            "finishedAt": "2026-10-20T16:35:58Z",
+            "reason": "Completed",
+            "startedAt": "2026-10-20T16:26:29Z"
+          }
+        },
+        "user": {
+          "linux": {
+            "gid": 65532,
+            "supplementalGroups": [
+              65532
+            ],
+            "uid": 65532
+          }
+        },
+        "volumeMounts": [
+          {
+            "mountPath": "/run/asservat/initial-preparer",
+            "name": "scratch",
+            "readOnly": true,
+            "recursiveReadOnly": "Disabled"
+          },
+          {
+            "mountPath": "/run/asservat/installer-continue",
+            "name": "continuation-input",
+            "readOnly": true,
+            "recursiveReadOnly": "Disabled"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "fixture-5464c7465c-h4pf8",
+    "namespace": "synthetic",
+    "uid": "c7c9ed5d-ba37-477b-9d31-16c5f311e5c9",
+    "phase": "Running",
+    "containers": [
+      {
+        "allocatedResources": {
+          "cpu": "5m",
+          "memory": "8Mi"
+        },
+        "containerID": "containerd://8567c18f82f42e6ba0c750a77fbe5f0b8b37a03afb3ab166e0aea4bc6d6e33ba",
+        "image": "registry.k8s.io/pause:3.10",
+        "imageID": "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a",
+        "lastState": {},
+        "name": "fixture",
+        "ready": true,
+        "resources": {
+          "limits": {
+            "cpu": "50m",
+            "memory": "32Mi"
+          },
+          "requests": {
+            "cpu": "5m",
+            "memory": "8Mi"
+          }
+        },
+        "restartCount": 0,
+        "started": true,
+        "state": {
+          "running": {
+            "startedAt": "2026-10-20T16:20:35Z"
+          }
+        },
+        "user": {
+          "linux": {
+            "gid": 0,
+            "supplementalGroups": [
+              0
+            ],
+            "uid": 65532
+          }
+        },
+        "volumeMounts": [
+          {
+            "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+            "name": "kube-api-access-m5jk2",
+            "readOnly": true,
+            "recursiveReadOnly": "Disabled"
+          }
+        ]
+      }
+    ]
+  }
+]

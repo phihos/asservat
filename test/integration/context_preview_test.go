@@ -109,8 +109,10 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 		other := s.a.Eligibility.Target
 		other.WorkloadUID = custodyID()
-		if _, err := reader.ContextStorage(ctx, other); err == nil {
-			t.Fatal("unbound workload adopted another placement")
+		_, err = reader.ContextStorage(ctx, other)
+		var refusal interface{ ContextStorageRead() string }
+		if !errors.Is(err, capture.ErrUnavailable) || !errors.As(err, &refusal) || refusal.ContextStorageRead() != "query/no-row" {
+			t.Fatal("unbound workload changed its refusal or lost its private no-row phase", err)
 		}
 		for _, check := range []struct {
 			statement string
