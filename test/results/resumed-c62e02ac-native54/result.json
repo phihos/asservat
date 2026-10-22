@@ -1,0 +1,41 @@
+{
+  "sourceCommit": "840f27fc338f0c170a4f6069bc95db4c109bbfaf",
+  "runId": "context-lcscbtz7",
+  "harnessExit": 1,
+  "harnessSeconds": 1292.094284,
+  "goExit": 1,
+  "goSeconds": 1191.451,
+  "sourceHashesVerified": 2778,
+  "sourceUnchangedDuringTest": true,
+  "failure": "accepted capture remains pending after four explicit continuations",
+  "captureID": "f5c6a41a-ec21-4eb4-ba72-f1756616879b",
+  "captureState": "intent_audited",
+  "captureIntentRequestUntil": "2026-10-22T21:11:20.952470Z",
+  "captureIntentSecondsAtInsert": 0.938375,
+  "counts": {
+    "captures": 1,
+    "executions": 0,
+    "reservedCustody": 1,
+    "publishedArtifacts": 0,
+    "downloads": 0
+  },
+  "resolutionAccepted": true,
+  "qualificationLimits": [
+    "No completed execution/acquisition/publication/download/Stop",
+    "Individual stage refusals do not prove one common cause",
+    "No original deadline was changed"
+  ],
+  "collection": {
+    "exit": 0,
+    "commands": 35,
+    "failures": []
+  },
+  "cleanup": {
+    "exit": 0,
+    "failures": [],
+    "resourcesIndependentlyAbsent": 12,
+    "clustersAbsent": true,
+    "privateConfigsRemoved": true
+  },
+  "precedingGates": "native53-followup-gates/results.json"
+}

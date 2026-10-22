@@ -3,6 +3,10 @@
 Date: 2026-10-14. Status: accepted; implemented; the connector executor's local start passes natively.
 Requirements: REQ-EXE-002, S-02 regional context start; TASK-03 / TASK-11.
 
+[ADR-216](216-request-owned-context-start-observation.md) subsequently removes
+repeated complete hub observations within one start. The regional process and
+current capacity/CAS checks described here retain their original bounds.
+
 ## Context
 
 Under [ADR-171](171-hub-run-context-execution.md), one API context execution

@@ -124,6 +124,70 @@ The archive preserves raw logs byte-for-byte, command exits and qualification
 limits. The next run must use the existing pinned runner identity for the fixture
 join and requalify the remaining installed path.
 
+The fixture correction and minimal chart RBAC follow-up pass the
+[recorded gates](../test/results/resumed-c62e02ac-native54/native53-followup-gates/README.md)
+on `840f27fc`: specification, architecture, design and Go dependency checks exit 0
+in 13.820 seconds; race-instrumented integration compilation with no selected
+tests exits 0 in 23.560 seconds; Helm lifecycle integration exits 0 in 53.985
+seconds. All 3,773 tracked non-result source hashes remain unchanged. The Helm
+read-back finds no owned clusters or matching containers. These checks qualify
+their stated component scopes, not a completed installed investigation.
+
+## Accepted capture remains pending (2026-10-22)
+
+Frozen `840f27fc` [native54](../test/results/resumed-c62e02ac-native54/README.md)
+exits 1 (1,191.451 seconds Go / 1,292.094 seconds harness). Regional join and
+readiness now progress. One capture is accepted and its intent audit acknowledged;
+the same accepted capture remains Pending after four explicit continuations and
+successful current progress reads. SQL contains zero execution rows, one reserved
+custody record, no published artifact and no download session.
+
+The initial intent has 0.938375 seconds remaining at insertion. Subsequent start
+attempts refuse at current route, Pod resolution, execution preparation, process
+check and final preparation headroom boundaries. The timestamped logs and SQL
+identify those stages, but do not establish one shared cause or justify extending
+the original authority intervals. Acquisition, publication, download and Stop
+remain unqualified for this installed candidate.
+
+All 2,778 harness source hashes match the candidate and remain unchanged. The
+bounded retained collection exits 0 with no failures. Exact-manifest cleanup
+exits 0; independent read-back confirms all 12 owned resources and both clusters
+absent, and private diagnostic configurations are removed. Raw evidence and
+preceding gate records are archived byte-for-byte; no new tests were run during
+this housekeeping.
+
+## One observation per capture start (2026-10-22)
+
+ADR-216 removes repeated complete authority observations within one context start.
+The bootstrap passes its original caller, accepted work, capability and recovery
+to the runner through a local service call. The runner resolves target, eligibility,
+retention and process once, then checks the completed observation and cancellation
+locally after wrapping and readiness. Every original cutoff remains binding; SQL
+still checks current permission, retention, recovery and storage at each effect.
+Acquisition still checks the exact pinned Pod. No credential, endpoint, background
+task, durable state or timeout increase is added.
+
+Both baseline regressions fail on the original runtime. The complete runner
+repeats target/eligibility/capability/retention three times each. The composed
+bootstrap-to-first-preparation path repeats the accepted-work read and performs
+48 capability HTTP requests (36 observer, 12 probe). The changed path uses one
+runner observation, one accepted-work read and 24 capability requests (18 observer,
+six probe). This uses the actual runner, router, evaluator and TLS capability
+adapter with synthetic SQL, identity, retention and regional replies. It measures
+duplicate work; it is not installed latency or proof of native54's complete cause.
+
+Focused execution/bootstrap race tests pass (actual exit 0, 31.815 seconds wall
+time; package times 1.215 and 1.162 seconds). All six recorded Go sources are
+unchanged during the run. Original-bound expiry/cancellation, changed handoff
+identity/scope, SQL refusal and returned-process conflict pass. The initial
+composed fixture setup failure is retained separately from the genuine baseline
+failures. The complete affected race suites also pass: execution 1.259 seconds,
+bootstrap 32.260 seconds, context-start 2.784 seconds and mTLS 35.042 seconds,
+with all six recorded sources unchanged. Independent review finds no remaining
+blockers. The [component archive](../test/results/resumed-c62e02ac-capture-start-observation/README.md)
+retains exact commands, original failures and qualification limits. Real SQL
+lock-wait revocation and the installed journey are still pending at this checkpoint.
+
 ## Qualification read-back (2026-10-22)
 
 Frozen candidate `768316a3` passes the full `make go-check` gate: actual exit 0,

@@ -51,7 +51,17 @@ its work. Under [ADR-171](../docs/decisions/171-hub-run-context-execution.md)
 the hub runs the SQL, permission, recovery and capability checks with the
 human's own current identity, and the region answers the process, target and
 local start checks as bounded operations for the verified work only. All of
-them remain mandatory. A transport result is not artifact
+them remain mandatory. Under
+[ADR-216](../docs/decisions/216-request-owned-context-start-observation.md), one
+start reuses one complete hub authority observation within its earliest original
+cutoff, at most five seconds. Its pre-signing accepted-work, caller, recovery and
+capability reads are reused by the in-process runner. Later helper boundaries
+check cancellation and the original observation's validity locally. Current SQL
+permission, retention, recovery and storage checks remain mandatory at each
+effect, and acquisition still checks the exact pinned Pod. Unobserved external
+identity or capability changes may remain unknown within that original interval;
+a new start observes them again. No observation crosses requests or renews a
+deadline. A transport result is not artifact
 publication or a successful download.
 
 Before any capture exists, preview and request target resolution use pre-work

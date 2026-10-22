@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
-	"reflect"
 	"time"
 
 	"asservat.local/asservat/internal/application/evidence"
@@ -109,7 +108,7 @@ func APIExecutionDigest(r value.APIExecution) artifact.Digest {
 	b, _ := json.Marshal(r)
 	return artifact.Digest(sha256.Sum256(b))
 }
-func (s APIContextRunner) check(ctx context.Context, current identities.CurrentIdentity, w APIContextWork, original time.Time) (APIExecutionCheck, error) {
+func (s APIContextRunner) checkObserved(ctx context.Context, current identities.CurrentIdentity, w APIContextWork, original time.Time, capability *planning.ContextCapability, observedRecovery *artifact.RecoveryProof) (APIExecutionCheck, error) {
 	var out APIExecutionCheck
 	start := s.Now().UTC().Truncate(time.Microsecond)
 	t, err := s.Targets.ResolvePod(ctx, w.Target)
@@ -120,9 +119,14 @@ func (s APIContextRunner) check(ctx context.Context, current identities.CurrentI
 	if !eligible.Eligible {
 		return out, apiCheckStep{"Eligibility", value.ErrDenied}
 	}
-	cap, err := s.Capabilities.ContextCapability(ctx, t.Target())
-	if err != nil {
-		return out, apiCheckStep{"Capability", err}
+	var cap planning.ContextCapability
+	if capability != nil {
+		cap = *capability
+	} else {
+		cap, err = s.Capabilities.ContextCapability(ctx, t.Target())
+		if err != nil {
+			return out, apiCheckStep{"Capability", err}
+		}
 	}
 	e := w.Accepted.Expectation
 	retention, err := s.Retention.Resolve(ctx, privacy.Input{Target: t.Target(), PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: e.Registration.AnchorAt})
@@ -133,9 +137,14 @@ func (s APIContextRunner) check(ctx context.Context, current identities.CurrentI
 	if err != nil {
 		return out, apiCheckStep{"Compile", err}
 	}
-	recovery, err := s.Recovery.RecoveryState(ctx)
-	if err != nil {
-		return out, apiCheckStep{"Recovery", err}
+	var recovery artifact.RecoveryProof
+	if observedRecovery != nil {
+		recovery = *observedRecovery
+	} else {
+		recovery, err = s.Recovery.RecoveryState(ctx)
+		if err != nil {
+			return out, apiCheckStep{"Recovery", err}
+		}
 	}
 	process, err := s.Process.ReadAPIProcess(ctx)
 	if err != nil {
@@ -146,20 +155,37 @@ func (s APIContextRunner) check(ctx context.Context, current identities.CurrentI
 		until = identity.Earlier(until, d)
 	}
 	out = APIExecutionCheck{w, plan, eligible, recovery, process, start, until.UTC().Truncate(time.Microsecond)}
-	if !out.Valid(s.Now()) {
-		return APIExecutionCheck{}, apiCheckStep{"Current", value.ErrDenied}
-	}
-	if ctx.Err() != nil {
-		return APIExecutionCheck{}, apiCheckStep{"Context", value.ErrDenied}
+	if err := out.current(ctx, s.Now()); err != nil {
+		return APIExecutionCheck{}, err
 	}
 	return out, nil
+}
+
+// current checks the one request-owned observation without renewing any fact.
+// Each SQL effect still independently checks its transactional fences; native
+// acquisition still checks the exact pinned Pod and the committed start.
+func (c APIExecutionCheck) current(ctx context.Context, now time.Time) error {
+	if !c.Valid(now) {
+		return apiCheckStep{"Current", value.ErrDenied}
+	}
+	if ctx.Err() != nil {
+		return apiCheckStep{"Context", value.ErrDenied}
+	}
+	if until, ok := ctx.Deadline(); ok && !now.Before(until) {
+		return apiCheckStep{"Context", value.ErrDenied}
+	}
+	return nil
+}
+
+func (s APIContextRunner) valid(ctx context.Context, current identities.CurrentIdentity, captureID string) bool {
+	return ctx != nil && current != nil && s.Read != nil && s.Prepare != nil && s.Record != nil && s.Process != nil && s.Local != nil && s.Starts != nil && s.Targets != nil && s.Eligibility != nil && s.Capabilities != nil && s.Retention != nil && s.Recovery != nil && s.Output != nil && s.Collector != nil && s.Now != nil && authorization.UUID(captureID)
 }
 
 // Execute starts only within the original request-owned identity interval. It
 // neither restores a human request after restart nor queues a frozen identity.
 func (s APIContextRunner) Execute(ctx context.Context, current identities.CurrentIdentity, captureID string) (ContextResult, error) {
 	var zero ContextResult
-	if ctx == nil || current == nil || s.Read == nil || s.Prepare == nil || s.Record == nil || s.Process == nil || s.Local == nil || s.Starts == nil || s.Targets == nil || s.Eligibility == nil || s.Capabilities == nil || s.Retention == nil || s.Recovery == nil || s.Output == nil || s.Collector == nil || s.Now == nil || !authorization.UUID(captureID) {
+	if !s.valid(ctx, current, captureID) {
 		return zero, executeStep{"start", value.ErrInvalid}
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
@@ -179,7 +205,32 @@ func (s APIContextRunner) Execute(ctx context.Context, current identities.Curren
 	if err != nil {
 		return zero, executeStep{"ReadAPIContextWork", err}
 	}
-	check, err := s.check(startCtx, current, w, original)
+	return s.execute(ctx, current, w, original, nil, nil)
+}
+
+// ExecuteObserved consumes the hub start's own already-read prelude. These are
+// local service values, never caller or regional wire authority. The caller
+// must retain the original narrowed context; no input is refreshed or cached.
+func (s APIContextRunner) ExecuteObserved(ctx context.Context, current identities.CurrentIdentity, caller identity.Identity, w APIContextWork, capability planning.ContextCapability, recovery artifact.RecoveryProof) (ContextResult, error) {
+	if !s.valid(ctx, current, w.Accepted.CaptureID) {
+		return ContextResult{}, executeStep{"start", value.ErrInvalid}
+	}
+	now := s.Now()
+	original, bounded := ctx.Deadline()
+	if !bounded || original.After(now.Add(5*time.Second)) || ctx.Err() != nil || !now.Before(original) || !caller.Valid(now) || w.Actor != caller.Principal || w.Accepted.CaptureID != w.Accepted.Expectation.CaptureUID || !capability.Valid(now) || !recovery.Valid(now) {
+		return ContextResult{}, executeStep{"start", value.ErrDenied}
+	}
+	for _, until := range []time.Time{caller.ValidUntil, capability.FreshUntil, recovery.FreshUntil} {
+		original = identity.Earlier(original, until)
+	}
+	return s.execute(ctx, current, w, original, &capability, &recovery)
+}
+
+func (s APIContextRunner) execute(ctx context.Context, current identities.CurrentIdentity, w APIContextWork, original time.Time, capability *planning.ContextCapability, recovery *artifact.RecoveryProof) (ContextResult, error) {
+	var zero ContextResult
+	startCtx, stop := context.WithDeadline(ctx, original)
+	defer stop()
+	check, err := s.checkObserved(startCtx, current, w, original, capability, recovery)
 	if err != nil {
 		return zero, executeStep{"Check", err}
 	}
@@ -223,19 +274,15 @@ func (s APIContextRunner) Execute(ctx context.Context, current identities.Curren
 	if !ok {
 		return zero, executeStep{"PrepareContext", value.ErrUnavailable}
 	}
-	fresh, err := s.check(startCtx, current, w, original)
-	if err != nil {
+	if err := check.current(startCtx, s.Now()); err != nil {
 		return zero, executeStep{"PrepareContext", err}
 	}
-	if fresh.Process.Binding != check.Process.Binding || fresh.Plan.ScopeDigest != check.Plan.ScopeDigest || !reflect.DeepEqual(fresh.Plan.Input.Target.Pin, check.Plan.Input.Target.Pin) {
-		return zero, executeStep{"PrepareContext", value.ErrConflict}
-	}
-	c := value.PreparationCheck{Binding: r.Binding, CheckedAt: fresh.CheckedAt, ValidUntil: identity.Earlier(fresh.ValidUntil, r.Binding.NotAfter), MayCreate: mayCreate}
+	c := value.PreparationCheck{Binding: r.Binding, CheckedAt: check.CheckedAt, ValidUntil: identity.Earlier(check.ValidUntil, r.Binding.NotAfter), MayCreate: mayCreate}
 	object, err := s.Local.PrepareStart(startCtx, c)
 	if err != nil {
 		return zero, executeStep{"PrepareStart", err}
 	}
-	r, err = s.Prepare.BindAPIStart(startCtx, fresh, r, object)
+	r, err = s.Prepare.BindAPIStart(startCtx, check, r, object)
 	if err != nil {
 		return zero, executeStep{"BindAPIStart", err}
 	}
@@ -250,17 +297,14 @@ func (s APIContextRunner) Execute(ctx context.Context, current identities.Curren
 	if ready.Phase == value.StartCommitted {
 		return ContextResult{State: "AlreadyStarted"}, nil
 	}
-	// The capacity operations may block; final current checks keep their original
-	// deadlines and still require the same process, exact target and reviewed scope.
-	fresh, err = s.check(startCtx, current, w, original)
-	if err != nil {
+	// Capacity waits consume the same observation's original interval. They do
+	// not trigger another provider graph or authorize a replacement target.
+	if err := check.current(startCtx, s.Now()); err != nil {
 		return zero, executeStep{"ReadyStart", err}
 	}
-	if fresh.Process.Binding != r.Process {
+	if check.Process.Binding != r.Process {
 		return zero, executeStep{"ReadyStart", value.ErrConflict}
 	}
-	request.CheckedAt = fresh.CheckedAt
-	request.ValidUntil = identity.Earlier(fresh.ValidUntil, r.Binding.NotAfter)
 	d, err := s.Starts.ConsumeStart(startCtx, request)
 	if err != nil {
 		return ContextResult{State: "Indeterminate"}, err
@@ -271,7 +315,7 @@ func (s APIContextRunner) Execute(ctx context.Context, current identities.Curren
 	if d.ObjectUID != r.ObjectUID || d.Phase != value.StartCommitted || !d.CommittedAt.Before(d.ValidUntil) || d.ValidUntil.After(request.ValidUntil) || !s.Now().Before(d.ValidUntil) {
 		return ContextResult{State: "Indeterminate"}, value.ErrDenied
 	}
-	r, err = s.Record.RecordAPIStart(startCtx, fresh, r, d)
+	r, err = s.Record.RecordAPIStart(startCtx, check, r, d)
 	if err != nil {
 		return ContextResult{State: "Indeterminate"}, err
 	}

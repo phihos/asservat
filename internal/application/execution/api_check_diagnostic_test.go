@@ -169,13 +169,20 @@ func TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary(t *testing.T) {
 		check int
 		want  string
 	}{
-		{2, "PrepareContext/ResolvePod"},
-		{3, "ReadyStart/ResolvePod"},
+		{2, "PrepareContext/Context"},
+		{3, "ReadyStart/Context"},
 	} {
 		t.Run(tc.want, func(t *testing.T) {
-			p, runner, current, ctx := apiCheckDiagnosticRunner(t, "ResolvePod", apiCheckPrivateError{}, tc.check)
+			p, runner, current, ctx := apiCheckDiagnosticRunner(t, "", nil, 0)
+			boundary := &apiObservationBoundary{apiRunnerFixture: p.apiRunnerFixture}
+			if tc.check == 2 {
+				boundary.wrapped = func(context.Context) { p.cancel() }
+			} else {
+				boundary.ready = func(context.Context) { p.cancel() }
+			}
+			runner.Output, runner.Local = boundary, boundary
 			_, err := runner.Execute(ctx, current, p.work.Accepted.CaptureID)
-			if !errors.Is(err, value.ErrUnavailable) || p.check != tc.check || p.record.Phase != "prepared" || p.prepares.Load() != 1 || p.closes.Load() != 1 || p.consumes.Load() != 0 || p.captures.Load() != 0 || p.stores.Load() != 0 {
+			if !errors.Is(err, value.ErrDenied) || p.check != 1 || p.record.Phase != "prepared" || p.prepares.Load() != 1 || p.closes.Load() != 1 || p.consumes.Load() != 0 || p.captures.Load() != 0 || p.stores.Load() != 0 {
 				t.Fatal("later check changed preparation ownership or allowed acquisition")
 			}
 			var step interface{ FixedStep() string }

@@ -1,0 +1,9 @@
+=== RUN   TestRegionalStartReusesPreludeBeforeFirstPreparation
+    context_regional_observation_test.go:311: execute/PrepareAPIExecution (PrepareAPIExecution (unavailable)) left@>=2s start-left@>=2s bound=parent
+    context_regional_observation_test.go:317: setup progress work=2 observer=36 probe=12 signed=true
+    context_regional_observation_test.go:321: actual StartContext -> runner first preparation: work reads=2, TLS observer=36 probe=12, elapsed=11.25235ms, opening QPS=50 burst=100
+    context_regional_observation_test.go:323: preparation repeated its already observed prelude 2 36 12
+--- FAIL: TestRegionalStartReusesPreludeBeforeFirstPreparation (0.03s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.040s
+FAIL

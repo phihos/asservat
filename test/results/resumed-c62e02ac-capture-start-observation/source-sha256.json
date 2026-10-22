@@ -1,0 +1,8 @@
+{
+  "internal/application/execution/api_context.go": "ea58cacdd658a4a87507807f09c7fbc4859d8ab2fd1576d851315feecfcf5b58",
+  "internal/application/execution/api_context_test.go": "37cd9b4b9e32b4e8c984abc29cdc2c88978688e889dba351dc8620128581f918",
+  "internal/application/execution/api_check_diagnostic_test.go": "91467db36806800ec8a39f83c8fbefb9916ae0bef33d61b0e45d0d05f9d21b3c",
+  "internal/application/execution/api_observation_test.go": "5e8d89d2d807e765b079398ada97e4fed6004d6db13513d3d6bafb1208733aad",
+  "internal/bootstrap/context_regional_start.go": "de897987d70e59698bb583b1ce02b0ef75ba34d092d4c70acdac2efbe1651b53",
+  "internal/bootstrap/context_regional_observation_test.go": "c95276279bb2a7901724e1f0b46fc5376e9b10563b77de4945f51918715f826d"
+}

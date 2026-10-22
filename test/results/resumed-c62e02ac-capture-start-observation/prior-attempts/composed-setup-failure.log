@@ -1,0 +1,6 @@
+=== RUN   TestRegionalStartReusesPreludeBeforeFirstPreparation
+    context_regional_observation_test.go:318: composed path did not reach the intended first SQL boundary local start state unavailable 0
+--- FAIL: TestRegionalStartReusesPreludeBeforeFirstPreparation (0.02s)
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	0.034s
+FAIL

@@ -1,0 +1,27 @@
+{
+  "runner-red": {
+    "session": 11245,
+    "terminal_chunk": "e4b8d2",
+    "go_exit": 1
+  },
+  "composed-red": {
+    "session": 39126,
+    "terminal_chunk": "3692ac",
+    "go_exit": 1
+  },
+  "focused-green": {
+    "session": 51720,
+    "terminal_chunk": "0d3882",
+    "go_exit": 0
+  },
+  "full-green": {
+    "session": 41133,
+    "terminal_chunk": "706b7d",
+    "go_exit": 0
+  },
+  "collector-green": {
+    "session": 8402,
+    "terminal_chunk": "1c2541",
+    "go_exit": 0
+  }
+}

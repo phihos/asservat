@@ -122,10 +122,23 @@ func (f *apiRunnerFixture) BindAPIStart(_ context.Context, _ APIExecutionCheck, 
 	return f.record, nil
 }
 func (f *apiRunnerFixture) PrepareStart(_ context.Context, c value.PreparationCheck) (value.PreparedStart, error) {
+	if f.mode == "restarted-process" {
+		// A restarted regional process loses the exact live exchange. It cannot
+		// answer this operation with a replacement process or inherit its work.
+		return value.PreparedStart{}, context.Canceled
+	}
 	if f.mode == "lost-create-reply" && c.MayCreate {
 		return value.PreparedStart{}, value.ErrUnavailable
 	}
 	return value.PreparedStart{ObjectUID: f.resolved.Start.ObjectUID, ResourceVersion: "1"}, nil
+}
+func (f *apiRunnerFixture) Capture(ctx context.Context, pin artifact.PinnedPod) ([]byte, error) {
+	if f.mode == "replacement-pod" {
+		// The native collector rechecks the pinned Pod/controller at acquisition;
+		// a new full runner observation is not needed to prevent substitution.
+		return nil, targets.ErrChanged
+	}
+	return f.contextExecutionFixture.Capture(ctx, pin)
 }
 func (f *apiRunnerFixture) ReadyStart(ctx context.Context, r value.Request) (value.Disposition, error) {
 	return f.LookupStart(ctx, r)
@@ -211,13 +224,32 @@ func TestAPIContextRunnerOneEffectAndClosedKeys(t *testing.T) {
 	}
 }
 func TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire(t *testing.T) {
-	for _, mode := range []string{"legacy-writer-protocol", "revoked-after-keys", "expired-after-keys", "replacement-pod", "restarted-process", "lost-preparation-reply", "lost-create-reply", "lost-start-reply", "lost-start-record-reply", "expired-start-record-reply"} {
+	for _, mode := range []string{"legacy-writer-protocol", "replacement-pod", "restarted-process", "lost-preparation-reply", "lost-create-reply", "lost-start-reply", "lost-start-record-reply", "expired-start-record-reply"} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, current := apiRunner(t)
 			f.mode = mode
 			_, err := s.Execute(context.Background(), current, f.work.Accepted.CaptureID)
 			if err == nil || f.captures.Load() != 0 || f.stores.Load() != 0 || f.prepares.Load() != f.closes.Load() {
 				t.Fatal("uncertain/stale authority acquired", err)
+			}
+		})
+	}
+}
+
+func TestAPIContextRunnerNextOperationObservesIdentityChange(t *testing.T) {
+	for _, mode := range []string{"revoked-after-keys", "expired-after-keys"} {
+		t.Run(mode, func(t *testing.T) {
+			f, s, current := apiRunner(t)
+			f.mode = mode
+			out, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
+			if err != nil || out.State != "StoredPendingVerification" || f.captures.Load() != 1 || f.stores.Load() != 1 {
+				t.Fatal("unobserved external change invalidated a live original observation", out, err)
+			}
+			// Both a new deny and an unavailable identity source are observed by
+			// the next operation. Neither can resurrect an old request or effect.
+			_, err = s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
+			if !errors.Is(err, value.ErrDenied) || f.prepares.Load() != 1 || f.captures.Load() != 1 || f.stores.Load() != 1 || f.prepares.Load() != f.closes.Load() {
+				t.Fatal("next request reused identity or replayed effects", err)
 			}
 		})
 	}

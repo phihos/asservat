@@ -3,6 +3,10 @@
 Date: 2026-10-14. Status: accepted; implemented, and the native public journey passes on this path.
 Requirements: REQ-FED-001/002, S-02 context collection; TASK-03 / TASK-11.
 
+[ADR-216](216-request-owned-context-start-observation.md) refines the repeated
+hub checks below: one start reuses one complete observation within its original
+interval, with current SQL effect checks. Qualification is tracked separately.
+
 ## Context
 
 ADR-135 runs `APIContextRunner` in the regional process after the hub signs

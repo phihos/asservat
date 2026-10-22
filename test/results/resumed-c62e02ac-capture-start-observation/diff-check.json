@@ -1,0 +1,15 @@
+{
+  "command": [
+    "git",
+    "diff",
+    "--check",
+    "--",
+    "internal/application/execution/api_context.go",
+    "internal/application/execution/api_context_test.go",
+    "internal/application/execution/api_check_diagnostic_test.go",
+    "internal/application/execution/api_observation_test.go",
+    "internal/bootstrap/context_regional_start.go",
+    "internal/bootstrap/context_regional_observation_test.go"
+  ],
+  "exit": 0
+}

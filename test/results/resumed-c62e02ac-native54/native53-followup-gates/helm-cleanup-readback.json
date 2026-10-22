@@ -1,0 +1,26 @@
+[
+  {
+    "argv": [
+      "kind",
+      "get",
+      "clusters"
+    ],
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "No kind clusters found.\n"
+  },
+  {
+    "argv": [
+      "docker",
+      "ps",
+      "-a",
+      "--filter",
+      "name=asservat-helm-",
+      "--format",
+      "{{.Names}}"
+    ],
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]

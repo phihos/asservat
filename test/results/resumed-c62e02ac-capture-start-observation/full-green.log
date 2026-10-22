@@ -1,0 +1,4 @@
+ok  	asservat.local/asservat/internal/application/execution	1.259s
+ok  	asservat.local/asservat/internal/bootstrap	32.260s
+ok  	asservat.local/asservat/internal/transport/contextstart	2.784s
+ok  	asservat.local/asservat/internal/adapters/mtls	35.042s

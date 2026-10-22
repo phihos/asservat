@@ -135,7 +135,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
 		r := s.Runner
 		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
-		result, err := r.Execute(ctx, current, id)
+		result, err := r.ExecuteObserved(ctx, current, caller, accepted, capability, recovery)
 		if err != nil && s.Report != nil {
 			step := "execute"
 			var fixed interface{ FixedStep() string }

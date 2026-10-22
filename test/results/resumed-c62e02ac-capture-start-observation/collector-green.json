@@ -1,0 +1,29 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-timeout=60s",
+    "./internal/adapters/kubernetes",
+    "-run",
+    "^(TestBoundedContextProtocol|TestAPIContextCollectorDoesNotRequireNodeAssignment)$",
+    "-v"
+  ],
+  "env": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exit": 0,
+  "seconds": 19.721168611955363,
+  "before": {
+    "internal/adapters/kubernetes/context.go": "a331a83b3818f2d8ef07807539edcaecf9173d5e8bc61daed2f87900200a51d5",
+    "internal/adapters/kubernetes/context_test.go": "6c791444126e4064a0ce4142b651030f99e4f01086ac7d7ce57b3ed04a68719f"
+  },
+  "after": {
+    "internal/adapters/kubernetes/context.go": "a331a83b3818f2d8ef07807539edcaecf9173d5e8bc61daed2f87900200a51d5",
+    "internal/adapters/kubernetes/context_test.go": "6c791444126e4064a0ce4142b651030f99e4f01086ac7d7ce57b3ed04a68719f"
+  }
+}

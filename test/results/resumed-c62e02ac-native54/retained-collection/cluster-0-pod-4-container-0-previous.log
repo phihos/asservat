@@ -1,0 +1,12 @@
+2026-10-22T20:59:05.015929609Z I1022 20:59:05.015796       1 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+2026-10-22T20:59:05.023528797Z I1022 20:59:05.023470       1 leaderelection.go:272] "Successfully acquired lease" lock="asservat configuration reconciliation"
+2026-10-22T20:59:05.025429689Z capacity waiting: projection hint pending
+2026-10-22T21:03:17.445164557Z hub-worker context deletion: waiting for the capacity projection
+2026-10-22T21:03:17.458150367Z hub-worker retention: reconciler/store.begin/client (unavailable)
+2026-10-22T21:03:17.461579048Z hub-worker worker configuration: source (unavailable)
+2026-10-22T21:03:40.558626457Z hub-worker worker configuration: ok
+2026-10-22T21:05:28.373967006Z capacity waiting: projection mount pending
+2026-10-22T21:05:44.923517987Z capacity started with 0 regional clusters
+2026-10-22T21:05:44.937331920Z capacity local observation capacity-namespace-candidates: candidates (unavailable) after 10ms
+2026-10-22T21:05:44.937337380Z capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+2026-10-22T21:06:02.881294850Z capacity local observation capacity-namespace-candidates: selected (unavailable) after 4.67s

@@ -63,6 +63,14 @@ authorized. Understand why existing mechanisms exist before removing them.
 
 ## Implementation notes
 
+ADR-216 removes repeated full hub authority observations within one context start.
+Read docs/decisions/216-request-owned-context-start-observation.md before changing
+this path. Reuse only the exact request's completed observations within their
+earliest original cutoff, at most five seconds. Validate cancellation/expiry after
+blocking work; keep current SQL effect checks and exact pinned-Pod acquisition.
+No global authority cache, renewed deadline, new key attempt or replacement target
+follows. Qualification belongs in docs/implementation-progress.md.
+
 The structural simplification candidate groups seven hub metadata readers into
 one SQL credential/pool (ADR-215) and combines bootstrap/continuation into one
 sequential runner. Keep distinct key, acquisition, publication and deletion

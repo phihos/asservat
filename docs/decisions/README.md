@@ -1,5 +1,11 @@
 # Decision records
 
+[ADR-216 — One authority observation for a context start](216-request-owned-context-start-observation.md)
+removes repeated complete authority reads within the same original five-second
+start. Current SQL effect checks, exact-target acquisition, cancellation and
+original deadlines remain. Affected race suites pass; real SQL and installed
+qualification remain pending.
+
 [ADR-215 — One SQL login for the hub's metadata readers](215-hub-metadata-reader-role.md)
 consolidates seven same-process metadata credentials and pools while retaining
 their typed adapters, exact union grants and existing SQL checks. Other privilege

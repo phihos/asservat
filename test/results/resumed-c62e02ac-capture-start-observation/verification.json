@@ -1,0 +1,36 @@
+{
+  "baseline": "840f27fc338f0c170a4f6069bc95db4c109bbfaf",
+  "result": "component regressions pass; external SQL and installed qualification pending",
+  "runs": {
+    "runner-red": {
+      "exit": 1,
+      "source_unchanged": true,
+      "record": "runner-red.json"
+    },
+    "composed-red": {
+      "exit": 1,
+      "source_unchanged": true,
+      "record": "composed-red.json"
+    },
+    "focused-green": {
+      "exit": 0,
+      "source_unchanged": true,
+      "record": "focused-green.json"
+    },
+    "full-green": {
+      "exit": 0,
+      "source_unchanged": true,
+      "record": "full-green.json"
+    },
+    "collector-green": {
+      "exit": 0,
+      "source_unchanged": true,
+      "record": "collector-green.json"
+    }
+  },
+  "final_owned_source_matches_full_race": true,
+  "scope": "request-owned capture start observation; unchanged original limits, SQL effect fences, regional transport and native acquisition",
+  "diff_check_exit": 0,
+  "independent_review": "ci_change_detection read six frozen files and focused evidence; no remaining blockers; no reruns",
+  "external_fixtures_run": false
+}

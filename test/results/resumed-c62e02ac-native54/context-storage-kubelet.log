@@ -1,0 +1,5 @@
+Owned node: asservat-context-lcscbtz7-0-control-plane
+-- No entries --
+Owned node: asservat-context-lcscbtz7-1-control-plane
+Oct 22 21:07:34 asservat-context-lcscbtz7-1-control-plane kubelet[798]: I1022 21:07:34.458328     798 server.go:177] "Pod update broadcasted" podUID="09118ca3-e437-4c32-a85b-463933c02167" type="MODIFIED"
+Oct 22 21:08:11 asservat-context-lcscbtz7-1-control-plane kubelet[798]: I1022 21:08:11.457781     798 server.go:177] "Pod update broadcasted" podUID="b271aea3-852f-44df-b4f1-eb17eaa6ddc9" type="MODIFIED"
