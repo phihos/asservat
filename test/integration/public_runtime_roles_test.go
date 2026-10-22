@@ -320,9 +320,17 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 			t.Fatal("lost completion reported success")
 		}
 	}
+	// Match production's independently observed fleet source during positive
+	// complete-inventory calls. Each observation still lasts five seconds;
+	// stopping joins the observer before any later fault/recovery assertions.
+	provisionCurrent := func() (out contracts.PublicRuntimeRoleSnapshot, err error) {
+		stop := keepFixtureFleetCurrent(ctx, observer, a)
+		defer func() { err = errors.Join(err, stop()) }()
+		return producer.Provision(ctx)
+	}
 	refresh()
 	provisionStarted := time.Now()
-	snapshot, e := producer.Provision(ctx)
+	snapshot, e := provisionCurrent()
 	if e != nil {
 		// Failure-only fixture diagnostics distinguish an expired synthetic
 		// fleet observation from an incomplete role inventory. They do not
@@ -356,7 +364,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		t.Fatal("missing SCRAM verifier")
 	}
 	refresh()
-	again, e := producer.Provision(ctx)
+	again, e := provisionCurrent()
 	if e != nil || root.claims != len(contracts.PublicRuntimeRolePurposes()) || again.State.OperationID != snapshot.State.OperationID {
 		t.Fatal("restart renewed creation claims", e)
 	}
@@ -539,7 +547,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		t.Fatal("same-name replacement role accepted")
 	}
 	refresh()
-	if _, e = producer.Provision(ctx); e != nil {
+	if _, e = provisionCurrent(); e != nil {
 		t.Fatal("original exact roles unavailable after fault removal", e)
 	}
 	if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", scope.InstallationID); e != nil {

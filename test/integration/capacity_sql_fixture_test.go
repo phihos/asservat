@@ -224,6 +224,10 @@ func (f *capacitySQLFixture) refreshFleet(t *testing.T) {
 // keepFleetCurrent renews the fixture's fleet observation every second until
 // stopped; it returns the first renewal failure.
 func (f *capacitySQLFixture) keepFleetCurrent() func() error {
+	return keepFixtureFleetCurrent(f.ctx, f.observer, f.administration)
+}
+
+func keepFixtureFleetCurrent(ctx context.Context, observer *postgres.FleetObservation, administration fleet.Administration) func() error {
 	stop, done := make(chan struct{}), make(chan error, 1)
 	go func() {
 		tick := time.NewTicker(time.Second)
@@ -234,12 +238,12 @@ func (f *capacitySQLFixture) keepFleetCurrent() func() error {
 				done <- nil
 				return
 			case <-tick.C:
-				b, err := f.observer.ReadAdministrationBasis(f.ctx)
-				a := f.administration
+				b, err := observer.ReadAdministrationBasis(ctx)
+				a := administration
 				a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 				a.FreshUntil = a.ObservedAt.Add(5 * time.Second)
 				if err == nil {
-					err = f.observer.ObserveAdministration(f.ctx, b, a)
+					err = observer.ObserveAdministration(ctx, b, a)
 				}
 				if err != nil {
 					done <- err
