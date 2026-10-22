@@ -1,0 +1,121 @@
+{
+  "scope": "Component regression for consumed preflight freshness; not exact native55 causality or installed download qualification",
+  "tests": {
+    "red-1": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^TestContextDownloadConsumedPreflight",
+        "-v",
+        "./internal/application/evidence"
+      ],
+      "environment": {
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOMAXPROCS": "2",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "started": "2026-10-22T22:18:10.534385+00:00",
+      "elapsedSeconds": 2.589435738977045,
+      "exitCode": 1,
+      "sourcesUnchanged": true
+    },
+    "red-2": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^TestContextDownloadConsumedPreflight",
+        "-v",
+        "./internal/application/evidence"
+      ],
+      "environment": {
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOMAXPROCS": "2",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "started": "2026-10-22T22:18:34.140610+00:00",
+      "elapsedSeconds": 2.4220324369962327,
+      "exitCode": 1,
+      "sourcesUnchanged": true
+    },
+    "green-initial": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^TestContextDownload(ConsumedPreflight|PreflightMustBeLive)",
+        "-v",
+        "./internal/application/evidence"
+      ],
+      "environment": {
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOMAXPROCS": "2",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "started": "2026-10-22T22:19:27.143747+00:00",
+      "elapsedSeconds": 2.0623335129930638,
+      "exitCode": 0,
+      "sourcesUnchanged": true
+    },
+    "green-race": {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-run",
+        "^TestContextDownload(ConsumedPreflight|PreflightMustBeLive)",
+        "-v",
+        "./internal/application/evidence"
+      ],
+      "environment": {
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOMAXPROCS": "2",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "started": "2026-10-22T22:19:59.082483+00:00",
+      "elapsedSeconds": 5.818498170003295,
+      "exitCode": 0,
+      "sourcesUnchanged": true
+    },
+    "full-evidence-race": {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "./internal/application/evidence"
+      ],
+      "environment": {
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOMAXPROCS": "2",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "started": "2026-10-22T22:20:21.874909+00:00",
+      "elapsedSeconds": 4.653651983011514,
+      "exitCode": 0,
+      "sourcesUnchanged": true
+    }
+  },
+  "classification": {
+    "red-1": "Fixture setup error: coordinator installation did not match composed runtime; not defect evidence",
+    "red-2": "Genuine pre-change failure: three consumed readiness/config/plan cases audited but unclaimed; five original-bound negatives passed",
+    "green-initial": "Post-change initial verification including three new consume-boundary negatives; all eleven cases passed",
+    "green-race": "Focused final race, all eleven cases passed",
+    "full-evidence-race": "Entire affected evidence package race passed"
+  },
+  "sourceCount": 2600,
+  "sourceHashes": {
+    "internal/application/evidence/context_download_preflight_freshness_test.go": "4ef0e1263db163da9409f95d4d6c20574d55569ceeda6cfe2b76571e09c35387",
+    "internal/application/evidence/context_download_control.go": "ea6e35c7a4de20eb1a927ad18f4813676f4dabdf33f6f55f1ae4d9c5e348ec46"
+  }
+}

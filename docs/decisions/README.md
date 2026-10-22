@@ -1,10 +1,16 @@
 # Decision records
 
+[ADR-218 — Consume download preflight observations at their phase](218-consumed-download-preflight.md)
+consumes readiness at its check and plan freshness through acknowledged session
+reservation. Original request/authority and session limits remain, with current
+configuration checked at worker effects. Implemented; affected race tests pass,
+with installed qualification pending.
+
 [ADR-216 — One authority observation for a context start](216-request-owned-context-start-observation.md)
 removes repeated complete authority reads within the same original five-second
 start. Current SQL effect checks, exact-target acquisition, cancellation and
-original deadlines remain. Affected race suites pass; real SQL and installed
-qualification remain pending.
+original deadlines remain. Affected race and selected real SQL suites pass;
+native55 reaches capture and publication but fails download preparation.
 
 [ADR-215 — One SQL login for the hub's metadata readers](215-hub-metadata-reader-role.md)
 consolidates seven same-process metadata credentials and pools while retaining

@@ -61,7 +61,8 @@ type ContextDownloadPlan struct {
 	Allocation                           artifact.DownloadAllocation
 	OutputLimit, ReadLimit, RequestLimit int64
 	Duration                             time.Duration
-	ObservedAt, ValidUntil               time.Time
+	// Freshness of this admission snapshot, consumed by session reservation.
+	ObservedAt, ValidUntil time.Time
 	// Absolute accepted backing end. Zero is historical component-only.
 	HardUntil time.Time
 }
@@ -71,7 +72,8 @@ func (p ContextDownloadPlan) Valid(scope artifact.DownloadScope, now time.Time) 
 }
 
 // All three methods belong to an actual configured regional native-work path.
-// Check is passive. Read never dispatches, decrypts, refreshes keys or retries.
+// Check is passive readiness at consumption, not a lease for later effects.
+// Read never dispatches, decrypts, refreshes keys or retries.
 // Continue is an explicit prepare operation: it reuses the exact original
 // session/worker and may do bounded prepaid work only under this live identity.
 // Pending=true is an acknowledged startup wait, not an unknown effect reply.
@@ -231,14 +233,16 @@ func (s ContextDownloadCoordinator) PrepareContextDownload(ctx context.Context, 
 	if err != nil || !s.Now().Before(readyUntil) || readyUntil.After(s.Now().Add(artifact.DownloadLease)) {
 		return zero, artifact.ErrDownloadUnavailable
 	}
-	until = identity.Earlier(until, readyUntil)
+	// Readiness is consumed here. Worker effects independently require current
+	// configuration and authority; an older readiness observation is not their
+	// lifetime. Keep the original request/identity/authority bounds in until.
 	if !lookup.Found {
 		plan, e := s.Plans.ContextDownloadPlan(ctx, scope)
 		if e != nil || !plan.Valid(scope, s.Now()) {
 			return zero, artifact.ErrDownloadUnavailable
 		}
-		until = identity.Earlier(until, plan.ValidUntil)
-		if ctx.Err() != nil || !s.Now().Before(until) {
+		admissionUntil := identity.Earlier(until, plan.ValidUntil)
+		if ctx.Err() != nil || !s.Now().Before(admissionUntil) {
 			return zero, artifact.ErrDownloadUnavailable
 		}
 		now := s.Now().UTC().Truncate(time.Microsecond)
@@ -247,12 +251,19 @@ func (s ContextDownloadCoordinator) PrepareContextDownload(ctx context.Context, 
 			session.Deadline = identity.Earlier(session.Deadline, plan.HardUntil).UTC().Truncate(time.Microsecond)
 		}
 		// The adapter resolves a racing original key before applying the new plan.
-		reserveCtx, stop := context.WithDeadline(ctx, until)
+		reserveCtx, stop := context.WithDeadline(ctx, admissionUntil)
 		session, err = s.reserve(reserveCtx, DownloadReservation{Session: session, IdempotencyDigest: ContextDownloadKeyDigest(key), Authority: a})
+		admissionExpired := reserveCtx.Err() != nil || !s.Now().Before(admissionUntil)
 		stop()
 		if err != nil {
 			return zero, err
 		}
+		if admissionExpired {
+			return zero, artifact.ErrDownloadUnavailable
+		}
+		// The acknowledged reservation consumes plan freshness. Its immutable
+		// limits, backing/access deadline and spend remain in the session; later
+		// effects use current SQL checks under the original request authority.
 	}
 	if !session.Valid() || session.Scope != scope || session.RequestDigest != ContextDownloadRequestDigest(artifactID) {
 		return zero, artifact.ErrDownloadUnavailable

@@ -1,0 +1,10 @@
+{
+  "commit": "d47f9a3caf08b390793357d0dea9a31409d6d529",
+  "argv": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestContextAdmissionWithRealServices$/^download-worker-installed-original-authority$"
+  ],
+  "startedUnix": 1792707347.4921746
+}

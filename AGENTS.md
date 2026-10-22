@@ -72,6 +72,12 @@ authorized. Understand why existing mechanisms exist before removing them.
 
 ## Implementation notes
 
+ADR-218 consumes download readiness at its check and plan freshness through
+acknowledged session reservation. Their expiry after consumption does not shorten
+later effects. Preserve original request/authority and hard session/access/backing
+deadlines, refusal after late/unknown reservation, and current SQL/Job checks.
+Read docs/decisions/218-consumed-download-preflight.md before changing this path.
+
 ADR-216 removes repeated full hub authority observations within one context start.
 Read docs/decisions/216-request-owned-context-start-observation.md before changing
 this path. Reuse only the exact request's completed observations within their

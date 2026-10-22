@@ -1,5 +1,41 @@
 # Sustained implementation progress
 
+## Download preflight lifetime simplification (2026-10-23)
+
+The maintainer's continuing mandate is to implement the specification and simplify
+it when sensible. ADR-218 removes two phase-lifetime couplings in download startup:
+readiness is consumed at its check, and plan freshness is consumed through
+acknowledged session reservation. Neither consumed observation limits later work.
+Original caller, authority, recovery, retention, source and session bounds remain;
+worker reservation/launch and evidence effects retain their current SQL checks.
+No timeout, permission, request count, durable state or background task is added.
+
+The [focused real SQL/S3 reproduction](../test/results/resumed-c62e02ac-download-preparation-claim/README.md)
+passes on frozen `d47f9a3c` (actual wrapper exit 0, 43.882 seconds; selected subtest
+2.29 seconds). The actual dispatcher and compiled session/worker/audit grants
+carry one original authority through reserve, encrypted intent audit,
+acknowledgement and launch claim. The test deliberately stops at the first Job
+port after 184.8 milliseconds; it creates no Job and does not model upstream
+readiness/plan latency. All 2,754 harness hashes match the commit and remain
+unchanged; cleanup and independent absence checks pass. This does not reproduce
+native55's failure and does not establish native transfer success.
+
+The [composed preflight regression](../test/results/resumed-c62e02ac-download-preflight-freshness/README.md)
+does reproduce an availability defect. Three baseline cases cross a 200-millisecond
+readiness/configuration/plan observation during 400 milliseconds of simulated audit
+work. All acknowledge the synthetic audit then refuse with zero claims and Jobs,
+despite still-live original authority. After the change they return acknowledged
+Preparing through the actual coordinator, native runtime and dispatcher. SQL,
+configuration, audit and Job ports in this test remain synthetic.
+
+Caller, identity, authority and hard-session expiry, cancellation after audit,
+expired readiness, and expiry/cancellation during reservation still refuse.
+Focused race tests pass (exit 0, 1.041 seconds) and the complete evidence race
+suite passes (exit 0, 3.978 seconds); all 2,600 recorded Go sources remain unchanged.
+The initial setup failure is retained separately from genuine baseline failures.
+Independent review finds no blocker. The next installed run must establish whether
+this correction resolves native startup; native55's exact cause remains unproven.
+
 ## Simplification delivery checkpoint (2026-10-23)
 
 The announced whole-design simplification is **partly implemented** on

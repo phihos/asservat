@@ -1,0 +1,7 @@
+{
+  "ownedResourcesAbsent": {
+    "asservat-custody-nvt_3rd5-postgres": true,
+    "asservat-custody-nvt_3rd5-s3": true,
+    "asservat-custody-nvt_3rd5": true
+  }
+}

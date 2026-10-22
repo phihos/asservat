@@ -1,0 +1,26 @@
+{
+  "command": [
+    "go",
+    "test",
+    "./test/integration",
+    "-run",
+    "^$"
+  ],
+  "environment": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exit": 0,
+  "elapsed_seconds": 29.243010997772217,
+  "before": {
+    "test/integration/download_sessions_test.go": "8e40aea089eac624bf45fa611bc744cce17995f46321887c197d0ce631c80a98",
+    "test/integration/installed_download_preparation_test.go": "8439026d75059df991638a9eb41c6c7ca8bff3ebd818c84e37e4e44eb1eea43a"
+  },
+  "after": {
+    "test/integration/download_sessions_test.go": "8e40aea089eac624bf45fa611bc744cce17995f46321887c197d0ce631c80a98",
+    "test/integration/installed_download_preparation_test.go": "8439026d75059df991638a9eb41c6c7ca8bff3ebd818c84e37e4e44eb1eea43a"
+  },
+  "unchanged": true
+}

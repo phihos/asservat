@@ -1,0 +1,16 @@
+diff --git a/test/integration/download_sessions_test.go b/test/integration/download_sessions_test.go
+index 8c57236b..35e23d2b 100644
+--- a/test/integration/download_sessions_test.go
++++ b/test/integration/download_sessions_test.go
+@@ -191,6 +191,11 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
+ 		a := f.authority()
+ 		return permissionDownloadAuditFixture{runtime: f.runtime, request: request(f, a)}
+ 	})
++	t.Run("download-worker-installed-original-authority", func(t *testing.T) {
++		f := setupWithKeys(t, func(string) (evidence.KeySealer, evidence.KeyOpener) { return keys, keys })
++		defer f.s.nativeSources.Close()
++		qualifyInstalledDownloadPreparation(t, f.s.nativeSources.ctx, admin, poolFor, store, keys, f.s, f.p, f.allocation, f.gate)
++	})
+ 
+ 	for _, mode := range []string{"native-retention-observation", "native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-current-request", "enrollment-audit-versions", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "capacity-held", "expired-claim", "cancelled-parent"} {
+ 		t.Run("download-worker-"+mode, func(t *testing.T) {

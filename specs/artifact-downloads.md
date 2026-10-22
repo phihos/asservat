@@ -48,6 +48,14 @@ Given an ordinary reader of a sanitized capture, a raw reader with a covering do
 
 ## REQ-DLD-003 — Bounded authenticated transfer and resume
 
+Runtime readiness is consumed when checked; a transfer plan's freshness is
+consumed through acknowledged session reservation. Their expiry after consumption
+does not shorten later startup under a still-live original request and authority.
+Expired preflight, expired/cancelled reservation and unknown replies refuse
+continuation. Preserve the original session's accepted limits and absolute
+access/backing deadlines, and current configuration/permission checks at effects.
+See [ADR-218](../docs/decisions/218-consumed-download-preflight.md).
+
 Use a minimized SQL `ArtifactDownload` session under C-14, referencing the exact immutable artifact/version, actor/client, authority revisions, output/read-work reservations, absolute deadline and conservative delivery counters. It is neither a new CRD nor a new plaintext evidence copy. States: Preparing, Ready, Streaming, Completed, Interrupted, Cancelled, Expired, Denied, Failed. A failed connection may enter Interrupted and resume within its original authority/deadline. Terminal cancellation/expiry/denial cannot restart. Preparation is idempotent; opaque paths are not bearer capabilities. Before verified native metadata is available, Preparing/early failure responses omit filename, format, size, checksum, ETag and coverage together; never invent a zero size or placeholder checksum. Ready/Streaming/Interrupted require that complete metadata group. Completed may omit it; if any native metadata is present, the entire verified group is required. Preparing and terminal states never advertise resume. The UI shows preparation progress and cancellation until the file is ready.
 
 Terminal status remains readable after the transfer deadline while current identity, evidence metadata access, retained audience, retention and recovery checks still permit metadata disclosure. This status does not renew the original transfer deadline, resume authority or evidence lifetime. Expired nonterminal sessions project Expired without starting work or changing accounting; an existing Completed outcome stays Completed. A terminal-only response needs neither a live regional worker nor a native metadata cache. Status reads never dispatch, unwrap, decrypt or re-prepare evidence. Completed records the server transfer outcome and is not proof that a browser/client saved or verified the local file. A successful regional conversation must not permit the worker to poll while its completed old operation is still routeable. Its existing final zero-byte acknowledgement follows positive exact SQL-owner closure under the original deadline; scheduling delay, idempotent cleanup, absence or expiry cannot substitute for that acknowledgement. Failed or unknown closure/final delivery remains uncertain and conservatively charged.
