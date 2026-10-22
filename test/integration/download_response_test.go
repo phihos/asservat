@@ -8,6 +8,7 @@ import (
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"errors"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -15,6 +16,16 @@ import (
 	"testing"
 	"time"
 )
+
+type downloadResponsePermissionProbe struct {
+	reader authorizationapp.ProjectionReader
+	reads  int
+}
+
+func (p *downloadResponsePermissionProbe) Permissions(ctx context.Context, target authorization.Target) (authorization.Projection, error) {
+	p.reads++
+	return p.reader.Permissions(ctx, target)
+}
 
 // Called by the owned custody suite. Actual PostgreSQL/S3/encrypted paired
 // records and original published context authority; large response size and
@@ -270,5 +281,53 @@ func qualifyDownloadResponses(t *testing.T, ctx context.Context, admin *pgxpool.
 		if !errors.As(err, &immutable) || immutable.Code != "23514" {
 			t.Fatal("audit lock column changed immutable response identity", err)
 		}
+		t.Run("response-permission-cadence-keeps-sql-revocation", func(t *testing.T) {
+			// The already qualified session supplies the actual SQL scope. These
+			// calls use the real authorizer/catalog/permission/retention adapters;
+			// IdP claims remain the fixture's explicit synthetic observation.
+			_ = current()
+			probe := &downloadResponsePermissionProbe{reader: scenario.p}
+			gate.Permissions = probe
+			owned, err := gate.NewDownloadResponse(ctx, scope)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer owned.Close()
+			actor := stopNativeIdentity{i: gate.Identities.(downloadTestIdentity).value}
+			first, err := owned.CheckDownloadCurrent(ctx, actor, scope)
+			if err != nil || probe.reads != 2 {
+				t.Fatal("first ordinary observation", err, probe.reads)
+			}
+			if _, err := ledger.ObserveDownload(ctx, second.ID, first, nil); err != nil {
+				t.Fatal("positive current SQL control", err)
+			}
+			reservation.Authority = first
+			if got, err := ledger.ReserveDownload(ctx, reservation); err != nil || got.ID != second.ID {
+				t.Fatal("positive same-key SQL control", err)
+			}
+			fence, err := scenario.p.BeginPermissions(ctx, scenario.batch.RootID, scenario.batch.Epoch, scenario.batch.TrustDigest)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := scenario.p.SuspendPermissions(ctx, fence); err != nil {
+				t.Fatal(err)
+			}
+			// Cadence does not impose a delayed revocation policy: the ordinary
+			// decision remains inside 30s while both existing SQL fences deny now.
+			retained, err := owned.CheckDownloadCurrent(ctx, actor, scope)
+			if err != nil || probe.reads != 2 || !retained.Valid(time.Now()) {
+				t.Fatal("response reconstructed before its cadence", err, probe.reads)
+			}
+			if _, err := ledger.ObserveDownload(ctx, second.ID, retained, nil); err == nil {
+				t.Fatal("current SQL read ignored suspension")
+			}
+			reservation.Authority = retained
+			if _, err := ledger.ReserveDownload(ctx, reservation); err == nil {
+				t.Fatal("current SQL transaction ignored suspension")
+			}
+			if !retained.Valid(time.Now()) {
+				t.Fatal("SQL refusal could be explained by ordinary short expiry")
+			}
+		})
 	})
 }

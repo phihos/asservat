@@ -151,3 +151,16 @@ one full worker authorization, bounded local checks, fresh authorization on a ne
 operation, and unchanged cancellation/expiry and SQL revocation enforcement.
 Preserve the failed combined run and the earlier repeated-check counts as evidence.
 Actual commands and results belong in [implementation progress](../implementation-progress.md).
+
+## Response-owned ordinary entitlement refinement (2026-10-23)
+
+[ADR-220](220-response-owned-download-permissions.md) permits ordinary permission
+reconstruction once per original response interval of at most 30 seconds, anchored
+before I/O. It refines the earlier requirement to reconstruct that component for
+every short lease. Current identity, catalog, retention, environment and SQL
+fences remain, and every combined authority/delivery/native interval still lasts
+at most five seconds. Known SQL changes may deny earlier. New responses and
+preparation are fresh; no stored source timestamp or original deadline is renewed.
+The actual native response consumes an exact already-checked short authority
+through a private handoff. Qualification is recorded separately; this does not
+claim sustained installed transfer or a native55 preparation fix.

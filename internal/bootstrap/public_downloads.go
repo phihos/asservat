@@ -275,7 +275,13 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		Audit: a.downloadObjects(), Acknowledgements: audits,
 		Native: evidence.NativeAttachmentConfig{KeyScope: scope, Fences: native, Origins: d.shared.origins, PreparationKeys: prepKeys, WindowKeys: windowKeys, Authority: gate, Now: time.Now, NewID: ownerRandomID},
 		Now:    time.Now, NewID: ownerRandomID},
-		evidence.DownloadResponseTransfer{Objects: windows, Audit: audits}, stop)
+		evidence.DownloadResponseTransfer{Objects: windows, Audit: audits, NewResponseAuthority: func(ctx context.Context, scope artifact.DownloadScope) (evidence.CurrentDownloadAuthority, func(), error) {
+			owned, err := gate.NewDownloadResponse(ctx, scope)
+			if err != nil {
+				return nil, nil, err
+			}
+			return owned, owned.Close, nil
+		}}, stop)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}

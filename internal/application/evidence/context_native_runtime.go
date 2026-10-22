@@ -105,12 +105,29 @@ func (r *ContextNativeRuntime) CheckContextDownloadRuntime(ctx context.Context, 
 // deadline. Beginning another HTTP request is the only way to get another
 // CurrentIdentity; polling cannot turn this closure into a renewable lease.
 func (r *ContextNativeRuntime) beginRequest(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession) (*ContextNativeRuntime, context.Context, context.CancelFunc, artifact.DownloadAuthority, error) {
+	return r.beginRequestAuthority(ctx, current, session, nil)
+}
+
+// Only the response coordinator can supply this already-checked short value.
+// Direct runtime operations continue to reconstruct their complete authority.
+func (r *ContextNativeRuntime) beginResponseRequest(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, a artifact.DownloadAuthority) (*ContextNativeRuntime, context.Context, context.CancelFunc, artifact.DownloadAuthority, error) {
+	return r.beginRequestAuthority(ctx, current, session, &a)
+}
+
+func (r *ContextNativeRuntime) beginRequestAuthority(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, observed *artifact.DownloadAuthority) (*ContextNativeRuntime, context.Context, context.CancelFunc, artifact.DownloadAuthority, error) {
 	var zero artifact.DownloadAuthority
 	if r == nil || ctx == nil || ctx.Err() != nil || current == nil || !session.Valid() || session.StopProtocol != artifact.DownloadStopProtocol || session.State.Terminal() {
 		return nil, nil, nil, zero, artifact.ErrDownloadUnavailable
 	}
 	call, end := context.WithDeadline(ctx, session.Deadline)
-	check, initial, e := newWorkerCurrentObservation(call, current, r.config.Authority, session.Scope, r.config.Now)
+	var check *workerCurrentCheck
+	var initial artifact.DownloadAuthority
+	var e error
+	if observed == nil {
+		check, initial, e = newWorkerCurrentObservation(call, current, r.config.Authority, session.Scope, r.config.Now)
+	} else {
+		check, initial, e = newWorkerResponseObservation(call, current, *observed, session.Scope, r.config.Now)
+	}
 	if e != nil {
 		end()
 		return nil, nil, nil, zero, e
@@ -395,9 +412,12 @@ func (r *ContextNativeRuntime) ReadPreparedContextDownload(ctx context.Context, 
 // it again. SQL and the original operation's local deadline/cancellation checks
 // also run on warm hits and after waiting for another caller's joined load.
 func (r *ContextNativeRuntime) prepared(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, pin bool) (artifact.PreparedDownload, contextNativeMetadataKey, func(), error) {
+	return r.preparedAuthority(ctx, current, session, pin, nil)
+}
+func (r *ContextNativeRuntime) preparedAuthority(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, pin bool, handoff *artifact.DownloadAuthority) (artifact.PreparedDownload, contextNativeMetadataKey, func(), error) {
 	var zero artifact.PreparedDownload
 	var key contextNativeMetadataKey
-	bound, call, end, initial, e := r.beginRequest(ctx, current, session)
+	bound, call, end, initial, e := r.beginRequestAuthority(ctx, current, session, handoff)
 	if e != nil {
 		return zero, key, nil, e
 	}

@@ -1,5 +1,13 @@
 # Decision records
 
+[ADR-220 — Response-owned ordinary download permissions](220-response-owned-download-permissions.md)
+selects a fixed 30-second reconstruction cadence within one original response and
+removes duplicate native-reader authorization through an exact short handoff.
+Identity, delivery/native bounds and current SQL permission/safety fences remain;
+known changes may deny earlier. Component race checks and independent source
+review pass; real SQL suspension and installed streaming qualification remain
+pending.
+
 [ADR-218 — Consume download preflight observations at their phase](218-consumed-download-preflight.md)
 consumes readiness at its check and plan freshness through acknowledged session
 reservation. Original request/authority and session limits remain, with current

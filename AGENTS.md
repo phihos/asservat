@@ -72,6 +72,15 @@ authorized. Understand why existing mechanisms exist before removing them.
 
 ## Implementation notes
 
+ADR-220 gives each original content response one ordinary-entitlement observation
+with a 30-second reconstruction cutoff anchored before its first read. Keep new
+identity/safety facts and every effect/native lease within their original five
+seconds; unchanged SQL permission fences may deny earlier. Changed claims require
+fresh eligibility before catalog access; failed refresh closes the response owner.
+The private native response handoff consumes the exact checked short authority.
+Read docs/decisions/220-response-owned-download-permissions.md; no raw/share grant,
+new GET, preparation or other response inherits this observation.
+
 ADR-218 consumes download readiness at its check and plan freshness through
 acknowledged session reservation. Their expiry after consumption does not shorten
 later effects. Preserve original request/authority and hard session/access/backing

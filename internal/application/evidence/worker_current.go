@@ -64,6 +64,39 @@ func newWorkerCurrentObservation(ctx context.Context, source identities.CurrentI
 	}
 	return c, a, nil
 }
+
+// The response has already reconstructed its complete short authority from its
+// owned ordinary observation and current safety facts. Bind that exact value to
+// the same current identity batch, keeping its original CheckedAt/ValidUntil.
+// This private handoff never creates another response or a renewable authority.
+func newWorkerResponseObservation(ctx context.Context, source identities.CurrentIdentity, a artifact.DownloadAuthority, scope artifact.DownloadScope, now func() time.Time) (*workerCurrentCheck, artifact.DownloadAuthority, error) {
+	var zero artifact.DownloadAuthority
+	if ctx == nil || ctx.Err() != nil || source == nil || !scope.Valid() || now == nil {
+		return nil, zero, artifact.ErrInvalid
+	}
+	started := now()
+	if !a.Valid(started) || !a.Environment.Valid(started) || !a.Retention.Valid(started) || a.Scope != scope {
+		return nil, zero, artifact.ErrDownloadUnavailable
+	}
+	until := identity.Earlier(started.Add(artifact.DownloadLease), a.ValidUntil)
+	if deadline, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, deadline)
+	}
+	call, cancel := context.WithDeadline(ctx, until)
+	i, err := source.ResolveIdentity(call)
+	callErr := call.Err()
+	cancel()
+	if err != nil || callErr != nil || ctx.Err() != nil || now().Before(started) || !i.Valid(now()) || i.Principal != scope.Principal || i.Policy != a.IdentityRevision || !slices.Contains(i.Scopes, "evidence:read") || !slices.Contains(i.Scopes, "evidence:download") {
+		return nil, zero, artifact.ErrDownloadUnavailable
+	}
+	c := &workerCurrentCheck{owner: ctx, observation: a, scope: scope, started: started, until: identity.Earlier(until, i.ValidUntil), now: now}
+	a, err = c.Check(ctx)
+	if err != nil {
+		return nil, zero, err
+	}
+	return c, a, nil
+}
+
 func (c *workerCurrentCheck) Deadline() time.Time {
 	c.mu.Lock()
 	defer c.mu.Unlock()

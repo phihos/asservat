@@ -26,6 +26,20 @@ remain independently enforced and may deny earlier. This observation bound does
 not extend a request or transfer deadline and does not apply to privacy-operator
 changes. The entire combined authorization decision is not reusable for 60 seconds.
 
+[ADR-220](../docs/decisions/220-response-owned-download-permissions.md) permits one
+original content response to retain its successful ordinary-entitlement decision
+for at most 30 seconds from reconstruction start, recorded before I/O. It MUST
+reconstruct at that cutoff, before output, and MUST discard the observation on
+close or failed refresh/safety check. New GETs and preparation operations are
+fresh. Current principal/client, identity, artifact/version/audience, retention,
+recovery and processing checks remain; changed identity claims require fresh
+scope eligibility before catalog lookup. Source freshness timestamps are never
+rewritten. Each combined authority and native/delivery lease stays at most five
+seconds and within every original caller/session/access bound. Current SQL
+permission fences remain and MAY deny earlier; this is not a promised 30-second
+revocation delay. The native response MAY consume the coordinator's exact checked
+short authority through a private handoff instead of reconstructing it again.
+
 A finite worker preparation/enrollment operation may reuse its initial combined
 authorization until the earliest original request, identity, evidence and proof
 deadline, capped at five seconds. Each subsequent helper checks that retained

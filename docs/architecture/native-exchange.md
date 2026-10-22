@@ -2,7 +2,15 @@
 
 C-14 uses `asservat-context-native/v1` on I-13 for the existing verified pod-status artifact. The acquisition worker opens an outbound HTTP/2, TLS 1.3 conversation to its installation-selected connector. The connector independently resolves the existing SQL45 operation and exact hub Pod/process. It forwards to that process only after current route, certificate and registry checks. An incoming Hello never creates work or chooses a different owner.
 
-The first mechanism handles the existing native context limit of 4096 bytes. SQL42's response/window accounting supports larger artifacts, but this reader and wire composition do not qualify a large artifact decoder or large-file throughput. One native payload per hop is outstanding, with a separately bounded next-phase control input to observe owner closure; the 1 MiB data limit is a ceiling, not a minimum. A five-second current lease bounds each admitted conversation. Actual sink backpressure can exhaust that lease; automatic pipelining and adaptive large-file behavior remain unqualified.
+The first mechanism handles the existing native context limit of 4096 bytes. SQL42's response/window accounting supports larger artifacts, but this reader and wire composition do not qualify a large artifact decoder or large-file throughput. One native payload per hop is outstanding, with a separately bounded next-phase control input to observe owner closure; the 1 MiB data limit is a ceiling, not a minimum. A five-second current lease bounds each admitted conversation.
+[ADR-220](../decisions/220-response-owned-download-permissions.md) lets the actual
+context response consume the response coordinator's exact already-checked short
+authority and current identity batch through package-private methods. Original
+`CheckedAt`/`ValidUntil`, exact scope and caller/session bounds survive; current
+attachment/source/SQL/key checks still run. Direct current-reader calls and
+independent runtime operations retain their own complete authorization. The
+response's separate ordinary-permission cadence neither changes this wire nor
+extends an admitted conversation. Actual sink backpressure can exhaust that lease; automatic pipelining and adaptive large-file behavior remain unqualified.
 
 ## Command size and memory planning
 

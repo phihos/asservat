@@ -1,0 +1,176 @@
+{
+  "baseCommit": "98f7e181bca3d075c3b42adefc604a993f22e1ac",
+  "scope": "ADR220 response-owned ordinary permission reconstruction and private exact short native-response authority handoff",
+  "status": "component-qualified; real SQL suspension assertion compiled but unrun; installed and sustained transfer unqualified",
+  "commands": {
+    "red": {
+      "label": "red",
+      "cwd": "/home/phil/Projekte/asservat-download-permission-c62e02ac",
+      "head": "98f7e181bca3d075c3b42adefc604a993f22e1ac",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^(TestDownloadResponse|TestResponseTransferOneAuthorityOwner|TestContextNativeResponseChecked)",
+        "./internal/application/authorization",
+        "./internal/application/evidence"
+      ],
+      "environment": {
+        "GOMAXPROCS": "2",
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "startedUTC": "2026-10-22T23:08:50.524364+00:00",
+      "exitCode": 1,
+      "elapsedSeconds": 4.672264,
+      "sourceCount": 2610,
+      "changedSources": []
+    },
+    "green-first": {
+      "label": "green-first",
+      "cwd": "/home/phil/Projekte/asservat-download-permission-c62e02ac",
+      "head": "98f7e181bca3d075c3b42adefc604a993f22e1ac",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^(TestDownloadResponse|TestResponseTransferOneAuthorityOwner|TestContextNativeResponseChecked)",
+        "./internal/application/authorization",
+        "./internal/application/evidence"
+      ],
+      "environment": {
+        "GOMAXPROCS": "2",
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "startedUTC": "2026-10-22T23:09:18.814150+00:00",
+      "exitCode": 1,
+      "elapsedSeconds": 2.35307,
+      "sourceCount": 2610,
+      "changedSources": []
+    },
+    "green-focused": {
+      "label": "green-focused",
+      "cwd": "/home/phil/Projekte/asservat-download-permission-c62e02ac",
+      "head": "98f7e181bca3d075c3b42adefc604a993f22e1ac",
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^(TestDownloadResponse|TestResponseTransferOneAuthorityOwner|TestContextNativeResponseChecked)",
+        "./internal/application/authorization",
+        "./internal/application/evidence"
+      ],
+      "environment": {
+        "GOMAXPROCS": "2",
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "startedUTC": "2026-10-22T23:10:31.089560+00:00",
+      "exitCode": 0,
+      "elapsedSeconds": 1.979412,
+      "sourceCount": 2610,
+      "changedSources": []
+    },
+    "green-race": {
+      "label": "green-race",
+      "cwd": "/home/phil/Projekte/asservat-download-permission-c62e02ac",
+      "head": "98f7e181bca3d075c3b42adefc604a993f22e1ac",
+      "argv": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "./internal/application/authorization",
+        "./internal/application/evidence"
+      ],
+      "environment": {
+        "GOMAXPROCS": "2",
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "startedUTC": "2026-10-22T23:10:57.556147+00:00",
+      "exitCode": 0,
+      "elapsedSeconds": 14.911272,
+      "sourceCount": 2610,
+      "changedSources": []
+    },
+    "green-integration-compile": {
+      "label": "green-integration-compile",
+      "cwd": "/home/phil/Projekte/asservat-download-permission-c62e02ac",
+      "head": "98f7e181bca3d075c3b42adefc604a993f22e1ac",
+      "argv": [
+        "go",
+        "test",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "environment": {
+        "GOMAXPROCS": "2",
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "startedUTC": "2026-10-22T23:11:30.222591+00:00",
+      "exitCode": 0,
+      "elapsedSeconds": 30.248751,
+      "sourceCount": 2610,
+      "changedSources": []
+    }
+  },
+  "terminalToolEvidence": {
+    "red": {
+      "session": 87451,
+      "chunk": "d509f0",
+      "exitCode": 1
+    },
+    "green-first": {
+      "session": 95710,
+      "chunk": "096dc3",
+      "exitCode": 1
+    },
+    "green-focused": {
+      "session": 23098,
+      "chunk": "3f8cae",
+      "exitCode": 0
+    },
+    "green-race": {
+      "session": 52351,
+      "chunk": "c77390",
+      "exitCode": 0
+    },
+    "green-integration-compile": {
+      "session": 88268,
+      "chunk": "f9a31d",
+      "exitCode": 0
+    }
+  },
+  "qualificationLimits": [
+    "Permission cadence uses actual C03 authorizer and counted permission port calls with simulated time, synthetic identity/catalog/retention/environment inputs.",
+    "Native C14 tests use warm synthetic verified metadata and attachment ports; the chunk negative stops at current SQL selection without reading bytes.",
+    "Real PostgreSQL suspension assertion in existing download-response-window-accounting is compiled only; no external fixture was run.",
+    "No installed availability, native56/native55 cause, large-file throughput or complete lifecycle claim.",
+    "Combined repository specification/architecture gates remain pending integration."
+  ],
+  "firstGreenFailure": "One test shortened a session after its long worker/session metadata key was primed. Existing immutable-key validation correctly refused. Final test creates a consistently short original worker/session and primes its exact metadata key; positive cutoff assertions unchanged.",
+  "review": {
+    "agent": "review_pr41",
+    "verdict": "no blockers",
+    "kind": "independent read-only source and command/hash receipt review; no duplicate execution"
+  },
+  "snapshotVerification": {
+    "redFiles": 11,
+    "initialGreenFiles": 11,
+    "finalFiles": 11,
+    "exactMatchesToCommandManifests": true
+  },
+  "externalResourcesCreated": false
+}
