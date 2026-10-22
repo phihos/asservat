@@ -1,0 +1,14 @@
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-helm.py
+Helm schema/render/package checks passed: 3 foundation modes, 6 canonical CRDs, fixed bootstrap hook/compartments/revisions, the regional installer hook, invalid values and unavailable runtime rejected.
+v4.3.0+gbec5b06
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/test-helm.py
+Helm lifecycle passed: hub
+Helm lifecycle passed: cluster
+Helm lifecycle passed: combined
+Helm foundation integration exit: 0

@@ -1,0 +1,12 @@
+{
+  "README.md": "c20b6d62d6d3ee9ef7dbc3c9c610233aaab983b14872b10f79ff1378c369851b",
+  "command.json": "9dcab36ce026174419556788c88a69819a523f5e838493d233e136431c390159",
+  "exact-network-readback.json": "0d648698f0f9aeca7948aeb16fcd0b3f77542ce77e22ceb5e630c08724139499",
+  "fleet-environment.json": "ee590f0c4c811d3769afae21939955f228f090c812835c043eda6a3469513f72",
+  "fleet.log": "720728fab4b39f5702dc1de1a3a5266b5f30d74fb3409f29e6664a9de8115b6b",
+  "owned-resource-checks.json": "f5afb6bebcdec070f84169b4503ee918bbcfd85bfe0a680576ea2deb92992233",
+  "result.json": "fa3a6cbf4f120bb4ce2aee6c0b001ea325986fe26bdae2b903f73e8cd60e67c1",
+  "source-after.json": "048b3bc6f0fc172b20b1cb256ecbda91e58c02f63da146175f2b46e1a7a65c33",
+  "source-before.json": "048b3bc6f0fc172b20b1cb256ecbda91e58c02f63da146175f2b46e1a7a65c33",
+  "stdout.log": "e01e12c9f69bb1fc92f1b42fc29a0c1bd60bd7001d142e60f6cc6cd3e075b883"
+}

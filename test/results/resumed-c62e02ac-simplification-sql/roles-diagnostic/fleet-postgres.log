@@ -1,0 +1,146 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-22 20:07:38.791 UTC [37] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-22 20:07:38.791 UTC [37] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-22 20:07:38.801 UTC [43] LOG:  database system was shut down at 2026-10-22 20:07:38 UTC
+2026-10-22 20:07:38.834 UTC [37] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-22 20:07:38.989 UTC [37] LOG:  received fast shutdown request
+.2026-10-22 20:07:38.991 UTC [37] LOG:  aborting any active transactions
+2026-10-22 20:07:38.992 UTC [37] LOG:  background worker "logical replication launcher" (PID 46) exited with exit code 1
+2026-10-22 20:07:38.992 UTC [41] LOG:  shutting down
+2026-10-22 20:07:38.996 UTC [41] LOG:  checkpoint starting: shutdown immediate
+.2026-10-22 20:07:40.255 UTC [41] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.036 s, sync=1.156 s, total=1.263 s; sync files=303, longest=0.024 s, average=0.004 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-22 20:07:40.297 UTC [37] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-22 20:07:40.424 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-22 20:07:40.425 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-22 20:07:40.425 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-22 20:07:40.432 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-22 20:07:40.448 UTC [94] LOG:  database system was shut down at 2026-10-22 20:07:40 UTC
+2026-10-22 20:07:40.457 UTC [1] LOG:  database system is ready to accept connections
+2026-10-22 20:07:40.600 UTC [104] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-22 20:07:40.600 UTC [104] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-22 20:08:06.525 UTC [124] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:08:06.525 UTC [124] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-22 20:08:06.526 UTC [124] ERROR:  cannot update view "fleet_current_trust"
+2026-10-22 20:08:06.526 UTC [124] DETAIL:  Views containing WITH are not automatically updatable.
+2026-10-22 20:08:06.526 UTC [124] HINT:  To enable updating the view, provide an INSTEAD OF UPDATE trigger or an unconditional ON UPDATE DO INSTEAD rule.
+2026-10-22 20:08:06.526 UTC [124] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1
+2026-10-22 20:08:06.573 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_00" by role "postgres"
+2026-10-22 20:08:06.635 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_01" by role "postgres"
+2026-10-22 20:08:06.684 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_02" by role "postgres"
+2026-10-22 20:08:06.737 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_03" by role "postgres"
+2026-10-22 20:08:06.800 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_04" by role "postgres"
+2026-10-22 20:08:06.857 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_05" by role "postgres"
+2026-10-22 20:08:06.907 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_06" by role "postgres"
+2026-10-22 20:08:06.959 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_93" by role "postgres"
+2026-10-22 20:08:07.007 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_16" by role "postgres"
+2026-10-22 20:08:07.059 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_17" by role "postgres"
+2026-10-22 20:08:07.109 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_19" by role "postgres"
+2026-10-22 20:08:07.159 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_20" by role "postgres"
+2026-10-22 20:08:07.212 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_30" by role "postgres"
+2026-10-22 20:08:07.262 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_31" by role "postgres"
+2026-10-22 20:08:07.314 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_32" by role "postgres"
+2026-10-22 20:08:07.365 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_33" by role "postgres"
+2026-10-22 20:08:07.415 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_34" by role "postgres"
+2026-10-22 20:08:07.472 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_40" by role "postgres"
+2026-10-22 20:08:07.523 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_41" by role "postgres"
+2026-10-22 20:08:07.571 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_42" by role "postgres"
+2026-10-22 20:08:07.623 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_46" by role "postgres"
+2026-10-22 20:08:07.677 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_47" by role "postgres"
+2026-10-22 20:08:07.732 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_21" by role "postgres"
+2026-10-22 20:08:07.791 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_22" by role "postgres"
+2026-10-22 20:08:07.846 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_23" by role "postgres"
+2026-10-22 20:08:07.904 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_28" by role "postgres"
+2026-10-22 20:08:07.963 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_29" by role "postgres"
+2026-10-22 20:08:08.026 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_35" by role "postgres"
+2026-10-22 20:08:08.088 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_36" by role "postgres"
+2026-10-22 20:08:08.140 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_37" by role "postgres"
+2026-10-22 20:08:08.195 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_38" by role "postgres"
+2026-10-22 20:08:08.248 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_39" by role "postgres"
+2026-10-22 20:08:08.302 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_57" by role "postgres"
+2026-10-22 20:08:08.358 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_58" by role "postgres"
+2026-10-22 20:08:08.417 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_59" by role "postgres"
+2026-10-22 20:08:08.474 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_60" by role "postgres"
+2026-10-22 20:08:08.530 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_61" by role "postgres"
+2026-10-22 20:08:08.582 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_62" by role "postgres"
+2026-10-22 20:08:08.634 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_63" by role "postgres"
+2026-10-22 20:08:08.688 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_64" by role "postgres"
+2026-10-22 20:08:08.739 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_74" by role "postgres"
+2026-10-22 20:08:08.792 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_75" by role "postgres"
+2026-10-22 20:08:08.845 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_76" by role "postgres"
+2026-10-22 20:08:08.898 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_77" by role "postgres"
+2026-10-22 20:08:08.951 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_85" by role "postgres"
+2026-10-22 20:08:09.005 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_92" by role "postgres"
+2026-10-22 20:08:09.060 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_43" by role "postgres"
+2026-10-22 20:08:09.114 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_44" by role "postgres"
+2026-10-22 20:08:09.168 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_45" by role "postgres"
+2026-10-22 20:08:09.220 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_48" by role "postgres"
+2026-10-22 20:08:09.276 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_49" by role "postgres"
+2026-10-22 20:08:09.331 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_50" by role "postgres"
+2026-10-22 20:08:09.386 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_51" by role "postgres"
+2026-10-22 20:08:09.440 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_52" by role "postgres"
+2026-10-22 20:08:09.495 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_56" by role "postgres"
+2026-10-22 20:08:09.549 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_24" by role "postgres"
+2026-10-22 20:08:09.608 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_25" by role "postgres"
+2026-10-22 20:08:09.664 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_26" by role "postgres"
+2026-10-22 20:08:09.718 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_27" by role "postgres"
+2026-10-22 20:08:09.771 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_65" by role "postgres"
+2026-10-22 20:08:09.826 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_66" by role "postgres"
+2026-10-22 20:08:09.883 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_53" by role "postgres"
+2026-10-22 20:08:09.940 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_54" by role "postgres"
+2026-10-22 20:08:09.998 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_55" by role "postgres"
+2026-10-22 20:08:10.056 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_70" by role "postgres"
+2026-10-22 20:08:10.112 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_71" by role "postgres"
+2026-10-22 20:08:10.171 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_72" by role "postgres"
+2026-10-22 20:08:10.227 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_73" by role "postgres"
+2026-10-22 20:08:10.283 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_78" by role "postgres"
+2026-10-22 20:08:10.338 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_79" by role "postgres"
+2026-10-22 20:08:10.395 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_80" by role "postgres"
+2026-10-22 20:08:10.450 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_81" by role "postgres"
+2026-10-22 20:08:10.507 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_86" by role "postgres"
+2026-10-22 20:08:10.565 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_87" by role "postgres"
+2026-10-22 20:08:10.664 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_89" by role "postgres"
+2026-10-22 20:08:10.724 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_90" by role "postgres"
+2026-10-22 20:08:10.783 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_91" by role "postgres"
+2026-10-22 20:08:10.840 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_82" by role "postgres"
+2026-10-22 20:08:10.900 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_83" by role "postgres"
+2026-10-22 20:08:10.958 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_84" by role "postgres"
+2026-10-22 20:08:11.019 UTC [125] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_88" by role "postgres"

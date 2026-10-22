@@ -1,0 +1,22 @@
+=== RUN   TestInitialInstallationWithRealServices
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-matrix
+    initial_installation_test.go:558: provision/reconcile fixed roles provisioning stopped at verify
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-unknown-claim
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-preview-generated-role-effects
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-resolution-generated-role-effects
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-held-lock
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-recovery-after-lock
+=== NAME  TestInitialInstallationWithRealServices
+    initial_installation_test.go:631: real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified
+--- FAIL: TestInitialInstallationWithRealServices (19.44s)
+    --- FAIL: TestInitialInstallationWithRealServices/public-runtime-roles-matrix (6.11s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-unknown-claim (0.16s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion (12.70s)
+        --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-preview-generated-role-effects (0.08s)
+        --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-resolution-generated-role-effects (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-held-lock (0.26s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-recovery-after-lock (0.14s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	19.506s
+FAIL

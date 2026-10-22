@@ -1,0 +1,12 @@
+{
+  "README.md": "569c189b3b4db7ba6daab3a2f13a80abbd03c959b4c9d580ea591916bf627015",
+  "command.json": "2163fa926c0cf4285e2e6f2479aa9d440abce8161683975d0618bd64248dff8e",
+  "fleet-environment.json": "4d0e030604d37c2085c3b875d1d542f6d493d031d796fc22d70f40786e39f386",
+  "fleet-postgres.log": "d59ebeaa28349f51096cc8d42053fc1692b3bd79508d7f3f2c447011763ad4f6",
+  "fleet.log": "0f8d93ba2fce3216da65e9f84ef265f1b48dd7a8fd676d22e7f2f0928860840b",
+  "owned-resource-checks.json": "c35bf8ce53756d0b152564bcf90ed9a97f93b2e4ac69d0d0ea7fd7bfdc38e6f5",
+  "result.json": "fa7cec7f46ab6804bc4da17edce8507745397123dad634022494b025310dc1be",
+  "source-after.json": "afa8feff601736e82aa673215911f58e04aa08b61d65dce92f765472064ac19e",
+  "source-before.json": "afa8feff601736e82aa673215911f58e04aa08b61d65dce92f765472064ac19e",
+  "stdout.log": "e8afb77e20348951d8625589299199388a83b936c68064e90339ae1d97d495ff"
+}

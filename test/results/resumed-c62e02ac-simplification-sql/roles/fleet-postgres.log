@@ -1,0 +1,1216 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-22 20:02:14.333 UTC [37] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-22 20:02:14.333 UTC [37] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-22 20:02:14.345 UTC [43] LOG:  database system was shut down at 2026-10-22 20:02:14 UTC
+2026-10-22 20:02:14.355 UTC [37] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-22 20:02:14.556 UTC [37] LOG:  received fast shutdown request
+.2026-10-22 20:02:14.559 UTC [37] LOG:  aborting any active transactions
+2026-10-22 20:02:14.560 UTC [37] LOG:  background worker "logical replication launcher" (PID 46) exited with exit code 1
+2026-10-22 20:02:14.560 UTC [41] LOG:  shutting down
+2026-10-22 20:02:14.564 UTC [41] LOG:  checkpoint starting: shutdown immediate
+2026-10-22 20:02:15.456 UTC [41] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.033 s, sync=0.837 s, total=0.896 s; sync files=303, longest=0.007 s, average=0.003 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-22 20:02:15.470 UTC [37] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-22 20:02:15.578 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-22 20:02:15.579 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-22 20:02:15.579 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-22 20:02:15.581 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-22 20:02:15.589 UTC [95] LOG:  database system was shut down at 2026-10-22 20:02:15 UTC
+2026-10-22 20:02:15.594 UTC [1] LOG:  database system is ready to accept connections
+2026-10-22 20:02:15.624 UTC [100] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-22 20:02:15.624 UTC [100] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-22 20:02:20.210 UTC [121] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:20.210 UTC [121] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-22 20:02:20.211 UTC [121] ERROR:  cannot update view "fleet_current_trust"
+2026-10-22 20:02:20.211 UTC [121] DETAIL:  Views containing WITH are not automatically updatable.
+2026-10-22 20:02:20.211 UTC [121] HINT:  To enable updating the view, provide an INSTEAD OF UPDATE trigger or an unconditional ON UPDATE DO INSTEAD rule.
+2026-10-22 20:02:20.211 UTC [121] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1
+2026-10-22 20:02:20.257 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_00" by role "postgres"
+2026-10-22 20:02:20.312 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_01" by role "postgres"
+2026-10-22 20:02:20.361 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_02" by role "postgres"
+2026-10-22 20:02:20.409 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_03" by role "postgres"
+2026-10-22 20:02:20.463 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_04" by role "postgres"
+2026-10-22 20:02:20.516 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_05" by role "postgres"
+2026-10-22 20:02:20.566 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_06" by role "postgres"
+2026-10-22 20:02:20.617 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_93" by role "postgres"
+2026-10-22 20:02:20.665 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_16" by role "postgres"
+2026-10-22 20:02:20.715 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_17" by role "postgres"
+2026-10-22 20:02:20.763 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_19" by role "postgres"
+2026-10-22 20:02:20.812 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_20" by role "postgres"
+2026-10-22 20:02:20.862 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_30" by role "postgres"
+2026-10-22 20:02:20.910 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_31" by role "postgres"
+2026-10-22 20:02:20.960 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_32" by role "postgres"
+2026-10-22 20:02:21.010 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_33" by role "postgres"
+2026-10-22 20:02:21.058 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_34" by role "postgres"
+2026-10-22 20:02:21.112 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_40" by role "postgres"
+2026-10-22 20:02:21.161 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_41" by role "postgres"
+2026-10-22 20:02:21.213 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_42" by role "postgres"
+2026-10-22 20:02:21.263 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_46" by role "postgres"
+2026-10-22 20:02:21.314 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_47" by role "postgres"
+2026-10-22 20:02:21.367 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_21" by role "postgres"
+2026-10-22 20:02:21.420 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_22" by role "postgres"
+2026-10-22 20:02:21.474 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_23" by role "postgres"
+2026-10-22 20:02:21.531 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_28" by role "postgres"
+2026-10-22 20:02:21.583 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_29" by role "postgres"
+2026-10-22 20:02:21.637 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_35" by role "postgres"
+2026-10-22 20:02:21.688 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_36" by role "postgres"
+2026-10-22 20:02:21.739 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_37" by role "postgres"
+2026-10-22 20:02:21.793 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_38" by role "postgres"
+2026-10-22 20:02:21.844 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_39" by role "postgres"
+2026-10-22 20:02:21.898 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_57" by role "postgres"
+2026-10-22 20:02:21.954 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_58" by role "postgres"
+2026-10-22 20:02:22.010 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_59" by role "postgres"
+2026-10-22 20:02:22.065 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_60" by role "postgres"
+2026-10-22 20:02:22.121 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_61" by role "postgres"
+2026-10-22 20:02:22.173 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_62" by role "postgres"
+2026-10-22 20:02:22.225 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_63" by role "postgres"
+2026-10-22 20:02:22.279 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_64" by role "postgres"
+2026-10-22 20:02:22.330 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_74" by role "postgres"
+2026-10-22 20:02:22.383 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_75" by role "postgres"
+2026-10-22 20:02:22.435 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_76" by role "postgres"
+2026-10-22 20:02:22.487 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_77" by role "postgres"
+2026-10-22 20:02:22.538 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_85" by role "postgres"
+2026-10-22 20:02:22.593 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_92" by role "postgres"
+2026-10-22 20:02:22.648 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_43" by role "postgres"
+2026-10-22 20:02:22.704 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_44" by role "postgres"
+2026-10-22 20:02:22.758 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_45" by role "postgres"
+2026-10-22 20:02:22.811 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_48" by role "postgres"
+2026-10-22 20:02:22.866 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_49" by role "postgres"
+2026-10-22 20:02:22.920 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_50" by role "postgres"
+2026-10-22 20:02:22.973 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_51" by role "postgres"
+2026-10-22 20:02:23.028 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_52" by role "postgres"
+2026-10-22 20:02:23.082 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_56" by role "postgres"
+2026-10-22 20:02:23.136 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_24" by role "postgres"
+2026-10-22 20:02:23.194 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_25" by role "postgres"
+2026-10-22 20:02:23.249 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_26" by role "postgres"
+2026-10-22 20:02:23.302 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_27" by role "postgres"
+2026-10-22 20:02:23.354 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_65" by role "postgres"
+2026-10-22 20:02:23.409 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_66" by role "postgres"
+2026-10-22 20:02:23.466 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_53" by role "postgres"
+2026-10-22 20:02:23.523 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_54" by role "postgres"
+2026-10-22 20:02:23.581 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_55" by role "postgres"
+2026-10-22 20:02:23.638 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_70" by role "postgres"
+2026-10-22 20:02:23.693 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_71" by role "postgres"
+2026-10-22 20:02:23.751 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_72" by role "postgres"
+2026-10-22 20:02:23.806 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_73" by role "postgres"
+2026-10-22 20:02:23.863 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_78" by role "postgres"
+2026-10-22 20:02:23.917 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_79" by role "postgres"
+2026-10-22 20:02:23.976 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_80" by role "postgres"
+2026-10-22 20:02:24.030 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_81" by role "postgres"
+2026-10-22 20:02:24.086 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_86" by role "postgres"
+2026-10-22 20:02:24.141 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_87" by role "postgres"
+2026-10-22 20:02:24.199 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_89" by role "postgres"
+2026-10-22 20:02:24.256 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_90" by role "postgres"
+2026-10-22 20:02:24.316 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_91" by role "postgres"
+2026-10-22 20:02:24.373 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_82" by role "postgres"
+2026-10-22 20:02:24.433 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_83" by role "postgres"
+2026-10-22 20:02:24.494 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_84" by role "postgres"
+2026-10-22 20:02:24.555 UTC [122] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_88" by role "postgres"
+2026-10-22 20:02:25.975 UTC [204] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:25.975 UTC [204] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-22 20:02:25.975 UTC [204] ERROR:  cannot update view "fleet_current_trust"
+2026-10-22 20:02:25.975 UTC [204] DETAIL:  Views containing WITH are not automatically updatable.
+2026-10-22 20:02:25.975 UTC [204] HINT:  To enable updating the view, provide an INSTEAD OF UPDATE trigger or an unconditional ON UPDATE DO INSTEAD rule.
+2026-10-22 20:02:25.975 UTC [204] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1
+2026-10-22 20:02:26.126 UTC [206] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:26.126 UTC [206] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-22 20:02:26.127 UTC [206] ERROR:  cannot update view "fleet_current_trust"
+2026-10-22 20:02:26.127 UTC [206] DETAIL:  Views containing WITH are not automatically updatable.
+2026-10-22 20:02:26.127 UTC [206] HINT:  To enable updating the view, provide an INSTEAD OF UPDATE trigger or an unconditional ON UPDATE DO INSTEAD rule.
+2026-10-22 20:02:26.127 UTC [206] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1
+2026-10-22 20:02:26.166 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_00" by role "postgres"
+2026-10-22 20:02:26.257 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_01" by role "postgres"
+2026-10-22 20:02:26.304 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_02" by role "postgres"
+2026-10-22 20:02:26.350 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_03" by role "postgres"
+2026-10-22 20:02:26.401 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_04" by role "postgres"
+2026-10-22 20:02:26.453 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_05" by role "postgres"
+2026-10-22 20:02:26.501 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_06" by role "postgres"
+2026-10-22 20:02:26.550 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_93" by role "postgres"
+2026-10-22 20:02:26.596 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_16" by role "postgres"
+2026-10-22 20:02:26.643 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_17" by role "postgres"
+2026-10-22 20:02:26.689 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_19" by role "postgres"
+2026-10-22 20:02:26.736 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_20" by role "postgres"
+2026-10-22 20:02:26.783 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_30" by role "postgres"
+2026-10-22 20:02:26.830 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_31" by role "postgres"
+2026-10-22 20:02:26.878 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_32" by role "postgres"
+2026-10-22 20:02:26.924 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_33" by role "postgres"
+2026-10-22 20:02:26.972 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_34" by role "postgres"
+2026-10-22 20:02:27.024 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_40" by role "postgres"
+2026-10-22 20:02:27.072 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_41" by role "postgres"
+2026-10-22 20:02:27.118 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_42" by role "postgres"
+2026-10-22 20:02:27.167 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_46" by role "postgres"
+2026-10-22 20:02:27.216 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_47" by role "postgres"
+2026-10-22 20:02:27.265 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_21" by role "postgres"
+2026-10-22 20:02:27.316 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_22" by role "postgres"
+2026-10-22 20:02:27.368 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_23" by role "postgres"
+2026-10-22 20:02:27.424 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_28" by role "postgres"
+2026-10-22 20:02:27.474 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_29" by role "postgres"
+2026-10-22 20:02:27.528 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_35" by role "postgres"
+2026-10-22 20:02:27.575 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_36" by role "postgres"
+2026-10-22 20:02:27.623 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_37" by role "postgres"
+2026-10-22 20:02:27.676 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_38" by role "postgres"
+2026-10-22 20:02:27.725 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_39" by role "postgres"
+2026-10-22 20:02:27.777 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_57" by role "postgres"
+2026-10-22 20:02:27.830 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_58" by role "postgres"
+2026-10-22 20:02:27.884 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_59" by role "postgres"
+2026-10-22 20:02:27.941 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_60" by role "postgres"
+2026-10-22 20:02:27.997 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_61" by role "postgres"
+2026-10-22 20:02:28.051 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_62" by role "postgres"
+2026-10-22 20:02:28.102 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_63" by role "postgres"
+2026-10-22 20:02:28.151 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_64" by role "postgres"
+2026-10-22 20:02:28.201 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_74" by role "postgres"
+2026-10-22 20:02:28.251 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_75" by role "postgres"
+2026-10-22 20:02:28.301 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_76" by role "postgres"
+2026-10-22 20:02:28.352 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_77" by role "postgres"
+2026-10-22 20:02:28.404 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_85" by role "postgres"
+2026-10-22 20:02:28.456 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_92" by role "postgres"
+2026-10-22 20:02:28.510 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_43" by role "postgres"
+2026-10-22 20:02:28.563 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_44" by role "postgres"
+2026-10-22 20:02:28.616 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_45" by role "postgres"
+2026-10-22 20:02:28.667 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_48" by role "postgres"
+2026-10-22 20:02:28.720 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_49" by role "postgres"
+2026-10-22 20:02:28.772 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_50" by role "postgres"
+2026-10-22 20:02:28.824 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_51" by role "postgres"
+2026-10-22 20:02:28.877 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_52" by role "postgres"
+2026-10-22 20:02:28.929 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_56" by role "postgres"
+2026-10-22 20:02:28.983 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_24" by role "postgres"
+2026-10-22 20:02:29.039 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_25" by role "postgres"
+2026-10-22 20:02:29.094 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_26" by role "postgres"
+2026-10-22 20:02:29.148 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_27" by role "postgres"
+2026-10-22 20:02:29.198 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_65" by role "postgres"
+2026-10-22 20:02:29.250 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_66" by role "postgres"
+2026-10-22 20:02:29.305 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_53" by role "postgres"
+2026-10-22 20:02:29.361 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_54" by role "postgres"
+2026-10-22 20:02:29.415 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_55" by role "postgres"
+2026-10-22 20:02:29.470 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_70" by role "postgres"
+2026-10-22 20:02:29.523 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_71" by role "postgres"
+2026-10-22 20:02:29.578 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_72" by role "postgres"
+2026-10-22 20:02:29.631 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_73" by role "postgres"
+2026-10-22 20:02:29.686 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_78" by role "postgres"
+2026-10-22 20:02:29.739 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_79" by role "postgres"
+2026-10-22 20:02:29.793 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_80" by role "postgres"
+2026-10-22 20:02:29.846 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_81" by role "postgres"
+2026-10-22 20:02:29.901 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_86" by role "postgres"
+2026-10-22 20:02:29.954 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_87" by role "postgres"
+2026-10-22 20:02:30.009 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_89" by role "postgres"
+2026-10-22 20:02:30.064 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_90" by role "postgres"
+2026-10-22 20:02:30.123 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_91" by role "postgres"
+2026-10-22 20:02:30.177 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_82" by role "postgres"
+2026-10-22 20:02:30.235 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_83" by role "postgres"
+2026-10-22 20:02:30.290 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_84" by role "postgres"
+2026-10-22 20:02:30.349 UTC [207] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000067_pub_88" by role "postgres"
+2026-10-22 20:02:35.023 UTC [371] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.023 UTC [371] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.023 UTC [371] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.023 UTC [371] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.023 UTC [371] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.023 UTC [371] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.080 UTC [373] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.080 UTC [373] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.081 UTC [373] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.081 UTC [373] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.081 UTC [373] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.081 UTC [373] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.135 UTC [375] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.135 UTC [375] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.135 UTC [375] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.135 UTC [375] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.135 UTC [375] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.135 UTC [375] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.190 UTC [377] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.190 UTC [377] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.190 UTC [377] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.190 UTC [377] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.191 UTC [377] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.191 UTC [377] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.246 UTC [379] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.246 UTC [379] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.247 UTC [379] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.247 UTC [379] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.247 UTC [379] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.247 UTC [379] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.301 UTC [381] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.301 UTC [381] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.301 UTC [381] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.301 UTC [381] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.302 UTC [381] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.302 UTC [381] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.357 UTC [383] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.357 UTC [383] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.357 UTC [383] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.357 UTC [383] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.357 UTC [383] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.357 UTC [383] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.411 UTC [385] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.411 UTC [385] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.411 UTC [385] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.411 UTC [385] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.412 UTC [385] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.412 UTC [385] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.466 UTC [387] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.466 UTC [387] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.466 UTC [387] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.466 UTC [387] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.466 UTC [387] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.466 UTC [387] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.521 UTC [389] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.521 UTC [389] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.521 UTC [389] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.521 UTC [389] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.521 UTC [389] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.521 UTC [389] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.578 UTC [391] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.578 UTC [391] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.579 UTC [391] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.579 UTC [391] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.579 UTC [391] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.579 UTC [391] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.636 UTC [393] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.636 UTC [393] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.636 UTC [393] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.636 UTC [393] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.636 UTC [393] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.636 UTC [393] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.691 UTC [395] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.691 UTC [395] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.691 UTC [395] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.691 UTC [395] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.691 UTC [395] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.691 UTC [395] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.746 UTC [397] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.746 UTC [397] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.747 UTC [397] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.747 UTC [397] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.747 UTC [397] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.747 UTC [397] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.802 UTC [399] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.802 UTC [399] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.802 UTC [399] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.802 UTC [399] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.802 UTC [399] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.802 UTC [399] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.856 UTC [401] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.856 UTC [401] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.856 UTC [401] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.856 UTC [401] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.856 UTC [401] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.856 UTC [401] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.911 UTC [403] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.911 UTC [403] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.911 UTC [403] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.911 UTC [403] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.911 UTC [403] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.911 UTC [403] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:35.965 UTC [405] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:35.965 UTC [405] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:35.965 UTC [405] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:35.965 UTC [405] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:35.966 UTC [405] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:35.966 UTC [405] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.020 UTC [407] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.020 UTC [407] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.021 UTC [407] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.021 UTC [407] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.021 UTC [407] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.021 UTC [407] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.076 UTC [409] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.076 UTC [409] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.076 UTC [409] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.076 UTC [409] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.077 UTC [409] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.077 UTC [409] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.133 UTC [411] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.133 UTC [411] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.134 UTC [411] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.134 UTC [411] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.134 UTC [411] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.134 UTC [411] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.146 UTC [411] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.146 UTC [411] STATEMENT:  UPDATE "public"."permission_stream" SET "epoch"="epoch" WHERE false
+2026-10-22 20:02:36.146 UTC [411] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.146 UTC [411] STATEMENT:  UPDATE "public"."permission_stream" SET "sequence"="sequence" WHERE false
+2026-10-22 20:02:36.146 UTC [411] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.146 UTC [411] STATEMENT:  UPDATE "public"."permission_stream" SET "trust_digest"="trust_digest" WHERE false
+2026-10-22 20:02:36.147 UTC [411] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.147 UTC [411] STATEMENT:  UPDATE "public"."permission_stream" SET "projection_digest"="projection_digest" WHERE false
+2026-10-22 20:02:36.147 UTC [411] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.147 UTC [411] STATEMENT:  UPDATE "public"."permission_stream" SET "lease_until"="lease_until" WHERE false
+2026-10-22 20:02:36.148 UTC [411] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.148 UTC [411] STATEMENT:  UPDATE "public"."permission_stream" SET "observed_at"="observed_at" WHERE false
+2026-10-22 20:02:36.148 UTC [411] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.148 UTC [411] STATEMENT:  UPDATE "public"."permission_stream" SET "fresh_until"="fresh_until" WHERE false
+2026-10-22 20:02:36.149 UTC [411] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.149 UTC [411] STATEMENT:  UPDATE "public"."permission_stream" SET "suspended"="suspended" WHERE false
+2026-10-22 20:02:36.149 UTC [411] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.149 UTC [411] STATEMENT:  UPDATE "public"."permission_stream" SET "initial_audit_id"="initial_audit_id" WHERE false
+2026-10-22 20:02:36.150 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.150 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "id"="id" WHERE false
+2026-10-22 20:02:36.151 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.151 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "root_id"="root_id" WHERE false
+2026-10-22 20:02:36.151 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.151 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "capture_id"="capture_id" WHERE false
+2026-10-22 20:02:36.152 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.152 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "attempt_id"="attempt_id" WHERE false
+2026-10-22 20:02:36.152 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.152 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "actor_key"="actor_key" WHERE false
+2026-10-22 20:02:36.153 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.153 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "principal_key"="principal_key" WHERE false
+2026-10-22 20:02:36.153 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.153 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "blueprint_json"="blueprint_json" WHERE false
+2026-10-22 20:02:36.153 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.153 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "blueprint_sha256"="blueprint_sha256" WHERE false
+2026-10-22 20:02:36.154 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.154 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "created_at"="created_at" WHERE false
+2026-10-22 20:02:36.154 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.154 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "deadline"="deadline" WHERE false
+2026-10-22 20:02:36.155 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.155 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "closed_at"="closed_at" WHERE false
+2026-10-22 20:02:36.155 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.155 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "closed_request_key"="closed_request_key" WHERE false
+2026-10-22 20:02:36.156 UTC [411] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.156 UTC [411] STATEMENT:  UPDATE "public"."context_preview" SET "closed_submission_digest"="closed_submission_digest" WHERE false
+2026-10-22 20:02:36.156 UTC [411] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.156 UTC [411] STATEMENT:  UPDATE "public"."context_preview_fence" SET "root_id"="root_id" WHERE false
+2026-10-22 20:02:36.157 UTC [411] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.157 UTC [411] STATEMENT:  UPDATE "public"."context_preview_fence" SET "preview_id"="preview_id" WHERE false
+2026-10-22 20:02:36.157 UTC [411] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.157 UTC [411] STATEMENT:  UPDATE "public"."context_preview_fence" SET "actor_key"="actor_key" WHERE false
+2026-10-22 20:02:36.158 UTC [411] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.158 UTC [411] STATEMENT:  UPDATE "public"."context_preview_fence" SET "principal_key"="principal_key" WHERE false
+2026-10-22 20:02:36.158 UTC [411] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.158 UTC [411] STATEMENT:  UPDATE "public"."context_preview_fence" SET "request_key"="request_key" WHERE false
+2026-10-22 20:02:36.158 UTC [411] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.158 UTC [411] STATEMENT:  UPDATE "public"."context_preview_fence" SET "submission_digest"="submission_digest" WHERE false
+2026-10-22 20:02:36.159 UTC [411] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.159 UTC [411] STATEMENT:  UPDATE "public"."context_preview_fence" SET "created_at"="created_at" WHERE false
+2026-10-22 20:02:36.159 UTC [411] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.159 UTC [411] STATEMENT:  UPDATE "public"."context_preview_fence" SET "expires_at"="expires_at" WHERE false
+2026-10-22 20:02:36.160 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.160 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "id"="id" WHERE false
+2026-10-22 20:02:36.161 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.161 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "root_id"="root_id" WHERE false
+2026-10-22 20:02:36.162 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.162 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "request_key"="request_key" WHERE false
+2026-10-22 20:02:36.162 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.162 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "submission_digest"="submission_digest" WHERE false
+2026-10-22 20:02:36.163 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.163 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "scope_digest"="scope_digest" WHERE false
+2026-10-22 20:02:36.163 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.163 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "scope_json"="scope_json" WHERE false
+2026-10-22 20:02:36.163 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.163 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "expectation_json"="expectation_json" WHERE false
+2026-10-22 20:02:36.164 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.164 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "pod_pin_json"="pod_pin_json" WHERE false
+2026-10-22 20:02:36.164 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.164 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "attempt_id"="attempt_id" WHERE false
+2026-10-22 20:02:36.165 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.165 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "permission_epoch"="permission_epoch" WHERE false
+2026-10-22 20:02:36.165 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.165 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "permission_sequence"="permission_sequence" WHERE false
+2026-10-22 20:02:36.166 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.166 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "identity_policy_uid"="identity_policy_uid" WHERE false
+2026-10-22 20:02:36.166 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.166 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "identity_policy_generation"="identity_policy_generation" WHERE false
+2026-10-22 20:02:36.167 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.167 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "identity_policy_digest"="identity_policy_digest" WHERE false
+2026-10-22 20:02:36.167 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.167 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "created_at"="created_at" WHERE false
+2026-10-22 20:02:36.168 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.168 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "deadline"="deadline" WHERE false
+2026-10-22 20:02:36.168 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.168 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "state"="state" WHERE false
+2026-10-22 20:02:36.169 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.169 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "intent_acknowledged_at"="intent_acknowledged_at" WHERE false
+2026-10-22 20:02:36.169 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.169 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "intent_digest"="intent_digest" WHERE false
+2026-10-22 20:02:36.169 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.169 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "intent_object_key"="intent_object_key" WHERE false
+2026-10-22 20:02:36.170 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.170 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "intent_object_version"="intent_object_version" WHERE false
+2026-10-22 20:02:36.170 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.170 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "intent_object_etag"="intent_object_etag" WHERE false
+2026-10-22 20:02:36.171 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.171 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "intent_object_bytes"="intent_object_bytes" WHERE false
+2026-10-22 20:02:36.171 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.171 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "intent_object_sha256"="intent_object_sha256" WHERE false
+2026-10-22 20:02:36.172 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.172 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "progress_revision"="progress_revision" WHERE false
+2026-10-22 20:02:36.172 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.172 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "deadline_observed_at"="deadline_observed_at" WHERE false
+2026-10-22 20:02:36.173 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.173 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "preview_id"="preview_id" WHERE false
+2026-10-22 20:02:36.173 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.173 UTC [411] STATEMENT:  UPDATE "public"."context_capture" SET "intent_operation_id"="intent_operation_id" WHERE false
+2026-10-22 20:02:36.174 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.174 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "id"="id" WHERE false
+2026-10-22 20:02:36.175 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.175 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "cluster_id"="cluster_id" WHERE false
+2026-10-22 20:02:36.175 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.175 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "artifact_id"="artifact_id" WHERE false
+2026-10-22 20:02:36.176 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.176 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "allocation_id"="allocation_id" WHERE false
+2026-10-22 20:02:36.176 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.176 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "request_digest"="request_digest" WHERE false
+2026-10-22 20:02:36.176 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.176 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "pool_revision"="pool_revision" WHERE false
+2026-10-22 20:02:36.177 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.177 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "allocation_revision"="allocation_revision" WHERE false
+2026-10-22 20:02:36.177 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.177 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "native_limit"="native_limit" WHERE false
+2026-10-22 20:02:36.178 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.178 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "reserved_bytes"="reserved_bytes" WHERE false
+2026-10-22 20:02:36.178 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.178 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "anchor_at"="anchor_at" WHERE false
+2026-10-22 20:02:36.179 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.179 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "write_until"="write_until" WHERE false
+2026-10-22 20:02:36.179 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.179 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "expires_at"="expires_at" WHERE false
+2026-10-22 20:02:36.180 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.180 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "delete_by"="delete_by" WHERE false
+2026-10-22 20:02:36.180 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.180 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "state"="state" WHERE false
+2026-10-22 20:02:36.181 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.181 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "copies_digest"="copies_digest" WHERE false
+2026-10-22 20:02:36.181 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.181 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "deletion_fence"="deletion_fence" WHERE false
+2026-10-22 20:02:36.182 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.182 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "lease_until"="lease_until" WHERE false
+2026-10-22 20:02:36.182 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.182 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "deleted_at"="deleted_at" WHERE false
+2026-10-22 20:02:36.182 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.182 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "effective_expires_at"="effective_expires_at" WHERE false
+2026-10-22 20:02:36.183 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.183 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "effective_delete_by"="effective_delete_by" WHERE false
+2026-10-22 20:02:36.183 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.183 UTC [411] STATEMENT:  UPDATE "public"."custody_attempt" SET "retention_sequence"="retention_sequence" WHERE false
+2026-10-22 20:02:36.184 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.184 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "id"="id" WHERE false
+2026-10-22 20:02:36.185 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.185 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "root_id"="root_id" WHERE false
+2026-10-22 20:02:36.185 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.185 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "lane"="lane" WHERE false
+2026-10-22 20:02:36.185 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.185 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "issuer_epoch"="issuer_epoch" WHERE false
+2026-10-22 20:02:36.186 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.186 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "principal_digest"="principal_digest" WHERE false
+2026-10-22 20:02:36.186 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.186 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "intent"="intent" WHERE false
+2026-10-22 20:02:36.187 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.187 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "request_until"="request_until" WHERE false
+2026-10-22 20:02:36.187 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.187 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "write_until"="write_until" WHERE false
+2026-10-22 20:02:36.188 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.188 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "retain_until"="retain_until" WHERE false
+2026-10-22 20:02:36.188 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.188 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "intent_started"="intent_started" WHERE false
+2026-10-22 20:02:36.189 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.189 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "intent_receipt"="intent_receipt" WHERE false
+2026-10-22 20:02:36.189 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.189 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "outcome"="outcome" WHERE false
+2026-10-22 20:02:36.189 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.189 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "outcome_started"="outcome_started" WHERE false
+2026-10-22 20:02:36.190 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.190 UTC [411] STATEMENT:  UPDATE "public"."operation_audit" SET "outcome_receipt"="outcome_receipt" WHERE false
+2026-10-22 20:02:36.191 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.191 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "id"="id" WHERE false
+2026-10-22 20:02:36.191 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.191 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "stream_id"="stream_id" WHERE false
+2026-10-22 20:02:36.192 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.192 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "epoch"="epoch" WHERE false
+2026-10-22 20:02:36.192 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.192 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "sequence"="sequence" WHERE false
+2026-10-22 20:02:36.193 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.193 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "event_kind"="event_kind" WHERE false
+2026-10-22 20:02:36.193 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.193 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "event_digest"="event_digest" WHERE false
+2026-10-22 20:02:36.194 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.194 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "created_at"="created_at" WHERE false
+2026-10-22 20:02:36.194 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.194 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "record"="record" WHERE false
+2026-10-22 20:02:36.195 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.195 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "acknowledged_at"="acknowledged_at" WHERE false
+2026-10-22 20:02:36.195 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.195 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "object_key"="object_key" WHERE false
+2026-10-22 20:02:36.196 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.196 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "object_version"="object_version" WHERE false
+2026-10-22 20:02:36.196 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.196 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "object_etag"="object_etag" WHERE false
+2026-10-22 20:02:36.196 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.196 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "object_bytes"="object_bytes" WHERE false
+2026-10-22 20:02:36.197 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.197 UTC [411] STATEMENT:  UPDATE "public"."authority_audit" SET "object_sha256"="object_sha256" WHERE false
+2026-10-22 20:02:36.197 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.197 UTC [411] STATEMENT:  INSERT INTO "public"."context_capture" DEFAULT VALUES
+2026-10-22 20:02:36.198 UTC [411] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.198 UTC [411] STATEMENT:  DELETE FROM "public"."context_capture" WHERE false
+2026-10-22 20:02:36.198 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.198 UTC [411] STATEMENT:  INSERT INTO "public"."custody_attempt" DEFAULT VALUES
+2026-10-22 20:02:36.199 UTC [411] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.199 UTC [411] STATEMENT:  DELETE FROM "public"."custody_attempt" WHERE false
+2026-10-22 20:02:36.199 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.199 UTC [411] STATEMENT:  INSERT INTO "public"."operation_audit" DEFAULT VALUES
+2026-10-22 20:02:36.199 UTC [411] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.199 UTC [411] STATEMENT:  DELETE FROM "public"."operation_audit" WHERE false
+2026-10-22 20:02:36.200 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.200 UTC [411] STATEMENT:  INSERT INTO "public"."authority_audit" DEFAULT VALUES
+2026-10-22 20:02:36.200 UTC [411] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.200 UTC [411] STATEMENT:  DELETE FROM "public"."authority_audit" WHERE false
+2026-10-22 20:02:36.202 UTC [411] ERROR:  context preview is not expired
+2026-10-22 20:02:36.202 UTC [411] CONTEXT:  PL/pgSQL function public.context_preview_immutable() line 21 at RAISE
+2026-10-22 20:02:36.202 UTC [411] STATEMENT:  DELETE FROM public.context_preview WHERE id=$1
+2026-10-22 20:02:36.203 UTC [411] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.203 UTC [411] STATEMENT:  INSERT INTO public.context_preview_fence DEFAULT VALUES
+2026-10-22 20:02:36.203 UTC [411] ERROR:  preview cannot begin closed
+2026-10-22 20:02:36.203 UTC [411] CONTEXT:  PL/pgSQL function public.context_preview_immutable() line 5 at RAISE
+2026-10-22 20:02:36.203 UTC [411] STATEMENT:  INSERT INTO public.context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline,closed_at,closed_request_key,closed_submission_digest) VALUES($1,$2,$3,$4,$5,$5,$6,$5,clock_timestamp(),clock_timestamp()+interval '1 minute',clock_timestamp(),$5,$5)
+2026-10-22 20:02:36.271 UTC [413] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.271 UTC [413] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.272 UTC [413] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.272 UTC [413] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.272 UTC [413] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.272 UTC [413] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.283 UTC [413] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.283 UTC [413] STATEMENT:  UPDATE "public"."permission_stream" SET "epoch"="epoch" WHERE false
+2026-10-22 20:02:36.284 UTC [413] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.284 UTC [413] STATEMENT:  UPDATE "public"."permission_stream" SET "sequence"="sequence" WHERE false
+2026-10-22 20:02:36.284 UTC [413] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.284 UTC [413] STATEMENT:  UPDATE "public"."permission_stream" SET "trust_digest"="trust_digest" WHERE false
+2026-10-22 20:02:36.285 UTC [413] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.285 UTC [413] STATEMENT:  UPDATE "public"."permission_stream" SET "projection_digest"="projection_digest" WHERE false
+2026-10-22 20:02:36.285 UTC [413] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.285 UTC [413] STATEMENT:  UPDATE "public"."permission_stream" SET "lease_until"="lease_until" WHERE false
+2026-10-22 20:02:36.285 UTC [413] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.285 UTC [413] STATEMENT:  UPDATE "public"."permission_stream" SET "observed_at"="observed_at" WHERE false
+2026-10-22 20:02:36.286 UTC [413] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.286 UTC [413] STATEMENT:  UPDATE "public"."permission_stream" SET "fresh_until"="fresh_until" WHERE false
+2026-10-22 20:02:36.286 UTC [413] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.286 UTC [413] STATEMENT:  UPDATE "public"."permission_stream" SET "suspended"="suspended" WHERE false
+2026-10-22 20:02:36.287 UTC [413] ERROR:  permission denied for table permission_stream
+2026-10-22 20:02:36.287 UTC [413] STATEMENT:  UPDATE "public"."permission_stream" SET "initial_audit_id"="initial_audit_id" WHERE false
+2026-10-22 20:02:36.288 UTC [413] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.288 UTC [413] STATEMENT:  UPDATE "public"."context_preview" SET "id"="id" WHERE false
+2026-10-22 20:02:36.288 UTC [413] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.288 UTC [413] STATEMENT:  UPDATE "public"."context_preview" SET "root_id"="root_id" WHERE false
+2026-10-22 20:02:36.289 UTC [413] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.289 UTC [413] STATEMENT:  UPDATE "public"."context_preview" SET "capture_id"="capture_id" WHERE false
+2026-10-22 20:02:36.289 UTC [413] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.289 UTC [413] STATEMENT:  UPDATE "public"."context_preview" SET "attempt_id"="attempt_id" WHERE false
+2026-10-22 20:02:36.290 UTC [413] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.290 UTC [413] STATEMENT:  UPDATE "public"."context_preview" SET "actor_key"="actor_key" WHERE false
+2026-10-22 20:02:36.290 UTC [413] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.290 UTC [413] STATEMENT:  UPDATE "public"."context_preview" SET "principal_key"="principal_key" WHERE false
+2026-10-22 20:02:36.291 UTC [413] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.291 UTC [413] STATEMENT:  UPDATE "public"."context_preview" SET "blueprint_json"="blueprint_json" WHERE false
+2026-10-22 20:02:36.291 UTC [413] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.291 UTC [413] STATEMENT:  UPDATE "public"."context_preview" SET "blueprint_sha256"="blueprint_sha256" WHERE false
+2026-10-22 20:02:36.291 UTC [413] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.291 UTC [413] STATEMENT:  UPDATE "public"."context_preview" SET "created_at"="created_at" WHERE false
+2026-10-22 20:02:36.292 UTC [413] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.292 UTC [413] STATEMENT:  UPDATE "public"."context_preview" SET "deadline"="deadline" WHERE false
+2026-10-22 20:02:36.293 UTC [413] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.293 UTC [413] STATEMENT:  UPDATE "public"."context_preview_fence" SET "root_id"="root_id" WHERE false
+2026-10-22 20:02:36.293 UTC [413] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.293 UTC [413] STATEMENT:  UPDATE "public"."context_preview_fence" SET "preview_id"="preview_id" WHERE false
+2026-10-22 20:02:36.293 UTC [413] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.293 UTC [413] STATEMENT:  UPDATE "public"."context_preview_fence" SET "actor_key"="actor_key" WHERE false
+2026-10-22 20:02:36.294 UTC [413] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.294 UTC [413] STATEMENT:  UPDATE "public"."context_preview_fence" SET "principal_key"="principal_key" WHERE false
+2026-10-22 20:02:36.294 UTC [413] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.294 UTC [413] STATEMENT:  UPDATE "public"."context_preview_fence" SET "request_key"="request_key" WHERE false
+2026-10-22 20:02:36.295 UTC [413] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.295 UTC [413] STATEMENT:  UPDATE "public"."context_preview_fence" SET "submission_digest"="submission_digest" WHERE false
+2026-10-22 20:02:36.295 UTC [413] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.295 UTC [413] STATEMENT:  UPDATE "public"."context_preview_fence" SET "created_at"="created_at" WHERE false
+2026-10-22 20:02:36.296 UTC [413] ERROR:  permission denied for table context_preview_fence
+2026-10-22 20:02:36.296 UTC [413] STATEMENT:  UPDATE "public"."context_preview_fence" SET "expires_at"="expires_at" WHERE false
+2026-10-22 20:02:36.297 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.297 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "id"="id" WHERE false
+2026-10-22 20:02:36.297 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.297 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "root_id"="root_id" WHERE false
+2026-10-22 20:02:36.298 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.298 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "request_key"="request_key" WHERE false
+2026-10-22 20:02:36.298 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.298 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "submission_digest"="submission_digest" WHERE false
+2026-10-22 20:02:36.299 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.299 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "scope_digest"="scope_digest" WHERE false
+2026-10-22 20:02:36.299 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.299 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "scope_json"="scope_json" WHERE false
+2026-10-22 20:02:36.300 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.300 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "expectation_json"="expectation_json" WHERE false
+2026-10-22 20:02:36.300 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.300 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "pod_pin_json"="pod_pin_json" WHERE false
+2026-10-22 20:02:36.300 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.300 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "attempt_id"="attempt_id" WHERE false
+2026-10-22 20:02:36.301 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.301 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "permission_epoch"="permission_epoch" WHERE false
+2026-10-22 20:02:36.301 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.301 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "permission_sequence"="permission_sequence" WHERE false
+2026-10-22 20:02:36.302 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.302 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "identity_policy_uid"="identity_policy_uid" WHERE false
+2026-10-22 20:02:36.302 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.302 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "identity_policy_generation"="identity_policy_generation" WHERE false
+2026-10-22 20:02:36.303 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.303 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "identity_policy_digest"="identity_policy_digest" WHERE false
+2026-10-22 20:02:36.303 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.303 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "created_at"="created_at" WHERE false
+2026-10-22 20:02:36.303 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.303 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "deadline"="deadline" WHERE false
+2026-10-22 20:02:36.304 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.304 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "state"="state" WHERE false
+2026-10-22 20:02:36.304 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.304 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "intent_acknowledged_at"="intent_acknowledged_at" WHERE false
+2026-10-22 20:02:36.305 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.305 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "intent_digest"="intent_digest" WHERE false
+2026-10-22 20:02:36.305 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.305 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "intent_object_key"="intent_object_key" WHERE false
+2026-10-22 20:02:36.306 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.306 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "intent_object_version"="intent_object_version" WHERE false
+2026-10-22 20:02:36.306 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.306 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "intent_object_etag"="intent_object_etag" WHERE false
+2026-10-22 20:02:36.306 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.306 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "intent_object_bytes"="intent_object_bytes" WHERE false
+2026-10-22 20:02:36.307 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.307 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "intent_object_sha256"="intent_object_sha256" WHERE false
+2026-10-22 20:02:36.307 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.307 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "progress_revision"="progress_revision" WHERE false
+2026-10-22 20:02:36.308 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.308 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "deadline_observed_at"="deadline_observed_at" WHERE false
+2026-10-22 20:02:36.308 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.308 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "preview_id"="preview_id" WHERE false
+2026-10-22 20:02:36.309 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.309 UTC [413] STATEMENT:  UPDATE "public"."context_capture" SET "intent_operation_id"="intent_operation_id" WHERE false
+2026-10-22 20:02:36.310 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.310 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "id"="id" WHERE false
+2026-10-22 20:02:36.310 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.310 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "cluster_id"="cluster_id" WHERE false
+2026-10-22 20:02:36.311 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.311 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "artifact_id"="artifact_id" WHERE false
+2026-10-22 20:02:36.311 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.311 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "allocation_id"="allocation_id" WHERE false
+2026-10-22 20:02:36.312 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.312 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "request_digest"="request_digest" WHERE false
+2026-10-22 20:02:36.312 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.312 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "pool_revision"="pool_revision" WHERE false
+2026-10-22 20:02:36.313 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.313 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "allocation_revision"="allocation_revision" WHERE false
+2026-10-22 20:02:36.313 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.313 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "native_limit"="native_limit" WHERE false
+2026-10-22 20:02:36.314 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.314 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "reserved_bytes"="reserved_bytes" WHERE false
+2026-10-22 20:02:36.314 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.314 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "anchor_at"="anchor_at" WHERE false
+2026-10-22 20:02:36.314 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.314 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "write_until"="write_until" WHERE false
+2026-10-22 20:02:36.315 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.315 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "expires_at"="expires_at" WHERE false
+2026-10-22 20:02:36.315 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.315 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "delete_by"="delete_by" WHERE false
+2026-10-22 20:02:36.316 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.316 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "state"="state" WHERE false
+2026-10-22 20:02:36.316 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.316 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "copies_digest"="copies_digest" WHERE false
+2026-10-22 20:02:36.317 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.317 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "deletion_fence"="deletion_fence" WHERE false
+2026-10-22 20:02:36.317 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.317 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "lease_until"="lease_until" WHERE false
+2026-10-22 20:02:36.317 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.317 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "deleted_at"="deleted_at" WHERE false
+2026-10-22 20:02:36.318 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.318 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "effective_expires_at"="effective_expires_at" WHERE false
+2026-10-22 20:02:36.318 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.318 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "effective_delete_by"="effective_delete_by" WHERE false
+2026-10-22 20:02:36.319 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.319 UTC [413] STATEMENT:  UPDATE "public"."custody_attempt" SET "retention_sequence"="retention_sequence" WHERE false
+2026-10-22 20:02:36.320 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.320 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "id"="id" WHERE false
+2026-10-22 20:02:36.320 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.320 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "root_id"="root_id" WHERE false
+2026-10-22 20:02:36.320 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.320 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "lane"="lane" WHERE false
+2026-10-22 20:02:36.321 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.321 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "issuer_epoch"="issuer_epoch" WHERE false
+2026-10-22 20:02:36.321 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.321 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "principal_digest"="principal_digest" WHERE false
+2026-10-22 20:02:36.322 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.322 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "intent"="intent" WHERE false
+2026-10-22 20:02:36.322 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.322 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "request_until"="request_until" WHERE false
+2026-10-22 20:02:36.323 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.323 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "write_until"="write_until" WHERE false
+2026-10-22 20:02:36.323 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.323 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "retain_until"="retain_until" WHERE false
+2026-10-22 20:02:36.324 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.324 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "intent_started"="intent_started" WHERE false
+2026-10-22 20:02:36.324 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.324 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "intent_receipt"="intent_receipt" WHERE false
+2026-10-22 20:02:36.325 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.325 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "outcome"="outcome" WHERE false
+2026-10-22 20:02:36.325 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.325 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "outcome_started"="outcome_started" WHERE false
+2026-10-22 20:02:36.325 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.325 UTC [413] STATEMENT:  UPDATE "public"."operation_audit" SET "outcome_receipt"="outcome_receipt" WHERE false
+2026-10-22 20:02:36.326 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.326 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "id"="id" WHERE false
+2026-10-22 20:02:36.327 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.327 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "stream_id"="stream_id" WHERE false
+2026-10-22 20:02:36.327 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.327 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "epoch"="epoch" WHERE false
+2026-10-22 20:02:36.328 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.328 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "sequence"="sequence" WHERE false
+2026-10-22 20:02:36.328 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.328 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "event_kind"="event_kind" WHERE false
+2026-10-22 20:02:36.329 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.329 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "event_digest"="event_digest" WHERE false
+2026-10-22 20:02:36.329 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.329 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "created_at"="created_at" WHERE false
+2026-10-22 20:02:36.329 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.329 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "record"="record" WHERE false
+2026-10-22 20:02:36.330 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.330 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "acknowledged_at"="acknowledged_at" WHERE false
+2026-10-22 20:02:36.330 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.330 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "object_key"="object_key" WHERE false
+2026-10-22 20:02:36.331 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.331 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "object_version"="object_version" WHERE false
+2026-10-22 20:02:36.331 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.331 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "object_etag"="object_etag" WHERE false
+2026-10-22 20:02:36.332 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.332 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "object_bytes"="object_bytes" WHERE false
+2026-10-22 20:02:36.332 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.332 UTC [413] STATEMENT:  UPDATE "public"."authority_audit" SET "object_sha256"="object_sha256" WHERE false
+2026-10-22 20:02:36.333 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.333 UTC [413] STATEMENT:  INSERT INTO "public"."context_capture" DEFAULT VALUES
+2026-10-22 20:02:36.333 UTC [413] ERROR:  permission denied for table context_capture
+2026-10-22 20:02:36.333 UTC [413] STATEMENT:  DELETE FROM "public"."context_capture" WHERE false
+2026-10-22 20:02:36.334 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.334 UTC [413] STATEMENT:  INSERT INTO "public"."custody_attempt" DEFAULT VALUES
+2026-10-22 20:02:36.334 UTC [413] ERROR:  permission denied for table custody_attempt
+2026-10-22 20:02:36.334 UTC [413] STATEMENT:  DELETE FROM "public"."custody_attempt" WHERE false
+2026-10-22 20:02:36.334 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.334 UTC [413] STATEMENT:  INSERT INTO "public"."operation_audit" DEFAULT VALUES
+2026-10-22 20:02:36.335 UTC [413] ERROR:  permission denied for table operation_audit
+2026-10-22 20:02:36.335 UTC [413] STATEMENT:  DELETE FROM "public"."operation_audit" WHERE false
+2026-10-22 20:02:36.335 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.335 UTC [413] STATEMENT:  INSERT INTO "public"."authority_audit" DEFAULT VALUES
+2026-10-22 20:02:36.336 UTC [413] ERROR:  permission denied for table authority_audit
+2026-10-22 20:02:36.336 UTC [413] STATEMENT:  DELETE FROM "public"."authority_audit" WHERE false
+2026-10-22 20:02:36.339 UTC [413] ERROR:  context preview closure is immutable
+2026-10-22 20:02:36.339 UTC [413] CONTEXT:  PL/pgSQL function public.context_preview_immutable() line 14 at RAISE
+2026-10-22 20:02:36.339 UTC [413] STATEMENT:  UPDATE public.context_preview SET closed_at=NULL,closed_request_key=NULL,closed_submission_digest=NULL WHERE id=$1
+2026-10-22 20:02:36.339 UTC [413] ERROR:  context preview closure is immutable
+2026-10-22 20:02:36.339 UTC [413] CONTEXT:  PL/pgSQL function public.context_preview_immutable() line 14 at RAISE
+2026-10-22 20:02:36.339 UTC [413] STATEMENT:  UPDATE public.context_preview SET "closed_request_key"=$2 WHERE id=$1
+2026-10-22 20:02:36.340 UTC [413] ERROR:  context preview closure is immutable
+2026-10-22 20:02:36.340 UTC [413] CONTEXT:  PL/pgSQL function public.context_preview_immutable() line 14 at RAISE
+2026-10-22 20:02:36.340 UTC [413] STATEMENT:  UPDATE public.context_preview SET "closed_submission_digest"=$2 WHERE id=$1
+2026-10-22 20:02:36.341 UTC [413] ERROR:  context preview closure is immutable
+2026-10-22 20:02:36.341 UTC [413] CONTEXT:  PL/pgSQL function public.context_preview_immutable() line 14 at RAISE
+2026-10-22 20:02:36.341 UTC [413] STATEMENT:  UPDATE public.context_preview SET closed_at=closed_at+interval '1 second' WHERE id=$1
+2026-10-22 20:02:36.341 UTC [413] ERROR:  permission denied for table context_preview
+2026-10-22 20:02:36.341 UTC [413] STATEMENT:  INSERT INTO public.context_preview DEFAULT VALUES
+2026-10-22 20:02:36.343 UTC [413] ERROR:  context preview fence is not expired
+2026-10-22 20:02:36.343 UTC [413] CONTEXT:  PL/pgSQL function public.guard_context_preview_fence() line 11 at RAISE
+2026-10-22 20:02:36.343 UTC [413] STATEMENT:  DELETE FROM public.context_preview_fence WHERE root_id=$1 AND preview_id=$2
+2026-10-22 20:02:36.409 UTC [415] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.409 UTC [415] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.409 UTC [415] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.409 UTC [415] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.409 UTC [415] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.409 UTC [415] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.463 UTC [417] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.463 UTC [417] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.463 UTC [417] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.463 UTC [417] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.463 UTC [417] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.463 UTC [417] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.517 UTC [419] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.517 UTC [419] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.518 UTC [419] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.518 UTC [419] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.518 UTC [419] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.518 UTC [419] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.571 UTC [421] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.571 UTC [421] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.572 UTC [421] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.572 UTC [421] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.572 UTC [421] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.572 UTC [421] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.626 UTC [423] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.626 UTC [423] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.626 UTC [423] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.626 UTC [423] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.626 UTC [423] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.626 UTC [423] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.679 UTC [425] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.679 UTC [425] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.680 UTC [425] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.680 UTC [425] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.680 UTC [425] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.680 UTC [425] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.734 UTC [427] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.734 UTC [427] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.735 UTC [427] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.735 UTC [427] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.735 UTC [427] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.735 UTC [427] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.789 UTC [429] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.789 UTC [429] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.789 UTC [429] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.789 UTC [429] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.789 UTC [429] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.789 UTC [429] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.843 UTC [431] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.843 UTC [431] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.843 UTC [431] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.843 UTC [431] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.844 UTC [431] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.844 UTC [431] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.897 UTC [433] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.897 UTC [433] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.898 UTC [433] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.898 UTC [433] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.898 UTC [433] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.898 UTC [433] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:36.951 UTC [435] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:36.951 UTC [435] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:36.952 UTC [435] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:36.952 UTC [435] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:36.952 UTC [435] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:36.952 UTC [435] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.006 UTC [437] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.006 UTC [437] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.006 UTC [437] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.006 UTC [437] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.007 UTC [437] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.007 UTC [437] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.061 UTC [439] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.061 UTC [439] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.061 UTC [439] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.061 UTC [439] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.062 UTC [439] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.062 UTC [439] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.116 UTC [441] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.116 UTC [441] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.116 UTC [441] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.116 UTC [441] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.116 UTC [441] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.116 UTC [441] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.170 UTC [443] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.170 UTC [443] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.170 UTC [443] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.170 UTC [443] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.170 UTC [443] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.170 UTC [443] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.225 UTC [445] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.225 UTC [445] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.225 UTC [445] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.225 UTC [445] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.225 UTC [445] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.225 UTC [445] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.279 UTC [447] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.279 UTC [447] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.279 UTC [447] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.279 UTC [447] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.279 UTC [447] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.279 UTC [447] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.333 UTC [449] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.333 UTC [449] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.333 UTC [449] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.333 UTC [449] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.334 UTC [449] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.334 UTC [449] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.387 UTC [451] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.387 UTC [451] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.387 UTC [451] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.387 UTC [451] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.388 UTC [451] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.388 UTC [451] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.442 UTC [453] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.442 UTC [453] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.442 UTC [453] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.442 UTC [453] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.442 UTC [453] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.442 UTC [453] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.497 UTC [455] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.497 UTC [455] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.497 UTC [455] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.497 UTC [455] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.498 UTC [455] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.498 UTC [455] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.552 UTC [457] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.552 UTC [457] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.552 UTC [457] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.552 UTC [457] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.552 UTC [457] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.552 UTC [457] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.607 UTC [459] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.607 UTC [459] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.607 UTC [459] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.607 UTC [459] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.608 UTC [459] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.608 UTC [459] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.662 UTC [461] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.662 UTC [461] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.662 UTC [461] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.662 UTC [461] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.662 UTC [461] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.662 UTC [461] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.717 UTC [463] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.717 UTC [463] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.717 UTC [463] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.717 UTC [463] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.717 UTC [463] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.717 UTC [463] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.735 UTC [464] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.735 UTC [464] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.735 UTC [464] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.735 UTC [464] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.736 UTC [464] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.736 UTC [464] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.754 UTC [465] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.754 UTC [465] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.754 UTC [465] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.754 UTC [465] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.754 UTC [465] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.754 UTC [465] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.772 UTC [466] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.772 UTC [466] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.772 UTC [466] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.772 UTC [466] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.772 UTC [466] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.772 UTC [466] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.789 UTC [467] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.789 UTC [467] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.790 UTC [467] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.790 UTC [467] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.790 UTC [467] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.790 UTC [467] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.808 UTC [468] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.808 UTC [468] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.808 UTC [468] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.808 UTC [468] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.808 UTC [468] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.808 UTC [468] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.826 UTC [469] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.826 UTC [469] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.826 UTC [469] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.826 UTC [469] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.826 UTC [469] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.826 UTC [469] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.844 UTC [470] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.844 UTC [470] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.844 UTC [470] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.844 UTC [470] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.844 UTC [470] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.844 UTC [470] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.862 UTC [471] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.862 UTC [471] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.863 UTC [471] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.863 UTC [471] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.863 UTC [471] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.863 UTC [471] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.880 UTC [472] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.880 UTC [472] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.881 UTC [472] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.881 UTC [472] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.881 UTC [472] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.881 UTC [472] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.898 UTC [473] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.898 UTC [473] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.899 UTC [473] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.899 UTC [473] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.899 UTC [473] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.899 UTC [473] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.917 UTC [474] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.917 UTC [474] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.917 UTC [474] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.917 UTC [474] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.917 UTC [474] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.917 UTC [474] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.934 UTC [475] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.934 UTC [475] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.934 UTC [475] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.934 UTC [475] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.935 UTC [475] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.935 UTC [475] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.952 UTC [476] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.952 UTC [476] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.952 UTC [476] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.952 UTC [476] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.952 UTC [476] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.952 UTC [476] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.971 UTC [477] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.971 UTC [477] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.971 UTC [477] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.971 UTC [477] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.971 UTC [477] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.971 UTC [477] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:37.988 UTC [478] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:37.988 UTC [478] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:37.989 UTC [478] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:37.989 UTC [478] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:37.989 UTC [478] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:37.989 UTC [478] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.006 UTC [479] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.006 UTC [479] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.006 UTC [479] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.006 UTC [479] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.006 UTC [479] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.006 UTC [479] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.025 UTC [480] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.025 UTC [480] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.025 UTC [480] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.025 UTC [480] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.026 UTC [480] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.026 UTC [480] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.043 UTC [481] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.043 UTC [481] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.043 UTC [481] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.043 UTC [481] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.043 UTC [481] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.043 UTC [481] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.061 UTC [482] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.061 UTC [482] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.061 UTC [482] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.061 UTC [482] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.062 UTC [482] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.062 UTC [482] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.080 UTC [483] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.080 UTC [483] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.080 UTC [483] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.080 UTC [483] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.081 UTC [483] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.081 UTC [483] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.098 UTC [484] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.098 UTC [484] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.099 UTC [484] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.099 UTC [484] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.099 UTC [484] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.099 UTC [484] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.117 UTC [485] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.117 UTC [485] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.118 UTC [485] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.118 UTC [485] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.118 UTC [485] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.118 UTC [485] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.135 UTC [486] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.135 UTC [486] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.135 UTC [486] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.135 UTC [486] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.136 UTC [486] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.136 UTC [486] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.153 UTC [487] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.153 UTC [487] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.153 UTC [487] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.153 UTC [487] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.153 UTC [487] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.153 UTC [487] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.172 UTC [488] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.172 UTC [488] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.172 UTC [488] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.172 UTC [488] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.172 UTC [488] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.172 UTC [488] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.190 UTC [489] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.190 UTC [489] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.190 UTC [489] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.190 UTC [489] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.190 UTC [489] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.190 UTC [489] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.208 UTC [490] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.208 UTC [490] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.208 UTC [490] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.208 UTC [490] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.208 UTC [490] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.208 UTC [490] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.226 UTC [491] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.226 UTC [491] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.226 UTC [491] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.226 UTC [491] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.226 UTC [491] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.226 UTC [491] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.244 UTC [492] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.244 UTC [492] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.244 UTC [492] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.244 UTC [492] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.245 UTC [492] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.245 UTC [492] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.262 UTC [493] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.262 UTC [493] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.262 UTC [493] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.262 UTC [493] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.262 UTC [493] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.262 UTC [493] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.280 UTC [494] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.280 UTC [494] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.281 UTC [494] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.281 UTC [494] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.281 UTC [494] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.281 UTC [494] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.298 UTC [495] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.298 UTC [495] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.298 UTC [495] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.298 UTC [495] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.298 UTC [495] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.298 UTC [495] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.315 UTC [496] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.315 UTC [496] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.316 UTC [496] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.316 UTC [496] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.316 UTC [496] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.316 UTC [496] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.334 UTC [497] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.334 UTC [497] STATEMENT:  UPDATE public.fleet_trust SET recovery_blocked=false
+2026-10-22 20:02:38.334 UTC [497] ERROR:  permission denied for table custody_pool
+2026-10-22 20:02:38.334 UTC [497] STATEMENT:  INSERT INTO public.custody_pool(id) VALUES('10000000-0000-4000-8000-000000000001')
+2026-10-22 20:02:38.334 UTC [497] ERROR:  permission denied for schema public at character 14
+2026-10-22 20:02:38.334 UTC [497] STATEMENT:  CREATE TABLE public.forbidden_public_runtime(id int)
+2026-10-22 20:02:38.835 UTC [498] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:38.835 UTC [498] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-22 20:02:38.835 UTC [498] ERROR:  cannot update view "fleet_current_trust"
+2026-10-22 20:02:38.835 UTC [498] DETAIL:  Views containing WITH are not automatically updatable.
+2026-10-22 20:02:38.835 UTC [498] HINT:  To enable updating the view, provide an INSTEAD OF UPDATE trigger or an unconditional ON UPDATE DO INSTEAD rule.
+2026-10-22 20:02:38.835 UTC [498] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1
+2026-10-22 20:02:39.088 UTC [502] ERROR:  permission denied for table fleet_trust
+2026-10-22 20:02:39.088 UTC [502] STATEMENT:  UPDATE fleet_trust SET recovery_blocked=false WHERE installation_id=$1
+2026-10-22 20:02:39.088 UTC [502] ERROR:  cannot update view "fleet_current_trust"
+2026-10-22 20:02:39.088 UTC [502] DETAIL:  Views containing WITH are not automatically updatable.
+2026-10-22 20:02:39.088 UTC [502] HINT:  To enable updating the view, provide an INSTEAD OF UPDATE trigger or an unconditional ON UPDATE DO INSTEAD rule.
+2026-10-22 20:02:39.088 UTC [502] STATEMENT:  UPDATE fleet_current_trust SET issuer_epoch=issuer_epoch WHERE installation_id=$1

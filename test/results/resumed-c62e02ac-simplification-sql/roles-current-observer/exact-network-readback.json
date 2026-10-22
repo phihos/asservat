@@ -1,0 +1,18 @@
+{
+  "at": "2026-10-22T20:16:34.840319+00:00",
+  "checks": [
+    {
+      "argv": [
+        "docker",
+        "network",
+        "inspect",
+        "asservat-custody-dpe_w_a_"
+      ],
+      "exitCode": 1,
+      "stdout": "[]\n",
+      "stderr": "Error response from daemon: network asservat-custody-dpe_w_a_ not found\n",
+      "absent": true
+    }
+  ],
+  "allAbsent": true
+}

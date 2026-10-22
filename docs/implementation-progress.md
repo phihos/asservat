@@ -15,7 +15,7 @@ installed qualification.
 - ADR-215 consolidates seven same-process metadata-reader credentials and pools
   into one, retaining their typed interfaces and union grants. Fresh installation
   uses one current layout; unsupported development state is rejected without
-  adoption or deletion. The planned counts are 81 public-runtime credentials and
+  adoption or deletion. The implemented counts are 81 public-runtime credentials and
   46 hub entries, with the existing 32-connection process ceiling.
 - The chart's bootstrap and continuation become one sequential five-command Pod,
   removing the second producer/projection pass and scratch volume. Credential
@@ -23,8 +23,9 @@ installed qualification.
   continuation container under the original identities and deadlines.
 
 These changes are isolated from the frozen `b9e63320` native52 baseline run.
-Focused regressions pass; full repository and installed qualification remain
-pending. The historical complexity review is preserved as the original review
+Focused regressions, selected real SQL and Helm lifecycle qualification pass;
+the full Go gate and installed qualification remain pending. The historical
+complexity review is preserved as the original review
 baseline rather than rewritten to imply these changes were already delivered.
 
 The specification, architecture, design, Go dependency and Helm rendering checks
@@ -41,8 +42,37 @@ The composed cold preparation takes 66.822 milliseconds; the near-expiry case ta
 413.885 milliseconds including a synthetic 350-millisecond permission delay.
 These are component measurements with synthetic SQL and worker effects, not
 installed timings. The [qualification archive](../test/results/resumed-c62e02ac-structural-simplification/README.md)
-records exact commands, scopes, failures and unchanged-source checks. Actual
-PostgreSQL, Helm lifecycle and installed qualification remain pending.
+records exact commands, scopes, failures and unchanged-source checks. At that
+component checkpoint, PostgreSQL, Helm lifecycle and installed qualification
+were still pending; the completed external checks follow below.
+
+The [real SQL qualification](../test/results/resumed-c62e02ac-simplification-sql/README.md)
+now passes on frozen `114dd899`. All five role scenarios pass (actual exit 0,
+46.527 seconds Go / 131.646 seconds harness), including the compiled grant matrix,
+unknown claim, lost completion, held lock and recovery after lock. The full
+capacity fixture also passes (exit 0, 79.525 seconds Go / 90.857 seconds harness).
+Its new shared-reader test exercises all seven typed adapters concurrently using
+the compiled metadata login and one cold seven-connection pool; excluded
+privileges, caller/identity expiry and cancellation after a SQL lock wait pass.
+Each run retains 2,750 source hashes matching its commit, unchanged throughout;
+cleanup reports no failures and the owned containers/networks are independently
+absent. Protected Kubernetes/root and human inputs remain synthetic. The separate
+SQL-generation check passes (exit 0, 0.378 seconds; 54 files match sqlc v1.31.1).
+
+The SQL archive preserves the initial and diagnostic failures. The diagnostic
+completed all 81 role receipts in 5.376 seconds but found the fixture's single
+five-second fleet observation expired. Positive full-inventory fixture calls now
+maintain the existing independent fleet observer and join its shutdown before
+later assertions. Observation intervals and production code are unchanged;
+deliberate unknown-result, privilege, lock and recovery cases retain their
+controlled negative state.
+
+The [Helm lifecycle qualification](../test/results/resumed-c62e02ac-simplification-helm/README.md)
+passes on frozen `c6be50ca` (actual exit 0, 50.352 seconds). All 22 recorded inputs
+remain unchanged; lifecycle and legacy-guard tests pass, and no owned resources
+remain. This qualifies the chart lifecycle, not execution of the combined
+five-command installer or the installed investigation. Those runtime checks and
+the full Go gate remain pending.
 
 ## Baseline installed failure and discovery follow-up (2026-10-22)
 
