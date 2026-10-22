@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"time"
 
@@ -27,8 +28,11 @@ func VerifyPublisherRuntimeCredential(ctx context.Context, pool *pgxpool.Pool, m
 }
 
 func verifyRuntimeCredential(ctx context.Context, pool *pgxpool.Pool, m contracts.PublicRuntimeCredentialManifest, purpose string, purposes []string) error {
-	if ctx == nil || ctx.Err() != nil || pool == nil || m.Format != contracts.PublicRuntimeCredentialManifestFormat || m.Input.Format != contracts.PublicRuntimeRolesFormat || m.Input.LayoutDigest != PublicRuntimeRoleLayoutDigest() || !authorization.UUID(m.Input.OwnerConfigurationUID) || !authorization.UUID(m.RootUID) || !authorization.UUID(m.SetupID) || !authorization.UUID(m.Input.InitialClaimID) || !authorization.UUID(m.Input.InstallationID) || !authorization.UUID(m.Input.ClusterID) || !authorization.UUID(m.Input.Namespace.UID) {
+	if ctx == nil || ctx.Err() != nil || pool == nil || m.Format != contracts.PublicRuntimeCredentialManifestFormat || m.Input.Format != contracts.PublicRuntimeRolesFormat || !authorization.UUID(m.Input.OwnerConfigurationUID) || !authorization.UUID(m.RootUID) || !authorization.UUID(m.SetupID) || !authorization.UUID(m.Input.InitialClaimID) || !authorization.UUID(m.Input.InstallationID) || !authorization.UUID(m.Input.ClusterID) || !authorization.UUID(m.Input.Namespace.UID) {
 		return cfg.ErrInvalid
+	}
+	if m.Input.LayoutDigest != PublicRuntimeRoleLayoutDigest() {
+		return errors.Join(cfg.ErrInvalid, contracts.ErrPublicRuntimeLayout)
 	}
 	if len(m.Roles) != len(purposes) {
 		return cfg.ErrInvalid
@@ -47,7 +51,8 @@ func verifyRuntimeCredential(ctx context.Context, pool *pgxpool.Pool, m contract
 			selected = r
 		}
 	}
-	if selected == nil || pool.Config().ConnConfig.User != selected.Receipt.RoleName || pool.Config().MaxConns != 1 {
+	limit, known := contracts.PublicRuntimeRolePoolLimit(purpose)
+	if selected == nil || !known || pool.Config().ConnConfig.User != selected.Receipt.RoleName || pool.Config().MaxConns != int32(limit) {
 		return cfg.ErrDenied
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)

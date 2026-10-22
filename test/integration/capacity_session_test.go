@@ -87,6 +87,7 @@ GRANT SELECT ON artifact_download,download_control_allocation,download_native_ba
 	if _, err = publisher.Publish(f.ctx, e.CaptureUID, copies); err != nil {
 		t.Fatal("managed independent verification/publication", err)
 	}
+	f.qualifySharedMetadataReaders(t, s, e, enrollment)
 	processing, err := postgres.NewProcessingReads(f.ctx, f.fixturePool("context_catalog_read_runtime", "synthetic-context-read"), s.a.RootID, s.recovery.guard)
 	if err != nil {
 		t.Fatal(err)

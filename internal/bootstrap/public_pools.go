@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"bytes"
 	"context"
+	"errors"
 	"slices"
 	"sync"
 
@@ -18,8 +19,9 @@ import (
 var hubAPIHotPurposes = []string{"browser-session", "refresh-admit", "refresh-owner", "audit-normal-journal", "audit-normal-ack", "audit-resolution-journal", "audit-resolution-ack", "capture-admit", "capture-journal", "capture-ack", "download-session", "native-owner"}
 
 // publicPools opens hub-api's public purpose pools on first use. Each pool is
-// governed, MaxConns=1, and verified against the installer's immutable role
-// manifest before it is returned. A purpose never shares another's login.
+// governed and verified against the installer's immutable role manifest. The
+// metadata pool retains the former seven readers' aggregate concurrency; every
+// other credential has MaxConns=1. No runtime role is adopted or migrated.
 type publicPools struct {
 	in       *providerInputs
 	manifest contracts.PublicRuntimeCredentialManifest
@@ -42,6 +44,9 @@ func readPublicRuntimeManifest(ctx context.Context, in *ownerInputs, files *prov
 	c := in.config
 	if e != nil || m.Format != contracts.PublicRuntimeCredentialManifestFormat || m.Input.InstallationID != c.InstallationID || m.Input.ClusterID != c.ClusterID || m.Input.Namespace != c.Namespace || m.Input.OwnerConfigurationUID != c.ConfigurationUID {
 		return zero, mounts.ErrUnavailable
+	}
+	if m.Input.LayoutDigest != postgres.PublicRuntimeRoleLayoutDigest() {
+		return zero, errors.Join(mounts.ErrUnavailable, contracts.ErrPublicRuntimeLayout)
 	}
 	return m, nil
 }
@@ -67,7 +72,11 @@ func (p *publicPools) open(ctx context.Context, purpose string) (*pgxpool.Pool, 
 	if e != nil || c == nil || c.ConnConfig.User != name {
 		return nil, mounts.ErrUnavailable
 	}
-	c.MaxConns, c.MinConns = 1, 0
+	limit, ok := contracts.PublicRuntimeRolePoolLimit(purpose)
+	if !ok {
+		return nil, mounts.ErrUnavailable
+	}
+	c.MaxConns, c.MinConns = int32(limit), 0
 	if p.governor.Govern(c, slices.Contains(hubAPIHotPurposes, purpose)) != nil {
 		return nil, mounts.ErrUnavailable
 	}

@@ -105,7 +105,7 @@ func TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim(t *testing.T) {
 }
 
 func TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState(t *testing.T) {
-	for _, mode := range []string{"revoked-before", "revoked-during-pod", "revoked-during-sql", "peer-removed", "peer-replaced", "peer-mutated", "key-replaced", "enrollment-removed", "worker-replaced", "busy", "uncertain", "metadata-started", "deadline", "cancelled"} {
+	for _, mode := range []string{"revoked-before", "peer-removed", "peer-replaced", "peer-mutated", "key-replaced", "enrollment-removed", "worker-replaced", "busy", "uncertain", "metadata-started", "deadline", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newActiveEnrollmentFixture(t)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -113,16 +113,11 @@ func TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState(t *testing.T) {
 			if mode == "revoked-before" {
 				f.f.failure = "current-authority"
 			}
-			if mode == "revoked-during-pod" {
-				f.launch.hooks["observe-job"] = func() { f.f.failure = "current-authority" }
-			}
 			f.lookup.before = func(n int) {
 				if n != 2 {
 					return
 				}
 				switch mode {
-				case "revoked-during-sql":
-					f.f.failure = "current-authority"
 				case "peer-removed":
 					f.lookup.value.ActivatedPeer = nil
 				case "peer-replaced":
@@ -220,5 +215,33 @@ func TestActiveContextEnrollmentPreservesOriginalRenewalBoundary(t *testing.T) {
 	a.ObservedAt, a.ValidUntil = now, peer.NotAfter
 	if !activeContextEnrollment(a, now, peer.NotAfter) || activeContextEnrollment(a, now, peer.NotAfter.Add(time.Nanosecond)) {
 		t.Fatal("final-period exception changed original certificate lifetime")
+	}
+}
+
+func TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation(t *testing.T) {
+	for _, phase := range []string{"pod", "sql"} {
+		t.Run(phase, func(t *testing.T) {
+			f := newActiveEnrollmentFixture(t)
+			original := f.f.s
+			if phase == "pod" {
+				f.launch.hooks["observe-job"] = func() { f.f.failure = "current-authority" }
+			}
+			f.lookup.before = func(n int) {
+				if phase == "sql" && n == 2 {
+					f.f.failure = "current-authority"
+				}
+			}
+			out, err := f.r.ContinueContextDownload(t.Context(), f.f, original, f.source)
+			// This fixture deliberately loses the first SQL batch reply. A bounded
+			// observation must reach that unchanged, non-replayable admission once.
+			if err == nil || out.Pending || f.f.count("begin") != 1 || f.f.count("current-authority") != 1 || f.claims != 0 {
+				t.Fatal("original observation did not reach the existing first preparation", err, f.f.count("begin"), f.f.count("current-authority"))
+			}
+			f.noLaunchEffects(t)
+			reads := f.lookup.reads
+			if _, err = f.r.ContinueContextDownload(t.Context(), f.f, original, f.source); err == nil || f.lookup.reads != reads || f.f.count("begin") != 1 {
+				t.Fatal("next operation bypassed changed authority or replayed admission", err)
+			}
+		})
 	}
 }

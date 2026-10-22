@@ -77,7 +77,7 @@ func ResumeInitialBootstrapRunner(ctx context.Context, c *rest.Config, namespace
 	if hex.EncodeToString(sum[:]) != originalDigest {
 		return zero, cfg.ErrChanged
 	}
-	plan := InitialBootstrapRunnerPlan{Namespace: namespace, Name: name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: input.ProbeAudience}
+	plan := InitialBootstrapRunnerPlan{Namespace: namespace, Name: name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, RegistrySecret: refs.RegistrySecret, ProbeAudience: input.ProbeAudience, ContinuationDigest: refs.ContinuationDigest}
 	want, err := BuildInitialBootstrapRunner(plan)
 	if err != nil {
 		return zero, err
@@ -126,7 +126,7 @@ func initialBootstrapRunnerTerminal(pod, want *core.Pod, now time.Time) error {
 	actual.NodeName = ""
 	normalizeInitialPodDefaults(actual)
 	normalizeInitialPodDefaults(expected)
-	// The same closed Kubernetes defaults apply to the three init containers.
+	// The same closed Kubernetes defaults apply to every fixed init container.
 	for _, s := range []*core.PodSpec{actual, expected} {
 		for i := range s.InitContainers {
 			if s.InitContainers[i].TerminationMessagePath == core.TerminationMessagePathDefault {
@@ -145,15 +145,24 @@ func initialBootstrapRunnerTerminal(pod, want *core.Pod, now time.Time) error {
 	if pod.Status.Phase != core.PodSucceeded && pod.Status.Phase != core.PodFailed || pod.Status.Reason == "NodeLost" || pod.Spec.NodeName == "" {
 		return ErrInitialBootstrapRunnerActive
 	}
-	expectedNames := []string{"produce", "schema", "prepare", "retire"}
+	expectedNames := make([]string, 0, len(want.Spec.InitContainers)+len(want.Spec.Containers))
+	initNames, mainNames := map[string]bool{}, map[string]bool{}
+	for _, c := range want.Spec.InitContainers {
+		expectedNames = append(expectedNames, c.Name)
+		initNames[c.Name] = true
+	}
+	for _, c := range want.Spec.Containers {
+		expectedNames = append(expectedNames, c.Name)
+		mainNames[c.Name] = true
+	}
 	statuses := map[string]core.ContainerStatus{}
 	for _, s := range pod.Status.InitContainerStatuses {
-		if s.Name != "produce" && s.Name != "schema" && s.Name != "prepare" {
+		if !initNames[s.Name] {
 			return cfg.ErrChanged
 		}
 	}
 	for _, s := range pod.Status.ContainerStatuses {
-		if s.Name != "retire" {
+		if !mainNames[s.Name] {
 			return cfg.ErrChanged
 		}
 	}
@@ -163,7 +172,7 @@ func initialBootstrapRunnerTerminal(pod, want *core.Pod, now time.Time) error {
 		}
 		statuses[s.Name] = s
 	}
-	if len(statuses) > 4 || len(pod.Status.InitContainerStatuses) > 3 || len(pod.Status.ContainerStatuses) > 1 {
+	if len(statuses) > len(expectedNames) || len(pod.Status.InitContainerStatuses) > len(initNames) || len(pod.Status.ContainerStatuses) > len(mainNames) {
 		return cfg.ErrChanged
 	}
 	for name := range statuses {
@@ -203,7 +212,7 @@ func initialBootstrapRunnerTerminal(pod, want *core.Pod, now time.Time) error {
 			unfinished = true
 		}
 	}
-	if started == 0 || pod.Status.Phase == core.PodSucceeded && (started != 4 || unfinished) {
+	if started == 0 || pod.Status.Phase == core.PodSucceeded && (started != len(expectedNames) || unfinished) {
 		return ErrInitialBootstrapRunnerActive
 	}
 	return nil

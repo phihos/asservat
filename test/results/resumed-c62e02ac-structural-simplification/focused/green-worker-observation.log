@@ -1,0 +1,921 @@
+=== RUN   TestContextDownloadNormalStartupContinuesOriginalKeyWithoutAnotherSession
+--- PASS: TestContextDownloadNormalStartupContinuesOriginalKeyWithoutAnotherSession (0.00s)
+=== RUN   TestContextDownloadStatusAndReadyReplayDoNotPrepareAgain
+--- PASS: TestContextDownloadStatusAndReadyReplayDoNotPrepareAgain (0.00s)
+=== RUN   TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation
+=== RUN   TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/nil
+=== RUN   TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/disabled
+=== RUN   TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/lookup-key
+=== RUN   TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/route
+=== RUN   TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/authority
+=== RUN   TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/plan
+--- PASS: TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation (0.00s)
+    --- PASS: TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/nil (0.00s)
+    --- PASS: TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/disabled (0.00s)
+    --- PASS: TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/lookup-key (0.00s)
+    --- PASS: TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/route (0.00s)
+    --- PASS: TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/authority (0.00s)
+    --- PASS: TestContextDownloadMissingRuntimeAndFailuresHaveNoReservation/plan (0.00s)
+=== RUN   TestContextDownloadUnknownReservationAndPreparationStayUncertain
+=== RUN   TestContextDownloadUnknownReservationAndPreparationStayUncertain/reserve
+=== RUN   TestContextDownloadUnknownReservationAndPreparationStayUncertain/continue
+--- PASS: TestContextDownloadUnknownReservationAndPreparationStayUncertain (0.00s)
+    --- PASS: TestContextDownloadUnknownReservationAndPreparationStayUncertain/reserve (0.00s)
+    --- PASS: TestContextDownloadUnknownReservationAndPreparationStayUncertain/continue (0.00s)
+=== RUN   TestContextDownloadCacheLossDoesNotSilentlyReprepareOrRevive
+=== RUN   TestContextDownloadCacheLossDoesNotSilentlyReprepareOrRevive/Ready
+--- PASS: TestContextDownloadCacheLossDoesNotSilentlyReprepareOrRevive (0.00s)
+    --- PASS: TestContextDownloadCacheLossDoesNotSilentlyReprepareOrRevive/Ready (0.00s)
+=== RUN   TestContextDownloadFinalFreshnessAndIdentityFence
+=== RUN   TestContextDownloadFinalFreshnessAndIdentityFence/groups
+=== RUN   TestContextDownloadFinalFreshnessAndIdentityFence/scope
+=== RUN   TestContextDownloadFinalFreshnessAndIdentityFence/policy
+=== RUN   TestContextDownloadFinalFreshnessAndIdentityFence/deadline
+=== RUN   TestContextDownloadFinalFreshnessAndIdentityFence/cancel
+=== RUN   TestContextDownloadFinalFreshnessAndIdentityFence/metadata
+--- PASS: TestContextDownloadFinalFreshnessAndIdentityFence (0.01s)
+    --- PASS: TestContextDownloadFinalFreshnessAndIdentityFence/groups (0.00s)
+    --- PASS: TestContextDownloadFinalFreshnessAndIdentityFence/scope (0.00s)
+    --- PASS: TestContextDownloadFinalFreshnessAndIdentityFence/policy (0.00s)
+    --- PASS: TestContextDownloadFinalFreshnessAndIdentityFence/deadline (0.00s)
+    --- PASS: TestContextDownloadFinalFreshnessAndIdentityFence/cancel (0.00s)
+    --- PASS: TestContextDownloadFinalFreshnessAndIdentityFence/metadata (0.00s)
+=== RUN   TestContextDownloadFinalShortenedIdentityDeadlineIsPreserved
+--- PASS: TestContextDownloadFinalShortenedIdentityDeadlineIsPreserved (0.00s)
+=== RUN   TestContextDownloadOriginalKeyDoesNotRetarget
+--- PASS: TestContextDownloadOriginalKeyDoesNotRetarget (0.00s)
+=== RUN   TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects
+=== RUN   TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects/no-download
+=== RUN   TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects/foreign-client
+=== RUN   TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects/source-expired
+=== RUN   TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects/runtime-expired
+=== RUN   TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects/plan-expired
+--- PASS: TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects (0.00s)
+    --- PASS: TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects/no-download (0.00s)
+    --- PASS: TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects/foreign-client (0.00s)
+    --- PASS: TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects/source-expired (0.00s)
+    --- PASS: TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects/runtime-expired (0.00s)
+    --- PASS: TestContextDownloadScopeAndDeadlineFailuresPrecedeEffects/plan-expired (0.00s)
+=== RUN   TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime
+=== RUN   TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Completed
+=== RUN   TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Cancelled
+=== RUN   TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Expired
+=== RUN   TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Denied
+=== RUN   TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Failed
+=== RUN   TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Preparing
+=== RUN   TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Ready
+=== RUN   TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Streaming
+=== RUN   TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Interrupted
+--- PASS: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime (0.01s)
+    --- PASS: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Completed (0.00s)
+    --- PASS: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Cancelled (0.00s)
+    --- PASS: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Expired (0.00s)
+    --- PASS: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Denied (0.00s)
+    --- PASS: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Failed (0.00s)
+    --- PASS: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Preparing (0.00s)
+    --- PASS: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Ready (0.00s)
+    --- PASS: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Streaming (0.00s)
+    --- PASS: TestContextDownloadTerminalStatusOutlivesTransferDeadlineWithoutRuntime/Interrupted (0.00s)
+=== RUN   TestContextDownloadTerminalStatusStillRequiresCurrentAuthority
+=== RUN   TestContextDownloadTerminalStatusStillRequiresCurrentAuthority/identity
+=== RUN   TestContextDownloadTerminalStatusStillRequiresCurrentAuthority/authority
+=== RUN   TestContextDownloadTerminalStatusStillRequiresCurrentAuthority/observe
+--- PASS: TestContextDownloadTerminalStatusStillRequiresCurrentAuthority (0.00s)
+    --- PASS: TestContextDownloadTerminalStatusStillRequiresCurrentAuthority/identity (0.00s)
+    --- PASS: TestContextDownloadTerminalStatusStillRequiresCurrentAuthority/authority (0.00s)
+    --- PASS: TestContextDownloadTerminalStatusStillRequiresCurrentAuthority/observe (0.00s)
+=== RUN   TestContextDownloadContinuationHonorsOriginalTransferDeadline
+--- PASS: TestContextDownloadContinuationHonorsOriginalTransferDeadline (0.00s)
+=== RUN   TestContextDownloadReadyReplayDoesNotRequireStartupCheck
+--- PASS: TestContextDownloadReadyReplayDoesNotRequireStartupCheck (0.00s)
+=== RUN   TestContextDownloadTerminalViewRetainsCurrentShortenedEvidenceLimits
+--- PASS: TestContextDownloadTerminalViewRetainsCurrentShortenedEvidenceLimits (0.00s)
+=== RUN   TestContextDownloadPlanKeepsAbsoluteBackingEndAcrossLookupWait
+=== RUN   TestContextDownloadPlanKeepsAbsoluteBackingEndAcrossLookupWait/2s
+=== RUN   TestContextDownloadPlanKeepsAbsoluteBackingEndAcrossLookupWait/6s
+--- PASS: TestContextDownloadPlanKeepsAbsoluteBackingEndAcrossLookupWait (0.00s)
+    --- PASS: TestContextDownloadPlanKeepsAbsoluteBackingEndAcrossLookupWait/2s (0.00s)
+    --- PASS: TestContextDownloadPlanKeepsAbsoluteBackingEndAcrossLookupWait/6s (0.00s)
+=== RUN   TestContextDownloadReserveRetriesStaleBindingWithinDeadline
+=== RUN   TestContextDownloadReserveRetriesStaleBindingWithinDeadline/refreshed_in_time
+=== RUN   TestContextDownloadReserveRetriesStaleBindingWithinDeadline/permanent_refusal
+=== RUN   TestContextDownloadReserveRetriesStaleBindingWithinDeadline/other_unavailable_refusal
+=== RUN   TestContextDownloadReserveRetriesStaleBindingWithinDeadline/never_refreshed
+--- PASS: TestContextDownloadReserveRetriesStaleBindingWithinDeadline (1.30s)
+    --- PASS: TestContextDownloadReserveRetriesStaleBindingWithinDeadline/refreshed_in_time (0.50s)
+    --- PASS: TestContextDownloadReserveRetriesStaleBindingWithinDeadline/permanent_refusal (0.00s)
+    --- PASS: TestContextDownloadReserveRetriesStaleBindingWithinDeadline/other_unavailable_refusal (0.00s)
+    --- PASS: TestContextDownloadReserveRetriesStaleBindingWithinDeadline/never_refreshed (0.80s)
+=== RUN   TestContextDownloadResultSurvivesExpiredFirstReplyWithoutAnotherRead
+--- PASS: TestContextDownloadResultSurvivesExpiredFirstReplyWithoutAnotherRead (0.00s)
+=== RUN   TestContextDownloadResultUnknownOutcomeCannotRepeatOrDisclose
+=== RUN   TestContextDownloadResultUnknownOutcomeCannotRepeatOrDisclose/begin
+=== RUN   TestContextDownloadResultUnknownOutcomeCannotRepeatOrDisclose/finish
+=== RUN   TestContextDownloadResultUnknownOutcomeCannotRepeatOrDisclose/outcome
+=== RUN   TestContextDownloadResultUnknownOutcomeCannotRepeatOrDisclose/outcome-ack
+--- PASS: TestContextDownloadResultUnknownOutcomeCannotRepeatOrDisclose (0.01s)
+    --- PASS: TestContextDownloadResultUnknownOutcomeCannotRepeatOrDisclose/begin (0.00s)
+    --- PASS: TestContextDownloadResultUnknownOutcomeCannotRepeatOrDisclose/finish (0.00s)
+    --- PASS: TestContextDownloadResultUnknownOutcomeCannotRepeatOrDisclose/outcome (0.00s)
+    --- PASS: TestContextDownloadResultUnknownOutcomeCannotRepeatOrDisclose/outcome-ack (0.00s)
+=== RUN   TestContextDownloadResultRestartDoesNotReprepareSpentSession
+--- PASS: TestContextDownloadResultRestartDoesNotReprepareSpentSession (0.00s)
+=== RUN   TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt
+=== RUN   TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/worker
+=== RUN   TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/key
+=== RUN   TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/version
+=== RUN   TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/batch
+=== RUN   TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/generation
+=== RUN   TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/ack
+=== RUN   TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/worker-unavailable
+--- PASS: TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt (0.02s)
+    --- PASS: TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/worker (0.00s)
+    --- PASS: TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/key (0.00s)
+    --- PASS: TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/version (0.00s)
+    --- PASS: TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/batch (0.00s)
+    --- PASS: TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/generation (0.00s)
+    --- PASS: TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/ack (0.00s)
+    --- PASS: TestContextDownloadResultRequiresExactWorkerAndHistoricalReceipt/worker-unavailable (0.00s)
+=== RUN   TestContextDownloadResultCurrentIdentityChangesDenyFirstResponse
+=== RUN   TestContextDownloadResultCurrentIdentityChangesDenyFirstResponse/groups
+=== RUN   TestContextDownloadResultCurrentIdentityChangesDenyFirstResponse/scopes
+=== RUN   TestContextDownloadResultCurrentIdentityChangesDenyFirstResponse/policy
+--- PASS: TestContextDownloadResultCurrentIdentityChangesDenyFirstResponse (0.01s)
+    --- PASS: TestContextDownloadResultCurrentIdentityChangesDenyFirstResponse/groups (0.00s)
+    --- PASS: TestContextDownloadResultCurrentIdentityChangesDenyFirstResponse/scopes (0.00s)
+    --- PASS: TestContextDownloadResultCurrentIdentityChangesDenyFirstResponse/policy (0.00s)
+=== RUN   TestContextDownloadResultConcurrentPreparationHasOneNativeRead
+--- PASS: TestContextDownloadResultConcurrentPreparationHasOneNativeRead (0.00s)
+=== RUN   TestContextDownloadResultCloseJoinsWorkAndForbidsLateRetention
+--- PASS: TestContextDownloadResultCloseJoinsWorkAndForbidsLateRetention (0.02s)
+=== RUN   TestContextDownloadResultCurrentRetentionAndResponseBounds
+--- PASS: TestContextDownloadResultCurrentRetentionAndResponseBounds (0.00s)
+=== RUN   TestContextDownloadResultObservationCannotRenewAfterBlockingRead
+--- PASS: TestContextDownloadResultObservationCannotRenewAfterBlockingRead (0.00s)
+=== RUN   TestContextDownloadPrepareCurrentUsesNoBearerAdapter
+--- PASS: TestContextDownloadPrepareCurrentUsesNoBearerAdapter (0.00s)
+=== RUN   TestContextDownloadResultLostCommitReplyNeverRepeatsRead
+=== RUN   TestContextDownloadResultLostCommitReplyNeverRepeatsRead/begin
+=== RUN   TestContextDownloadResultLostCommitReplyNeverRepeatsRead/outcome-ack
+--- PASS: TestContextDownloadResultLostCommitReplyNeverRepeatsRead (0.01s)
+    --- PASS: TestContextDownloadResultLostCommitReplyNeverRepeatsRead/begin (0.00s)
+    --- PASS: TestContextDownloadResultLostCommitReplyNeverRepeatsRead/outcome-ack (0.00s)
+=== RUN   TestContextDownloadResultSnapshotsSourceAndReturnedMetadata
+--- PASS: TestContextDownloadResultSnapshotsSourceAndReturnedMetadata (0.00s)
+=== RUN   TestContextDownloadResultFinalIdentityCheckAndShortenedDeadline
+=== RUN   TestContextDownloadResultFinalIdentityCheckAndShortenedDeadline/groups
+=== RUN   TestContextDownloadResultFinalIdentityCheckAndShortenedDeadline/deadline
+--- PASS: TestContextDownloadResultFinalIdentityCheckAndShortenedDeadline (0.01s)
+    --- PASS: TestContextDownloadResultFinalIdentityCheckAndShortenedDeadline/groups (0.00s)
+    --- PASS: TestContextDownloadResultFinalIdentityCheckAndShortenedDeadline/deadline (0.00s)
+=== RUN   TestContextDownloadResultRejectsUnboundComposition
+=== RUN   TestContextDownloadResultRejectsUnboundComposition/current-authority
+=== RUN   TestContextDownloadResultRejectsUnboundComposition/proofs
+=== RUN   TestContextDownloadResultRejectsUnboundComposition/observations
+=== RUN   TestContextDownloadResultRejectsUnboundComposition/session
+=== RUN   TestContextDownloadResultRejectsUnboundComposition/version
+=== RUN   TestContextDownloadResultRejectsUnboundComposition/worker
+=== RUN   TestContextDownloadResultRejectsUnboundComposition/key
+--- PASS: TestContextDownloadResultRejectsUnboundComposition (0.00s)
+    --- PASS: TestContextDownloadResultRejectsUnboundComposition/current-authority (0.00s)
+    --- PASS: TestContextDownloadResultRejectsUnboundComposition/proofs (0.00s)
+    --- PASS: TestContextDownloadResultRejectsUnboundComposition/observations (0.00s)
+    --- PASS: TestContextDownloadResultRejectsUnboundComposition/session (0.00s)
+    --- PASS: TestContextDownloadResultRejectsUnboundComposition/version (0.00s)
+    --- PASS: TestContextDownloadResultRejectsUnboundComposition/worker (0.00s)
+    --- PASS: TestContextDownloadResultRejectsUnboundComposition/key (0.00s)
+=== RUN   TestContextDownloadResultProofCannotRenewOriginalIdentityInterval
+--- PASS: TestContextDownloadResultProofCannotRenewOriginalIdentityInterval (0.00s)
+=== RUN   TestContextDownloadResultConcurrentShorteningCannotBeReversed
+--- PASS: TestContextDownloadResultConcurrentShorteningCannotBeReversed (0.00s)
+=== RUN   TestContextDownloadResultDeniedPreflightDoesNotConsumeAttempt
+--- PASS: TestContextDownloadResultDeniedPreflightDoesNotConsumeAttempt (0.00s)
+=== RUN   TestContextDownloadResultRetainsShorteningSeenBeforeFirstReply
+--- PASS: TestContextDownloadResultRetainsShorteningSeenBeforeFirstReply (0.00s)
+=== RUN   TestContextDownloadComposedOrderAndClearBuffers
+--- PASS: TestContextDownloadComposedOrderAndClearBuffers (0.00s)
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/authority
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/begin
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/intent
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/intent-ack
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/permit
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/native
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/finish
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/outcome
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/outcome-ack
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/metadata-permit
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/current-decision-loss
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/current-decision-loss#01
+=== RUN   TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/current-decision-loss#02
+--- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/authority (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/begin (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/intent (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/intent-ack (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/permit (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/native (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/finish (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/outcome (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/outcome-ack (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/metadata-permit (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/current-decision-loss (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/current-decision-loss#01 (0.00s)
+    --- PASS: TestContextDownloadFailuresNeverBypassAuditOrReauthorizeLate/current-decision-loss#02 (0.00s)
+=== RUN   TestContextDownloadShortAndFailedOutputRemainCharged
+--- PASS: TestContextDownloadShortAndFailedOutputRemainCharged (0.00s)
+=== RUN   TestDownloadUsesShortenedMetadataAndIODeadline
+--- PASS: TestDownloadUsesShortenedMetadataAndIODeadline (0.00s)
+=== RUN   TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim
+--- PASS: TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim (0.00s)
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/revoked-before
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-removed
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-replaced
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-mutated
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/key-replaced
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/enrollment-removed
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/worker-replaced
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/busy
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/uncertain
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/metadata-started
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/deadline
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/cancelled
+--- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState (0.03s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/revoked-before (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-removed (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-replaced (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-mutated (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/key-replaced (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/enrollment-removed (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/worker-replaced (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/busy (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/uncertain (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/metadata-started (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/deadline (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/cancelled (0.00s)
+=== RUN   TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute
+=== RUN   TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/no-enrollment
+=== RUN   TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/no-peer
+=== RUN   TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/short-peer
+--- PASS: TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute (0.01s)
+    --- PASS: TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/no-enrollment (0.00s)
+    --- PASS: TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/no-peer (0.00s)
+    --- PASS: TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute/short-peer (0.00s)
+=== RUN   TestActiveContextEnrollmentPreservesOriginalRenewalBoundary
+--- PASS: TestActiveContextEnrollmentPreservesOriginalRenewalBoundary (0.00s)
+=== RUN   TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation
+=== RUN   TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation/pod
+=== RUN   TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation/sql
+--- PASS: TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation (0.01s)
+    --- PASS: TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation/pod (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation/sql (0.00s)
+=== RUN   TestNativeContentStopKeepsSlotsUntilJoinedAndDoesNotCrossPrincipal
+--- PASS: TestNativeContentStopKeepsSlotsUntilJoinedAndDoesNotCrossPrincipal (0.02s)
+=== RUN   TestNativeContentRegistryCloseJoinsAndCannotReuseUnjoinedCapacity
+--- PASS: TestNativeContentRegistryCloseJoinsAndCannotReuseUnjoinedCapacity (0.00s)
+=== RUN   TestNativeContentStopRestrictionBeforeJoinedCancellationBeforeAudit
+--- PASS: TestNativeContentStopRestrictionBeforeJoinedCancellationBeforeAudit (0.00s)
+=== RUN   TestContextRuntimeBoundWorkerAvoidsCompletedLaunchReplay
+--- PASS: TestContextRuntimeBoundWorkerAvoidsCompletedLaunchReplay (0.00s)
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/revoked-before
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/pod-replaced
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/job-replaced
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/multiple-pods
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/bound-pending
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/terminated
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/binding-removed
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/sql-worker-replaced
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/busy
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/uncertain
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/cancelled
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-pod
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-sql
+--- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations (0.03s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/revoked-before (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/pod-replaced (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/job-replaced (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/multiple-pods (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/bound-pending (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/terminated (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/binding-removed (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/sql-worker-replaced (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/busy (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/uncertain (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/cancelled (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-pod (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-sql (0.00s)
+=== RUN   TestContextRuntimeBoundWorkerPreservesShorterParentDeadline
+=== RUN   TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/pod
+=== RUN   TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/sql
+--- PASS: TestContextRuntimeBoundWorkerPreservesShorterParentDeadline (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/pod (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/sql (0.00s)
+=== RUN   TestContextRuntimeUnboundWorkerStillUsesLaunchRecovery
+--- PASS: TestContextRuntimeUnboundWorkerStillUsesLaunchRecovery (0.00s)
+=== RUN   TestContextRuntimeNewEnrollmentDefersPreparationToNextContinuation
+--- PASS: TestContextRuntimeNewEnrollmentDefersPreparationToNextContinuation (0.00s)
+=== RUN   TestContextRuntimeKeepsRegistrationDuringInFlightEnrollment
+--- PASS: TestContextRuntimeKeepsRegistrationDuringInFlightEnrollment (0.20s)
+=== RUN   TestContextRuntimeNewEnrollmentWaitsForDeliveryToEnd
+--- PASS: TestContextRuntimeNewEnrollmentWaitsForDeliveryToEnd (0.21s)
+=== RUN   TestContextRuntimeBoundWorkerReusesOneAuthorityObservation
+=== RUN   TestContextRuntimeBoundWorkerReusesOneAuthorityObservation/pod
+=== RUN   TestContextRuntimeBoundWorkerReusesOneAuthorityObservation/sql
+--- PASS: TestContextRuntimeBoundWorkerReusesOneAuthorityObservation (0.01s)
+    --- PASS: TestContextRuntimeBoundWorkerReusesOneAuthorityObservation/pod (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerReusesOneAuthorityObservation/sql (0.00s)
+=== RUN   TestContextRuntimeOneAuthorityObservationReachesFirstReservation
+=== RUN   TestContextRuntimeOneAuthorityObservationReachesFirstReservation/0s
+=== RUN   TestContextRuntimeOneAuthorityObservationReachesFirstReservation/1.7s
+--- PASS: TestContextRuntimeOneAuthorityObservationReachesFirstReservation (0.00s)
+    --- PASS: TestContextRuntimeOneAuthorityObservationReachesFirstReservation/0s (0.00s)
+    --- PASS: TestContextRuntimeOneAuthorityObservationReachesFirstReservation/1.7s (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/caller
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/identity
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/authority
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/session
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/source
+--- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff (0.01s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/caller (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/identity (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/session (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/source (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/source-expired-during-authority
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/invalid-source
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/wrong-profile
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/authority-denied
+--- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead (0.01s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/source-expired-during-authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/invalid-source (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/wrong-profile (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/authority-denied (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/clock-rollback
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/proof-expired
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/caller-cancelled
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/scope-changed
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/current-path-missing
+--- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges (0.01s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/clock-rollback (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/proof-expired (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/caller-cancelled (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/scope-changed (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/current-path-missing (0.00s)
+=== RUN   TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff
+=== RUN   TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/revoked
+=== RUN   TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/identity-changed
+=== RUN   TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/expired
+=== RUN   TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/cancelled
+--- PASS: TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff (0.01s)
+    --- PASS: TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/revoked (0.00s)
+    --- PASS: TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/identity-changed (0.00s)
+    --- PASS: TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/expired (0.00s)
+    --- PASS: TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/cancelled (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/authority
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/attachment
+--- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/attachment (0.00s)
+=== RUN   TestContextMetadataWarmPollsAndActivePinConsumeNoNativeCredits
+--- PASS: TestContextMetadataWarmPollsAndActivePinConsumeNoNativeCredits (0.00s)
+=== RUN   TestContextMetadataCoalescesWithoutBorrowingWaiterDeadline
+--- PASS: TestContextMetadataCoalescesWithoutBorrowingWaiterDeadline (0.02s)
+=== RUN   TestContextMetadataFailedObservationIsNotAutomaticRetry
+--- PASS: TestContextMetadataFailedObservationIsNotAutomaticRetry (0.00s)
+=== RUN   TestContextMetadataRejectsDifferentOriginalBindingAndExpiry
+=== RUN   TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/worker
+=== RUN   TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/batch
+=== RUN   TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/key
+=== RUN   TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/version
+=== RUN   TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/path
+=== RUN   TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/deadline
+--- PASS: TestContextMetadataRejectsDifferentOriginalBindingAndExpiry (0.00s)
+    --- PASS: TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/worker (0.00s)
+    --- PASS: TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/batch (0.00s)
+    --- PASS: TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/key (0.00s)
+    --- PASS: TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/version (0.00s)
+    --- PASS: TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/path (0.00s)
+    --- PASS: TestContextMetadataRejectsDifferentOriginalBindingAndExpiry/deadline (0.00s)
+=== RUN   TestContextNativeMetadataHandoffExactSingleUse
+--- PASS: TestContextNativeMetadataHandoffExactSingleUse (0.00s)
+=== RUN   TestContextRuntimeWarmPollStillChecksCurrentAuthorityAndSQL
+--- PASS: TestContextRuntimeWarmPollStillChecksCurrentAuthorityAndSQL (0.02s)
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/unjoined
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/expired-response
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/exhausted
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/active-stream
+--- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady (0.01s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/unjoined (0.00s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/expired-response (0.00s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/exhausted (0.00s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/active-stream (0.00s)
+=== RUN   TestContextRuntimeWarmFactsRespectCurrentRetentionAndPath
+--- PASS: TestContextRuntimeWarmFactsRespectCurrentRetentionAndPath (0.00s)
+=== RUN   TestProjectionWorkerExactClaimBeforeProtectedOpen
+--- PASS: TestProjectionWorkerExactClaimBeforeProtectedOpen (0.00s)
+=== RUN   TestProjectionWorkerCallerCancellationBoundsBlockingAuthority
+--- PASS: TestProjectionWorkerCallerCancellationBoundsBlockingAuthority (0.03s)
+=== RUN   TestProjectionWorkerUnknownOpenStillClosesKnownLocalHandle
+--- PASS: TestProjectionWorkerUnknownOpenStillClosesKnownLocalHandle (0.00s)
+=== RUN   TestProjectionWorkerThreeRolesAndTwoChargedBatches
+--- PASS: TestProjectionWorkerThreeRolesAndTwoChargedBatches (0.01s)
+=== RUN   TestProjectionWorkerOriginalProofBoundsBlockingSource
+--- PASS: TestProjectionWorkerOriginalProofBoundsBlockingSource (0.04s)
+=== RUN   TestProjectionWorkerUnknownCloseNeverReleasesLocalWorker
+--- PASS: TestProjectionWorkerUnknownCloseNeverReleasesLocalWorker (0.01s)
+=== RUN   TestProjectionWorkerCleanupKeepsOriginalHorizonAfterPublicExpiry
+--- PASS: TestProjectionWorkerCleanupKeepsOriginalHorizonAfterPublicExpiry (0.00s)
+=== RUN   TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot
+=== RUN   TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/foreign
+=== RUN   TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/repeat
+=== RUN   TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/unknown
+--- PASS: TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot (0.01s)
+    --- PASS: TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/foreign (0.00s)
+    --- PASS: TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/repeat (0.00s)
+    --- PASS: TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/unknown (0.00s)
+=== RUN   TestProjectionWorkerCloseJoinsInFlightCurrentChecks
+--- PASS: TestProjectionWorkerCloseJoinsInFlightCurrentChecks (0.02s)
+=== RUN   TestProjectionWorkerShortKeyCallerAndPostKeyRevocation
+=== RUN   TestProjectionWorkerShortKeyCallerAndPostKeyRevocation/caller
+=== RUN   TestProjectionWorkerShortKeyCallerAndPostKeyRevocation/revoked
+--- PASS: TestProjectionWorkerShortKeyCallerAndPostKeyRevocation (0.03s)
+    --- PASS: TestProjectionWorkerShortKeyCallerAndPostKeyRevocation/caller (0.03s)
+    --- PASS: TestProjectionWorkerShortKeyCallerAndPostKeyRevocation/revoked (0.00s)
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-pod
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-action
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-limit
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/worker-process
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/worker-certificate
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-version
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-case
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-capture
+--- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys (0.01s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-pod (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-action (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-limit (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/worker-process (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/worker-certificate (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-version (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-case (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-capture (0.00s)
+=== RUN   TestContextPublicationEffectOrdering
+=== RUN   TestContextPublicationEffectOrdering/accepted
+=== RUN   TestContextPublicationEffectOrdering/authority
+=== RUN   TestContextPublicationEffectOrdering/verify
+=== RUN   TestContextPublicationEffectOrdering/record
+=== RUN   TestContextPublicationEffectOrdering/audit
+=== RUN   TestContextPublicationEffectOrdering/ack
+--- PASS: TestContextPublicationEffectOrdering (0.01s)
+    --- PASS: TestContextPublicationEffectOrdering/accepted (0.00s)
+    --- PASS: TestContextPublicationEffectOrdering/authority (0.00s)
+    --- PASS: TestContextPublicationEffectOrdering/verify (0.00s)
+    --- PASS: TestContextPublicationEffectOrdering/record (0.00s)
+    --- PASS: TestContextPublicationEffectOrdering/audit (0.00s)
+    --- PASS: TestContextPublicationEffectOrdering/ack (0.00s)
+=== RUN   TestContextPublicationRechecksAfterBlockingWork
+=== RUN   TestContextPublicationRechecksAfterBlockingWork/verify
+=== RUN   TestContextPublicationRechecksAfterBlockingWork/audit
+=== RUN   TestContextPublicationRechecksAfterBlockingWork/ack
+--- PASS: TestContextPublicationRechecksAfterBlockingWork (0.00s)
+    --- PASS: TestContextPublicationRechecksAfterBlockingWork/verify (0.00s)
+    --- PASS: TestContextPublicationRechecksAfterBlockingWork/audit (0.00s)
+    --- PASS: TestContextPublicationRechecksAfterBlockingWork/ack (0.00s)
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/ready
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/conditional
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/begin-expired
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/begin-failed
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-failed
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-expired
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-revoked
+=== RUN   TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-shortened
+--- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/ready (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/conditional (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/begin-expired (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/begin-failed (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-failed (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-expired (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-revoked (0.00s)
+    --- PASS: TestNativeContentPreflightPrecedesReservationAndConditionalDisclosure/finish-shortened (0.00s)
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/ready
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/conditional
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/finish-failed
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/finish-shortened
+=== RUN   TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/body-failed
+--- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority (0.00s)
+    --- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/ready (0.00s)
+    --- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/conditional (0.00s)
+    --- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/finish-failed (0.00s)
+    --- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/finish-shortened (0.00s)
+    --- PASS: TestNativeContentBodyPhaseAfterAuditBeforeFreshAuthority/body-failed (0.00s)
+=== RUN   TestDownloadPeerProofCannotRenewOrSubstituteAuthority
+=== RUN   TestDownloadPeerProofCannotRenewOrSubstituteAuthority/valid
+=== RUN   TestDownloadPeerProofCannotRenewOrSubstituteAuthority/missing-source
+=== RUN   TestDownloadPeerProofCannotRenewOrSubstituteAuthority/source-failed
+=== RUN   TestDownloadPeerProofCannotRenewOrSubstituteAuthority/wrong-session
+=== RUN   TestDownloadPeerProofCannotRenewOrSubstituteAuthority/wrong-certificate
+=== RUN   TestDownloadPeerProofCannotRenewOrSubstituteAuthority/expired-after-read
+=== RUN   TestDownloadPeerProofCannotRenewOrSubstituteAuthority/expired-after-bind
+=== RUN   TestDownloadPeerProofCannotRenewOrSubstituteAuthority/cancelled-after-bind
+--- PASS: TestDownloadPeerProofCannotRenewOrSubstituteAuthority (0.00s)
+    --- PASS: TestDownloadPeerProofCannotRenewOrSubstituteAuthority/valid (0.00s)
+    --- PASS: TestDownloadPeerProofCannotRenewOrSubstituteAuthority/missing-source (0.00s)
+    --- PASS: TestDownloadPeerProofCannotRenewOrSubstituteAuthority/source-failed (0.00s)
+    --- PASS: TestDownloadPeerProofCannotRenewOrSubstituteAuthority/wrong-session (0.00s)
+    --- PASS: TestDownloadPeerProofCannotRenewOrSubstituteAuthority/wrong-certificate (0.00s)
+    --- PASS: TestDownloadPeerProofCannotRenewOrSubstituteAuthority/expired-after-read (0.00s)
+    --- PASS: TestDownloadPeerProofCannotRenewOrSubstituteAuthority/expired-after-bind (0.00s)
+    --- PASS: TestDownloadPeerProofCannotRenewOrSubstituteAuthority/cancelled-after-bind (0.00s)
+=== RUN   TestNativeResponseOwnedRefreshPauseSettledAndPending
+=== RUN   TestNativeResponseOwnedRefreshPauseSettledAndPending/settled
+=== RUN   TestNativeResponseOwnedRefreshPauseSettledAndPending/pending
+--- PASS: TestNativeResponseOwnedRefreshPauseSettledAndPending (0.10s)
+    --- PASS: TestNativeResponseOwnedRefreshPauseSettledAndPending/settled (0.00s)
+    --- PASS: TestNativeResponseOwnedRefreshPauseSettledAndPending/pending (0.10s)
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/mismatch
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/expired
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/nonjoined
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/repeat-busy
+=== RUN   TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/changed-claim
+--- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop (0.10s)
+    --- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/mismatch (0.00s)
+    --- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/expired (0.00s)
+    --- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/nonjoined (0.00s)
+    --- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/repeat-busy (0.00s)
+    --- PASS: TestNativeResponsePauseMismatchExpiryAndRepeatedBusyStop/changed-claim (0.10s)
+=== RUN   TestNativeResponsePauseRequiresAdmittedResponseAndHonorsDisconnect
+--- PASS: TestNativeResponsePauseRequiresAdmittedResponseAndHonorsDisconnect (0.02s)
+=== RUN   TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent
+=== RUN   TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/success
+=== RUN   TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/revoked
+=== RUN   TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/shorter-retention
+--- PASS: TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent (0.00s)
+    --- PASS: TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/success (0.00s)
+    --- PASS: TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/revoked (0.00s)
+    --- PASS: TestNativeResponseFreshBatchBetweenJoinedMetadataAndContent/shorter-retention (0.00s)
+=== RUN   TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation
+=== RUN   TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation/changed-client
+=== RUN   TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation/cancel
+--- PASS: TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation (0.00s)
+    --- PASS: TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation/changed-client (0.00s)
+    --- PASS: TestNativeResponseFreshPhaseCannotChangeClientOrIgnoreCancellation/cancel (0.00s)
+=== RUN   TestResponseTransferMultipleWindowsReuseLeaseAndFinishWholeFile
+--- PASS: TestResponseTransferMultipleWindowsReuseLeaseAndFinishWholeFile (0.09s)
+=== RUN   TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry
+=== RUN   TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/identity
+=== RUN   TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/authority
+=== RUN   TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/source
+=== RUN   TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/intent
+=== RUN   TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/intent-ack
+=== RUN   TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/read
+=== RUN   TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/write
+=== RUN   TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/outcome
+=== RUN   TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/outcome-ack
+--- PASS: TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry (0.00s)
+    --- PASS: TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/identity (0.00s)
+    --- PASS: TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/authority (0.00s)
+    --- PASS: TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/source (0.00s)
+    --- PASS: TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/intent (0.00s)
+    --- PASS: TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/intent-ack (0.00s)
+    --- PASS: TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/read (0.00s)
+    --- PASS: TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/write (0.00s)
+    --- PASS: TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/outcome (0.00s)
+    --- PASS: TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry/outcome-ack (0.00s)
+=== RUN   TestResponseTransferVerifiesFinalBeforeLastBytes
+=== RUN   TestResponseTransferVerifiesFinalBeforeLastBytes/hash
+=== RUN   TestResponseTransferVerifiesFinalBeforeLastBytes/range-proof
+--- PASS: TestResponseTransferVerifiesFinalBeforeLastBytes (0.00s)
+    --- PASS: TestResponseTransferVerifiesFinalBeforeLastBytes/hash (0.00s)
+    --- PASS: TestResponseTransferVerifiesFinalBeforeLastBytes/range-proof (0.00s)
+=== RUN   TestResponseTransferEmptyNativeStillHasOneAuditedWindow
+--- PASS: TestResponseTransferEmptyNativeStillHasOneAuditedWindow (0.00s)
+=== RUN   TestHealthyStopFindCannotInventLostProducerCompletion
+--- PASS: TestHealthyStopFindCannotInventLostProducerCompletion (0.00s)
+=== RUN   TestHealthyStopRecoversOnlyExactPersistedCompletion
+--- PASS: TestHealthyStopRecoversOnlyExactPersistedCompletion (0.00s)
+=== RUN   TestHealthyStopRejectsForeignBindingAndIncompleteClose
+--- PASS: TestHealthyStopRejectsForeignBindingAndIncompleteClose (0.00s)
+=== RUN   TestStopCertificateVerificationRequiresPrepaidAttemptBeforeOpen
+--- PASS: TestStopCertificateVerificationRequiresPrepaidAttemptBeforeOpen (0.00s)
+=== RUN   TestPendingStopFailureDoesNotStarveAnotherPrepaidObligation
+--- PASS: TestPendingStopFailureDoesNotStarveAnotherPrepaidObligation (0.00s)
+=== RUN   TestPendingStopCancellationDoesNotStartAnotherClaim
+--- PASS: TestPendingStopCancellationDoesNotStartAnotherClaim (0.00s)
+=== RUN   TestDownloadStopWithoutEvidenceScopesAndSameKeyReplay
+--- PASS: TestDownloadStopWithoutEvidenceScopesAndSameKeyReplay (0.00s)
+=== RUN   TestDownloadStopUnknownWriteRemainsPendingAndNeverRecreated
+--- PASS: TestDownloadStopUnknownWriteRemainsPendingAndNeverRecreated (0.00s)
+=== RUN   TestDownloadStopFinalIdentityDeadlineAfterProviderWait
+--- PASS: TestDownloadStopFinalIdentityDeadlineAfterProviderWait (0.00s)
+=== RUN   TestDownloadStopReconciliationFindsOriginalAfterWriteWindow
+--- PASS: TestDownloadStopReconciliationFindsOriginalAfterWriteWindow (0.00s)
+=== RUN   TestDownloadStopAlreadyTerminalIsCoarseAndActorBound
+--- PASS: TestDownloadStopAlreadyTerminalIsCoarseAndActorBound (0.00s)
+=== RUN   TestWorkerPendingContinuationRetainsOneOriginalCreateAndAudit
+--- PASS: TestWorkerPendingContinuationRetainsOneOriginalCreateAndAudit (0.00s)
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/unknown
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/intent
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/job
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/expired
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/revoked
+    download_worker_pending_test.go:95: unknown or denied work became pending download worker startup pending
+=== RUN   TestWorkerPendingCannotMaskUnknownOrChangedAuthority/shortened
+    download_worker_pending_test.go:92: pending response outlived known shorter authority download worker startup pending
+--- FAIL: TestWorkerPendingCannotMaskUnknownOrChangedAuthority (0.01s)
+    --- PASS: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/unknown (0.00s)
+    --- PASS: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/intent (0.00s)
+    --- PASS: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/job (0.00s)
+    --- PASS: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/expired (0.00s)
+    --- FAIL: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/revoked (0.00s)
+    --- FAIL: TestWorkerPendingCannotMaskUnknownOrChangedAuthority/shortened (0.00s)
+=== RUN   TestArtifactKeyBindingPreservesFramedV1
+--- PASS: TestArtifactKeyBindingPreservesFramedV1 (0.00s)
+=== RUN   TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof
+=== RUN   TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/positive
+=== RUN   TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/unknown
+=== RUN   TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/cleanup-first
+=== RUN   TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/wrong-generation
+--- PASS: TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof (0.00s)
+    --- PASS: TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/positive (0.00s)
+    --- PASS: TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/unknown (0.00s)
+    --- PASS: TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/cleanup-first (0.00s)
+    --- PASS: TestNativeCompletionNeverReplaysUnknownCloseOrUsesCleanupAsProof/wrong-generation (0.00s)
+=== RUN   TestNativeRegionalResultCommitGatesObserveAndNoRepeatedDecrypt
+--- PASS: TestNativeRegionalResultCommitGatesObserveAndNoRepeatedDecrypt (0.00s)
+=== RUN   TestNativeRegionalResultFailedReadCannotRetryAndCloseJoins
+--- PASS: TestNativeRegionalResultFailedReadCannotRetryAndCloseJoins (0.00s)
+=== RUN   TestNativeRegionalObservationRejectsReplacementAndMissingResult
+--- PASS: TestNativeRegionalObservationRejectsReplacementAndMissingResult (0.00s)
+=== RUN   TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent
+=== RUN   TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/success
+=== RUN   TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/partial-sink
+=== RUN   TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/lost-ack
+--- PASS: TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent (0.00s)
+    --- PASS: TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/success (0.00s)
+    --- PASS: TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/partial-sink (0.00s)
+    --- PASS: TestNativeDeliveryAckFollowsFinalSinkAndUnknownStaysSpent/lost-ack (0.00s)
+=== RUN   TestNativeFrameGateConcurrentShorteningCannotRenew
+--- PASS: TestNativeFrameGateConcurrentShorteningCannotRenew (0.00s)
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/cancel
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/revoked
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/changed-owner
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/processing-changed
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/worker-configuration-changed
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/hub-path-changed
+=== RUN   TestNativeFrameGateOwnsCancellationAndKnownRevocation/store-changed
+--- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/cancel (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/revoked (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/changed-owner (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/processing-changed (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/worker-configuration-changed (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/hub-path-changed (0.00s)
+    --- PASS: TestNativeFrameGateOwnsCancellationAndKnownRevocation/store-changed (0.00s)
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath/missing-processing
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath/missing-path
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath/wrong-target
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath/expired-processing
+=== RUN   TestNativeFrameGateRequiresProcessingAndExactPath/cross-cluster-connector
+--- PASS: TestNativeFrameGateRequiresProcessingAndExactPath (0.00s)
+    --- PASS: TestNativeFrameGateRequiresProcessingAndExactPath/missing-processing (0.00s)
+    --- PASS: TestNativeFrameGateRequiresProcessingAndExactPath/missing-path (0.00s)
+    --- PASS: TestNativeFrameGateRequiresProcessingAndExactPath/wrong-target (0.00s)
+    --- PASS: TestNativeFrameGateRequiresProcessingAndExactPath/expired-processing (0.00s)
+    --- PASS: TestNativeFrameGateRequiresProcessingAndExactPath/cross-cluster-connector (0.00s)
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/success
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/outcome-ack
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/metadata-permit
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/invalid-metadata
+=== RUN   TestNativePreparationPreservesOutcomeAndFinalGate/unknown-commit
+--- PASS: TestNativePreparationPreservesOutcomeAndFinalGate (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/success (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/outcome-ack (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/metadata-permit (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/invalid-metadata (0.00s)
+    --- PASS: TestNativePreparationPreservesOutcomeAndFinalGate/unknown-commit (0.00s)
+=== RUN   TestNativePreparationDoesNotEnableLegacyContentOrAmbiguousReader
+--- PASS: TestNativePreparationDoesNotEnableLegacyContentOrAmbiguousReader (0.00s)
+=== RUN   TestNativeTerminalSnapshotNeverRenewsOrConsultsRetiredAuthority
+--- PASS: TestNativeTerminalSnapshotNeverRenewsOrConsultsRetiredAuthority (0.00s)
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/zero
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/nil
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-caller
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-owner
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-revoked
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-owner-change
+=== RUN   TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/shortened
+--- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/zero (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/nil (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-caller (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/cancelled-owner (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-revoked (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/known-owner-change (0.00s)
+    --- PASS: TestNativeTerminalSnapshotRejectsUnknownOrKnownLostAuthority/shortened (0.00s)
+=== RUN   TestWorkerCurrentBrowserSessionReachesDispatchAndEnrollmentWithoutBearer
+--- PASS: TestWorkerCurrentBrowserSessionReachesDispatchAndEnrollmentWithoutBearer (0.00s)
+=== RUN   TestWorkerCurrentOriginalCheckTraversesConstructorRouterLocatorAndDelivery
+--- PASS: TestWorkerCurrentOriginalCheckTraversesConstructorRouterLocatorAndDelivery (0.00s)
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/groups
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/scopes
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/policy
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/expiry
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/groups
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/scopes
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/policy
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/expiry
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/groups
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/scopes
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/policy
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/expiry
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/groups
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/scopes
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/policy
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/expiry
+--- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval (0.02s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/expiry (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/expiry (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/expiry (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/groups (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/scopes (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/expiry (0.00s)
+=== RUN   TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation
+=== RUN   TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/proof
+=== RUN   TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/prepare-certificate
+=== RUN   TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/sign
+=== RUN   TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/activate
+--- PASS: TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation (0.01s)
+    --- PASS: TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/proof (0.00s)
+    --- PASS: TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/prepare-certificate (0.00s)
+    --- PASS: TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/sign (0.00s)
+    --- PASS: TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/activate (0.00s)
+=== RUN   TestWorkerCurrentLostCreateReplyUsesExactLookupWithoutAnotherCreate
+--- PASS: TestWorkerCurrentLostCreateReplyUsesExactLookupWithoutAnotherCreate (0.00s)
+=== RUN   TestWorkerCurrentLocatorClaimKeepsOriginalObservationAndDeadline
+=== RUN   TestWorkerCurrentLocatorClaimKeepsOriginalObservationAndDeadline/expiry
+=== RUN   TestWorkerCurrentLocatorClaimKeepsOriginalObservationAndDeadline/groups
+=== RUN   TestWorkerCurrentLocatorClaimKeepsOriginalObservationAndDeadline/shorter
+--- PASS: TestWorkerCurrentLocatorClaimKeepsOriginalObservationAndDeadline (0.00s)
+    --- PASS: TestWorkerCurrentLocatorClaimKeepsOriginalObservationAndDeadline/expiry (0.00s)
+    --- PASS: TestWorkerCurrentLocatorClaimKeepsOriginalObservationAndDeadline/groups (0.00s)
+    --- PASS: TestWorkerCurrentLocatorClaimKeepsOriginalObservationAndDeadline/shorter (0.00s)
+=== RUN   TestWorkerCurrentConcurrentLocalChecksCannotRestoreShorterBound
+--- PASS: TestWorkerCurrentConcurrentLocalChecksCannotRestoreShorterBound (0.00s)
+=== RUN   TestWorkerCurrentOwningRequestCancellationStopsBackgroundCheck
+--- PASS: TestWorkerCurrentOwningRequestCancellationStopsBackgroundCheck (0.00s)
+=== RUN   TestWorkerCurrentObservationDoesNotFollowCallerMutation
+=== RUN   TestWorkerCurrentObservationDoesNotFollowCallerMutation/groups
+=== RUN   TestWorkerCurrentObservationDoesNotFollowCallerMutation/scopes
+=== RUN   TestWorkerCurrentObservationDoesNotFollowCallerMutation/authority
+--- PASS: TestWorkerCurrentObservationDoesNotFollowCallerMutation (0.00s)
+    --- PASS: TestWorkerCurrentObservationDoesNotFollowCallerMutation/groups (0.00s)
+    --- PASS: TestWorkerCurrentObservationDoesNotFollowCallerMutation/scopes (0.00s)
+    --- PASS: TestWorkerCurrentObservationDoesNotFollowCallerMutation/authority (0.00s)
+=== RUN   TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect
+=== RUN   TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect/dispatch
+=== RUN   TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect/enrollment
+--- PASS: TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect (0.00s)
+    --- PASS: TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect/dispatch (0.00s)
+    --- PASS: TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect/enrollment (0.00s)
+=== RUN   TestWorkerCurrentCheckCannotStartOverAfterBlockingProof
+--- PASS: TestWorkerCurrentCheckCannotStartOverAfterBlockingProof (0.00s)
+=== RUN   TestWorkerCurrentExplicitShorteningBoundsCertificateDelivery
+--- PASS: TestWorkerCurrentExplicitShorteningBoundsCertificateDelivery (0.00s)
+=== RUN   TestWorkerCurrentRouterAndOwnerUseShorterCurrentBound
+--- PASS: TestWorkerCurrentRouterAndOwnerUseShorterCurrentBound (0.00s)
+=== RUN   TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority
+=== RUN   TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/read-scope
+=== RUN   TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/download-scope
+=== RUN   TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/principal
+=== RUN   TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/authority-scope
+=== RUN   TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/environment
+=== RUN   TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/retention
+=== RUN   TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/expired
+=== RUN   TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/cancelled
+=== RUN   TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/authority-denied
+--- PASS: TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority (0.00s)
+    --- PASS: TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/read-scope (0.00s)
+    --- PASS: TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/download-scope (0.00s)
+    --- PASS: TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/principal (0.00s)
+    --- PASS: TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/authority-scope (0.00s)
+    --- PASS: TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/environment (0.00s)
+    --- PASS: TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/retention (0.00s)
+    --- PASS: TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/expired (0.00s)
+    --- PASS: TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/cancelled (0.00s)
+    --- PASS: TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority/authority-denied (0.00s)
+=== RUN   TestWorkerCurrentNewOperationObservesRevocation
+--- PASS: TestWorkerCurrentNewOperationObservesRevocation (0.00s)
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/claim
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/lookup
+=== RUN   TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/release
+--- PASS: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose (0.15s)
+    --- PASS: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/claim (0.05s)
+    --- PASS: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/lookup (0.05s)
+    --- PASS: TestWorkerOwnerWrappersJoinOriginalSQLBeforeDependencyClose/release (0.05s)
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/current
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/uncertain-claim
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/cancelled-claim
+=== RUN   TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/foreign-return
+--- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/current (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/uncertain-claim (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/cancelled-claim (0.00s)
+    --- PASS: TestWorkerOwnerRegistrationPreservesLocalLifetimeOnSQLFailure/foreign-return (0.00s)
+=== RUN   TestWorkerOwnerLookupKeepsExactRegistrationAcrossReplacement
+--- PASS: TestWorkerOwnerLookupKeepsExactRegistrationAcrossReplacement (0.00s)
+=== RUN   TestWorkerRoutesCloseAndJoinRetainsRegistrationIO
+--- PASS: TestWorkerRoutesCloseAndJoinRetainsRegistrationIO (0.05s)
+=== RUN   TestWorkerRoutesCloseAndJoinRetainsBusyEnrollment
+--- PASS: TestWorkerRoutesCloseAndJoinRetainsBusyEnrollment (0.05s)
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/valid
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/credential
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/actor
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/worker
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/pod
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/start
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/end
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/installation
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/authority-installation
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/expired
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/cancelled
+=== RUN   TestWorkerRoutesRequireCurrentOwnerAndExactWorker/binding-expired
+--- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/valid (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/credential (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/actor (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/worker (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/pod (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/start (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/end (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/installation (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/authority-installation (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/expired (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/cancelled (0.00s)
+    --- PASS: TestWorkerRoutesRequireCurrentOwnerAndExactWorker/binding-expired (0.00s)
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO/authority-expired
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO/owner-expired
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO/caller-cancelled
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO/parent-cancelled
+=== RUN   TestWorkerRoutesRejectStaleRegistrationAfterIO/router-closed
+--- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO (0.00s)
+    --- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO/authority-expired (0.00s)
+    --- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO/owner-expired (0.00s)
+    --- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO/caller-cancelled (0.00s)
+    --- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO/parent-cancelled (0.00s)
+    --- PASS: TestWorkerRoutesRejectStaleRegistrationAfterIO/router-closed (0.00s)
+=== RUN   TestWorkerRoutesKeepConcurrentWorkerTokensSeparate
+--- PASS: TestWorkerRoutesKeepConcurrentWorkerTokensSeparate (0.00s)
+=== RUN   TestWorkerRoutesBoundConcurrentRegistrationAndPreserveReplacement
+--- PASS: TestWorkerRoutesBoundConcurrentRegistrationAndPreserveReplacement (0.00s)
+=== RUN   TestWorkerRoutesKeepClosingWorkChargedUntilItReturns
+--- PASS: TestWorkerRoutesKeepClosingWorkChargedUntilItReturns (0.00s)
+=== RUN   TestWorkerRoutesCancelIdleOwnersAndCloseRouter
+--- PASS: TestWorkerRoutesCancelIdleOwnersAndCloseRouter (0.00s)
+=== RUN   TestWorkerRuntimeOriginalPeriodsAndShortDeadline
+=== RUN   TestWorkerRuntimeOriginalPeriodsAndShortDeadline/1s
+=== RUN   TestWorkerRuntimeOriginalPeriodsAndShortDeadline/30s
+=== RUN   TestWorkerRuntimeOriginalPeriodsAndShortDeadline/21m0s
+=== RUN   TestWorkerRuntimeOriginalPeriodsAndShortDeadline/8h0m0s
+--- PASS: TestWorkerRuntimeOriginalPeriodsAndShortDeadline (0.00s)
+    --- PASS: TestWorkerRuntimeOriginalPeriodsAndShortDeadline/1s (0.00s)
+    --- PASS: TestWorkerRuntimeOriginalPeriodsAndShortDeadline/30s (0.00s)
+    --- PASS: TestWorkerRuntimeOriginalPeriodsAndShortDeadline/21m0s (0.00s)
+    --- PASS: TestWorkerRuntimeOriginalPeriodsAndShortDeadline/8h0m0s (0.00s)
+=== RUN   TestWorkerRuntimeFailureAndCancellationAreFinite
+--- PASS: TestWorkerRuntimeFailureAndCancellationAreFinite (0.00s)
+=== RUN   TestWorkerRuntimeBlockedObserverCannotDelayExpiry
+--- PASS: TestWorkerRuntimeBlockedObserverCannotDelayExpiry (0.02s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	2.934s
+FAIL

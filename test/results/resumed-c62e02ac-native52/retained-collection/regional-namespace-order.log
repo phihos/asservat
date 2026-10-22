@@ -1,0 +1,9 @@
+asservat-connector e1c96129-db15-41e5-abd7-917c36744599
+asservat-connector-capacity-probe 9f067ecf-fefc-4e5f-adc0-b40bb6273bb1
+default 9a84871f-caf2-4833-8013-f49f053078c4
+kube-node-lease b1610eee-9273-4936-8206-91158af2dbb6
+kube-public 8884ec35-09ee-4bd4-977a-416d31aded46
+kube-system df0f9037-88ae-4e64-8fc2-d044988120ec
+local-path-storage 2bc6fd01-b292-4c82-8daf-6f5bdcae38a4
+regional-apps 7d48b7c3-df1b-4eef-b1d8-a824af3bf2fe
+synthetic 857cb3e0-0b4b-4c28-9f03-c0c3b1dc1b7d

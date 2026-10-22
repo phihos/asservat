@@ -4,7 +4,7 @@ Helm is the official installation and upgrade path. The [chart README](../../cha
 
 ## Current scope
 
-Version `0.1.0-dev.1` packages AccessBinding, PermissionSource, EvidenceRetentionPolicy and CapacityReservation structural CRDs, plus a nonauthorizing release inventory. All three topology modes are accepted. By default, no runtime Deployment, collector, public route, database migration, default permission grant or baseline policy is installed. The optional ADR-137 bootstrap hook packages initial schema and activation through the existing four-command installer; its native Helm qualification is pending. It starts no runtime service. Default policies must be protected and accepted by the runtime before becoming authoritative; shipping an unqualified default would not satisfy this requirement.
+Version `0.1.0-dev.1` packages AccessBinding, PermissionSource, EvidenceRetentionPolicy and CapacityReservation structural CRDs, plus a nonauthorizing release inventory. All three topology modes are accepted. By default, no runtime Deployment, collector, public route, database migration, default permission grant or baseline policy is installed. The optional ADR-137 bootstrap hook packages initial schema and activation. Explicit runtime continuation adds its final command to the same fixed runner Pod. The earlier bootstrap/private-registry composition has native evidence; this consolidated layout awaits separate qualification. Default policies must be protected and accepted by the runtime before becoming authoritative; rendering a policy does not establish acceptance.
 
 The initial external identity provider is **Keycloak**, selected by the maintainer. Reuse the [qualified reference profile](../architecture/keycloak-profile.md) for its browser/MCP implementation; issuer/client/group configuration remains independently protected. The maintainer subsequently required an internal users/login option and small-deployment alternatives under [ADR-063](../decisions/063-small-deployment-alternatives.md). Those are planned features; the current chart does not provide them. Do not auto-install a realm, embed an administrator password or infer authority from group display names. Keycloak token integration is already tested; complete browser/MCP sign-in and installer acceptance remain in progress.
 
@@ -13,10 +13,11 @@ The chart's `runtime.enabled: false` constraint is temporary and explicit. Add r
 ## Optional initial bootstrap checkpoint
 
 This development package offers `bootstrap.enabled: true` for the existing
-external PostgreSQL, S3 and OpenBao path. Its actual chart/private-registry
-qualification is pending; the underlying ADR-133 four-command chain has passed
-separate native tests. Keep `runtime.enabled: false`. Successful bootstrap does
-not yet provide an installed browser/MCP investigation service; see the exact
+external PostgreSQL, S3 and OpenBao path. The actual four-command chart and
+private-registry composition has [native evidence](../architecture/helm-bootstrap.md#qualification-and-remaining-installed-prerequisites).
+Keep `runtime.enabled: false`; runtime continuation is a separate explicit
+option below. Successful bootstrap alone does not provide an installed
+browser/MCP investigation service; see the exact
 [remaining installed prerequisites](../architecture/helm-bootstrap.md#qualification-and-remaining-installed-prerequisites).
 
 Use a verified chart archive and its actual product image digest. Select a
@@ -83,9 +84,12 @@ helm upgrade --install asservat ./asservat-0.1.0-dev.1.tgz \
 ```
 
 The fixed hook runs produce, schema, preparation and retirement in order with
-one original image, Restricted security and memory-only private scratch. It
-creates no runtime services. Original effect/credential/cleanup deadlines still
-apply independently of Helm's wait timeout. Retain this original bootstrap image
+one original image, Restricted security and memory-only private scratch. With
+continuation enabled, it runs `installer-continue` as the final container,
+without another producer or scratch volume. Bootstrap alone creates no runtime
+services. The entire Pod retains its 1,800-second ceiling; original
+effect/credential/cleanup deadlines still apply independently of Helm's wait
+timeout. Retain this original bootstrap image
 and desired input on later chart-only replay; changing an image/bundle is not an
 application upgrade protocol.
 
@@ -122,9 +126,11 @@ asservat installer-resume --context MANAGEMENT_CONTEXT \
 
 Normal `--kubeconfig`/`KUBECONFIG`/current-context resolution applies; the command
 reports its resolved scope and never falls back to in-cluster credentials. It
-validates the exact original public input and fixed Pod, then removes only its
+validates the exact original bootstrap/runner input and fixed Pod, including
+the final continuation's termination when enabled, then removes only its
 terminal UID/resource version. It does not read setup credentials or finish an
-installation. Retry the same Helm command explicitly afterward. Expired original
+installation. It does not need the downstream continuation ConfigMap to remove
+an already terminated runner. Retry the same Helm command explicitly afterward. Expired original
 effects or contradictory product state require qualified recovery, not new IDs.
 
 Correcting malformed public input creates a new immutable revision snapshot;
@@ -135,10 +141,22 @@ chart housekeeping, not ownership of product history.
 
 ### Runtime continuation (development)
 
-[ADR-183](../decisions/183-installer-runtime-continuation.md) adds a second
-hook, enabled with `bootstrap.continuation.enabled: true`. It starts the
-configuration worker and the owner after first activation. Its native
-qualification is pending; keep `runtime.enabled: false`.
+[ADR-183](../decisions/183-installer-runtime-continuation.md) defines the
+continuation enabled with `bootstrap.continuation.enabled: true`. It starts
+the configuration worker and the owner after first activation. It now runs as
+the final container of `<bootstrap.name>-bootstrap`, after retirement has
+refreshed the shared public/history projection and removed its maintenance
+credential. The separate continuation Pod and duplicate projection producer are
+removed. Installed evidence for the earlier composition does not qualify this
+new layout; see [implementation status](../implementation-status.md). Keep
+`runtime.enabled: false`.
+
+When upgrading from the separate-Pod layout, Helm checks the legacy
+`<bootstrap.name>-continuation` Pod through the selected administrative
+connection. A nonterminal, node-lost or deleting legacy Pod blocks rendering.
+Resolve that original operation before retrying; the chart never deletes or
+adopts it. Completed legacy Pods may remain. Offline `helm template` cannot
+perform this live overlap check.
 
 Before enabling it, prepare these in OpenBao and the audit store:
 
@@ -150,8 +168,10 @@ Set the two mounts' paths and accessors and the owner PKI roots PEM in
 `bootstrap.continuation`. Keep `postgres-administrator.json` in the producer
 Secret until the continuation completes.
 
-The hook runs as the runner account. It finishes in two provider waits inside
-the original 30-minute window. At each wait it publishes an exact public
+The continuation runs as the runner account and uses its own rotating API token.
+Its existing provider waits remain inside their original runtime journal
+window and the same Pod's 30-minute ceiling; joining the phases grants no new
+time or retry. At each wait it publishes an exact public
 recipe to the outbox ConfigMap `asservat-<installation>-installer-outbox` in
 the bootstrap namespace. For each wait, run the applier with your own OpenBao
 administration (`BAO_ADDR`, `BAO_CACERT`, `BAO_TOKEN`) and a scoped audit

@@ -1,6 +1,7 @@
 package contracts
 
 import (
+	"errors"
 	"io"
 	"time"
 )
@@ -12,8 +13,13 @@ const PublicRuntimeCredentialManifestFormat = "asservat-public-runtime-credentia
 const PublicRuntimeCredentialManifestFile = "public-roles.json"
 const PublicRuntimeCredentialManifestMaxBytes = 32 << 10
 
-// The role ceiling is installation-wide. Each process still opens at most one
-// connection per purpose; the additional slot is for installer verification.
+// ErrPublicRuntimeLayout refuses unsupported retained development state without
+// adopting, rewriting or removing it.
+var ErrPublicRuntimeLayout = errors.New("unsupported development SQL credential layout; preserve retained state; recreate only a disposable development installation")
+
+// The role ceiling is installation-wide. Most credentials have one connection
+// per process; metadata readers share seven. One extra slot verifies installation.
+const PublicRuntimeMetadataConnections = 7
 const PublicRuntimeRetainedHubProcesses = 4
 const PublicRuntimeRoleConnections = PublicRuntimeRetainedHubProcesses + 1
 
@@ -93,7 +99,7 @@ func PublicRuntimePermissionPurposes() []string {
 // Reconciler credentials must never enter the hub merely because the installer
 // learns how to create another fixed purpose.
 func PublicRuntimeHubRolePurposes() []string {
-	out := []string{"identity-read", "browser-settings", "browser-session", "browser-cleanup", "refresh-admit", "refresh-owner", "refresh-read", "permission-read", "retention-read", "storage-read", "progress-read", "case-read", "processing-read", "capture-intent-read", "download-source", "catalog-read", "download-plan", "worker-config-read", "audit-normal-journal", "audit-normal-ack", "audit-resolution-journal", "audit-resolution-ack", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack", "capture-preview", "capture-resolution"}
+	out := []string{"identity-read", "browser-settings", "browser-session", "browser-cleanup", "refresh-admit", "refresh-owner", "refresh-read", "hub-metadata-read", "capture-intent-read", "download-source", "download-plan", "worker-config-read", "audit-normal-journal", "audit-normal-ack", "audit-resolution-journal", "audit-resolution-ack", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack", "capture-preview", "capture-resolution"}
 	return append(out, PublicRuntimeHubExtensionPurposes()...)
 }
 
@@ -131,24 +137,10 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 5, true
 	case "refresh-read":
 		return 6, true
-	case "permission-read":
-		return 10, true
-	case "retention-read":
-		return 11, true
-	case "storage-read":
-		return 12, true
-	case "progress-read":
-		return 13, true
-	case "case-read":
-		return 14, true
-	case "processing-read":
-		return 15, true
 	case "capture-intent-read":
 		return 16, true
 	case "download-source":
 		return 17, true
-	case "catalog-read":
-		return 18, true
 	case "download-plan":
 		return 19, true
 	case "worker-config-read":
@@ -296,6 +288,9 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 	// ADR-210: the hub-api's privacy-operator processing decisions.
 	case "processing-decision":
 		return 92, true
+	// Former metadata-reader ordinals 10-15 and 18 are not reused.
+	case "hub-metadata-read":
+		return 93, true
 	default:
 		return 0, false
 	}

@@ -95,7 +95,7 @@ func (k *InstallerContinuation) Close() {
 // OpenInstallerContinuation reopens the activated installation: the original
 // preparer and passive history under native protection, the acknowledged
 // activation record, and the operator superuser for the runtime SQL bridge.
-// preparer is the produce step's fresh projection; files holds the
+// preparer is the retirement step's refreshed public/history projection; files holds the
 // continuation input, the superuser and the kubelet-rotated runner token.
 func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, step *string) (*InstallerContinuation, error) {
 	if ctx == nil || ctx.Err() != nil || files == nil || preparer == nil || disableWorkerCoreDumps() != nil {

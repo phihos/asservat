@@ -50,7 +50,7 @@ func initialAuthorityFixture(t *testing.T) (boundWorkerFixture, *initialAuthorit
 	return f, probe
 }
 
-func TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation(t *testing.T) {
+func TestContextRuntimeOneAuthorityObservationReachesFirstReservation(t *testing.T) {
 	for _, delay := range []time.Duration{0, 1700 * time.Millisecond} {
 		t.Run(delay.String(), func(t *testing.T) {
 			f, reserve := initialAuthorityFixture(t)
@@ -67,8 +67,8 @@ func TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation(t *testing
 			if !errors.Is(err, errInitialAuthorityReserved) || reserve.calls != 1 {
 				t.Fatalf("first reservation not reached: calls=%d authority=%d err=%v", reserve.calls, f.f.count("current-authority"), err)
 			}
-			if beforeRead != 1 || f.lookup.reads != 1 || f.f.count("current-authority") != 2 {
-				t.Fatalf("full authority checks before first SQL=%d total=%d SQL reads=%d; want one before SQL and one after it", beforeRead, f.f.count("current-authority"), f.lookup.reads)
+			if beforeRead != 1 || f.lookup.reads != 1 || f.f.count("current-authority") != 1 {
+				t.Fatalf("full authority checks before first SQL=%d total=%d SQL reads=%d; want one request-owned observation", beforeRead, f.f.count("current-authority"), f.lookup.reads)
 			}
 			if reserve.deadline.After(original) || reserve.authority.ValidUntil.After(original) || !f.f.now.Before(original) {
 				t.Fatal("first reservation escaped the original interval")
@@ -185,7 +185,7 @@ func TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges(t *testing.T)
 	}
 }
 
-func TestContextRuntimeInitialAuthorityRechecksAfterAttachment(t *testing.T) {
+func TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff(t *testing.T) {
 	for _, which := range []string{"revoked", "identity-changed", "expired", "cancelled"} {
 		t.Run(which, func(t *testing.T) {
 			f, reserve := initialAuthorityFixture(t)
@@ -203,8 +203,13 @@ func TestContextRuntimeInitialAuthorityRechecksAfterAttachment(t *testing.T) {
 					cancel()
 				}
 			}
-			if _, err := f.r.ContinueContextDownload(ctx, f.f, f.f.s, f.source); err == nil || f.lookup.reads != 1 || reserve.calls != 0 {
-				t.Fatal("a changed observation survived attachment I/O", which, f.lookup.reads, reserve.calls, err)
+			_, err := f.r.ContinueContextDownload(ctx, f.f, f.f.s, f.source)
+			if which == "revoked" || which == "identity-changed" {
+				if !errors.Is(err, errInitialAuthorityReserved) || f.lookup.reads != 1 || reserve.calls != 1 || f.f.count("current-authority") != 1 {
+					t.Fatal("bounded observation was reconstructed after attachment", which, f.lookup.reads, reserve.calls, err)
+				}
+			} else if err == nil || f.lookup.reads != 1 || reserve.calls != 0 {
+				t.Fatal("an expired or cancelled operation reached reservation", which, f.lookup.reads, reserve.calls, err)
 			}
 		})
 	}

@@ -133,6 +133,131 @@ func TestCapacityDiscoveryBoundsPagesAndRejectsChangedContinuation(t *testing.T)
 	}
 }
 
+type capacityDiscoveryRetryReader struct {
+	capacityRuntimeReader
+	workloads func(context.Context, cfg.NamespaceRef, string, string) (CapacityWorkloadPage, error)
+}
+
+func (r *capacityDiscoveryRetryReader) DiscoverCapacityNamespaces(ctx context.Context, _ string) (CapacityNamespacePage, error) {
+	return CapacityNamespacePage{ResourceVersion: "namespaces-1", Namespaces: []cfg.NamespaceRef{
+		{Name: "app", UID: "app-uid"}, {Name: "later", UID: "later-uid"},
+	}}, ctx.Err()
+}
+
+func (r *capacityDiscoveryRetryReader) DiscoverCapacityWorkloads(ctx context.Context, ns cfg.NamespaceRef, kind, next string) (CapacityWorkloadPage, error) {
+	return r.workloads(ctx, ns, kind, next)
+}
+
+// A transient failed LIST must not lose the only Deployment candidate for a
+// complete traversal. Retrying is a separate ordinary turn; two consecutive
+// failures must still let later kinds/namespaces make progress.
+func TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget(t *testing.T) {
+	for _, continuation := range []bool{false, true} {
+		for _, failures := range []int{1, 2} {
+			name := "first-page"
+			if continuation {
+				name = "continuation"
+			}
+			if failures == 2 {
+				name += "/persistent-failure"
+			} else {
+				name += "/transient-failure"
+			}
+			t.Run(name, func(t *testing.T) {
+				until := time.Now().Add(time.Minute)
+				ctx, cancel := context.WithDeadline(context.Background(), until)
+				defer cancel()
+				app := cfg.NamespaceRef{Name: "app", UID: "app-uid"}
+				target := cfg.WorkloadRef{Kind: "Deployment", Name: "target", UID: "target-uid"}
+				first := cfg.WorkloadRef{Kind: "Deployment", Name: "first", UID: "first-uid"}
+				token := ""
+				if continuation {
+					token = "original-page-token"
+				}
+				calls, attempts := 0, 0
+				later := false
+				reader := &capacityDiscoveryRetryReader{}
+				reader.workloads = func(call context.Context, ns cfg.NamespaceRef, kind, next string) (CapacityWorkloadPage, error) {
+					calls++
+					deadline, ok := call.Deadline()
+					if call != ctx || !ok || !deadline.Equal(until) {
+						t.Fatal("discovery replaced the original caller or deadline")
+					}
+					if ns == app && kind == "Deployment" {
+						if continuation && calls == 1 {
+							if next != "" {
+								t.Fatal("first LIST supplied a continuation")
+							}
+							return CapacityWorkloadPage{ResourceVersion: "work-1", Continue: token, Workloads: []cfg.WorkloadRef{first}}, nil
+						}
+						if next != token {
+							t.Fatalf("retry changed original page token: got %q, want %q", next, token)
+						}
+						attempts++
+						if attempts <= failures {
+							return CapacityWorkloadPage{}, cfg.ErrUnavailable
+						}
+						return CapacityWorkloadPage{ResourceVersion: "work-1", Workloads: []cfg.WorkloadRef{target}}, nil
+					}
+					if ns.Name == "later" {
+						if ns.UID != "later-uid" || kind != "Deployment" || next != "" {
+							t.Fatal("later namespace did not start at its original first page")
+						}
+						later = true
+					}
+					return CapacityWorkloadPage{ResourceVersion: "empty-1"}, nil
+				}
+				var cursor capacityDiscoveryCursor
+				step := func() (cfg.NamespaceRef, cfg.WorkloadRef, bool, error) {
+					t.Helper()
+					before := calls
+					ns, candidate, found, err := cursor.next(ctx, reader)
+					if calls-before > 1 {
+						t.Fatal("retry added I/O inside the failed turn")
+					}
+					return ns, candidate, found, err
+				}
+				if _, _, found, err := step(); found || err != nil {
+					t.Fatal("namespace LIST became a candidate", err)
+				}
+				if continuation {
+					if _, _, found, err := step(); found || err != nil {
+						t.Fatal("first page did not load", err)
+					}
+					if ns, got, found, err := step(); err != nil || !found || ns != app || got != first {
+						t.Fatal("first candidate changed or disappeared", err)
+					}
+				}
+				if ns, _, found, err := step(); found || !errors.Is(err, cfg.ErrUnavailable) || ns != app || attempts != 1 {
+					t.Fatal("failed page was not refused once in its original scope", err)
+				}
+				ns, _, found, err := step()
+				if attempts != 2 || ns != app || found {
+					t.Fatalf("next turn skipped failed page: attempts=%d namespace=%+v found=%v", attempts, ns, found)
+				}
+				if failures == 1 {
+					if err != nil {
+						t.Fatal("transient failed page did not recover", err)
+					}
+					if ns, got, found, err := step(); err != nil || !found || ns != app || got != target {
+						t.Fatal("successful retry lost or changed the exact target", err)
+					}
+				} else if !errors.Is(err, cfg.ErrUnavailable) {
+					t.Fatal("second failed LIST was accepted", err)
+				}
+				for i := 0; i < 6 && !later; i++ {
+					if _, _, found, err := step(); err != nil || found {
+						t.Fatal("failed page blocked later namespace or replayed a candidate", err)
+					}
+				}
+				if !later || attempts != 2 {
+					t.Fatalf("persistent failure pinned namespace or retried without a bound: later=%v attempts=%d", later, attempts)
+				}
+			})
+		}
+	}
+}
+
 func TestCapacityReconcilerCancellationJoinsBlockedDiscoveryOwner(t *testing.T) {
 	source, f := capacityObserverTestFixture()
 	q, _ := capacityQualificationFixture()

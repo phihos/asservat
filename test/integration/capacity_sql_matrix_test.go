@@ -351,7 +351,7 @@ func (f *capacitySQLFixture) assertAdmission(t *testing.T, index int, e app.Enro
 		t.Fatal("native storage target invalid before readiness assertion")
 	}
 	f.assertLegacyAdmission(t, e, want)
-	reader, err := postgres.NewContextStorageReader(f.ctx, f.roles["storage-read"], f.input.PermissionRootID)
+	reader, err := postgres.NewContextStorageReader(f.ctx, f.roles["hub-metadata-read"], f.input.PermissionRootID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +362,7 @@ func (f *capacitySQLFixture) assertAdmission(t *testing.T, index int, e app.Enro
 	if (err == nil) != want {
 		t.Fatalf("current storage reader readiness=%t want=%t error=%v", err == nil, want, err)
 	}
-	for _, purpose := range []string{"storage-read", "capture-admit"} {
+	for _, purpose := range []string{"hub-metadata-read", "capture-admit"} {
 		for _, kind := range []string{"context", "download"} {
 			allocation := e.AllocationID
 			if kind == "download" {

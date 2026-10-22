@@ -1,0 +1,17 @@
+=== RUN   TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget
+=== RUN   TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget/first-page/transient-failure
+    reconciliation_test.go:236: next turn skipped failed page: attempts=1 namespace={Name:app UID:app-uid} found=false
+=== RUN   TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget/first-page/persistent-failure
+    reconciliation_test.go:236: next turn skipped failed page: attempts=1 namespace={Name:app UID:app-uid} found=false
+=== RUN   TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget/continuation/transient-failure
+    reconciliation_test.go:236: next turn skipped failed page: attempts=1 namespace={Name:app UID:app-uid} found=false
+=== RUN   TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget/continuation/persistent-failure
+    reconciliation_test.go:236: next turn skipped failed page: attempts=1 namespace={Name:app UID:app-uid} found=false
+--- FAIL: TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget (0.00s)
+    --- FAIL: TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget/first-page/transient-failure (0.00s)
+    --- FAIL: TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget/first-page/persistent-failure (0.00s)
+    --- FAIL: TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget/continuation/transient-failure (0.00s)
+    --- FAIL: TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget/continuation/persistent-failure (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/capacity	0.006s
+FAIL

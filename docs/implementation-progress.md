@@ -1,5 +1,72 @@
 # Sustained implementation progress
 
+## Structural simplification candidate (2026-10-22)
+
+The maintainer asked whether the announced design simplification had actually
+been delivered. At that point only ADR-214's bounded configuration observations
+were implemented and qualified at component level; the broader recommendations
+were still unimplemented. The work below is a new candidate, not a completed
+installed qualification.
+
+- Request-owned worker authority is evaluated once and reused within the original
+  at-most-five-second operation. Current SQL effect checks remain. The composed
+  regression measures three complete evaluations instead of ten and ten token
+  validations instead of forty, with six permission reads instead of twenty.
+- ADR-215 consolidates seven same-process metadata-reader credentials and pools
+  into one, retaining their typed interfaces and union grants. Fresh installation
+  uses one current layout; unsupported development state is rejected without
+  adoption or deletion. The planned counts are 81 public-runtime credentials and
+  46 hub entries, with the existing 32-connection process ceiling.
+- The chart's bootstrap and continuation become one sequential five-command Pod,
+  removing the second producer/projection pass and scratch volume. Credential
+  mounts remain phase-specific. The existing runner-resume path covers the final
+  continuation container under the original identities and deadlines.
+
+These changes are isolated from the frozen `b9e63320` native52 baseline run.
+Focused regressions pass; full repository and installed qualification remain
+pending. The historical complexity review is preserved as the original review
+baseline rather than rewritten to imply these changes were already delivered.
+
+The specification, architecture, design, Go dependency and Helm rendering checks
+pass for this candidate (actual exit 0, 15.938 seconds). The first specification
+run found three fragment-only schema references unsupported by the repository's
+registry; they now use their canonical absolute schema URI. The checker was not
+changed. The request-observation regression fails against the original production
+source as expected. The candidate's first full evidence race run finds two older
+pending-response tests expecting immediate re-observation; those tests now follow
+the selected bounded-operation contract while retaining fresh-operation revocation
+and observed-shorter-deadline checks. The full evidence race suite, focused
+Kubernetes/installer/metadata tests and metadata/bootstrap contract checks pass.
+The composed cold preparation takes 66.822 milliseconds; the near-expiry case takes
+413.885 milliseconds including a synthetic 350-millisecond permission delay.
+These are component measurements with synthetic SQL and worker effects, not
+installed timings. The [qualification archive](../test/results/resumed-c62e02ac-structural-simplification/README.md)
+records exact commands, scopes, failures and unchanged-source checks. Actual
+PostgreSQL, Helm lifecycle and installed qualification remain pending.
+
+## Baseline installed failure and discovery follow-up (2026-10-22)
+
+The frozen `b9e63320` [native52 run](../test/results/resumed-c62e02ac-native52/README.md)
+exits 1 after 1,425.418 seconds, before the installed download. Regional workload
+readiness times out despite an acknowledged permission assignment for the exact
+target. The workload discovery cursor advances after a failed LIST of the target
+namespace, postponing it until another complete scan. This establishes a discovery
+availability defect; the upstream `claim/post` failure's cause remains unproven.
+The generic permission-scope refusal in the diagnostic log cannot be attributed to
+this target. All 2,771 harness source hashes match the baseline commit and remain
+unchanged during the test. The owned fixtures and private diagnostic configurations
+have been removed, with independent read-back recorded in the archive. This run
+does not test the isolated structural simplification candidate.
+
+The follow-up cursor regression fails against the original source in all four
+first-page/continuation and transient/persistent cases. The correction retains a
+failed page for one retry on the next ordinary turn, then advances after another
+failure so one inaccessible namespace cannot block the remainder of that cluster.
+It adds no call within a turn and changes no pacing or authority interval. The
+complete capacity race suite passes (actual exit 0, 8.136 seconds wall time), with
+unchanged package sources. Independent review finds no blockers; installed
+readiness after this correction is still unqualified.
+
 ## Qualification read-back (2026-10-22)
 
 Frozen candidate `768316a3` passes the full `make go-check` gate: actual exit 0,

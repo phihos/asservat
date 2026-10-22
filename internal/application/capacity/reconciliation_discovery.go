@@ -20,6 +20,7 @@ type capacityDiscoveryCursor struct {
 	workloadIndex              int
 	workloadNext, workloadRV   string
 	workloadPageLoaded         bool
+	workloadRetried            bool
 }
 
 var capacityWorkloadKinds = [...]string{"Deployment", "StatefulSet", "Pod"}
@@ -31,6 +32,7 @@ func capacityDiscoveryPageValid(rv, next, requested, prior string, count int) bo
 
 func (s *capacityDiscoveryCursor) resetWorkloads() {
 	s.workloads, s.workloadIndex, s.workloadNext, s.workloadRV, s.workloadPageLoaded = nil, 0, "", "", false
+	s.workloadRetried = false
 }
 
 func (s *capacityDiscoveryCursor) next(ctx context.Context, reader CapacityWorkloadReader) (cfg.NamespaceRef, cfg.WorkloadRef, bool, error) {
@@ -79,8 +81,14 @@ func (s *capacityDiscoveryCursor) next(ctx context.Context, reader CapacityWorkl
 	kind := capacityWorkloadKinds[s.kindIndex]
 	page, err := reader.DiscoverCapacityWorkloads(ctx, ns, kind, s.workloadNext)
 	if err != nil || ctx.Err() != nil || !capacityDiscoveryPageValid(page.ResourceVersion, page.Continue, s.workloadNext, s.workloadRV, len(page.Workloads)) {
-		// Skip this kind for this pass, then continue other kinds/namespaces.
-		// The next complete enumeration starts from an empty continuation.
+		if (err != nil || ctx.Err() != nil) && !s.workloadRetried {
+			// Keep the exact page for one retry on the next ordinary turn.
+			// A transient read failure must not skip the target for a full pass.
+			s.workloadRetried = true
+			return ns, candidate, false, cfg.ErrUnavailable
+		}
+		// Two failed reads or an invalid page skip this kind for this pass.
+		// A deleted namespace must not pin all later namespaces indefinitely.
 		s.resetWorkloads()
 		s.workloadPageLoaded = true
 		return ns, candidate, false, cfg.ErrUnavailable
@@ -96,5 +104,6 @@ func (s *capacityDiscoveryCursor) next(ctx context.Context, reader CapacityWorkl
 	}
 	s.workloads, s.workloadIndex = append([]cfg.WorkloadRef(nil), page.Workloads...), 0
 	s.workloadNext, s.workloadRV, s.workloadPageLoaded = page.Continue, page.ResourceVersion, true
+	s.workloadRetried = false
 	return ns, candidate, false, nil
 }

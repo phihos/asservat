@@ -63,7 +63,7 @@ func TestOwnerPublicInputsRequireNativeOriginAndBudget(t *testing.T) {
 }
 
 func publicManifestFixture(c contracts.OwnerDeployment) contracts.PublicRuntimeCredentialManifest {
-	return contracts.PublicRuntimeCredentialManifest{Format: contracts.PublicRuntimeCredentialManifestFormat, Input: contracts.PublicRuntimeRoles{InstallationID: c.InstallationID, ClusterID: c.ClusterID, Namespace: c.Namespace, OwnerConfigurationUID: c.ConfigurationUID}}
+	return contracts.PublicRuntimeCredentialManifest{Format: contracts.PublicRuntimeCredentialManifestFormat, Input: contracts.PublicRuntimeRoles{InstallationID: c.InstallationID, ClusterID: c.ClusterID, Namespace: c.Namespace, OwnerConfigurationUID: c.ConfigurationUID, LayoutDigest: postgres.PublicRuntimeRoleLayoutDigest()}}
 }
 
 func TestPublicRuntimeManifestBindsTheOwnerInstallation(t *testing.T) {
@@ -97,7 +97,7 @@ func TestPublicPoolsOpenOnlyVerifiedOwnPurposeLogins(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	name, _ := postgres.PublicRuntimeRoleName(c.InstallationID, "capture-preview")
-	other, _ := postgres.PublicRuntimeRoleName(c.InstallationID, "case-read")
+	other, _ := postgres.PublicRuntimeRoleName(c.InstallationID, "hub-metadata-read")
 	for _, purpose := range []string{"unknown", "browser-settings", "browser-cleanup"} {
 		writeOwnerJSON(t, dir, "sql-public-"+purpose+".json", contracts.OwnerSQLCredential{Username: name, Password: "synthetic"})
 		if _, e := p.open(ctx, purpose); e == nil {

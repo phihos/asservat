@@ -371,7 +371,11 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		if e != nil {
 			t.Fatal(e)
 		}
-		pc.ConnConfig, pc.MaxConns, pc.MinConns = current, 1, 0
+		limit, known := contracts.PublicRuntimeRolePoolLimit(role.Purpose)
+		if !known {
+			t.Fatal("unknown runtime pool limit", role.Purpose)
+		}
+		pc.ConnConfig, pc.MaxConns, pc.MinConns = current, int32(limit), 0
 		runtime, e := pgxpool.NewWithConfig(ctx, pc)
 		if e != nil {
 			t.Fatal(e)

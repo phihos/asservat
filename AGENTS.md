@@ -63,12 +63,27 @@ authorized. Understand why existing mechanisms exist before removing them.
 
 ## Implementation notes
 
+The structural simplification candidate groups seven hub metadata readers into
+one SQL credential/pool (ADR-215) and combines bootstrap/continuation into one
+sequential runner. Keep distinct key, acquisition, publication and deletion
+privileges, phase-specific installer mounts, original journals and conservative
+unknown-effect accounting. This unreleased project does not require a permanent
+compatibility framework for every development layout: reject unsupported retained
+state clearly and never adopt or erase unknown installations. Check
+docs/implementation-progress.md for actual qualification; candidate code is not
+proof of an installed outcome.
+
 ADR-214 applies the accepted complexity review to download preparation. Reuse a
 completed protected download-policy observation for at most its original start
 plus 60 seconds; keep raw administration reads at five seconds. Reuse identity
 settings only within their existing 30-second observation, while still validating
-tokens, sessions and eligibility on each resolution. Neither cache contains a
-complete authorization decision or renews caller/evidence deadlines. Read
+tokens, sessions and eligibility on each resolution. These policy caches contain
+no complete authorization decision. The request-owned worker operation separately
+reuses one complete authority observation within its earliest original deadline,
+capped at five seconds; later helper checks are local. New operations authorize
+again, and current SQL effect checks remain. This supersedes older per-helper
+external-identity refresh instructions for that operation; it adds no global
+authority cache and never renews caller/evidence deadlines. Read
 docs/decisions/214-bounded-download-policy-observation.md and the latest
 docs/implementation-progress.md for measured request budgets and qualification.
 

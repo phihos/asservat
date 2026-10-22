@@ -43,7 +43,8 @@ func PublicRuntimeConnectorMaintenancePurposes() []string {
 // also support that purpose before any credential effect or runtime mount.
 func PublicRuntimeRoleConnectionLimit(purpose string) (int, bool) {
 	if slices.Contains(PublicRuntimeHubRolePurposes(), purpose) {
-		return PublicRuntimeRoleConnections, true
+		limit, _ := PublicRuntimeRolePoolLimit(purpose)
+		return PublicRuntimeRetainedHubProcesses*limit + 1, true
 	}
 	if slices.Contains(PublicRuntimeCaptureCleanupPurposes(), purpose) || slices.Contains(PublicRuntimeConnectorMaintenancePurposes(), purpose) || purpose == "capacity" || purpose == "capacity-capture" || slices.Contains(PublicRuntimePermissionPurposes(), purpose) || slices.Contains(PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(PublicRuntimeContextDeletionPurposes(), purpose) {
 		return PublicRuntimeWorkerRoleConnections, true
@@ -58,4 +59,16 @@ func PublicRuntimeRoleConnectionLimit(purpose string) (int, bool) {
 		return PublicRuntimeKeyServiceRoleConnections, true
 	}
 	return 0, false
+}
+
+// PublicRuntimeRolePoolLimit preserves the aggregate seven-reader concurrency
+// in one cold hub pool. All other credentials retain one connection per process.
+func PublicRuntimeRolePoolLimit(purpose string) (int, bool) {
+	if !slices.Contains(PublicRuntimeRolePurposes(), purpose) {
+		return 0, false
+	}
+	if purpose == "hub-metadata-read" {
+		return PublicRuntimeMetadataConnections, true
+	}
+	return 1, true
 }

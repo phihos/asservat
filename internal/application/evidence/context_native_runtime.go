@@ -134,9 +134,9 @@ func (r *ContextNativeRuntime) attachment(ctx context.Context, current identitie
 	return r.attachmentWithAuthority(ctx, session, a)
 }
 
-// The first read consumes beginRequest's exact observation across local work
-// only. Later reads call attachment to recheck after blocking I/O. Reclip this
-// value after any narrower source bound without changing the original proof.
+// Every attachment read uses the operation's original authority observation and
+// independently rereads SQL. Reclip this value after any narrower source bound
+// without changing the original proof or repeating the human authorizer.
 func (r *ContextNativeRuntime) attachmentWithAuthority(ctx context.Context, session artifact.DownloadSession, a artifact.DownloadAuthority) (ContextDownloadAttachment, artifact.DownloadAuthority, error) {
 	if r == nil || ctx == nil || ctx.Err() != nil {
 		return ContextDownloadAttachment{}, a, artifact.ErrDownloadUnavailable
@@ -349,8 +349,8 @@ func (r *ContextNativeRuntime) observeBoundWorker(ctx context.Context, current i
 	if e != nil || latest.Worker == nil || *latest.Worker != worker || latest.State != artifact.DownloadPreparing || latest.NativeBusy || latest.ResponseBusy || latest.NativeUncertain {
 		return zero, artifact.ErrDownloadUnavailable
 	}
-	// SQL may have waited while the request identity changed. Keep the final
-	// ordinary check before any registration or preparation effect as well.
+	// SQL may have consumed the original interval or observed cancellation.
+	// Validate that local bound before any registration or preparation effect.
 	if _, e = r.bound.Check(call); e != nil {
 		return zero, e
 	}
@@ -392,8 +392,8 @@ func (r *ContextNativeRuntime) ReadPreparedContextDownload(ctx context.Context, 
 }
 
 // Cache misses may observe the already committed original result, never prepare
-// it again. The final original-request checks also run on warm hits and after
-// waiting for another caller's joined load. No cached identity is used.
+// it again. SQL and the original operation's local deadline/cancellation checks
+// also run on warm hits and after waiting for another caller's joined load.
 func (r *ContextNativeRuntime) prepared(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, pin bool) (artifact.PreparedDownload, contextNativeMetadataKey, func(), error) {
 	var zero artifact.PreparedDownload
 	var key contextNativeMetadataKey

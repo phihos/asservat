@@ -1,6 +1,15 @@
 {{- include "asservat.bootstrap.validate" . -}}
 {{- if .Values.bootstrap.enabled }}
 {{- $b := .Values.bootstrap }}
+{{- if $b.continuation.enabled }}
+{{- $legacy := lookup "v1" "Pod" .Release.Namespace (printf "%s-continuation" $b.name) }}
+{{- if $legacy }}
+{{- $phase := dig "status" "phase" "" $legacy }}
+{{- if or (dig "metadata" "deletionTimestamp" "" $legacy) (eq (dig "status" "reason" "" $legacy) "NodeLost") (not (has $phase (list "Succeeded" "Failed"))) }}
+{{- fail "the legacy continuation Pod is not positively terminal; finish or resolve it before starting the single installer runner" }}
+{{- end }}
+{{- end }}
+{{- end }}
 apiVersion: v1
 kind: Pod
 metadata:
@@ -12,7 +21,7 @@ metadata:
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-delete-policy: hook-succeeded
-    asservat.io/bootstrap-runner: four-command/v1
+    asservat.io/bootstrap-runner: {{ if $b.continuation.enabled }}five-command/v1{{ else }}four-command/v1{{ end }}
     asservat.io/bootstrap-input: {{ include "asservat.bootstrap.inputDigest" . | quote }}
 spec:
   serviceAccountName: {{ printf "%s-bootstrap-runner" $b.name }}
@@ -71,7 +80,9 @@ spec:
           mountPath: /run/asservat/initial-preparer
           subPath: projection/preparer
           readOnly: true
+  {{- if not $b.continuation.enabled }}
   containers:
+  {{- end }}
     - name: retire
       image: {{ $b.image | quote }}
       imagePullPolicy: IfNotPresent
@@ -84,6 +95,23 @@ spec:
         - name: retirement-input
           mountPath: /run/asservat/initial-bootstrap
           readOnly: true
+  {{- if $b.continuation.enabled }}
+  containers:
+    - name: continue
+      image: {{ $b.image | quote }}
+      imagePullPolicy: IfNotPresent
+      command: [/asservat, installer-continue]
+      securityContext: {{ include "asservat.bootstrap.security" . | nindent 8 }}
+      resources: {{ include "asservat.bootstrap.resources" . | nindent 8 }}
+      volumeMounts:
+        - name: scratch
+          mountPath: /run/asservat/initial-preparer
+          subPath: projection/preparer
+          readOnly: true
+        - name: continuation-input
+          mountPath: /run/asservat/installer-continue
+          readOnly: true
+  {{- end }}
   volumes:
     - name: scratch
       emptyDir:
@@ -127,4 +155,28 @@ spec:
         items:
           - key: postgres-ddl.json
             path: postgres-ddl.json
+  {{- if $b.continuation.enabled }}
+    - name: continuation-input
+      projected:
+        defaultMode: 0440
+        sources:
+          - configMap:
+              name: {{ printf "%s-continuation.%s" $b.name (substr 0 32 (include "asservat.bootstrap.continuation" . | sha256sum)) }}
+              optional: false
+              items:
+                - key: continuation.json
+                  path: continuation.json
+          - serviceAccountToken:
+              path: administrator-token
+              expirationSeconds: 600
+              {{- if $b.probeAudience }}
+              audience: {{ $b.probeAudience | quote }}
+              {{- end }}
+          - secret:
+              name: {{ $b.secrets.producer | quote }}
+              optional: false
+              items:
+                - key: postgres-administrator.json
+                  path: postgres-administrator.json
+  {{- end }}
 {{- end }}

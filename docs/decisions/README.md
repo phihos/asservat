@@ -1,9 +1,17 @@
 # Decision records
 
+[ADR-215 — One SQL login for the hub's metadata readers](215-hub-metadata-reader-role.md)
+consolidates seven same-process metadata credentials and pools while retaining
+their typed adapters, exact union grants and existing SQL checks. Other privilege
+boundaries and the hub connection ceiling remain. Implementation and
+qualification are in progress.
+
 [ADR-214 — Reuse a bounded download policy observation](214-bounded-download-policy-observation.md)
 selects a 60-second download-only policy observation instead of repeating its
 Kubernetes protection read at each helper call. Raw administrative reads, original
-request deadlines and current SQL effect checks remain separate. Implementation
+request deadlines and current SQL effect checks remain separate. Its request-owned
+refinement removes repeated full worker authorization within one original
+five-second operation. Implementation
 and complete-path qualification are in progress.
 
 [ADR-213 — Storage readiness at consumption](213-storage-readiness-at-consumption.md)

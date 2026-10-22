@@ -1,0 +1,200 @@
+=== RUN   TestPublicMetadataReadConsolidatesOnlyHubReaders
+--- PASS: TestPublicMetadataReadConsolidatesOnlyHubReaders (0.00s)
+=== RUN   TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection
+--- PASS: TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection (0.00s)
+=== RUN   TestPublicRuntimeWorkerOmissionPreservesOriginalInputBytes
+--- PASS: TestPublicRuntimeWorkerOmissionPreservesOriginalInputBytes (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/contracts	1.027s
+=== RUN   TestPublicMetadataReadHasExactExistingReadPrivileges
+--- PASS: TestPublicMetadataReadHasExactExistingReadPrivileges (0.00s)
+=== RUN   TestPublisherRetentionCredentialRemainsNarrow
+--- PASS: TestPublisherRetentionCredentialRemainsNarrow (0.00s)
+=== RUN   TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection
+--- PASS: TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection (0.01s)
+=== RUN   TestPublicContextDraftRolesHaveExactPurposeGrants
+=== RUN   TestPublicContextDraftRolesHaveExactPurposeGrants/capture-preview
+=== RUN   TestPublicContextDraftRolesHaveExactPurposeGrants/capture-resolution
+--- PASS: TestPublicContextDraftRolesHaveExactPurposeGrants (0.00s)
+    --- PASS: TestPublicContextDraftRolesHaveExactPurposeGrants/capture-preview (0.00s)
+    --- PASS: TestPublicContextDraftRolesHaveExactPurposeGrants/capture-resolution (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.055s
+=== RUN   TestPublicContextOperationsOwnCompleteSubmissionAndNativeBindings
+--- PASS: TestPublicContextOperationsOwnCompleteSubmissionAndNativeBindings (0.41s)
+=== RUN   TestPublicContextOperationsWithoutNativeRuntime
+--- PASS: TestPublicContextOperationsWithoutNativeRuntime (0.21s)
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/resolution
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/regional-local-port
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/native-override
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/non-tls-origin
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/foreign-root
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/regional-router
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/regional-recovery-override
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/different-active-runtime
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/no-stop-ledger
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/admission
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/intent-publication
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/regional-capability-override
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/no-native-runtime
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/foreign-download-root
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/regional-reader
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/regional-preparer
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/regional-signer
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/navigation-override
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/no-active-runtime
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/invalid-review-lifetime
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/no-clock
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/foreign-case-installation
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/foreign-audit-root
+=== RUN   TestPublicContextOperationsRejectMissingOrForeignComposition/preview
+--- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/resolution (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/regional-local-port (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/native-override (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/non-tls-origin (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/foreign-root (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/regional-router (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/regional-recovery-override (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/different-active-runtime (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/no-stop-ledger (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/admission (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/intent-publication (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/regional-capability-override (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/no-native-runtime (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/foreign-download-root (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/regional-reader (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/regional-preparer (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/regional-signer (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/navigation-override (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/no-active-runtime (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/invalid-review-lifetime (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/no-clock (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/foreign-case-installation (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/foreign-audit-root (0.00s)
+    --- PASS: TestPublicContextOperationsRejectMissingOrForeignComposition/preview (0.00s)
+=== RUN   TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency
+=== RUN   TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/cancel_artifact_download
+=== RUN   TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/get_artifact_download
+=== RUN   TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/get_capture
+=== RUN   TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/get_case
+=== RUN   TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/list_diagnostics
+=== RUN   TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/prepare_artifact_download
+=== RUN   TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/preview_capture
+=== RUN   TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/request_capture
+=== RUN   TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/resolve_capture_request
+--- PASS: TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency (0.21s)
+    --- PASS: TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/cancel_artifact_download (0.00s)
+    --- PASS: TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/get_artifact_download (0.00s)
+    --- PASS: TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/get_capture (0.00s)
+    --- PASS: TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/get_case (0.00s)
+    --- PASS: TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/list_diagnostics (0.00s)
+    --- PASS: TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/prepare_artifact_download (0.00s)
+    --- PASS: TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/preview_capture (0.00s)
+    --- PASS: TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/request_capture (0.00s)
+    --- PASS: TestPublicContextOperationsKeepCurrentIdentityBeforeAnyDependency/resolve_capture_request (0.00s)
+=== RUN   TestPublicContextRoutesKeepDistinctProtocolOwners
+--- PASS: TestPublicContextRoutesKeepDistinctProtocolOwners (0.00s)
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/login?return_to=%2Fcaptures%2Fnew
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/callback?state=opaque&code=a%2Bb&iss=https%3A%2F%2Fidentity.invalid
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/backchannel-logout
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/csrf
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/refresh
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/logout
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//api/v1/session
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//mcp
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//.well-known/oauth-protected-resource/mcp
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//.well-known/oauth-protected-resource/downloads
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//api/v1/operations/request_capture
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//api/v1/operations/cancel_artifact_download
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//api/v1/downloads/00000000-0000-4000-8000-000000000001/content
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//assets/entry-12345678.js
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//captures/new
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//captures/00000000-0000-4000-8000-000000000001
+=== RUN   TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//cases/00000000-0000-4000-8000-000000000001
+--- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/login?return_to=%2Fcaptures%2Fnew (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/callback?state=opaque&code=a%2Bb&iss=https%3A%2F%2Fidentity.invalid (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/backchannel-logout (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/csrf (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/refresh (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//auth/logout (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//api/v1/session (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//mcp (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//.well-known/oauth-protected-resource/mcp (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//.well-known/oauth-protected-resource/downloads (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//api/v1/operations/request_capture (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//api/v1/operations/cancel_artifact_download (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//api/v1/downloads/00000000-0000-4000-8000-000000000001/content (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests// (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//assets/entry-12345678.js (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//captures/new (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//captures/00000000-0000-4000-8000-000000000001 (0.00s)
+    --- PASS: TestPublicContextRoutesPreserveOriginalAuthAndEvidenceRequests//cases/00000000-0000-4000-8000-000000000001 (0.00s)
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/operations
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/downloads
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//auth
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//auth/unknown
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//mcp/
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//private/owner
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//metrics
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//healthz
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//.well-known/oauth-protected-resource
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//.well-known/oauth-protected-resource/downloads/
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api//v1/operations/request_capture
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/../operations/request_capture
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/./operations/request_capture
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//%61pi/v1/operations/request_capture
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api%2fv1/operations/request_capture
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/downloads/x%252fy/content
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/operations/request_capture?
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/operations/request_capture?token=x
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//mcp?access_token=x
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/downloads/x/content?token=x
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//?token=x
+=== RUN   TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback/https://asservat.invalid/mcp
+--- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/operations (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/downloads (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//auth (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//auth/unknown (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//mcp/ (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//private/owner (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//metrics (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//healthz (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//.well-known/oauth-protected-resource (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//.well-known/oauth-protected-resource/downloads/ (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api//v1/operations/request_capture (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/../operations/request_capture (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/./operations/request_capture (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//%61pi/v1/operations/request_capture (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api%2fv1/operations/request_capture (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/downloads/x%252fy/content (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/operations/request_capture? (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/operations/request_capture?token=x (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//mcp?access_token=x (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//api/v1/downloads/x/content?token=x (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback//?token=x (0.00s)
+    --- PASS: TestPublicContextRoutesNeverNormalizeOrUseAPIAsConsoleFallback/https://asservat.invalid/mcp (0.00s)
+=== RUN   TestPublicContextRoutesRequireActualTLSAndOriginalHost
+--- PASS: TestPublicContextRoutesRequireActualTLSAndOriginalHost (0.00s)
+=== RUN   TestPublicContextRoutesRetainTLSResponseController
+--- PASS: TestPublicContextRoutesRetainTLSResponseController (0.01s)
+=== RUN   TestPublicContextRoutesWithoutContentAnswerUnavailable
+--- PASS: TestPublicContextRoutesWithoutContentAnswerUnavailable (0.00s)
+=== RUN   TestPublicRuntimeUnsupportedLayoutPreservesMountedState
+--- PASS: TestPublicRuntimeUnsupportedLayoutPreservesMountedState (0.01s)
+=== RUN   TestPublicMetadataPoolLimitLeavesOtherCredentialsIndependent
+--- PASS: TestPublicMetadataPoolLimitLeavesOtherCredentialsIndependent (0.00s)
+=== RUN   TestPublicRuntimeManifestBindsTheOwnerInstallation
+--- PASS: TestPublicRuntimeManifestBindsTheOwnerInstallation (0.01s)
+=== RUN   TestPublicPoolsOpenOnlyVerifiedOwnPurposeLogins
+--- PASS: TestPublicPoolsOpenOnlyVerifiedOwnPurposeLogins (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/bootstrap	1.930s

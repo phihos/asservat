@@ -1,0 +1,69 @@
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/groups
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/scopes
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/policy
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/expiry
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/groups
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit authority write-worker-audit authority ack-worker-audit authority claim-worker]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/scopes
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit authority write-worker-audit authority ack-worker-audit authority claim-worker]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/policy
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit authority write-worker-audit authority ack-worker-audit authority claim-worker]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/expiry
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/groups
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit authority write-worker-audit authority ack-worker-audit authority claim-worker authority create-job authority record-job observe-job]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/scopes
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit authority write-worker-audit authority ack-worker-audit authority claim-worker authority create-job authority record-job observe-job]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/policy
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit authority write-worker-audit authority ack-worker-audit authority claim-worker authority create-job authority record-job observe-job]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/expiry
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/groups
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit authority write-worker-audit authority ack-worker-audit authority claim-worker authority create-job authority record-job observe-job authority bind-worker read-worker]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/scopes
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit authority write-worker-audit authority ack-worker-audit authority claim-worker authority create-job authority record-job observe-job authority bind-worker read-worker]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/policy
+    worker_current_test.go:369: bounded operation repeated authority or lost its admitted effects download authority or session expired [authority authority reserve-worker read-worker-audit authority write-worker-audit authority ack-worker-audit authority claim-worker authority create-job authority record-job observe-job authority bind-worker read-worker]
+=== RUN   TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/expiry
+--- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval (0.03s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/groups (0.00s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/scopes (0.00s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker-audit/expiry (0.00s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/groups (0.00s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/scopes (0.00s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/claim-worker/expiry (0.00s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/groups (0.00s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/scopes (0.00s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/observe-job/expiry (0.00s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/groups (0.00s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/scopes (0.00s)
+    --- FAIL: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/policy (0.00s)
+    --- PASS: TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval/read-worker/expiry (0.00s)
+=== RUN   TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation
+=== RUN   TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/proof
+    worker_current_test.go:406: enrollment repeated its original human authority download authority or session expired [authority authority proof]
+=== RUN   TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/prepare-certificate
+    worker_current_test.go:406: enrollment repeated its original human authority download authority or session expired [authority authority proof authority claim-enrollment authority proof authority write-enrollment-audit authority proof authority ack-enrollment-audit authority proof authority prepare-certificate]
+=== RUN   TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/sign
+    worker_current_test.go:406: enrollment repeated its original human authority download authority or session expired [authority authority proof authority claim-enrollment authority proof authority write-enrollment-audit authority proof authority ack-enrollment-audit authority proof authority prepare-certificate authority proof authority sign]
+=== RUN   TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/activate
+    worker_current_test.go:406: enrollment repeated its original human authority download authority or session expired [authority authority proof authority claim-enrollment authority proof authority write-enrollment-audit authority proof authority ack-enrollment-audit authority proof authority prepare-certificate authority proof authority sign authority proof authority store-certificate read-certificate-audit authority proof authority write-certificate-audit authority proof authority ack-certificate-audit authority proof authority activate]
+--- FAIL: TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation (0.01s)
+    --- FAIL: TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/proof (0.00s)
+    --- FAIL: TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/prepare-certificate (0.00s)
+    --- FAIL: TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/sign (0.00s)
+    --- FAIL: TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation/activate (0.01s)
+=== RUN   TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect
+=== RUN   TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect/dispatch
+=== RUN   TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect/enrollment
+--- PASS: TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect (0.01s)
+    --- PASS: TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect/dispatch (0.00s)
+    --- PASS: TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect/enrollment (0.01s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.064s
+FAIL

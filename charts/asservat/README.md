@@ -2,7 +2,7 @@
 
 Helm is Asservat's officially supported installation method. The release layout is one hub and one cluster release per workload cluster; `combined` is for single-cluster evaluation. PostgreSQL, S3-compatible storage, KMS and Keycloak are operated separately. No dependency chart, external download hook or operator-managed credentials are bundled.
 
-**Current version: configuration foundation with optional initial bootstrap.** This development chart installs the four implemented CRDs and a small release inventory ConfigMap. The optional `bootstrap.enabled` hook packages the existing four-command initial installer; native qualification of this chart/private-registry composition is pending. It does not start the hub, console, MCP server or collectors. Installing this chart does not provide a working debugging platform, activate permission resources, qualify an identity provider or collect evidence. `runtime.enabled: true` is rejected. The inventory ConfigMap records intent and is never an authority/readiness source.
+**Current version: configuration foundation with optional installer.** By default this development chart installs the four implemented CRDs and a small release inventory ConfigMap. The optional `bootstrap.enabled` hook performs initial schema and activation; `bootstrap.continuation.enabled` adds runtime continuation as its fifth sequential command. The consolidated single-Pod layout awaits its own qualification; earlier installed evidence is recorded in [implementation status](../../docs/implementation-status.md). Rendering the chart alone does not activate permissions, qualify an identity provider or collect evidence. `runtime.enabled: true` is rejected. The inventory ConfigMap records intent and is never an authority/readiness source.
 
 ## Install the current foundation
 
@@ -28,6 +28,7 @@ For GitOps, use the same chart and checked-in nonsecret values. Give one adminis
 | `mode` | `hub` | `hub`, `cluster` or `combined` release topology |
 | `runtime.enabled` | `false` | Only `false` is supported by this development package |
 | `bootstrap.enabled` | `false` | Run the fixed initial checkpoint using explicit external services; no runtime enablement |
+| `bootstrap.continuation.enabled` | `false` | Add runtime continuation after retirement in the same fixed installer Pod |
 | `bootstrap.name`, `targetNamespace`, `image` | `asservat`, `asservat-system`, empty | Stable original installation choices and verified image digest |
 | `bootstrap.secrets.*` | empty | Existing producer, schema and retirement private input references |
 | `bootstrap.registrySecret` | empty | Optional explicit image-registry Docker auth Secret |
@@ -38,7 +39,9 @@ Unknown values are rejected to catch typos and avoid accepting ineffective secur
 
 ## Optional bootstrap
 
-Follow the [bootstrap operator flow](../../docs/installation/helm.md#optional-initial-bootstrap-checkpoint) for exact private file contracts, provider prerequisite recipe, one fresh Helm invocation and terminal-only `installer-resume`. Do not put secret bodies or dynamic UID/OID/digest bundles in values. The hook deletes itself only after success; failed/unknown hooks remain. Completed replay preserves original identities and can run without setup SQL/provider files. Private registry input remains a separate ongoing distribution dependency.
+Follow the [bootstrap operator flow](../../docs/installation/helm.md#optional-initial-bootstrap-checkpoint) for exact private file contracts, provider prerequisite recipe, one fresh Helm invocation and terminal-only `installer-resume`. Do not put secret bodies or dynamic UID/OID/digest bundles in values. With continuation enabled, one Pod runs produce, schema, prepare, retire and continue using separated credential mounts and one memory-only scratch volume. All five share the original 1,800-second Pod ceiling; phase and effect deadlines remain unchanged. The hook deletes itself only after success; failed/unknown hooks remain. Resume covers the final continuation as well as the earlier phases. Bootstrap-only completed replay can run without setup SQL/provider files; continuation still needs its documented input references. Private registry input remains a separate ongoing distribution dependency.
+
+On upgrade, a live render-time lookup refuses a nonterminal, node-lost or deleting legacy `<bootstrap.name>-continuation` Pod. Completed legacy Pods are left alone; no Pod is adopted or removed by that check. Offline rendering cannot establish this live migration precondition.
 
 ## Regional cluster
 

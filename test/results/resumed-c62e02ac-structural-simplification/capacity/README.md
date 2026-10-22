@@ -1,0 +1,13 @@
+# Bounded capacity discovery retry
+
+Native52 evidence is archived in `../native52-full/README.md`: a single failed Deployment LIST caused the target kind to be skipped for the entire traversal, while the target's accepted permission assignment was present. The upstream transport failure is not attributed.
+
+Ownership is limited to `internal/application/capacity/reconciliation_discovery.go` and `reconciliation_test.go` in the simplify worktree. `source-before.json` and `.before.txt` preserve the pre-edit source. The parent-run genuine RED failed all four cases because the next turn skipped the failed page (attempts1); its actual command and terminal exit are in `red-result.json` and `red.log`. The regression source is unchanged in the proposed correction.
+
+The correction retains the original namespace, workload kind, continuation token and resource version for one retry on the next ordinary scheduled turn. A second consecutive read failure follows the existing skip behavior, so a deleted namespace cannot pin all later namespaces. Invalid metadata/pages still skip immediately. Success or cursor reset clears the one boolean. No effect authority, freshness observation, credential or durable journal is retained by the discovery cursor.
+
+The source keeps one LIST maximum per turn, the existing source interval, 250ms serial pause, per-cluster pace and round-robin cluster selection. A failed page costs at most one extra LIST in that traversal. Exact candidate reads and current SQL/proof checks remain unchanged. No same-operation retry, new background worker, backoff knob, API/QPS limit or deadline extension was added.
+
+Complexity check: (1) one observed native miss before readiness, not a quantified occurrence rate; (2) parent-authorized correction, no reopened user guarantee; (3) ordinary startup discovery; (4) no comparable-project claim used; (5) zero added privileges/credentials/endpoints; (6) one bounded retry state; (7) zero configuration knobs; (8) same existing Kubernetes dependency; (9) one boolean/cursor, at most one extra failed-page LIST, no successful-page request increase; (10) process-local only, no persisted-state migration; (11) one retry plus existing skip is the smallest correction that handles the observed transient miss without permanently blocking later namespaces.
+
+`source-green-ready.json` and `candidate.patch` identify the frozen proposed fix. gofmt and scoped git diff --check exited0. This agent did not launch tests; the parent owns the full-capacity race check. Green/native qualification must be read from its actual later command record, not inferred from this proposal.

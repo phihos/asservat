@@ -3,6 +3,11 @@
 Date: 2026-10-14. Status: accepted; governor and the 22 hub extension roles implemented, roles verified on real PostgreSQL; hub-api public composition and the browser duty move pending.
 Requirements: REQ-DB-004 (specs/persistence.md connection budget), S-02; TASK-03 / TASK-11.
 
+The one-login-per-purpose choice is partially superseded by
+[ADR-215](215-hub-metadata-reader-role.md): seven hub metadata readers share one
+login and pool under the unchanged process governor. The account below records
+the original layout and its qualification, not the current credential count.
+
 ## Context
 
 Each hub duty has its own NOINHERIT login with one `MaxConns=1` pool. The

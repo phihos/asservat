@@ -55,6 +55,7 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	if err != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 1 && (len(f.Clusters) != 2 || os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") != "1") || f.WorkerImage == "" || f.NativeProviders.Postgres == "" {
 		t.Fatal("owned single-cluster/native services unavailable")
 	}
+	installedMode := os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") == "1"
 	ownerMode := os.Getenv("ASSERVAT_INITIAL_RUNTIME_PROVIDER_OWNER") == "1"
 	if ownerMode && (os.Getenv("ASSERVAT_INITIAL_RUNTIME_PROVIDER_WORKER") != "1" || os.Getenv("ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR") != "1" || os.Getenv("ASSERVAT_INITIAL_RUNTIME_BRIDGE") != "1") {
 		t.Fatal("owner runtime requires the complete original worker qualification")
@@ -140,7 +141,11 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	desired.AuditStore = contracts.OwnerAuditStore{Endpoint: f.NativeProviders.S3, Roots: [][]byte{f.NativeProviders.Root}, Region: "us-east-1", Bucket: "initial-bootstrap-chain"}
 	desired.KeyService = contracts.ConfigurationKeyService{Endpoint: f.NativeProviders.KMS, Roots: [][]byte{f.NativeProviders.Root}, AuditMount: "bootstrap-chain-transit", AuditKey: "audit"}
 	desired.Providers = contracts.InitialBootstrapProviders{IssuerPolicy: "bootstrap-chain-issuer", WrapRole: "bootstrap-chain-wrap", WrapPolicy: "bootstrap-chain-encrypt", UnwrapRole: "bootstrap-chain-unwrap", UnwrapPolicy: "bootstrap-chain-decrypt"}
-	account, err := api.CoreV1().ServiceAccounts(namespace).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: "trusted-runner"}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
+	runnerAccount := "trusted-runner"
+	if installedMode {
+		runnerAccount = desired.Name + "-bootstrap-runner"
+	}
+	account, err := api.CoreV1().ServiceAccounts(namespace).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: runnerAccount}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -186,6 +191,10 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	}
 	clear(claims)
 	desired.ProbeAudience = aud.Audience[0]
+	var publicInput contracts.InitialBootstrapInput
+	if installedMode {
+		publicInput, desired = installedUnifiedPublicInput(t, desired)
+	}
 	rootCert, err := x509.ParseCertificate(f.NativeProviders.Root)
 	if err != nil {
 		t.Fatal(err)
@@ -205,12 +214,18 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	if _, err = store.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &desired.AuditStore.Bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); err != nil {
 		t.Fatal("enable owned required versioned audit", err)
 	}
-	public, err := json.Marshal(desired)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err = api.CoreV1().ConfigMaps(namespace).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "operator-bootstrap"}, Immutable: ptr.To(true), Data: map[string]string{"bootstrap.json": string(public)}}, meta.CreateOptions{}); err != nil {
-		t.Fatal(err)
+	var unified *installedUnifiedRunner
+	if installedMode {
+		setup := prepareInstallerContinuationNative(t, ctx, api, f, desired)
+		unified = newInstalledUnifiedRunner(t, ctx, api, publicInput, setup, f.Clusters[0].Pod.NodeName)
+	} else {
+		public, e := json.Marshal(desired)
+		if e != nil {
+			t.Fatal(e)
+		}
+		if _, e = api.CoreV1().ConfigMaps(namespace).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "operator-bootstrap"}, Immutable: ptr.To(true), Data: map[string]string{"bootstrap.json": string(public)}}, meta.CreateOptions{}); e != nil {
+			t.Fatal(e)
+		}
 	}
 	sql := admin.Config().ConnConfig
 	credentialsJSON, _ := json.Marshal(contracts.OwnerSQLCredential{Username: sql.User, Password: sql.Password})
@@ -246,7 +261,13 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	defer func() { watch.Stop(); <-joined }()
 	retirement := initialBootstrapWatchRetirement(t, ctx, api, desired)
 	defer retirement.Close()
-	first := initialBootstrapChainRun(t, ctx, api, desired, "bootstrap-first", false)
+	var first *core.Pod
+	if unified != nil {
+		first = unified.start(t, ctx, api)
+		unified.waitRetired(t, ctx, api, first)
+	} else {
+		first = initialBootstrapChainRun(t, ctx, api, desired, "bootstrap-first", false)
+	}
 	var terminal *core.Pod
 	select {
 	case terminal = <-terminals:
@@ -299,10 +320,26 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	}
 	state.Passwords.Manager = ""
 	originalSeed.State.Passwords.Manager = ""
-	finalSeed := initialBootstrapVerifyCopyClosure(t, ctx, api, kc, desired, originalSeed)
+	closureAPI := kubernetes.Interface(api)
+	closureConfig := kc
+	if unified != nil {
+		closureConfig = installedUnifiedRunnerConfig(kc, desired)
+		closureAPI, err = kubernetes.NewForConfig(closureConfig)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	finalSeed := initialBootstrapVerifyCopyClosure(t, ctx, closureAPI, closureConfig, desired, originalSeed)
 	// Remove only operator fixture inputs. Product copies must already have
-	// positively closed; a fresh runner receives no setup SQL/provider inputs.
-	for _, name := range []string{"operator-producer", "operator-ddl", "operator-retirement"} {
+	// positively closed. The bootstrap-only replay receives no setup inputs;
+	// the unified continuation retains its explicit SQL prerequisite.
+	setupNames := []string{"operator-producer", "operator-ddl", "operator-retirement"}
+	if unified != nil {
+		// Continuation still needs the same operator SQL credential. The issuer is
+		// revoked below; the product's managed setup copies have already closed.
+		setupNames = []string{"operator-ddl", "operator-retirement"}
+	}
+	for _, name := range setupNames {
 		object, e := api.CoreV1().Secrets(namespace).Get(ctx, name, meta.GetOptions{})
 		if e != nil {
 			t.Fatal(e)
@@ -312,13 +349,9 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 		}
 	}
 	request(t, f.KMS, "synthetic-root", "auth/token/revoke", map[string]any{"token": issuer}, 204)
-	t.Run("all-four-commands-passive-without-setup-files", func(t *testing.T) {
-		second := initialBootstrapChainRun(t, ctx, api, desired, "bootstrap-replay", true)
-		if second.UID == first.UID {
-			t.Fatal("replay reused old runner result")
-		}
+	verifyReplay := func(t *testing.T) {
 		after, configAfter, rootAfter := initialBootstrapChainState(t, ctx, api, desired, originalSeed)
-		afterSeed := initialBootstrapVerifyCopyClosure(t, ctx, api, kc, desired, originalSeed)
+		afterSeed := initialBootstrapVerifyCopyClosure(t, ctx, closureAPI, closureConfig, desired, originalSeed)
 		if afterSeed.UID != finalSeed.UID || afterSeed.ResourceVersion != finalSeed.ResourceVersion || !equalJSONForBootstrap(finalSeed.Annotations, afterSeed.Annotations) {
 			t.Fatal("completed replay changed original copy closure")
 		}
@@ -337,7 +370,19 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 		if err := admin.QueryRow(ctx, "SELECT count(*) FROM fleet_initial_activation WHERE installation_id=$1", state.InstallationID).Scan(&count); err != nil || count != 1 {
 			t.Fatal("passive replay repeated activation", err)
 		}
-	})
+	}
+	if unified != nil {
+		unified.verifyReplay = verifyReplay
+	}
+	if unified == nil {
+		t.Run("all-four-commands-passive-without-setup-files", func(t *testing.T) {
+			second := initialBootstrapChainRun(t, ctx, api, desired, "bootstrap-replay", true)
+			if second.UID == first.UID {
+				t.Fatal("replay reused old runner result")
+			}
+			verifyReplay(t)
+		})
+	}
 	if os.Getenv("ASSERVAT_INITIAL_RUNTIME_PROVIDER_OWNER") != "" && os.Getenv("ASSERVAT_INITIAL_RUNTIME_PROVIDER_WORKER") != "1" {
 		t.Fatal("owner runtime requires original running worker qualification")
 	}
@@ -347,7 +392,7 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 				t.Fatal("installer continuation owns the provider-pair network without fixture continuation")
 			}
 			t.Run("installer-continuation", func(t *testing.T) {
-				qualifyInstallerContinuationNative(t, ctx, direct, f.Clusters[0].Config, api, admin, f, desired, configuration)
+				qualifyInstallerContinuationNative(t, ctx, direct, f.Clusters[0].Config, api, admin, f, desired, configuration, unified)
 			})
 		} else if os.Getenv("ASSERVAT_INITIAL_RUNTIME_PROVIDER_WORKER") == "1" {
 			if os.Getenv("ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR") != "1" {
@@ -378,9 +423,17 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	}
 	initialBootstrapCopyGuardRBAC(t, ctx, api, desired, originalSeed)
 	t.Run("administrator-removal-detected-without-recreation", func(t *testing.T) {
-		initialBootstrapCopyAdministratorBoundary(t, ctx, directAPI, direct, desired)
+		boundaryConfig := direct
+		if unified != nil {
+			boundaryConfig = installedUnifiedRunnerConfig(direct, desired)
+		}
+		initialBootstrapCopyAdministratorBoundary(t, ctx, directAPI, boundaryConfig, desired)
 	})
-	t.Log("actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim")
+	if unified != nil {
+		t.Log("actual fresh unified five-command runner, original activation/retirement and managed copy closure; original SQL/operator inputs retained for continuation; installed/resume results reported by installer-continuation")
+	} else {
+		t.Log("actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim")
+	}
 }
 
 func initialBootstrapAdminPoolConfig(dsn string) (*pgxpool.Config, error) {
@@ -635,7 +688,7 @@ func initialBootstrapChainCleanup(t *testing.T, api kubernetes.Interface, d cont
 		}
 	}
 	// Stop and join only this test's runners before removing public protections.
-	for _, name := range []string{"bootstrap-first", "bootstrap-replay"} {
+	for _, name := range []string{"bootstrap-first", "bootstrap-replay", d.Name + "-bootstrap"} {
 		p, e := api.CoreV1().Pods(d.BootstrapNamespace).Get(ctx, name, meta.GetOptions{})
 		if e == nil {
 			e = api.CoreV1().Pods(d.BootstrapNamespace).Delete(ctx, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &p.UID}})

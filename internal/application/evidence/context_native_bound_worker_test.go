@@ -141,7 +141,7 @@ func TestContextRuntimeBoundWorkerAvoidsCompletedLaunchReplay(t *testing.T) {
 }
 
 func TestContextRuntimeBoundWorkerRechecksNegativeObservations(t *testing.T) {
-	for _, mode := range []string{"revoked-before", "revoked-during-pod", "revoked-during-sql", "pod-replaced", "job-replaced", "multiple-pods", "bound-pending", "terminated", "binding-removed", "sql-worker-replaced", "busy", "uncertain", "cancelled", "expired-after-pod", "expired-after-sql"} {
+	for _, mode := range []string{"revoked-before", "pod-replaced", "job-replaced", "multiple-pods", "bound-pending", "terminated", "binding-removed", "sql-worker-replaced", "busy", "uncertain", "cancelled", "expired-after-pod", "expired-after-sql"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newBoundWorkerFixture(t)
 			ctx, cancel := context.WithCancel(context.Background())
@@ -149,14 +149,6 @@ func TestContextRuntimeBoundWorkerRechecksNegativeObservations(t *testing.T) {
 			switch mode {
 			case "revoked-before":
 				f.f.failure = "current-authority"
-			case "revoked-during-pod":
-				f.launch.hooks["observe-job"] = func() { f.f.failure = "current-authority" }
-			case "revoked-during-sql":
-				f.lookup.before = func(n int) {
-					if n == 2 {
-						f.f.failure = "current-authority"
-					}
-				}
 			case "pod-replaced":
 				f.launch.hooks["observe-job"] = func() { f.launch.w.Binding.PodUID = "replacement-pod" }
 			case "job-replaced":
@@ -351,5 +343,35 @@ func TestContextRuntimeNewEnrollmentWaitsForDeliveryToEnd(t *testing.T) {
 	out, err := f.r.ContinueContextDownload(context.Background(), f.f, f.f.s, f.source)
 	if err != nil || !out.Pending || reads < 3 || f.f.count("begin") != 0 || f.launch.count("release-owner") != 1 {
 		t.Fatal("request closed its registration during certificate delivery", reads, err)
+	}
+}
+
+// A failed later authorizer observation is learned by the next operation. The
+// existing SQL/Pod reads remain real calls in this operation and can still deny.
+func TestContextRuntimeBoundWorkerReusesOneAuthorityObservation(t *testing.T) {
+	for _, phase := range []string{"pod", "sql"} {
+		t.Run(phase, func(t *testing.T) {
+			f := newBoundWorkerFixture(t)
+			if phase == "pod" {
+				f.launch.hooks["observe-job"] = func() { f.f.failure = "current-authority" }
+			}
+			f.lookup.before = func(n int) {
+				if phase == "sql" && n == 2 {
+					f.f.failure = "current-authority"
+				}
+				if f.launch.count("claim-owner") > 0 {
+					f.advance(1100 * time.Millisecond)
+				}
+			}
+			out, err := f.r.ContinueContextDownload(t.Context(), f.f, f.f.s, f.source)
+			if err != nil || !out.Pending || f.f.count("current-authority") != 1 || f.launch.count("claim-owner") != 1 || f.launch.count("release-owner") != 1 {
+				t.Fatal("bounded continuation repeated its authorization", err, f.launch.calls)
+			}
+			f.noLaunchEffects(t)
+			reads := f.lookup.reads
+			if _, err = f.r.ContinueContextDownload(t.Context(), f.f, f.f.s, f.source); err == nil || f.lookup.reads != reads {
+				t.Fatal("next operation bypassed the changed authorizer", err)
+			}
+		})
 	}
 }

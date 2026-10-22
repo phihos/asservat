@@ -31,6 +31,67 @@ def hashes():
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
 
+def check_legacy_continuation_lookup(k, h, archive, work, report):
+    """Real Helm lookup, synthetic Pod status: no installer process is run."""
+    namespace = "runner-lookup"
+    run(k + ["create", "namespace", namespace])
+    run(k + ["label", "namespace", namespace, "pod-security.kubernetes.io/enforce=restricted"])
+    values = yaml.safe_load((CHART / "values.yaml").read_text())
+    b = values["bootstrap"]
+    b.update(enabled=True, image="registry.invalid/asservat@sha256:" + "a" * 64,
+             targetNamespace="asservat-runtime")
+    b["secrets"] = {"producer": "operator-producer", "schema": "operator-schema", "retirement": "operator-retirement"}
+    b["postgres"].update(host="postgres.invalid", rootsPEM="PUBLIC-CA")
+    b["auditStore"].update(endpoint="https://store.invalid", region="region-a", bucket="audit", rootsPEM="PUBLIC-CA")
+    b["keyService"].update(endpoint="https://bao.invalid", rootsPEM="PUBLIC-CA")
+    b["fleet"].update(issuer="https://id.invalid/realms/org", clients=["console"], subjects=[{"id": "installer", "kind": "human"}])
+    b["continuation"].update(enabled=True, ownerIssuerRootsPEM="-----BEGIN CERTIFICATE-----\nPUBLIC\n-----END CERTIFICATE-----\n",
+                             workerProvider={"authMount": "worker-k8s", "authMountAccessor": "auth_kubernetes_1"},
+                             ownerProvider={"authMount": "owner-k8s", "authMountAccessor": "auth_kubernetes_2"})
+    values_path = work / "runner-lookup-values.yaml"
+    values_path.write_text(yaml.safe_dump(values))
+    dry_run = h + ["install", "runner-check", str(archive), "-n", namespace, "--skip-crds",
+                   "--dry-run=server", "-f", str(values_path)]
+    run(dry_run)  # An absent legacy Pod does not block a first installation.
+    name = b["name"] + "-continuation"
+    cases = [("pending", "Pending", "", False, False),
+             ("running", "Running", "", False, False),
+             ("unknown", "Unknown", "", False, False),
+             ("succeeded", "Succeeded", "", False, True),
+             ("failed", "Failed", "", False, True),
+             ("node-lost", "Failed", "NodeLost", False, False),
+             ("deleting", "Succeeded", "", True, False)]
+    for label, phase, reason, deleting, accepted in cases:
+        # Never scheduled: this fixture tests the exact API status predicate,
+        # not kubelet termination or the product's stronger CLI resume proof.
+        pod = {"apiVersion": "v1", "kind": "Pod", "metadata": {"name": name, "namespace": namespace,
+               "finalizers": ["fixture.asservat.io/hold"]},
+               "spec": {"schedulerName": "fixture-unassigned", "restartPolicy": "Never",
+                        "automountServiceAccountToken": False,
+                        "securityContext": {"runAsNonRoot": True, "runAsUser": 65532, "seccompProfile": {"type": "RuntimeDefault"}},
+                        "containers": [{"name": "fixture", "image": "registry.invalid/never-started@sha256:" + "a" * 64,
+                                        "securityContext": {"allowPrivilegeEscalation": False, "capabilities": {"drop": ["ALL"]}}}]}}
+        created = json.loads(run(k + ["create", "-f", "-", "-o", "json"], json.dumps(pod)))
+        run(k + ["patch", "pod", name, "-n", namespace, "--subresource=status", "--type=merge", "-p",
+                 json.dumps({"status": {"phase": phase, "reason": reason}})])
+        if deleting:
+            run(k + ["delete", "pod", name, "-n", namespace, "--wait=false"])
+        before = json.loads(run(k + ["get", "pod", name, "-n", namespace, "-o", "json"]))
+        assert before["status"]["phase"] == phase
+        assert ("deletionTimestamp" in before["metadata"]) == deleting
+        output = run(dry_run, ok=accepted)
+        if not accepted:
+            assert "legacy continuation Pod is not positively terminal" in output, output
+        after = json.loads(run(k + ["get", "pod", name, "-n", namespace, "-o", "json"]))
+        assert after["metadata"]["uid"] == created["metadata"]["uid"]
+        assert after == before, "Helm lookup deleted, adopted or mutated the legacy Pod"
+        run(k + ["patch", "pod", name, "-n", namespace, "--type=merge", "-p", '{"metadata":{"finalizers":[]}}'])
+        run(k + ["delete", "pod", name, "-n", namespace, "--ignore-not-found", "--wait=true", "--timeout=15s"])
+        report["checks"].append("legacy continuation lookup: " + label + (" accepted without adoption" if accepted else " refused without mutation"))
+    assert not run(k + ["get", "pod", b["name"] + "-bootstrap", "-n", namespace, "--ignore-not-found", "-o", "name"]).strip()
+    report["checks"].append("server-side dry-run lookup only; no installer process or provider effect")
+
+
 def main():
     cache = Path(os.environ.get("ASSERVAT_BUILD_TMP", Path.home() / ".cache/asservat-build/tmp"))
     cache.mkdir(parents=True, exist_ok=True)
@@ -126,6 +187,7 @@ def main():
             final_ns = json.loads(run(k + ["get", "namespace", "synthetic-workload", "-o", "json"]))
             assert final_ns["metadata"] == original_ns["metadata"], "workload namespace was changed"
             report["checks"].append("workload namespace unchanged")
+            check_legacy_continuation_lookup(k, h, archive, work, report)
             report["testExit"] = 0
         finally:
             report["sourceUnchangedDuringTest"] = hashes() == report["sourceHashes"]

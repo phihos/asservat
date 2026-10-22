@@ -7,9 +7,8 @@ import (
 
 func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
-	// ADR-204 added three logins outside the hub projection (80 to 83),
-	// ADR-205 three more (86) and ADR-210 one hub login (87, 52 in the hub).
-	if len(all) != 87 || len(hub) != 52 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
+	// Seven hub metadata readers now share one credential: six fewer logins.
+	if len(all) != 81 || len(hub) != 46 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
 		t.Fatal("unreviewed compartment expansion")
 	}
 	// ADR-205 decision 2: the hub-worker's deletion logins, in this order.
@@ -77,7 +76,11 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	}
 	for _, purpose := range hub {
 		limit, ok := PublicRuntimeRoleConnectionLimit(purpose)
-		if !ok || limit != 5 {
+		want := 5
+		if purpose == "hub-metadata-read" {
+			want = 29
+		}
+		if !ok || limit != want {
 			t.Fatal("hub envelope changed", purpose)
 		}
 	}

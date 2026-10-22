@@ -43,8 +43,11 @@ type PublicRuntimeSQLRoles struct {
 }
 
 func NewPublicRuntimeSQLRoles(ctx context.Context, c *pgx.ConnConfig, root PublicRuntimeRoleRoot, input contracts.PublicRuntimeRoles) (*PublicRuntimeSQLRoles, error) {
-	if ctx == nil || ctx.Err() != nil || c == nil || root == nil || input.Format != contracts.PublicRuntimeRolesFormat || input.LayoutDigest != PublicRuntimeRoleLayoutDigest() || !authorization.UUID(input.OwnerConfigurationUID) || !authorization.UUID(input.InitialClaimID) || !authorization.UUID(input.ClusterID) || !authorization.UUID(input.Namespace.UID) || input.Namespace.Name == "" || len(input.Namespace.Name) > 63 {
+	if ctx == nil || ctx.Err() != nil || c == nil || root == nil || input.Format != contracts.PublicRuntimeRolesFormat || !authorization.UUID(input.OwnerConfigurationUID) || !authorization.UUID(input.InitialClaimID) || !authorization.UUID(input.ClusterID) || !authorization.UUID(input.Namespace.UID) || input.Namespace.Name == "" || len(input.Namespace.Name) > 63 {
 		return nil, cfg.ErrInvalid
+	}
+	if input.LayoutDigest != PublicRuntimeRoleLayoutDigest() {
+		return nil, errors.Join(cfg.ErrInvalid, contracts.ErrPublicRuntimeLayout)
 	}
 	if _, ok := PublicRuntimeRoleName(input.InstallationID, "identity-read"); !ok {
 		return nil, cfg.ErrInvalid

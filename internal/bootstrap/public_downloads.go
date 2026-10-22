@@ -83,7 +83,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	processing, err := d.public.open(ctx, "processing-read")
+	processing, err := d.public.open(ctx, "hub-metadata-read")
 	if err != nil {
 		return nil, err
 	}

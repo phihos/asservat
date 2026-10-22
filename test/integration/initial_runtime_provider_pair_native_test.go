@@ -57,18 +57,9 @@ type initialRuntimeNativeProviders struct {
 // secrets=false leaves the two empty audit Secrets to the product (ADR-183).
 func initialRuntimeProviderSelections(t *testing.T, ctx context.Context, api kubernetes.Interface, connection *rest.Config, f fixture, desired contracts.InitialBootstrap, original contracts.InitialPreparer, secrets bool) *initialRuntimeNativeProviders {
 	t.Helper()
-	root, err := x509.ParseCertificate(f.NativeProviders.Root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	roots := x509.NewCertPool()
-	roots.AddCert(root)
-	transport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}}
-	p := &initialRuntimeNativeProviders{client: &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, endpoint: f.NativeProviders.KMS, fixture: f, desired: desired, installation: original.Plan.InstallationID, cluster: original.Plan.ClusterID}
-	t.Cleanup(transport.CloseIdleConnections)
+	prefix := "asservat-" + strings.ReplaceAll(original.Plan.InstallationID, "-", "")
 	// The existing original namespace guard must already protect these empty
 	// selected objects. A UID is not readiness and no dummy payload is supplied.
-	prefix := "asservat-" + strings.ReplaceAll(original.Plan.InstallationID, "-", "")
 	refs := make([]contracts.WorkerObjectReference, 2)
 	for i, name := range []string{prefix + "-worker-providers", contracts.OwnerProviderAuditSecretName(original.Plan.InstallationID)} {
 		if !secrets {
@@ -80,6 +71,25 @@ func initialRuntimeProviderSelections(t *testing.T, ctx context.Context, api kub
 		}
 		refs[i] = contracts.WorkerObjectReference{Name: secret.Name, UID: string(secret.UID)}
 	}
+	p := initialRuntimeProviderPrerequisites(t, ctx, api, f, desired, original.Kubernetes, prefix)
+	p.installation, p.cluster = original.Plan.InstallationID, original.Plan.ClusterID
+	p.worker.AuditCredentials, p.owner.AuditCredentials = refs[0], refs[1]
+	return p
+}
+
+// These upstream choices need no product installation ID. The unified runner
+// receives them before its first command; only product readback binds IDs later.
+func initialRuntimeProviderPrerequisites(t *testing.T, ctx context.Context, api kubernetes.Interface, f fixture, desired contracts.InitialBootstrap, endpoint contracts.OwnerProviderEndpoint, prefix string) *initialRuntimeNativeProviders {
+	t.Helper()
+	root, err := x509.ParseCertificate(f.NativeProviders.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots := x509.NewCertPool()
+	roots.AddCert(root)
+	transport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13}}
+	p := &initialRuntimeNativeProviders{client: &http.Client{Transport: transport, Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, endpoint: f.NativeProviders.KMS, fixture: f, desired: desired}
+	t.Cleanup(transport.CloseIdleConnections)
 	// A separate upstream reviewer is owned by this lab, outside the runtime
 	// namespace. It receives only TokenReview creation, never administrator RBAC.
 	reviewer, e := api.CoreV1().ServiceAccounts(desired.BootstrapNamespace).Create(ctx, &core.ServiceAccount{ObjectMeta: meta.ObjectMeta{Name: "provider-reviewer"}, AutomountServiceAccountToken: ptr.To(false)}, meta.CreateOptions{})
@@ -114,7 +124,7 @@ func initialRuntimeProviderSelections(t *testing.T, ctx context.Context, api kub
 		t.Fatal(e)
 	}
 	var ca bytes.Buffer
-	for _, der := range original.Kubernetes.Roots {
+	for _, der := range endpoint.Roots {
 		if e := pem.Encode(&ca, &pem.Block{Type: "CERTIFICATE", Bytes: der}); e != nil {
 			t.Fatal(e)
 		}
@@ -134,10 +144,10 @@ func initialRuntimeProviderSelections(t *testing.T, ctx context.Context, api kub
 			t.Fatal("actual auth mount identity unavailable")
 		}
 		accessors[i] = body.Data.Accessor
-		p.admin(t, ctx, http.MethodPost, "auth/"+mount+"/config", map[string]any{"kubernetes_host": original.Kubernetes.Endpoint, "kubernetes_ca_cert": ca.String(), "token_reviewer_jwt": token.Status.Token, "disable_local_ca_jwt": true, "disable_iss_validation": true}, 204)
+		p.admin(t, ctx, http.MethodPost, "auth/"+mount+"/config", map[string]any{"kubernetes_host": endpoint.Endpoint, "kubernetes_ca_cert": ca.String(), "token_reviewer_jwt": token.Status.Token, "disable_local_ca_jwt": true, "disable_iss_validation": true}, 204)
 	}
-	p.worker = contracts.ConfigurationProviderSelection{AuthMount: mounts[0], AuthMountAccessor: accessors[0], AuditCredentials: refs[0]}
-	p.owner = contracts.OwnerProviderSelection{AuthMount: mounts[1], AuthMountAccessor: accessors[1], AuditCredentials: refs[1]}
+	p.worker = contracts.ConfigurationProviderSelection{AuthMount: mounts[0], AuthMountAccessor: accessors[0]}
+	p.owner = contracts.OwnerProviderSelection{AuthMount: mounts[1], AuthMountAccessor: accessors[1]}
 	// Owner issuer trust is generated independently of provider HTTPS trust and
 	// selected before the first resource claim. Later owner setup must use this
 	// exact mount/root; a new CA cannot be substituted into the original source.

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"slices"
 	"strings"
@@ -240,6 +241,9 @@ func (s *PublicRuntimeRoleRoot) decode(raw []byte, started, until time.Time) (co
 		return zero, nil, cfg.ErrChanged
 	}
 	state, err := contracts.DecodePublicRuntimeRoleState(bytes.NewReader(data))
+	if err == nil && state.Input.LayoutDigest != s.input.LayoutDigest {
+		return zero, nil, errors.Join(cfg.ErrChanged, contracts.ErrPublicRuntimeLayout)
+	}
 	if err != nil || !runtimeRoleStateValid(s.input, state, s.client.now()) {
 		return zero, nil, cfg.ErrChanged
 	}

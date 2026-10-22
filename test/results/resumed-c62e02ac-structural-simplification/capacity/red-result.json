@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-timeout=5m",
+    "-run",
+    "^TestCapacityDiscoveryRetriesFailedPageOnceWithoutSkippingTarget$",
+    "-v",
+    "./internal/application/capacity"
+  ],
+  "exitCode": 1,
+  "elapsedSeconds": 1.413,
+  "sourceBefore": {
+    "internal/application/capacity/reconciliation_discovery.go": "ee152da320d030e5856b21c1d21fa79ace351ed5f30b32e8ea80c8ab10f52db2",
+    "internal/application/capacity/reconciliation_test.go": "6fbf8650a2eb6b21c5c9d136dc235b1fc188cb505ea14b42c11af09d38d80d2e"
+  },
+  "sourceAfter": {
+    "internal/application/capacity/reconciliation_discovery.go": "ee152da320d030e5856b21c1d21fa79ace351ed5f30b32e8ea80c8ab10f52db2",
+    "internal/application/capacity/reconciliation_test.go": "6fbf8650a2eb6b21c5c9d136dc235b1fc188cb505ea14b42c11af09d38d80d2e"
+  }
+}

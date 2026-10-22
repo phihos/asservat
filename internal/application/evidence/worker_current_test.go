@@ -341,11 +341,12 @@ func TestWorkerCurrentOriginalCheckTraversesConstructorRouterLocatorAndDelivery(
 		}
 	}
 }
-func TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls(t *testing.T) {
+func TestWorkerCurrentDispatchReusesObservationOnlyWithinOriginalInterval(t *testing.T) {
 	for _, phase := range []string{"read-worker-audit", "claim-worker", "observe-job", "read-worker"} {
 		for _, change := range []string{"groups", "scopes", "policy", "expiry"} {
 			t.Run(phase+"/"+change, func(t *testing.T) {
 				f, d, _, current := newWorkerLifecycleFixture(t)
+				original := f.a.ValidUntil
 				f.hooks[phase] = func() {
 					f.change(func() {
 						switch change {
@@ -357,49 +358,65 @@ func TestWorkerCurrentDispatchRejectsChangedOrExpiredIdentityAfterBlockingCalls(
 							f.i.Policy.Generation++
 						case "expiry":
 							f.now = f.now.Add(6 * time.Second)
-							f.i.VerifiedAt = f.now
-							f.i.ValidUntil = f.now.Add(5 * time.Second)
-							f.a.CheckedAt = f.now
-							f.a.ValidUntil = f.now.Add(5 * time.Second)
+							f.i.VerifiedAt, f.i.ValidUntil = f.now, f.now.Add(5*time.Second)
+							f.a.CheckedAt, f.a.ValidUntil = f.now, f.now.Add(5*time.Second)
 						}
 					})
 				}
-				if _, err := d.EnsureCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope); err == nil {
-					t.Fatal("changed/expired current request accepted")
+				_, err := d.EnsureCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope)
+				if change != "expiry" {
+					if err != nil || f.count("authority") != 1 || f.count("create-job") != 1 || f.count("bind-worker") != 1 {
+						t.Fatal("bounded operation repeated authority or lost its admitted effects", err, f.calls)
+					}
+					for name, until := range f.deadlines {
+						if until.After(original) {
+							t.Fatal("effect renewed original interval", name, until)
+						}
+					}
+					if _, err = newWorkerCurrentCheck(context.Background(), current, f, f.a.Scope, f.Now); err == nil {
+						t.Fatal("a new operation reused the old identity after a changed claim")
+					}
+					return
+				}
+				if err == nil {
+					t.Fatal("expired operation accepted")
 				}
 				if phase == "read-worker-audit" && f.count("write-worker-audit") != 0 {
-					t.Fatal("audit effect after original request lost authority")
+					t.Fatal("audit after original expiry")
 				}
 				if phase == "claim-worker" && f.count("create-job") != 0 {
-					t.Fatal("create after original authority lost")
+					t.Fatal("create after original expiry")
 				}
 				if phase == "observe-job" && f.count("bind-worker") != 0 {
-					t.Fatal("bind after observed identity change")
+					t.Fatal("bind after original expiry")
 				}
 			})
 		}
 	}
 }
-func TestWorkerCurrentEnrollmentRejectsChangedIdentityBeforeEffectsAndDelivery(t *testing.T) {
+
+func TestWorkerCurrentEnrollmentReusesItsOriginalIdentityObservation(t *testing.T) {
 	for _, phase := range []string{"proof", "prepare-certificate", "sign", "activate"} {
 		t.Run(phase, func(t *testing.T) {
-			f, _, s, current := newWorkerLifecycleFixture(t)
+			f, _, service, current := newWorkerLifecycleFixture(t)
+			original := f.a.ValidUntil
 			f.hooks[phase] = func() { f.change(func() { f.i.Groups = []string{"revoked-group"} }) }
-			if _, err := s.EnrollCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope, []byte("csr")); err == nil {
-				t.Fatal("changed identity accepted")
+			cert, err := service.EnrollCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope, []byte("csr"))
+			if err != nil || cert.Peer.Role != "acquisition" || f.count("authority") != 1 || f.count("sign") != 1 || f.count("activate") != 1 {
+				t.Fatal("enrollment repeated its original human authority", err, f.calls)
 			}
-			if phase == "proof" && f.count("claim-enrollment") != 0 {
-				t.Fatal("claimed after proof lost identity")
+			for name, until := range f.deadlines {
+				if until.After(original) {
+					t.Fatal("effect renewed original interval", name, until)
+				}
 			}
-			if phase == "prepare-certificate" && f.count("sign") != 0 {
-				t.Fatal("signed after current identity changed")
-			}
-			if phase == "sign" && f.count("store-certificate") != 0 {
-				t.Fatal("stored using changed identity")
+			if _, err = newWorkerCurrentCheck(context.Background(), current, f, f.a.Scope, f.Now); err == nil {
+				t.Fatal("new operation did not observe changed identity")
 			}
 		})
 	}
 }
+
 func TestWorkerCurrentLostCreateReplyUsesExactLookupWithoutAnotherCreate(t *testing.T) {
 	f, d, _, current := newWorkerLifecycleFixture(t)
 	f.lostCreate = true
@@ -411,16 +428,17 @@ func TestWorkerCurrentLostCreateReplyUsesExactLookupWithoutAnotherCreate(t *test
 		t.Fatal("retry replaced original creation/audit", err, f.calls)
 	}
 }
-func TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner(t *testing.T) {
+func TestWorkerCurrentLocatorClaimKeepsOriginalObservationAndDeadline(t *testing.T) {
 	for _, change := range []string{"expiry", "groups", "shorter"} {
 		t.Run(change, func(t *testing.T) {
-			f, _, s, current := newWorkerLifecycleFixture(t)
-			op := currentWorkerOperation(t, f, s, current)
-			r, err := NewWorkerEnrollmentRouter(context.Background(), f.w.Binding.InstallationID, f, f.Now, 1)
+			f, _, service, current := newWorkerLifecycleFixture(t)
+			op := currentWorkerOperation(t, f, service, current)
+			original := op.bound()
+			router, err := NewWorkerEnrollmentRouter(context.Background(), f.w.Binding.InstallationID, f, f.Now, 1)
 			if err != nil {
 				t.Fatal(err)
 			}
-			defer r.Close()
+			defer router.Close()
 			released := 0
 			store := testWorkerOwnerStore{claim: func(ctx context.Context, request value.WorkerOwnerRequest) (value.WorkerOwnerLease, error) {
 				lease := value.WorkerOwnerLease{Request: request, Fence: 1, Started: f.Now()}
@@ -428,10 +446,6 @@ func TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner(t *testing.T) {
 					switch change {
 					case "expiry":
 						f.now = f.now.Add(6 * time.Second)
-						f.i.VerifiedAt = f.now
-						f.i.ValidUntil = f.now.Add(5 * time.Second)
-						f.a.CheckedAt = f.now
-						f.a.ValidUntil = f.now.Add(5 * time.Second)
 					case "groups":
 						f.i.Groups = []string{"changed"}
 					case "shorter":
@@ -440,19 +454,28 @@ func TestWorkerCurrentLocatorClaimCannotRenewOrKeepRevokedOwner(t *testing.T) {
 				})
 				return lease, nil
 			}, release: func(context.Context, value.WorkerOwnerLease) error { released++; return nil }}
-			o := &WorkerRequestOwners{Router: r, Store: store, PodUID: f.w.Binding.PodUID, ProcessEpoch: f.w.Intent.ID, NewID: func() string { return f.w.Intent.ID }}
-			h, err := o.Register(context.Background(), op)
-			if err == nil || h != nil {
-				t.Fatal("stale locator returned")
+			owners := &WorkerRequestOwners{Router: router, Store: store, PodUID: f.w.Binding.PodUID, ProcessEpoch: f.w.Intent.ID, NewID: func() string { return f.w.Intent.ID }}
+			handle, err := owners.Register(context.Background(), op)
+			if change == "expiry" {
+				if err == nil || handle != nil {
+					t.Fatal("expired locator returned")
+				}
+			} else {
+				if err != nil || handle == nil || handle.Lease().Request.Until.After(original) || op.bound() != original || f.count("authority") != 1 {
+					t.Fatal("locator failed to use its original bounded observation", err)
+				}
+				if err = handle.Close(context.Background()); err != nil {
+					t.Fatal(err)
+				}
 			}
 			if released != 1 {
-				t.Fatal("known exact claim was not restricted", released)
+				t.Fatal("exact claim was not released", released)
 			}
-			r.mu.Lock()
-			used := r.used
-			r.mu.Unlock()
+			router.mu.Lock()
+			used := router.used
+			router.mu.Unlock()
 			if used != 0 {
-				t.Fatal("failed registration retained local slot")
+				t.Fatal("joined registration retained local slot")
 			}
 		})
 	}
@@ -469,137 +492,105 @@ type workerCurrentSourceFunc func(context.Context) (identity.Identity, error)
 func (f workerCurrentSourceFunc) ResolveIdentity(c context.Context) (identity.Identity, error) {
 	return f(c)
 }
-func TestWorkerCurrentConcurrentOldAuthorityCannotRestoreShorterBound(t *testing.T) {
+func TestWorkerCurrentConcurrentLocalChecksCannotRestoreShorterBound(t *testing.T) {
 	f, _, _, current := newWorkerLifecycleFixture(t)
-	entered, release := make(chan struct{}), make(chan struct{})
-	var blocking bool
-	var mu sync.Mutex
-	gate := workerCurrentGateFunc(func(ctx context.Context, i identities.CurrentIdentity, s artifact.DownloadScope) (artifact.DownloadAuthority, error) {
-		a, e := f.CheckDownloadCurrent(ctx, i, s)
-		mu.Lock()
-		block := blocking
-		blocking = false
-		mu.Unlock()
-		if block {
-			close(entered)
-			select {
-			case <-release:
-			case <-ctx.Done():
-			}
-		}
-		return a, e
-	})
-	check, err := newWorkerCurrentCheck(context.Background(), current, gate, f.a.Scope, f.Now)
+	check, err := newWorkerCurrentCheck(context.Background(), current, f, f.a.Scope, f.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	mu.Lock()
-	blocking = true
-	mu.Unlock()
-	done := make(chan artifact.DownloadAuthority, 1)
-	errs := make(chan error, 1)
-	go func() { a, e := check.Check(context.Background()); done <- a; errs <- e }()
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
-		t.Fatal("authority did not block")
+	original, short := check.Deadline(), f.Now().Add(time.Second)
+	var work sync.WaitGroup
+	for n := 0; n < 32; n++ {
+		work.Add(1)
+		go func(n int) {
+			defer work.Done()
+			until := original
+			if n == 0 {
+				until = short
+			}
+			if _, err := check.narrow(until); err != nil {
+				t.Error(err)
+			}
+			if _, err := check.Check(context.Background()); err != nil {
+				t.Error(err)
+			}
+		}(n)
 	}
-	short := f.Now().Add(time.Second)
-	f.change(func() { f.a.ValidUntil = short })
+	work.Wait()
 	a, err := check.Check(context.Background())
-	if err != nil || a.ValidUntil != short {
-		t.Fatal(err, a.ValidUntil)
-	}
-	f.change(func() { f.a.ValidUntil = f.now.Add(5 * time.Second) })
-	close(release)
-	old := <-done
-	if err := <-errs; err != nil || old.ValidUntil != short || check.Deadline() != short {
-		t.Fatal("old read extended current observation", err, old.ValidUntil)
+	if err != nil || a.ValidUntil != short || check.Deadline() != short || f.count("authority") != 1 {
+		t.Fatal("local checks restored the original bound or repeated authority", err, a.ValidUntil, f.calls)
 	}
 }
+
 func TestWorkerCurrentOwningRequestCancellationStopsBackgroundCheck(t *testing.T) {
 	f, _, _, current := newWorkerLifecycleFixture(t)
 	owner, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	var blocked bool
-	entered := make(chan struct{})
-	gate := workerCurrentGateFunc(func(ctx context.Context, i identities.CurrentIdentity, s artifact.DownloadScope) (artifact.DownloadAuthority, error) {
-		if blocked {
-			close(entered)
-			<-ctx.Done()
-			return artifact.DownloadAuthority{}, ctx.Err()
-		}
-		return f.CheckDownloadCurrent(ctx, i, s)
-	})
-	check, err := newWorkerCurrentCheck(owner, current, gate, f.a.Scope, f.Now)
+	check, err := newWorkerCurrentCheck(owner, current, f, f.a.Scope, f.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	blocked = true
-	done := make(chan error, 1)
-	go func() { _, e := check.Check(context.Background()); done <- e }()
-	select {
-	case <-entered:
-	case <-time.After(time.Second):
-		t.Fatal("not blocked")
-	}
 	cancel()
-	select {
-	case err := <-done:
-		if err == nil {
-			t.Fatal("cancelled owner accepted")
-		}
-	case <-time.After(time.Second):
-		t.Fatal("Background detached owning request")
+	if _, err = check.Check(context.Background()); err == nil {
+		t.Fatal("Background detached the cancelled owner")
+	}
+	if f.count("authority") != 1 {
+		t.Fatal("cancelled local check performed authority I/O")
 	}
 }
-func TestWorkerCurrentClonesIdentityClaimsInsteadOfFollowingCallerMutation(t *testing.T) {
-	for _, field := range []string{"groups", "scopes"} {
+
+func TestWorkerCurrentObservationDoesNotFollowCallerMutation(t *testing.T) {
+	for _, field := range []string{"groups", "scopes", "authority"} {
 		t.Run(field, func(t *testing.T) {
 			f, _, _, _ := newWorkerLifecycleFixture(t)
 			f.i.Groups = []string{"original"}
 			raw := f.i
 			source := workerCurrentSourceFunc(func(context.Context) (identity.Identity, error) { return raw, nil })
-			check, err := newWorkerCurrentCheck(context.Background(), source, f, f.a.Scope, f.Now)
+			check, first, err := newWorkerCurrentObservation(context.Background(), source, f, f.a.Scope, f.Now)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if field == "groups" {
+			switch field {
+			case "groups":
 				raw.Groups[0] = "changed"
-			} else {
+			case "scopes":
 				raw.Scopes[0] = "changed"
+			case "authority":
+				f.a.AccessUntil = f.now.Add(30 * time.Second)
 			}
-			if _, err = check.Check(context.Background()); err == nil {
-				t.Fatal("caller changed the pinned original claim slice")
+			got, err := check.Check(context.Background())
+			if err != nil || got != first || f.count("authority") != 1 {
+				t.Fatal("caller mutation replaced the owned observation", err)
 			}
 		})
 	}
 }
-func TestWorkerCurrentShorterObservationBoundsLaterEffectContexts(t *testing.T) {
+
+func TestWorkerCurrentOriginalShorterObservationBoundsEveryEffect(t *testing.T) {
 	for _, step := range []string{"dispatch", "enrollment"} {
 		t.Run(step, func(t *testing.T) {
-			f, d, s, current := newWorkerLifecycleFixture(t)
+			f, dispatcher, service, current := newWorkerLifecycleFixture(t)
 			short := f.Now().Add(time.Second)
-			hook, effect := "read-worker-audit", "write-worker-audit"
-			if step == "enrollment" {
-				hook, effect = "proof", "claim-enrollment"
-			}
-			f.hooks[hook] = func() { f.change(func() { f.i.ValidUntil = short }) }
+			f.change(func() { f.i.ValidUntil = short })
 			var err error
 			if step == "dispatch" {
-				_, err = d.EnsureCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope)
+				_, err = dispatcher.EnsureCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope)
 			} else {
-				_, err = s.EnrollCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope, []byte("csr"))
+				_, err = service.EnrollCurrent(context.Background(), current, f.w.Intent.SessionID, f.w.Intent.ID, f.a.Scope, []byte("csr"))
 			}
 			if err != nil {
 				t.Fatal(err)
 			}
-			if got := f.deadlines[effect]; got.IsZero() || got.After(short) {
-				t.Fatal("effect retained the older longer deadline", effect, got, short)
+			for name, until := range f.deadlines {
+				if until.IsZero() || until.After(short) {
+					t.Fatal("effect lost original shorter bound", name, until, short)
+				}
 			}
 		})
 	}
 }
+
 func TestWorkerCurrentCheckCannotStartOverAfterBlockingProof(t *testing.T) {
 	f, _, s, current := newWorkerLifecycleFixture(t)
 	op := currentWorkerOperation(t, f, s, current)
@@ -620,11 +611,15 @@ func TestWorkerCurrentCheckCannotStartOverAfterBlockingProof(t *testing.T) {
 		t.Fatal("expired operation gained effects")
 	}
 }
-func TestWorkerCurrentFinalShorterIdentityBoundsCertificateDelivery(t *testing.T) {
+func TestWorkerCurrentExplicitShorteningBoundsCertificateDelivery(t *testing.T) {
 	f, _, s, current := newWorkerLifecycleFixture(t)
 	op := currentWorkerOperation(t, f, s, current)
 	short := f.Now().Add(time.Second)
-	f.hooks["activate"] = func() { f.change(func() { f.i.ValidUntil = short }) }
+	f.hooks["activate"] = func() {
+		if _, err := op.pinned.narrow(short); err != nil {
+			t.Error(err)
+		}
+	}
 	d, err := op.BeginWorkerEnrollment(context.Background(), op.target.InstallationID, op.target.SessionID, op.target.WorkerID, []byte("pod-token"), []byte("csr"))
 	if err != nil {
 		t.Fatal(err)
@@ -632,7 +627,7 @@ func TestWorkerCurrentFinalShorterIdentityBoundsCertificateDelivery(t *testing.T
 	defer d.Close()
 	until, ok := d.Context().Deadline()
 	if !ok || until.After(short) {
-		t.Fatal("delivery ignored shorter final identity", until, short)
+		t.Fatal("delivery ignored the explicitly narrowed operation", until, short)
 	}
 }
 
@@ -640,12 +635,87 @@ func TestWorkerCurrentRouterAndOwnerUseShorterCurrentBound(t *testing.T) {
 	f, _, s, current := newWorkerLifecycleFixture(t)
 	op := currentWorkerOperation(t, f, s, current)
 	short := f.Now().Add(time.Second)
-	f.change(func() { f.i.ValidUntil = short })
+	if _, err := op.pinned.narrow(short); err != nil {
+		t.Fatal(err)
+	}
 	_, h := currentWorkerOwners(t, f, op)
 	if got, ok := h.route.ctx.Deadline(); !ok || got.After(short) {
 		t.Fatal("route retained longer bound", got)
 	}
 	if got := f.deadlines["claim-owner"]; got.IsZero() || got.After(short) {
 		t.Fatal("locator claim retained longer bound", got)
+	}
+}
+
+func TestWorkerCurrentInitialObservationRequiresIdentityScopesAndAuthority(t *testing.T) {
+	for _, which := range []string{"read-scope", "download-scope", "principal", "authority-scope", "environment", "retention", "expired", "cancelled", "authority-denied"} {
+		t.Run(which, func(t *testing.T) {
+			f, _, _, _ := newWorkerLifecycleFixture(t)
+			source := workerCurrentSourceFunc(func(context.Context) (identity.Identity, error) { return f.i, nil })
+			owner, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			scope := f.a.Scope
+			gate := workerCurrentGateFunc(func(context.Context, identities.CurrentIdentity, artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+				if which == "authority-denied" {
+					return artifact.DownloadAuthority{}, artifact.ErrDownloadUnavailable
+				}
+				return f.a, nil
+			})
+			switch which {
+			case "read-scope":
+				f.i.Scopes = []string{"evidence:download"}
+			case "download-scope":
+				f.i.Scopes = []string{"evidence:read"}
+			case "principal":
+				f.i.Principal.Subject = "another-user"
+			case "authority-scope":
+				f.a.Scope.Principal.Subject = "another-user"
+			case "environment":
+				f.a.Environment = artifact.DownloadEnvironment{}
+			case "retention":
+				f.a.Retention = artifact.RetentionProof{}
+			case "expired":
+				f.a.ValidUntil = f.now
+			case "cancelled":
+				cancel()
+			}
+			if _, err := newWorkerCurrentCheck(owner, source, gate, scope, f.Now); err == nil {
+				t.Fatal("incomplete initial observation admitted", which)
+			}
+		})
+	}
+}
+
+func TestWorkerCurrentNewOperationObservesRevocation(t *testing.T) {
+	f, _, _, current := newWorkerLifecycleFixture(t)
+	denied := false
+	calls := 0
+	gate := workerCurrentGateFunc(func(ctx context.Context, source identities.CurrentIdentity, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+		calls++
+		if denied {
+			return artifact.DownloadAuthority{}, artifact.ErrDownloadUnavailable
+		}
+		return f.CheckDownloadCurrent(ctx, source, scope)
+	})
+	check, first, err := newWorkerCurrentObservation(t.Context(), current, gate, f.a.Scope, f.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	denied = true
+	for range 4 {
+		got, err := check.Check(t.Context())
+		if err != nil || got != first {
+			t.Fatal("operation did not retain its original observation", err)
+		}
+	}
+	if calls != 1 {
+		t.Fatal("local operation repeated the authorizer", calls)
+	}
+	if _, err := newWorkerCurrentCheck(t.Context(), current, gate, f.a.Scope, f.Now); err == nil || calls != 2 {
+		t.Fatal("next operation reused the old authorization", err, calls)
+	}
+	f.change(func() { f.now = first.ValidUntil })
+	if _, err := check.Check(t.Context()); err == nil || calls != 2 {
+		t.Fatal("expired operation renewed its observation", err, calls)
 	}
 }

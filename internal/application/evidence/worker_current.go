@@ -13,13 +13,13 @@ import (
 
 // workerCurrentCheck belongs to one live hub request. It neither serializes
 // identity nor renews a request when routing, SQL or provider work blocks.
-// Multiple current observations may shorten, but cannot restore, its bound.
+// One complete authority observation belongs to the original <=5s operation.
+// Later checks are local; SQL effects retain their independent current fences.
+// Explicit source/attachment bounds may shorten, but cannot restore, its bound.
 type workerCurrentCheck struct {
 	mu             sync.Mutex
 	owner          context.Context
-	source         identities.CurrentIdentity
-	authority      CurrentDownloadAuthority
-	initial        identity.Identity
+	observation    artifact.DownloadAuthority
 	scope          artifact.DownloadScope
 	started, until time.Time
 	now            func() time.Time
@@ -30,8 +30,8 @@ func newWorkerCurrentCheck(ctx context.Context, source identities.CurrentIdentit
 	return c, err
 }
 
-// The initial observation can be consumed by an immediately following read.
-// It is not cached by Check: every later check still observes current authority.
+// Every new operation obtains one complete observation. Reusing it through
+// Check never repeats authentication or renews any original deadline.
 func newWorkerCurrentObservation(ctx context.Context, source identities.CurrentIdentity, authority CurrentDownloadAuthority, scope artifact.DownloadScope, now func() time.Time) (*workerCurrentCheck, artifact.DownloadAuthority, error) {
 	var zero artifact.DownloadAuthority
 	if ctx == nil || ctx.Err() != nil || source == nil || authority == nil || !scope.Valid() || now == nil {
@@ -49,9 +49,16 @@ func newWorkerCurrentObservation(ctx context.Context, source identities.CurrentI
 	if err != nil || callErr != nil || ctx.Err() != nil || now().Before(started) || !initial.Valid(now()) || initial.Principal != scope.Principal || !slices.Contains(initial.Scopes, "evidence:read") || !slices.Contains(initial.Scopes, "evidence:download") {
 		return nil, zero, artifact.ErrDownloadUnavailable
 	}
-	initial.Groups, initial.Scopes = slices.Clone(initial.Groups), slices.Clone(initial.Scopes)
-	c := &workerCurrentCheck{owner: ctx, source: source, authority: authority, initial: initial, scope: scope, started: started, until: identity.Earlier(until, initial.ValidUntil), now: now}
-	a, err := c.Check(ctx)
+	until = identity.Earlier(until, initial.ValidUntil)
+	call, cancel = context.WithDeadline(ctx, until)
+	a, err := authority.CheckDownloadCurrent(call, source, scope)
+	callErr = call.Err()
+	cancel()
+	if err != nil || callErr != nil || ctx.Err() != nil || now().Before(started) || !a.Valid(now()) || !a.Environment.Valid(now()) || !a.Retention.Valid(now()) || a.Scope != scope {
+		return nil, zero, artifact.ErrDownloadUnavailable
+	}
+	c := &workerCurrentCheck{owner: ctx, observation: a, scope: scope, started: started, until: identity.Earlier(until, a.ValidUntil), now: now}
+	a, err = c.Check(ctx)
 	if err != nil {
 		return nil, zero, err
 	}
@@ -77,53 +84,20 @@ func (c *workerCurrentCheck) Check(ctx context.Context) (artifact.DownloadAuthor
 	if c == nil || ctx == nil || ctx.Err() != nil || c.owner.Err() != nil {
 		return zero, artifact.ErrDownloadUnavailable
 	}
-	until, err := c.narrow(c.Deadline())
-	if err != nil {
-		return zero, err
-	}
-	call, cancel := context.WithDeadline(ctx, until)
-	stop := context.AfterFunc(c.owner, cancel)
-	defer func() { stop(); cancel() }()
-	latest, err := c.source.ResolveIdentity(call)
-	if err != nil || call.Err() != nil || !downloadSameIdentity(c.initial, latest, c.now()) {
-		return zero, artifact.ErrDownloadUnavailable
-	}
-	until, err = c.narrow(latest.ValidUntil)
-	if err != nil {
-		return zero, err
-	}
-	gate, end := context.WithDeadline(call, until)
-	defer end()
-	a, err := c.authority.CheckDownloadCurrent(gate, c.source, c.scope)
-	if err != nil || gate.Err() != nil || !a.Valid(c.now()) || !a.Environment.Valid(c.now()) || !a.Retention.Valid(c.now()) || a.Scope != c.scope {
-		return zero, artifact.ErrDownloadUnavailable
-	}
-	// Preserve this restrictive observation even if final identity later fails.
-	until, err = c.narrow(a.ValidUntil)
-	if err != nil {
-		return zero, err
-	}
-	final, stopFinal := context.WithDeadline(gate, until)
-	latest, err = c.source.ResolveIdentity(final)
-	finalErr := final.Err()
-	stopFinal()
-	if err != nil || finalErr != nil || !downloadSameIdentity(c.initial, latest, c.now()) {
-		return zero, artifact.ErrDownloadUnavailable
-	}
-	until, err = c.narrow(latest.ValidUntil)
-	if err != nil || ctx.Err() != nil || gate.Err() != nil {
-		return zero, artifact.ErrDownloadExpired
-	}
-	a.ValidUntil = until
-	if !a.Valid(c.now()) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	n := c.now()
+	a := c.observation
+	a.ValidUntil = c.until
+	if ctx.Err() != nil || c.owner.Err() != nil || n.Before(c.started) || !n.Before(c.until) || !a.Valid(n) || !a.Environment.Valid(n) || !a.Retention.Valid(n) || a.Scope != c.scope {
 		return zero, artifact.ErrDownloadExpired
 	}
 	return a, nil
 }
 
-// Each finite coordinator call shortens subsequent effect contexts when a newer
-// observation is stricter. Existing children also retain their earlier bound;
-// this helper never renews the request or creates background work.
+// Each finite coordinator call shortens subsequent effect contexts when an
+// independently read source/attachment is stricter. Existing children retain
+// their earlier bound; this never renews the request or creates background work.
 func workerEffectContext(ctx *context.Context, bound func() time.Time) (shorten, finish func()) {
 	var mu sync.Mutex
 	var cancels []context.CancelFunc

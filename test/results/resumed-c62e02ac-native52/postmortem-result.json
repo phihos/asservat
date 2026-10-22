@@ -1,0 +1,36 @@
+{
+  "runId": "context-84bi0pmu",
+  "sourceCommit": "b9e633205eb07a4b438b6847793e1a3096609cc8",
+  "harnessExit": 1,
+  "elapsedSeconds": 1425.418426,
+  "qualification": "failed at regional capacity workload readiness; no capture or download result",
+  "collection": {
+    "exit": 0,
+    "terminal": "session62099/chunk625561",
+    "failures": []
+  },
+  "cleanup": {
+    "exit": 0,
+    "terminal": "session21825/chunk4d535c",
+    "failures": [],
+    "independentlyAbsentResources": 12,
+    "clustersAbsent": true,
+    "privateConfigsRemoved": true,
+    "verification": "cleanup-verification-corrected.json"
+  },
+  "sourceVerification": "source-verification.json",
+  "diagnosis": "README.md",
+  "counts": {
+    "capacity_workload": 0,
+    "context_storage_binding": 0,
+    "context_capture": 0,
+    "context_execution": 0,
+    "custody": 0
+  },
+  "limitations": [
+    "The upstream cause of claim/post unavailable is not identified.",
+    "The permission-scope report is not target-specific.",
+    "Retrying candidate discovery is not itself proof of successful enrollment.",
+    "The separate simplified installer/runtime source was not exercised."
+  ]
+}

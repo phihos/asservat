@@ -15,6 +15,7 @@ import (
 
 const InitialBootstrapRunnerInputAnnotation = "asservat.io/bootstrap-input"
 const InitialBootstrapRunnerProfile = "four-command/v1"
+const InitialInstallerRunnerProfile = "five-command/v1"
 
 // Static orchestration only. This contains no UID, credential or effect claim.
 // Helm renders this exact fixed profile; positive-terminal resume rechecks it.
@@ -22,6 +23,7 @@ type InitialBootstrapRunnerPlan struct {
 	Namespace, Name, Image, InputDigest                            string
 	ProducerSecret, SchemaSecret, RetirementSecret, RegistrySecret string
 	ProbeAudience                                                  string
+	ContinuationDigest                                             string
 }
 
 func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error) {
@@ -34,6 +36,9 @@ func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error
 		}
 	}
 	if p.RegistrySecret != "" && len(validation.IsDNS1123Subdomain(p.RegistrySecret)) != 0 {
+		return nil, cfg.ErrInvalid
+	}
+	if p.ContinuationDigest != "" && !preparationDigestValid(p.ContinuationDigest) {
 		return nil, cfg.ErrInvalid
 	}
 	parts := strings.Split(p.Image, "@sha256:")
@@ -76,6 +81,18 @@ func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error
 	if p.RegistrySecret != "" {
 		pod.Spec.ImagePullSecrets = []core.LocalObjectReference{{Name: p.RegistrySecret}}
 	}
+	if p.ContinuationDigest != "" {
+		pod.Annotations["asservat.io/bootstrap-runner"] = InitialInstallerRunnerProfile
+		pod.Spec.InitContainers = append(pod.Spec.InitContainers, retire)
+		pod.Spec.Containers = []core.Container{container("continue", "installer-continue",
+			core.VolumeMount{Name: "scratch", MountPath: "/run/asservat/initial-preparer", SubPath: "projection/preparer", ReadOnly: true},
+			core.VolumeMount{Name: "continuation-input", MountPath: "/run/asservat/installer-continue", ReadOnly: true})}
+		pod.Spec.Volumes = append(pod.Spec.Volumes, core.Volume{Name: "continuation-input", VolumeSource: core.VolumeSource{Projected: &core.ProjectedVolumeSource{DefaultMode: ptr.To(int32(0440)), Sources: []core.VolumeProjection{
+			{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: initialBootstrapContinuationInputName(p.Name, p.ContinuationDigest)}, Items: []core.KeyToPath{{Key: "continuation.json", Path: "continuation.json"}}, Optional: ptr.To(false)}},
+			token,
+			{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: p.ProducerSecret}, Items: []core.KeyToPath{{Key: "postgres-administrator.json", Path: "postgres-administrator.json"}}, Optional: ptr.To(false)}},
+		}}}})
+	}
 	return pod, nil
 }
 
@@ -83,4 +100,8 @@ func BuildInitialBootstrapRunner(p InitialBootstrapRunnerPlan) (*core.Pod, error
 // Helm values create another nonsecret snapshot, never update the old one.
 func initialBootstrapRunnerInputName(name, digest string) string {
 	return name + "-bootstrap-input." + digest[:32] + "." + digest[32:]
+}
+
+func initialBootstrapContinuationInputName(name, digest string) string {
+	return name + "-continuation." + digest[:32]
 }

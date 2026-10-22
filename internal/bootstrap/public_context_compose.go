@@ -155,7 +155,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		return out, nil
 	}
-	sql, err := need("identity-read", "permission-read", "retention-read", "storage-read", "processing-read", "progress-read", "case-read", "catalog-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution-read", "api-execution-prepare", "api-execution-record")
+	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution-read", "api-execution-prepare", "api-execution-record")
 	if err != nil {
 		return nil, err
 	}
@@ -249,10 +249,10 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Admissions: admissions, Connections: p.Standby, Preflight: p.Standby}
 
 	recovery := shared.guards.Recovery
-	if out.permissions, err = postgres.NewPermissions(ctx, sql["permission-read"], root); err != nil {
+	if out.permissions, err = postgres.NewPermissions(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	sources, err := postgres.NewRetentionSources(ctx, sql["retention-read"], root)
+	sources, err := postgres.NewRetentionSources(ctx, sql["hub-metadata-read"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -272,16 +272,16 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	storage, err := postgres.NewContextStorageReader(ctx, sql["storage-read"], root)
+	storage, err := postgres.NewContextStorageReader(ctx, sql["hub-metadata-read"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	processing, err := postgres.NewProcessingReads(ctx, sql["processing-read"], root, recovery)
+	processing, err := postgres.NewProcessingReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	// ADR-200: a stale binding records a refresh demand with the
-	// capture-preview credentials; storage-read stays SELECT-only.
+	// capture-preview credentials; metadata reads gain no demand-writing privilege.
 	refresh, err := postgres.NewCapacityRefreshDemands(ctx, sql["capture-preview"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
@@ -323,16 +323,16 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
 
-	progress, err := postgres.NewContextProgressReads(ctx, sql["progress-read"], root, recovery)
+	progress, err := postgres.NewContextProgressReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	out.progress = captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: progress}
-	routes, err := postgres.NewContextCaseReads(ctx, sql["case-read"], root, recovery)
+	routes, err := postgres.NewContextCaseReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	if out.catalog, err = postgres.NewContextPublications(ctx, sql["catalog-read"], root); err != nil {
+	if out.catalog, err = postgres.NewContextPublications(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing}

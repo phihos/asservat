@@ -30,10 +30,10 @@ func installedPermissionObserver(t *testing.T, ctx context.Context, admin *pgxpo
 	if err != nil {
 		t.Fatal("installed permission projection", err)
 	}
-	raw := projection.Data["sql-public-permission-read.json"]
+	raw := projection.Data["sql-public-hub-metadata-read.json"]
 	var login contracts.OwnerSQLCredential
 	if json.Unmarshal(raw, &login) != nil || login.Username == "" || login.Password == "" {
-		t.Fatal("installed permission-read login missing")
+		t.Fatal("installed hub metadata login missing")
 	}
 	defer clear(raw)
 	c := admin.Config().ConnConfig
@@ -118,7 +118,7 @@ func TestInstalledPermissionObserverWithRealServices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	api := fake.NewSimpleClientset(&core.Secret{ObjectMeta: meta.ObjectMeta{Namespace: "installed-observer", Name: contracts.PublicRuntimeProjectionName(installation)}, Data: map[string][]byte{"sql-public-permission-read.json": credential}})
+	api := fake.NewSimpleClientset(&core.Secret{ObjectMeta: meta.ObjectMeta{Namespace: "installed-observer", Name: contracts.PublicRuntimeProjectionName(installation)}, Data: map[string][]byte{"sql-public-hub-metadata-read.json": credential}})
 	observer, closeObserver := installedPermissionObserver(t, ctx, admin, api, "installed-observer", installation, root)
 	if observer == nil {
 		t.Fatal("scoped TLS observer missing")

@@ -49,7 +49,9 @@ current SQL permissions, recovery, processing restrictions and transaction spend
 5. Keep current SQL permission, retention, recovery, processing, worker/generation
    and spend checks at their existing effect boundaries. Their shorter proof and
    request bounds remain independent. Cheap checks may detect and enforce changes
-   earlier than 60 seconds. The entire `DownloadAuthority` is never cached.
+   earlier than 60 seconds. A complete `DownloadAuthority` is never shared across
+   independent requests. The request-owned refinement below reuses it only within
+   one already bounded operation.
 
 This amends ADR-127's repeated protected-policy observation requirement for the
 download path. It changes no persistent schema, wire format, grant scope, approval,
@@ -83,6 +85,38 @@ This replaces repeated reads of unchanged identity settings, not repeated identi
 validation. The installed browser, MCP and download services share that pinned
 reader; their independent session, token and request deadlines still apply.
 
+## Request-owned authority refinement (2026-10-22)
+
+Configuration reuse removes the demonstrated Kubernetes rate-limit failure, but
+the first worker-preparation path still reconstructs complete authority ten times.
+The worker helper adds identity reads around an authorizer that already checks
+identity and permissions before and after its catalog/privacy reads. Retaining
+these nested checks is not a user requirement.
+
+Obtain one complete authority observation when constructing the request-owned
+worker operation. Later checks in that operation validate the retained value,
+exact scope, cancellation, clock direction and its earliest original deadline
+locally. The operation is still capped at five seconds and cannot renew itself.
+Another request performs a new authorization. This is neither a process-wide
+authority cache nor a sixty-second download permit.
+
+Keep the SQL effect checks for permission revision/suspension, retention and
+effective dates, processing restrictions, recovery epoch, worker generation and
+spend. A durable change can therefore reject an effect before the observation
+expires. External identity/group changes no longer require another remote lookup
+at every helper boundary within the same operation; the next request observes
+them. Token/session/evidence expiry known when authorizing still caps the original
+operation, as does cancellation at any point.
+
+This removes repeated work from dispatch and enrollment without another timer,
+configuration option, durable record or credential. It amends the per-step
+external-identity refresh described in
+[the worker lifecycle contract](../architecture/worker-current-lifecycle.md).
+The coordinator's separate entry/final evaluations and the transfer's existing
+bounded authority renewal remain. No constant is increased by this refinement.
+Qualification must measure the resulting count rather than equating it with one
+authorization for the whole public request.
+
 ## Complexity check
 
 | Question | Answer |
@@ -112,5 +146,8 @@ Measure remaining complete-path work before running the installed fixture; quali
 native transfer, Stop, expiry and deletion separately from a successful preparation.
 Require the stronger identity/authority regression to pass at the unchanged client
 rates, with one identity-policy read (three observer requests) and continued token
-validation at each existing call site. Preserve the failed combined run as evidence.
+validation at each actual authorization boundary. For request-owned reuse, prove
+one full worker authorization, bounded local checks, fresh authorization on a new
+operation, and unchanged cancellation/expiry and SQL revocation enforcement.
+Preserve the failed combined run and the earlier repeated-check counts as evidence.
 Actual commands and results belong in [implementation progress](../implementation-progress.md).
