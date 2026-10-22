@@ -1,0 +1,38 @@
+{
+  "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+  "argv": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "^(TestPublicAPIExecutionHasExactFormerGrantUnion|TestPublicAPIExecutionConsolidatesOnlySameProcessFacets)$",
+    "./internal/contracts",
+    "./internal/adapters/postgres"
+  ],
+  "environment": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exitCode": 1,
+  "elapsedSeconds": 21.203779,
+  "before": {
+    "internal/contracts/public_runtime_api_execution_test.go": "affd59138ea76e788afe65912ab4e3698b971002e6e8f32c80a2897b93722875",
+    "internal/adapters/postgres/public_runtime_api_execution_test.go": "842f02debb8d6305b48415483ab0d3355af9649892b74afe1de10a55a8be9970",
+    "internal/contracts/public_runtime_roles.go": "3b65d54f956c3f1b86ca0a35c02a093dba8e7707150fe6c1155a98bd8675349d",
+    "internal/contracts/public_runtime_compartments.go": "d47f23f2c55eb3c3b5dd0021938b86109372f662232328c5b57ad23ba98ef250",
+    "internal/adapters/postgres/public_runtime_hub_extension_grants.go": "eb0efe636d7f0ddf7491599c0f6db0dd706211c400bd9b025ed1fabd9991bdf0",
+    "internal/adapters/postgres/public_runtime_role_plan.go": "4ed2a0c9e272c5be868f46279f11b8ebcd6a16a291d8d03bb9c8f604a03d5e87"
+  },
+  "after": {
+    "internal/contracts/public_runtime_api_execution_test.go": "affd59138ea76e788afe65912ab4e3698b971002e6e8f32c80a2897b93722875",
+    "internal/adapters/postgres/public_runtime_api_execution_test.go": "842f02debb8d6305b48415483ab0d3355af9649892b74afe1de10a55a8be9970",
+    "internal/contracts/public_runtime_roles.go": "3b65d54f956c3f1b86ca0a35c02a093dba8e7707150fe6c1155a98bd8675349d",
+    "internal/contracts/public_runtime_compartments.go": "d47f23f2c55eb3c3b5dd0021938b86109372f662232328c5b57ad23ba98ef250",
+    "internal/adapters/postgres/public_runtime_hub_extension_grants.go": "eb0efe636d7f0ddf7491599c0f6db0dd706211c400bd9b025ed1fabd9991bdf0",
+    "internal/adapters/postgres/public_runtime_role_plan.go": "4ed2a0c9e272c5be868f46279f11b8ebcd6a16a291d8d03bb9c8f604a03d5e87"
+  },
+  "changedSources": [],
+  "scope": "New consolidation contract regression against unchanged production baseline."
+}

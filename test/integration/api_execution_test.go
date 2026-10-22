@@ -60,21 +60,22 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				}
 				initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, accepted.Expectation)
 				pool := func(user, password string) *pgxpool.Pool { p := poolFor(user, password); t.Cleanup(p.Close); return p }
-				preparePool := pool("api_execution_prepare_runtime", "synthetic-api-execution-prepare")
-				executePool := pool("api_execution_runtime", "synthetic-api-execution")
-				readPool := pool("api_execution_read_runtime", "synthetic-api-execution-read")
-				for _, p := range []*pgxpool.Pool{preparePool, executePool, readPool} {
-					for _, query := range []string{"DELETE FROM context_execution", "UPDATE context_execution SET binding_json=binding_json", "UPDATE context_capture SET expectation_json=expectation_json", "UPDATE fleet_trust SET recovery_blocked=false", "INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture LIMIT 0"} {
-						if _, err = p.Exec(ctx, query); err == nil {
-							t.Fatal("execution role acquired unrelated authority", query)
-						}
+				sharedPool, _ := compiledAPIExecutionPool(t, ctx, admin, poolFor)
+				qualifyAPIExecutionPoolBound(t, ctx, sharedPool)
+				for _, query := range []string{
+					"DELETE FROM context_execution WHERE false",
+					"UPDATE context_execution SET binding_json=binding_json WHERE false",
+					"INSERT INTO context_capture SELECT * FROM context_capture WHERE false",
+					"UPDATE context_capture SET expectation_json=expectation_json WHERE false",
+					"UPDATE fleet_trust SET recovery_blocked=false WHERE false",
+					"INSERT INTO context_catalog(artifact_id,capture_id,root_id) SELECT id,id,root_id FROM context_capture WHERE false",
+					"UPDATE custody_copy SET etag=etag WHERE false",
+					"INSERT INTO context_key_unwrap SELECT * FROM context_key_unwrap WHERE false",
+					"DELETE FROM authority_audit WHERE false",
+				} {
+					if _, err = sharedPool.Exec(ctx, query); capacitySQLState(err) != "42501" {
+						t.Fatal("execution credential acquired excluded authority", query, err)
 					}
-				}
-				if _, err = preparePool.Exec(ctx, "UPDATE context_execution SET phase=phase"); err == nil {
-					t.Fatal("preparation can start")
-				}
-				if _, err = executePool.Exec(ctx, "INSERT INTO context_execution(capture_id) SELECT id FROM context_capture LIMIT 0"); err == nil {
-					t.Fatal("execution can prepare identity")
 				}
 				guards := postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
 				newExecution := func(p *pgxpool.Pool) *postgres.APIContextExecutions {
@@ -84,7 +85,8 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 					}
 					return x
 				}
-				prepare, execute, read := newExecution(preparePool), newExecution(executePool), newExecution(readPool)
+				executionSQL := newExecution(sharedPool)
+				prepare, execute, read := executionSQL, executionSQL, executionSQL
 				intents, err := postgres.NewCaptureIntentAudits(ctx, pool("capture_audit_runtime", "synthetic-capture-audit"), s.a.RootID)
 				if err != nil {
 					t.Fatal(err)

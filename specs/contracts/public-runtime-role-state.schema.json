@@ -34,8 +34,8 @@
     },
     "roles": {
       "type": "array",
-      "minItems": 81,
-      "maxItems": 81,
+      "minItems": 79,
+      "maxItems": 79,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -68,9 +68,7 @@
               "capture-ack",
               "capture-preview",
               "capture-resolution",
-              "api-execution-read",
-              "api-execution-prepare",
-              "api-execution-record",
+              "api-execution",
               "download-session",
               "download-audit",
               "download-worker",

@@ -25,6 +25,13 @@ Refusal leaves no execution row or key permission. Exact existing prepared
 rows are passive no-create results even after expiry, allowing the runner's
 existing `PreparationUncertain` classification without repeating effects.
 
+[ADR-217](../decisions/217-api-execution-role.md) composes the hub's read,
+preparation and recording ports with one `APIContextExecutions` adapter, one
+`api-execution` SQL credential and one cold three-connection pool. The exact
+former grant union and existing SQL methods are retained. This does not join
+regional acquisition, audit, publication, key-service or deletion credentials.
+The hub physical connection governor remains 32.
+
 ## Exact class and target
 
 `artifact.ContextExecutionClass` has two supported values. The empty value is

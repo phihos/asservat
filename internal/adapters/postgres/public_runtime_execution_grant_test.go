@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// The installed api-execution-prepare login must hold INSERT on every column
+// The installed api-execution login must hold INSERT on every column
 // InsertAPIExecution writes. SQL39 added writer_protocol to the statement and
 // the component fixture role, but not to the product grant plan, so every
 // installed context start was denied at its first execution row.
@@ -21,10 +21,10 @@ func TestAPIExecutionPrepareInsertsEveryWrittenColumn(t *testing.T) {
 	if m == nil {
 		t.Fatal("InsertAPIExecution statement not found")
 	}
-	grants, _ := publicRuntimeRoleGrants("api-execution-prepare")
+	grants, _ := publicRuntimeRoleGrants("api-execution")
 	for _, column := range strings.Split(string(m[1]), ",") {
 		if !slices.Contains(grants, publicRuntimeGrant{"table", "context_execution", strings.TrimSpace(column), "INSERT"}) {
-			t.Errorf("api-execution-prepare cannot insert context_execution.%s", column)
+			t.Errorf("api-execution cannot insert context_execution.%s", column)
 		}
 	}
 }

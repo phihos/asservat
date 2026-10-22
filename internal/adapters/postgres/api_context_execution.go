@@ -25,8 +25,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// APIContextExecutions is instantiated separately for read, prepare and execute
-// credentials. Its facets never acquire key-unwrapping or publication rights.
+// APIContextExecutions supplies three typed facets from one installed credential
+// and pool. It has no key-unwrapping, capture-admission or publication rights.
 type APIContextExecutions struct {
 	ledger *Ledger
 	root   string

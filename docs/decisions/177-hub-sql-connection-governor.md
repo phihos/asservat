@@ -5,7 +5,9 @@ Requirements: REQ-DB-004 (specs/persistence.md connection budget), S-02; TASK-03
 
 The one-login-per-purpose choice is partially superseded by
 [ADR-215](215-hub-metadata-reader-role.md): seven hub metadata readers share one
-login and pool under the unchanged process governor. The account below records
+login and pool, and [ADR-217](217-api-execution-role.md): API execution read,
+preparation and record share one login and pool, under the unchanged process
+governor. The account below records
 the original layout and its qualification, not the current credential count.
 
 ## Context

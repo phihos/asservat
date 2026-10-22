@@ -20,8 +20,8 @@ var hubAPIHotPurposes = []string{"browser-session", "refresh-admit", "refresh-ow
 
 // publicPools opens hub-api's public purpose pools on first use. Each pool is
 // governed and verified against the installer's immutable role manifest. The
-// metadata pool retains the former seven readers' aggregate concurrency; every
-// other credential has MaxConns=1. No runtime role is adopted or migrated.
+// metadata and execution pools retain their former aggregate concurrency (seven
+// and three); other credentials have MaxConns=1. No role is adopted or migrated.
 type publicPools struct {
 	in       *providerInputs
 	manifest contracts.PublicRuntimeCredentialManifest

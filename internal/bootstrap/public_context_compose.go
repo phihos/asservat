@@ -155,7 +155,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		return out, nil
 	}
-	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution-read", "api-execution-prepare", "api-execution-record")
+	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution")
 	if err != nil {
 		return nil, err
 	}
@@ -309,18 +309,12 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	out.intents = auditapp.CaptureOperationPublication{RootID: root, Completed: completed, Journal: journal, Acknowledgements: acks, Writer: writer, Reader: reader, MAC: out.mac}
 
-	runner := executionapp.APIContextRunner{Eligibility: eligibility, Retention: out.retention}
-	for purpose, port := range map[string]func(*postgres.APIContextExecutions){
-		"api-execution-read":    func(x *postgres.APIContextExecutions) { runner.Read = x },
-		"api-execution-prepare": func(x *postgres.APIContextExecutions) { runner.Prepare = x },
-		"api-execution-record":  func(x *postgres.APIContextExecutions) { runner.Record = x },
-	} {
-		x, err := postgres.NewAPIContextExecutions(ctx, sql[purpose], root, shared.guards)
-		if err != nil {
-			return nil, mounts.ErrUnavailable
-		}
-		port(x)
+	executionSQL, err := postgres.NewAPIContextExecutions(ctx, sql["api-execution"], root, shared.guards)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
 	}
+	// One governed pool/credential, retaining the three typed runner ports.
+	runner := executionapp.APIContextRunner{Read: executionSQL, Prepare: executionSQL, Record: executionSQL, Eligibility: eligibility, Retention: out.retention}
 	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
 
 	progress, err := postgres.NewContextProgressReads(ctx, sql["hub-metadata-read"], root, recovery)

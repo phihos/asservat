@@ -61,14 +61,17 @@ func PublicRuntimeRoleConnectionLimit(purpose string) (int, bool) {
 	return 0, false
 }
 
-// PublicRuntimeRolePoolLimit preserves the aggregate seven-reader concurrency
-// in one cold hub pool. All other credentials retain one connection per process.
+// PublicRuntimeRolePoolLimit preserves the former aggregate concurrency for
+// shared metadata and execution pools. Other credentials keep one connection.
 func PublicRuntimeRolePoolLimit(purpose string) (int, bool) {
 	if !slices.Contains(PublicRuntimeRolePurposes(), purpose) {
 		return 0, false
 	}
 	if purpose == "hub-metadata-read" {
 		return PublicRuntimeMetadataConnections, true
+	}
+	if purpose == "api-execution" {
+		return PublicRuntimeAPIExecutionConnections, true
 	}
 	return 1, true
 }

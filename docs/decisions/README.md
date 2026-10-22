@@ -6,6 +6,12 @@ reservation. Original request/authority and session limits remain, with current
 configuration checked at worker effects. Implemented; affected race tests pass,
 with installed qualification pending.
 
+[ADR-217 — One SQL login for API execution facets](217-api-execution-role.md)
+consolidates the same hub process's read, preparation and recording credentials
+and pools. Typed ports, exact union grants, current SQL effect checks and the
+32-connection process ceiling remain. Implementation and qualification are in
+progress; this is not an installed availability claim.
+
 [ADR-216 — One authority observation for a context start](216-request-owned-context-start-observation.md)
 removes repeated complete authority reads within the same original five-second
 start. Current SQL effect checks, exact-target acquisition, cancellation and

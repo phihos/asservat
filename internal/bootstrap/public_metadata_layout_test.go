@@ -44,7 +44,7 @@ func TestPublicMetadataPoolLimitLeavesOtherCredentialsIndependent(t *testing.T) 
 		t.Fatal("metadata pool lost aggregate concurrency")
 	}
 	for _, purpose := range contracts.PublicRuntimeRolePurposes() {
-		if purpose == "hub-metadata-read" {
+		if purpose == "hub-metadata-read" || purpose == "api-execution" {
 			continue
 		}
 		if limit, ok := contracts.PublicRuntimeRolePoolLimit(purpose); !ok || limit != 1 {

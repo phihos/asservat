@@ -7,7 +7,7 @@ import (
 
 func TestPublicMetadataReadConsolidatesOnlyHubReaders(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
-	if len(all) != 81 || len(hub) != 46 || !slices.Contains(hub, "hub-metadata-read") {
+	if len(all) != 79 || len(hub) != 44 || !slices.Contains(hub, "hub-metadata-read") {
 		t.Fatalf("metadata credentials were not consolidated: all=%d hub=%d", len(all), len(hub))
 	}
 	if ordinal, ok := PublicRuntimeRoleOrdinal("hub-metadata-read"); !ok || ordinal != 93 {

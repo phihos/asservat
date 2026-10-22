@@ -1,0 +1,26 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "README.md": "793f422dd9bfbfed99dd60a4f56a132bd514d05c96d1ea6065c6ff65b02578fc",
+    "changed-files.txt": "c97a991fa05c97375f40708a9f32e7a841c3454157cbe7e6eb8ba77b755f5b6b",
+    "green-composition-race-result.json": "e24cc81f10f4805e43b1f2b90c2e1e74ee54917d510fd3a36e8f35930df1ef11",
+    "green-composition-race.log": "d4488ab7c191c5488bc1dcc4ae5b2dac1ca3b934cc4c7c0a581351e2937a4894",
+    "green-core-race-result.json": "d37c95f7489f216dc040fa2064c1946d095094c6105966a8df7c728fc826cee8",
+    "green-core-race.log": "30e5e8a0eb769281bc608676b1ed8c4d020230b50323e13c7341d83b21bd9156",
+    "green-design-result.json": "840d038997dd7cef423dcd8c703bbd5faefb6dce35bb1fc2fbcd7403d7c8a185",
+    "green-design.log": "2f515a4eab8d30573d934af44189185512d8a8ccb458faa42cddb03a72398217",
+    "green-integration-compile-result.json": "4f98f10e32830198e101aa2c3450291e4131e131740d48a32f56d856b72a29fd",
+    "green-integration-compile.log": "7f1188921993e28ba8c69195d6dbc9901a5c17afb73f2d795d995d618c006e82",
+    "green-results.json": "91875ba4d0fc76209344b81de3ce674bf9d0335c0dcedfa17e4fb824e71e6e27",
+    "green-source-sha256.json": "9997d756ca48e385344fa293a7ada9187ff2f63ebd0c0263faf5547e6bca6b5b",
+    "original-grants.json": "b90991988f07c6fbce0399228b542034f8d969710246e408c8075408185e6864",
+    "red-contracts-test.go.txt": "affd59138ea76e788afe65912ab4e3698b971002e6e8f32c80a2897b93722875",
+    "red-postgres-test.go.txt": "842f02debb8d6305b48415483ab0d3355af9649892b74afe1de10a55a8be9970",
+    "red-result.json": "99c0f1cc85d2d29a9e2642597e77e0f78812d6cf22db0d4fb8ff984681e658cf",
+    "red-snapshot-verification.json": "b494ce4340129569775fa4c0c1929a4c9495fbf6f1407251ccdf4f974bd1b753",
+    "red.log": "9c25016f3d0b8daa7eece6830ca9849a55de1f66d0ea5003f5b32203dab6d32f",
+    "result.json": "5e65a0b8877b70ecf0246f027dc2b42fdce98ba4a5e6015283b51fa038ccfecd",
+    "source-manifest-mapping.json": "e21d0a45435055fab8efad987bdef00911cf9e733a16e301be9db958d43372f3",
+    "source-ready.json": "cb1936379643b60a1d0579a9f16d88cf8f35c07530d3b988f6ebbb5b1dda91b6"
+  }
+}

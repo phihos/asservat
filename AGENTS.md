@@ -78,6 +78,14 @@ later effects. Preserve original request/authority and hard session/access/backi
 deadlines, refusal after late/unknown reservation, and current SQL/Job checks.
 Read docs/decisions/218-consumed-download-preflight.md before changing this path.
 
+ADR-217 groups same-process API execution read, preparation and recording into
+one credential and cold three-connection pool under the existing global 32 cap.
+Read docs/decisions/217-api-execution-role.md. Preserve typed ports, exact union
+grants and current SQL effect checks; reject earlier development layouts without
+adoption. Capture/connector/capacity identity pins and key/publication/deletion
+process boundaries are outside this consolidation. Qualification remains pending
+until recorded in implementation progress.
+
 ADR-216 removes repeated full hub authority observations within one context start.
 Read docs/decisions/216-request-owned-context-start-observation.md before changing
 this path. Reuse only the exact request's completed observations within their

@@ -1,0 +1,22 @@
+{
+  "label": "green-design",
+  "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+  "argv": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "spec-check",
+    "architecture-check",
+    "design-check",
+    "go-architecture-check"
+  ],
+  "environment": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exitCode": 0,
+  "elapsedSeconds": 12.102537,
+  "sourceCount": 3782,
+  "changedSources": []
+}

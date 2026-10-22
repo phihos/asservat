@@ -39,7 +39,7 @@ func TestPublicRuntimeOldLayoutCannotReplaceRetainedJournal(t *testing.T) {
 	}
 }
 
-func TestPublicMetadataProjectionContainsOneCredential(t *testing.T) {
+func TestPublicSharedProjectionContainsOnlyCurrentCredentials(t *testing.T) {
 	state := contracts.PublicRuntimeRoleState{}
 	for _, purpose := range contracts.PublicRuntimeHubRolePurposes() {
 		state.Roles = append(state.Roles, contracts.PublicRuntimeRoleMaterial{Purpose: purpose, Password: "synthetic", Claim: &contracts.PublicRuntimeRoleClaim{}, Receipt: &contracts.PublicRuntimeRoleReceipt{RoleName: purpose}})
@@ -49,12 +49,12 @@ func TestPublicMetadataProjectionContainsOneCredential(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clearRuntimeProjection(data)
-	if len(data) != 46 || len(data["sql-public-hub-metadata-read.json"]) == 0 {
-		t.Fatal("metadata projection retained separate credentials")
+	if len(data) != 44 || len(data["sql-public-hub-metadata-read.json"]) == 0 || len(data["sql-public-api-execution.json"]) == 0 {
+		t.Fatal("shared projection retained separate credentials")
 	}
-	for _, old := range []string{"permission-read", "retention-read", "storage-read", "progress-read", "case-read", "processing-read", "catalog-read"} {
+	for _, old := range []string{"permission-read", "retention-read", "storage-read", "progress-read", "case-read", "processing-read", "catalog-read", "api-execution-read", "api-execution-prepare", "api-execution-record"} {
 		if _, ok := data["sql-public-"+old+".json"]; ok {
-			t.Fatal("retired metadata credential still projected", old)
+			t.Fatal("retired credential still projected", old)
 		}
 	}
 }

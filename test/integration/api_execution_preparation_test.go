@@ -23,7 +23,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// The SQL read/preparation facets use their compiled installation grants.
+// The SQL read/preparation facets share the compiled installation credential.
 // Current target/process/identity observations are explicit synthetic inputs;
 // the composed runner's later ports record and refuse every attempted effect.
 func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario) {
@@ -51,23 +51,12 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 				t.Cleanup(p.Close)
 				return p
 			}
-			newExecution := func(purpose, prefix string) (*postgres.APIContextExecutions, string) {
-				role := narrowRole(t, ctx, admin, prefix, "synthetic-api-preparation", func(role string) []string {
-					grants, ok := postgres.PublicRuntimeRoleGrantSQL(purpose, role)
-					if !ok {
-						t.Fatal("missing compiled execution role", purpose)
-					}
-					return grants
-				})
-				p := open(role, "synthetic-api-preparation")
-				a, err := postgres.NewAPIContextExecutions(ctx, p, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
-				if err != nil {
-					t.Fatal(err)
-				}
-				return a, role
+			sharedPool, role := compiledAPIExecutionPool(t, ctx, admin, poolFor)
+			executionSQL, err := postgres.NewAPIContextExecutions(ctx, sharedPool, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+			if err != nil {
+				t.Fatal(err)
 			}
-			prepare, role := newExecution("api-execution-prepare", "api_preparation_")
-			read, _ := newExecution("api-execution-read", "api_preparation_read_")
+			prepare, read := executionSQL, executionSQL
 			intents, err := postgres.NewCaptureIntentAudits(ctx, open("capture_audit_runtime", "synthetic-capture-audit"), s.a.RootID)
 			if err != nil {
 				t.Fatal(err)

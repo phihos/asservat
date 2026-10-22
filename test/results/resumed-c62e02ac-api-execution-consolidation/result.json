@@ -1,0 +1,187 @@
+{
+  "baseCommit": "2d02b4fea8c2c1d3ac3b07cbf84f153ddaa3f8b1",
+  "testedTree": "uncommitted reviewed patch on the base commit; exact source hashes archived",
+  "red": {
+    "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+    "argv": [
+      "go",
+      "test",
+      "-count=1",
+      "-run",
+      "^(TestPublicAPIExecutionHasExactFormerGrantUnion|TestPublicAPIExecutionConsolidatesOnlySameProcessFacets)$",
+      "./internal/contracts",
+      "./internal/adapters/postgres"
+    ],
+    "environment": {
+      "GOMAXPROCS": "2",
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOFLAGS": "-buildvcs=false -p=1"
+    },
+    "exitCode": 1,
+    "elapsedSeconds": 21.203779,
+    "before": {
+      "internal/contracts/public_runtime_api_execution_test.go": "affd59138ea76e788afe65912ab4e3698b971002e6e8f32c80a2897b93722875",
+      "internal/adapters/postgres/public_runtime_api_execution_test.go": "842f02debb8d6305b48415483ab0d3355af9649892b74afe1de10a55a8be9970",
+      "internal/contracts/public_runtime_roles.go": "3b65d54f956c3f1b86ca0a35c02a093dba8e7707150fe6c1155a98bd8675349d",
+      "internal/contracts/public_runtime_compartments.go": "d47f23f2c55eb3c3b5dd0021938b86109372f662232328c5b57ad23ba98ef250",
+      "internal/adapters/postgres/public_runtime_hub_extension_grants.go": "eb0efe636d7f0ddf7491599c0f6db0dd706211c400bd9b025ed1fabd9991bdf0",
+      "internal/adapters/postgres/public_runtime_role_plan.go": "4ed2a0c9e272c5be868f46279f11b8ebcd6a16a291d8d03bb9c8f604a03d5e87"
+    },
+    "after": {
+      "internal/contracts/public_runtime_api_execution_test.go": "affd59138ea76e788afe65912ab4e3698b971002e6e8f32c80a2897b93722875",
+      "internal/adapters/postgres/public_runtime_api_execution_test.go": "842f02debb8d6305b48415483ab0d3355af9649892b74afe1de10a55a8be9970",
+      "internal/contracts/public_runtime_roles.go": "3b65d54f956c3f1b86ca0a35c02a093dba8e7707150fe6c1155a98bd8675349d",
+      "internal/contracts/public_runtime_compartments.go": "d47f23f2c55eb3c3b5dd0021938b86109372f662232328c5b57ad23ba98ef250",
+      "internal/adapters/postgres/public_runtime_hub_extension_grants.go": "eb0efe636d7f0ddf7491599c0f6db0dd706211c400bd9b025ed1fabd9991bdf0",
+      "internal/adapters/postgres/public_runtime_role_plan.go": "4ed2a0c9e272c5be868f46279f11b8ebcd6a16a291d8d03bb9c8f604a03d5e87"
+    },
+    "changedSources": [],
+    "scope": "New consolidation contract regression against unchanged production baseline."
+  },
+  "green": [
+    {
+      "label": "green-core-race",
+      "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+      "argv": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "./internal/contracts",
+        "./internal/adapters/postgres"
+      ],
+      "environment": {
+        "GOMAXPROCS": "2",
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "exitCode": 0,
+      "elapsedSeconds": 38.209011,
+      "sourceCount": 3782,
+      "changedSources": []
+    },
+    {
+      "label": "green-composition-race",
+      "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+      "argv": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-run",
+        "^(TestPublic|TestOwnerPublicInputs)",
+        "./internal/bootstrap",
+        "./internal/adapters/kubernetes"
+      ],
+      "environment": {
+        "GOMAXPROCS": "2",
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "exitCode": 0,
+      "elapsedSeconds": 581.861832,
+      "sourceCount": 3782,
+      "changedSources": []
+    },
+    {
+      "label": "green-integration-compile",
+      "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+      "argv": [
+        "go",
+        "test",
+        "-race",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "environment": {
+        "GOMAXPROCS": "2",
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "exitCode": 0,
+      "elapsedSeconds": 24.324937,
+      "sourceCount": 3782,
+      "changedSources": []
+    },
+    {
+      "label": "green-design",
+      "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+      "argv": [
+        "make",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "spec-check",
+        "architecture-check",
+        "design-check",
+        "go-architecture-check"
+      ],
+      "environment": {
+        "GOMAXPROCS": "2",
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "exitCode": 0,
+      "elapsedSeconds": 12.102537,
+      "sourceCount": 3782,
+      "changedSources": []
+    }
+  ],
+  "toolEvidence": {
+    "red": {
+      "session": 79801,
+      "terminalChunk": "e8014f",
+      "exitCode": 1
+    },
+    "greenWrapper": {
+      "session": 43847,
+      "terminalChunk": "4de0f2",
+      "exitCode": 0,
+      "intermediateChunks": [
+        "b225ba",
+        "a28ac8"
+      ]
+    }
+  },
+  "independentReview": {
+    "reviewer": "review_pr41",
+    "result": "no blockers",
+    "scope": "29 frozen changed files; exact former 46-grant union mechanically compared; role identity and nested-pool call paths inspected; source-ready hashes matched; no duplicate tests"
+  },
+  "qualification": {
+    "unitAndRace": "contracts and PostgreSQL full packages; bootstrap/Kubernetes selected public role, projection and owner-public-input tests",
+    "integration": "race-instrumented compilation only, no integration tests executed",
+    "design": "spec-check, architecture-check, design-check, go-architecture-check",
+    "externalServicesRun": false,
+    "stillRequired": [
+      "real SQL shared-pool lifecycle/concurrency/revocation and excluded-privilege qualification",
+      "fresh compiled-role provisioning and immutable projection replay",
+      "installed acquisition/publication and remaining end-user journey on combined candidate"
+    ],
+    "limits": [
+      "No measured handshake, latency, CPU or memory saving claimed.",
+      "No new role-identity pins, authority deadline, SQL effect predicate, global connection cap or user capability changed.",
+      "One facet now has the exact sibling-facet privilege union; process-level authority is unchanged."
+    ]
+  },
+  "contract": {
+    "publicRolesBefore": 81,
+    "publicRolesAfter": 79,
+    "hubPublicBefore": 46,
+    "hubPublicAfter": 44,
+    "ordinal": 94,
+    "retiredOrdinals": [
+      21,
+      22,
+      23
+    ],
+    "grantEntries": 46,
+    "coldPoolMaxConns": 3,
+    "roleConnectionLimit": 13,
+    "processGlobalConnections": 32
+  }
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "originalCacheFile": "green-core-race-source-before.json",
+    "archivedAs": "green-source-sha256.json",
+    "sha256": "9997d756ca48e385344fa293a7ada9187ff2f63ebd0c0263faf5547e6bca6b5b",
+    "identicalBytes": true
+  },
+  {
+    "originalCacheFile": "green-core-race-source-after.json",
+    "archivedAs": "green-source-sha256.json",
+    "sha256": "9997d756ca48e385344fa293a7ada9187ff2f63ebd0c0263faf5547e6bca6b5b",
+    "identicalBytes": true
+  },
+  {
+    "originalCacheFile": "green-composition-race-source-before.json",
+    "archivedAs": "green-source-sha256.json",
+    "sha256": "9997d756ca48e385344fa293a7ada9187ff2f63ebd0c0263faf5547e6bca6b5b",
+    "identicalBytes": true
+  },
+  {
+    "originalCacheFile": "green-composition-race-source-after.json",
+    "archivedAs": "green-source-sha256.json",
+    "sha256": "9997d756ca48e385344fa293a7ada9187ff2f63ebd0c0263faf5547e6bca6b5b",
+    "identicalBytes": true
+  },
+  {
+    "originalCacheFile": "green-integration-compile-source-before.json",
+    "archivedAs": "green-source-sha256.json",
+    "sha256": "9997d756ca48e385344fa293a7ada9187ff2f63ebd0c0263faf5547e6bca6b5b",
+    "identicalBytes": true
+  },
+  {
+    "originalCacheFile": "green-integration-compile-source-after.json",
+    "archivedAs": "green-source-sha256.json",
+    "sha256": "9997d756ca48e385344fa293a7ada9187ff2f63ebd0c0263faf5547e6bca6b5b",
+    "identicalBytes": true
+  },
+  {
+    "originalCacheFile": "green-design-source-before.json",
+    "archivedAs": "green-source-sha256.json",
+    "sha256": "9997d756ca48e385344fa293a7ada9187ff2f63ebd0c0263faf5547e6bca6b5b",
+    "identicalBytes": true
+  },
+  {
+    "originalCacheFile": "green-design-source-after.json",
+    "archivedAs": "green-source-sha256.json",
+    "sha256": "9997d756ca48e385344fa293a7ada9187ff2f63ebd0c0263faf5547e6bca6b5b",
+    "identicalBytes": true
+  }
+]

@@ -52,8 +52,9 @@ func (c APIExecutionCheck) Valid(now time.Time) bool {
 	return e.ExecutionClass == artifact.ContextAPIExecution && e.Validate() == nil && w.Accepted.State == capture.IntentAudited && w.Actor == c.Eligibility.Principal && c.Eligibility.VerifiedIdentity.Principal == w.Actor && c.Eligibility.Eligible && c.Eligibility.Target == t.Target() && c.Eligibility.VerifiedIdentity.Valid(now) && now.Before(c.Eligibility.ValidUntil) && compiler.VerifyContextPlan(c.Plan, now) && c.Plan.ScopeDigest == e.PlanDigest && c.Plan.Input.Executor == w.Actor && c.Plan.Input.CaptureID == e.CaptureUID && c.Plan.Input.Deadline.Equal(w.Accepted.Deadline) && t.Request == w.Target && t.Pin == w.Accepted.Pin && c.Process.Valid(now) && c.Process.Binding.ClusterID == e.Registration.Location.ClusterID && c.Process.Binding.ImageDigest == e.CollectorImageDigest && c.Process.Binding.InstallationID == c.Recovery.InstallationID && c.Process.Binding.IssuerEpoch == c.Recovery.IssuerEpoch && c.Recovery.Valid(now) && c.Plan.Input.Retention.Proof.Valid(now) && identity.Fresh(c.CheckedAt, c.ValidUntil, now, 5*time.Second) && !c.ValidUntil.After(c.Eligibility.ValidUntil) && !c.ValidUntil.After(c.Plan.ValidUntil) && !c.ValidUntil.After(c.Process.ValidUntil) && !c.ValidUntil.After(c.Recovery.FreshUntil) && now.Before(e.Registration.WriteUntil) && w.IntentDigest != (artifact.Digest{})
 }
 
-// Each method is composed with its own SQL credential; no facet conveys another
-// role's ability to acquire, acknowledge audit, publish or unwrap evidence.
+// Typed facets share one installed SQL credential and pool (ADR-217). Their
+// transaction checks remain; acquisition, audit, publication and unwrap stay
+// separate privileges and ports.
 type APIExecutionReader interface {
 	ReadAPIContextWork(context.Context, string, identity.Identity, artifact.RecoveryProof) (APIContextWork, error)
 }

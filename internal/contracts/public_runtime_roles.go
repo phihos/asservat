@@ -18,8 +18,10 @@ const PublicRuntimeCredentialManifestMaxBytes = 32 << 10
 var ErrPublicRuntimeLayout = errors.New("unsupported development SQL credential layout; preserve retained state; recreate only a disposable development installation")
 
 // The role ceiling is installation-wide. Most credentials have one connection
-// per process; metadata readers share seven. One extra slot verifies installation.
+// per process; metadata readers share seven and execution facets share three.
+// One extra slot verifies installation.
 const PublicRuntimeMetadataConnections = 7
+const PublicRuntimeAPIExecutionConnections = 3
 const PublicRuntimeRetainedHubProcesses = 4
 const PublicRuntimeRoleConnections = PublicRuntimeRetainedHubProcesses + 1
 
@@ -105,10 +107,10 @@ func PublicRuntimeHubRolePurposes() []string {
 
 // PublicRuntimeHubExtensionPurposes are the request-path duties hub-api needs
 // for execution and native download (ADR-177); publication moved to its own
-// process kind (ADR-181). They keep their
-// own logins and count against the hub's connection governor, not 32 logins.
+// process kind (ADR-181). Execution facets share one login (ADR-217).
+// All connections count against the hub's governor, not a 32-login limit.
 func PublicRuntimeHubExtensionPurposes() []string {
-	return []string{"api-execution-read", "api-execution-prepare", "api-execution-record", "download-session", "download-audit", "download-worker", "download-worker-audit", "download-worker-identity", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "worker-owner", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "download-stop-writer", "download-stop-ack",
+	return []string{"api-execution", "download-session", "download-audit", "download-worker", "download-worker-audit", "download-worker-identity", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "worker-owner", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "download-stop-writer", "download-stop-ack",
 		// ADR-193: fleet-operator bootstrap issuance (ordinals 74-77).
 		"fleet-bootstrap-reserve", "fleet-bootstrap-record", "fleet-bootstrap-audit", "fleet-bootstrap-activate",
 		// ADR-197: regional capacity's activated-leaf reads and cluster
@@ -189,12 +191,6 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 55, true
 	case "connector-owner-read":
 		return 56, true
-	case "api-execution-read":
-		return 21, true
-	case "api-execution-prepare":
-		return 22, true
-	case "api-execution-record":
-		return 23, true
 	case "publication-gate":
 		return 24, true
 	case "context-verify":
@@ -291,6 +287,9 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 	// Former metadata-reader ordinals 10-15 and 18 are not reused.
 	case "hub-metadata-read":
 		return 93, true
+	// Former execution-facet ordinals 21-23 are not reused.
+	case "api-execution":
+		return 94, true
 	default:
 		return 0, false
 	}

@@ -46,23 +46,12 @@ func qualifyAPIExecutionRetainedObservation(t *testing.T, ctx context.Context, a
 			t.Cleanup(p.Close)
 			return p
 		}
-		const password = "synthetic-api-observation"
-		newExecution := func(purpose, prefix string) (*postgres.APIContextExecutions, string) {
-			role := narrowRole(t, ctx, admin, prefix, password, func(role string) []string {
-				grants, ok := postgres.PublicRuntimeRoleGrantSQL(purpose, role)
-				if !ok {
-					t.Fatal("missing compiled execution role", purpose)
-				}
-				return grants
-			})
-			out, err := postgres.NewAPIContextExecutions(ctx, open(role, password), s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
-			if err != nil {
-				t.Fatal(err)
-			}
-			return out, role
+		sharedPool, role := compiledAPIExecutionPool(t, ctx, admin, poolFor)
+		executionSQL, err := postgres.NewAPIContextExecutions(ctx, sharedPool, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+		if err != nil {
+			t.Fatal(err)
 		}
-		prepare, role := newExecution("api-execution-prepare", "api_observation_prepare_")
-		read, _ := newExecution("api-execution-read", "api_observation_read_")
+		prepare, read := executionSQL, executionSQL
 		intents, err := postgres.NewCaptureIntentAudits(ctx, open("capture_audit_runtime", "synthetic-capture-audit"), s.a.RootID)
 		if err != nil {
 			t.Fatal(err)

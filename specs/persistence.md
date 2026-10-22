@@ -72,6 +72,15 @@ Claim bounded work batches using FOR UPDATE SKIP LOCKED, then release locks befo
 
 Initial tuning budgets: <=100 work items per claim, <=30-second claim lease with bounded renewal, <=5-second SQL statement timeout and <=1-second lock wait for online requests, <=32 pooled connections per hub replica with an installation-wide allocation leaving maintenance headroom. Different lifecycle batches require explicit bounded profiles. Exhaustion returns actionable pressure and does not grow queues without limits. Ordinary completed work rows expire after the replay window; authoritative denial/accounting rows have dependency-aware retention.
 
+Same-process API execution read, preparation and recording MUST share the
+fixed `api-execution` credential and cold pool under
+[ADR-217](../docs/decisions/217-api-execution-role.md). Grant exactly the former
+three-facet union, preserve the typed ports and current transaction checks, and
+retain `MaxConns=3` under the unchanged 32-connection process governor. Keep
+capture audit, connector/capacity identity pins and distinct acquisition, key,
+publication and deletion duties separate. Refuse unsupported retained development
+credential layouts before effects, without adoption or implicit migration.
+
 Before provisioning the promoted installed graph, the continuation MUST compare
 its compiled process/purpose allowance, including retained workers, simultaneous
 installer pools, verifier and maintenance reserve, with the actual server's
@@ -88,6 +97,12 @@ read-only under the original activation/incarnation and deadline checks.
 ### SC-DB-004
 
 Given a worker dies after object audit upload or remote dispatch, when another claims the expired lease, then it resumes the same operation, verifies audit by digest and never blindly reruns an ambiguous dump. Missing notifications do not lose work; audit failure prevents action start and evidence delivery.
+
+With the compiled shared API execution login, concurrent preparation still
+creates one immutable execution. Current revocation committed while preparation
+waits for a lock prevents its effect; a fourth concurrent pool acquisition
+stays within its original caller deadline. Unrelated audit, publication, unwrap
+and deletion statements remain denied.
 
 ## REQ-DB-005 — Durability, outage and disaster recovery
 

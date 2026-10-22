@@ -102,7 +102,14 @@ governor. It has the exact union of the former metadata grants, including their
 existing lock columns, without evidence-key, acquisition, publication, audit-write
 or deletion privileges. Those duties retain their credentials.
 
-The fixed inventory contains 81 public-runtime credentials, including 46 hub
+Under [ADR-217](../decisions/217-api-execution-role.md), API execution read,
+preparation and recording share one `api-execution` credential and cold pool
+with `MaxConns=3`, the former aggregate limit. One adapter supplies the three
+typed runner ports; every SQL method retains its current effect checks. The
+credential is the exact old grant union, without capture admission, audit,
+publication, key or deletion privileges. The process governor remains 32.
+
+The fixed inventory contains 79 public-runtime credentials, including 44 hub
 entries. These are credential counts, not simultaneously open connections.
 Exact-count and layout-digest validation reject unsupported development
 states/manifests before effects; startup cannot adopt or migrate retained state.
