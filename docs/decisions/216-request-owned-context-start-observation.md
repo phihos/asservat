@@ -1,7 +1,8 @@
 # ADR-216 — One authority observation for a context start
 
-Date: 2026-10-22. Status: accepted; implemented; affected race suites pass.
-Real SQL and installed qualification remain pending.
+Date: 2026-10-22. Status: accepted; implemented; affected race and selected real
+SQL suites pass. The installed journey reaches capture, verification and
+publication; native download and complete installed qualification remain pending.
 Requirements: REQ-EXE-002, REQ-DB-003–004; S-02.
 
 ## Observed problem
@@ -93,3 +94,16 @@ now makes one accepted-work read and 24 capability HTTP requests. The successful
 runner makes one target/eligibility/capability/retention observation and retains
 its separate completion process check. These results do not qualify installed
 latency or a complete native capture/download.
+
+The [selected real PostgreSQL/S3 gates](../../test/results/resumed-c62e02ac-capture-start-gates/README.md)
+pass on frozen `9543cff7`, including permission revocation committed while the
+retained observation waits on the permission lock. The effect refuses while the
+original observation and caller remain live, and preserves the immutable
+preparation. Both compiled verifier/publisher lifecycle cases also pass.
+
+The installed native55 run on that same commit reaches a regional capture,
+verification and catalog publication after two earlier unknown start outcomes.
+It then fails native-download preparation with an acknowledged unavailable reply.
+That result demonstrates a successful installed capture path, not sustained
+availability or a complete investigation. See the current
+[qualification record](../implementation-progress.md).

@@ -1,0 +1,26 @@
+{
+  "argv": [
+    "docker",
+    "exec",
+    "-i",
+    "asservat-context-jb2tvobx-postgres",
+    "psql",
+    "-X",
+    "-w",
+    "-U",
+    "postgres",
+    "-d",
+    "custody_test",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-P",
+    "pager=off",
+    "-f",
+    "-"
+  ],
+  "sqlSource": "/home/phil/.cache/asservat-build/recovered-c62e02ac/native50-full/postmortem-download.sql",
+  "sqlSHA256": "6977e1eca5696b7ac91283337ade2b4b1901f6fe450403029d1fec6dc9bcd487",
+  "exitCode": 0,
+  "elapsedSeconds": 0.081611,
+  "scope": "Retained exact native55 fixture; bounded read-only metadata only."
+}

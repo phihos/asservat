@@ -1,0 +1,12 @@
+{
+  "argv": [
+    "python3",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/verify-native-sources.py",
+    "/home/phil/Projekte/asservat-simplify-c62e02ac",
+    "9543cff77c78bd7a3262e575820c47bd413dc430",
+    "/home/phil/Projekte/asservat-simplify-c62e02ac/test/results/resumed-c62e02ac-capture-start-gates/sql/custody-environment.json"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 0.311973,
+  "scope": "Read-only comparison of existing harness hashes against committed Git blobs; no test or fixture run."
+}

@@ -1,0 +1,23 @@
+{
+  "runId": "context-jb2tvobx",
+  "clusters": [
+    "asservat-context-jb2tvobx-0",
+    "asservat-context-jb2tvobx-1"
+  ],
+  "containers": [
+    "asservat-context-jb2tvobx-s3",
+    "asservat-context-jb2tvobx-kms",
+    "asservat-context-jb2tvobx-postgres",
+    "asservat-context-jb2tvobx-tls",
+    "asservat-context-jb2tvobx-keycloak",
+    "asservat-context-jb2tvobx-0-seed"
+  ],
+  "volumes": [
+    "asservat-context-jb2tvobx-0-var"
+  ],
+  "image": "asservat-context-worker:context-jb2tvobx",
+  "networks": [
+    "asservat-context-jb2tvobx",
+    "asservat-context-jb2tvobx-kind"
+  ]
+}

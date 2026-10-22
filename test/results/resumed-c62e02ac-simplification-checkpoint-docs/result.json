@@ -1,0 +1,22 @@
+{
+  "sourceCommit": "9543cff77c78bd7a3262e575820c47bd413dc430",
+  "command": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "spec-check",
+    "architecture-check",
+    "design-check"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 9.474334,
+  "documentHashesBefore": {
+    "HANDOFF-CLAUDE.md": "a3831fecf8e17d099c65dc913d7a06aa6b8a51b6be2bbc60240c9a9b6db7844f",
+    "docs/implementation-progress.md": "55ab2e51cfbf77774b3d47804d20682927ba625197ca8a07e5588d67a40a7a01",
+    "docs/decisions/216-request-owned-context-start-observation.md": "df0174284bdc7dbcf39b0889d27cb16e2ae9217ba75ca9badfa9211b925652f5"
+  },
+  "documentHashesAfter": {
+    "HANDOFF-CLAUDE.md": "a3831fecf8e17d099c65dc913d7a06aa6b8a51b6be2bbc60240c9a9b6db7844f",
+    "docs/implementation-progress.md": "55ab2e51cfbf77774b3d47804d20682927ba625197ca8a07e5588d67a40a7a01",
+    "docs/decisions/216-request-owned-context-start-observation.md": "df0174284bdc7dbcf39b0889d27cb16e2ae9217ba75ca9badfa9211b925652f5"
+  }
+}

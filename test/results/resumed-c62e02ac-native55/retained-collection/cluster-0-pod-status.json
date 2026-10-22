@@ -1,0 +1,1162 @@
+{
+  "items": [
+    {
+      "metadata": {
+        "namespace": "bootstrap-chain-10000000-target",
+        "name": "asservat-5d89c736db7146339dd237b8a75a75c3-federation-78bb44bk8m",
+        "uid": "e44000af-589f-44ce-b3da-4163805ea1fa"
+      },
+      "containers": [
+        "federation"
+      ],
+      "status": {
+        "allocatedResources": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        },
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:11Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:10Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:11Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:11Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:10Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "cpu": "100m",
+              "memory": "128Mi"
+            },
+            "containerID": "containerd://9316bd7b1efef8d9185de75ef98f8231ea239811197d9ff33a743becb41876ec",
+            "image": "docker.io/library/asservat-context-worker:context-jb2tvobx",
+            "imageID": "docker.io/library/asservat-context-worker@sha256:564b6e97554c6b2dfb8635a814ddfe593e10b86f06e587e7c2aa70403bf63bf0",
+            "lastState": {},
+            "name": "federation",
+            "ready": true,
+            "resources": {
+              "limits": {
+                "cpu": "1",
+                "memory": "512Mi"
+              },
+              "requests": {
+                "cpu": "100m",
+                "memory": "128Mi"
+              }
+            },
+            "restartCount": 0,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-10-22T21:52:11Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 65532,
+                "supplementalGroups": [
+                  65532
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/run/asservat/federation",
+                "name": "inputs",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "172.21.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.21.0.2"
+          }
+        ],
+        "observedGeneration": 1,
+        "phase": "Running",
+        "podIP": "10.244.0.11",
+        "podIPs": [
+          {
+            "ip": "10.244.0.11"
+          }
+        ],
+        "qosClass": "Burstable",
+        "resources": {
+          "limits": {
+            "cpu": "1",
+            "memory": "512Mi"
+          },
+          "requests": {
+            "cpu": "79m",
+            "memory": "128Mi"
+          }
+        },
+        "startTime": "2026-10-22T21:52:10Z"
+      }
+    },
+    {
+      "metadata": {
+        "namespace": "bootstrap-chain-10000000-target",
+        "name": "asservat-5d89c736db7146339dd237b8a75a75c3-key-service-775dfd7gl",
+        "uid": "d7fa9eaa-1585-463e-b98c-f4e3f40b9f49"
+      },
+      "containers": [
+        "key-service"
+      ],
+      "status": {
+        "allocatedResources": {
+          "cpu": "50m",
+          "memory": "64Mi"
+        },
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:16Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:15Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:54:02Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:54:02Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:15Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "cpu": "50m",
+              "memory": "64Mi"
+            },
+            "containerID": "containerd://bc8a6ef25e7c11f6404663e40af7fc63608d4adb12ff3ed0d113d27bc91c26cb",
+            "image": "docker.io/library/asservat-context-worker:context-jb2tvobx",
+            "imageID": "docker.io/library/asservat-context-worker@sha256:564b6e97554c6b2dfb8635a814ddfe593e10b86f06e587e7c2aa70403bf63bf0",
+            "lastState": {
+              "terminated": {
+                "containerID": "containerd://6b28c104da849a79c46b4ef0b42d389735f932a380212bf2e5470adcf8d80971",
+                "exitCode": 1,
+                "finishedAt": "2026-10-22T21:54:01Z",
+                "reason": "Error",
+                "startedAt": "2026-10-22T21:52:16Z"
+              }
+            },
+            "name": "key-service",
+            "ready": true,
+            "resources": {
+              "limits": {
+                "cpu": "500m",
+                "memory": "256Mi"
+              },
+              "requests": {
+                "cpu": "50m",
+                "memory": "64Mi"
+              }
+            },
+            "restartCount": 1,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-10-22T21:54:02Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 65532,
+                "supplementalGroups": [
+                  65532
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/run/asservat/key-service",
+                "name": "inputs",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "172.21.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.21.0.2"
+          }
+        ],
+        "observedGeneration": 1,
+        "phase": "Running",
+        "podIP": "10.244.0.12",
+        "podIPs": [
+          {
+            "ip": "10.244.0.12"
+          }
+        ],
+        "qosClass": "Burstable",
+        "resources": {
+          "limits": {
+            "cpu": "500m",
+            "memory": "256Mi"
+          },
+          "requests": {
+            "cpu": "28m",
+            "memory": "64Mi"
+          }
+        },
+        "startTime": "2026-10-22T21:52:15Z"
+      }
+    },
+    {
+      "metadata": {
+        "namespace": "bootstrap-chain-10000000-target",
+        "name": "asservat-5d89c736db7146339dd237b8a75a75c3-owner-7f496c6b9bmszn7",
+        "uid": "c6cf654a-2b98-41aa-a468-c85e11a68b75"
+      },
+      "containers": [
+        "hub"
+      ],
+      "status": {
+        "allocatedResources": {
+          "cpu": "100m",
+          "memory": "128Mi"
+        },
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:00Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:51:59Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:54:09Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:54:09Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:51:59Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "cpu": "100m",
+              "memory": "128Mi"
+            },
+            "containerID": "containerd://eeeabf86ed0413e01c7030585b7a91b15b4943920ee4ef82b29e3e1d48c464d3",
+            "image": "docker.io/library/asservat-context-worker:context-jb2tvobx",
+            "imageID": "docker.io/library/asservat-context-worker@sha256:564b6e97554c6b2dfb8635a814ddfe593e10b86f06e587e7c2aa70403bf63bf0",
+            "lastState": {
+              "terminated": {
+                "containerID": "containerd://4b8d66c0f755902537f9bce35a2cfeb1f2e4a415a4b9e4a356acccb1d85a16bc",
+                "exitCode": 1,
+                "finishedAt": "2026-10-22T21:54:09Z",
+                "reason": "Error",
+                "startedAt": "2026-10-22T21:52:00Z"
+              }
+            },
+            "name": "hub",
+            "ready": true,
+            "resources": {
+              "limits": {
+                "cpu": "1",
+                "memory": "512Mi"
+              },
+              "requests": {
+                "cpu": "100m",
+                "memory": "128Mi"
+              }
+            },
+            "restartCount": 1,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-10-22T21:54:09Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 65532,
+                "supplementalGroups": [
+                  65532
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/run/asservat/hub",
+                "name": "inputs",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/run/asservat/owner-observation",
+                "name": "observation",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/run/asservat/public",
+                "name": "public",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "172.21.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.21.0.2"
+          }
+        ],
+        "observedGeneration": 1,
+        "phase": "Running",
+        "podIP": "10.244.0.10",
+        "podIPs": [
+          {
+            "ip": "10.244.0.10"
+          }
+        ],
+        "qosClass": "Burstable",
+        "resources": {
+          "limits": {
+            "cpu": "1",
+            "memory": "512Mi"
+          },
+          "requests": {
+            "cpu": "79m",
+            "memory": "128Mi"
+          }
+        },
+        "startTime": "2026-10-22T21:51:59Z"
+      }
+    },
+    {
+      "metadata": {
+        "namespace": "bootstrap-chain-10000000-target",
+        "name": "asservat-5d89c736db7146339dd237b8a75a75c3-publisher-69fbf9x2l6z",
+        "uid": "16c223c8-8212-4801-8cef-ce051abe2aba"
+      },
+      "containers": [
+        "publisher"
+      ],
+      "status": {
+        "allocatedResources": {
+          "cpu": "50m",
+          "memory": "128Mi"
+        },
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:21Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:21Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:54:09Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:54:09Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:21Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "cpu": "50m",
+              "memory": "128Mi"
+            },
+            "containerID": "containerd://ebb79f1a49808aa906bbcf29c6c0f5ea40ab721eecabc1096edf5634a302d1e8",
+            "image": "docker.io/library/asservat-context-worker:context-jb2tvobx",
+            "imageID": "docker.io/library/asservat-context-worker@sha256:564b6e97554c6b2dfb8635a814ddfe593e10b86f06e587e7c2aa70403bf63bf0",
+            "lastState": {
+              "terminated": {
+                "containerID": "containerd://521e2616ce0c0a363d481bcf9569dc13c9cbb49d5f240cb6c70f6ccf17e93fa8",
+                "exitCode": 1,
+                "finishedAt": "2026-10-22T21:54:08Z",
+                "reason": "Error",
+                "startedAt": "2026-10-22T21:52:21Z"
+              }
+            },
+            "name": "publisher",
+            "ready": true,
+            "resources": {
+              "limits": {
+                "cpu": "1",
+                "memory": "512Mi"
+              },
+              "requests": {
+                "cpu": "50m",
+                "memory": "128Mi"
+              }
+            },
+            "restartCount": 1,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-10-22T21:54:09Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 65532,
+                "supplementalGroups": [
+                  65532
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/run/asservat/publisher",
+                "name": "inputs",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "172.21.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.21.0.2"
+          }
+        ],
+        "observedGeneration": 1,
+        "phase": "Running",
+        "podIP": "10.244.0.13",
+        "podIPs": [
+          {
+            "ip": "10.244.0.13"
+          }
+        ],
+        "qosClass": "Burstable",
+        "resources": {
+          "limits": {
+            "cpu": "1",
+            "memory": "512Mi"
+          },
+          "requests": {
+            "cpu": "28m",
+            "memory": "128Mi"
+          }
+        },
+        "startTime": "2026-10-22T21:52:21Z"
+      }
+    },
+    {
+      "metadata": {
+        "namespace": "bootstrap-chain-10000000-target",
+        "name": "asservat-5d89c736db7146339dd237b8a75a75c3-worker-78d64bd5dvl7xp",
+        "uid": "aa24a317-e911-4462-8957-5546d4dbd49f"
+      },
+      "containers": [
+        "worker"
+      ],
+      "status": {
+        "allocatedResources": {
+          "cpu": "100m",
+          "memory": "64Mi"
+        },
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:45:26Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:45:26Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:51Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:51Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:45:26Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "cpu": "100m",
+              "memory": "64Mi"
+            },
+            "containerID": "containerd://3acefed5e33bb98982fccf7a4eb7637061f2b10c7fba6ab32e0a260e9bfb8b72",
+            "image": "docker.io/library/asservat-context-worker:context-jb2tvobx",
+            "imageID": "docker.io/library/asservat-context-worker@sha256:564b6e97554c6b2dfb8635a814ddfe593e10b86f06e587e7c2aa70403bf63bf0",
+            "lastState": {
+              "terminated": {
+                "containerID": "containerd://8bc49a151baceec3c56a6ec2b35c36b2634352e9c7f18c40224d14c95f8a2f60",
+                "exitCode": 137,
+                "finishedAt": "2026-10-22T21:52:51Z",
+                "reason": "Error",
+                "startedAt": "2026-10-22T21:45:26Z"
+              }
+            },
+            "name": "worker",
+            "ready": true,
+            "resources": {
+              "limits": {
+                "cpu": "500m",
+                "memory": "256Mi"
+              },
+              "requests": {
+                "cpu": "100m",
+                "memory": "64Mi"
+              }
+            },
+            "restartCount": 1,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-10-22T21:52:51Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 65532,
+                "supplementalGroups": [
+                  65532
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/run/asservat/hub-worker",
+                "name": "inputs",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "172.21.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.21.0.2"
+          }
+        ],
+        "observedGeneration": 1,
+        "phase": "Running",
+        "podIP": "10.244.0.9",
+        "podIPs": [
+          {
+            "ip": "10.244.0.9"
+          }
+        ],
+        "qosClass": "Burstable",
+        "resources": {
+          "limits": {
+            "cpu": "500m",
+            "memory": "256Mi"
+          },
+          "requests": {
+            "cpu": "79m",
+            "memory": "64Mi"
+          }
+        },
+        "startTime": "2026-10-22T21:45:26Z"
+      }
+    },
+    {
+      "metadata": {
+        "namespace": "bootstrap-chain-10000000",
+        "name": "install-bootstrap",
+        "uid": "94f2fb1b-beb6-4160-864d-f3902372a0c6"
+      },
+      "containers": [
+        "continue"
+      ],
+      "status": {
+        "allocatedResources": {
+          "cpu": "20m",
+          "memory": "32Mi"
+        },
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:25Z",
+            "message": "pod sandbox is not ready",
+            "observedGeneration": 1,
+            "reason": "PodSandboxNotReady",
+            "status": "False",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:44:49Z",
+            "observedGeneration": 1,
+            "reason": "PodCompleted",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:24Z",
+            "observedGeneration": 1,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:52:24Z",
+            "observedGeneration": 1,
+            "reason": "PodCompleted",
+            "status": "False",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:44:30Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "cpu": "20m",
+              "memory": "32Mi"
+            },
+            "containerID": "containerd://c64d32bb3afd86537a3e6697fa099c503dfc558c5cd32d1f46d88c26289070a3",
+            "image": "docker.io/library/asservat-context-worker:context-jb2tvobx",
+            "imageID": "docker.io/library/asservat-context-worker@sha256:564b6e97554c6b2dfb8635a814ddfe593e10b86f06e587e7c2aa70403bf63bf0",
+            "lastState": {},
+            "name": "continue",
+            "ready": false,
+            "resources": {
+              "limits": {
+                "cpu": "1",
+                "memory": "256Mi"
+              },
+              "requests": {
+                "cpu": "20m",
+                "memory": "32Mi"
+              }
+            },
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "containerd://c64d32bb3afd86537a3e6697fa099c503dfc558c5cd32d1f46d88c26289070a3",
+                "exitCode": 0,
+                "finishedAt": "2026-10-22T21:52:23Z",
+                "reason": "Completed",
+                "startedAt": "2026-10-22T21:44:49Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 65532,
+                "supplementalGroups": [
+                  65532
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/run/asservat/initial-preparer",
+                "name": "scratch",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/run/asservat/installer-continue",
+                "name": "continuation-input",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "172.21.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.21.0.2"
+          }
+        ],
+        "initContainerStatuses": [
+          {
+            "allocatedResources": {
+              "cpu": "20m",
+              "memory": "32Mi"
+            },
+            "containerID": "containerd://5eda29a45c6ce1e1647a1b4d3f6ae4e92dec64e22bce6cb04e56af88a4f8ebe0",
+            "image": "docker.io/library/asservat-context-worker:context-jb2tvobx",
+            "imageID": "docker.io/library/asservat-context-worker@sha256:564b6e97554c6b2dfb8635a814ddfe593e10b86f06e587e7c2aa70403bf63bf0",
+            "lastState": {},
+            "name": "produce",
+            "ready": true,
+            "resources": {
+              "limits": {
+                "cpu": "1",
+                "memory": "256Mi"
+              },
+              "requests": {
+                "cpu": "20m",
+                "memory": "32Mi"
+              }
+            },
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "containerd://5eda29a45c6ce1e1647a1b4d3f6ae4e92dec64e22bce6cb04e56af88a4f8ebe0",
+                "exitCode": 0,
+                "finishedAt": "2026-10-22T21:44:36Z",
+                "reason": "Completed",
+                "startedAt": "2026-10-22T21:44:31Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 65532,
+                "supplementalGroups": [
+                  65532
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/run/asservat/initial-bootstrap-work",
+                "name": "scratch"
+              },
+              {
+                "mountPath": "/run/asservat/initial-bootstrap",
+                "name": "producer-input",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          },
+          {
+            "allocatedResources": {
+              "cpu": "20m",
+              "memory": "32Mi"
+            },
+            "containerID": "containerd://a777a434cd60f2e7dd54893da473bb76d0524a48358ba3fcc8d9eb0e695169b8",
+            "image": "docker.io/library/asservat-context-worker:context-jb2tvobx",
+            "imageID": "docker.io/library/asservat-context-worker@sha256:564b6e97554c6b2dfb8635a814ddfe593e10b86f06e587e7c2aa70403bf63bf0",
+            "lastState": {},
+            "name": "schema",
+            "ready": true,
+            "resources": {
+              "limits": {
+                "cpu": "1",
+                "memory": "256Mi"
+              },
+              "requests": {
+                "cpu": "20m",
+                "memory": "32Mi"
+              }
+            },
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "containerd://a777a434cd60f2e7dd54893da473bb76d0524a48358ba3fcc8d9eb0e695169b8",
+                "exitCode": 0,
+                "finishedAt": "2026-10-22T21:44:37Z",
+                "reason": "Completed",
+                "startedAt": "2026-10-22T21:44:36Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 65532,
+                "supplementalGroups": [
+                  65532
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/run/asservat/initial-schema",
+                "name": "scratch",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              },
+              {
+                "mountPath": "/run/asservat/initial-schema-private",
+                "name": "ddl-input",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          },
+          {
+            "allocatedResources": {
+              "cpu": "20m",
+              "memory": "32Mi"
+            },
+            "containerID": "containerd://88a9f778ae2efd433dc1f0e28a87581d64eb40f4c044ca52c1652a1ff9b733b5",
+            "image": "docker.io/library/asservat-context-worker:context-jb2tvobx",
+            "imageID": "docker.io/library/asservat-context-worker@sha256:564b6e97554c6b2dfb8635a814ddfe593e10b86f06e587e7c2aa70403bf63bf0",
+            "lastState": {},
+            "name": "prepare",
+            "ready": true,
+            "resources": {
+              "limits": {
+                "cpu": "1",
+                "memory": "256Mi"
+              },
+              "requests": {
+                "cpu": "20m",
+                "memory": "32Mi"
+              }
+            },
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "containerd://88a9f778ae2efd433dc1f0e28a87581d64eb40f4c044ca52c1652a1ff9b733b5",
+                "exitCode": 0,
+                "finishedAt": "2026-10-22T21:44:43Z",
+                "reason": "Completed",
+                "startedAt": "2026-10-22T21:44:38Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 65532,
+                "supplementalGroups": [
+                  65532
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/run/asservat/initial-preparer",
+                "name": "scratch",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          },
+          {
+            "allocatedResources": {
+              "cpu": "20m",
+              "memory": "32Mi"
+            },
+            "containerID": "containerd://614427ec9f05a854ece61e586884e9ac3560f6af0ba2a91c6fda97a211cd0169",
+            "image": "docker.io/library/asservat-context-worker:context-jb2tvobx",
+            "imageID": "docker.io/library/asservat-context-worker@sha256:564b6e97554c6b2dfb8635a814ddfe593e10b86f06e587e7c2aa70403bf63bf0",
+            "lastState": {},
+            "name": "retire",
+            "ready": true,
+            "resources": {
+              "limits": {
+                "cpu": "1",
+                "memory": "256Mi"
+              },
+              "requests": {
+                "cpu": "20m",
+                "memory": "32Mi"
+              }
+            },
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "containerd://614427ec9f05a854ece61e586884e9ac3560f6af0ba2a91c6fda97a211cd0169",
+                "exitCode": 0,
+                "finishedAt": "2026-10-22T21:44:48Z",
+                "reason": "Completed",
+                "startedAt": "2026-10-22T21:44:44Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 65532,
+                "supplementalGroups": [
+                  65532
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/run/asservat/initial-bootstrap-work",
+                "name": "scratch"
+              },
+              {
+                "mountPath": "/run/asservat/initial-bootstrap",
+                "name": "retirement-input",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "observedGeneration": 1,
+        "phase": "Succeeded",
+        "podIP": "10.244.0.8",
+        "podIPs": [
+          {
+            "ip": "10.244.0.8"
+          }
+        ],
+        "qosClass": "Burstable",
+        "resources": {
+          "requests": {
+            "memory": "32Mi"
+          }
+        },
+        "startTime": "2026-10-22T21:44:30Z"
+      }
+    },
+    {
+      "metadata": {
+        "namespace": "synthetic",
+        "name": "fixture-5464c7465c-bjq9g",
+        "uid": "11bb11ae-e9d7-417c-8369-f3e5d3b0fca4"
+      },
+      "containers": [
+        "fixture"
+      ],
+      "status": {
+        "allocatedResources": {
+          "cpu": "5m",
+          "memory": "8Mi"
+        },
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:37:36Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:37:36Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:37:37Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:37:37Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-22T21:37:36Z",
+            "observedGeneration": 1,
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "allocatedResources": {
+              "cpu": "5m",
+              "memory": "8Mi"
+            },
+            "containerID": "containerd://b88c29c947412e925fb327c937f7ca7bc1460a14d8af56fb09c349ebb9e8750f",
+            "image": "registry.k8s.io/pause:3.10",
+            "imageID": "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a",
+            "lastState": {},
+            "name": "fixture",
+            "ready": true,
+            "resources": {
+              "limits": {
+                "cpu": "50m",
+                "memory": "32Mi"
+              },
+              "requests": {
+                "cpu": "5m",
+                "memory": "8Mi"
+              }
+            },
+            "restartCount": 0,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-10-22T21:37:36Z"
+              }
+            },
+            "user": {
+              "linux": {
+                "gid": 0,
+                "supplementalGroups": [
+                  0
+                ],
+                "uid": 65532
+              }
+            },
+            "volumeMounts": [
+              {
+                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                "name": "kube-api-access-x4ktt",
+                "readOnly": true,
+                "recursiveReadOnly": "Disabled"
+              }
+            ]
+          }
+        ],
+        "hostIP": "172.21.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.21.0.2"
+          }
+        ],
+        "observedGeneration": 1,
+        "phase": "Running",
+        "podIP": "10.244.0.5",
+        "podIPs": [
+          {
+            "ip": "10.244.0.5"
+          }
+        ],
+        "qosClass": "Burstable",
+        "resources": {
+          "limits": {
+            "cpu": "50m",
+            "memory": "32Mi"
+          },
+          "requests": {
+            "memory": "8Mi"
+          }
+        },
+        "startTime": "2026-10-22T21:37:36Z"
+      }
+    }
+  ]
+}

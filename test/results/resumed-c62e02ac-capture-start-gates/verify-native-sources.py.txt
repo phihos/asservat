@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+"""Compare harness source hashes against exact Git blobs; read-only."""
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import sys
+repo, commit, report = sys.argv[1:]
+data = json.loads(Path(report).read_text())
+items = list(data["sourceHashes"].items())
+requests = "".join(f"{commit}:{name}\n" for name, _ in items).encode()
+run = subprocess.run(["git", "cat-file", "--batch"], input=requests, stdout=subprocess.PIPE, cwd=repo, check=True)
+payload, offset, mismatch = run.stdout, 0, []
+for name, expected in items:
+    end = payload.index(b"\n", offset)
+    header = payload[offset:end].split()
+    if len(header) != 3 or header[1] != b"blob":
+        raise SystemExit(f"Missing/non-blob Git source: {name}")
+    size = int(header[2]); offset = end + 1
+    raw = payload[offset:offset+size]; offset += size
+    if payload[offset:offset+1] != b"\n":
+        raise SystemExit(f"Invalid Git batch framing: {name}")
+    offset += 1
+    actual = hashlib.sha256(raw).hexdigest()
+    if actual != expected:
+        mismatch.append({"path": name, "gitSHA256": actual, "harnessSHA256": expected})
+if offset != len(payload):
+    raise SystemExit("Unexpected trailing Git batch bytes")
+print(json.dumps({"sourceCommit": commit, "sourceHashesVerified": len(items), "sourceHashMismatches": mismatch, "sourceUnchangedDuringTest": data.get("sourceUnchangedDuringTest"), "testExit": data.get("testExit"), "cleanupFailures": data.get("cleanupFailures"), "buildScratchRemoved": data.get("buildScratchRemoved")}, indent=2))
+raise SystemExit(bool(mismatch) or data.get("sourceUnchangedDuringTest") is not True)

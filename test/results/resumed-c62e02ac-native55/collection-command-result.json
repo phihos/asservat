@@ -1,0 +1,18 @@
+{
+  "argv": [
+    "python3",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/collect-kept-native.py",
+    "/home/phil/.cache/asservat-build/kept/context-jb2tvobx.json",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/native55-full/retained-collection",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/native55-private",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/native48-full"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 2.913499,
+  "terminalHarnessReceipt": {
+    "session": 78269,
+    "chunk": "042bd6",
+    "exitCode": 1,
+    "provenance": "Parent-reported actual terminal receipt before collection."
+  }
+}

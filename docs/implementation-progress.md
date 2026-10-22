@@ -1,5 +1,56 @@
 # Sustained implementation progress
 
+## Simplification delivery checkpoint (2026-10-23)
+
+The announced whole-design simplification is **partly implemented** on
+`codex/simplify-installed-lifecycle`; it has not been integrated into the original
+project checkout. Four concrete reductions are present in frozen `9543cff7`:
+download preparation performs three complete authority evaluations instead of ten;
+seven hub metadata SQL credentials/pools become one; two bootstrap/continuation
+Pods become one sequential runner; and a context start performs one full runner
+observation instead of three. The composed pre-preparation capability path drops
+from 48 HTTP requests to 24. These counts have component regressions; they are not
+claims about installed latency or a completed architecture rewrite.
+
+The [selected real SQL and design gates](../test/results/resumed-c62e02ac-capture-start-gates/README.md)
+pass on that commit. PostgreSQL/S3 execution cases exit 0 (14.395 seconds Go /
+50.458 seconds wrapper), including a permission change committed during a real
+lock wait, all four preparation-boundary cases and both compiled
+verifier/publisher lifecycle cases. All 2,753 harness source hashes match the
+commit and remain unchanged; cleanup and independent resource-absence checks
+pass. Specification, architecture, design and Go dependency checks exit 0 in
+13.203 seconds. The full Go gate has not yet run on this candidate.
+
+Installed [native55](../test/results/resumed-c62e02ac-native55/README.md) exits 1
+(1,247.424 seconds Go / 1,373.129 seconds wrapper).
+The unified installer, interruption/resume and regional join progress. The MCP
+journey reaches a real regional pod-status capture, verification and publication
+after two earlier unknown start outcomes. Its first native-download preparation
+then returns acknowledged unavailable after 2.459 seconds. Native file delivery,
+Stop and later lifecycle outcomes are not qualified. All 2,781 harness source
+hashes match `9543cff7` and remain unchanged; the harness removed its build scratch.
+All 35 bounded retained-diagnostic commands pass. Exact-manifest cleanup exits 0
+with no failures; independent read-back confirms all 12 owned resources and both
+clusters absent, and private diagnostic configurations are removed.
+
+The retained SQL read-back contains a Preparing download session and an audited
+generation-one worker, with no claim, acknowledged Job, worker binding, transfer
+batch, response or emitted bytes. Source review narrows the refusal to the audit
+acknowledgement's return after its durable commit, the following local bound check
+or the SQL worker claim, before Job creation/discovery. The current logs do not
+distinguish these branches. The next focused reproduction should exercise reserve,
+durable audit acknowledgement and claim through the compiled SQL role with a
+retained bounded observation before
+another installed run; no timeout, retry or discovery change follows from this
+evidence.
+
+The [original complexity review](reviews/complexity-2026-10-20/README.md) remains
+the review baseline, not an implementation checklist marked complete. Broader
+credential consolidation, owner/certificate lifecycle simplification, audit and
+cleanup consolidation, and operator restart/upgrade/rollback/restore outcomes
+remain unfinished. The next runtime investigation is the recorded download
+preparation failure; a successful component gate does not close that gap.
+
 ## Structural simplification candidate (2026-10-22)
 
 The maintainer asked whether the announced design simplification had actually

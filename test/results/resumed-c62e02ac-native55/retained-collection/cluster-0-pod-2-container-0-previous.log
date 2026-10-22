@@ -1,0 +1,24 @@
+2026-10-22T21:52:10.690654650Z owner provider refresh: audit-wrap final-proof (1)
+2026-10-22T21:52:44.742922491Z owner port router: started (1)
+2026-10-22T21:52:44.742929131Z owner router: started (1)
+2026-10-22T21:52:44.743042762Z owner router: handoff observation (1)
+2026-10-22T21:52:44.743069142Z owner router: handoff observation (2)
+2026-10-22T21:52:44.743667675Z owner router: handoff observation (4)
+2026-10-22T21:53:07.909073805Z owner observer 302 calls 250ms, operation 0 calls 0s, readiness 256 calls 210ms, identity 3 calls 0s, provider 710 calls 640ms, credentials 204 calls 160ms, context-start 0 calls 0s total
+2026-10-22T21:53:10.466406727Z owner router: handoff observation (8)
+2026-10-22T21:53:37.909169136Z owner observer 648 calls 520ms, operation 0 calls 0s, readiness 925 calls 770ms, identity 3 calls 0s, provider 710 calls 640ms, credentials 204 calls 160ms, context-start 0 calls 0s total
+2026-10-22T21:53:47.691683390Z owner router: handoff observation (16)
+2026-10-22T21:53:53.414595833Z owner router: handoff native (1)
+2026-10-22T21:53:53.587797040Z context start ingress refused: admission (1)
+2026-10-22T21:53:53.587801660Z context start refused: authenticate (1)
+2026-10-22T21:53:55.469744413Z owner router: handoff native (2)
+2026-10-22T21:53:55.640497659Z context start ingress refused: admission (2)
+2026-10-22T21:53:55.640502579Z context start refused: authenticate (2)
+2026-10-22T21:53:59.469760559Z owner router: handoff native (4)
+2026-10-22T21:53:59.639431818Z context start ingress refused: admission (4)
+2026-10-22T21:53:59.639438208Z context start refused: authenticate (4)
+2026-10-22T21:54:07.471136619Z owner router: handoff native (8)
+2026-10-22T21:54:07.641188622Z context start ingress refused: admission (8)
+2026-10-22T21:54:07.641194882Z context start refused: authenticate (8)
+2026-10-22T21:54:07.908817988Z owner observer 1024 calls 800ms, operation 0 calls 0s, readiness 1654 calls 1.38s, identity 3 calls 0s, provider 710 calls 640ms, credentials 204 calls 160ms, context-start 0 calls 0s total
+2026-10-22T21:54:09.145629566Z owner startup failed: phase=full-runtime role=none reason=changed native=unspecified detail=unspecified sql=unknown sql-reason=unspecified

@@ -1,5 +1,26 @@
 # Asservat handoff to Claude Code
 
+## Current continuation (2026-10-23)
+
+The maintainer subsequently resumed implementation and approved the complexity
+review follow-up. The historical stop and no-Git statements below describe
+2026-10-14 only. Git now exists. The current simplification worktree is
+`/home/phil/Projekte/asservat-simplify-c62e02ac`, branch
+`codex/simplify-installed-lifecycle`; the original checkout remains separate.
+
+Start with the [current progress checkpoint](docs/implementation-progress.md),
+[AGENTS.md](AGENTS.md) and the accepted
+[complexity review](docs/reviews/complexity-2026-10-20/README.md). Runtime candidate
+`9543cff7` implements four scoped simplifications. Selected component, race,
+PostgreSQL/S3 and Helm checks pass; the full Go gate on that candidate remains
+pending. Native55 reaches capture, verification and publication but fails download
+preparation after durable worker-intent audit and before a recorded worker claim.
+The exact refusal is unresolved; the progress checkpoint records the bounded
+next reproduction. Retained diagnostics are archived and owned fixtures removed.
+No complete installed investigation or whole-design simplification is claimed.
+
+## Historical handoff (2026-10-14)
+
 Prepared 2026-10-14 at approximately 08:20 Europe/Berlin.
 
 ## Start here

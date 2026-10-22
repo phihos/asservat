@@ -1,0 +1,31 @@
+{
+  "harness": {
+    "session": 78269,
+    "chunk": "042bd6",
+    "exitCode": 1,
+    "provenance": "Parent-supplied actual terminal identifier; command-result.json corroborates status and elapsed time."
+  },
+  "sourceVerification": {
+    "chunk": "16a845",
+    "exitCode": 0
+  },
+  "collection": {
+    "session": 83390,
+    "chunk": "9b8367",
+    "exitCode": 0
+  },
+  "minimizedDownloadRead": {
+    "chunk": "f38f9b",
+    "exitCode": 0
+  },
+  "cleanup": {
+    "session": 44359,
+    "chunk": "085b58",
+    "exitCode": 0,
+    "elapsedSeconds": 16.205455
+  },
+  "independentCleanupReadback": {
+    "chunk": "0d05e6",
+    "exitCode": 0
+  }
+}
