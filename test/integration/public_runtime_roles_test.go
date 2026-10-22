@@ -321,8 +321,34 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		}
 	}
 	refresh()
+	provisionStarted := time.Now()
 	snapshot, e := producer.Provision(ctx)
 	if e != nil {
+		// Failure-only fixture diagnostics distinguish an expired synthetic
+		// fleet observation from an incomplete role inventory. They do not
+		// refresh the source, retry provisioning or alter the failed interval.
+		root.mu.Lock()
+		claims, receipts := 0, 0
+		for _, role := range root.value.State.Roles {
+			if role.Claim != nil {
+				claims++
+			}
+			if role.Receipt != nil {
+				receipts++
+			}
+		}
+		root.mu.Unlock()
+		t.Logf("failed_role_provision_elapsed_ms=%d original_fleet_fresh_until=%s claims=%d receipts=%d expected=%d", time.Since(provisionStarted).Milliseconds(), a.FreshUntil.Format(time.RFC3339Nano), claims, receipts, len(contracts.PublicRuntimeRolePurposes()))
+		read, cancel := context.WithTimeout(ctx, time.Second)
+		var observed, fresh, current time.Time
+		var suspended, blocked bool
+		readErr := admin.QueryRow(read, `SELECT observed_at,fresh_until,clock_timestamp(),suspended,recovery_blocked FROM fleet_current_trust WHERE installation_id=$1`, scope.InstallationID).Scan(&observed, &fresh, &current, &suspended, &blocked)
+		cancel()
+		if readErr == nil {
+			t.Logf("failed_role_provision_current_fleet observed_at=%s fresh_until=%s database_now=%s expired=%t suspended=%t recovery_blocked=%t", observed.Format(time.RFC3339Nano), fresh.Format(time.RFC3339Nano), current.Format(time.RFC3339Nano), !current.Before(fresh), suspended, blocked)
+		} else {
+			t.Log("failed_role_provision_current_fleet unavailable")
+		}
 		t.Fatal("provision/reconcile fixed roles", e)
 	}
 	var originalVerifier string
