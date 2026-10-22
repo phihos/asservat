@@ -1,0 +1,21 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "README.md": "e12f44efdba9791d74b5524300a2ef53553a59e634951b0b3363cf677b46173a",
+    "design/gate.log": "cc3702c5470eeda440c1c84e0cc02027e5bb1549a9af2609ea21bf88efb6a00c",
+    "design/invocation.json": "55351ba9f970450e512ef4477933265b9580f7a02ada44d31b7e49619a019a9b",
+    "design/result.json": "8308adfad27a40890665549450fe0c36812afa90d97190c478e6923c763ed951",
+    "design/source-before.json": "9a45e3a82a88d3c25f7d7a20a92da02675fb5d93c0762cfe4786045ba9a5b58e",
+    "design-repeat/gate.log": "cc3702c5470eeda440c1c84e0cc02027e5bb1549a9af2609ea21bf88efb6a00c",
+    "design-repeat/invocation.json": "140744bbbd9c931deac598da69eca716a702405fe11369be187959832ca4d13c",
+    "design-repeat/result.json": "b8780628623887af0b44c29911457819ac9b68ac135e6a679f58ada12c2d9e1e",
+    "design-repeat/source-before.json": "13be0236de0a818b7a3fdd370f79cabb8ba5d8098a3f23822b7bcb7c90e00af0",
+    "sql/custody-environment.json": "ddf22139d9459892f314a0aad5135d25d0b1a0bafbc779ddb62482017d00da46",
+    "sql/custody.log": "43213b6b4076a455d8a7fea64771f103abdb51d4471cd701f7e393230959d0a8",
+    "sql/gate.log": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373",
+    "sql/invocation.json": "895a8ab37aa19780a358ce9f8df774fdd7c0f0f7654a8aad83bd32721754fc1b",
+    "sql/result.json": "3127cfa4f6ebcbac9d7fc2c7ae2ca216499e9429c7b52590efbc7557867f0e02",
+    "sql/source-and-cleanup-verification.json": "0360580be5b9b3cf392c5d2bfe293bfa6f61c7fd49523d3edae62739069f7bbf",
+    "sql/source-before.json": "13be0236de0a818b7a3fdd370f79cabb8ba5d8098a3f23822b7bcb7c90e00af0"
+  }
+}

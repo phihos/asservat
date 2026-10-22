@@ -1,0 +1,28 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-installed-original-authority
+    installed_download_preparation_test.go:162: preparation stage=authority elapsed=38.08613ms call-left=4.96190997s authority-left=-2562047h47m16.854775808s error=<nil>/<nil>
+    installed_download_preparation_test.go:163: authority checked=2026-10-23T01:24:38.304078726+02:00 valid-until=2026-10-23T01:24:42.899775+02:00 retention-until=2026-10-23T01:24:42.899775+02:00 environment-until=2026-10-23T01:24:43.304018276+02:00
+    installed_download_preparation_test.go:170: preparation stage=reserve elapsed=88.715381ms call-left=4.507037444s authority-left=4.507036394s error=<nil>/<nil>
+    installed_download_preparation_test.go:176: preparation stage=read-audit elapsed=106.004274ms call-left=4.48974856s authority-left=4.48974746s error=<nil>/<nil>
+    installed_download_preparation_test.go:185: preparation stage=write-audit elapsed=115.483832ms call-left=4.480268972s authority-left=4.480268012s error=<nil>/<nil>
+    installed_download_preparation_test.go:191: preparation stage=ack-audit elapsed=138.17586ms call-left=4.457576974s authority-left=4.457575974s error=<nil>/<nil>
+    installed_download_preparation_test.go:198: preparation stage=claim elapsed=187.792079ms call-left=4.407960795s authority-left=4.407959815s error=<nil>/<nil>
+    installed_download_preparation_test.go:212: preparation stage=create-job-boundary elapsed=188.049939ms call-left=4.407702935s authority-left=4.407701975s error=<nil>/<nil>
+    download_sessions_test.go:197: preparation result elapsed=188.147509ms original-request-left=4.811848671s authority-left=4.407605205s stages=[authority reserve read-audit write-audit ack-audit claim create-job-boundary] error=*errors.errorString/test stopped before Kubernetes Job creation
+    native_exchange_test.go:469: native fixture observation longest-refresh=44.614735ms widest-completion-gap=1.045023468s
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01
+=== RUN   TestContextAdmissionWithRealServices/download-response-window-accounting/response-permission-cadence-keeps-sql-revocation
+--- PASS: TestContextAdmissionWithRealServices (5.56s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-installed-original-authority (2.16s)
+    --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting (2.98s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty (0.09s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null (0.07s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-empty#01 (0.07s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/retained-window-intent-null#01 (0.07s)
+        --- PASS: TestContextAdmissionWithRealServices/download-response-window-accounting/response-permission-cadence-keeps-sql-revocation (0.18s)
+PASS
+ok  	asservat.local/asservat/test/integration	6.629s

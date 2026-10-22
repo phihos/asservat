@@ -1,5 +1,52 @@
 # Sustained implementation progress
 
+## Combined download checks and installed native57 (2026-10-23)
+
+The implementation mandate remains active. Candidate `17e0ff63` includes the
+response-owned 30-second ordinary-permission cadence, one complete authority
+construction per finite download preparation, and removal of two namespace GETs
+from candidate-only workload listing. The latter still requires exact target and
+guarded reads before effects; its [component archive](../test/results/resumed-c62e02ac-capacity-candidate-list/README.md)
+records the genuine failing baseline and passing synthetic TLS/race checks.
+
+The [combined gates](../test/results/resumed-c62e02ac-download-finite-cadence-gates/README.md)
+pass on frozen sources: specification/architecture/design/dependency checks
+(11.126 seconds) and the selected real SQL/S3 launch/response cases (67.863 seconds
+wrapper). The response case verifies current SQL suspension inside the relaxed
+ordinary-permission interval. All 2,764 harness hashes and 3,791 outer source
+hashes remain unchanged; cleanup and independent resource absence pass. The
+initial design run's generated assertion-count update and repeat are retained.
+The full current Go gate remains pending.
+
+Installed [native57](../test/results/resumed-c62e02ac-native57/README.md) exits 1
+(1,228.512 seconds Go; 1,342.424 seconds wrapper). Initial activation, interrupted
+installer resume, runtime startup, regional enrollment and capacity readiness
+pass. Demand readiness records six distinct binding observations and 33 samples
+with at least one second left during 15 seconds. Console processing setup passes.
+Capture then returns ReviewChanged and two OutcomeUnknown results, followed by
+`resolve_capture_request` failing at `audit-begin/reserve` with HTTP 503.
+
+The retained database has one intent-audited capture, no execution/publication,
+and no download session, worker, response or emitted bytes. Its original capture
+deadline was only 1.433310 seconds after admission; execution preparation later
+reports insufficient parent headroom. The winning earlier observation cutoff
+and initial SQL ReviewChanged predicate are not established by these logs.
+The fixture's two resolution records are spent; this is its configured allowance,
+not a fixed product limit. This run does not qualify the new download behavior.
+
+All 2,792 harness source hashes match the candidate and remain unchanged. The
+35-command retained-fixture collection and additional read-only download SQL pass.
+Exact-manifest cleanup exits 0 in 12.456 seconds; independent checks confirm all
+12 owned resources and both clusters absent, with private diagnostic configs
+removed. Native delivery, Stop, expiry, managed deletion and success-path
+foreground cleanup remain unqualified.
+
+Approved inspection through shared acquisition and independent admitted-worker
+identity enrollment (ADR-219/221) are being implemented in the isolated projection
+tree. A further same-process credential consolidation (ADR-222) is isolated too.
+Neither is part of native57. Continue the complete workflow; do not stop at this
+failed qualification or infer that component checks complete S-02.
+
 ## One authority construction per finite download preparation (2026-10-23)
 
 The continuing ADR-214 simplification now shares the prepare coordinator's initial
@@ -24,8 +71,9 @@ ADR-220 is integrated: one active response reconstructs ordinary permissions at
 30 seconds while shorter identity/retention/recovery and current SQL checks remain.
 Its independent component/race evidence is in the
 [response cadence archive](../test/results/resumed-c62e02ac-response-permission-cadence/README.md).
-Combined design/real SQL and installed native qualification of these two refinements
-remain pending; neither is claimed to explain native56's exact refusal.
+Combined design/real SQL checks subsequently pass as recorded above. Native57
+fails before reaching downloads; installed download qualification remains pending.
+Neither refinement is claimed to explain native56's exact refusal.
 
 ## Current installed qualification and credential consolidation (2026-10-23)
 

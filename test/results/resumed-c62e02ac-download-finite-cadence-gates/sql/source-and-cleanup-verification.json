@@ -1,0 +1,35 @@
+{
+  "sourceCommit": "17e0ff6387e5e472037bb3a0bfdd7239ddbec95b",
+  "verifiedSourceHashes": 2764,
+  "mismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "testExit": 0,
+  "cleanupFailures": [],
+  "checks": [
+    {
+      "kind": "container",
+      "name": "asservat-custody-qljjmtf5-postgres",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-custody-qljjmtf5-s3",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "containers",
+      "label": "custody-qljjmtf5",
+      "exitCode": 0,
+      "absent": true
+    },
+    {
+      "kind": "networks",
+      "label": "custody-qljjmtf5",
+      "exitCode": 0,
+      "absent": true
+    }
+  ],
+  "allOwnedResourcesAbsent": true
+}

@@ -1,0 +1,81 @@
+{
+  "runId": "context---zb0ywd",
+  "resources": [
+    {
+      "kind": "container",
+      "name": "asservat-context---zb0ywd-s3",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context---zb0ywd-kms",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context---zb0ywd-postgres",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context---zb0ywd-tls",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context---zb0ywd-keycloak",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context---zb0ywd-0-seed",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context---zb0ywd-0-control-plane",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context---zb0ywd-1-control-plane",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "network",
+      "name": "asservat-context---zb0ywd",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "network",
+      "name": "asservat-context---zb0ywd-kind",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "volume",
+      "name": "asservat-context---zb0ywd-0-var",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "image",
+      "name": "asservat-context-worker:context---zb0ywd",
+      "exitCode": 1,
+      "absent": true
+    }
+  ],
+  "kindExit": 0,
+  "ownedClustersAbsent": true,
+  "allOwnedResourcesAbsent": true,
+  "privateDiagnosticConfigsRemoved": true
+}

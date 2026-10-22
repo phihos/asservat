@@ -1,0 +1,10 @@
+{
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--cleanup-kept",
+    "/home/phil/.cache/asservat-build/kept/context---zb0ywd.json"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 12.456303681014106
+}

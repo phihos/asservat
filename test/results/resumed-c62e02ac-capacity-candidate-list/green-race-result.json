@@ -1,0 +1,25 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-run",
+    "^(TestClusterObservationMetadata|TestCapacityWorkloadObservationsBindNamespaceAndPermanentUID|TestCapacityDiscoveryIsBoundedCandidateEnumeration)",
+    "./internal/adapters/kubernetes"
+  ],
+  "cwd": "/home/phil/Projekte/asservat-capacity-candidates-c62e02ac",
+  "environmentOverrides": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "inheritedGOCACHE": null,
+  "head": "ecf35eaf7ed7d84b3edd17e581346bd7dd98b584",
+  "exitCode": 0,
+  "elapsedSeconds": 37.83608150482178,
+  "sourceCount": 2610,
+  "sourceUnchanged": true,
+  "log": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capacity-candidate-list/green-race.log"
+}

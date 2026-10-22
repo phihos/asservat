@@ -11,24 +11,32 @@ review follow-up. The historical stop and no-Git statements below describe
 Start with the [current progress checkpoint](docs/implementation-progress.md),
 [AGENTS.md](AGENTS.md) and the accepted
 [complexity review](docs/reviews/complexity-2026-10-20/README.md). Candidate
-`98f7e181` includes request-owned download/context observations, consolidated hub
-metadata and API execution credentials, one sequential installer runner and
-consumed download preflight observations. Selected race, real SQL/S3, role and
-design gates pass; the full current Go gate remains pending.
+`17e0ff63` adds one authority construction per finite download preparation,
+response-owned ordinary-permission reconstruction at 30 seconds, and removal of
+two namespace GETs from candidate-only workload listing. Exact effect checks and
+short current SQL/identity/retention/recovery checks remain. Selected race, real
+SQL/S3 and design gates pass; the full current Go gate remains pending.
 
-Native56 reaches regional capture, verification and publication. Download startup
-now claims and records the real acquisition Job but returns acknowledged
-unavailable before a Pod binding or native bytes. The exact branch remains
-unresolved; the next composed regression removes duplicate authority construction
-within that same original request while retaining current SQL effect checks.
-All 2,787 source hashes match, retained diagnostics are archived, and all owned
-fixtures are removed. No complete installed investigation is claimed.
+Native57 passes interrupted installation, regional enrollment, demand readiness
+and console processing setup, then fails during capture resolution audit reserve.
+One intent-audited capture has no execution/publication. It was admitted with
+only 1.433310 seconds left on its original deadline; execution preparation later
+has insufficient parent headroom. The winning earlier cutoff and initial SQL
+ReviewChanged predicate remain under investigation. The two resolution records
+are spent under the fixture's configured allowance. No download is attempted.
+All 2,792 source hashes match; diagnostics are archived and all owned resources
+are independently confirmed removed. No complete installed journey is claimed.
 
-The implementation mandate remains active. Isolated follow-up work covers approved
-pod-status projection through the shared acquisition worker and a 30-second
-ordinary-permission reconstruction cadence for active responses. These are not
-part of `98f7e181` or qualified by native56. Continue through complete workflows;
-status questions and component handoffs do not revoke implementation approval.
+The implementation mandate remains active. The isolated projection tree
+`/home/phil/Projekte/asservat-projection-c62e02ac` implements ADR-219/221: approved
+pod-status inspection through shared acquisition and certificate enrollment based
+on admitted worker identity, independent of the human preparation socket. It also
+replaces separate query capacity/deployment machinery with the actual installed
+shared resources. The isolated credential tree
+`/home/phil/Projekte/asservat-hub-credentials-c62e02ac` drafts ADR-222's same-process
+SQL credential unions and fixed 32-connection allocation. Neither draft is part
+of native57; their testing/integration is in progress. Continue through complete
+workflows; status questions and component handoffs do not revoke approval.
 
 ## Historical handoff (2026-10-14)
 

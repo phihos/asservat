@@ -1,0 +1,14 @@
+{
+  "commit": "17e0ff6387e5e472037bb3a0bfdd7239ddbec95b",
+  "argv": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestContextAdmissionWithRealServices$/^(download-worker-installed-original-authority|download-response-window-accounting)$"
+  ],
+  "startedUnix": 1792711422.9870167,
+  "exitCode": 0,
+  "elapsedSeconds": 67.863,
+  "sourceCount": 3791,
+  "changedSources": []
+}

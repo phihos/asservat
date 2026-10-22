@@ -1,0 +1,8 @@
+{
+  "base": "ecf35eaf7ed7d84b3edd17e581346bd7dd98b584",
+  "files": {
+    "internal/adapters/kubernetes/cluster_observation_metadata.go": "c843a02eb798909f41ac0fd19a088c9755f32447fb92fa5fb27a7a876e516afa",
+    "internal/adapters/kubernetes/cluster_observation_metadata_test.go": "2d400ded2f7f708033fa08cdcc1bd0fb1308e9111145cd60ce383f71f591dedb",
+    "docs/architecture/capacity-production.md": "16a42ec502ab8979c9fc0419b25411801ae8bb646d17d615dfb574ad2eed73ac"
+  }
+}

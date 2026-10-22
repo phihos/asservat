@@ -1,0 +1,109 @@
+{
+  "base": "ecf35eaf7ed7d84b3edd17e581346bd7dd98b584",
+  "source": {
+    "internal/adapters/kubernetes/cluster_observation_metadata.go": "c843a02eb798909f41ac0fd19a088c9755f32447fb92fa5fb27a7a876e516afa",
+    "internal/adapters/kubernetes/cluster_observation_metadata_test.go": "2d400ded2f7f708033fa08cdcc1bd0fb1308e9111145cd60ce383f71f591dedb",
+    "docs/architecture/capacity-production.md": "16a42ec502ab8979c9fc0419b25411801ae8bb646d17d615dfb574ad2eed73ac"
+  },
+  "results": {
+    "red": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^(TestClusterObservationMetadata|TestCapacityWorkloadObservationsBindNamespaceAndPermanentUID|TestCapacityWorkloadDiscovery)",
+        "./internal/adapters/kubernetes"
+      ],
+      "cwd": "/home/phil/Projekte/asservat-capacity-candidates-c62e02ac",
+      "environmentOverrides": {
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOMAXPROCS": "2",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "inheritedGOCACHE": null,
+      "head": "ecf35eaf7ed7d84b3edd17e581346bd7dd98b584",
+      "exitCode": 1,
+      "elapsedSeconds": 19.952813148498535,
+      "sourceCount": 2610,
+      "sourceUnchanged": true,
+      "log": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capacity-candidate-list/red.log"
+    },
+    "green-focused": {
+      "command": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^(TestClusterObservationMetadata|TestCapacityWorkloadObservationsBindNamespaceAndPermanentUID|TestCapacityDiscoveryIsBoundedCandidateEnumeration)",
+        "./internal/adapters/kubernetes"
+      ],
+      "cwd": "/home/phil/Projekte/asservat-capacity-candidates-c62e02ac",
+      "environmentOverrides": {
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOMAXPROCS": "2",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "inheritedGOCACHE": null,
+      "head": "ecf35eaf7ed7d84b3edd17e581346bd7dd98b584",
+      "exitCode": 0,
+      "elapsedSeconds": 14.04896879196167,
+      "sourceCount": 2610,
+      "sourceUnchanged": true,
+      "log": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capacity-candidate-list/green-focused.log"
+    },
+    "green-race": {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-run",
+        "^(TestClusterObservationMetadata|TestCapacityWorkloadObservationsBindNamespaceAndPermanentUID|TestCapacityDiscoveryIsBoundedCandidateEnumeration)",
+        "./internal/adapters/kubernetes"
+      ],
+      "cwd": "/home/phil/Projekte/asservat-capacity-candidates-c62e02ac",
+      "environmentOverrides": {
+        "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+        "GOMAXPROCS": "2",
+        "GOFLAGS": "-buildvcs=false -p=1"
+      },
+      "inheritedGOCACHE": null,
+      "head": "ecf35eaf7ed7d84b3edd17e581346bd7dd98b584",
+      "exitCode": 0,
+      "elapsedSeconds": 37.83608150482178,
+      "sourceCount": 2610,
+      "sourceUnchanged": true,
+      "log": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capacity-candidate-list/green-race.log"
+    }
+  },
+  "terminalReceipts": {
+    "red": {
+      "session": 97058,
+      "terminalChunk": "ac939d",
+      "actualExitCode": 1
+    },
+    "green-focused": {
+      "session": 86524,
+      "terminalChunk": "a12eda",
+      "actualExitCode": 0
+    },
+    "green-race": {
+      "session": 94393,
+      "terminalChunk": "7a67e2",
+      "actualExitCode": 0
+    }
+  },
+  "independentReview": "review_pr41: no source blockers; no tests rerun",
+  "scope": "Synthetic local TLS API protocol tests only; no external or installed qualification",
+  "counts": {
+    "candidateSuccessfulPageBefore": 3,
+    "candidateSuccessfulPageAfter": 1,
+    "candidateNamespaceGetsBefore": 2,
+    "candidateNamespaceGetsAfter": 0
+  },
+  "remaining": "Parent-owned combined repository gates and installed qualification; no latency improvement measured"
+}
