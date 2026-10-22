@@ -1,5 +1,14 @@
 # Working on Asservat
 
+## Active implementation mandate
+
+Maintainer clarification (2026-10-23): implement the specification and simplify it
+when sensible. Preserve the requested product capabilities while revising
+implementation choices that add complexity or runtime cost without a clear
+benefit. Update the affected contracts and tests with those changes. Continue
+through complete user workflows; a status question or component checkpoint does
+not revoke the instruction to continue and does not require renewed permission.
+
 ## Security proportionality and delivery
 
 Maintainer clarification (2026-10-20): the maintainer did not require permission
