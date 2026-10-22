@@ -154,7 +154,6 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	providers.installation, providers.cluster = installation, original.Plan.ClusterID
 	prefix := "asservat-" + strings.ReplaceAll(installation, "-", "")
 	t.Cleanup(func() { initialRuntimeNativeCleanup(t, api, desired.TargetNamespace, installation, prefix) })
-	defer installerContinuationLaunchedCleanup(t, api, desired.TargetNamespace, prefix)
 	// Use the original compiled runner actor for guarded operator prerequisites;
 	// fixture administration is not added to the product administrator list.
 	runnerConfig := installedUnifiedRunnerConfig(kc, desired)
@@ -162,6 +161,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer installerContinuationLaunchedCleanup(t, api, runnerAPI, desired, prefix)
 	installNativeCapacityObjects(t, ctx, runnerAPI, desired.TargetNamespace, original.Plan.ClusterID)
 	servingCA := installerFederationServingSecret(t, ctx, runnerAPI, desired.TargetNamespace, installation, "federation.synthetic.invalid")
 	keyServingCA := installerServingSecret(t, ctx, runnerAPI, desired.TargetNamespace, contracts.KeyServiceServingSecretName(installation), setup.keyServiceHost)
@@ -684,15 +684,60 @@ func installerContinuationRunning(t *testing.T, ctx context.Context, api kuberne
 	}
 }
 
-// installerContinuationLaunchedCleanup scales nothing and removes only the two
-// exact launched Deployments with normal foreground GC under the guard.
-func installerContinuationLaunchedCleanup(t *testing.T, api kubernetes.Interface, namespace, prefix string) {
-	c, end := context.WithTimeout(context.Background(), 5*time.Second)
+// Cleanup uses the original accepted installer actor for guarded deletion.
+// Only after the journey ends does the owned fixture grant that actor DELETE
+// for these two exact Deployment names. This is not installer/runtime RBAC.
+// Reads use the fixture administrator; the guard and normal foreground GC stay
+// active. A retained failed fixture must remain intact for diagnosis.
+func installerContinuationLaunchedCleanup(t *testing.T, admin, actor kubernetes.Interface, desired contracts.InitialBootstrap, prefix string) {
+	t.Helper()
+	if keepFailedFixture(t) {
+		return
+	}
+	ctx, end := context.WithTimeout(context.Background(), 90*time.Second)
 	defer end()
-	for _, name := range []string{prefix + "-owner", prefix + "-worker"} {
-		if d, e := api.AppsV1().Deployments(namespace).Get(c, name, meta.GetOptions{}); e == nil {
-			providerWorkerNativeCleanup(t, api, d)
+	names := []string{prefix + "-owner", prefix + "-worker"}
+	role, err := admin.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{
+		ObjectMeta: meta.ObjectMeta{Name: prefix + "-fixture-cleanup"},
+		Rules:      []rbac.PolicyRule{{APIGroups: []string{"apps"}, Resources: []string{"deployments"}, ResourceNames: names, Verbs: []string{"delete"}}},
+	}, meta.CreateOptions{})
+	if err != nil {
+		t.Error("owned cleanup role", err)
+		return
+	}
+	defer func() {
+		clean, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
+		if err := admin.RbacV1().ClusterRoles().Delete(clean, role.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &role.UID}}); err != nil {
+			t.Error("owned cleanup role retirement", err)
 		}
+	}()
+	binding, err := admin.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{
+		ObjectMeta: meta.ObjectMeta{Name: role.Name},
+		RoleRef:    rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: role.Name},
+		Subjects:   []rbac.Subject{{Kind: "ServiceAccount", Namespace: desired.BootstrapNamespace, Name: desired.Name + "-bootstrap-runner"}},
+	}, meta.CreateOptions{})
+	if err != nil {
+		t.Error("owned cleanup binding", err)
+		return
+	}
+	defer func() {
+		clean, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
+		if err := admin.RbacV1().ClusterRoleBindings().Delete(clean, binding.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &binding.UID}}); err != nil {
+			t.Error("owned cleanup binding retirement", err)
+		}
+	}()
+	for _, name := range names {
+		d, err := admin.AppsV1().Deployments(desired.TargetNamespace).Get(ctx, name, meta.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			t.Error("owned cleanup deployment read", err)
+			return
+		}
+		providerWorkerNativeCleanupAs(t, admin, actor, d)
 	}
 }
 

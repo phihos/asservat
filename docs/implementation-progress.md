@@ -36,6 +36,13 @@ The initial setup failure is retained separately from genuine baseline failures.
 Independent review finds no blocker. The next installed run must establish whether
 this correction resolves native startup; native55's exact cause remains unproven.
 
+The next installed candidate also corrects native55's separate fixture cleanup
+failure. Final foreground deletion uses the original accepted installer identity,
+with a temporary fixture-only DELETE grant for the two exact Deployment names.
+The unchanged guard and normal controller cleanup remain active; failed fixtures
+selected for diagnostics remain intact. No production RBAC is expanded. Native
+qualification of this correction is pending.
+
 ## Simplification delivery checkpoint (2026-10-23)
 
 The announced whole-design simplification is **partly implemented** on
