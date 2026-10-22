@@ -16,6 +16,17 @@ namespace/workload UID, approved selector labels and ownership are reread before
 enrollment. Accepted maintainer assignments identify eligible scopes without
 turning a group, candidate or capacity account into collection authority.
 
+Workload candidate pages use one bounded, typed LIST in the selected namespace,
+without separate namespace GETs before and after it. The page can contain a
+candidate from a replacement namespace with the same name; it cannot establish
+namespace identity or authorize enrollment. The later exact workload observation
+still checks the original namespace UID and protected labels around its reads,
+and the workload UID, ownership and generation independently. This removes two
+API calls per candidate page (three calls become one), including empty pages;
+it changes no cursor, retry policy, API rate, request deadline, guard or SQL
+authority check. The call reduction is an operation count, not a measured
+installed latency improvement.
+
 Admission needs a binding refreshed within the last five seconds, and a
 discovery pass revisits a workload only once per pass, which takes minutes on a
 regional cluster. Under [ADR-200](../decisions/200-on-demand-capacity-refresh.md)

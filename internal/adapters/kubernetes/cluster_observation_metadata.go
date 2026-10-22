@@ -102,32 +102,12 @@ func (m *ClusterObservationMetadata) ObserveCluster(ctx context.Context, request
 		}
 		out.Namespaces = &fleet.ClusterNamespaceCandidatePage{ResourceVersion: page.ResourceVersion, Continue: page.Continue, Items: append([]cfg.NamespaceRef{}, page.Namespaces...)}
 	case fleet.ObserveCapacityWorkloads:
-		// The underlying one-page LIST addresses a namespace by name. Bind
-		// this remote selection to its original UID on both sides of that
-		// LIST; candidates still do not authorize a workload effect.
-		first, err := m.client.namespace(call, request.Namespace)
-		if err != nil {
-			return zero, err
-		}
-		if first.Deleting {
-			return zero, cfg.ErrChanged
-		}
-		if err = current(); err != nil {
-			return zero, err
-		}
+		// This name-addressed page supplies candidates only. The later exact
+		// workload observation independently checks the original namespace UID
+		// and protected labels; candidate enumeration does not supply that proof.
 		page, err := m.client.DiscoverCapacityWorkloads(call, request.Namespace, request.Kind, request.Continue)
 		if err != nil {
 			return zero, err
-		}
-		if err = current(); err != nil {
-			return zero, err
-		}
-		last, err := m.client.namespace(call, request.Namespace)
-		if err != nil {
-			return zero, err
-		}
-		if last.Deleting {
-			return zero, cfg.ErrChanged
 		}
 		out.Workloads = &fleet.ClusterWorkloadCandidatePage{ResourceVersion: page.ResourceVersion, Continue: page.Continue, Items: append([]cfg.WorkloadRef{}, page.Workloads...)}
 	case fleet.ObserveCapacityGuardedWorkload:

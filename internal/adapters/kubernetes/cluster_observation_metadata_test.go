@@ -97,6 +97,10 @@ func observationMetadataTestFixture(t *testing.T, mode string) *observationMetad
 			if strings.HasSuffix(r.URL.Path, "/payments") {
 				ns = cfg.NamespaceRef{Name: "payments", UID: "payments-uid"}
 				n := f.namespaces.Add(1)
+				if mode == "namespace-unavailable" {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					return
+				}
 				if mode == "replaced-before" || mode == "replaced-after" && n > 1 {
 					ns.UID = "replacement"
 				}
@@ -211,8 +215,8 @@ func TestClusterObservationMetadataPurposesPreserveOriginalBounds(t *testing.T) 
 						t.Fatal("namespace page changed or reselected")
 					}
 				case fleet.ObserveCapacityWorkloads:
-					if f.calls.Load() != 3 || f.namespaces.Load() != 2 || f.lists.Load() != 1 || len(out.Workloads.Items) != 1 || out.Workloads.ResourceVersion != "page-rv" {
-						t.Fatal("exact namespace brackets or original single LIST lost")
+					if f.calls.Load() != 1 || f.namespaces.Load() != 0 || f.lists.Load() != 1 || len(out.Workloads.Items) != 1 || out.Workloads.ResourceVersion != "page-rv" || out.Workloads.Continue != "next-cursor" {
+						t.Fatalf("candidate page requires only its original LIST: calls=%d namespace GETs=%d lists=%d", f.calls.Load(), f.namespaces.Load(), f.lists.Load())
 					}
 				case fleet.ObserveCapacityGuardedWorkload:
 					// ADR-197: one combined observation. Its exact call count is
@@ -268,7 +272,7 @@ func TestClusterObservationMetadataRejectsInvalidSelectionBeforeIO(t *testing.T)
 }
 
 func TestClusterObservationMetadataRejectsChangedOrUnavailablePage(t *testing.T) {
-	for _, mode := range []string{"replaced-before", "replaced-after", "deleted-after", "expired-first", "expired-list", "unavailable", "duplicate", "overflow", "empty"} {
+	for _, mode := range []string{"expired-list", "unavailable", "duplicate", "overflow", "empty"} {
 		t.Run(mode, func(t *testing.T) {
 			f := observationMetadataTestFixture(t, mode)
 			r := f.request(fleet.ObserveCapacityWorkloads)
@@ -277,19 +281,49 @@ func TestClusterObservationMetadataRejectsChangedOrUnavailablePage(t *testing.T)
 			out, err := f.reader.ObserveCluster(ctx, r)
 			if mode == "empty" {
 				digest, _ := app.ClusterObservationRequestDigest(r)
-				if err != nil || !out.Matches(r, digest, f.now()) || out.Workloads.Items == nil || len(out.Workloads.Items) != 0 || f.calls.Load() != 3 {
+				if err != nil || !out.Matches(r, digest, f.now()) || out.Workloads.Items == nil || len(out.Workloads.Items) != 0 || f.calls.Load() != 1 {
 					t.Fatal("acknowledged empty page became unavailable or missing")
 				}
 			} else if err == nil || out.Workloads != nil {
 				t.Fatal("changed, expired or unknown page reported success")
 			}
-			if (mode == "replaced-before" || mode == "expired-first") && f.calls.Load() != 1 {
-				t.Fatal("failed first namespace check allowed a subsequent LIST")
-			}
-			if mode == "expired-list" && f.calls.Load() != 2 {
-				t.Fatal("expiry after LIST allowed a subsequent API read")
+			if f.calls.Load() != 1 || f.namespaces.Load() != 0 || f.lists.Load() != 1 {
+				t.Fatalf("candidate result caused additional reads: calls=%d namespace GETs=%d lists=%d", f.calls.Load(), f.namespaces.Load(), f.lists.Load())
 			}
 		})
+	}
+}
+
+// Candidate pages confer no namespace or workload authority. A later exact
+// observation must independently reject a stale namespace selection even when
+// the name-addressed candidate LIST still succeeds.
+func TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks(t *testing.T) {
+	for _, purpose := range []fleet.ClusterObservationPurpose{fleet.ObserveCapacityWorkload, fleet.ObserveCapacityGuardedWorkload} {
+		for _, mode := range []string{"namespace-unavailable", "replaced-before", "replaced-after", "deleted-after", "expired-first"} {
+			t.Run(string(purpose)+"/"+mode, func(t *testing.T) {
+				f := observationMetadataTestFixture(t, mode)
+				r := f.request(fleet.ObserveCapacityWorkloads)
+				ctx, cancel := context.WithDeadline(context.Background(), r.NotAfter)
+				defer cancel()
+				out, err := f.reader.ObserveCluster(ctx, r)
+				digest, _ := app.ClusterObservationRequestDigest(r)
+				if err != nil || !out.Matches(r, digest, f.now()) || len(out.Workloads.Items) != 1 {
+					t.Fatalf("non-authorizing candidate LIST depended on namespace GET: %v", err)
+				}
+				if f.calls.Load() != 1 || f.namespaces.Load() != 0 || f.lists.Load() != 1 {
+					t.Fatalf("candidate consumed exact namespace reads: calls=%d namespace GETs=%d", f.calls.Load(), f.namespaces.Load())
+				}
+				exact := f.request(purpose)
+				exact.Namespace, exact.Workload = r.Namespace, out.Workloads.Items[0]
+				checked, err := f.reader.ObserveCluster(ctx, exact)
+				if err == nil || checked.Workload != nil || checked.Guard != nil || f.namespaces.Load() == 0 {
+					t.Fatalf("candidate bypassed independent exact namespace refusal: err=%v namespace GETs=%d", err, f.namespaces.Load())
+				}
+				if f.lists.Load() != 1 {
+					t.Fatal("exact refusal reselected a candidate page")
+				}
+			})
+		}
 	}
 }
 
@@ -303,32 +337,34 @@ func TestClusterObservationMetadataGuardChangeAndCancellation(t *testing.T) {
 			t.Fatal("changed guard returned a current metadata proof")
 		}
 	})
-	t.Run("cancel-blocked-read", func(t *testing.T) {
-		f := observationMetadataTestFixture(t, "blocked")
-		r := f.request(fleet.ObserveCapacityNamespaces)
-		ctx, cancel := context.WithDeadline(context.Background(), r.NotAfter)
-		defer cancel()
-		joined := make(chan error, 1)
-		go func() { _, err := f.reader.ObserveCluster(ctx, r); joined <- err }()
-		select {
-		case <-f.entered:
-		case <-time.After(time.Second):
-			t.Fatal("native read never started")
-		}
-		cancel()
-		select {
-		case err := <-joined:
-			if !errors.Is(err, context.Canceled) {
-				t.Fatalf("original caller cancellation lost: %v", err)
+	for _, purpose := range []fleet.ClusterObservationPurpose{fleet.ObserveCapacityNamespaces, fleet.ObserveCapacityWorkloads} {
+		t.Run("cancel-blocked-read/"+string(purpose), func(t *testing.T) {
+			f := observationMetadataTestFixture(t, "blocked")
+			r := f.request(purpose)
+			ctx, cancel := context.WithDeadline(context.Background(), r.NotAfter)
+			defer cancel()
+			joined := make(chan error, 1)
+			go func() { _, err := f.reader.ObserveCluster(ctx, r); joined <- err }()
+			select {
+			case <-f.entered:
+			case <-time.After(time.Second):
+				t.Fatal("native read never started")
 			}
-		case <-time.After(time.Second):
-			t.Fatal("caller cancellation did not join metadata read")
-		}
-		f.unblock()
-		if f.calls.Load() != 1 {
-			t.Fatal("cancelled read retried")
-		}
-	})
+			cancel()
+			select {
+			case err := <-joined:
+				if !errors.Is(err, context.Canceled) {
+					t.Fatalf("original caller cancellation lost: %v", err)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("caller cancellation did not join metadata read")
+			}
+			f.unblock()
+			if f.calls.Load() != 1 {
+				t.Fatal("cancelled read retried")
+			}
+		})
+	}
 }
 
 func TestClusterObservationMetadataConstructorRequiresExactClients(t *testing.T) {
