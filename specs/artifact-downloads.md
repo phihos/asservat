@@ -47,6 +47,11 @@ observation and cancellation locally; it need not repeat external identity or
 catalog reads. New operations authorize again. Current SQL effect checks still
 enforce permission revisions, retention, recovery, processing and spend. This
 request-owned reuse neither renews a deadline nor authorizes a different scope.
+The finite prepare coordinator, installed runtime and final status/metadata view
+MAY consume the same original combined authority through private handoff. Current
+SQL state and final identity are still checked. Each new public request MUST
+construct fresh authority; an unknown effect reply MUST NOT become acknowledged
+Preparing merely because its original authority is retained.
 
 Download needs current retained-artifact entitlement or explicit share coverage, no deny/restriction, current authenticated principal/client, `evidence:download`, finite transfer resources and durable audit. Ordinary artifact readers may download the actual approved artifact they can read without independent human review. An extract view does not confer access to its hidden raw parent. Existing ordinary shares that authorize reading an explicit approved artifact also authorize its native download; raw shares require explicit download coverage.
 

@@ -112,10 +112,24 @@ This removes repeated work from dispatch and enrollment without another timer,
 configuration option, durable record or credential. It amends the per-step
 external-identity refresh described in
 [the worker lifecycle contract](../architecture/worker-current-lifecycle.md).
-The coordinator's separate entry/final evaluations and the transfer's existing
-bounded authority renewal remain. No constant is increased by this refinement.
-Qualification must measure the resulting count rather than equating it with one
-authorization for the whole public request.
+The 2026-10-23 refinement extends that ownership to the complete finite prepare
+request: coordinator entry, installed native runtime, and final Preparing/Ready
+view consume the same original authority. The private native handoff validates
+exact scope, current identity-policy revision, required scopes and all original
+bounds without another full reconstruction. Ready replay and metadata reads also
+consume the current request's checked authority. A standalone runtime call still
+authorizes independently, and a new prepare/status request always authorizes anew.
+Current SQL observations and final identity comparison remain. An unknown Job or
+SQL reply cannot become acknowledged Pending. No constant is increased.
+
+The composed regression genuinely observes three full constructions before the
+change. With 1.6 seconds of synthetic cost per construction and 400 milliseconds
+of audit work, Job creation/observation succeed but the final reconstruction
+exhausts the original five seconds. After the change, Pending and exact warm Ready
+replay each use one full construction; current SQL reads, changed final identity,
+cancellation, expiry and unknown-Job refusal remain covered. This is component
+evidence, not proof that native56 failed in that exact branch. The existing
+transfer renewal is separately refined by ADR-220.
 
 ## Complexity check
 

@@ -1,0 +1,23 @@
+{
+  "label": "green-race",
+  "cwd": "/home/phil/Projekte/asservat-simplify-c62e02ac",
+  "head": "ecf35eaf7ed7d84b3edd17e581346bd7dd98b584",
+  "argv": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "./internal/application/evidence"
+  ],
+  "environment": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "startedUTC": "2026-10-22T23:16:18.223333+00:00",
+  "exitCode": 0,
+  "elapsedSeconds": 8.140099,
+  "sourceCount": 2611,
+  "changedSources": []
+}

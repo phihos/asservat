@@ -1,5 +1,32 @@
 # Sustained implementation progress
 
+## One authority construction per finite download preparation (2026-10-23)
+
+The continuing ADR-214 simplification now shares the prepare coordinator's initial
+complete authority with the installed native runtime and final Preparing/Ready
+view. This reuses ADR-220's private short-proof handoff; it adds no public interface,
+cache, timer, durable state, credential or timeout. Standalone runtime calls and
+each new public request still authorize afresh. Original deadlines, exact scope,
+current SQL observations, final identity checks and unknown-effect refusal remain.
+
+The [composed regression](../test/results/resumed-c62e02ac-download-coordinator-observation/README.md)
+records genuine baseline failures: three full reconstructions; successful Job
+recording/observation followed by expiry in the final reconstruction under synthetic
+1.6-second authority cost. Warm Ready replay also reconstructs three times. After
+the change both paths use one construction and retain current SQL reads. Focused
+tests pass; the full evidence race suite passes (4.069 seconds Go, 8.140 seconds
+wrapper), with all 2,611 recorded Go/module sources unchanged. Final SQL refusal,
+changed groups/scopes/policy, cancellation, original expiry, unknown Job reply and
+fresh authorization on another request remain tested. The initial Ready fixture
+request-digest mismatch and corrected genuine baseline are both retained.
+
+ADR-220 is integrated: one active response reconstructs ordinary permissions at
+30 seconds while shorter identity/retention/recovery and current SQL checks remain.
+Its independent component/race evidence is in the
+[response cadence archive](../test/results/resumed-c62e02ac-response-permission-cadence/README.md).
+Combined design/real SQL and installed native qualification of these two refinements
+remain pending; neither is claimed to explain native56's exact refusal.
+
 ## Current installed qualification and credential consolidation (2026-10-23)
 
 The active instruction remains implementation with sensible simplification. The

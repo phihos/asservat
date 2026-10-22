@@ -1,0 +1,24 @@
+{
+  "label": "red-corrected-fixture",
+  "cwd": "/home/phil/Projekte/asservat-simplify-c62e02ac",
+  "head": "8302f761bfaa31d83d304e01f949dcb17aa37731",
+  "argv": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "^TestContextDownloadRequest",
+    "./internal/application/evidence"
+  ],
+  "environment": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "startedUTC": "2026-10-22T23:13:40.612128+00:00",
+  "exitCode": 1,
+  "elapsedSeconds": 1.812543,
+  "sourceCount": 2607,
+  "changedSources": []
+}

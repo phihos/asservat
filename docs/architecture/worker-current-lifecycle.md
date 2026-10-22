@@ -21,9 +21,13 @@ to its immediately following attachment read. Only local validation and deadline
 narrowing intervene. Before that read, the observation is checked again for
 scope, current environment/profile, cancellation, clock rollback and the earliest
 original source/request cutoff. Dispatch and later attachment reads use the same
-request-owned observation. Each new operation obtains new authority. The outer
-coordinator retains its own entry/final evaluations; this refinement does not
-claim one authorization for the entire public request.
+request-owned observation. The installed prepare coordinator supplies its initial
+checked authority through a private native handoff and consumes it for the final
+view too. The complete finite Preparing path therefore performs one full authority
+construction. Ready metadata uses the same private short-proof handoff while
+retaining its independent current SQL observations. Standalone runtime calls and
+each new public operation obtain fresh authority. Final identity comparison,
+exact scope, original deadlines and current SQL effects are unchanged.
 
 Dispatch retains the observation through reserve, encrypted intent
 audit/acknowledgement, create claim, exact create-or-lookup, observed Job

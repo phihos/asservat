@@ -1,0 +1,10 @@
+--- FAIL: TestContextDownloadRequestUsesOneObservationThroughPending (0.00s)
+    --- FAIL: TestContextDownloadRequestUsesOneObservationThroughPending/0s (0.00s)
+        context_download_request_observation_test.go:34: duplicate reconstruction or missing current observations: full=3 launch=[reserve-worker read-worker-audit write-worker-audit ack-worker-audit claim-worker create-job record-job observe-job] control=[identity recovery lookup-key route identity authority plan reserve source identity identity authority identity authority observe identity]
+    --- FAIL: TestContextDownloadRequestUsesOneObservationThroughPending/1.6s (0.00s)
+        context_download_request_observation_test.go:31: one original request lost acknowledged Pending: full checks=3 launch=[reserve-worker read-worker-audit write-worker-audit ack-worker-audit claim-worker create-job record-job observe-job] error=download unavailable
+--- FAIL: TestContextDownloadRequestReadyReplayUsesFreshSingleObservation (0.00s)
+    context_download_request_observation_test.go:97: exact committed metadata unavailable 1 {{   {       [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0] {   }} [0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]  0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0 0 0 0 0 0 0 0 <nil>} <nil> false 0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC 0001-01-01 00:00:00 +0000 UTC} download operation conflicts
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.006s
+FAIL

@@ -1,0 +1,25 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "README.md": "a1f21f7ec1652db8e66e49c1be6af7cfcc5b3a0f050ad41578ef8598a88d1f44",
+    "change.patch": "708ce5d5cc26234178fbe250323fba3b6242ccea8c1226bc774894f4e699a2f3",
+    "green-focused-result.json": "d3d9545c87f292b5a95b2b88580985e7c177c4d0008d11fffcfed4b55bce9fc5",
+    "green-focused-source-after.json": "663bbbf67ff74975d60958180f0408dfeba90bc5fc4a9c4800b94b4bd749f931",
+    "green-focused-source-before.json": "663bbbf67ff74975d60958180f0408dfeba90bc5fc4a9c4800b94b4bd749f931",
+    "green-focused.log": "7227ab37479bfb7ce02eada945ccdd31925053185066d4577780b55b7a728baa",
+    "green-race-result.json": "cf56fac359f3cd44892132a6a1fe07bebb51ff865de6af2032f9bff1a8f49168",
+    "green-race-source-after.json": "663bbbf67ff74975d60958180f0408dfeba90bc5fc4a9c4800b94b4bd749f931",
+    "green-race-source-before.json": "663bbbf67ff74975d60958180f0408dfeba90bc5fc4a9c4800b94b4bd749f931",
+    "green-race.log": "3f4623289ff86fc3164e934b96a6c640e10c85658af15ca62a18f6986ed74500",
+    "red-corrected-fixture-result.json": "b8e7b2da0f12c128399177cefb626d22f63945c09a7793e01fd4a554d627dac6",
+    "red-corrected-fixture-source-after.json": "96b49428fb729222af07d56c19fb004f69bd2733002df9cff12cbd5378ae49a8",
+    "red-corrected-fixture-source-before.json": "96b49428fb729222af07d56c19fb004f69bd2733002df9cff12cbd5378ae49a8",
+    "red-corrected-fixture.log": "061cad5a8015c97a72df34cb8ff2b910e50132f572b7af7a0b440b65a1da60e2",
+    "red-result.json": "48699a676867718bb3b8511aef5718f57e4e293ea7ef4b8ad3b859fc4eacecaf",
+    "red-source-after.json": "c64833e0edeae376ad4ad4cd47295e3b6f4d4a5c18c7cf302404144635c5ef79",
+    "red-source-before.json": "c64833e0edeae376ad4ad4cd47295e3b6f4d4a5c18c7cf302404144635c5ef79",
+    "red.log": "c34fe79b0280da88b6a83ad28985eb029f768aab8b5c0d46b0287b9d58c6d78f",
+    "regression.go.txt": "800c654cd3687f1be1ca4ef7b8e3c9ef87824ae30d3ceab7834adc2ae0688140",
+    "run-local-check.py": "8e22e031596eaefb203579d0ef52f2d645150b4d8420e8a242fca1b2aa8ea6ca"
+  }
+}

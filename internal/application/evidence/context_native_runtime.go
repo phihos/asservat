@@ -108,7 +108,7 @@ func (r *ContextNativeRuntime) beginRequest(ctx context.Context, current identit
 	return r.beginRequestAuthority(ctx, current, session, nil)
 }
 
-// Only the response coordinator can supply this already-checked short value.
+// Only an in-process coordinator can supply this already-checked short value.
 // Direct runtime operations continue to reconstruct their complete authority.
 func (r *ContextNativeRuntime) beginResponseRequest(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, a artifact.DownloadAuthority) (*ContextNativeRuntime, context.Context, context.CancelFunc, artifact.DownloadAuthority, error) {
 	return r.beginRequestAuthority(ctx, current, session, &a)
@@ -192,8 +192,12 @@ func (r *ContextNativeRuntime) native(en value.WorkerEnrollment) (*NativeAttachm
 	return NewNativeAttachment(c)
 }
 func (r *ContextNativeRuntime) ContinueContextDownload(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, source ContextDownloadSource) (ContextDownloadContinuation, error) {
+	return r.continueContextDownloadAuthority(ctx, current, session, source, nil)
+}
+
+func (r *ContextNativeRuntime) continueContextDownloadAuthority(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, source ContextDownloadSource, handoff *artifact.DownloadAuthority) (ContextDownloadContinuation, error) {
 	var zero ContextDownloadContinuation
-	bound, call, end, initial, e := r.beginRequest(ctx, current, session)
+	bound, call, end, initial, e := r.beginRequestAuthority(ctx, current, session, handoff)
 	if e != nil {
 		return zero, e
 	}
