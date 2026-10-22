@@ -1,0 +1,17 @@
+{
+  "README.md": "70312a1e582f3ec6433ca548acf15bd99dabfb67d838b121aaa728dd43fc8d7a",
+  "download-observation-final-contracts/gates.log": "a41c9b60bc6900822e751131d71c70a8f7cefaa8f71b7f6369717763a2921bb9",
+  "download-observation-final-contracts/result.json": "4be45524f8cd0e0355aa0c00dff277aef95b9c2ff170b1db2609f7cff27c364a",
+  "download-observation-full-go/go-check.log": "6b1a7fe1c56087ca936ce2ead834a2ee4e018706858454f85aa2ab6c39f60d9f",
+  "download-observation-full-go/result.json": "186c7625ac04c938dffa189bd00143608a0671277d9253113bb494b8c8e0c6cc",
+  "download-observation-full-go/source-hashes-after.json": "56c1b79015a5cc65cb55705dae0028e26635859cf19c8a3705afbdbe15fa5c87",
+  "download-observation-full-go/source-hashes-before.json": "56c1b79015a5cc65cb55705dae0028e26635859cf19c8a3705afbdbe15fa5c87",
+  "download-observation-permission-native/cleanup-readback.json": "4cbe558052e225dcba4bfff0d91ef5ebad24ce20fda8e358a0995210bd65bbac",
+  "download-observation-permission-native/command-result.json": "d2f31500315745fc02a6916594e3b2ff05eb9837f2c4cd732c5b96022dd0c521",
+  "download-observation-permission-native/permission-admission.log": "3c3f607e919873dd7b6382a10ae4b30c0c5614fea6d8f3705826c6cf474e8a34",
+  "download-observation-permission-native/permission-kubernetes-environment.json": "3114f4d38cd8aa565a1eee43fec31173741b53606cac4499a1f61c7b17821bc4",
+  "download-observation-permission-native/permission-kubernetes.log": "c1e86329fb356b62d162f5f84e4f3418085802d21da52381e1a4a0e44fbfb6d7",
+  "download-observation-permission-native/runner.log": "f5d166cd481dee6c02bedf503dbcaabaf7c7cf862f7eb8e06e05b7c2e3fd5349",
+  "download-observation-permission-native/source-verification.err": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "download-observation-permission-native/source-verification.json": "2f578fc742947c5b954acb6a38cbe79fa37501ccb804505915a9828617d7c6be"
+}

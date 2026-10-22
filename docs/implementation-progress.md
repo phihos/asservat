@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+## Qualification read-back (2026-10-22)
+
+Frozen candidate `768316a3` passes the full `make go-check` gate: actual exit 0,
+2,924.562 seconds, with all 3,765 tracked source hashes unchanged. Specification,
+architecture, design and Go dependency checks also pass. The
+[complete qualification archive](../test/results/resumed-c62e02ac-download-observation-gates/README.md)
+retains the exact commands, logs and hashes.
+
+`make permission-integration` passes against real Kubernetes, PostgreSQL and S3
+(actual exit 0, 174.040 seconds). The identity-settings fixture now demonstrates
+reuse without restamping, then removal and same-name replacement detection after
+the original real observation expiries. Its parent admission test passes in
+71.20 seconds; local start and retention cases also pass. Synthetic KMS/setup
+authority remains explicit. All 2,905 native source hashes match the candidate;
+cleanup reports no failures, and independent inspection confirms the owned node
+and both service containers are absent. The installed download journey is next.
+
 ## Applying the complexity review (2026-10-20)
 
 The maintainer approved the [whole-design review](reviews/complexity-2026-10-20/README.md)

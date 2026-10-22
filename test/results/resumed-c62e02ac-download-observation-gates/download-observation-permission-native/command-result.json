@@ -1,0 +1,16 @@
+{
+  "sourceCommit": "768316a3bb10d53763661b1bbdd6b069a192ec84",
+  "command": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "permission-integration"
+  ],
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "actualExit": 0,
+  "elapsedSeconds": 174.04022927599726
+}
