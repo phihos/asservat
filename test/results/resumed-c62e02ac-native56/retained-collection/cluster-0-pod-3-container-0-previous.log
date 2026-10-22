@@ -1,0 +1,12 @@
+2026-10-22T22:55:36.672572326Z owner provider refresh: audit-wrap final-proof (1)
+2026-10-22T22:56:10.704214766Z owner port router: started (1)
+2026-10-22T22:56:10.704221936Z owner router: started (1)
+2026-10-22T22:56:10.704313286Z owner router: handoff observation (1)
+2026-10-22T22:56:10.704337796Z owner router: handoff observation (2)
+2026-10-22T22:56:10.704939767Z owner router: handoff observation (4)
+2026-10-22T22:56:33.884330864Z owner observer 302 calls 250ms, operation 0 calls 0s, readiness 256 calls 230ms, identity 3 calls 0s, provider 710 calls 630ms, credentials 204 calls 160ms, context-start 0 calls 0s total
+2026-10-22T22:56:45.090870639Z owner router: handoff observation (8)
+2026-10-22T22:56:47.625652587Z owner router: handoff native (1)
+2026-10-22T22:56:47.796604468Z context start ingress refused: admission (1)
+2026-10-22T22:56:47.796611268Z context start refused: authenticate (1)
+2026-10-22T22:56:48.946991534Z owner startup failed: phase=full-runtime role=none reason=changed native=unspecified detail=unspecified sql=unknown sql-reason=unspecified

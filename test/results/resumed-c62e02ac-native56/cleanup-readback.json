@@ -1,0 +1,81 @@
+{
+  "checks": [
+    {
+      "kind": "container",
+      "name": "asservat-context-02iyre38-s3",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-02iyre38-kms",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-02iyre38-postgres",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-02iyre38-tls",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-02iyre38-keycloak",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-02iyre38-0-seed",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-02iyre38-0-control-plane",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-02iyre38-1-control-plane",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "network",
+      "name": "asservat-context-02iyre38",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "network",
+      "name": "asservat-context-02iyre38-kind",
+      "exitCode": 1,
+      "absent": true
+    },
+    {
+      "kind": "volume",
+      "name": "asservat-context-02iyre38-0-var",
+      "exitCode": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: get asservat-context-02iyre38-0-var: no such volume\n"
+    },
+    {
+      "kind": "image",
+      "name": "asservat-context-worker:context-02iyre38",
+      "exitCode": 1,
+      "absent": true
+    }
+  ],
+  "kindExit": 0,
+  "ownedClustersAbsent": true,
+  "allAbsent": true,
+  "privateDiagnosticFilesRemoved": true
+}

@@ -10,14 +10,25 @@ review follow-up. The historical stop and no-Git statements below describe
 
 Start with the [current progress checkpoint](docs/implementation-progress.md),
 [AGENTS.md](AGENTS.md) and the accepted
-[complexity review](docs/reviews/complexity-2026-10-20/README.md). Runtime candidate
-`9543cff7` implements four scoped simplifications. Selected component, race,
-PostgreSQL/S3 and Helm checks pass; the full Go gate on that candidate remains
-pending. Native55 reaches capture, verification and publication but fails download
-preparation after durable worker-intent audit and before a recorded worker claim.
-The exact refusal is unresolved; the progress checkpoint records the bounded
-next reproduction. Retained diagnostics are archived and owned fixtures removed.
-No complete installed investigation or whole-design simplification is claimed.
+[complexity review](docs/reviews/complexity-2026-10-20/README.md). Candidate
+`98f7e181` includes request-owned download/context observations, consolidated hub
+metadata and API execution credentials, one sequential installer runner and
+consumed download preflight observations. Selected race, real SQL/S3, role and
+design gates pass; the full current Go gate remains pending.
+
+Native56 reaches regional capture, verification and publication. Download startup
+now claims and records the real acquisition Job but returns acknowledged
+unavailable before a Pod binding or native bytes. The exact branch remains
+unresolved; the next composed regression removes duplicate authority construction
+within that same original request while retaining current SQL effect checks.
+All 2,787 source hashes match, retained diagnostics are archived, and all owned
+fixtures are removed. No complete installed investigation is claimed.
+
+The implementation mandate remains active. Isolated follow-up work covers approved
+pod-status projection through the shared acquisition worker and a 30-second
+ordinary-permission reconstruction cadence for active responses. These are not
+part of `98f7e181` or qualified by native56. Continue through complete workflows;
+status questions and component handoffs do not revoke implementation approval.
 
 ## Historical handoff (2026-10-14)
 

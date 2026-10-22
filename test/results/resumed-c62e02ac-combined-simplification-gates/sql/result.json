@@ -1,0 +1,14 @@
+{
+  "commit": "98f7e181bca3d075c3b42adefc604a993f22e1ac",
+  "argv": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestContextAdmissionWithRealServices$/^(api-execution-(preparation-boundaries|retained-check-revoked-during-permission-lock|one-preparation-exact-result-historical-publication)|download-worker-installed-original-authority)$"
+  ],
+  "startedUnix": 1792708597.5033977,
+  "exitCode": 0,
+  "elapsedSeconds": 74.734,
+  "sourceCount": 3785,
+  "changedSources": []
+}

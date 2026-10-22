@@ -1,5 +1,51 @@
 # Sustained implementation progress
 
+## Current installed qualification and credential consolidation (2026-10-23)
+
+The active instruction remains implementation with sensible simplification. The
+current candidate is `98f7e181`. ADR-217 consolidates the three same-process API
+execution SQL credentials/pools into one, preserving the exact union of 46 grants
+and all typed read/prepare/record checks. Two credentials and pools disappear;
+no new grants, schema migration, background work or public option are added.
+The shared pool permits three connections within the unchanged global budget.
+
+The [combined gates](../test/results/resumed-c62e02ac-combined-simplification-gates/README.md)
+pass: specification/architecture/design/dependency checks (12.461 seconds),
+selected real SQL/S3 execution and download-launch cases (74.734 seconds wrapper),
+and five fresh installation-role cases (41.147 seconds wrapper). The SQL runs
+verify the compiled role union, three-connection bound, excluded-write refusals,
+permission revocation during a real lock wait and the original download authority
+through launch claim. Both fixture cleanups and independent absence checks pass;
+2,759 harness hashes per run match the candidate and remain unchanged. The full
+current Go gate remains pending.
+
+Installed [native56](../test/results/resumed-c62e02ac-native56/README.md) exits 1
+(1,248.277 seconds Go; 1,360.834 seconds wrapper). Installer interruption/resume,
+five runtime Deployments, regional enrollment/join and demand readiness progress.
+The Keycloak/MCP journey collects, verifies, audits and publishes the regional
+pod-status artifact after several unknown capture-start outcomes. Its first
+download preparation returns acknowledged unavailable after 4.496 seconds.
+
+This time the exact original worker is claimed, audited and recorded with a real
+Kubernetes Job, advancing beyond native55's unclaimed intent. It has no Pod
+binding, batch, response or emitted bytes. A worker Pod later exits after its
+30-second startup wait; that later exit does not explain the earlier prepare
+failure. The remaining refusal lies after Job recording, including Pod observation
+or the final response view. Three complete authority reconstructions still occur
+within the same original request; final-view source activity is consistent with
+that last reconstruction but does not prove the failure branch. The next composed
+regression targets that duplicate work while retaining current SQL checks and all
+original caller, authority and session bounds.
+
+All 2,787 native harness hashes match the candidate and remain unchanged.
+Retained diagnostics and their read-only SQL queries pass. Exact-manifest cleanup
+exits 0; independent read-back confirms all 12 owned resources and both clusters
+absent, and private diagnostic configurations are removed. Native delivery, Stop,
+expiry and managed deletion remain unqualified. Successful-journey foreground
+fixture cleanup was not reached. Approved pod-status projection composition and
+the response-owned 30-second ordinary-permission check cadence are being developed
+in isolated trees; neither is included in this candidate or claimed qualified.
+
 ## Download preflight lifetime simplification (2026-10-23)
 
 The maintainer's continuing mandate is to implement the specification and simplify

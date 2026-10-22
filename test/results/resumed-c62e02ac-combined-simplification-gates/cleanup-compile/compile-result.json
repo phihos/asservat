@@ -1,0 +1,17 @@
+{
+  "argv": [
+    "go",
+    "test",
+    "-race",
+    "-run",
+    "^$",
+    "./test/integration"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 43.658,
+  "sourceHashes": {
+    "test/integration/installer_continuation_native_test.go": "0526f4e7a781254ac80d8cbbaf2c79b606e4b6c28582ea5a0594a2aa32f9d653",
+    "test/integration/initial_runtime_worker_source_native_test.go": "05fc5760c25e089a0d08c949e36402a8f5ca21ab5d24f29fa8f90379facfb107"
+  },
+  "sourceUnchanged": true
+}

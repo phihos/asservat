@@ -1,0 +1,10 @@
+{
+  "command.json": "fd397b0f6e5dfeb036eb0df2f9a568b69068693ead6c49313073ee580b30829f",
+  "fleet-environment.json": "995fe98b6f818ea0ceaa157735ffc8186a50044d143710676be0daa225e79570",
+  "fleet.log": "b0d83ae9e2a40822b5bd567aee52f84ff1ecaa12992da3155b0811174c4888e7",
+  "owned-resource-checks.json": "c7d0e366226f142865c3f3540ef7c07e82750bf28106f996b5adac4815babb6a",
+  "result.json": "88f400d21c1dc65914e2647b355209573ddf44b78cf949604a8f3f7a4da09084",
+  "source-after.json": "53caee60333f85be251c70468694b569cfdfe1e14b4cbe721a472b23acab5460",
+  "source-before.json": "53caee60333f85be251c70468694b569cfdfe1e14b4cbe721a472b23acab5460",
+  "stdout.log": "e01e12c9f69bb1fc92f1b42fc29a0c1bd60bd7001d142e60f6cc6cd3e075b883"
+}

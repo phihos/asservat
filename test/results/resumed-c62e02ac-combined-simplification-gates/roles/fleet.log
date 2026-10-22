@@ -1,0 +1,26 @@
+=== RUN   TestInitialInstallationWithRealServices
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-matrix
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-matrix/capture-preview-generated-role-effects
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-matrix/capture-resolution-generated-role-effects
+=== NAME  TestInitialInstallationWithRealServices/public-runtime-roles-matrix
+    initial_installation_test.go:558: actual SQL role creation/SCRAM/privilege matrix passed; Secret root CAS and protected configuration facts were explicit synthetic test inputs
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-unknown-claim
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-preview-generated-role-effects
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-resolution-generated-role-effects
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-held-lock
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-recovery-after-lock
+=== NAME  TestInitialInstallationWithRealServices
+    initial_installation_test.go:631: real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified
+--- PASS: TestInitialInstallationWithRealServices (31.27s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-matrix (18.20s)
+        --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-matrix/capture-preview-generated-role-effects (0.09s)
+        --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-matrix/capture-resolution-generated-role-effects (0.08s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-unknown-claim (0.16s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion (12.45s)
+        --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-preview-generated-role-effects (0.08s)
+        --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-resolution-generated-role-effects (0.07s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-held-lock (0.26s)
+    --- PASS: TestInitialInstallationWithRealServices/public-runtime-roles-recovery-after-lock (0.14s)
+PASS
+ok  	asservat.local/asservat/test/integration	32.335s
