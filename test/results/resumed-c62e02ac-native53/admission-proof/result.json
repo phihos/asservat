@@ -1,0 +1,10 @@
+{
+  "originalIdentity": "kubernetes-admin",
+  "expectedAdministrator": "system:serviceaccount:bootstrap-chain-10000000:install-bootstrap-runner",
+  "oldIdentityDenied": false,
+  "runnerDryRunAccepted": true,
+  "capabilityAbsentBefore": true,
+  "capabilityAbsentAfter": true,
+  "persistentWrites": false,
+  "cleanupPerformed": false
+}

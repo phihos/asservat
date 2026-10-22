@@ -1,0 +1,20 @@
+{
+  "apiVersion": "admissionregistration.k8s.io/v1",
+  "kind": "ValidatingAdmissionPolicyBinding",
+  "metadata": {
+    "annotations": {
+      "asservat.io/runtime-resource-operation": "9cbbbc7c-be03-4ba8-b1fd-02aab4b65d38"
+    },
+    "creationTimestamp": "2026-10-22T20:29:49Z",
+    "generation": 1,
+    "name": "asservat-c71fa5be1d3b459da57b1234889affda-workload-guard",
+    "resourceVersion": "1445",
+    "uid": "7bf453ce-97bf-443c-8c3d-b0399b7e9856"
+  },
+  "spec": {
+    "policyName": "asservat-c71fa5be1d3b459da57b1234889affda-workload-guard",
+    "validationActions": [
+      "Deny"
+    ]
+  }
+}

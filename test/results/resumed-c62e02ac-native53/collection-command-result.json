@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "python3",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/collect-kept-native.py",
+    "/home/phil/.cache/asservat-build/kept/context-co1zv192.json",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-full/retained-collection",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/native48-full"
+  ],
+  "exitCode": 0,
+  "terminalEvidence": "write_stdin session37095 chunkc8aea8 exit0",
+  "commandsCompleted": 31,
+  "failures": [],
+  "cleanupPerformed": false,
+  "privateConfigsRetained": true
+}

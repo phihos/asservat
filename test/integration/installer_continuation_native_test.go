@@ -502,7 +502,8 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		installedJourney(t, ctx, identity, publicRoot, publicAddress, origin, diagnose,
 			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose))(cluster, namespace, workload, deny)
 	}
-	qualifyRegionalInstall(t, ctx, f, admin, api, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
+	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
+	qualifyRegionalInstall(t, ctx, f, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
 	// After the guard bridge, the same five-command profile replays (as on
 	// upgrade), finds the installation complete and preserves guard/journal state.
 	guard, err := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, original.Plan.Workload.WorkloadGuard, meta.GetOptions{})
@@ -530,7 +531,9 @@ func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes
 		{APIGroups: []string{"coordination.k8s.io"}, Resources: []string{"leases"}, Verbs: []string{"get", "create", "update"}},
 		{APIGroups: []string{"discovery.k8s.io"}, Resources: []string{"endpointslices"}, Verbs: []string{"list"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidencestoragepools", "evidencebudgetpolicies"}, Verbs: []string{"get", "list", "create"}},
+		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidencestoragepools"}, Verbs: []string{"update"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"accessbindings", "permissionsources"}, Verbs: []string{"get", "list", "watch", "create"}},
+		{APIGroups: []string{"asservat.io"}, Resources: []string{"accessbindings"}, Verbs: []string{"delete"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidenceretentionpolicies"}, Verbs: []string{"get", "list", "watch", "create", "update"}},
 		{APIGroups: []string{""}, Resources: []string{"namespaces", "pods"}, Verbs: []string{"get", "list"}},
 		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets"}, Verbs: []string{"get", "list"}},

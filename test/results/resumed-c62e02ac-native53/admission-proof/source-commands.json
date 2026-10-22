@@ -1,0 +1,134 @@
+[
+  {
+    "label": "owner-input",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "get",
+      "configmap",
+      "asservat-c71fa5be1d3b459da57b1234889affda-owner-inputs",
+      "-n",
+      "bootstrap-chain-10000000-target",
+      "-o",
+      "json"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.08172798156738281
+  },
+  {
+    "label": "offer",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "get",
+      "configmap",
+      "asservat-c71fa5be1d3b459da57b1234889affda-regional-offer",
+      "-n",
+      "bootstrap-chain-10000000-target",
+      "-o",
+      "json"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.07050704956054688
+  },
+  {
+    "label": "regional-join",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-1-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-1",
+      "--request-timeout=10s",
+      "get",
+      "configmap",
+      "regional-join",
+      "-n",
+      "asservat-connector",
+      "-o",
+      "json"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.07993388175964355
+  },
+  {
+    "label": "validatingadmissionpolicy-cluster-1-capability-guard",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "get",
+      "validatingadmissionpolicy",
+      "asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability-guard",
+      "-o",
+      "json"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.06932497024536133
+  },
+  {
+    "label": "validatingadmissionpolicy-workload-guard",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "get",
+      "validatingadmissionpolicy",
+      "asservat-c71fa5be1d3b459da57b1234889affda-workload-guard",
+      "-o",
+      "json"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.07327485084533691
+  },
+  {
+    "label": "validatingadmissionpolicybinding-cluster-1-capability-guard",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "get",
+      "validatingadmissionpolicybinding",
+      "asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability-guard",
+      "-o",
+      "json"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.07512259483337402
+  },
+  {
+    "label": "validatingadmissionpolicybinding-workload-guard",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "get",
+      "validatingadmissionpolicybinding",
+      "asservat-c71fa5be1d3b459da57b1234889affda-workload-guard",
+      "-o",
+      "json"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.07497692108154297
+  }
+]

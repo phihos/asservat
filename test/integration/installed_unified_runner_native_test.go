@@ -8,7 +8,9 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -22,6 +24,8 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/utils/ptr"
 )
 
@@ -53,6 +57,33 @@ func installedUnifiedRunnerConfig(config *rest.Config, desired contracts.Initial
 	runner := rest.CopyConfig(config)
 	runner.Impersonate = rest.ImpersonationConfig{UserName: "system:serviceaccount:" + desired.BootstrapNamespace + ":" + desired.Name + "-bootstrap-runner", Groups: []string{"system:serviceaccounts", "system:serviceaccounts:" + desired.BootstrapNamespace, "system:authenticated"}}
 	return runner
+}
+
+// The join CLI uses the same accepted runner actor as guarded operator writes.
+// Keep the owned hub credentials and endpoint in a private temporary file;
+// neither the original kubeconfig nor the regional configuration is changed.
+func installedUnifiedRunnerKubeconfig(t *testing.T, original string, desired contracts.InitialBootstrap) string {
+	t.Helper()
+	config, err := clientcmd.LoadFromFile(original)
+	if err != nil || clientcmdapi.MinifyConfig(config) != nil || clientcmd.ResolveLocalPaths(config) != nil {
+		t.Fatal("owned hub kubeconfig unavailable")
+	}
+	auth := config.AuthInfos[config.Contexts[config.CurrentContext].AuthInfo]
+	if auth == nil {
+		t.Fatal("owned hub kubeconfig identity missing")
+	}
+	actor := installedUnifiedRunnerConfig(&rest.Config{}, desired).Impersonate
+	auth.Impersonate, auth.ImpersonateUID = actor.UserName, actor.UID
+	auth.ImpersonateGroups, auth.ImpersonateUserExtra = actor.Groups, actor.Extra
+	dir := t.TempDir()
+	if err = os.Chmod(dir, 0o700); err != nil {
+		t.Fatal("private hub kubeconfig directory unavailable", err)
+	}
+	file := filepath.Join(dir, "hub-runner.kubeconfig")
+	if err = clientcmd.WriteToFile(*config, file); err != nil {
+		t.Fatal("private hub kubeconfig unavailable", err)
+	}
+	return file
 }
 
 type installedUnifiedRunner struct {

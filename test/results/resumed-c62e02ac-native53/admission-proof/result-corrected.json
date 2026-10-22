@@ -1,0 +1,11 @@
+{
+  "originalIdentity": "kubernetes-admin",
+  "expectedAdministrator": "system:serviceaccount:bootstrap-chain-10000000:install-bootstrap-runner",
+  "oldIdentityDenied": true,
+  "runnerDryRunAccepted": true,
+  "capabilityAbsentBefore": true,
+  "capabilityAbsentAfter": true,
+  "persistentWrites": false,
+  "cleanupPerformed": false,
+  "correction": "The API reports Invalid with the named admission-policy denial, not the literal word Forbidden. Original result.json retained; raw command exits/output unchanged."
+}

@@ -1,0 +1,12 @@
+BEGIN
+SET
+ capture_id | attempt_id | verified_at | audit_acknowledged_at | artifact_id | published_at | custody_state | effective_expires_at | effective_delete_by 
+------------+------------+-------------+-----------------------+-------------+--------------+---------------+----------------------+---------------------
+(0 rows)
+
+ download_sessions 
+-------------------
+                 0
+(1 row)
+
+COMMIT

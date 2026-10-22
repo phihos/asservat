@@ -1,0 +1,17 @@
+{
+  "apiVersion": "admissionregistration.k8s.io/v1",
+  "kind": "ValidatingAdmissionPolicyBinding",
+  "metadata": {
+    "creationTimestamp": "2026-10-22T20:39:29Z",
+    "generation": 1,
+    "name": "asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability-guard",
+    "resourceVersion": "3025",
+    "uid": "ac9e3d81-0364-49ee-8f5d-e9e1f12c4d7e"
+  },
+  "spec": {
+    "policyName": "asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability-guard",
+    "validationActions": [
+      "Deny"
+    ]
+  }
+}

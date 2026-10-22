@@ -1,0 +1,90 @@
+[
+  {
+    "label": "capability-absent-before",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "get",
+      "configmap",
+      "asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability",
+      "-n",
+      "bootstrap-chain-10000000-target",
+      "-o",
+      "name"
+    ],
+    "exitCode": 1,
+    "elapsedSeconds": 0.0734717845916748
+  },
+  {
+    "label": "old-identity-create-dryrun",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "create",
+      "--dry-run=server",
+      "--validate=false",
+      "-f",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-full/admission-proof/capability-create.json",
+      "-o",
+      "name"
+    ],
+    "exitCode": 1,
+    "elapsedSeconds": 0.061799049377441406
+  },
+  {
+    "label": "runner-identity-create-dryrun",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "--as",
+      "system:serviceaccount:bootstrap-chain-10000000:install-bootstrap-runner",
+      "--as-group",
+      "system:serviceaccounts",
+      "--as-group",
+      "system:serviceaccounts:bootstrap-chain-10000000",
+      "--as-group",
+      "system:authenticated",
+      "create",
+      "--dry-run=server",
+      "--validate=false",
+      "-f",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-full/admission-proof/capability-create.json",
+      "-o",
+      "name"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.06104588508605957
+  },
+  {
+    "label": "capability-absent-after",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "get",
+      "configmap",
+      "asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability",
+      "-n",
+      "bootstrap-chain-10000000-target",
+      "-o",
+      "name"
+    ],
+    "exitCode": 1,
+    "elapsedSeconds": 0.06186628341674805
+  }
+]

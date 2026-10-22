@@ -1,0 +1,1 @@
+BEGIN READ ONLY; SET LOCAL statement_timeout='5s'; SELECT capture_id,attempt_id,object_uid,phase,created_at,not_before,not_after,EXTRACT(EPOCH FROM not_after-created_at) AS preparation_remaining_seconds FROM context_execution; COMMIT;

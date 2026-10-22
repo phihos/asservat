@@ -1,0 +1,11 @@
+2026-10-22T20:38:56.338048035Z I1022 20:38:56.337956       1 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+2026-10-22T20:39:13.960631698Z I1022 20:39:13.958733       1 leaderelection.go:272] "Successfully acquired lease" lock="asservat configuration reconciliation"
+2026-10-22T20:39:14.737347792Z capacity started with 0 regional clusters
+2026-10-22T20:39:14.755911961Z capacity local observation capacity-namespace-candidates: candidates (unavailable) after 20ms
+2026-10-22T20:39:14.755918461Z capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+2026-10-22T20:39:15.783237063Z permission reconciler stopped: start/begin (changed)
+2026-10-22T20:39:15.898633788Z capacity source: accept (unavailable)
+2026-10-22T20:39:18.960150545Z capacity local observation capacity-namespace-candidates: post (unavailable) after 3.19s
+2026-10-22T20:39:32.636116966Z capacity local observation capacity-namespace-candidates: unavailable after 3.92s
+2026-10-22T20:39:47.085365891Z capacity local discovery: steps=11 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+2026-10-22T20:39:50.145659521Z capacity source: ok

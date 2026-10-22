@@ -1,0 +1,22 @@
+BEGIN
+SET
+ id | created_at | deadline | state | intent_acknowledged_at | request_until | write_until | initial_intent_seconds | intent_started | intent_acknowledged | outcome_set | outcome_acknowledged | intent_stored_at | intent_closed_at | intent_reads | intent_first_until | intent_second_until 
+----+------------+----------+-------+------------------------+---------------+-------------+------------------------+----------------+---------------------+-------------+----------------------+------------------+------------------+--------------+--------------------+---------------------
+(0 rows)
+
+                  id                  |   lane   |        operation_name        |         created_at          |         request_until         |          write_until          | intent_started | intent_acknowledged | outcome_set | outcome_acknowledged 
+--------------------------------------+----------+------------------------------+-----------------------------+-------------------------------+-------------------------------+----------------+---------------------+-------------+----------------------
+ 42d6fcaa-0542-4fd4-8cb8-b08c0f3fa822 | identity | connector_process_enrollment | 2026-10-22T20:39:23.87572Z  | 2026-10-22 20:39:28.559426+00 | 2026-10-22 20:39:53.87572+00  | t              | t                   | t           | t
+ 97896ccd-2b2e-4b02-b9ca-4883f235f718 | identity | connector_client_certificate | 2026-10-22T20:39:24.416434Z | 2026-10-22 20:39:28.559426+00 | 2026-10-22 20:39:54.416434+00 | t              | t                   | t           | t
+ 58a5fd79-9a62-4cf2-bb12-8faf9730733c | identity | connector_server_certificate | 2026-10-22T20:39:25.532435Z | 2026-10-22 20:39:30.532435+00 | 2026-10-22 20:39:55.532435+00 | t              | t                   | t           | t
+(3 rows)
+
+ capture_id | phase | created_at | not_before | not_after | started_at | acquired_at | completed_at 
+------------+-------+------------+------------+-----------+------------+-------------+--------------
+(0 rows)
+
+ state | count 
+-------+-------
+(0 rows)
+
+COMMIT

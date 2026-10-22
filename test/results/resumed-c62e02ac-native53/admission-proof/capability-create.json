@@ -1,0 +1,12 @@
+{
+  "apiVersion": "v1",
+  "kind": "ConfigMap",
+  "metadata": {
+    "name": "asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability",
+    "namespace": "bootstrap-chain-10000000-target"
+  },
+  "immutable": true,
+  "data": {
+    "context-capability.json": "{\"format\":\"asservat-context-capability/v1\",\"rootID\":\"7591d375-5ea8-4641-ad84-f0cb3e30790b\",\"installationID\":\"c71fa5be-1d3b-459d-a57b-1234889affda\",\"clusterID\":\"a7b251dc-0f4e-424e-b190-75a766d987a3\",\"issuerEpoch\":\"5f5f208d-b5e4-4cc6-ba9f-dfe595408b6a\",\"revision\":1,\"enabled\":true,\"executionClass\":\"kubernetesAPI\",\"collectorVersion\":\"sha256-f07cd05701686c6547d595a8d4645d9a\",\"collectorImageDigest\":\"f07cd05701686c6547d595a8d4645d9ac3222ec5514025f13ad2e817d6639a0c\",\"projectionDigest\":\"ddb974bae2428c1469a5cab504cf410a8b2d5331fd5bfe3bdf2b8856579a4141\"}"
+  }
+}

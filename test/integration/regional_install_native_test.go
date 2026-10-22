@@ -50,8 +50,9 @@ import (
 // activate, a Pod restart is readmitted, a rerun is idempotent and a
 // non-administrator source write is denied. The issuance logins are the
 // product fleet-bootstrap purposes the continuation provisioned; only the
-// fleet operator authority is fixture setup.
-func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin *pgxpool.Pool, hub kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
+// fleet operator authority is fixture setup. Hub operations use the accepted
+// runner; the original observer retains diagnostic log access only.
+func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin *pgxpool.Pool, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
 	t.Helper()
 	var offer contracts.RegionalOffer
 	if json.Unmarshal([]byte(offerJSON), &offer) != nil {
@@ -125,9 +126,9 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin 
 	t.Log("installer-cluster connector enrolled generation 1 and both leaves")
 	if executor {
 		qualifyRegionalExecutor(t, ctx, admin, region, offer, installed, peer)
-		qualifyRegionalJoin(t, ctx, f, hub, namespace, installation, *installed.Join)
+		qualifyRegionalJoin(t, ctx, hub, hubObserver, hubKubeconfig, namespace, installation, *installed.Join)
 		if offer.Capacity != nil {
-			qualifyRegionalCapacity(t, ctx, admin, hub, region, namespace, issuer, journey, installation, offer, installed)
+			qualifyRegionalCapacity(t, ctx, admin, hub, hubObserver, region, namespace, issuer, journey, installation, offer, installed)
 		}
 	}
 	// A rerun reopens every object unchanged.
@@ -450,7 +451,7 @@ func qualifyRegionalExecutor(t *testing.T, ctx context.Context, admin *pgxpool.P
 // rerun is exact, the catalog holds the printed entry, and the hub-api
 // restarts its container in the same Pod, reads the entry at start and is
 // Ready again.
-func qualifyRegionalJoin(t *testing.T, ctx context.Context, f fixture, hub kubernetes.Interface, namespace, installation string, join contracts.RegionalJoin) {
+func qualifyRegionalJoin(t *testing.T, ctx context.Context, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, installation string, join contracts.RegionalJoin) {
 	t.Helper()
 	raw, err := json.Marshal(join)
 	if err != nil {
@@ -462,7 +463,7 @@ func qualifyRegionalJoin(t *testing.T, ctx context.Context, f fixture, hub kuber
 	}
 	owner := "asservat-" + strings.ReplaceAll(installation, "-", "") + "-owner"
 	before := hubAPIRestarts(t, ctx, hub, namespace, owner)
-	args := []string{"--kubeconfig", f.Clusters[0].Config, "--namespace", namespace, "--join", file}
+	args := []string{"--kubeconfig", hubKubeconfig, "--namespace", namespace, "--join", file}
 	var first, second bytes.Buffer
 	if err = bootstrap.RunInstallerClusterJoin(ctx, args, &first); err != nil {
 		t.Fatal("installer-cluster-join", err)
@@ -490,7 +491,7 @@ func qualifyRegionalJoin(t *testing.T, ctx context.Context, f fixture, hub kuber
 			return
 		}
 		if time.Now().After(until) {
-			installedProcessDiagnostics(t, ctx, hub, namespace, owner)
+			installedProcessDiagnostics(t, ctx, hubObserver, namespace, owner)
 			t.Fatal("hub-api did not restart and accept the joined entry", restarts, before, ready)
 		}
 	}
@@ -587,7 +588,7 @@ func nodeInternalIP(t *testing.T, ctx context.Context, api kubernetes.Interface,
 // the owner's operation port, and after the operator adds a regional budget
 // policy, a labeled regional workload and its maintainer binding, the
 // hub-worker enrolls that workload through v2 to ready_at with a fresh binding.
-func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation) {
+func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, hubObserver, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation) {
 	t.Helper()
 	j := installed.Join
 	if j == nil || j.Capacity == nil || !slices.Equal(j.Capacity.Keys, slices.Sorted(slices.Values(offer.Capacity.Keys))) {
@@ -611,7 +612,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 			break
 		}
 		if time.Now().After(until) {
-			installedProcessDiagnostics(t, ctx, hub, namespace, prefix+"-owner")
+			installedProcessDiagnostics(t, ctx, hubObserver, namespace, prefix+"-owner")
 			t.Fatal("hub-api did not record the regional capacity qualification")
 		}
 	}
@@ -687,7 +688,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	}
 	t.Log("operator added the regional budget policy, pool slot, workload and maintainer binding")
 	diagnose := func() {
-		installedProcessDiagnostics(t, ctx, hub, namespace, prefix+"-worker", prefix+"-owner", kube.FederationWorkloadName(installation))
+		installedProcessDiagnostics(t, ctx, hubObserver, namespace, prefix+"-worker", prefix+"-owner", kube.FederationWorkloadName(installation))
 		regionalLogs(t, ctx, region)
 		permissionScopeDiagnostics(t, ctx, admin, root)
 	}

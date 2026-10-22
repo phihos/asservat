@@ -1,0 +1,1 @@
+2026-10-22T20:38:49.305162116Z 2026/10/22 20:38:49 http: TLS handshake error from 10.244.0.1:57929: tls: failed to verify certificate: x509: certificate signed by unknown authority

@@ -1,0 +1,55 @@
+[
+  {
+    "label": "identity",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "auth",
+      "whoami",
+      "-o",
+      "json"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.1603384017944336
+  },
+  {
+    "label": "runtime-configmap-names",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "get",
+      "configmaps",
+      "-n",
+      "bootstrap-chain-10000000-target",
+      "-o",
+      "jsonpath={range .items[*]}{.metadata.name}{\" \"}{.metadata.uid}{\"\\n\"}{end}"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.15265750885009766
+  },
+  {
+    "label": "policy-names",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native53-private/cluster-0-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-co1zv192-0",
+      "--request-timeout=10s",
+      "get",
+      "validatingadmissionpolicies",
+      "-o",
+      "jsonpath={range .items[*]}{.metadata.name}{\" \"}{.metadata.uid}{\"\\n\"}{end}"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 0.16937494277954102
+  }
+]

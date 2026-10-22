@@ -58,6 +58,12 @@ written.
 
    Neither the continuation (which has finished) nor the hub-worker (not an
    administrator, and it cannot know the startup digest) writes the entry.
+   The CLI kubeconfig must select that accepted runner identity; cluster-admin
+   RBAC alone does not satisfy the installation's admission guards. Its existing
+   continuation role also permits the intended operator maintenance actions:
+   updating an `EvidenceStoragePool` and deleting an `AccessBinding`. These
+   verbs let the selected administrator extend a regional pool and remove a
+   previously applied Deny; they add no administrator identity or runtime grant.
 2. **A public join record.** `installer-cluster` writes a `RegionalJoin`
    record to an immutable ConfigMap in the region and prints it. It
    carries:

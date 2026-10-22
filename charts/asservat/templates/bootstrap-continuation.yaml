@@ -35,10 +35,18 @@ rules:
   - apiGroups: [asservat.io]
     resources: [evidencestoragepools, evidencebudgetpolicies]
     verbs: [get, list, create]
+  # Regional operator maintenance extends the existing pool allocation.
+  - apiGroups: [asservat.io]
+    resources: [evidencestoragepools]
+    verbs: [update]
   # ADR-189: the hub-worker's permission reader and guard probe.
   - apiGroups: [asservat.io]
     resources: [accessbindings, permissionsources]
     verbs: [get, list, watch, create]
+  # The selected administrator can remove a previously applied binding.
+  - apiGroups: [asservat.io]
+    resources: [accessbindings]
+    verbs: [delete]
   # ADR-195: the hub-worker's retention reader and guard probe, and the
   # installation administrator's baseline policy and its later edits.
   - apiGroups: [asservat.io]

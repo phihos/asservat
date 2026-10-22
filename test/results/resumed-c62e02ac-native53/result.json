@@ -1,0 +1,32 @@
+{
+  "sourceCommit": "157026815311c56016d5fc975772827ab4ff6b07",
+  "runId": "context-co1zv192",
+  "harnessExit": 1,
+  "harnessSeconds": 1046.914059,
+  "goExit": 1,
+  "goSeconds": 932.362,
+  "sourceHashesVerified": 2778,
+  "sourceUnchangedDuringTest": true,
+  "failure": "fixture installer-cluster-join uses raw cluster-admin identity instead of the sole pinned bootstrap runner",
+  "admissionProof": "admission-proof/result-corrected.json",
+  "captureExecutionPublicationDownloadRows": 0,
+  "qualification": [
+    "fresh original activation/retirement and managed copy closure",
+    "positive-terminal interruption/resume with original root/resource journal before first provider apply",
+    "resumed unified installer Pod reached Succeeded",
+    "hub worker/owner and regional connector running; later join failed before capture"
+  ],
+  "notQualified": [
+    "completed post-bridge installer replay",
+    "regional join/capacity readiness after correction",
+    "installed capture/download/Stop"
+  ],
+  "cleanup": {
+    "exit": 0,
+    "failures": [],
+    "ownedResourcesIndependentlyAbsent": 12,
+    "clustersAbsent": true,
+    "privateConfigsRemoved": true
+  },
+  "evidenceIndex": "README.md"
+}

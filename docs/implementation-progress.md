@@ -97,6 +97,33 @@ complete capacity race suite passes (actual exit 0, 8.136 seconds wall time), wi
 unchanged package sources. Independent review finds no blockers; installed
 readiness after this correction is still unqualified.
 
+## First simplified installed run: fixture join identity (2026-10-22)
+
+Frozen `15702681` [native53](../test/results/resumed-c62e02ac-native53/README.md)
+exits 1 (932.362 seconds Go / 1,046.914 seconds harness). The fresh unified runner
+performs original activation, retirement and managed-copy closure. Its continuation
+is interrupted before the first provider apply, positively terminates, and resumes
+with a new Pod UID while retaining the original installation, root and resource
+journal. The resumed five-command Pod reaches Succeeded; hub services and the
+regional connector start. Completed post-bridge replay is not reached.
+
+The fixture then calls `installer-cluster-join` as `kubernetes-admin`, although
+the public compiler and installed guards pin only the bootstrap runner as
+installation administrator. The first regional capability ConfigMap remains
+absent. An exact server-side dry-run CREATE is denied under the old identity and
+accepted under the pinned runner, with the object still absent afterward.
+The [admission proof](../test/results/resumed-c62e02ac-native53/admission-proof/README.md)
+establishes this fixture mismatch without a persistent write or relaxed guard;
+it does not qualify later join stages. Capture, execution, publication and download
+rows are zero. Installed capture/download/Stop remain pending.
+
+All 2,778 source hashes match the candidate and remain unchanged. Exact-manifest
+cleanup exits 0 with no failures; independent read-back confirms all 12 owned
+resources and both clusters absent. Private diagnostic configurations are removed.
+The archive preserves raw logs byte-for-byte, command exits and qualification
+limits. The next run must use the existing pinned runner identity for the fixture
+join and requalify the remaining installed path.
+
 ## Qualification read-back (2026-10-22)
 
 Frozen candidate `768316a3` passes the full `make go-check` gate: actual exit 0,

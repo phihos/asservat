@@ -162,11 +162,15 @@ def check_bootstrap(directory):
     assert cpod["metadata"]["annotations"]["asservat.io/bootstrap-input"] == cdigest and cdigest != digest
     assert "token" not in cinput["data"]["continuation.json"].lower()
     crole, = [r for r in cdocs if r["kind"] == "ClusterRole" and r["metadata"]["name"].endswith("-bootstrap-continuation")]
-    # ADR-204: the only delete is on Jobs, which the runner must hold to grant
-    # the hub-api's worker dispatch Role (RBAC admits only rules it holds).
+    # ADR-204 worker dispatch and ADR-196 operator maintenance retain exact
+    # resource/verb additions, never a blanket administrative wildcard.
     jobs, = [rule for rule in crole["rules"] if "jobs" in rule["resources"]]
     assert jobs == {"apiGroups": ["batch"], "resources": ["jobs"], "verbs": ["get", "create", "delete"]}
-    cverbs = {v for rule in crole["rules"] if rule is not jobs for v in rule["verbs"]}
+    binding_delete, = [rule for rule in crole["rules"] if "accessbindings" in rule["resources"] and "delete" in rule["verbs"]]
+    assert binding_delete == {"apiGroups": ["asservat.io"], "resources": ["accessbindings"], "verbs": ["delete"]}
+    pool_update, = [rule for rule in crole["rules"] if "evidencestoragepools" in rule["resources"] and "update" in rule["verbs"]]
+    assert pool_update == {"apiGroups": ["asservat.io"], "resources": ["evidencestoragepools"], "verbs": ["update"]}
+    cverbs = {v for rule in crole["rules"] if rule is not jobs and rule is not binding_delete for v in rule["verbs"]}
     assert "*" not in json.dumps(crole["rules"]) and not cverbs & {"escalate", "bind", "impersonate", "delete", "patch"}
     cbinding, = [r for r in cdocs if r["kind"] == "ClusterRoleBinding" and r["roleRef"]["name"] == crole["metadata"]["name"]]
     assert cbinding["subjects"] == [{"kind": "ServiceAccount", "namespace": "trusted-bootstrap", "name": b["name"] + "-bootstrap-runner"}]

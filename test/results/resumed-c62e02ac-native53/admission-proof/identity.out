@@ -1,0 +1,21 @@
+{
+    "kind": "SelfSubjectReview",
+    "apiVersion": "authentication.k8s.io/v1",
+    "metadata": {
+        "creationTimestamp": "2026-10-22T20:43:06Z"
+    },
+    "status": {
+        "userInfo": {
+            "username": "kubernetes-admin",
+            "groups": [
+                "kubeadm:cluster-admins",
+                "system:authenticated"
+            ],
+            "extra": {
+                "authentication.kubernetes.io/credential-id": [
+                    "X509SHA256=00bae2d0e52d6091c322eefdc5cb21d0f727834633134f5532df45f35b856a89"
+                ]
+            }
+        }
+    }
+}
