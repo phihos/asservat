@@ -1,5 +1,21 @@
 # Sustained implementation progress
 
+## Installed journey passes end to end (2026-10-24)
+
+Installed native92 on `aa4eac9a` exits 0 (1886.8 s): install with resumed installer,
+regional enrollment, Keycloak MCP capture, regional collection/verification/publication,
+approved pod-status inspection via the shared acquisition worker (read-only scope refused for
+download), native download, query-worker retirement, Stop after Deny, Deny revocation,
+cleanup-lease denial safety, expiry refusal and verified deletion. The
+[record](../test/results/resumed-c62e02ac-native92/README.md) lists every milestone. Runs
+native58–91 drove the fixes recorded in their own `resumed-c62e02ac-nativeNN` folders: grant and
+storage-prefix gaps from credential consolidation, 5 s freshness windows relaxed to the
+authorized 30 s (bindings, capacity, permission, trust, retention, topology, self-proofs),
+stored-evidence reads decoupled from workload capacity (maintainer decision 2026-10-23), 20 s
+evidence-read windows, early-refreshed caches, native transport deadline/gate fixes and
+positive worker retirement. Open: 25 real-SQL `download-worker-*` subtests already failing at
+`dd788576` (`reserve worker custody unavailable`), active-stream interruption on Stop.
+
 ## Capacity-backed download windows and content refusal stages (2026-10-24)
 
 Installed native91 prepared the native download, then the content GET got a
