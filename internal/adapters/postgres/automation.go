@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"slices"
-	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	app "asservat.local/asservat/internal/application/authorization"
@@ -114,7 +113,7 @@ func automationProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 	if err != nil {
 		return authorization.AutomationProjection{}, err
 	}
-	if !identity.Fresh(out.ObservedAt, out.FreshUntil, now.Time, 5*time.Second) || !a.Valid(now.Time) || (!out.NotAfter.IsZero() && !now.Time.Before(out.NotAfter)) {
+	if !identity.Fresh(out.ObservedAt, out.FreshUntil, now.Time, authorization.PermissionObservationInterval) || !a.Valid(now.Time) || (!out.NotAfter.IsZero() && !now.Time.Before(out.NotAfter)) {
 		return authorization.AutomationProjection{}, cfg.ErrUnavailable
 	}
 	return out, nil

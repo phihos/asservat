@@ -1,5 +1,28 @@
 # Sustained implementation progress
 
+## Thirty-second permission stream and fleet trust (2026-10-23)
+
+With binding and root source at 30 s, `capacity_managed_root_until` still
+lapsed through the permission stream and fleet trust observations, both
+written for five seconds by hub-worker refreshes that run late under load.
+Migration 00074 (schema 74) widens the permission_stream CHECK and the four
+SQL capacity readers/locks that bound the stream interval to 30 seconds, and
+makes `observe_fleet_administration` store the positive fleet row for 30
+seconds after its own observation (ADR-200 revision; one-line notes in ADR-189,
+ADR-161 and permission-observation.md). The Go permission store writes
+`observed_at + 30 s` and keeps the lease at least that long; the Go stream
+fences and the ordinary/automation deny bounds use
+`authorization.PermissionObservationInterval` (30 s). Batch/caller receipts,
+request deadlines, audit freshness, protection proofs, incarnation checks,
+suspension and the failure fence are unchanged. Unit tests cover the Go rule
+and the migration's Up/Down text. Real PostgreSQL (owned fixtures, sequential):
+`TestCapacityProducerWithRealPostgres` (--fleet), `TestEnrollmentFleetObservationWithRealPostgres`
+(--fleet, now asserting the 30-second positive row) and
+`TestPermissionAuthorityWithRealServices` passed with clean fixture cleanup; a
+manual goose up/down/up on a disposable PostgreSQL confirmed the rewritten
+bounds and the restored five-second rule. Installed native qualification of
+this change has not run.
+
 ## Thirty-second root capacity source (2026-10-23)
 
 With the binding at 30 s, admission still lapsed through the root

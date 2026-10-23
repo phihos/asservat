@@ -165,7 +165,7 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 		return queryRefusal("fence-permission-revision", nil)
 	case p.Suspended || !p.InitialAuditID.Valid:
 		return queryRefusal("fence-permission-suspended", nil)
-	case !now.Time.Before(p.LeaseUntil.Time) || !identity.Fresh(p.ObservedAt.Time, p.FreshUntil.Time, now.Time, 5*time.Second):
+	case !now.Time.Before(p.LeaseUntil.Time) || !identity.Fresh(p.ObservedAt.Time, p.FreshUntil.Time, now.Time, authorization.PermissionObservationInterval):
 		return queryRefusal("fence-permission-fresh", nil)
 	}
 	var profile value.ContextQueryResourceProfile

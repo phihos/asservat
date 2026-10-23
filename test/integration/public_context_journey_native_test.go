@@ -189,7 +189,7 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	f.gateTrace.probe = func(c context.Context) string {
 		// Fixture-admin timestamps only; classifies which stream predicate lapsed.
 		var stale, lease, suspended, window bool
-		e := admin.QueryRow(c, "SELECT fresh_until IS NULL OR clock_timestamp()>=fresh_until, clock_timestamp()>=lease_until, suspended, fresh_until-observed_at>interval '5 seconds' FROM permission_stream WHERE id=$1", root).Scan(&stale, &lease, &suspended, &window)
+		e := admin.QueryRow(c, "SELECT fresh_until IS NULL OR clock_timestamp()>=fresh_until, clock_timestamp()>=lease_until, suspended, fresh_until-observed_at>interval '30 seconds' FROM permission_stream WHERE id=$1", root).Scan(&stale, &lease, &suspended, &window)
 		switch {
 		case e != nil:
 			return "unreadable"

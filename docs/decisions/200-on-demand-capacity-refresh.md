@@ -203,3 +203,21 @@ invalidating observations keep their original intervals and take effect
 immediately, and trust, permission-stream, recovery and request bounds are
 unchanged. A capacity source change still takes effect at the next accepted
 or invalidating observation.
+
+Migration 00074 (schema 74) applies the 30-second lifetime to the two remaining
+observations that `capacity_managed_root_until` intersects: the accepted
+`permission_stream` observation and the positive fleet trust observation
+(`fleet_observation`, read through `fleet_current_trust`). Both were written for
+five seconds by hub-worker refresh loops that run late under load, so every
+capture, approved query and download admission still lapsed whenever either
+refresh missed its window. The Go permission store writes
+`fresh_until = observed_at + 30 seconds` and keeps the stream lease at least
+that long; `observe_fleet_administration` stores the positive row for
+30 seconds. The permission_stream CHECK, the SQL capacity readers/locks, the
+Go stream fences and the ordinary/automation deny-snapshot bound
+(`authorization.PermissionObservationInterval`) accept 30 seconds; fleet trust
+consumers already accepted 30 seconds. Batch and caller receipts keep their
+original five-second intervals. Suspension, newly accepted denies or retired
+assignments, recovery blocking, database incarnation checks and the fleet
+failure fence still take effect immediately; only a missing refresh is
+tolerated for up to 30 seconds. Down narrows stored rows back to five seconds.

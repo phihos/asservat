@@ -283,6 +283,15 @@ func projectionDigest(b cfg.PermissionBatch) []byte {
 	}
 	return digest(b)
 }
+
+// permissionStreamUntil is the stored lifetime of an accepted permission
+// stream observation (ADR-200 revision, 2026-10-23): 30 seconds after its own
+// observation, so a late hub-worker refresh does not lapse every admission.
+// The batch itself keeps its original interval, which validBatch still checks.
+func permissionStreamUntil(observed time.Time) time.Time {
+	return observed.Add(authorization.PermissionObservationInterval)
+}
+
 func validBatch(b cfg.PermissionBatch, now time.Time) error {
 	if err := b.Validate(now); err != nil {
 		return err
@@ -456,7 +465,7 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 		if err = q.InsertPermissionAcceptance(ctx, custodydb.InsertPermissionAcceptanceParams{RequestID: id(b.RequestID), StreamID: s.ID, Epoch: s.Epoch, Sequence: record.Sequence, RequestDigest: requestDigest, AuditID: id(record.ID), Assignments: int32(len(wanted)), Retired: int32(retired)}); err != nil {
 			return err
 		}
-		if err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, Sequence: record.Sequence, ProjectionDigest: projected, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(b.FreshUntil)}); err != nil {
+		if err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, Sequence: record.Sequence, ProjectionDigest: projected, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(permissionStreamUntil(b.ObservedAt))}); err != nil {
 			return err
 		}
 		if err = liveStream(ctx, q, s, requested); err != nil {
@@ -506,7 +515,7 @@ func (p *Permissions) RefreshPermissions(ctx context.Context, b cfg.PermissionBa
 		if err = validBatch(b, n.Time); err != nil {
 			return err
 		}
-		if err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, Sequence: s.Sequence, ProjectionDigest: s.ProjectionDigest, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(b.FreshUntil)}); err != nil {
+		if err = q.UpdatePermissionStream(ctx, custodydb.UpdatePermissionStreamParams{ID: s.ID, Sequence: s.Sequence, ProjectionDigest: s.ProjectionDigest, ObservedAt: ts(b.ObservedAt), FreshUntil: ts(permissionStreamUntil(b.ObservedAt))}); err != nil {
 			return err
 		}
 		n, err = q.CurrentTime(ctx)
@@ -547,7 +556,7 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 	if err != nil {
 		return authorization.Projection{}, err
 	}
-	if !s.InitialAuditID.Valid || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, 5*time.Second) || len(s.ProjectionDigest) != 32 {
+	if !s.InitialAuditID.Valid || s.Suspended || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) || len(s.ProjectionDigest) != 32 {
 		return authorization.Projection{}, cfg.ErrUnavailable
 	}
 	reset, err := q.ReadAuthorityAudit(ctx, s.Epoch)

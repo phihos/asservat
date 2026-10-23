@@ -207,7 +207,7 @@ func (s *Downloads) downloadFence(ctx context.Context, q *custodydb.Queries, p c
 	if err != nil {
 		return err
 	}
-	if !a.Valid(n.Time) || a.DeleteBy.IsZero() || id(a.Scope.RootID) != p.ID || id(a.PermissionEpoch) != p.Epoch || a.PermissionSequence != p.Sequence || !bytes.Equal(a.ProjectionDigest[:], p.ProjectionDigest) || p.Suspended || !p.InitialAuditID.Valid || !n.Time.Before(p.LeaseUntil.Time) || !identity.Fresh(p.ObservedAt.Time, p.FreshUntil.Time, n.Time, 5*time.Second) {
+	if !a.Valid(n.Time) || a.DeleteBy.IsZero() || id(a.Scope.RootID) != p.ID || id(a.PermissionEpoch) != p.Epoch || a.PermissionSequence != p.Sequence || !bytes.Equal(a.ProjectionDigest[:], p.ProjectionDigest) || p.Suspended || !p.InitialAuditID.Valid || !n.Time.Before(p.LeaseUntil.Time) || !identity.Fresh(p.ObservedAt.Time, p.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
 		return privacy.ErrFence
 	}
 	for _, v := range []pgtype.UUID{p.Epoch, p.InitialAuditID} {

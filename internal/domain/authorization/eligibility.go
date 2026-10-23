@@ -19,6 +19,13 @@ const (
 )
 
 type Target struct{ ClusterID, NamespaceUID, WorkloadUID, PodUID string }
+
+// PermissionObservationInterval bounds the accepted permission stream
+// observation, including its complete deny snapshot. ADR-200 revision
+// (2026-10-23): the maintainer authorized a relaxed 30-second cadence instead
+// of five seconds; suspension and accepted deny changes still apply at once.
+const PermissionObservationInterval = 30 * time.Second
+
 type CurrentAssignment struct {
 	Audience               artifact.AudienceAssignment
 	ObservedAt, FreshUntil time.Time
@@ -31,8 +38,9 @@ type Projection struct {
 	Revision               identity.Revision
 	ObservedAt, FreshUntil time.Time
 	DeniesComplete         bool
-	// The complete deny snapshot has its own five-second maximum, including an
-	// empty set. Positive configuration freshness cannot renew this deadline.
+	// The complete deny snapshot has its own PermissionObservationInterval
+	// maximum, including an empty set. Positive configuration freshness cannot
+	// renew this deadline.
 	DeniesObservedAt, DeniesFreshUntil time.Time
 	Allows, Denies                     []CurrentAssignment
 }
@@ -153,7 +161,7 @@ func evaluate(i identity.Identity, p Projection, op Operation, t Target, e *Reta
 	if !i.Valid(now) {
 		return deny("IdentityUnavailable")
 	}
-	if !p.Revision.Valid() || p.Target != t || !p.DeniesComplete || !identity.Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) || !identity.Fresh(p.DeniesObservedAt, p.DeniesFreshUntil, now, 5*time.Second) || !rowsValid(p.Allows) || !rowsValid(p.Denies) {
+	if !p.Revision.Valid() || p.Target != t || !p.DeniesComplete || !identity.Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) || !identity.Fresh(p.DeniesObservedAt, p.DeniesFreshUntil, now, PermissionObservationInterval) || !rowsValid(p.Allows) || !rowsValid(p.Denies) {
 		return deny("PermissionUnavailable")
 	}
 	if op == CollectContext && e != nil {
@@ -169,7 +177,7 @@ func evaluate(i identity.Identity, p Projection, op Operation, t Target, e *Reta
 	until = identity.Earlier(until, p.DeniesFreshUntil)
 	// All authoritative denies must remain current, even if an allow is fresh.
 	for _, d := range p.Denies {
-		if !identity.Fresh(d.ObservedAt, d.FreshUntil, now, 5*time.Second) {
+		if !identity.Fresh(d.ObservedAt, d.FreshUntil, now, PermissionObservationInterval) {
 			return deny("PermissionUnavailable")
 		}
 		until = identity.Earlier(until, d.FreshUntil)

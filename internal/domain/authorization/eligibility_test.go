@@ -26,6 +26,34 @@ func TestEmptyDenySnapshotCannotOutliveFiveSeconds(t *testing.T) {
 	}
 }
 
+// ADR-200 revision (2026-10-23): the accepted permission stream observation,
+// including its complete deny snapshot and deny rows, is current for 30
+// seconds after its own observation.
+func TestPermissionObservationThirtySecondLifetime(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		age, lifetime time.Duration
+		want          bool
+	}{
+		{"observed-20s-ago", 20 * time.Second, 30 * time.Second, true},
+		{"observed-31s-ago", 31 * time.Second, 30 * time.Second, false},
+		{"lifetime-over-30s", 20 * time.Second, 31 * time.Second, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			i, p, e, now := fixture()
+			observed := now.Add(-test.age)
+			p.DeniesObservedAt, p.DeniesFreshUntil = observed, observed.Add(test.lifetime)
+			deny := p.Allows[0]
+			deny.Audience.SubjectID, deny.Audience.AssignmentID = "unrelated-team", "44444444-4444-4444-4444-444444444444"
+			deny.ObservedAt, deny.FreshUntil = observed, observed.Add(test.lifetime)
+			p.Denies = []CurrentAssignment{deny}
+			if r := Evaluate(i, p, ReadApproved, p.Target, &e, now); r.Eligible != test.want {
+				t.Fatalf("eligible=%t want=%t reason=%s", r.Eligible, test.want, r.Reason)
+			}
+		})
+	}
+}
+
 func TestDenySnapshotDeadlineIsIndependentAndNotRenewable(t *testing.T) {
 	for _, change := range []string{"missing", "too long", "stale", "future", "old row"} {
 		t.Run(change, func(t *testing.T) {
@@ -34,7 +62,7 @@ func TestDenySnapshotDeadlineIsIndependentAndNotRenewable(t *testing.T) {
 			case "missing":
 				p.DeniesObservedAt = time.Time{}
 			case "too long":
-				p.DeniesFreshUntil = now.Add(6 * time.Second)
+				p.DeniesFreshUntil = now.Add(PermissionObservationInterval + time.Second)
 			case "stale":
 				p.DeniesObservedAt = now.Add(-5 * time.Second)
 				p.DeniesFreshUntil = now
@@ -43,6 +71,7 @@ func TestDenySnapshotDeadlineIsIndependentAndNotRenewable(t *testing.T) {
 			case "old row":
 				row := p.Allows[0]
 				row.Audience.SubjectID = "unrelated-team"
+				row.FreshUntil = row.ObservedAt.Add(PermissionObservationInterval + time.Second)
 				p.Denies = []CurrentAssignment{row}
 			}
 			if r := Evaluate(i, p, ReadApproved, p.Target, &e, now); r.Eligible || r.Reason != "PermissionUnavailable" {

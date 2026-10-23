@@ -169,3 +169,8 @@ Complete the remaining custody and full-Go qualification
 and finish sustained startup availability.
 The SQL split is qualified for its focused boundary, not a complete startup fix
 or permission to enable public/Helm runtime.
+
+Revision (2026-10-23): the positive fleet observation row is now stored for
+30 seconds after its own observation (migration 00074, see the
+[ADR-200 revision](200-on-demand-capacity-refresh.md#revision-2026-10-23));
+suspension, recovery blocking and the failure fence remain immediate.
