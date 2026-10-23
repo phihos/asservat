@@ -16,3 +16,9 @@ Neither a bookmark, retry nor lock wait refreshes an observation's original five
 
 
 Migration 00018 stores observation sequence, finite times and the nondecreasing LIST watermark. There is no writable Ready bit. The read facet derives source readiness from current epoch/guard proof, complete history, every prior catch-up job, all checkpoint audit receipts and all linked lifecycle audit receipts. It checks time after blocking locks and before returning. Restart, suspension, recovery blocking or a new policy checkpoint invalidates availability. Full acquisition/disclosure still requires accepted source topology, selector facts and the corresponding transaction fences; a ready source alone is not an execution or read permit.
+
+Revision (2026-10-23): an accepted observation is now stored for 30 seconds
+after its original LIST/guard observation, not five (migration 00075, see the
+[ADR-200 revision](200-on-demand-capacity-refresh.md#revision-2026-10-23));
+the LIST and guard must still be within five seconds when written, and
+invalidation, suspension and the no-renewal rule are unchanged.

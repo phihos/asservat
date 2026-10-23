@@ -221,3 +221,22 @@ original five-second intervals. Suspension, newly accepted denies or retired
 assignments, recovery blocking, database incarnation checks and the fleet
 failure fence still take effect immediately; only a missing refresh is
 tolerated for up to 30 seconds. Down narrows stored rows back to five seconds.
+
+Migration 00075 (schema 75) applies the 30-second lifetime to the accepted
+`retention_source` observation. Retained-policy resolution
+(`AcceptedRetentionReader`, used by approved-query projection, downloads,
+catalog listing and the retention transaction guard) intersected it with a
+five-second bound, and the hub-worker retention follower runs late under
+load, so installed `get_query_result` was refused at
+`current/authority/retention` (native74) even with every other input
+current. `ObserveRetention` still requires the original LIST and guard proof
+to be inside their five seconds when it writes, then stores
+`fresh_until = observed_at + 30 seconds` and keeps the source lease at least
+that long; the table CHECK, the Go source/snapshot readers
+(`privacy.RetentionSourceInterval`) and the derived `RetentionProof`
+(`artifact.RetentionProofInterval`) accept 30 seconds. Raw Kubernetes LIST
+snapshots, guard proofs and protected selector facts keep five seconds. A data
+event, a LIST with changed policy state, suspension, takeover and recovery
+blocking still clear the observation at once, bookmarks still never renew it,
+and an unchanged LIST awaiting watch progress keeps only the original
+deadline. Down narrows stored rows back to five seconds.

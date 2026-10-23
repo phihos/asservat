@@ -15,6 +15,13 @@ func TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions(t *testing.T)
 	if !p.Valid(now) || !p.Matches(root, cluster, "namespace", "workload", "pod") {
 		t.Fatal("valid proof")
 	}
+	// ADR-200 revision (2026-10-23): a proof derived from accepted sources is
+	// valid for up to 30 seconds after its original observation, no longer.
+	long := p
+	long.ValidUntil = now.Add(30 * time.Second)
+	if !long.Valid(now.Add(29*time.Second)) || long.Valid(now.Add(30*time.Second)) {
+		t.Fatal("thirty-second proof interval")
+	}
 	for _, test := range []struct {
 		name string
 		edit func(*RetentionProof)
@@ -32,7 +39,7 @@ func TestRetentionProofBindsCompleteBoundedTargetAndSourceVersions(t *testing.T)
 		{"missing-acceptance", func(x *RetentionProof) { x.Sources[0].Acceptance = identity.Revision{} }},
 		{"missing-snapshot", func(x *RetentionProof) { x.Sources[0].SnapshotDigest = Digest{} }},
 		{"missing-guard", func(x *RetentionProof) { x.Sources[0].ProtectionDigest = Digest{} }},
-		{"overlong-observation", func(x *RetentionProof) { x.ValidUntil = x.ValidUntil.Add(time.Nanosecond) }},
+		{"overlong-observation", func(x *RetentionProof) { x.ValidUntil = x.ObservedAt.Add(RetentionProofInterval + time.Nanosecond) }},
 		{"future-observation", func(x *RetentionProof) { x.ObservedAt = x.ObservedAt.Add(time.Second) }},
 		{"excess-sources", func(x *RetentionProof) { x.SourceCount = 3 }},
 	} {

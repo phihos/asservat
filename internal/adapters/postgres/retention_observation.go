@@ -92,11 +92,14 @@ func (s *RetentionSources) ObserveRetention(ctx context.Context, o app.Retention
 			return nil
 		}
 		observed := identity.Earlier(o.List.Snapshot.ObservedAt, p.ObservedAt).UTC().Truncate(time.Microsecond)
-		until := identity.Earlier(o.List.Snapshot.FreshUntil, p.FreshUntil)
-		until = identity.Earlier(until, f.LeaseUntil).UTC().Truncate(time.Microsecond)
-		if !identity.Fresh(observed, until, now, 5*time.Second) {
+		input := identity.Earlier(o.List.Snapshot.FreshUntil, p.FreshUntil)
+		input = identity.Earlier(input, f.LeaseUntil)
+		// The LIST and guard proof must still be inside their original five
+		// seconds now; only the stored observation lives longer.
+		if !identity.Fresh(observed, input, now, 5*time.Second) {
 			return value.ErrUnavailable
 		}
+		until := retentionSourceUntil(observed)
 		// Out-of-order observation replies cannot extend an older observation.
 		if row.ObservedAt.Valid && (observed.Before(row.ObservedAt.Time) || (observed.Equal(row.ObservedAt.Time) && until.After(row.FreshUntil.Time))) {
 			return value.ErrRetentionObservationObsolete
@@ -111,7 +114,7 @@ func (s *RetentionSources) ObserveRetention(ctx context.Context, o app.Retention
 		if err != nil {
 			return err
 		}
-		if !identity.Fresh(observed, until, after, 5*time.Second) {
+		if !identity.Fresh(observed, until, after, privacy.RetentionSourceInterval) {
 			return value.ErrUnavailable
 		}
 		return nil
@@ -123,6 +126,15 @@ func (s *RetentionSources) ObserveRetention(ctx context.Context, o app.Retention
 		return value.ErrRetentionHistoryBehind
 	}
 	return nil
+}
+
+// retentionSourceUntil is the stored lifetime of an accepted retention source
+// observation (ADR-200 revision, 2026-10-23): 30 seconds after its original
+// LIST/guard observation, so a late hub-worker refresh does not refuse
+// retained-policy resolution. ObserveRetentionSource keeps the lease at least
+// that long. Invalidation, suspension and takeover still clear it at once.
+func retentionSourceUntil(observed time.Time) time.Time {
+	return observed.Add(privacy.RetentionSourceInterval).UTC().Truncate(time.Microsecond)
 }
 
 func (s *RetentionSources) AcceptedRetentionSource(ctx context.Context, root string, ref privacy.PolicySourceRef) (privacy.AcceptedSource, error) {
@@ -157,7 +169,7 @@ func acceptedRetentionSource(ctx context.Context, q *custodydb.Queries, root str
 		return out, err
 	}
 	f := retentionFence(row)
-	if f.Source != ref || row.RecoveryBlocked || row.Suspended || row.Sequence < 1 || !row.ObservedSequence.Valid || row.ObservedSequence.Int64 != row.Sequence || !now.Time.Before(row.LeaseUntil.Time) || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now.Time, 5*time.Second) {
+	if f.Source != ref || row.RecoveryBlocked || row.Suspended || row.Sequence < 1 || !row.ObservedSequence.Valid || row.ObservedSequence.Int64 != row.Sequence || !now.Time.Before(row.LeaseUntil.Time) || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now.Time, privacy.RetentionSourceInterval) {
 		return out, value.ErrUnavailable
 	}
 	complete, err := q.RetentionSourceCaughtUp(ctx, custodydb.RetentionSourceCaughtUpParams{RootID: row.RootID, ClusterID: row.ClusterID, NamespaceUid: row.NamespaceUid})

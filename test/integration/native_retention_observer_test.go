@@ -113,7 +113,8 @@ func qualifyNativeRetentionObservation(t *testing.T, admin *pgxpool.Pool, s capt
 		t.Fatal("native retention owner missing")
 	}
 	s.nativeSources.Close()
-	ctx, stop := context.WithTimeout(context.Background(), 10*time.Second)
+	// The accepted observation lives up to 30 seconds (migration 00075).
+	ctx, stop := context.WithTimeout(context.Background(), 40*time.Second)
 	defer stop()
 	type stamp struct {
 		observed, fresh, lease time.Time

@@ -76,6 +76,11 @@ func qualifyRetentionObservation(t *testing.T, ctx context.Context, admin *pgxpo
 			t.Fatal("empty scan", page, err)
 		}
 		before := ready()
+		// ADR-200 revision (2026-10-23, migration 00075): the accepted
+		// observation lives 30 seconds after its original LIST/guard start.
+		if before.FreshUntil.Sub(before.ObservedAt) != privacy.RetentionSourceInterval {
+			t.Fatal("accepted retention observation lifetime", before.FreshUntil.Sub(before.ObservedAt))
+		}
 		if err = s.AdvanceRetentionCursor(ctx, f, "101"); err != nil {
 			t.Fatal(err)
 		}
@@ -204,7 +209,11 @@ func qualifyRetentionObservation(t *testing.T, ctx context.Context, admin *pgxpo
 			t.Fatal(err)
 		}
 		time.Sleep(150 * time.Millisecond)
-		unavailable()
+		// Migration 00075: the stored observation outlives its short input LIST
+		// and guard proof by the relaxed 30-second rule.
+		if late := ready(); late.FreshUntil.Sub(late.ObservedAt) != privacy.RetentionSourceInterval {
+			t.Fatal("accepted retention observation lifetime", late.FreshUntil.Sub(late.ObservedAt))
+		}
 		if err = s.ObserveRetention(ctx, observe(large, 5*time.Second)); err != nil {
 			t.Fatal(err)
 		}

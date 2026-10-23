@@ -163,7 +163,7 @@ func (r AcceptedRetentionReader) read(ctx context.Context, t authorization.Targe
 		}
 		until = identity.Earlier(until, identity.Earlier(s.FreshUntil, s.Snapshot.FreshUntil))
 	}
-	if ctx.Err() != nil || !identity.Fresh(observed, until, r.Now(), 5*time.Second) {
+	if ctx.Err() != nil || !identity.Fresh(observed, until, r.Now(), value.RetentionSourceInterval) {
 		return out, readStep("fresh")
 	}
 	slices.SortFunc(origins, func(a, b artifact.RetentionRule) int {

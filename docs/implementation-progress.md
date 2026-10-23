@@ -1,5 +1,33 @@
 # Sustained implementation progress
 
+## Thirty-second retention source observation (2026-10-23)
+
+Installed native74 refused `get_query_result` at `current/authority/retention`:
+retained-policy resolution (`AcceptedRetentionReader`, shared by query
+projection, downloads, catalog listing and the retention transaction guard)
+required the accepted `retention_source` observation within five seconds, and
+the hub-worker retention follower writes it late under load. Migration 00075
+(schema 75) widens the table CHECK to 30 seconds; `ObserveRetention` still
+requires the LIST and guard proof inside their original five seconds at write
+time, then stores `observed_at + 30 s` and keeps the source lease at least that
+long. The Go accepted-source/snapshot bound (`privacy.RetentionSourceInterval`),
+accepted-source matching, the reader's final bound and `RetentionProof`
+(`artifact.RetentionProofInterval`) accept 30 seconds; raw LIST snapshots, guard
+proofs and protected selector facts keep five. Data events, a changed LIST,
+suspension, takeover and recovery blocking still clear the observation at
+once; bookmarks never renew it (ADR-200 revision; notes in ADR-056 and the
+retention checkpoint/effects/observation architecture). The reader already
+reuses the pinned topology for 30 s (8f10b477) and performs no other
+per-request Kubernetes read. Unit tests cover the 30 s rule, the overlong and
+expired refusals, raw-LIST five seconds and the immediate-clear queries; two
+real-SQL tests now assert the 30 s stored lifetime instead of a 100 ms/10 s
+expiry. Real PostgreSQL (owned fixtures, sequential):
+`TestContextAdmissionWithRealServices/retention` (25 subtests) and
+`TestRetentionReceiptPredicatesWithRealPostgres` passed with empty cleanup
+failures and unchanged sources; a disposable goose up/down/up confirmed the
+30 s and restored 5 s CHECK. Installed native qualification of this change has
+not run.
+
 ## Thirty-second permission stream and fleet trust (2026-10-23)
 
 With binding and root source at 30 s, `capacity_managed_root_until` still

@@ -27,7 +27,9 @@ UPDATE retention_source SET sequence=$4,watch_cursor=$5,observed_sequence=NULL,o
 UPDATE retention_source SET watch_cursor=$4 WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3;
 
 -- name: ObserveRetentionSource :exec
-UPDATE retention_source SET observed_sequence=sequence,observed_at=$4,fresh_until=$5 WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3;
+-- ADR-200 revision (2026-10-23): the live lease holder's accepted observation
+-- also keeps the lease at least until that observation's 30-second lifetime.
+UPDATE retention_source SET observed_sequence=sequence,observed_at=$4,fresh_until=$5,lease_until=GREATEST(lease_until,$5) WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3;
 
 -- name: InvalidateRetentionObservation :exec
 UPDATE retention_source SET observed_sequence=NULL,observed_at=NULL,fresh_until=NULL WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3;
