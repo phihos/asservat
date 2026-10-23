@@ -6,10 +6,14 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -248,8 +252,29 @@ func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.Worke
 			return s, nil
 		},
 		run: func(ctx context.Context, s contracts.NativeStream, h contracts.NativeHello) (contracts.NativeConversationResult, error) {
-			return native.RunWorkerConversation(ctx, s, h, input.Target, key, result)
+			ctx, steps := auditapp.WithStepTimes(ctx)
+			out, err := native.RunWorkerConversation(ctx, s, h, input.Target, key, result)
+			reportNativeRead(os.Stderr, steps.String(), err)
+			return out, err
 		},
 	}
 	return loop.Run(ctx)
+}
+
+// reportNativeRead writes one approved read's worker-side step timing (key
+// unwraps, object read and decryption, parsing, result frames) with its outcome.
+// Only fixed step names, buckets and the closed stop stage are written.
+func reportNativeRead(out io.Writer, steps string, err error) {
+	if steps == "" {
+		return
+	}
+	outcome := "joined"
+	if err != nil {
+		outcome = "stopped"
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			outcome += " at " + fixed.FixedStep()
+		}
+	}
+	fmt.Fprintf(out, "native read: %s, %s\n", steps, outcome)
 }

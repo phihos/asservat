@@ -31,6 +31,17 @@ func OperationLane(name string) string {
 	}
 }
 
+// OperationRequestWindow is the maximum request interval of an operation:
+// identity.EvidenceReadRequestWindow for evidence reads, five seconds otherwise.
+func OperationRequestWindow(name string) time.Duration {
+	switch name {
+	case "get_file_excerpt", "get_query_result", "prepare_artifact_download", "get_artifact_download":
+		return identity.EvidenceReadRequestWindow
+	default:
+		return 5 * time.Second
+	}
+}
+
 // OperationIntent contains only bounded audit facts. It is not a permit, and
 // persisted identity/deadline fields never become current caller authority.
 type OperationIntent struct {
@@ -55,7 +66,7 @@ func (r OperationIntent) Valid() bool {
 	return (r.Lifecycle == nil || r.Lifecycle.Valid(r)) && authorization.UUID(r.ID) && authorization.UUID(r.RootID) && authorization.UUID(r.TraceID) && OperationLane(r.Name) != "" &&
 		r.actorValid() && r.connectorReservationsValid() && r.capturePayloadValid() && identity.Text(r.MACVersion, 64) && identity.Text(r.AccountVersion, 64) &&
 		r.PrincipalDigest != (artifact.Digest{}) && r.InputDigest != (artifact.Digest{}) &&
-		identity.Fresh(r.CreatedAt, r.RequestUntil, r.CreatedAt, 5*time.Second) && r.WriteUntil.After(r.CreatedAt) && !r.WriteUntil.After(r.CreatedAt.Add(30*time.Second)) &&
+		identity.Fresh(r.CreatedAt, r.RequestUntil, r.CreatedAt, OperationRequestWindow(r.Name)) && r.WriteUntil.After(r.CreatedAt) && !r.WriteUntil.After(r.CreatedAt.Add(30*time.Second)) &&
 		!r.RequestUntil.After(r.WriteUntil) && r.RetainUntil.After(r.WriteUntil) && !r.RetainUntil.After(r.CreatedAt.Add(3660*24*time.Hour))
 }
 

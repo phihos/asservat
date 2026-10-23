@@ -639,8 +639,8 @@ func TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun(t *testing.T) {
 		current := projectionIdentityFunc(func(ctx context.Context) (identity.Identity, error) {
 			called = true
 			until, ok := ctx.Deadline()
-			if !ok || !until.Equal(f.now.Add(5*time.Second)) {
-				t.Fatal("first identity read lacked original5s deadline", until)
+			if !ok || !until.Equal(f.now.Add(identity.EvidenceReadRequestWindow)) {
+				t.Fatal("first identity read lacked the original evidence-read request deadline", until)
 			}
 			return identity.Identity{}, value.ErrUnavailable
 		})

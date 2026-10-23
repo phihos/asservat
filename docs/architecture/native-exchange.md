@@ -49,6 +49,13 @@ Content uses an exact SQL42 response/window and a separate SQL45 key binding wit
 
 The worker retains its pending buffer until delivery acknowledgement or joined cancellation, then clears it. The connector and hub each hold at most one bounded pending chunk. A lost acknowledgement after a successful sink write stays conservatively charged. Source and sink close join blocking I/O before local capacity is released.
 
+An approved projection operation may span the evidence-read request window
+(twenty seconds, 2026-10-23, after installed native78-80 expired the read at
+the worker); its command lease, the batch and the projection authority still
+bound the worker's read. The worker reports per-read step buckets (`native
+read: unwrap-1 unwrap-2 unwrap-3 object-decrypt parse frames`, outcome) for
+installed timing.
+
 ## Conversation outcomes and recovery
 
 The actual h2 client uses a non-rewindable live POST body, no retry-enabling headers and no redirects. One original setup bound covers handshake, headers and Hello. It never retries an uncertain POST automatically.

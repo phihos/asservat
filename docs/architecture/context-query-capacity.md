@@ -164,3 +164,26 @@ for evidence of a deleted or unobserved workload uses the workload's original
 immutable allocation, the accepted anchor's `HardUntil`, incarnation and
 recovery epoch, and all current authorization checks. No allowance is
 refunded or replenished.
+
+## Evidence-read request window (2026-10-23)
+
+Installed native78-80 spent each approved `get_query_result` within one
+five-second request: audit Begin, the complete projection authority, the SQL
+poll/permit/batch/claim fences, operation publication, waking the parked
+worker and the worker's three key unwraps and object read. In native80 the
+command reached the worker, which consumed one key role before the request
+expired at its read step; every attempt spent a paid poll. Under the
+maintainer-authorized relaxed intervals, `get_file_excerpt`,
+`get_query_result`, `prepare_artifact_download` and `get_artifact_download`
+now have a twenty-second request window (`identity.EvidenceReadRequestWindow`;
+audit `RequestUntil`, migration 00077's audit guard, `ContextQueryCall`, the
+native projection operation, the MCP request context and response write
+deadline). Other tools keep five seconds; `WriteUntil` stays thirty seconds.
+The window only bounds the request: the projection authority, worker
+observation, batch, native lease and identity keep their own shorter
+`ValidUntil`, so the request still ends when the earliest of them expires
+(the cached projection authority is valid for five seconds from its check).
+Hub `mcp timing` (keyed by tool for evidence reads) and `query refused`
+reports now carry `q-*` step buckets, and the worker prints
+`native read: unwrap-N, object-decrypt, parse, frames` with its outcome, so the
+next installed run shows which step consumes the time.

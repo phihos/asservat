@@ -3,8 +3,11 @@ package objectstore
 import (
 	"context"
 	"slices"
+	"strconv"
+	"sync"
 	"time"
 
+	app "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -37,18 +40,25 @@ func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, sour
 	// Retain the exact expected audience/retention values across provider waits.
 	source.Expectation.Audience = slices.Clone(source.Expectation.Audience)
 	source.Expectation.RetentionRules = slices.Clone(source.Expectation.RetentionRules)
-	verifier, err := NewContextVerifier(r.store, keys)
+	// Worker read timing: each key unwrap, then the remaining object reads and
+	// decryption, then parsing. Fixed step names and buckets only.
+	timed := &timedKeyOpener{inner: keys}
+	verifier, err := NewContextVerifier(r.store, timed)
 	if err != nil {
 		return value.PodStatusProjection{}, value.ErrUnavailable
 	}
 	// Same authenticated pinned commit/manifest/envelope/index/native machinery;
 	// no download session, authority, key grant or metadata builder is invoked.
+	started := time.Now()
 	native, err := verifier.readContext(ctx, source.Expectation, source.Copies, minDeadline(deadline, source.Expectation.Registration.ExpiresAt))
+	app.MarkDuration(ctx, "object-decrypt", time.Since(started)-timed.total())
 	defer clear(native)
 	if err != nil || ctx.Err() != nil {
 		return value.PodStatusProjection{}, value.ErrUnavailable
 	}
+	started = time.Now()
 	p, err := ParseContextProjection(native, scope)
+	app.MarkStep(ctx, "parse", started)
 	if err != nil || ctx.Err() != nil || !time.Now().Before(deadline) {
 		return value.PodStatusProjection{}, value.ErrUnavailable
 	}
@@ -56,3 +66,33 @@ func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, sour
 }
 
 var _ evidence.ContextProjectionNativeRead = (*ContextProjectionReader)(nil)
+
+// timedKeyOpener marks each unwrap as unwrap-1, unwrap-2, ... in the call's
+// step recorder and keeps their sum. It changes no key result.
+type timedKeyOpener struct {
+	inner evidence.KeyOpener
+	mu    sync.Mutex
+	n     int
+	sum   time.Duration
+}
+
+func (t *timedKeyOpener) Open(ctx context.Context, key artifact.SealedKey, aad []byte) ([]byte, error) {
+	started := time.Now()
+	out, err := t.inner.Open(ctx, key, aad)
+	d := time.Since(started)
+	t.mu.Lock()
+	t.n++
+	t.sum += d
+	n := t.n
+	t.mu.Unlock()
+	if n <= 8 {
+		app.MarkDuration(ctx, "unwrap-"+strconv.Itoa(n), d)
+	}
+	return out, err
+}
+
+func (t *timedKeyOpener) total() time.Duration {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.sum
+}

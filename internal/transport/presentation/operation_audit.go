@@ -249,9 +249,10 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	if s.Timing != nil {
 		ctx, steps = auditapp.WithStepTimes(ctx)
 	}
+	event := ""
 	defer func() {
 		if lane != "" {
-			timing.report(lane, steps, s.Timing)
+			timing.report(event, steps, s.Timing)
 		}
 	}()
 	initial, err := current.ResolveIdentity(ctx)
@@ -331,7 +332,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	if err != nil {
 		return OperationReply{}, auditapp.ErrUnavailable
 	}
-	until := identity.Earlier(initial.ValidUntil, now.Add(5*time.Second))
+	until := identity.Earlier(initial.ValidUntil, now.Add(audit.OperationRequestWindow(op)))
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -348,6 +349,12 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		}
 	}()
 	lane, timing.admitted = audit.OperationLane(op), time.Now()
+	// Evidence reads get their own timing sequence, so a few reads among many
+	// other normal-lane calls still reach the doubling report.
+	event = lane
+	if audit.OperationRequestWindow(op) > 5*time.Second {
+		event = op
+	}
 	e := s.audit[lane].Begin(ctx, intent)
 	timing.begin = time.Now()
 	if e != nil {

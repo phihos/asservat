@@ -55,7 +55,7 @@ func (o NativeOperation) Valid() bool {
 	case NativeResponse:
 		return o.Reference.Parent().Purpose == AcquisitionDownload && !o.Until.After(o.StartedAt.Add(8*time.Hour))
 	case NativeProjection:
-		return o.Reference.Parent().Purpose == AcquisitionProjection && !o.Until.After(o.StartedAt.Add(5*time.Second))
+		return o.Reference.Parent().Purpose == AcquisitionProjection && !o.Until.After(o.StartedAt.Add(identity.EvidenceReadRequestWindow))
 	default:
 		return false
 	}

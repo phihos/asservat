@@ -1,5 +1,34 @@
 # Sustained implementation progress
 
+## Twenty-second evidence-read request window (2026-10-23)
+
+Installed native78-80 refused approved pod-status reads: one five-second
+request had to cover audit Begin, the projection authority, the SQL
+poll/permit/batch/claim fences, publication, waking the parked worker and the
+worker's three key unwraps and object read; in native80 the worker consumed
+one key role before the window expired at its read step, and each attempt
+spent a paid poll. Using the maintainer-authorized relaxed intervals,
+`identity.EvidenceReadRequestWindow` (20 s) now bounds `get_file_excerpt`,
+`get_query_result`, `prepare_artifact_download` and `get_artifact_download`:
+audit `RequestUntil` (domain and migration 00077's `guard_operation_audit`,
+schema 77), `ContextQueryCall`, the projection request, the native projection
+operation, the MCP request context/identity binding and the response write
+deadline. Other tools keep five seconds (the MCP handler shortens them once
+the route is known); `WriteUntil` stays 30 s. No authority, identity,
+observation, batch or lease `ValidUntil` is extended, so the request still
+ends at the earliest of them; in particular the cached projection authority
+(five seconds from its check) and the worker's five-second command lease
+still bound the read. Hub `mcp timing` is keyed by tool for evidence reads and
+`query refused` carries `q-*` step buckets; the worker prints
+`native read: unwrap-N object-decrypt parse frames, <outcome>`.
+`TestEvidenceReadRequestWindowOutlastsOrdinaryRequests` runs a 12 s
+get_query_result successfully while get_capture is refused after 5 s.
+Go build/vet, race tests (domain/application/transport/bootstrap/postgres/
+objectstore), architecture/spec checks and the real-SQL
+`TestSharedProjectionLifecycleWithRealServices` and
+`TestEvidenceReadsWithoutWorkloadCapacityWithRealPostgres` pass. Installed
+qualification has not rerun.
+
 ## Shared native operation observation (2026-10-23)
 
 Installed native79 parked the idle worker request as intended (7e72396b); the

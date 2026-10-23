@@ -138,7 +138,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	}
 	stop := evidence.ContextDownloadStopCoordinator{Ledger: publicStopLedger{stops, stopWriter}, Acknowledgements: stopAcks, Objects: stopObjects, Now: time.Now}
 	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: sources, Sources: sources, Authority: gate, Sessions: downloads,
-		Refused: downloadRefusalReport(eventLog(os.Stderr, "download refused"), time.Now)}
+		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "download refused"), time.Now)}
 
 	wa, wp := capacityWorkerGuard(p.WorkerConfiguration.Guard)
 	sourceObserver, sourceProbe, sourceControl, err := d.workerSourceClients(observer, probe, control, closers)

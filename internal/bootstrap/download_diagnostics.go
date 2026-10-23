@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	query "asservat.local/asservat/internal/domain/analysis"
@@ -16,7 +17,7 @@ import (
 // approved query excerpt/result like the context start report (ADR-197): the
 // closed stage path, the error class and the coarse remaining request deadline. It never logs error text, identifiers
 // or user data.
-func downloadRefusalReport(report func(string), now func() time.Time) func(context.Context, string, error) {
+func downloadRefusalReport(report func(string, string), now func() time.Time) func(context.Context, string, error) {
 	return func(ctx context.Context, operation string, err error) {
 		if err == nil || report == nil || now == nil {
 			return
@@ -26,7 +27,8 @@ func downloadRefusalReport(report func(string), now func() time.Time) func(conte
 		if errors.As(err, &fixed) {
 			step += "/" + fixed.FixedStep()
 		}
-		report(step + " (" + downloadRefusalClass(err) + ") left" + fleetapp.RemainingBucket(ctx, now()))
+		// The payload carries only the call's fixed step names and buckets.
+		report(step+" ("+downloadRefusalClass(err)+") left"+fleetapp.RemainingBucket(ctx, now()), auditapp.StepTimesFrom(ctx).String())
 	}
 }
 

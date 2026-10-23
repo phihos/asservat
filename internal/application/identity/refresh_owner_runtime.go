@@ -337,7 +337,7 @@ func (s *ownedRefreshStore) ClaimCurrentRefresh(ctx context.Context, key [32]byt
 		view, err := s.sessions.resolveKey(c, key, false, nil)
 		return view.Identity, err
 	}
-	current, _, err := bindCurrentRequest(ctx, s.now(), initial, resolve, s.now)
+	current, _, err := bindCurrentRequest(ctx, s.now(), 5*time.Second, initial, resolve, s.now)
 	if err != nil {
 		return err
 	}

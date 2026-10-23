@@ -1,6 +1,7 @@
 package native
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
@@ -196,6 +197,9 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		if e != nil {
 			return e
 		}
+		// Result write, acknowledgement and close, for the worker's read report.
+		framesStarted := time.Now()
+		defer func() { auditapp.MarkStep(ctx, "frames", framesStarted) }()
 		b, e := json.Marshal(projection)
 		projection = query.PodStatusProjection{}
 		if e != nil || len(b) > query.ContextResultBytes {

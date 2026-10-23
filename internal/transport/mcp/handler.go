@@ -19,6 +19,7 @@ import (
 
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/audit"
 	identity "asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/presentation"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -438,9 +439,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		problem(w, 429)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), requestLifetime)
+	// Evidence reads may use the longer evidence-read window; every other
+	// request is shortened to requestLifetime once its route is known below.
+	started, identityStarted := time.Now(), h.now()
+	ctx, cancel := context.WithTimeout(r.Context(), identity.EvidenceReadRequestWindow)
 	defer cancel()
-	current, i, err := identities.NewBearerRequest(ctx, pinnedResolver{h}, fields[1], h.now)
+	current, i, err := identities.NewBearerRequestWithin(ctx, pinnedResolver{h}, fields[1], h.now, identity.EvidenceReadRequestWindow)
 	if err != nil {
 		h.security.Add(presentation.IngressPreAdmission)
 		h.authFailure(w, err, "identity")
@@ -458,7 +462,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx = context.WithValue(ctx, operationDeadlineKey{}, delivery)
 	r = r.WithContext(ctx)
 	control := http.NewResponseController(w)
-	if control.SetReadDeadline(deadline) != nil || control.SetWriteDeadline(deadline) != nil {
+	// The bounded request body is always read within the ordinary lifetime;
+	// only an evidence read's socket write deadline is lengthened below.
+	ordinary := identity.Earlier(deadline, started.Add(requestLifetime))
+	if control.SetReadDeadline(ordinary) != nil || control.SetWriteDeadline(ordinary) != nil {
 		h.unavailable(w, "deadline-setup")
 		return
 	}
@@ -482,6 +489,25 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.security.Add(presentation.IngressPreAdmission)
 		problem(w, 400)
 		return
+	}
+	if early, _ := decodeRouting(body); early.Method == "tools/call" && audit.OperationRequestWindow(early.Name) > requestLifetime {
+		if control.SetWriteDeadline(deadline) != nil {
+			h.unavailable(w, "deadline-setup")
+			return
+		}
+	} else {
+		var shorten context.CancelFunc
+		ctx, shorten = context.WithDeadline(ctx, ordinary)
+		defer shorten()
+		identityUntil := identityStarted.Add(requestLifetime)
+		current = identities.ShortenRequest(current, identityUntil, h.now)
+		i.ValidUntil = identity.Earlier(i.ValidUntil, identityUntil)
+		ctx = context.WithValue(ctx, operationIdentityKey{}, current)
+		r = r.WithContext(ctx)
+		if !delivery.restrict(ordinary) {
+			h.unavailable(w, "deadline-setup")
+			return
+		}
 	}
 	if invalidHeaders {
 		if h.rejectIngress(w, r, current, delivery, "", body, presentation.IngressInvalid) {

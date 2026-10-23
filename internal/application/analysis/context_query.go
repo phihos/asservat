@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	auditapp "asservat.local/asservat/internal/application/audit"
 	identities "asservat.local/asservat/internal/application/identity"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -253,7 +254,7 @@ func (s ContextProjectionResults) request(ctx context.Context, current identitie
 		return nil, queryStepped("configuration", value.ErrUnavailable)
 	}
 	started := s.Now()
-	until := started.Add(5 * time.Second)
+	until := started.Add(identity.EvidenceReadRequestWindow)
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -490,10 +491,12 @@ func (s ContextProjectionResults) getQueryResult(ctx context.Context, current id
 	if !authorization.UUID(queryID) {
 		return nil, queryStepped("handle", value.ErrInvalid)
 	}
+	mark := time.Now()
 	o, err := s.request(ctx, current, invocation, "get_query_result")
 	if err != nil {
 		return nil, err
 	}
+	auditapp.MarkStep(o.ctx, "q-request", mark)
 	owned := false
 	defer func() {
 		if !owned {
@@ -503,18 +506,24 @@ func (s ContextProjectionResults) getQueryResult(ctx context.Context, current id
 	if err = invocation.CheckInput(o.ctx, ContextQueryInput{QueryID: queryID}); err != nil {
 		return nil, queryStepped("input", value.ErrUnavailable)
 	}
+	mark = time.Now()
 	q, err := s.Ledger.LookupQuery(o.ctx, o.initial.Principal, queryID)
 	if err != nil || !q.Valid() || q.ID != queryID || q.Scope.RootID != s.RootID || q.Scope.Principal != o.initial.Principal {
 		return nil, queryCollapsed("lookup", value.ErrUnavailable, err)
 	}
+	auditapp.MarkStep(o.ctx, "q-lookup", mark)
 	o.query = q
+	mark = time.Now()
 	a, err := o.CheckCurrent(o.ctx)
 	if err != nil {
 		return nil, queryStepped("current", err)
 	}
+	auditapp.MarkStep(o.ctx, "q-authority", mark)
+	mark = time.Now()
 	if err = s.Ledger.AdmitQueryPoll(o.ctx, q, o.request, a); err != nil {
 		return nil, queryCollapsed("poll", value.ErrUnavailable, err)
 	}
+	auditapp.MarkStep(o.ctx, "q-poll", mark)
 	d, err := s.prepare(o, ContextQueryPollCharged)
 	if err != nil {
 		return nil, queryStepped("prepare", err)
@@ -527,10 +536,12 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	if _, err := o.CheckCurrent(o.ctx); err != nil {
 		return nil, queryStepped("current-start", err)
 	}
+	mark := time.Now()
 	worker, err := s.Reader.ObserveProjectionWorker(o.ctx, o.query, o)
 	if err != nil || !identity.Fresh(worker.ObservedAt, worker.ValidUntil, s.Now(), 5*time.Second) || !o.shorten(worker.ValidUntil) {
 		return nil, queryCollapsed("worker-observe", value.ErrUnavailable, err)
 	}
+	auditapp.MarkStep(o.ctx, "q-worker", mark)
 	a, err := o.CheckCurrent(o.ctx)
 	if err != nil {
 		return nil, queryStepped("current-observed", err)
@@ -557,9 +568,11 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	// The full SQL fence runs once before a read. A pending reply discloses only
 	// the handle, and admission just ran the same fence (native69: repeating it
 	// on the first call exhausted the request before the worker could start).
+	mark = time.Now()
 	if err = s.Ledger.PermitQuery(o.ctx, o.query, o.request, a); err != nil {
 		return nil, queryCollapsed("permit", value.ErrUnavailable, err)
 	}
+	auditapp.MarkStep(o.ctx, "q-permit", mark)
 	a, err = o.CheckCurrent(o.ctx)
 	if err != nil {
 		return nil, queryStepped("current-permitted", err)
@@ -568,6 +581,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	if !authorization.UUID(batchID) {
 		return nil, queryStepped("association", value.ErrUnavailable)
 	}
+	mark = time.Now()
 	admitted, err := s.Ledger.BeginReadBatch(o.ctx, o.query, o.request, worker.Worker, batchID, a)
 	b := admitted.Batch
 	if err != nil || !admitted.Fresh || !b.Current(o.query, a, s.Now()) || b.Until.After(a.ValidUntil) || b.ID != batchID || b.Worker != worker.Worker || b.Request != o.request {
@@ -580,10 +594,13 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	if !o.shorten(b.Until) {
 		return nil, queryStepped("batch-expired", value.ErrExpired)
 	}
+	auditapp.MarkStep(o.ctx, "q-batch", mark)
+	mark = time.Now()
 	start, err := s.Ledger.ClaimReadBatch(o.ctx, b, a)
 	if err != nil || !start.Fresh || !start.Batch.Equal(b) || !authorization.UUID(start.ClaimID) {
 		return nil, queryCollapsed("batch-claim", value.ErrUnavailable, err)
 	}
+	auditapp.MarkStep(o.ctx, "q-claim", mark)
 	if _, err = o.CheckCurrent(o.ctx); err != nil {
 		return nil, queryStepped("current-claimed", err)
 	}
@@ -592,7 +609,9 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	d.association.BatchID, d.association.Generation = b.ID, b.Generation
 	// No retry is possible after this one-use claim. A missing handle on an
 	// uncertain reply remains charged for independently protected cleanup.
+	mark = time.Now()
 	d.read, err = s.Reader.ReadProjection(o.ctx, start, o)
+	auditapp.MarkStep(o.ctx, "q-read", mark)
 	if err != nil || d.read == nil {
 		if d.read != nil {
 			_ = d.Close(context.WithoutCancel(o.ctx))
@@ -603,7 +622,9 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 		_ = d.Close(context.WithoutCancel(o.ctx))
 		return nil, queryStepped("current-read", err)
 	}
+	mark = time.Now()
 	projection, err := d.read.Projection(o.ctx)
+	auditapp.MarkStep(o.ctx, "q-projection", mark)
 	if err == nil && projection.NamespaceUID == o.query.Scope.NamespaceUID && projection.PodUID == o.query.Scope.PodUID {
 		d.excerpt, err = FormatContextExcerpt(projection, o.query.Scope.Selection)
 	} else {

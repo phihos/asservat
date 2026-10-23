@@ -155,7 +155,7 @@ func (s *ProjectionRuntime) ReadProjection(ctx context.Context, q query.ContextQ
 		return nil, query.ErrUnavailable
 	}
 	now := s.Now().UTC().Truncate(time.Microsecond)
-	until = identity.Earlier(until, identity.Earlier(c.Peer.NotAfter, now.Add(5*time.Second))).UTC().Truncate(time.Microsecond)
+	until = identity.Earlier(until, identity.Earlier(c.Peer.NotAfter, now.Add(identity.EvidenceReadRequestWindow))).UTC().Truncate(time.Microsecond)
 	operation := value.NativeOperation{Kind: value.NativeProjection, Path: a.Environment.Path.AcquisitionPath(), Processing: a.Environment.Processing,
 		Reference: value.NativeReference{InstallationID: q.Plan.InstallationID, QueryID: q.ID, WorkerID: q.WorkerID, OperationID: start.Batch.ID, Fence: start.Batch.Generation},
 		HubPodUID: s.HubPodUID, HubProcessEpoch: s.HubProcessEpoch, WorkerPodUID: c.Enrollment.Worker.Binding.PodUID, WorkerPublicKey: c.Enrollment.PublicKeyDigest,

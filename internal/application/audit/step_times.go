@@ -21,15 +21,26 @@ func WithStepTimes(ctx context.Context) (context.Context, *StepTimes) {
 	return context.WithValue(ctx, stepTimesKey{}, t), t
 }
 
+// StepTimesFrom returns the call's recorder, or nil when none is installed.
+func StepTimesFrom(ctx context.Context) *StepTimes {
+	if ctx == nil {
+		return nil
+	}
+	t, _ := ctx.Value(stepTimesKey{}).(*StepTimes)
+	return t
+}
+
 // MarkStep records step with the bucketed time since start, at most 64 marks.
 func MarkStep(ctx context.Context, step string, start time.Time) {
-	if ctx == nil {
-		return
-	}
-	if t, ok := ctx.Value(stepTimesKey{}).(*StepTimes); ok && t != nil {
+	MarkDuration(ctx, step, time.Since(start))
+}
+
+// MarkDuration records step with the bucketed duration d, at most 64 marks.
+func MarkDuration(ctx context.Context, step string, d time.Duration) {
+	if t := StepTimesFrom(ctx); t != nil {
 		t.mu.Lock()
 		if len(t.marks) < 64 {
-			t.marks = append(t.marks, step+DurationBucket(time.Since(start)))
+			t.marks = append(t.marks, step+DurationBucket(d))
 		}
 		t.mu.Unlock()
 	}

@@ -51,7 +51,7 @@ func TestDownloadRefusalReportNamesTheRefusingStage(t *testing.T) {
 		ports := downloadReportPorts{}
 		s := evidence.ContextDownloadCoordinator{RootID: "00000000-0000-4000-8000-000000000001", InstallationID: "00000000-0000-4000-8000-000000000002",
 			Recovery: downloadReportRecovery{c.cause}, Routes: ports, Sources: ports, Authority: ports, Sessions: ports, Plans: ports,
-			Refused: downloadRefusalReport(func(line string) { lines = append(lines, line) }, time.Now), Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000003" }}
+			Refused: downloadRefusalReport(func(line, _ string) { lines = append(lines, line) }, time.Now), Now: time.Now, NewID: func() string { return "00000000-0000-4000-8000-000000000003" }}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		_, err := s.PrepareContextDownload(ctx, current, "00000000-0000-4000-8000-000000000004", "key")
 		cancel()
