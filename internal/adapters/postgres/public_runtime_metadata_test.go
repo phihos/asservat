@@ -7,7 +7,7 @@ import (
 )
 
 func TestPublicMetadataReadHasExactExistingReadPrivileges(t *testing.T) {
-	got, ok := publicRuntimeRoleGrants("hub-metadata-read")
+	got, ok := publicRuntimeDutyGrants("hub-metadata-read")
 	if !ok {
 		t.Fatal("missing consolidated metadata credential")
 	}

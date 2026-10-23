@@ -1,0 +1,17 @@
+{
+  "results": [
+    {
+      "argv": [
+        "go",
+        "test",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 11.493756294250488
+    }
+  ],
+  "sourceCount": 2610,
+  "changedSources": []
+}

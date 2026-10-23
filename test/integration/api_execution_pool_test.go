@@ -12,12 +12,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// All three typed execution ports use this actual compiled login and one cold
-// pool. Other fixture privileges remain separate; cleanup joins the pool before
+// All three typed execution ports use the compiled ordinary hub login and its
+// shared 18-connection pool. Other fixture processes stay separate; cleanup joins it before
 // the role is removed. The setup-only pool supplies TLS endpoint configuration.
-func compiledAPIExecutionPool(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) (*pgxpool.Pool, string) {
+func compiledOrdinaryHubPools(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool) (ordinaryHubPools, string) {
 	t.Helper()
-	const purpose = "api-execution"
+	const purpose = "hub-runtime"
 	const password = "synthetic-shared-api-execution"
 	role := narrowRole(t, ctx, admin, "api_shared_", password, func(role string) []string {
 		grants, ok := postgres.PublicRuntimeRoleGrantSQL(purpose, role)
@@ -27,30 +27,50 @@ func compiledAPIExecutionPool(t *testing.T, ctx context.Context, admin *pgxpool.
 		return grants
 	})
 	limit, ok := contracts.PublicRuntimeRoleConnectionLimit(purpose)
-	if !ok || limit != 13 {
+	if !ok || limit != 81 {
 		t.Fatal("unexpected execution login envelope")
 	}
-	if _, err := admin.Exec(ctx, "ALTER ROLE "+pgx.Identifier{role}.Sanitize()+" CONNECTION LIMIT 13"); err != nil {
+	if _, err := admin.Exec(ctx, "ALTER ROLE "+pgx.Identifier{role}.Sanitize()+" CONNECTION LIMIT 81"); err != nil {
 		t.Fatal(err)
 	}
 	seed := poolFor(role, password)
 	config := seed.Config()
 	seed.Close()
-	config.MaxConns, config.MinConns = 3, 0
-	governor, err := postgres.NewSQLConnectionGovernor(32, 0)
-	if err != nil || governor.Govern(config, false) != nil {
-		t.Fatal("execution pool governor unavailable", err)
-	}
-	pool, err := pgxpool.NewWithConfig(ctx, config)
+	return governedOrdinaryHubPools(t, ctx, config), role
+}
+
+type ordinaryHubPools struct {
+	ordinary   *pgxpool.Pool
+	resolution []*pgxpool.Pool
+}
+
+// This subset keeps the public group's 20 physical connections. Independent
+// owner/capture/reader pools and their credentials are qualified separately.
+func governedOrdinaryHubPools(t *testing.T, ctx context.Context, config *pgxpool.Config) ordinaryHubPools {
+	t.Helper()
+	governor, err := postgres.NewSQLConnectionGovernor(32, 20)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(pool.Close)
-	return pool, role
+	open := func(limit int32) *pgxpool.Pool {
+		c := config.Copy()
+		c.MaxConns, c.MinConns = limit, 0
+		if err := governor.Govern(c, true); err != nil {
+			t.Fatal("public pool governor unavailable", err)
+		}
+		pool, err := pgxpool.NewWithConfig(ctx, c)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(pool.Close)
+		return pool
+	}
+	return ordinaryHubPools{ordinary: open(contracts.PublicRuntimeHubOrdinaryConnections), resolution: []*pgxpool.Pool{open(1), open(1)}}
 }
 
-func qualifyAPIExecutionPoolBound(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+func qualifyOrdinaryHubPoolBound(t *testing.T, ctx context.Context, pools ordinaryHubPools) {
 	t.Helper()
+	pool := pools.ordinary
 	for round := 0; round < 2; round++ {
 		var held []*pgxpool.Conn
 		release := func() {
@@ -60,15 +80,25 @@ func qualifyAPIExecutionPoolBound(t *testing.T, ctx context.Context, pool *pgxpo
 			held = nil
 		}
 		defer release()
-		for range 3 {
+		for range contracts.PublicRuntimeHubOrdinaryConnections {
 			conn, err := pool.Acquire(ctx)
 			if err != nil {
-				t.Fatal("shared execution pool cannot acquire former three slots", err)
+				t.Fatal("shared execution pool cannot acquire 18 ordinary slots", err)
 			}
 			held = append(held, conn)
 		}
-		if pool.Stat().AcquiredConns() != 3 || pool.Stat().TotalConns() != 3 {
+		if pool.Stat().AcquiredConns() != contracts.PublicRuntimeHubOrdinaryConnections || pool.Stat().TotalConns() != contracts.PublicRuntimeHubOrdinaryConnections {
 			t.Fatal("shared execution concurrency changed")
+		}
+		// Saturating ordinary traffic must leave both resolution lanes usable.
+		for _, reserved := range pools.resolution {
+			call, cancel := context.WithTimeout(ctx, time.Second)
+			var one int
+			err := reserved.QueryRow(call, "SELECT 1").Scan(&one)
+			cancel()
+			if err != nil || one != 1 {
+				t.Fatal("ordinary saturation blocked a reserved resolution lane", err)
+			}
 		}
 		wait, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
 		if round == 1 {
@@ -84,7 +114,7 @@ func qualifyAPIExecutionPoolBound(t *testing.T, ctx context.Context, pool *pgxpo
 			want = context.Canceled
 		}
 		if !errors.Is(err, want) {
-			t.Fatal("fourth execution acquisition escaped original caller bound", err)
+			t.Fatal("nineteenth ordinary acquisition escaped original caller bound", err)
 		}
 		release()
 	}

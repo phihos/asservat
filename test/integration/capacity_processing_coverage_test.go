@@ -21,7 +21,7 @@ func (f *capacitySQLFixture) checkManagedProcessingAdmission(t *testing.T, admis
 	t.Helper()
 	ctx, end := context.WithDeadline(f.ctx, original.Eligibility.VerifiedIdentity.ValidUntil)
 	defer end()
-	reader, err := postgres.NewProcessingReads(ctx, f.roles["hub-metadata-read"], f.input.PermissionRootID, recovery)
+	reader, err := postgres.NewProcessingReads(ctx, f.roles["hub-runtime"], f.input.PermissionRootID, recovery)
 	if err != nil {
 		t.Fatal("fixed processing-read constructor", err)
 	}

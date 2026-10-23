@@ -17,7 +17,7 @@ func TestProviderOwnerInstallationRunsFiniteOriginalSequence(t *testing.T) {
 	}
 	t.Cleanup(driver.Close)
 	out, err := driver.Run(context.Background())
-	if err != nil || !out.Complete || out.Stop != "" || out.Phase != "launch-receipt" || out.Calls != 30 || out.Finalizations != 8 || out.Inspections != 0 || out.RoleRootUID == "" || out.ResourceRootUID == "" || out.OperationID == "" {
+	if err != nil || !out.Complete || out.Stop != "" || out.Phase != "launch-receipt" || out.Calls != 20 || out.Finalizations != 8 || out.Inspections != 0 || out.RoleRootUID == "" || out.ResourceRootUID == "" || out.OperationID == "" {
 		t.Fatal("finite original installation", out, err)
 	}
 	if f.roles.creates != len(contracts.OwnerIdentityRolePurposes()) || f.creates[0].Load() != 1 || f.creates[1].Load() != 1 || f.launches.Load() != 1 {
@@ -58,7 +58,7 @@ func TestProviderOwnerInstallationUsesOnlyOneUnknownResultInspection(t *testing.
 	}
 	t.Cleanup(driver.Close)
 	out, err := driver.Run(context.Background())
-	if err == nil || out.Complete || out.Stop != OwnerInstallationUnverified || out.Inspections != 1 || out.Phase != "projection" || out.Calls != 18 {
+	if err == nil || out.Complete || out.Stop != OwnerInstallationUnverified || out.Inspections != 1 || out.Phase != "projection" || out.Calls != 8 {
 		t.Fatal("global inspection cap", out, err)
 	}
 	if f.roles.creates != len(contracts.OwnerIdentityRolePurposes()) || f.creates[0].Load() != 1 || f.creates[1].Load() != 0 || f.launches.Load() != 0 {
@@ -160,10 +160,10 @@ func TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplet
 				}
 				driver.Close()
 			}()
-			// This watchdog covers all 30 sequential calls, each of which keeps
+			// This watchdog covers all 20 sequential calls, each of which keeps
 			// its original at-most-five-second operation budget. It does not
 			// change any caller, root, claim, effect or authority deadline.
-			sequenceWatchdog := time.NewTimer(30 * 5 * time.Second)
+			sequenceWatchdog := time.NewTimer(20 * 5 * time.Second)
 			defer sequenceWatchdog.Stop()
 			select {
 			case <-blocked.entered:
@@ -202,7 +202,7 @@ func TestProviderOwnerInstallationCancellationDuringOuterJoinCannotReturnComplet
 			unblock()
 			select {
 			case out := <-done:
-				if out.err == nil || out.result.Complete || out.result.Stop != OwnerInstallationCancelled || out.result.Phase != "launch-receipt" || out.result.Calls != 30 || out.result.Finalizations != 8 || out.result.Inspections != 0 || out.result.RoleRootUID == "" || out.result.ResourceRootUID == "" || out.result.OperationID == "" {
+				if out.err == nil || out.result.Complete || out.result.Stop != OwnerInstallationCancelled || out.result.Phase != "launch-receipt" || out.result.Calls != 20 || out.result.Finalizations != 8 || out.result.Inspections != 0 || out.result.RoleRootUID == "" || out.result.ResourceRootUID == "" || out.result.OperationID == "" {
 					t.Fatal("cleanup cancellation changed the completed sequence or returned complete", out.result, out.err)
 				}
 			case <-time.After(5 * time.Second):

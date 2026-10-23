@@ -90,23 +90,25 @@ func TestSQLConnectionBudgetRejectsCompositionDefects(t *testing.T) {
 	over := plan
 	over.Compartments = append([]SQLConnectionCompartment{}, plan.Compartments...)
 	over.Compartments[0].Purposes = append(append([]string{}, plan.Compartments[0].Purposes...), "unplaced-purpose")
-	// ADR-177: more purposes are fine under the governor cap; an ungoverned hub
-	// or a cap above the per-replica allowance is a composition defect.
+	// A shared credential may back several pool slots. A governor can cap a
+	// compiled 33-slot pool plan at 32; removing that cap must fail even though
+	// the credential count is small.
+	over.Compartments[0].PoolCapacity = SQLConnectionsPerHubReplica + 1
 	if _, err := over.Validate(0, SQLServerCapacity{MaxConnections: 1000, SuperuserReserved: 3}); err != nil {
 		t.Fatal("governed hub purpose rejected", err)
 	}
 	over.Compartments[0].MaxOpen = 0
 	var budget *SQLConnectionBudgetError
-	if _, err := over.Validate(0, SQLServerCapacity{MaxConnections: 1000, SuperuserReserved: 3}); !errors.As(err, &budget) || budget.Rule != "per-hub-process" || budget.Required != len(over.Compartments[0].Purposes) {
+	if _, err := over.Validate(0, SQLServerCapacity{MaxConnections: 1000, SuperuserReserved: 3}); !errors.As(err, &budget) || budget.Rule != "per-hub-process" || budget.Required != 33 {
 		t.Fatal("ungoverned hub beyond the per-replica allowance accepted", err)
 	}
 	over.Compartments[0].MaxOpen = SQLConnectionsPerHubReplica + 1
 	if _, err := over.Validate(0, SQLServerCapacity{MaxConnections: 1000, SuperuserReserved: 3}); !errors.As(err, &budget) || budget.Rule != "per-hub-process" || budget.Required != 33 {
 		t.Fatal("governor cap above the per-replica allowance accepted", err)
 	}
-	over.Compartments[0].MaxOpen = len(over.Compartments[0].Purposes) + 1
+	over.Compartments[0].MaxOpen = over.Compartments[0].PoolCapacity + 1
 	if _, err := over.Validate(0, SQLServerCapacity{MaxConnections: 1000, SuperuserReserved: 3}); err == nil || errors.As(err, &budget) {
-		t.Fatal("governor cap above the purpose count accepted", err)
+		t.Fatal("governor cap above the compiled pool capacity accepted", err)
 	}
 	dup := plan
 	dup.Compartments = append([]SQLConnectionCompartment{}, plan.Compartments...)

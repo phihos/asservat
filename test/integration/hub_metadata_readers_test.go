@@ -22,19 +22,13 @@ import (
 func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captureAdmissionScenario, e artifact.ContextExpectation, enrollment app.Enrollment) {
 	t.Helper()
 	if !t.Run("compiled-shared-metadata-readers", func(t *testing.T) {
-		// One new cold pool represents the hub's seven typed readers. The outer
+		// One ordinary hub pool serves the seven typed readers. The outer
 		// fixture's independent setup pools remain unchanged for later scenarios.
-		config := f.roles["hub-metadata-read"].Config()
-		config.MaxConns, config.MinConns = 7, 0
-		governor, err := postgres.NewSQLConnectionGovernor(32, 0)
-		if err != nil || governor.Govern(config, false) != nil {
-			t.Fatal("metadata connection governor unavailable", err)
-		}
-		pool, err := pgxpool.NewWithConfig(f.ctx, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer pool.Close() // joins cold connection disposal before this helper ends
+		config := f.roles["hub-runtime"].Config()
+		pools := governedOrdinaryHubPools(t, f.ctx, config)
+		pool := pools.ordinary
+		var err error
+		defer pool.Close() // joins the ordinary pool before this helper ends
 		snapshot := f.root.value
 		manifest := contracts.PublicRuntimeCredentialManifest{Format: contracts.PublicRuntimeCredentialManifestFormat, Input: snapshot.State.Input, RootUID: snapshot.UID, SetupID: snapshot.State.OperationID}
 		for _, role := range snapshot.State.Roles {
@@ -45,7 +39,7 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 				manifest.Roles = append(manifest.Roles, contracts.PublicRuntimeCredentialProof{Purpose: role.Purpose, Claim: *role.Claim, Receipt: *role.Receipt})
 			}
 		}
-		if err = postgres.VerifyPublicRuntimeCredential(f.ctx, pool, manifest, "hub-metadata-read"); err != nil {
+		if err = postgres.VerifyPublicRuntimeCredential(f.ctx, pool, manifest, "hub-runtime"); err != nil {
 			t.Fatal("actual metadata login/grant verification", err)
 		}
 		permission, err := postgres.NewPermissions(f.ctx, pool, s.a.RootID)
@@ -185,7 +179,6 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 			t.Fatal("published metadata bypassed current identity scope", err)
 		}
 		for _, statement := range []string{
-			`SELECT * FROM custody_copy LIMIT 0`,
 			`UPDATE context_catalog SET published_at=published_at WHERE false`,
 			`INSERT INTO context_capture SELECT * FROM context_capture WHERE false`,
 			`DELETE FROM authority_audit WHERE false`,
@@ -196,47 +189,11 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 				t.Fatalf("excluded metadata privilege: statement=%s sqlstate=%s", statement, capacitySQLState(err))
 			}
 		}
-		qualifyMetadataPoolBound(t, call, pool)
+		qualifyOrdinaryHubPoolBound(t, call, pools)
 		f.qualifyMetadataReadDeadline(t, pool, progress, query)
-		t.Log("compiled_metadata_adapters=7 shared_pool_max=7 governor_limit=32 excluded_privileges_denied=true")
+		t.Log("compiled_metadata_adapters=7 shared_hub_pool_max=18 governor_limit=32 excluded_privileges_denied=true")
 	}) {
 		t.FailNow()
-	}
-}
-
-func qualifyMetadataPoolBound(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
-	t.Helper()
-	for round := 0; round < 2; round++ {
-		var held []*pgxpool.Conn
-		release := func() {
-			for _, conn := range held {
-				conn.Release()
-			}
-			held = nil
-		}
-		defer release()
-		for range 7 {
-			conn, err := pool.Acquire(ctx)
-			if err != nil {
-				t.Fatal("shared metadata pool could not acquire original seven slots", err)
-			}
-			held = append(held, conn)
-		}
-		if pool.Stat().AcquiredConns() != 7 || pool.Stat().TotalConns() != 7 {
-			t.Fatal("shared metadata pool exceeded its original aggregate limit")
-		}
-		if round == 0 {
-			wait, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
-			extra, err := pool.Acquire(wait)
-			cancel()
-			if extra != nil {
-				extra.Release()
-			}
-			if !errors.Is(err, context.DeadlineExceeded) {
-				t.Fatal("eighth metadata acquisition escaped its caller deadline", err)
-			}
-		}
-		release()
 	}
 }
 

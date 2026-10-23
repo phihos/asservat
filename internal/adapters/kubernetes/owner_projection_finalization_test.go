@@ -543,7 +543,7 @@ func TestProviderOwnerInstallationUnknownReceiptConsumesSingleFinalizer(t *testi
 	}
 	defer driver.Close()
 	out, err := driver.Run(context.Background())
-	if err != nil || !out.Complete || out.Calls != 30 || out.Finalizations != 8 || out.Inspections != 1 || f.verification.finalizations != 8 {
+	if err != nil || !out.Complete || out.Calls != 20 || out.Finalizations != 8 || out.Inspections != 1 || f.verification.finalizations != 8 {
 		t.Fatal("unknown receipt scheduled a second finalizer or replay", out, err)
 	}
 	if f.creates[0].Load() != 1 || f.creates[1].Load() != 1 || f.launches.Load() != 1 || f.journalWrites.Load() != 8 {
@@ -559,7 +559,7 @@ func TestProviderOwnerInstallationFailedFinalizerDoesNotInspectAgain(t *testing.
 	}
 	defer driver.Close()
 	out, err := driver.Run(context.Background())
-	if err == nil || out.Complete || out.Calls != 16 || out.Finalizations != 1 || out.Inspections != 0 || f.creates[0].Load() != 0 {
+	if err == nil || out.Complete || out.Calls != 6 || out.Finalizations != 1 || out.Inspections != 0 || f.creates[0].Load() != 0 {
 		t.Fatal("failed finalization was retried", out, err)
 	}
 }

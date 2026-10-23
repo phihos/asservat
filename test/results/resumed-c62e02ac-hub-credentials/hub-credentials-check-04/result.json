@@ -1,0 +1,46 @@
+{
+  "results": [
+    {
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^Test(Public|Hub|OwnerCredential|OwnerIdentity|OwnerPublic|SQLConnection)",
+        "./internal/contracts",
+        "./internal/bootstrap",
+        "./internal/adapters/postgres"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 4.109163761138916
+    },
+    {
+      "argv": [
+        "go",
+        "test",
+        "-run",
+        "^$",
+        "./test/integration"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 13.052455425262451
+    },
+    {
+      "argv": [
+        "go",
+        "test",
+        "-v",
+        "-count=1",
+        "-timeout",
+        "20m",
+        "-run",
+        "^Test(Public|Hub|Owner|ProviderOwner|ProviderInstalledOwner|InstalledOwner|FederationRuntimeProjection|PublisherRuntimeProjection)",
+        "./internal/adapters/kubernetes"
+      ],
+      "exitCode": 1,
+      "elapsedSeconds": 189.50936937332153
+    }
+  ],
+  "sourceCount": 2610,
+  "changedSources": []
+}

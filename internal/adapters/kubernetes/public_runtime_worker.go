@@ -26,7 +26,7 @@ import (
 // ADR-205's context deletion logins likewise stay out of the hub.
 func publicRuntimeWorkerPurpose(purpose string) bool {
 	switch purpose {
-	case "capture-cleanup", "capture-verifier", "capture-finalizer", "capacity", "capacity-capture":
+	case "browser-settings", "capture-cleanup", "capture-verifier", "capture-finalizer", "capacity", "capacity-capture":
 		return true
 	}
 	return slices.Contains(contracts.PublicRuntimePermissionPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeContextDeletionPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeFederationPurposes(), purpose) || slices.Contains(contracts.PublicRuntimePublisherPurposes(), purpose) || slices.Contains(contracts.PublicRuntimeConnectorMaintenancePurposes(), purpose) || slices.Contains(contracts.PublicRuntimeKeyServicePurposes(), purpose)

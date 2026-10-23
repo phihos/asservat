@@ -71,7 +71,7 @@ func VerifyOwnerIdentityCredential(ctx context.Context, pool *pgxpool.Pool, m co
 			selected = r
 		}
 	}
-	if selected == nil || pool.Config().ConnConfig.User != selected.Receipt.RoleName || pool.Config().MaxConns != 1 {
+	if selected == nil || pool.Config().ConnConfig.User != selected.Receipt.RoleName || pool.Config().MaxConns != contracts.OwnerIdentityPoolConnections {
 		return cfg.ErrDenied
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)

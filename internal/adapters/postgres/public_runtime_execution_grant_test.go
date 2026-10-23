@@ -21,7 +21,7 @@ func TestAPIExecutionPrepareInsertsEveryWrittenColumn(t *testing.T) {
 	if m == nil {
 		t.Fatal("InsertAPIExecution statement not found")
 	}
-	grants, _ := publicRuntimeRoleGrants("api-execution")
+	grants, _ := publicRuntimeDutyGrants("api-execution")
 	for _, column := range strings.Split(string(m[1]), ",") {
 		if !slices.Contains(grants, publicRuntimeGrant{"table", "context_execution", strings.TrimSpace(column), "INSERT"}) {
 			t.Errorf("api-execution cannot insert context_execution.%s", column)

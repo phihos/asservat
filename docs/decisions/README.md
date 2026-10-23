@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-222 — Consolidate SQL credentials within the hub process](222-hub-process-sql-credentials.md)
+uses exact grant unions for ordinary public duties and owner identity/routing,
+with separate pinned/nested readers and unchanged process/connection boundaries.
+Implementation is in progress; no qualification has run for this decision.
+
 [ADR-220 — Response-owned ordinary download permissions](220-response-owned-download-permissions.md)
 selects a fixed 30-second reconstruction cadence within one original response and
 removes duplicate native-reader authorization through an exact short handoff.

@@ -89,7 +89,7 @@ func TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe(t *testin
 	if len(data) != 1+len(contracts.OwnerIdentityRolePurposes()) || out.ProviderAuthentication == nil || out.Observation.Activation == nil || digest == "" {
 		t.Fatal("v2 projection incomplete")
 	}
-	for _, key := range []string{contracts.OwnerIdentityRoleManifestFile, "sql-enrollment.json", "sql-audit.json", "sql-activation.json", "sql-registry.json", "sql-routing.json", "sql-native-read.json"} {
+	for _, key := range []string{contracts.OwnerIdentityRoleManifestFile, "sql-owner-runtime.json"} {
 		if len(data[key]) == 0 {
 			t.Fatal("missing original SQL projection", key)
 		}
@@ -111,7 +111,7 @@ func TestProviderOwnerProjectionContainsOnlyOriginalSQLAndPublicRecipe(t *testin
 	raw, _ := json.Marshal(roles.State)
 	_ = json.Unmarshal(raw, &changed.State)
 	clear(raw)
-	changed.State.Roles[0].Password = changed.State.Roles[1].Password // invalid private state still rejects
+	changed.State.Roles[0].Password = "short" // invalid private state still rejects
 	if _, _, bad, _, e := ownerIdentityProjectionMaterial(in, a, changed, OwnerIdentityProviderMaterial{}, time.Now()); e == nil {
 		clearRuntimeProjection(bad)
 		t.Fatal("invalid SQL private state admitted")

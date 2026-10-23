@@ -30,7 +30,7 @@ func installedPermissionObserver(t *testing.T, ctx context.Context, admin *pgxpo
 	if err != nil {
 		t.Fatal("installed permission projection", err)
 	}
-	raw := projection.Data["sql-public-hub-metadata-read.json"]
+	raw := projection.Data["sql-public-hub-runtime.json"]
 	var login contracts.OwnerSQLCredential
 	if json.Unmarshal(raw, &login) != nil || login.Username == "" || login.Password == "" {
 		t.Fatal("installed hub metadata login missing")
@@ -58,7 +58,8 @@ func installedPermissionObserver(t *testing.T, ctx context.Context, admin *pgxpo
 	if err != nil {
 		t.Fatal("installed permission observer", err)
 	}
-	// The observation role cannot turn a fixture check into authority mutation.
+	// The shared hub still cannot accept or suspend permission projections; that
+	// remains a separate worker responsibility.
 	_, err = reader.Exec(ctx, "UPDATE permission_stream SET suspended=suspended WHERE false")
 	var denied *pgconn.PgError
 	if !errors.As(err, &denied) || denied.Code != "42501" {
@@ -118,7 +119,7 @@ func TestInstalledPermissionObserverWithRealServices(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	api := fake.NewSimpleClientset(&core.Secret{ObjectMeta: meta.ObjectMeta{Namespace: "installed-observer", Name: contracts.PublicRuntimeProjectionName(installation)}, Data: map[string][]byte{"sql-public-hub-metadata-read.json": credential}})
+	api := fake.NewSimpleClientset(&core.Secret{ObjectMeta: meta.ObjectMeta{Namespace: "installed-observer", Name: contracts.PublicRuntimeProjectionName(installation)}, Data: map[string][]byte{"sql-public-hub-runtime.json": credential}})
 	observer, closeObserver := installedPermissionObserver(t, ctx, admin, api, "installed-observer", installation, root)
 	if observer == nil {
 		t.Fatal("scoped TLS observer missing")

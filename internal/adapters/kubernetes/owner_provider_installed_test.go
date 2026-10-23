@@ -34,7 +34,7 @@ func TestProviderInstalledOwnerSeparatesSQLStorageAndNativeAuthentication(t *tes
 	if len(sources) != len(v1.Deployment.Spec.Template.Spec.Volumes[0].Projected.Sources)+2 || len(sources[1].Secret.Items) != 1+len(contracts.OwnerIdentityRolePurposes()) {
 		t.Fatal("unexpected identity/provider projection graph")
 	}
-	keys := []string{contracts.OwnerIdentityRoleManifestFile, "sql-enrollment.json", "sql-audit.json", "sql-activation.json", "sql-registry.json", "sql-routing.json", "sql-native-read.json"}
+	keys := []string{contracts.OwnerIdentityRoleManifestFile, "sql-owner-runtime.json"}
 	for i, item := range sources[1].Secret.Items {
 		if item.Key != keys[i] || item.Path != item.Key {
 			t.Fatal("SQL identity projection includes or redirects another credential")

@@ -316,7 +316,7 @@ func ownerStartupAnnotate(phase *ownerStartupPhase, role *string, result *error)
 }
 func ownerStartupRole(s string) string {
 	switch s {
-	case "enrollment", "audit", "activation", "registry", "server", "client":
+	case "enrollment", "audit", "activation", "registry", "owner-runtime", "server", "client":
 		return s
 	default:
 		return "none"

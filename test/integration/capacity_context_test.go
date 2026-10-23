@@ -116,7 +116,7 @@ func (f *capacitySQLFixture) admitManagedContextRetention(t *testing.T, root app
 	if err != nil {
 		t.Fatal(err)
 	}
-	storage, err := postgres.NewContextStorageReader(f.ctx, f.roles["hub-metadata-read"], f.input.PermissionRootID)
+	storage, err := postgres.NewContextStorageReader(f.ctx, f.roles["hub-runtime"], f.input.PermissionRootID)
 	if err != nil {
 		t.Fatal(err)
 	}

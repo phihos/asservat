@@ -1,0 +1,12 @@
+{
+  "internal/contracts/public_runtime_roles.go": "4b8c4e5f7908ed0586fe344942bb4c064102f315929930c2135f5970b0952aec",
+  "internal/contracts/public_runtime_compartments.go": "2cc89ee71114ac145d2b68278c2cac4647f04d0c98e9b6f50a42e2aabd344fed",
+  "internal/contracts/owner_identity_roles.go": "076c9a1b167b1bce4a99f55035761192f6bcbbf3e628b623491d49e9ec778ecb",
+  "internal/contracts/sql_connection_budget.go": "e1a1d939d80d750ba2db839defae5932d39f884975a8c69ddc95be82c4491434",
+  "internal/adapters/postgres/public_runtime_role_plan.go": "efdfec2d6fe82c28ef9eadbee8a7a31293349a68eca4596ec12aa662db16264c",
+  "internal/adapters/postgres/owner_identity_role_plan.go": "1d69a75465b6314af25a37e607e030a933ffb64e64eb65e597df31cd606f6bf9",
+  "internal/adapters/postgres/public_runtime_credential.go": "4d96275345948e867287b6dacc57f457aaa8d9a9121dd1c8fe920ed08307ef6d",
+  "internal/bootstrap/public_pools.go": "43d0f15150d78f20de75991366e9a49965721ed438f0ddbadd490149ecf72ff3",
+  "internal/bootstrap/owner_observation_deployment.go": "283554ad8beefc5edb4b7592452035d373ff7e7761e5b1c35c7957a9ceda89c6",
+  "internal/bootstrap/public_downloads.go": "4c2c4437772ec71c39c1d590d02ffdd5a6b62573eacd43cbbb721cc73213e1de"
+}

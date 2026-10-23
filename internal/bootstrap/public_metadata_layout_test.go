@@ -39,12 +39,12 @@ func TestPublicRuntimeUnsupportedLayoutPreservesMountedState(t *testing.T) {
 	}
 }
 
-func TestPublicMetadataPoolLimitLeavesOtherCredentialsIndependent(t *testing.T) {
-	if limit, ok := contracts.PublicRuntimeRolePoolLimit("hub-metadata-read"); !ok || limit != 7 {
+func TestPublicSharedCredentialLeavesOtherCredentialsIndependent(t *testing.T) {
+	if limit, ok := contracts.PublicRuntimeRolePoolLimit("hub-runtime"); !ok || limit != 20 {
 		t.Fatal("metadata pool lost aggregate concurrency")
 	}
 	for _, purpose := range contracts.PublicRuntimeRolePurposes() {
-		if purpose == "hub-metadata-read" || purpose == "api-execution" {
+		if purpose == "hub-runtime" {
 			continue
 		}
 		if limit, ok := contracts.PublicRuntimeRolePoolLimit(purpose); !ok || limit != 1 {

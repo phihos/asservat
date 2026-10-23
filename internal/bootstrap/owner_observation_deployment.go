@@ -321,7 +321,7 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 	users := map[string]bool{}
 	// ADR-184: a promoted hub-api also opens its backend pools here, under the
 	// same name, SCRAM, governor and manifest checks as the identity pools.
-	roles := append([]string{"enrollment", "audit", "activation", "registry"}, backend...)
+	roles := contracts.OwnerIdentityRolePurposes()
 	for _, role := range roles {
 		*purpose = role
 		*phase = startupSqlCredential
@@ -334,7 +334,7 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		if !known || c.ConnConfig.User != expected {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
-		c.MaxConns, c.MinConns = 1, 0
+		c.MaxConns, c.MinConns = contracts.OwnerIdentityPoolConnections, 0
 		c.ConnConfig.RequireAuth = "scram-sha-256"
 		users[c.ConnConfig.User] = true
 		// A promoted installed owner governs its identity pools too (ADR-177).
@@ -352,6 +352,11 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		if err = postgres.VerifyOwnerIdentityCredential(verified, pool, manifest, role); err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
+	}
+	// Typed identity and backend adapters share this process credential. The
+	// pool is opened, verified and closed once, with six physical slots.
+	for _, duty := range []string{"enrollment", "audit", "activation", "registry", "routing", "native-read"} {
+		pools[duty] = pools["owner-runtime"]
 	}
 	*purpose = "none"
 	*phase = startupConfigurationReader

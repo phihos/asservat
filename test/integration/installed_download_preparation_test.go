@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 	authorizationapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
 	identities "asservat.local/asservat/internal/application/identity"
-	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
@@ -38,48 +36,20 @@ func qualifyInstalledDownloadPreparation(t *testing.T, ctx context.Context, admi
 	}
 	s.nativeSources.SetWorker(t, observer.Observe)
 
-	// Match the three involved purposes' one-connection pools and installed
-	// hot-session/cold-worker policy. This is a subset, not a whole-hub load test.
-	governor, err := postgres.NewSQLConnectionGovernor(3, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	open := func(purpose string) *pgxpool.Pool {
-		const password = "synthetic-preparation"
-		role := narrowRole(t, ctx, admin, "prep_"+strings.ReplaceAll(purpose, "-", "_")+"_", password, func(role string) []string {
-			grants, ok := postgres.PublicRuntimeRoleGrantSQL(purpose, role)
-			if !ok {
-				t.Fatal("missing installed grants", purpose)
-			}
-			return grants
-		})
-		seed := poolFor(role, password)
-		config := installedSQLPoolProfile(seed.Config())
-		seed.Close()
-		limit, ok := contracts.PublicRuntimeRolePoolLimit(purpose)
-		if !ok || limit != 1 {
-			t.Fatal("installed pool inventory changed", purpose, limit)
-		}
-		if err := governor.Govern(config, purpose == "download-session"); err != nil {
-			t.Fatal(err)
-		}
-		pool, err := pgxpool.NewWithConfig(ctx, config)
-		if err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(pool.Close)
-		return pool
-	}
+	// Reuse the actual ordinary hub login and shared pool for these three typed
+	// facets. This is a transaction fixture, not a whole-hub load measurement.
+	sharedPools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
+	shared := sharedPools.ordinary
 	guards := postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}
-	sessions, err := postgres.NewDownloads(ctx, open("download-session"), s.a.RootID, guards)
+	sessions, err := postgres.NewDownloads(ctx, shared, s.a.RootID, guards)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workers, err := postgres.NewDownloadWorkers(ctx, open("download-worker"), s.a.RootID, profile, guards)
+	workers, err := postgres.NewDownloadWorkers(ctx, shared, s.a.RootID, profile, guards)
 	if err != nil {
 		t.Fatal(err)
 	}
-	ack, err := postgres.NewDownloadWorkers(ctx, open("download-worker-audit"), s.a.RootID, profile, guards)
+	ack, err := postgres.NewDownloadWorkers(ctx, shared, s.a.RootID, profile, guards)
 	if err != nil {
 		t.Fatal(err)
 	}

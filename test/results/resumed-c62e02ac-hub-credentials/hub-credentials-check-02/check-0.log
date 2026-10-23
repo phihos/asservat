@@ -1,0 +1,7 @@
+--- FAIL: TestSQLConnectionBudgetRejectsCompositionDefects (0.00s)
+    sql_connection_budget_test.go:101: ungoverned hub beyond the per-replica allowance accepted <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/contracts	0.007s
+ok  	asservat.local/asservat/internal/bootstrap	0.410s
+ok  	asservat.local/asservat/internal/adapters/postgres	0.484s
+FAIL

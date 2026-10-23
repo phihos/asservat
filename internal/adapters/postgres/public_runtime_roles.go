@@ -49,7 +49,7 @@ func NewPublicRuntimeSQLRoles(ctx context.Context, c *pgx.ConnConfig, root Publi
 	if input.LayoutDigest != PublicRuntimeRoleLayoutDigest() {
 		return nil, errors.Join(cfg.ErrInvalid, contracts.ErrPublicRuntimeLayout)
 	}
-	if _, ok := PublicRuntimeRoleName(input.InstallationID, "identity-read"); !ok {
+	if _, ok := PublicRuntimeRoleName(input.InstallationID, "hub-runtime"); !ok {
 		return nil, cfg.ErrInvalid
 	}
 	if c.User == "" || c.Database == "" || c.TLSConfig == nil || c.TLSConfig.InsecureSkipVerify || c.TLSConfig.ServerName == "" || c.TLSConfig.MinVersion < tls.VersionTLS13 || len(c.Fallbacks) != 0 || c.Tracer != nil || c.ValidateConnect != nil || c.AfterConnect != nil {

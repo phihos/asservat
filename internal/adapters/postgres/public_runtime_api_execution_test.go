@@ -9,7 +9,7 @@ import (
 // This literal is the exact union of the three installed execution logins at
 // 2d02b4fe. A new table-wide write, unrelated privilege or lost column fails.
 func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
-	got, ok := publicRuntimeRoleGrants("api-execution")
+	got, ok := publicRuntimeDutyGrants("api-execution")
 	if !ok {
 		t.Fatal("missing consolidated execution credential")
 	}

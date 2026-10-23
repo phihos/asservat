@@ -37,7 +37,7 @@ func TestOwnerIdentityProducerOriginalRoleCASAndFreshNegativeProofs(t *testing.T
 			end()
 			t.Fatal("claim replay became another effect", purpose, e)
 		}
-		receipt := contracts.PublicRuntimeRoleReceipt{RoleName: "as_" + strings.ReplaceAll(f.root.input.InstallationID, "-", "") + "_own_0" + strconv.Itoa(i), RoleOID: uint32(6000 + i), LayoutDigest: f.root.input.LayoutDigest}
+		receipt := contracts.PublicRuntimeRoleReceipt{RoleName: "as_" + strings.ReplaceAll(f.root.input.InstallationID, "-", "") + "_own_0" + strconv.Itoa(6), RoleOID: uint32(6000 + i), LayoutDigest: f.root.input.LayoutDigest}
 		if e = f.root.CompleteOwnerIdentityRole(ctx, current, purpose, receipt); e != nil {
 			end()
 			t.Fatal("exact synthetic SQL receipt", purpose, e)
@@ -118,10 +118,10 @@ func TestOwnerIdentityProducerUnknownRoleCASNeverGrantsReplacement(t *testing.T)
 			}
 			f.api.mu.Unlock()
 			postmaster := time.Now().UTC().Add(-time.Hour).Truncate(time.Microsecond)
-			if _, fresh, e := f.root.ClaimOwnerIdentityRole(context.Background(), "enrollment", 42, postmaster); e == nil || fresh {
+			if _, fresh, e := f.root.ClaimOwnerIdentityRole(context.Background(), "owner-runtime", 42, postmaster); e == nil || fresh {
 				t.Fatal("unknown claim returned CREATE permission")
 			}
-			got, fresh, e := f.root.ClaimOwnerIdentityRole(context.Background(), "enrollment", 42, postmaster)
+			got, fresh, e := f.root.ClaimOwnerIdentityRole(context.Background(), "owner-runtime", 42, postmaster)
 			if fresh || committed && e != nil || !committed && e == nil {
 				t.Fatal("unknown CAS replay disposition", fresh, e)
 			}

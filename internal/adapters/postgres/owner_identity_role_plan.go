@@ -26,9 +26,18 @@ func OwnerIdentityRoleName(installation, purpose string) (string, bool) {
 const nativeReadConnectorLeaf = "read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb)"
 
 func ownerIdentityRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
-	if _, ok := contracts.OwnerIdentityRoleOrdinal(purpose); !ok {
+	if purpose != "owner-runtime" {
 		return nil, false
 	}
+	var out []publicRuntimeGrant
+	for _, duty := range []string{"enrollment", "audit", "activation", "registry", "routing", "native-read"} {
+		grants, _ := ownerIdentityDutyGrants(duty)
+		out = append(out, grants...)
+	}
+	return ownerIdentityGrantSet(out), true
+}
+
+func ownerIdentityDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	out := []publicRuntimeGrant{{"schema", "public", "", "USAGE"}}
 	add := func(table, privilege string, columns ...string) {
 		if len(columns) == 0 {

@@ -60,8 +60,9 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				}
 				initializeProcessingTestFixture(t, ctx, poolFor, store, keys, s, accepted.Expectation)
 				pool := func(user, password string) *pgxpool.Pool { p := poolFor(user, password); t.Cleanup(p.Close); return p }
-				sharedPool, _ := compiledAPIExecutionPool(t, ctx, admin, poolFor)
-				qualifyAPIExecutionPoolBound(t, ctx, sharedPool)
+				sharedPools, _ := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
+				sharedPool := sharedPools.ordinary
+				qualifyOrdinaryHubPoolBound(t, ctx, sharedPools)
 				for _, query := range []string{
 					"DELETE FROM context_execution WHERE false",
 					"UPDATE context_execution SET binding_json=binding_json WHERE false",

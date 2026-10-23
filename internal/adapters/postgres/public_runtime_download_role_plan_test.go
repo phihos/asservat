@@ -63,7 +63,7 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 	}
 	for purpose, want := range map[string][]publicRuntimeGrant{"worker-config-observe": observe, "worker-config-audit": acknowledge, "key-acquisition": acquisition} {
 		t.Run(purpose, func(t *testing.T) {
-			got, ok := publicRuntimeRoleGrants(purpose)
+			got, ok := publicRuntimeDutyGrants(purpose)
 			if !ok || !slices.Equal(keys(got), keys(want)) {
 				t.Fatalf("purpose grants differ: got %v, want %v", keys(got), keys(want))
 			}
@@ -82,7 +82,7 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 		t.Fatal("observer and audit acknowledgement merged")
 	}
 	for _, purpose := range []string{"download-key-bind", "native-key-bind", "key-verify"} {
-		got, _ := publicRuntimeRoleGrants(purpose)
+		got, _ := publicRuntimeDutyGrants(purpose)
 		if slices.ContainsFunc(got, func(g publicRuntimeGrant) bool { return g.column == "used_roles" && g.privilege == "UPDATE" }) {
 			t.Fatal("binding or verifier role can spend download key slots", purpose)
 		}
@@ -104,7 +104,7 @@ func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
 	// native-owner, native-key-bind), Downloads.withKeyBatch (download-key-bind)
 	// and the browser refresh effects (refresh-admit, refresh-owner).
 	for _, purpose := range []string{"download-session", "download-source", "download-worker", "worker-enrollment", "worker-enrollment-activate", "worker-owner", "native-owner", "download-key-bind", "native-key-bind", "refresh-admit", "refresh-owner"} {
-		got, ok := publicRuntimeRoleGrants(purpose)
+		got, ok := publicRuntimeDutyGrants(purpose)
 		if !ok {
 			t.Fatal("missing purpose", purpose)
 		}
@@ -116,7 +116,7 @@ func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
 	}
 	// download-worker-identity serves only readWorkerIdentity (no fence).
 	for _, purpose := range []string{"download-audit", "download-worker-audit", "download-worker-identity", "worker-enrollment-audit", "download-stop", "download-stop-writer", "download-stop-ack", "download-plan", "worker-config-read"} {
-		got, _ := publicRuntimeRoleGrants(purpose)
+		got, _ := publicRuntimeDutyGrants(purpose)
 		for _, g := range fence {
 			if slices.Contains(got, g) {
 				t.Errorf("%s runs no download fence but reads %s", purpose, g.key())
@@ -126,11 +126,11 @@ func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
 	// The additions are reads only: no hub extension purpose writes a
 	// processing table or a retention table beyond the root_id lock column.
 	// ADR-210's processing-decision is the one processing writer.
-	for _, purpose := range contracts.PublicRuntimeHubExtensionPurposes() {
+	for _, purpose := range contracts.PublicRuntimeHubSharedDuties() {
 		if purpose == "processing-decision" {
 			continue
 		}
-		got, _ := publicRuntimeRoleGrants(purpose)
+		got, _ := publicRuntimeDutyGrants(purpose)
 		for _, g := range got {
 			lock := g.object == "retention_source" && g.column == "root_id" && g.privilege == "UPDATE"
 			if g.privilege != "SELECT" && !lock && (strings.Contains(g.object, "processing") || strings.HasPrefix(g.object, "retention_")) {

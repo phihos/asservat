@@ -135,10 +135,10 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 	if installed {
 		// ADR-184: every installed owner pool is an identity purpose with one
 		// connection per process.
-		hot = 4 + len(backendRoles)
+		hot = contracts.OwnerIdentityPoolConnections
 	}
 	if in.config.Public != nil {
-		hot += len(hubAPIHotPurposes)
+		hot += hubAPIHotConnections
 	}
 	governor, err := postgres.NewSQLConnectionGovernor(contracts.SQLConnectionsPerHubReplica, hot)
 	if err != nil {

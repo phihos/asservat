@@ -292,7 +292,7 @@ func TestPublicRoleRootUnknownClaimCannotRenewFirstCreation(t *testing.T) {
 			if original.UID == "" || len(original.State.Roles) != len(contracts.PublicRuntimeRolePurposes()) || f.writes.Load() != 1 {
 				t.Fatal("missing exact original private root")
 			}
-			claimed, fresh, err := f.root.ClaimPublicRuntimeRole(t.Context(), "identity-read", 123, time.Now().Add(-time.Hour))
+			claimed, fresh, err := f.root.ClaimPublicRuntimeRole(t.Context(), "hub-runtime", 123, time.Now().Add(-time.Hour))
 			if mode == "lost-claim" {
 				if err == nil || fresh {
 					t.Fatal("unknown CAS was fresh")
@@ -300,7 +300,7 @@ func TestPublicRoleRootUnknownClaimCannotRenewFirstCreation(t *testing.T) {
 			} else if err != nil || !fresh {
 				t.Fatal("sole acknowledged first CAS unavailable", err)
 			}
-			replay, again, err := f.root.ClaimPublicRuntimeRole(t.Context(), "identity-read", 456, time.Now().Add(-time.Minute))
+			replay, again, err := f.root.ClaimPublicRuntimeRole(t.Context(), "hub-runtime", 456, time.Now().Add(-time.Minute))
 			if err != nil || again || replay.State.Roles[0].Claim.DatabaseOID != 123 || f.writes.Load() != 2 {
 				t.Fatal("claim replay replaced original identity or repeated write", err)
 			}
@@ -320,13 +320,13 @@ func TestPublicRoleRootRevokedAdministratorAndCancelledCallerCannotClaim(t *test
 		t.Fatal(err)
 	}
 	f.badAdmin.Store(true)
-	if _, fresh, err := f.root.ClaimPublicRuntimeRole(t.Context(), "identity-read", 123, time.Now().Add(-time.Hour)); err == nil || fresh || f.writes.Load() != 1 {
+	if _, fresh, err := f.root.ClaimPublicRuntimeRole(t.Context(), "hub-runtime", 123, time.Now().Add(-time.Hour)); err == nil || fresh || f.writes.Load() != 1 {
 		t.Fatal("revoked administrator created role claim")
 	}
 	f.badAdmin.Store(false)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, fresh, err := f.root.ClaimPublicRuntimeRole(ctx, "identity-read", 123, time.Now().Add(-time.Hour)); err == nil || fresh || f.writes.Load() != 1 {
+	if _, fresh, err := f.root.ClaimPublicRuntimeRole(ctx, "hub-runtime", 123, time.Now().Add(-time.Hour)); err == nil || fresh || f.writes.Load() != 1 {
 		t.Fatal("cancelled caller created role claim")
 	}
 }
@@ -337,11 +337,11 @@ func TestPublicRoleRootRejectsUnsupportedRetainedProcessCount(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.replicas.Store(3)
-	if _, fresh, err := f.root.ClaimPublicRuntimeRole(t.Context(), "identity-read", 123, time.Now().Add(-time.Hour)); err == nil || fresh || f.writes.Load() != 1 {
+	if _, fresh, err := f.root.ClaimPublicRuntimeRole(t.Context(), "hub-runtime", 123, time.Now().Add(-time.Hour)); err == nil || fresh || f.writes.Load() != 1 {
 		t.Fatal("unsupported hub replica count created a role claim")
 	}
 	f.replicas.Store(2)
-	if _, fresh, err := f.root.ClaimPublicRuntimeRole(t.Context(), "identity-read", 123, time.Now().Add(-time.Hour)); err != nil || !fresh {
+	if _, fresh, err := f.root.ClaimPublicRuntimeRole(t.Context(), "hub-runtime", 123, time.Now().Add(-time.Hour)); err != nil || !fresh {
 		t.Fatal("valid bounded rollout could not make original first claim", err)
 	}
 }
@@ -552,7 +552,7 @@ func TestPublicRoleRootRejectsWrongSecretResponseVersion(t *testing.T) {
 	}
 	before := f.writes.Load()
 	f.badSecretVersion.Store(true)
-	if _, fresh, e := f.root.ClaimPublicRuntimeRole(t.Context(), "identity-read", 123, time.Now().Add(-time.Hour)); e == nil || fresh || f.writes.Load() != before {
+	if _, fresh, e := f.root.ClaimPublicRuntimeRole(t.Context(), "hub-runtime", 123, time.Now().Add(-time.Hour)); e == nil || fresh || f.writes.Load() != before {
 		t.Fatal("invalid returned Secret version allowed a role claim")
 	}
 }
@@ -564,7 +564,7 @@ func TestPublicRoleStateRejectsIncompletePriorInventory(t *testing.T) {
 	}
 	old := snapshot.State
 	old.Roles = slices.DeleteFunc(slices.Clone(old.Roles), func(r contracts.PublicRuntimeRoleMaterial) bool {
-		return r.Purpose == "capture-preview" || r.Purpose == "capture-resolution"
+		return r.Purpose == "capture-intent-read" || r.Purpose == "worker-config-read"
 	})
 	if len(old.Roles) != len(contracts.PublicRuntimeRolePurposes())-2 || runtimeRoleStateValid(f.input, old, time.Now()) {
 		t.Fatal("prior inventory silently accepted")

@@ -16,7 +16,7 @@ import (
 // qualifyContextPreviews/qualifyContextRequestResolution test application
 // validation, current authority, caps and expiry after blocking reads.
 func qualifyPublicContextDraftRole(t *testing.T, ctx context.Context, admin *pgxpool.Pool, conn *pgx.Conn, purpose, installation string) {
-	if purpose != "capture-preview" && purpose != "capture-resolution" {
+	if purpose != "hub-runtime" {
 		return
 	}
 	t.Run(purpose+"-generated-role-effects", func(t *testing.T) {
@@ -70,18 +70,19 @@ func qualifyPublicContextDraftRole(t *testing.T, ctx context.Context, admin *pgx
 			must("ROLLBACK TO SAVEPOINT draft_negative")
 			must("RELEASE SAVEPOINT draft_negative")
 		}
-		if purpose == "capture-resolution" {
-			must(`SELECT * FROM public.fleet_current_trust WHERE installation_id=$1 FOR SHARE`, installation)
-		}
+		must(`SELECT * FROM public.fleet_current_trust WHERE installation_id=$1 FOR SHARE`, installation)
 		must(`SELECT id FROM public.permission_stream WHERE id=$1 FOR UPDATE`, root)
 		must(`SELECT * FROM public.context_preview WHERE root_id=$1`, root)
 		must(`SELECT * FROM public.context_preview_fence WHERE root_id=$1`, root)
 		// Separate statements prevent one missing column from masking a broad grant
 		// on another column. Catalog inspection covers every future column as well.
-		allowed := map[string]map[string]bool{"permission_stream": {"id": true}}
-		if purpose == "capture-resolution" {
-			allowed["fleet_current_trust"] = map[string]bool{"installation_id": true}
-			allowed["context_preview"] = map[string]bool{"closed_at": true, "closed_request_key": true, "closed_submission_digest": true}
+		allowed := map[string]map[string]bool{
+			"permission_stream":   {"id": true},
+			"fleet_current_trust": {"installation_id": true},
+			"context_preview":     {"closed_at": true, "closed_request_key": true, "closed_submission_digest": true},
+			"context_capture":     {"id": true},
+			"custody_attempt":     {"id": true},
+			"operation_audit":     {"id": true, "intent_started": true, "outcome": true, "outcome_started": true, "intent_receipt": true, "outcome_receipt": true},
 		}
 		for _, table := range []string{"permission_stream", "fleet_current_trust", "context_preview", "context_preview_fence", "context_capture", "custody_attempt", "operation_audit", "authority_audit"} {
 			rows, e := conn.Query(ctx, `SELECT a.attname,has_column_privilege(current_user,c.oid,a.attnum,'UPDATE') FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=$1 AND a.attnum>0 AND NOT a.attisdropped ORDER BY a.attnum`, table)
@@ -118,18 +119,20 @@ func qualifyPublicContextDraftRole(t *testing.T, ctx context.Context, admin *pgx
 			}
 		}
 		for _, table := range []string{"context_capture", "custody_attempt", "operation_audit", "authority_audit"} {
-			deny("42501", "INSERT INTO "+pgx.Identifier{"public", table}.Sanitize()+" DEFAULT VALUES")
+			if table != "operation_audit" {
+				deny("42501", "INSERT INTO "+pgx.Identifier{"public", table}.Sanitize()+" DEFAULT VALUES")
+			}
 			deny("42501", "DELETE FROM "+pgx.Identifier{"public", table}.Sanitize()+" WHERE false")
 		}
-		if purpose == "capture-preview" {
+		{
 			live := custodyID()
 			must(`WITH original AS MATERIALIZED (SELECT clock_timestamp() AS created_at) INSERT INTO public.context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline) SELECT $1,$2,$3,$4,$5,$5,$6,$5,created_at,created_at+interval '5 minutes' FROM original`, live, root, custodyID(), custodyID(), digest, []byte(`{"fixture":"ACL-only"}`))
 			deny("23514", `DELETE FROM public.context_preview WHERE id=$1`, live)
-			deny("42501", `INSERT INTO public.context_preview_fence DEFAULT VALUES`)
 			// The SQL guard rejects a created-closed blueprint even though this role
 			// has INSERT authority, independently of Go field validation.
 			deny("23514", `INSERT INTO public.context_preview(id,root_id,capture_id,attempt_id,actor_key,principal_key,blueprint_json,blueprint_sha256,created_at,deadline,closed_at,closed_request_key,closed_submission_digest) VALUES($1,$2,$3,$4,$5,$5,$6,$5,clock_timestamp(),clock_timestamp()+interval '1 minute',clock_timestamp(),$5,$5)`, custodyID(), root, custodyID(), custodyID(), digest, []byte(`{}`))
-		} else {
+		}
+		{
 			for _, table := range []string{"permission_basis", "permission_assignment", "authority_audit", "context_capture"} {
 				must("SELECT * FROM " + pgx.Identifier{"public", table}.Sanitize() + " WHERE false")
 			}
@@ -139,7 +142,6 @@ func qualifyPublicContextDraftRole(t *testing.T, ctx context.Context, admin *pgx
 				deny("23514", "UPDATE public.context_preview SET "+pgx.Identifier{column}.Sanitize()+"=$2 WHERE id=$1", preview, make([]byte, 32))
 			}
 			deny("23514", `UPDATE public.context_preview SET closed_at=closed_at+interval '1 second' WHERE id=$1`, preview)
-			deny("42501", `INSERT INTO public.context_preview DEFAULT VALUES`)
 			fence := custodyID()
 			must(`INSERT INTO public.context_preview_fence(root_id,preview_id,actor_key,principal_key,request_key,submission_digest,created_at,expires_at) VALUES($1,$2,$3,$3,$3,$3,clock_timestamp()-interval '2 minutes',clock_timestamp()-interval '1 minute')`, root, fence, digest)
 			var current bool

@@ -52,7 +52,12 @@ func verifyRuntimeCredential(ctx context.Context, pool *pgxpool.Pool, m contract
 		}
 	}
 	limit, known := contracts.PublicRuntimeRolePoolLimit(purpose)
-	if selected == nil || !known || pool.Config().ConnConfig.User != selected.Receipt.RoleName || pool.Config().MaxConns != int32(limit) {
+	poolLimit := pool.Config().MaxConns
+	validPool := poolLimit == int32(limit)
+	if purpose == "hub-runtime" {
+		validPool = poolLimit == contracts.PublicRuntimeHubOrdinaryConnections || poolLimit == 1
+	}
+	if selected == nil || !known || pool.Config().ConnConfig.User != selected.Receipt.RoleName || !validPool {
 		return cfg.ErrDenied
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)

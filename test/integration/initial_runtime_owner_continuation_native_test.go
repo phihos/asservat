@@ -119,7 +119,7 @@ func providerOwnerScopedPool(t *testing.T, ctx context.Context, config *pgx.Conn
 	p.ConnConfig = config.Copy()
 	p.ConnConfig.User, p.ConnConfig.Password = credential.Username, credential.Password
 	p.ConnConfig.RuntimeParams = map[string]string{"application_name": "asservat-original-owner-native-observer", "statement_timeout": "5000ms", "lock_timeout": "1000ms", "idle_in_transaction_session_timeout": "5000ms"}
-	p.MaxConns, p.MinConns = 1, 0
+	p.MaxConns, p.MinConns = contracts.OwnerIdentityPoolConnections, 0
 	pool, err := pgxpool.NewWithConfig(ctx, p)
 	if err != nil {
 		t.Fatal("original scoped observer connection", err)
@@ -147,7 +147,7 @@ func (o *initialRuntimeNativeOwner) registry(t *testing.T, ctx context.Context, 
 	}
 	ref := claim.Receipt.Credentials
 	secret, err := api.CoreV1().Secrets(in.Namespace.Name).Get(ctx, ref.Name, meta.GetOptions{})
-	if err != nil || string(secret.UID) != ref.UID || secret.Immutable == nil || !*secret.Immutable || secret.ResourceVersion != claim.Credentials.Receipt.ResourceVersion || len(secret.Data) != 5 {
+	if err != nil || string(secret.UID) != ref.UID || secret.Immutable == nil || !*secret.Immutable || secret.ResourceVersion != claim.Credentials.Receipt.ResourceVersion || len(secret.Data) != 1+len(contracts.OwnerIdentityRolePurposes()) {
 		t.Fatal("original immutable owner credential projection", err)
 	}
 	defer func() {
@@ -159,7 +159,7 @@ func (o *initialRuntimeNativeOwner) registry(t *testing.T, ctx context.Context, 
 	if err != nil || manifest.Input != in || manifest.RootUID != claim.RoleRoot.UID || manifest.SetupID != claim.RoleSetupID {
 		t.Fatal("original owner registry manifest", err)
 	}
-	credential, err := contracts.DecodeOwnerSQLCredential(bytes.NewReader(secret.Data["sql-registry.json"]))
+	credential, err := contracts.DecodeOwnerSQLCredential(bytes.NewReader(secret.Data["sql-owner-runtime.json"]))
 	if err != nil {
 		t.Fatal("original owner registry credential", err)
 	}
@@ -172,7 +172,7 @@ func (o *initialRuntimeNativeOwner) registry(t *testing.T, ctx context.Context, 
 	}()
 	call, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
-	if err = postgres.VerifyOwnerIdentityCredential(call, pool, manifest, "registry"); err != nil {
+	if err = postgres.VerifyOwnerIdentityCredential(call, pool, manifest, "owner-runtime"); err != nil {
 		t.Fatal("actual original owner registry role", err)
 	}
 	reader, err := postgres.NewOwnerEnrollments(call, pool, in.InstallationID, in.ClusterID, in.Namespace.UID, in.OwnerConfigurationUID, custodyID)

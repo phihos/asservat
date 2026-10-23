@@ -51,7 +51,8 @@ func qualifyAPIExecutionPreparationBoundaries(t *testing.T, ctx context.Context,
 				t.Cleanup(p.Close)
 				return p
 			}
-			sharedPool, role := compiledAPIExecutionPool(t, ctx, admin, poolFor)
+			sharedPools, role := compiledOrdinaryHubPools(t, ctx, admin, poolFor)
+			sharedPool := sharedPools.ordinary
 			executionSQL, err := postgres.NewAPIContextExecutions(ctx, sharedPool, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
 			if err != nil {
 				t.Fatal(err)

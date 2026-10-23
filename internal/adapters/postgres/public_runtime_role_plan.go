@@ -69,6 +69,23 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	if !slices.Contains(contracts.PublicRuntimeRolePurposes(), purpose) {
 		return nil, false
 	}
+	if purpose == "hub-runtime" {
+		var out []publicRuntimeGrant
+		for _, duty := range contracts.PublicRuntimeHubSharedDuties() {
+			grants, ok := publicRuntimeDutyGrants(duty)
+			if !ok {
+				return nil, false
+			}
+			out = append(out, grants...)
+		}
+		return ownerIdentityGrantSet(out), true
+	}
+	return publicRuntimeDutyGrants(purpose)
+}
+
+// Duties retain their exact compiled grants; only installed role plans may
+// render them into credentials. A retired duty is not an accepted role name.
+func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	if out, ok := publicRuntimeCapacityGrants(purpose); ok {
 		return out, true
 	}
@@ -371,24 +388,16 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("browser_login", "SELECT", "root_id")
 		add("browser_session", "SELECT", "root_id", "id", "epoch", "created_at", "expires_at", "refresh_at")
 		add("browser_session", "UPDATE", "expires_at", "refresh_at")
-	case "browser-session", "browser-cleanup":
+	case "browser-session":
 		read("browser_session_root", "browser_login", "browser_session", "browser_logout", "browser_refresh_owner", "browser_refresh_consumer")
 		add("browser_session_root", "UPDATE", "id")
 		add("browser_refresh_owner", "UPDATE", "session_id")
 		for _, table := range []string{"browser_login", "browser_session", "browser_logout"} {
 			add(table, "DELETE")
-			if purpose == "browser-session" {
-				add(table, "INSERT")
-				add(table, "UPDATE")
-			} else {
-				add(table, "UPDATE", "id")
-			}
+			add(table, "INSERT")
+			add(table, "UPDATE")
 		}
-		if purpose == "browser-cleanup" {
-			add("browser_refresh_owner", "DELETE")
-		} else {
-			out = append(out, publicRuntimeGrant{"function", "browser_owned_refresh_busy(uuid,bytea)", "", "EXECUTE"})
-		}
+		out = append(out, publicRuntimeGrant{"function", "browser_owned_refresh_busy(uuid,bytea)", "", "EXECUTE"})
 	case "refresh-admit", "refresh-owner", "refresh-read":
 		read("browser_session_root", "browser_session", "browser_refresh_owner", "browser_refresh_consumer", "fleet_current_trust", "artifact_download", "download_response", "context_catalog", "context_capture", "context_verification", "custody_attempt")
 		add("fleet_current_trust", "UPDATE", "installation_id")

@@ -18,10 +18,11 @@ const PublicRuntimeCredentialManifestMaxBytes = 32 << 10
 var ErrPublicRuntimeLayout = errors.New("unsupported development SQL credential layout; preserve retained state; recreate only a disposable development installation")
 
 // The role ceiling is installation-wide. Most credentials have one connection
-// per process; metadata readers share seven and execution facets share three.
+// per process; the ordinary hub credential has twenty aggregate connections.
 // One extra slot verifies installation.
-const PublicRuntimeMetadataConnections = 7
-const PublicRuntimeAPIExecutionConnections = 3
+const PublicRuntimeHubOrdinaryConnections = 18
+const PublicRuntimeHubResolutionConnections = 2
+const PublicRuntimeHubConnections = PublicRuntimeHubOrdinaryConnections + PublicRuntimeHubResolutionConnections
 const PublicRuntimeRetainedHubProcesses = 4
 const PublicRuntimeRoleConnections = PublicRuntimeRetainedHubProcesses + 1
 
@@ -29,7 +30,7 @@ const PublicRuntimeRoleConnections = PublicRuntimeRetainedHubProcesses + 1
 // The source-stage inventory currently covers identity and retained reads; no installed path
 // can be enabled until the entire public graph and role layout are qualified.
 func PublicRuntimeRolePurposes() []string {
-	out := PublicRuntimeHubRolePurposes()
+	out := append(PublicRuntimeHubRolePurposes(), "browser-settings")
 	out = append(out, PublicRuntimeCaptureCleanupPurposes()...)
 	out = append(out, PublicRuntimeFederationPurposes()...)
 	out = append(out, PublicRuntimePublisherPurposes()...)
@@ -101,23 +102,13 @@ func PublicRuntimePermissionPurposes() []string {
 // Reconciler credentials must never enter the hub merely because the installer
 // learns how to create another fixed purpose.
 func PublicRuntimeHubRolePurposes() []string {
-	out := []string{"identity-read", "browser-settings", "browser-session", "browser-cleanup", "refresh-admit", "refresh-owner", "refresh-read", "hub-metadata-read", "capture-intent-read", "download-source", "download-plan", "worker-config-read", "audit-normal-journal", "audit-normal-ack", "audit-resolution-journal", "audit-resolution-ack", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack", "capture-preview", "capture-resolution"}
-	return append(out, PublicRuntimeHubExtensionPurposes()...)
+	return []string{"hub-runtime", "capture-intent-read", "worker-config-read", "capacity-profile-read", "capture-admit", "capture-journal", "capture-ack"}
 }
 
-// PublicRuntimeHubExtensionPurposes are the request-path duties hub-api needs
-// for execution and native download (ADR-177); publication moved to its own
-// process kind (ADR-181). Execution facets share one login (ADR-217).
-// All connections count against the hub's governor, not a 32-login limit.
-func PublicRuntimeHubExtensionPurposes() []string {
-	return []string{"api-execution", "download-session", "download-audit", "download-worker", "download-worker-audit", "download-worker-identity", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "worker-owner", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "download-stop-writer", "download-stop-ack",
-		// ADR-193: fleet-operator bootstrap issuance (ordinals 74-77).
-		"fleet-bootstrap-reserve", "fleet-bootstrap-record", "fleet-bootstrap-audit", "fleet-bootstrap-activate",
-		// ADR-197: regional capacity's activated-leaf reads and cluster
-		// qualification writes (ordinal 85).
-		"regional-capacity",
-		// ADR-210: a privacy operator's processing decisions (ordinal 92).
-		"processing-decision"}
+// PublicRuntimeHubSharedDuties are typed adapter duties sharing one credential,
+// not additional role identities, projection files or pools (ADR-222).
+func PublicRuntimeHubSharedDuties() []string {
+	return []string{"identity-read", "browser-session", "refresh-admit", "refresh-owner", "refresh-read", "hub-metadata-read", "download-source", "download-plan", "audit-normal-journal", "audit-normal-ack", "audit-resolution-journal", "audit-resolution-ack", "capture-preview", "capture-resolution", "api-execution", "download-session", "download-audit", "download-worker", "download-worker-audit", "download-worker-identity", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "download-stop-writer", "download-stop-ack", "fleet-bootstrap-reserve", "fleet-bootstrap-record", "fleet-bootstrap-audit", "fleet-bootstrap-activate", "regional-capacity", "processing-decision"}
 }
 
 // Permanent role identities are not positions in a configurable or growing
@@ -125,36 +116,12 @@ func PublicRuntimeHubExtensionPurposes() []string {
 // product grants and separate projection have been implemented and qualified.
 func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 	switch purpose {
-	case "identity-read":
-		return 0, true
 	case "browser-settings":
 		return 1, true
-	case "browser-session":
-		return 2, true
-	case "browser-cleanup":
-		return 3, true
-	case "refresh-admit":
-		return 4, true
-	case "refresh-owner":
-		return 5, true
-	case "refresh-read":
-		return 6, true
 	case "capture-intent-read":
 		return 16, true
-	case "download-source":
-		return 17, true
-	case "download-plan":
-		return 19, true
 	case "worker-config-read":
 		return 20, true
-	case "audit-normal-journal":
-		return 30, true
-	case "audit-normal-ack":
-		return 31, true
-	case "audit-resolution-journal":
-		return 32, true
-	case "audit-resolution-ack":
-		return 33, true
 	case "capacity-profile-read":
 		return 34, true
 	case "capture-admit":
@@ -169,10 +136,6 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 44, true
 	case "capture-finalizer":
 		return 45, true
-	case "capture-preview":
-		return 46, true
-	case "capture-resolution":
-		return 47, true
 	case "connector-source":
 		return 48, true
 	case "connector-journal":
@@ -203,36 +166,6 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 65, true
 	case "publisher-retention-read":
 		return 66, true
-	case "download-session":
-		return 28, true
-	case "download-audit":
-		return 29, true
-	case "download-worker":
-		return 35, true
-	case "download-worker-audit":
-		return 36, true
-	case "download-worker-identity":
-		return 37, true
-	case "worker-enrollment":
-		return 38, true
-	case "worker-enrollment-audit":
-		return 39, true
-	case "worker-enrollment-activate":
-		return 57, true
-	case "worker-owner":
-		return 58, true
-	case "native-owner":
-		return 59, true
-	case "download-key-bind":
-		return 60, true
-	case "native-key-bind":
-		return 61, true
-	case "download-stop":
-		return 62, true
-	case "download-stop-writer":
-		return 63, true
-	case "download-stop-ack":
-		return 64, true
 	case "capacity":
 		return 70, true
 	case "capacity-capture":
@@ -241,14 +174,6 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 72, true
 	case "permission-audit":
 		return 73, true
-	case "fleet-bootstrap-reserve":
-		return 74, true
-	case "fleet-bootstrap-record":
-		return 75, true
-	case "fleet-bootstrap-audit":
-		return 76, true
-	case "fleet-bootstrap-activate":
-		return 77, true
 	case "retention-source":
 		return 78, true
 	case "retention-source-audit":
@@ -264,8 +189,6 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 		return 83, true
 	case "key-verify":
 		return 84, true
-	case "regional-capacity":
-		return 85, true
 	// ADR-204: the hub-worker's worker configuration acceptance and the key
 	// service's acquisition unwraps.
 	case "worker-config-observe":
@@ -282,14 +205,10 @@ func PublicRuntimeRoleOrdinal(purpose string) (int, bool) {
 	case "context-cleanup-finalize":
 		return 91, true
 	// ADR-210: the hub-api's privacy-operator processing decisions.
-	case "processing-decision":
-		return 92, true
 	// Former metadata-reader ordinals 10-15 and 18 are not reused.
-	case "hub-metadata-read":
-		return 93, true
 	// Former execution-facet ordinals 21-23 are not reused.
-	case "api-execution":
-		return 94, true
+	case "hub-runtime":
+		return 95, true
 	default:
 		return 0, false
 	}

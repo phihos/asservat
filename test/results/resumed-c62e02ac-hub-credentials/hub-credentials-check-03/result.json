@@ -1,0 +1,20 @@
+{
+  "results": [
+    {
+      "argv": [
+        "go",
+        "test",
+        "-count=1",
+        "-run",
+        "^Test(Public|Hub|OwnerCredential|OwnerIdentity|OwnerPublic|SQLConnection)",
+        "./internal/contracts",
+        "./internal/bootstrap",
+        "./internal/adapters/postgres"
+      ],
+      "exitCode": 1,
+      "elapsedSeconds": 23.6128888130188
+    }
+  ],
+  "sourceCount": 2610,
+  "changedSources": []
+}

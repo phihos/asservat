@@ -49,10 +49,10 @@ func TestPublicSharedProjectionContainsOnlyCurrentCredentials(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer clearRuntimeProjection(data)
-	if len(data) != 44 || len(data["sql-public-hub-metadata-read.json"]) == 0 || len(data["sql-public-api-execution.json"]) == 0 {
+	if len(data) != 7 || len(data["sql-public-hub-runtime.json"]) == 0 {
 		t.Fatal("shared projection retained separate credentials")
 	}
-	for _, old := range []string{"permission-read", "retention-read", "storage-read", "progress-read", "case-read", "processing-read", "catalog-read", "api-execution-read", "api-execution-prepare", "api-execution-record"} {
+	for _, old := range []string{"browser-settings", "browser-cleanup", "hub-metadata-read", "api-execution", "permission-read", "retention-read", "storage-read", "progress-read", "case-read", "processing-read", "catalog-read", "api-execution-read", "api-execution-prepare", "api-execution-record"} {
 		if _, ok := data["sql-public-"+old+".json"]; ok {
 			t.Fatal("retired credential still projected", old)
 		}

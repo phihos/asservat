@@ -25,7 +25,7 @@ func TestOwnerPublicProjectionMatchesMountedRoot(t *testing.T) {
 			ref := contracts.WorkerObjectReference{Name: contracts.PublicRuntimeProjectionName(x.reader.input.InstallationID), UID: ownerID(3600)}
 			x.reader.input.Public = &contracts.OwnerPublicDeployment{RuntimeProjection: ref}
 			manifest, _ := json.Marshal(contracts.PublicRuntimeCredentialManifest{Format: contracts.PublicRuntimeCredentialManifestFormat, RootUID: ownerID(3601), SetupID: ownerID(3602)})
-			data := map[string][]byte{contracts.PublicRuntimeCredentialManifestFile: manifest, "sql-public-identity-read.json": []byte("synthetic-login"), contracts.PublicAuditKeysFile: []byte("synthetic-keys")}
+			data := map[string][]byte{contracts.PublicRuntimeCredentialManifestFile: manifest, "sql-public-hub-runtime.json": []byte("synthetic-login"), contracts.PublicAuditKeysFile: []byte("synthetic-keys")}
 			secret := core.Secret{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Secret"}, ObjectMeta: meta.ObjectMeta{Name: ref.Name, Namespace: in.Namespace.Name, UID: types.UID(ref.UID), ResourceVersion: "7",
 				Annotations: map[string]string{"asservat.io/role-root-uid": ownerID(3601), "asservat.io/role-setup-id": ownerID(3602), "asservat.io/projection-id": ownerID(3603)}}, Immutable: ptr.To(true), Type: core.SecretTypeOpaque, Data: data}
 			mounted := map[string][]byte{"client-secret": []byte("operator-only")}
@@ -38,7 +38,7 @@ func TestOwnerPublicProjectionMatchesMountedRoot(t *testing.T) {
 			case "other-uid":
 				secret.UID = types.UID(ownerID(3699))
 			case "changed-bytes":
-				mounted["sql-public-identity-read.json"] = []byte("replaced-login")
+				mounted["sql-public-hub-runtime.json"] = []byte("replaced-login")
 			case "other-root":
 				secret.Annotations["asservat.io/role-root-uid"] = ownerID(3698)
 			case "missing-file":

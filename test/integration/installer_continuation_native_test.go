@@ -1009,7 +1009,7 @@ func installerHubRetentionReadyEpoch(t *testing.T, ctx context.Context, api kube
 		t.Fatal(err)
 	}
 	var login contracts.OwnerSQLCredential
-	if json.Unmarshal(projection.Data["sql-public-hub-metadata-read.json"], &login) != nil || login.Username == "" {
+	if json.Unmarshal(projection.Data["sql-public-hub-runtime.json"], &login) != nil || login.Username == "" {
 		t.Fatal("retention-read login missing")
 	}
 	// The product ledger requires verified TLS, as the step-5 issuance logins.

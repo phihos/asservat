@@ -48,11 +48,11 @@ func TestOwnerIdentityPrivateRoleStateRetainsOriginalAttemptAndEnd(t *testing.T)
 		t.Fatal("historical original role claims rejected")
 	}
 	for name, change := range map[string]func(*contracts.OwnerIdentityRoleState){
-		"different-resource-root": func(v *contracts.OwnerIdentityRoleState) { v.Input.Resources.UID = ownerID(8990) },
-		"new-setup":               func(v *contracts.OwnerIdentityRoleState) { v.Roles[0].Claim.OperationID = v.OperationID },
-		"resource-setup-reuse":    func(v *contracts.OwnerIdentityRoleState) { v.Roles[0].Claim.OperationID = in.ResourceSetupID },
-		"duplicate-attempt":       func(v *contracts.OwnerIdentityRoleState) { v.Roles[1].Claim.OperationID = v.Roles[0].Claim.OperationID },
-		"duplicate-password":      func(v *contracts.OwnerIdentityRoleState) { v.Roles[1].Password = v.Roles[0].Password },
+		"different-resource-root":     func(v *contracts.OwnerIdentityRoleState) { v.Input.Resources.UID = ownerID(8990) },
+		"new-setup":                   func(v *contracts.OwnerIdentityRoleState) { v.Roles[0].Claim.OperationID = v.OperationID },
+		"resource-setup-reuse":        func(v *contracts.OwnerIdentityRoleState) { v.Roles[0].Claim.OperationID = in.ResourceSetupID },
+		"extra-role":                  func(v *contracts.OwnerIdentityRoleState) { v.Roles = append(v.Roles, v.Roles[0]) },
+		"claim-reuses-root-operation": func(v *contracts.OwnerIdentityRoleState) { v.Roles[0].Claim.OperationID = v.OperationID },
 		"zero-password": func(v *contracts.OwnerIdentityRoleState) {
 			v.Roles[0].Password = base64.RawURLEncoding.EncodeToString(make([]byte, 32))
 		},

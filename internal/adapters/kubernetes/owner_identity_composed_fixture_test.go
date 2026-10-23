@@ -45,7 +45,7 @@ func newOwnerIdentityComposedFixture(t *testing.T) (*ownerIdentityComposedFixtur
 		ctx, end := context.WithTimeout(context.Background(), 5*time.Second)
 		roles, fresh, e := f.root.ClaimOwnerIdentityRole(ctx, purpose, 42, started)
 		if e == nil && fresh {
-			e = f.root.CompleteOwnerIdentityRole(ctx, roles, purpose, contracts.PublicRuntimeRoleReceipt{RoleName: "as_" + strings.ReplaceAll(f.root.input.InstallationID, "-", "") + "_own_0" + strconv.Itoa(i), RoleOID: uint32(6500 + i), LayoutDigest: f.root.input.LayoutDigest})
+			e = f.root.CompleteOwnerIdentityRole(ctx, roles, purpose, contracts.PublicRuntimeRoleReceipt{RoleName: "as_" + strings.ReplaceAll(f.root.input.InstallationID, "-", "") + "_own_0" + strconv.Itoa(6), RoleOID: uint32(6500 + i), LayoutDigest: f.root.input.LayoutDigest})
 		}
 		end()
 		if e != nil || !fresh {

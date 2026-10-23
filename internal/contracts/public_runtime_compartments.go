@@ -46,7 +46,7 @@ func PublicRuntimeRoleConnectionLimit(purpose string) (int, bool) {
 		limit, _ := PublicRuntimeRolePoolLimit(purpose)
 		return PublicRuntimeRetainedHubProcesses*limit + 1, true
 	}
-	if slices.Contains(PublicRuntimeCaptureCleanupPurposes(), purpose) || slices.Contains(PublicRuntimeConnectorMaintenancePurposes(), purpose) || purpose == "capacity" || purpose == "capacity-capture" || slices.Contains(PublicRuntimePermissionPurposes(), purpose) || slices.Contains(PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(PublicRuntimeContextDeletionPurposes(), purpose) {
+	if purpose == "browser-settings" || slices.Contains(PublicRuntimeCaptureCleanupPurposes(), purpose) || slices.Contains(PublicRuntimeConnectorMaintenancePurposes(), purpose) || purpose == "capacity" || purpose == "capacity-capture" || slices.Contains(PublicRuntimePermissionPurposes(), purpose) || slices.Contains(PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(PublicRuntimeContextDeletionPurposes(), purpose) {
 		return PublicRuntimeWorkerRoleConnections, true
 	}
 	if slices.Contains(PublicRuntimeFederationPurposes(), purpose) {
@@ -61,17 +61,15 @@ func PublicRuntimeRoleConnectionLimit(purpose string) (int, bool) {
 	return 0, false
 }
 
-// PublicRuntimeRolePoolLimit preserves the former aggregate concurrency for
-// shared metadata and execution pools. Other credentials keep one connection.
+// PublicRuntimeRolePoolLimit is the aggregate pool maximum for a credential
+// in one process. The shared hub login owns an 18-slot ordinary pool and two
+// one-slot resolution pools; other public credentials keep one connection.
 func PublicRuntimeRolePoolLimit(purpose string) (int, bool) {
 	if !slices.Contains(PublicRuntimeRolePurposes(), purpose) {
 		return 0, false
 	}
-	if purpose == "hub-metadata-read" {
-		return PublicRuntimeMetadataConnections, true
-	}
-	if purpose == "api-execution" {
-		return PublicRuntimeAPIExecutionConnections, true
+	if purpose == "hub-runtime" {
+		return PublicRuntimeHubConnections, true
 	}
 	return 1, true
 }

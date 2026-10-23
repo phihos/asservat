@@ -53,7 +53,7 @@ func (r *activityRows) Scan(out ...any) error {
 }
 
 func TestInstalledSQLActivityUsesOnlyBoundedReadProjection(t *testing.T) {
-	registry, _ := postgres.OwnerIdentityRoleName(activityInstallation, "registry")
+	registry, _ := postgres.OwnerIdentityRoleName(activityInstallation, "owner-runtime")
 	rows := &activityRows{left: 1000, role: registry, event: "ClientRead"}
 	var output strings.Builder
 	queries := 0
@@ -76,7 +76,7 @@ func TestInstalledSQLActivityUsesOnlyBoundedReadProjection(t *testing.T) {
 		roles := args[0].([]string)
 		source, _ := postgres.ConfigurationRuntimeRoleName(activityInstallation, "configuration-source")
 		capture, _ := postgres.PublicRuntimeRoleName(activityInstallation, "capture-journal")
-		foreign, _ := postgres.OwnerIdentityRoleName("20000000-0000-4000-8000-000000000002", "registry")
+		foreign, _ := postgres.OwnerIdentityRoleName("20000000-0000-4000-8000-000000000002", "owner-runtime")
 		if !slices.Contains(roles, registry) || !slices.Contains(roles, source) || !slices.Contains(roles, capture) ||
 			slices.Contains(roles, foreign) || slices.Contains(roles, "postgres") {
 			t.Fatal("diagnostic roles are not the installation's runtime roles")
@@ -93,7 +93,7 @@ func TestInstalledSQLActivityUsesOnlyBoundedReadProjection(t *testing.T) {
 }
 
 func TestInstalledSQLActivityRedactsFailuresAndRejectsUnexpectedRows(t *testing.T) {
-	role, _ := postgres.OwnerIdentityRoleName(activityInstallation, "registry")
+	role, _ := postgres.OwnerIdentityRoleName(activityInstallation, "owner-runtime")
 	const sensitive = "provider password=secret SELECT user_data"
 	for _, tc := range []struct {
 		name, role, event, want    string
@@ -129,7 +129,7 @@ func TestInstalledSQLActivityKeepsOriginalCancellationAndDeadline(t *testing.T) 
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
 	until, _ := ctx.Deadline()
-	role, _ := postgres.OwnerIdentityRoleName(activityInstallation, "registry")
+	role, _ := postgres.OwnerIdentityRoleName(activityInstallation, "owner-runtime")
 	rows := &activityRows{left: 1, role: role, beforeNext: cancel}
 	calls := 0
 	var stages []string

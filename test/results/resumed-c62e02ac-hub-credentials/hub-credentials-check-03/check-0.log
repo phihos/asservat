@@ -1,0 +1,7 @@
+--- FAIL: TestHubCredentialsPreserveProcessAndPinnedBoundaries (0.00s)
+    public_runtime_hub_test.go:29: separate process credential moved into hub browser-cleanup
+FAIL
+FAIL	asservat.local/asservat/internal/contracts	0.005s
+ok  	asservat.local/asservat/internal/bootstrap	0.370s
+ok  	asservat.local/asservat/internal/adapters/postgres	0.486s
+FAIL
