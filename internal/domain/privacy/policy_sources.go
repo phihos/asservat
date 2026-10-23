@@ -21,8 +21,13 @@ type PolicyTopology struct {
 	ObservedAt, FreshUntil  time.Time
 }
 
+// PolicyTopologyInterval bounds one topology observation. The topology is an
+// installer-pinned immutable ConfigMap whose content digest every read checks,
+// so the authorized 30 s recheck cadence applies (ADR-200 revision 2026-10-23).
+const PolicyTopologyInterval = 30 * time.Second
+
 func (t PolicyTopology) Valid(now time.Time) bool {
-	if !authorization.UUID(t.RootID) || !authorization.UUID(t.TargetClusterID) || !t.Revision.Valid() || !identity.Fresh(t.ObservedAt, t.FreshUntil, now, 5*time.Second) || len(t.Sources) < 1 || len(t.Sources) > 2 {
+	if !authorization.UUID(t.RootID) || !authorization.UUID(t.TargetClusterID) || !t.Revision.Valid() || !identity.Fresh(t.ObservedAt, t.FreshUntil, now, PolicyTopologyInterval) || len(t.Sources) < 1 || len(t.Sources) > 2 {
 		return false
 	}
 	hubs := 0

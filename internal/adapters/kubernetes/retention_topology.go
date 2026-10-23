@@ -3,6 +3,8 @@ package kubernetes
 import (
 	"context"
 	"encoding/hex"
+	"slices"
+	"sync"
 	"time"
 
 	port "asservat.local/asservat/internal/application/configuration"
@@ -22,6 +24,10 @@ type RetentionTopologyClient struct {
 	client                  *PermissionClient
 	name, uid, root, target string
 	digest                  artifact.Digest
+	// ponytail: one process-wide reuse of the last successful pinned read;
+	// failures are never kept. Per-target lock serializes cold reads.
+	mu   sync.Mutex
+	last privacy.PolicyTopology
 }
 
 var _ port.RetentionTopologyReader = (*RetentionTopologyClient)(nil)
@@ -77,6 +83,13 @@ func (c *RetentionTopologyClient) RetentionTopology(ctx context.Context, target 
 	if target != c.target {
 		return out, value.ErrDenied
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if n := c.client.now(); c.last.Valid(n) && n.Before(c.last.FreshUntil) {
+		out = c.last
+		out.Sources = slices.Clone(c.last.Sources)
+		return out, nil
+	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := c.client.now()
@@ -108,7 +121,7 @@ func (c *RetentionTopologyClient) RetentionTopology(ctx context.Context, target 
 	if err != nil {
 		return out, err
 	}
-	out = privacy.PolicyTopology{RootID: c.root, TargetClusterID: c.target, Revision: identity.Revision{UID: ref.UID, Generation: wire.Revision, Digest: digest}, Sources: []privacy.PolicySourceRef{hub}, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
+	out = privacy.PolicyTopology{RootID: c.root, TargetClusterID: c.target, Revision: identity.Revision{UID: ref.UID, Generation: wire.Revision, Digest: digest}, Sources: []privacy.PolicySourceRef{hub}, ObservedAt: start, FreshUntil: start.Add(privacy.PolicyTopologyInterval)}
 	if wire.Local != nil {
 		local, err := source(*wire.Local, false)
 		if err != nil {
@@ -119,5 +132,7 @@ func (c *RetentionTopologyClient) RetentionTopology(ctx context.Context, target 
 	if c.client.current(ctx, start, 5*time.Second) != nil || !out.Valid(c.client.now()) {
 		return privacy.PolicyTopology{}, value.ErrUnavailable
 	}
+	c.last = out
+	c.last.Sources = slices.Clone(out.Sources)
 	return out, nil
 }

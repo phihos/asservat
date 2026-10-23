@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -105,8 +106,13 @@ func TestRetentionTopologyRequiresIndependentExactImmutablePin(t *testing.T) {
 				if mode == "hub-only-explicit" {
 					want = 1
 				}
-				if err != nil || !out.Valid(time.Unix(0, clock.Load())) || out.Revision.Digest != pin || out.RootID != root || out.TargetClusterID != target || len(out.Sources) != want || !out.Sources[0].Hub || out.FreshUntil.Sub(out.ObservedAt) != 5*time.Second {
+				if err != nil || !out.Valid(time.Unix(0, clock.Load())) || out.Revision.Digest != pin || out.RootID != root || out.TargetClusterID != target || len(out.Sources) != want || !out.Sources[0].Hub || out.FreshUntil.Sub(out.ObservedAt) != privacy.PolicyTopologyInterval {
 					t.Fatal("valid topology", out, err)
+				}
+				// The pinned immutable read is reused within its interval.
+				before := requests.Load()
+				if again, err := reader.RetentionTopology(context.Background(), query); err != nil || again.Revision != out.Revision || requests.Load() != before {
+					t.Fatal("pinned topology reread inside its interval", err, requests.Load()-before)
 				}
 			} else if err == nil {
 				t.Fatal("unsafe topology accepted", mode)
