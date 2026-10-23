@@ -369,8 +369,15 @@ func (s *serverStream) SendTerminal(ctx context.Context, f contracts.NativeFrame
 func (s *serverStream) sendCompleted(ctx context.Context, f contracts.NativeFrame, proof nativeCompletionProof) error {
 	lease, err := s.gate.TerminalLease(ctx)
 	a, decode := contracts.DecodeNativeAcknowledge(f.Payload)
-	if err != nil || decode != nil || proof.gate != s.gate || !proof.lease.Valid(time.Now()) || !lease.Operation.Equal(proof.lease.Operation) || lease.Sequence != proof.lease.Sequence || lease.Certificate != proof.lease.Certificate || lease.Until.After(proof.lease.Until) || f.Kind != contracts.NativeDoneFrame || a.Format != contracts.NativeExchangeFormat || a.Reference != nativeReference(proof.lease.Operation) || a.Nonce != proof.nonce || a.Phase != proof.phase || a.Bytes != 0 || (a.Phase != "closed" && a.Phase != "joined") {
-		return contracts.ErrNativeProtocol
+	switch {
+	case err != nil:
+		return frameRefusal("terminal-lease", err)
+	case proof.gate != s.gate:
+		return step("proof-gate", contracts.ErrNativeProtocol)
+	case decode != nil || !proof.lease.Valid(time.Now()) || !lease.Operation.Equal(proof.lease.Operation) || lease.Sequence != proof.lease.Sequence || lease.Certificate != proof.lease.Certificate || lease.Until.After(proof.lease.Until):
+		return step("proof-lease", contracts.ErrNativeProtocol)
+	case f.Kind != contracts.NativeDoneFrame || a.Format != contracts.NativeExchangeFormat || a.Reference != nativeReference(proof.lease.Operation) || a.Nonce != proof.nonce || a.Phase != proof.phase || a.Bytes != 0 || (a.Phase != "closed" && a.Phase != "joined"):
+		return step("proof-frame", contracts.ErrNativeProtocol)
 	}
 	return s.send(ctx, f, true)
 }

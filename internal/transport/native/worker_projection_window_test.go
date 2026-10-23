@@ -152,3 +152,91 @@ func testHubWorkerProjectionLifetime(t *testing.T, lifetime time.Duration, revok
 		t.Fatal("worker gate did not span the projection operation", err, lease.Until.Sub(now))
 	}
 }
+
+// Installed native88: the worker read and returned the projection, the hub's
+// operation closed its SQL native row, and the hub then refused its own final
+// close (serve/close): the operation's completion proof names its inner gate,
+// while a hub-local worker conversation streams under the outer peer gate.
+// Production worker admission, router, registration, both gates, handler and
+// real TLS/h2 run the complete approved exchange to the joined close.
+func TestHubWorkerProjectionConversationJoinsThroughPeerGate(t *testing.T) {
+	f := newProjectionProtocolFixture(t)
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	op := f.lease.Operation
+	op.StartedAt, op.Until = now, now.Add(identity.EvidenceReadRequestWindow)
+	op.Processing.ObservedAt, op.Processing.ValidUntil = now, op.Until
+	stored := value.NativeLease{Operation: op, Certificate: f.lease.Certificate, Sequence: 1, ObservedAt: op.StartedAt, Until: op.Until}
+	f.lease = stored
+	peer := value.KeyPeer{InstallationID: nativeID, PeerID: nativeID, Role: "acquisition", Certificate: stored.Certificate, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Minute)}
+	binding := value.AcquisitionWorkerBinding{Parent: value.AcquisitionParent{Purpose: value.AcquisitionProjection, ID: op.Reference.QueryID}, InstallationID: nativeID, ClusterID: nativeID, Namespace: "private-workers", NamespaceUID: nativeID, ServiceAccount: "acquisition", ServiceAccountUID: nativeID, Job: "query", JobUID: nativeID, Pod: "query-pod", PodUID: nativeID, JobSpec: artifact.Digest{1}, PodSpec: artifact.Digest{2}}
+	origin := evidence.NativeOrigin{Lease: stored, Proof: value.AcquisitionPeerProof{Binding: binding, Peer: peer, TokenDigest: artifact.Digest{4}, ObservedAt: now, FreshUntil: now.Add(identity.EvidenceReadRequestWindow)}}
+	origin.Lease.Until = now.Add(5 * time.Second)
+	stored0 := projectionStoredOperations{lease: stored, calls: new(atomic.Int32), revokeAt: new(atomic.Int32)}
+	origins := &evidence.NativeOrigins{Projection: stored0, Now: time.Now}
+	router, err := native.NewHubRouter(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer router.Close()
+	var completed atomic.Int32
+	pending, err := router.RegisterNativeExchange(f.ctx, evidence.NativeExchangeRegistration{Operation: op, Projection: &f.scope, Source: f.source, Complete: func(ctx context.Context, l value.NativeLease) error {
+		completed.Add(1)
+		return ctx.Err()
+	}}, func(context.Context, evidence.NativeOrigin) error { return nil },
+		func(bound context.Context, o evidence.NativeOrigin) (value.NativeLease, error) {
+			return origins.Recheck(bound, o)
+		})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pending.Close()
+	peers := &projectionWorkerPeers{origin: origin, origins: origins, hello: f.hello}
+	a, err := native.NewHubWorkerAdmission(peers, &hubWorkerServing{until: now.Add(5 * time.Second), pod: nativeID}, router, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var hubStep atomic.Value
+	client := flowServerReporting(t, contracts.NativeWorkerPath, a, func(_ context.Context, stage string, err error) {
+		var s interface{ FixedStep() string }
+		if errors.As(err, &s) {
+			stage += "/" + s.FixedStep()
+		}
+		hubStep.Store(stage)
+	})
+	// The fixture's frame-inspecting stream pins its own command interval;
+	// this test runs the actual worker conversation on the plain stream.
+	stream, err := client.Open(f.ctx, f.hello)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := f.result(t, f.reader())
+	done := make(chan projectionProtocolOutcome, 1)
+	go func() {
+		defer stream.Close()
+		state, err := native.RunWorkerConversation(f.ctx, stream, f.hello, f.target, artifact.Digest{1}, result)
+		done <- projectionProtocolOutcome{state, err}
+	}()
+	exchange, err := pending.Wait(f.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projection, ok := exchange.(evidence.NativeProjectionExchange)
+	if !ok {
+		t.Fatal("not a projection exchange")
+	}
+	if _, err = projection.Projection(f.ctx); err != nil {
+		out := projectionProtocolReceive(t, f.ctx, done)
+		var s interface{ FixedStep() string }
+		step := ""
+		if errors.As(out.err, &s) {
+			step = s.FixedStep()
+		}
+		t.Fatal("projection not received", err, out.err, step, hubStep.Load())
+	}
+	if err = projection.AcknowledgeProjection(f.ctx); err != nil {
+		t.Fatal("hub refused its own final close", err, hubStep.Load())
+	}
+	if out := projectionProtocolReceive(t, f.ctx, done); out.err != nil || out.state.State != contracts.NativeJoined || completed.Load() != 1 {
+		t.Fatal("hub-local projection conversation did not join", out.err, completed.Load())
+	}
+}

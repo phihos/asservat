@@ -116,6 +116,9 @@ func (a *flowAdmission) OpenNative(ctx context.Context, peer *tls.ConnectionStat
 	return flowConversation{c, "connector", a.t}, nil
 }
 func flowServer(t *testing.T, path string, a native.Admission) *mtls.NativeClient {
+	return flowServerReporting(t, path, a, nil)
+}
+func flowServerReporting(t *testing.T, path string, a native.Admission, refused func(context.Context, string, error)) *mtls.NativeClient {
 	server, client, roots := testCertificates(t)
 	var handler http.Handler
 	var handlers sync.WaitGroup
@@ -144,10 +147,12 @@ func flowServer(t *testing.T, path string, a native.Admission) *mtls.NativeClien
 	})
 	u, _ := url.Parse(s.URL)
 	var e error
-	handler, e = native.NewHandler(path, u.Host, a, 1)
+	h, e := native.NewHandler(path, u.Host, a, 1)
 	if e != nil {
 		t.Fatal(e)
 	}
+	h.Refused = refused
+	handler = h
 	c, e := mtls.NewNativeClient(s.URL+path, &tls.Config{RootCAs: roots, Certificates: []tls.Certificate{client}})
 	if e != nil {
 		t.Fatal(e)

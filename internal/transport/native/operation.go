@@ -297,28 +297,28 @@ type nativeCompletionProof struct {
 func (o *HubOperation) finish(ctx context.Context, s Stream, phase string) error {
 	lease, err := o.gate.Check(ctx)
 	if err != nil {
-		return err
+		return step("gate", err)
 	}
 	call, stop := context.WithDeadline(ctx, lease.Until)
 	defer stop()
 	if err = o.complete(call, lease); err != nil {
-		return err
+		return step("complete", err)
 	}
 	if call.Err() != nil || o.ctx.Err() != nil || !lease.Valid(time.Now()) {
-		return artifact.ErrDownloadExpired
+		return step("expired", artifact.ErrDownloadExpired)
 	}
 	terminal, ok := s.(interface {
 		sendCompleted(context.Context, contracts.NativeFrame, nativeCompletionProof) error
 	})
 	if !ok {
-		return contracts.ErrNativeProtocol
+		return step("terminal-stream", contracts.ErrNativeProtocol)
 	}
 	payload, err := json.Marshal(ack(o.command, phase, 0))
 	if err != nil {
 		return err
 	}
 	defer clear(payload)
-	return terminal.sendCompleted(call, contracts.NativeFrame{Kind: contracts.NativeDoneFrame, Payload: payload}, nativeCompletionProof{o.gate, lease, o.command.Nonce, phase})
+	return step("send-done", terminal.sendCompleted(call, contracts.NativeFrame{Kind: contracts.NativeDoneFrame, Payload: payload}, nativeCompletionProof{o.gate, lease, o.command.Nonce, phase}))
 }
 
 func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
@@ -418,19 +418,19 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 	}
 	if o.command.Kind == string(value.NativeProjection) {
 		if action.phase != "approved" || action.n != 0 {
-			return contracts.ErrNativeProtocol
+			return step("action", contracts.ErrNativeProtocol)
 		}
 		if err = sendControl(work, s, contracts.NativeAcknowledgeFrame, ack(o.command, "approved", 0)); err != nil {
-			return err
+			return step("ack", err)
 		}
 		f, e := s.Receive(work)
 		if e != nil {
-			return e
+			return step("worker-closed", e)
 		}
 		if err = exactAck(f, contracts.NativeDoneFrame, o.command, "closed", 0); err != nil {
-			return err
+			return step("worker-closed-frame", err)
 		}
-		return o.finish(work, s, "joined")
+		return step("finish", o.finish(work, s, "joined"))
 	}
 	if action.phase != "delivered" || action.n != o.command.Length {
 		return contracts.ErrNativeProtocol

@@ -1,5 +1,27 @@
 # Sustained implementation progress
 
+## Final close through the peer gate (2026-10-23)
+
+Installed native88 completed the approved read in the worker (all three key
+roles consumed, `used_roles=7`) and the hub closed the native SQL row
+(`context_query_batch.native_closed=true`), then refused its own final Done
+frame at `serve/close`. `HubOperation.finish` proves its exact SQL close
+against the operation's own (inner) frame gate; a hub-local worker
+conversation (and a relayed one) streams under the outer peer gate, and
+`serverStream.sendCompleted` required the proof's gate to be the stream's,
+so every such final close was refused. The synthetic native close tests
+attach the operation directly and never covered the peer conversation.
+`peerConversation.Serve` now carries the proof across: it accepts only a
+proof for its own inner operation gate and re-states it for its outer gate
+(bounded by the inner one); the stream's complete terminal-lease, lease and
+frame checks are unchanged. Close refusals now name their stage
+(`serve/close/<action|ack|worker-closed|finish>/<gate|complete|expired|
+send-done>/<proof-gate|proof-lease|proof-frame|terminal-lease>`).
+`TestHubWorkerProjectionConversationJoinsThroughPeerGate` (production worker
+admission, router, registration, both gates, handler, real TLS/h2) fails
+before at `serve/close/finish/send-done/proof-gate` and joins after.
+Installed qualification has not rerun.
+
 ## Hello read deadline outlived by the projection conversation (2026-10-23)
 
 Installed native87 failed both sides within 9 ms: hub
