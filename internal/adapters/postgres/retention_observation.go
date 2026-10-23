@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -19,27 +20,27 @@ var _ app.RetentionSourceReader = (*RetentionSources)(nil)
 func (s *RetentionSources) ObserveRetention(ctx context.Context, o app.RetentionObservation) error {
 	f, p := o.Fence, o.Protection
 	if !f.Valid() || f.RootID != s.root || f.Sequence < 1 || p.SourceClusterID != f.Source.ClusterID || p.ControlNamespaceUID != f.Source.ControlNamespaceUID || p.Digest != f.Source.ProtectionDigest || o.List.Snapshot.SourceClusterID != f.Source.ClusterID || o.List.Snapshot.ControlNamespaceUID != f.Source.ControlNamespaceUID || o.List.Snapshot.Hub != f.Source.Hub {
-		return value.ErrInvalid
+		return retentionObserveStep("input", value.ErrInvalid)
 	}
 	behind := false
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		behind = false
 		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
-			return err
+			return retentionObserveStep("permission-lock", err)
 		}
 		row, err := lockRetentionSource(ctx, q, s.root, f.Source)
 		if err != nil {
-			return err
+			return retentionObserveStep("source-lock", err)
 		}
 		now, err := liveRetentionSource(ctx, q, row, f)
 		if err != nil {
-			return err
+			return retentionObserveStep("source-live", err)
 		}
 		if !identity.Fresh(p.ObservedAt, p.FreshUntil, now, 5*time.Second) {
-			return value.ErrUnavailable
+			return retentionObserveStep("proof-fresh", value.ErrUnavailable)
 		}
 		if _, err = app.NewRetentionJournal(o.List, now); err != nil {
-			return value.ErrInvalid
+			return retentionObserveStep("journal-new", value.ErrInvalid)
 		}
 		recordCursor := func() error {
 			return q.RecordRetentionListCursor(ctx, custodydb.RecordRetentionListCursorParams{RootID: row.RootID, ClusterID: row.ClusterID, NamespaceUid: row.NamespaceUid, ListCursor: o.List.ResourceVersion})
@@ -59,27 +60,27 @@ func (s *RetentionSources) ObserveRetention(ctx context.Context, o app.Retention
 		// deleted between LISTs. Process history through the LIST watermark first.
 		order, err := resourceversion.CompareResourceVersion(row.WatchCursor, o.List.ResourceVersion)
 		if err != nil {
-			return value.ErrInvalid
+			return retentionObserveStep("watch-cursor", value.ErrInvalid)
 		}
 		if row.ListCursor != "" {
 			newer, err := resourceversion.CompareResourceVersion(o.List.ResourceVersion, row.ListCursor)
 			if err != nil {
-				return value.ErrInvalid
+				return retentionObserveStep("list-cursor", value.ErrInvalid)
 			}
 			if newer < 0 {
-				return value.ErrRetentionObservationObsolete
+				return retentionObserveStep("list-obsolete", value.ErrRetentionObservationObsolete)
 			}
 		}
 		checkpoint, err := currentRetentionCheckpoint(ctx, q, row)
 		if err != nil {
-			return err
+			return retentionObserveStep("checkpoint", err)
 		}
 		if checkpoint == nil || checkpoint.Transition.Fence.Source != f.Source {
-			return value.ErrChanged
+			return retentionObserveStep("checkpoint-source", value.ErrChanged)
 		}
 		journal, err := app.ResumeRetentionJournal(checkpoint.Transition.List)
 		if err != nil {
-			return err
+			return retentionObserveStep("journal-resume", err)
 		}
 		if err = journal.Confirm(o.List, now); err != nil {
 			return invalidate()
@@ -97,29 +98,33 @@ func (s *RetentionSources) ObserveRetention(ctx context.Context, o app.Retention
 		// The LIST and guard proof must still be inside their original five
 		// seconds now; only the stored observation lives longer.
 		if !identity.Fresh(observed, input, now, 5*time.Second) {
-			return value.ErrUnavailable
+			return retentionObserveStep("input-fresh", value.ErrUnavailable)
 		}
 		until := retentionSourceUntil(observed)
 		// Out-of-order observation replies cannot extend an older observation.
 		if row.ObservedAt.Valid && (observed.Before(row.ObservedAt.Time) || (observed.Equal(row.ObservedAt.Time) && until.After(row.FreshUntil.Time))) {
-			return value.ErrRetentionObservationObsolete
+			return retentionObserveStep("out-of-order", value.ErrRetentionObservationObsolete)
 		}
 		if err = recordCursor(); err != nil {
-			return err
+			return retentionObserveStep("record-cursor", err)
 		}
 		if err = q.ObserveRetentionSource(ctx, custodydb.ObserveRetentionSourceParams{RootID: row.RootID, ClusterID: row.ClusterID, NamespaceUid: row.NamespaceUid, ObservedAt: ts(observed), FreshUntil: ts(until)}); err != nil {
-			return err
+			return retentionObserveStep("observe-write", err)
 		}
 		after, err := liveRetentionSource(ctx, q, row, f)
 		if err != nil {
-			return err
+			return retentionObserveStep("source-live-after", err)
 		}
 		if !identity.Fresh(observed, until, after, privacy.RetentionSourceInterval) {
-			return value.ErrUnavailable
+			return retentionObserveStep("stored-fresh", value.ErrUnavailable)
 		}
 		return nil
 	})
 	if err != nil {
+		var step *retentionObserveError
+		if errors.As(err, &step) {
+			return &retentionObserveError{step: step.step, err: permissionError(step.err)}
+		}
 		return permissionError(err)
 	}
 	if behind {
@@ -215,4 +220,22 @@ func acceptedRetentionSource(ctx context.Context, q *custodydb.Queries, root str
 		return out, value.ErrUnavailable
 	}
 	return out, nil
+}
+
+// retentionObserveStep names the refusing observe check for the hub-worker
+// report; errors.Is/As still see the original error unchanged.
+type retentionObserveError struct {
+	step string
+	err  error
+}
+
+func (e *retentionObserveError) Error() string     { return e.err.Error() }
+func (e *retentionObserveError) Unwrap() error     { return e.err }
+func (e *retentionObserveError) FixedStep() string { return "observe-" + e.step }
+
+func retentionObserveStep(step string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return &retentionObserveError{step: step, err: err}
 }
