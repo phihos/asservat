@@ -40,7 +40,7 @@ permission fences remain and MAY deny earlier; this is not a promised 30-second
 revocation delay. The native response MAY consume the coordinator's exact checked
 short authority through a private handoff instead of reconstructing it again.
 
-A finite worker preparation/enrollment operation may reuse its initial combined
+A finite public worker-preparation operation may reuse its initial combined
 authorization until the earliest original request, identity, evidence and proof
 deadline, capped at five seconds. Each subsequent helper checks that retained
 observation and cancellation locally; it need not repeat external identity or
@@ -52,6 +52,14 @@ MAY consume the same original combined authority through private handoff. Curren
 SQL state and final identity are still checked. Each new public request MUST
 construct fresh authority; an unknown effect reply MUST NOT become acknowledged
 Preparing merely because its original authority is retained.
+
+[ADR-221](../docs/decisions/221-admitted-worker-identity-enrollment.md) separates
+identity enrollment from public preparation. An exact admitted worker MAY obtain
+or renew its certificate under its own original request, without a connected
+human preparation request. Current admitted parent, workload proof, configuration,
+recovery, immutable key, finite signing and audit checks remain. Its certificate
+MUST NOT confer evidence or key access: each acquisition still requires fresh
+purpose-specific authority within the original worker and parent lifetimes.
 
 Download needs current retained-artifact entitlement or explicit share coverage, no deny/restriction, current authenticated principal/client, `evidence:download`, finite transfer resources and durable audit. Ordinary artifact readers may download the actual approved artifact they can read without independent human review. An extract view does not confer access to its hidden raw parent. Existing ordinary shares that authorize reading an explicit approved artifact also authorize its native download; raw shares require explicit download coverage.
 
