@@ -87,7 +87,7 @@ func (a *ConnectorAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 		if e != nil || !other.Operation.Equal(local.Operation) || other.Certificate != local.Certificate || other.Sequence != local.Sequence {
 			return value.NativeLease{}, artifact.ErrDownloadUnavailable
 		}
-		local.Until = identity.Earlier(local.Until, identity.Earlier(serving, identity.Earlier(until, other.Until)))
+		local.Until = identity.Earlier(local.Until, identity.Earlier(admissionServing(local, serving), identity.Earlier(until, other.Until)))
 		return local, nil
 	}, a.now)
 	if e != nil {
@@ -169,7 +169,7 @@ func (a *HubAdmission) OpenNative(ctx context.Context, state *tls.ConnectionStat
 		if e != nil || !local.Operation.Equal(peer.Operation) || local.Certificate != peer.Certificate || local.Sequence != peer.Sequence {
 			return value.NativeLease{}, artifact.ErrDownloadUnavailable
 		}
-		local.Until = identity.Earlier(local.Until, identity.Earlier(serving, identity.Earlier(until, peer.Until)))
+		local.Until = identity.Earlier(local.Until, identity.Earlier(admissionServing(local, serving), identity.Earlier(until, peer.Until)))
 		return local, nil
 	}, a.now)
 	if e != nil {
@@ -191,4 +191,15 @@ func (c *peerConversation) Close() error {
 	e := c.inner.Close()
 	_ = c.gate.Wait(context.Background())
 	return e
+}
+
+// admissionServing is the admission's serving observation as a per-frame
+// bound. Each frame's own serving check is current; an approved projection
+// conversation (up to the evidence-read window) is not ended by the stale
+// admission observation. Other kinds keep it.
+func admissionServing(l value.NativeLease, serving time.Time) time.Time {
+	if l.Operation.Kind == value.NativeProjection {
+		return l.Operation.Until
+	}
+	return serving
 }

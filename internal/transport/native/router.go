@@ -79,6 +79,17 @@ func (r *HubRouter) Attach(ctx context.Context, origin evidence.NativeOrigin, h 
 	}
 	return entry.attach(ctx, origin, h)
 }
+// attachBound is the latest Until an attached gate may report. An approved
+// projection gate spans its operation (each frame repeats its complete check);
+// the admission origin's five-second observations bound only that admission.
+// Other kinds keep the admission origin's lease.
+func attachBound(l value.NativeLease) time.Time {
+	if l.Operation.Kind == value.NativeProjection {
+		return l.Operation.Until
+	}
+	return l.Until
+}
+
 func (r *NativeRegistration) attach(ctx context.Context, origin evidence.NativeOrigin, h contracts.NativeHello) (Conversation, error) {
 	r.mu.Lock()
 	if r.closed || r.attaching || r.ctx.Err() != nil || !r.operation.Equal(origin.Lease.Operation) {
@@ -95,7 +106,7 @@ func (r *NativeRegistration) attach(ctx context.Context, origin evidence.NativeO
 		checked, e := checkNativeAdmission(call, operation.Gate())
 		if e != nil {
 			err = e
-		} else if lease := checked.lease; !lease.Operation.Equal(r.operation) || lease.Certificate != origin.Lease.Certificate || lease.Sequence != origin.Lease.Sequence || lease.Until.After(origin.Lease.Until) {
+		} else if lease := checked.lease; !lease.Operation.Equal(r.operation) || lease.Certificate != origin.Lease.Certificate || lease.Sequence != origin.Lease.Sequence || lease.Until.After(attachBound(origin.Lease)) {
 			err = artifact.ErrDownloadUnavailable
 		} else {
 			_, err = operation.attachChecked(checked, h)

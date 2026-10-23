@@ -167,16 +167,25 @@ func (s *ProjectionRuntime) ReadProjection(ctx context.Context, q query.ContextQ
 	current := func(bound context.Context, origin NativeOrigin) (value.NativeLease, error) {
 		var zero value.NativeLease
 		fresh, e := owner.CheckCurrent(bound)
-		if e != nil || call.Err() != nil || !start.Batch.Current(q, fresh, s.Now()) || fresh.Scope != a.Scope || fresh.Environment.Path != a.Environment.Path || !fresh.Environment.Processing.Equal(a.Environment.Processing) || origin.Proof.Binding != c.Enrollment.Worker.Binding || origin.Proof.Peer.Certificate != start.Batch.Worker.Certificate {
-			return zero, query.ErrUnavailable
+		if e != nil || call.Err() != nil {
+			return zero, collapsed("request", query.ErrUnavailable, errors.Join(e, call.Err()))
+		}
+		if !start.Batch.Current(q, fresh, s.Now()) {
+			return zero, stepped("batch", query.ErrUnavailable)
+		}
+		if fresh.Scope != a.Scope || fresh.Environment.Path != a.Environment.Path || !fresh.Environment.Processing.Equal(a.Environment.Processing) || origin.Proof.Binding != c.Enrollment.Worker.Binding || origin.Proof.Peer.Certificate != start.Batch.Worker.Certificate {
+			return zero, stepped("binding", query.ErrUnavailable)
 		}
 		lease, e := s.Origins.Recheck(bound, origin)
-		if e != nil || !lease.Operation.Equal(operation) {
-			return zero, query.ErrUnavailable
+		if e != nil {
+			return zero, collapsed("origin", query.ErrUnavailable, e)
+		}
+		if !lease.Operation.Equal(operation) {
+			return zero, stepped("operation", query.ErrUnavailable)
 		}
 		lease.Until = identity.Earlier(lease.Until, identity.Earlier(until, fresh.ValidUntil))
 		if !lease.Valid(s.Now()) || call.Err() != nil {
-			return zero, query.ErrUnavailable
+			return zero, stepped("lease", query.ErrUnavailable)
 		}
 		return lease, nil
 	}

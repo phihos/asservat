@@ -80,17 +80,20 @@ func (a *HubWorkerAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 	gate, e := evidence.NewNativeFrameGate(inner.Gate().Context(), func(c context.Context) (value.NativeLease, error) {
 		until, e := a.serving.CheckNativeHub(c, operation)
 		if e != nil {
-			return value.NativeLease{}, e
+			return value.NativeLease{}, step("hub", e)
 		}
 		peer, e := a.peers.RecheckWorkerNative(c, state, origin)
 		if e != nil {
-			return peer, e
+			return peer, step("worker", e)
 		}
 		local, e := inner.Gate().Check(c)
-		if e != nil || !local.Operation.Equal(peer.Operation) || local.Certificate != peer.Certificate || local.Sequence != peer.Sequence {
-			return value.NativeLease{}, artifact.ErrDownloadUnavailable
+		if e != nil {
+			return value.NativeLease{}, step("operation", e)
 		}
-		local.Until = identity.Earlier(local.Until, identity.Earlier(serving, identity.Earlier(until, peer.Until)))
+		if !local.Operation.Equal(peer.Operation) || local.Certificate != peer.Certificate || local.Sequence != peer.Sequence {
+			return value.NativeLease{}, step("match", artifact.ErrDownloadUnavailable)
+		}
+		local.Until = identity.Earlier(local.Until, identity.Earlier(admissionServing(local, serving), identity.Earlier(until, peer.Until)))
 		return local, nil
 	}, a.now)
 	if e != nil {

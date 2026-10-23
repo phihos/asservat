@@ -175,19 +175,22 @@ func (p *NativePeerChecks) RecheckWorkerNative(ctx context.Context, state *tls.C
 	h := contracts.NativeHello{Reference: nativeWireRef(original.Lease.Operation.Reference)}
 	w, v, e := p.worker(ctx, h)
 	if e != nil {
-		return value.NativeLease{}, e
+		return value.NativeLease{}, answerStep("enrollment", e, nil)
 	}
 	peer, e := v.Verify(state)
-	if e != nil || !original.Lease.Operation.CurrentValid(p.Now()) || original.Lease.Operation.Path.AcquisitionClusterID != w.Worker.Intent.Profile.ClusterID || original.Lease.Operation.Path.WorkerConfiguration != w.Worker.Intent.Profile.Configuration || peer != original.Proof.Peer || w.Worker.Binding != original.Proof.Binding {
-		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	if e != nil {
+		return value.NativeLease{}, answerStep("certificate", artifact.ErrDownloadUnavailable, e)
+	}
+	if !original.Lease.Operation.CurrentValid(p.Now()) || original.Lease.Operation.Path.AcquisitionClusterID != w.Worker.Intent.Profile.ClusterID || original.Lease.Operation.Path.WorkerConfiguration != w.Worker.Intent.Profile.Configuration || peer != original.Proof.Peer || w.Worker.Binding != original.Proof.Binding {
+		return value.NativeLease{}, answerStep("binding", artifact.ErrDownloadUnavailable, nil)
 	}
 	lease, e := p.Origins.Recheck(ctx, original)
 	if e != nil {
-		return lease, e
+		return lease, answerStep("origin", e, nil)
 	}
 	lease.Until = identity.Earlier(lease.Until, w.FreshUntil)
 	if !lease.Valid(p.Now()) || ctx.Err() != nil {
-		return value.NativeLease{}, artifact.ErrDownloadExpired
+		return value.NativeLease{}, answerStep("expired", artifact.ErrDownloadExpired, nil)
 	}
 	return lease, nil
 }

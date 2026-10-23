@@ -1,5 +1,30 @@
 # Sustained implementation progress
 
+## Projection worker attachment over the read window (2026-10-23)
+
+Installed native82 (f0fc6ec4) refused the projection worker at
+`worker native refused: admission/gate (unavailable)`; the gate's inner
+check discarded its cause, so the exact sub-check is not in that log. A
+composition test with installed-like intervals
+(`TestHubWorkerAdmissionAttachesTwentySecondProjection`: production
+HubWorkerAdmission, router, registration and both frame gates; a 20 s
+projection operation; five-second worker/serving observations) showed the
+attachment refused the 20 s operation: `NativeRegistration.attach` still
+required the attached gate's lease to end by the admission origin's
+five-second `Until`, while 81c8926b lets a projection gate span its
+operation. `attachBound` now uses the operation's `Until` for projection
+operations; per-frame worker gates also no longer end at the admission's
+stale serving observation for projection (each frame's own
+`CheckNativeHub` serving check stays). Downloads keep both five-second
+bounds. Gate refusals now carry their inner stage
+(`gate/check/<hub|worker|operation|match>/...`, Recheck
+`original-lease|pod-proof|observe|changed|expired`, projection
+`request|batch|binding|origin|operation|lease`, worker recheck
+`enrollment|certificate|binding|origin|expired`); a revoked operation at the
+worker gate reports `gate/check/worker/observe`. If installed native82's
+failure was not this mismatch, the next run's report names it. Installed
+qualification has not rerun.
+
 ## Processing snapshot interval for evidence reads (2026-10-23)
 
 Installed native81 (81c8926b) refused the first get_file_excerpt within

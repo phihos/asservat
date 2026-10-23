@@ -1,6 +1,8 @@
 package evidence
 
 import (
+	"errors"
+
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
@@ -49,6 +51,25 @@ type NativeFrameGate struct {
 	done               chan struct{}
 }
 
+// gateRefusal names the closed stage at which a new gate refused, with the
+// check's own closed stage if it has one, for the operator report only. It
+// unwraps to ErrDownloadUnavailable, so no caller decision changes.
+type gateRefusal struct {
+	stage string
+	cause error
+}
+
+func (e *gateRefusal) Error() string    { return artifact.ErrDownloadUnavailable.Error() }
+func (e *gateRefusal) Unwrap() error    { return artifact.ErrDownloadUnavailable }
+func (e *gateRefusal) StepCause() error { return e.cause }
+func (e *gateRefusal) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if e.cause != nil && errors.As(e.cause, &inner) {
+		return e.stage + "/" + inner.FixedStep()
+	}
+	return e.stage
+}
+
 func NewNativeFrameGate(parent context.Context, check NativeCurrentCheck, now func() time.Time) (*NativeFrameGate, error) {
 	if parent == nil || parent.Err() != nil || check == nil || now == nil {
 		return nil, artifact.ErrInvalid
@@ -57,8 +78,13 @@ func NewNativeFrameGate(parent context.Context, check NativeCurrentCheck, now fu
 	bounded, stop := context.WithDeadline(parent, started.Add(artifact.DownloadLease))
 	defer stop()
 	l, err := check(bounded)
-	if err != nil || bounded.Err() != nil || (!l.Valid(now()) || !l.Operation.CurrentValid(now())) {
-		return nil, artifact.ErrDownloadUnavailable
+	switch {
+	case err != nil || bounded.Err() != nil:
+		return nil, &gateRefusal{"check", err}
+	case !l.Valid(now()):
+		return nil, &gateRefusal{"lease", nil}
+	case !l.Operation.CurrentValid(now()):
+		return nil, &gateRefusal{"operation", nil}
 	}
 	until := gateUntil(started, l)
 	if d, ok := parent.Deadline(); ok {
@@ -167,7 +193,10 @@ func (g *NativeFrameGate) Check(ctx context.Context) (value.NativeLease, error) 
 	g.mu.Unlock()
 	if !valid {
 		g.Close()
-		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+		if err != nil {
+			return value.NativeLease{}, &gateRefusal{"check", err}
+		}
+		return value.NativeLease{}, &gateRefusal{"lease", nil}
 	}
 	return l, nil
 }

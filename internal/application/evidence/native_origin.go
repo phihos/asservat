@@ -190,8 +190,14 @@ func (s NativeOrigins) Recheck(ctx context.Context, original NativeOrigin) (valu
 	if bound.Operation.Kind == value.NativeProjection {
 		bound.Until = bound.Operation.Until
 	}
-	if ctx == nil || s.Now == nil || !bound.Valid(s.Now()) || !original.Proof.Valid(s.Now()) {
+	if ctx == nil || s.Now == nil {
 		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	}
+	if !bound.Valid(s.Now()) {
+		return value.NativeLease{}, stepped("original-lease", artifact.ErrDownloadUnavailable)
+	}
+	if !original.Proof.Valid(s.Now()) {
+		return value.NativeLease{}, stepped("pod-proof", artifact.ErrDownloadUnavailable)
 	}
 	call, stop := context.WithDeadline(ctx, bound.Until)
 	defer stop()
@@ -219,12 +225,15 @@ func (s NativeOrigins) Recheck(ctx context.Context, original NativeOrigin) (valu
 	if e == nil && !recent && call.Err() == nil {
 		s.Recent.put(key, l, observedAt)
 	}
-	if e != nil || !sameNativeOperation(l.Operation, original.Lease.Operation) || l.Sequence != original.Lease.Sequence || l.Certificate != original.Lease.Certificate {
-		return value.NativeLease{}, artifact.ErrDownloadUnavailable
+	if e != nil {
+		return value.NativeLease{}, collapsed("observe", artifact.ErrDownloadUnavailable, e)
+	}
+	if !sameNativeOperation(l.Operation, original.Lease.Operation) || l.Sequence != original.Lease.Sequence || l.Certificate != original.Lease.Certificate {
+		return value.NativeLease{}, stepped("changed", artifact.ErrDownloadUnavailable)
 	}
 	l.Until = identity.Earlier(l.Until, bound.Until)
 	if !l.Valid(s.Now()) || !original.Proof.Valid(s.Now()) || call.Err() != nil {
-		return value.NativeLease{}, artifact.ErrDownloadExpired
+		return value.NativeLease{}, stepped("expired", artifact.ErrDownloadExpired)
 	}
 	return l, nil
 }
