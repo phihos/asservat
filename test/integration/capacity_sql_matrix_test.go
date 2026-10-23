@@ -222,6 +222,11 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 		if err := admin.QueryRow(ctx, `SELECT fresh_until-observed_at=interval '30 seconds' FROM context_storage_binding WHERE root_id=$1 AND allocation_id=$2`, f.input.PermissionRootID, first.AllocationID).Scan(&lifetime); err != nil || !lifetime {
 			t.Fatal("refreshed binding lifetime", lifetime, err)
 		}
+		// Migration 00073: the accepted root source observation likewise lives
+		// 30 seconds from its own observation.
+		if err := admin.QueryRow(ctx, `SELECT fresh_until-observed_at=interval '30 seconds' FROM capacity_source WHERE root_id=$1 AND NOT suspended`, f.input.PermissionRootID).Scan(&lifetime); err != nil || !lifetime {
+			t.Fatal("accepted source lifetime", lifetime, err)
+		}
 		after := f.accounting(t)
 		if before != after {
 			t.Fatal("binding observation changed fixed backing or charges")

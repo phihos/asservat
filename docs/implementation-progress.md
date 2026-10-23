@@ -1,5 +1,21 @@
 # Sustained implementation progress
 
+## Thirty-second root capacity source (2026-10-23)
+
+With the binding at 30 s, admission still lapsed through the root
+`capacity_source` observation, whose five-second window depends on a separate
+hub-worker refresh that failed under load (`capacity demand refresh:
+guarded-read (unavailable)`). Migration 00073 (schema 73) makes
+`accept_capacity_source` store an accepted observation for 30 seconds after
+its own observation and widens the table CHECK to 30 seconds (ADR-200
+revision). No admission consumer bounded the stored source interval itself, so
+`capacity_managed_root_until` and the query-capacity lock accept it unchanged.
+Negative/invalidating observations, the acceptance receipt, trust,
+permission-stream, recovery and request bounds are unchanged. A unit test
+checks the migration's Up/Down rule; the real-SQL capacity matrix asserts the
+30-second source lifetime but has not run yet. Installed native qualification
+of this change has not run.
+
 ## Thirty-second context storage binding (2026-10-23)
 
 Installed runs native64 and native68 refused captures, approved queries and
