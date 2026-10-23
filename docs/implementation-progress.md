@@ -1,5 +1,18 @@
 # Sustained implementation progress
 
+## Thirty-second context storage binding (2026-10-23)
+
+Installed runs native64 and native68 refused captures, approved queries and
+downloads intermittently ("query workload capacity unavailable") because the
+hub-worker's binding refresh took 2 s or more, or failed, and the binding's
+five-second window lapsed. Migration 00072 (schema 72) stores a refreshed
+`context_storage_binding` for 30 seconds after its own observation and lets
+`capacity_managed_admission_until` accept that interval (ADR-200 revision).
+Root source, trust, permission, recovery and request bounds are unchanged. A
+unit test admits a binding observed 20 s ago and refuses one observed 31 s
+ago; the real-SQL capacity matrix asserts the refreshed 30-second lifetime.
+Installed native qualification of this change has not run.
+
 ## Reused hub self-protection proof (2026-10-23)
 
 The hub's proof of its own installed guard (`OwnerWorkloadProtection.Current`)

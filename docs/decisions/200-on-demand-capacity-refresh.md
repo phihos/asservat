@@ -173,3 +173,19 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
   adapter never returns, so it would not have retried at all. Unit tests pass;
   the extended SQL stage passed on CI (fleet run 39077437536).
 
+
+## Revision (2026-10-23)
+
+Option 3 is now taken for the binding alone, under the maintainer's
+authorization of relaxed, bounded recheck intervals. Migration 00072
+(schema 72) makes `refresh_capacity_enrollment` store
+`fresh_until = observed_at + 30 seconds` and lets
+`capacity_managed_admission_until` accept a binding observed at most
+30 seconds earlier (the table CHECK and Go `StorageBinding.Valid` already
+allowed 30 seconds). Installed runs native64 and native68 showed demand
+refreshes taking 2 s or more, or failing, so the five-second window lapsed and
+query, capture and download admission flapped between refused and admitted.
+The refresh receipt returned to the caller keeps its original interval; the
+root source, trust, permission, recovery and request bounds are unchanged, and
+a workload or namespace change still takes effect at the next refresh, within
+30 seconds. Demand refresh stays as described above.

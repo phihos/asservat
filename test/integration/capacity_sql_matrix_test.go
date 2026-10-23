@@ -216,6 +216,12 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 			t.Fatal("current exact binding observation", err)
 		}
 		f.assertAdmission(t, 0, first, true)
+		// ADR-200 revision (2026-10-23): the refreshed binding lives 30
+		// seconds from its own observation, independent of the caller receipt.
+		var lifetime bool
+		if err := admin.QueryRow(ctx, `SELECT fresh_until-observed_at=interval '30 seconds' FROM context_storage_binding WHERE root_id=$1 AND allocation_id=$2`, f.input.PermissionRootID, first.AllocationID).Scan(&lifetime); err != nil || !lifetime {
+			t.Fatal("refreshed binding lifetime", lifetime, err)
+		}
 		after := f.accounting(t)
 		if before != after {
 			t.Fatal("binding observation changed fixed backing or charges")

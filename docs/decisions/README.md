@@ -140,7 +140,7 @@ OpenTelemetry eBPF profiler in the node collector, keeps only the selected pod's
 output, and leaves allocation and lock profiles to Go pprof and JVM JFR.
 
 [ADR-200 — On-demand capacity refresh](200-on-demand-capacity-refresh.md)
-keeps the five-second binding freshness bound and refreshes a workload's binding when a capture preview,
+refreshes a workload's binding (current for 30 seconds since the 2026-10-23 revision) when a capture preview,
 request or download needs it: admission records a short demand, the hub-worker reconciles demanded
 workloads first, and admission waits within its original deadline.
 SQL and installed refresh checks pass; later storage reads still require their

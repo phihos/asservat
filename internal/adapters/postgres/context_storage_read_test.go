@@ -107,3 +107,28 @@ func TestCapacityManagedStorageFenceRetainsEarliestOriginalDeadline(t *testing.T
 		})
 	}
 }
+
+// ADR-200 revision (2026-10-23): a binding is current for 30 seconds after
+// its own observation, matching migration 00072's producer and SQL fence.
+func TestContextStorageBindingThirtySecondLifetime(t *testing.T) {
+	for _, test := range []struct {
+		name          string
+		age, lifetime time.Duration
+		want          bool
+	}{
+		{"observed-20s-ago", 20 * time.Second, 30 * time.Second, true},
+		{"observed-31s-ago", 31 * time.Second, 30 * time.Second, false},
+		{"lifetime-over-30s", 20 * time.Second, 31 * time.Second, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			row, root, target, now := storageObservationFixture()
+			row.ObservedAt = ts(now.Add(-test.age))
+			row.FreshUntil = ts(row.ObservedAt.Time.Add(test.lifetime))
+			row.CapacityUntil = row.FreshUntil
+			_, err := contextStorageObservation(row, root, target, now)
+			if (err == nil) != test.want {
+				t.Fatalf("admitted=%t want=%t error=%v", err == nil, test.want, err)
+			}
+		})
+	}
+}
