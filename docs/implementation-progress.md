@@ -1,5 +1,29 @@
 # Sustained implementation progress
 
+## Capture response metadata no longer shortens startup (2026-10-23)
+
+Candidate `89bfff49` refines ADR-216: submission consumes the exact accepted
+receipt while its metadata is current, then lets the separately authorized start
+use the original caller/identity/capture/write bounds. If metadata expires during
+successful startup, one exact-key passive lookup supplies current response data.
+It cannot admit, repeat audit or start again, replace the capture, or extend dates.
+Unexpired metadata is returned without renewal. The persisted audit first-write
+cutoff remains binding.
+
+The [regression archive](../test/results/resumed-c62e02ac-capture-phase-lifetime/README.md)
+records a genuine failing baseline for request and continuation across intent/start
+work. Focused tests and the complete capture/audit race suites pass; the latter
+runs in 18.949 seconds with all 2,613 Go/module hashes unchanged. Exact operation
+replacement, identity changes, cancellation, real caller expiry and the actual
+audit publisher's original first-write cutoff retain negative coverage. An
+independent source review passes. The [combined design checks](../test/results/resumed-c62e02ac-capture-phase-design/README.md)
+exit 0 in 13.011 seconds with 3,793 source hashes unchanged.
+
+This fixes a reproduced phase-lifetime defect; it does not identify which source
+provided native57's minimum timestamp or prove the installed journey now passes.
+ADR-219/221 shared acquisition and ADR-222 credential consolidation remain in
+isolated implementation/testing. The full implementation mandate remains active.
+
 ## Combined download checks and installed native57 (2026-10-23)
 
 The implementation mandate remains active. Candidate `17e0ff63` includes the
@@ -27,8 +51,8 @@ Capture then returns ReviewChanged and two OutcomeUnknown results, followed by
 `resolve_capture_request` failing at `audit-begin/reserve` with HTTP 503.
 
 The retained database has one intent-audited capture, no execution/publication,
-and no download session, worker, response or emitted bytes. Its original capture
-deadline was only 1.433310 seconds after admission; execution preparation later
+and no download session, worker, response or emitted bytes. Its persisted audit first-write
+cutoff was only 1.433310 seconds after admission; execution preparation later
 reports insufficient parent headroom. The winning earlier observation cutoff
 and initial SQL ReviewChanged predicate are not established by these logs.
 The fixture's two resolution records are spent; this is its configured allowance,

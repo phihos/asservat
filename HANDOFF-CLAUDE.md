@@ -11,7 +11,8 @@ review follow-up. The historical stop and no-Git statements below describe
 Start with the [current progress checkpoint](docs/implementation-progress.md),
 [AGENTS.md](AGENTS.md) and the accepted
 [complexity review](docs/reviews/complexity-2026-10-20/README.md). Candidate
-`17e0ff63` adds one authority construction per finite download preparation,
+`89bfff49` adds the reviewed response-metadata/start phase correction on top
+of `17e0ff63`: one authority construction per finite download preparation,
 response-owned ordinary-permission reconstruction at 30 seconds, and removal of
 two namespace GETs from candidate-only workload listing. Exact effect checks and
 short current SQL/identity/retention/recovery checks remain. Selected race, real
@@ -19,10 +20,12 @@ SQL/S3 and design gates pass; the full current Go gate remains pending.
 
 Native57 passes interrupted installation, regional enrollment, demand readiness
 and console processing setup, then fails during capture resolution audit reserve.
-One intent-audited capture has no execution/publication. It was admitted with
-only 1.433310 seconds left on its original deadline; execution preparation later
+One intent-audited capture has no execution/publication. Its persisted audit first-write cutoff was
+only 1.433310 seconds after admission; execution preparation later
 has insufficient parent headroom. The winning earlier cutoff and initial SQL
-ReviewChanged predicate remain under investigation. The two resolution records
+ReviewChanged predicate remain unknown. A separate regression now fixes the use
+of response metadata freshness to shorten independently authorized startup, with
+original effect deadlines preserved; capture/audit race and design gates pass. The two resolution records
 are spent under the fixture's configured allowance. No download is attempted.
 All 2,792 source hashes match; diagnostics are archived and all owned resources
 are independently confirmed removed. No complete installed journey is claimed.
