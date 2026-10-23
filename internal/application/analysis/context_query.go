@@ -535,13 +535,6 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	if err != nil {
 		return nil, queryStepped("current-observed", err)
 	}
-	if err = s.Ledger.PermitQuery(o.ctx, o.query, o.request, a); err != nil {
-		return nil, queryCollapsed("permit", value.ErrUnavailable, err)
-	}
-	a, err = o.CheckCurrent(o.ctx)
-	if err != nil {
-		return nil, queryStepped("current-permitted", err)
-	}
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
 		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
 		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
@@ -560,6 +553,16 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	}
 	if !worker.Worker.Matches(o.query) {
 		return nil, queryStepped("worker-match", value.ErrUnavailable)
+	}
+	// The full SQL fence runs once before a read. A pending reply discloses only
+	// the handle, and admission just ran the same fence (native69: repeating it
+	// on the first call exhausted the request before the worker could start).
+	if err = s.Ledger.PermitQuery(o.ctx, o.query, o.request, a); err != nil {
+		return nil, queryCollapsed("permit", value.ErrUnavailable, err)
+	}
+	a, err = o.CheckCurrent(o.ctx)
+	if err != nil {
+		return nil, queryStepped("current-permitted", err)
 	}
 	batchID := s.NewID()
 	if !authorization.UUID(batchID) {

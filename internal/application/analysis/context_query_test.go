@@ -725,3 +725,17 @@ func TestQueryDeliveryDoneTracksOriginalOwner(t *testing.T) {
 		t.Fatal("missing owner appears live")
 	}
 }
+
+// native69: the first excerpt call returns pending while the worker starts;
+// the full SQL permit fence runs before a read, not on the pending reply.
+func TestQueryPendingReplySkipsPermitFence(t *testing.T) {
+	f := newProjectionFixture(t)
+	f.ready = false
+	f.permitErr = value.ErrUnavailable
+	i := f.invocation("get_file_excerpt")
+	d, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection)
+	if err != nil || !d.Pending() || f.batches != 0 {
+		t.Fatal("pending reply ran the read permit", err)
+	}
+	_ = d.Close(context.Background())
+}
