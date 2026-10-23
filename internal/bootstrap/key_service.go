@@ -308,6 +308,7 @@ func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err erro
 	if k.handler, err = keyservice.NewHandler([]authapp.KeyService{{Scope: scope, Authority: authority, Backend: backend, Now: time.Now}}, mtls.KeyPeerUnion{KeyClients: keyClients, Connectors: connectors}, time.Now, c.Concurrency); err != nil {
 		return k, mounts.ErrUnavailable
 	}
+	k.handler.Report = eventLog(os.Stderr, "key service refused")
 	// The TLS layer accepts key-client and connector client chains; the
 	// handler's peer union then selects exactly one verifier per leaf.
 	clients := keyRoots.Clone()

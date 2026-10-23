@@ -16,20 +16,20 @@ import (
 func (r *NativeContextReader) ReadApprovedContext(ctx context.Context, source evidence.NativeContextSource, o value.NativeOperation, scope query.ContextProjectionScope, until time.Time) (query.PodStatusProjection, error) {
 	var zero query.PodStatusProjection
 	if r == nil || ctx == nil || ctx.Err() != nil || o.Kind != value.NativeProjection || !o.CurrentValid(time.Now()) || o.Reference.InstallationID != r.scope.InstallationID || !scope.Valid() || scope.Version != o.SourceVersion {
-		return zero, query.ErrUnavailable
+		return zero, &readRefusal{query.ErrUnavailable, &contextReadStage{"operation", query.ErrUnavailable}}
 	}
 	end, ok := ctx.Deadline()
 	if !ok || end.After(until) || end.After(o.Until) || !time.Now().Before(end) {
-		return zero, query.ErrUnavailable
+		return zero, &readRefusal{query.ErrUnavailable, &contextReadStage{"deadline", query.ErrUnavailable}}
 	}
 	opener, e := kms.NewRemoteOpener(r.endpoint, r.scope, o.ParentID, r.client)
 	if e != nil {
-		return zero, e
+		return zero, &readRefusal{e, &contextReadStage{"key-client", e}}
 	}
 	defer opener.Close()
 	reader, e := NewContextProjectionReader(r.store)
 	if e != nil {
-		return zero, e
+		return zero, &readRefusal{e, &contextReadStage{"store", e}}
 	}
 	return reader.ReadProjectionNative(ctx, source, scope, opener, end)
 }

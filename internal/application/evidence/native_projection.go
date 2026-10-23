@@ -51,8 +51,11 @@ func (r *RegionalContextResult) ReadApproved(ctx context.Context, o value.Native
 	reader := r.approved
 	r.mu.Unlock()
 	p, e := reader.ReadApprovedContext(call, cloneNativeSource(source), o, scope, o.Until)
-	if e != nil || call.Err() != nil || !r.now().Before(o.Until) || !p.Valid() || p.NamespaceUID != scope.NamespaceUID || p.PodUID != scope.PodUID {
-		return zero, query.ErrUnavailable
+	if e != nil {
+		return zero, collapsed("approved", query.ErrUnavailable, e)
+	}
+	if call.Err() != nil || !r.now().Before(o.Until) || !p.Valid() || p.NamespaceUID != scope.NamespaceUID || p.PodUID != scope.PodUID {
+		return zero, stepped("approved-result", query.ErrUnavailable)
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()

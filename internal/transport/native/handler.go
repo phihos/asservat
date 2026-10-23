@@ -171,6 +171,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		unavailable(w)
 		return
 	}
+	// The five-second Hello read deadline set at request start bounds only the
+	// Hello. An attached projection conversation (up to the evidence-read
+	// window) reads under its checked lease; otherwise a slow admission left
+	// the first result read past that deadline (installed native87). Every
+	// frame read still sets its own lease deadline.
+	if lease.Operation.Kind == value.NativeProjection && controller.SetReadDeadline(lease.Until) != nil {
+		unavailable(w)
+		return
+	}
 	w.Header().Set("Content-Type", contracts.NativeExchangeMedia)
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")

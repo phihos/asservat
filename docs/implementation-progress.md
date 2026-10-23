@@ -1,5 +1,28 @@
 # Sustained implementation progress
 
+## Hello read deadline outlived by the projection conversation (2026-10-23)
+
+Installed native87 failed both sides within 9 ms: hub
+`serve/result/read/refused` at 19:58:21.523, worker `stopped at read`
+(object-decrypt@<100ms, no key unwrap) at 19:58:21.532. The worker's last
+native request reached the hub at 19:58:16.41; admission, the handler's
+attachment check and the command frame's check took about five seconds, and
+the hub's first result read began after 19:58:21.41. The handler had set a
+five-second read deadline at request start for the Hello and never moved it
+before Serve, so the HTTP/2 stream's body failed at that deadline; the
+worker's concurrent receive saw the closed stream and cancelled its
+object-store read before any key unwrap (key binding `used_roles=0`, op/batch
+valid to 19:58:23.05). An attached projection conversation now sets the read
+deadline to its checked lease before serving (every frame read still sets
+its own). `TestNativeApprovedProjectionResultReadOutlivesHelloDeadline` (real
+TLS/h2, 1.8 s complete checks) failed before and passes after. The worker's
+read stop now names its step (`read/approved/<operation|deadline|key-client|
+store|expectation|cutoff|commit-get|commit-parse|manifest-get|manifest-open|
+manifest-parse|data-pin|index-pin|data-open|data-read|validate|parse>`,
+`/cancelled` when its context ended) and the key service logs refused
+requests' closed stages (`key service refused: <stage>`). Installed
+qualification has not rerun.
+
 ## Retention topology observation cut the read (2026-10-23)
 
 Installed native86 refused the poll at `result/until-authority/prepare/read`.

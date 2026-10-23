@@ -2,6 +2,7 @@ package objectstore
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"strconv"
 	"sync"
@@ -55,13 +56,13 @@ func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, sour
 	app.MarkDuration(ctx, "object-decrypt", time.Since(started)-timed.total())
 	defer clear(native)
 	if err != nil || ctx.Err() != nil {
-		return value.PodStatusProjection{}, value.ErrUnavailable
+		return value.PodStatusProjection{}, &readRefusal{value.ErrUnavailable, err}
 	}
 	started = time.Now()
 	p, err := ParseContextProjection(native, scope)
 	app.MarkStep(ctx, "parse", started)
 	if err != nil || ctx.Err() != nil || !time.Now().Before(deadline) {
-		return value.PodStatusProjection{}, value.ErrUnavailable
+		return value.PodStatusProjection{}, &readRefusal{value.ErrUnavailable, readStage(ctx, "parse", errors.Join(value.ErrUnavailable, err))}
 	}
 	return p, nil
 }
@@ -96,4 +97,18 @@ func (t *timedKeyOpener) total() time.Duration {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.sum
+}
+
+// readRefusal keeps the returned refusal and carries the read step that
+// caused it (FixedStep only), for the worker's report.
+type readRefusal struct{ err, cause error }
+
+func (e *readRefusal) Error() string { return e.err.Error() }
+func (e *readRefusal) Unwrap() error { return e.err }
+func (e *readRefusal) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if e.cause != nil && errors.As(e.cause, &inner) {
+		return inner.FixedStep()
+	}
+	return "verify"
 }

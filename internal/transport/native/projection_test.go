@@ -424,3 +424,65 @@ func TestNativeApprovedProjectionSharesFrameChecksWithinInterval(t *testing.T) {
 		t.Fatal("frame checks were not shared within the recheck interval", out.err, checks.Load())
 	}
 }
+
+// Installed native87: the worker's request started 16.41; admission, the
+// handler's attachment check and the command's frame check took about five
+// seconds, and the hub's first result read then failed: the five-second
+// Hello read deadline set at request start still applied to the attached
+// conversation. The attached projection conversation reads under its lease.
+func TestNativeApprovedProjectionResultReadOutlivesHelloDeadline(t *testing.T) {
+	f := newProjectionProtocolFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	t.Cleanup(cancel)
+	f.ctx = ctx
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	f.lease.Operation.StartedAt, f.lease.Operation.Until = now, now.Add(20*time.Second)
+	f.lease.Operation.Processing.ObservedAt, f.lease.Operation.Processing.ValidUntil = now, f.lease.Operation.Until
+	f.lease.ObservedAt, f.lease.Until = now, f.lease.Operation.Until
+	result := f.result(t, f.reader())
+	var slow atomic.Bool
+	op, client := f.operationChecked(t, func(ctx context.Context, _ value.NativeLease) error { return ctx.Err() }, func(ctx context.Context) (value.NativeLease, error) {
+		if slow.Load() {
+			select {
+			case <-time.After(1800 * time.Millisecond): // installed complete check cost
+			case <-ctx.Done():
+				return value.NativeLease{}, ctx.Err()
+			}
+		}
+		return f.lease, nil
+	})
+	slow.Store(true)
+	done, _ := f.run(t, client, result, f.target, artifact.Digest{1})
+	p, err := op.Projection(f.ctx)
+	if err != nil || !reflect.DeepEqual(p, f.projection) {
+		t.Fatal("result read failed after the Hello deadline", err)
+	}
+	if err = op.AcknowledgeProjection(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if out := projectionProtocolReceive(t, f.ctx, done); out.err != nil || out.state.State != contracts.NativeJoined {
+		t.Fatal("conversation did not join", out.err)
+	}
+}
+
+type fixedReadStep struct{ step string }
+
+func (e fixedReadStep) Error() string     { return "refused" }
+func (e fixedReadStep) FixedStep() string { return e.step }
+
+// Installed native87 stopped the worker at "read" with no inner step. The
+// worker's stop now names the approved reader's own closed step.
+func TestNativeApprovedProjectionWorkerNamesReadStep(t *testing.T) {
+	f := newProjectionProtocolFixture(t)
+	reader := &projectionProtocolReader{read: func(context.Context, evidence.NativeContextSource, value.NativeOperation, query.ContextProjectionScope, time.Time) (query.PodStatusProjection, error) {
+		return query.PodStatusProjection{}, fixedReadStep{"commit-get/cancelled"}
+	}}
+	result := f.result(t, reader)
+	_, client := f.operation(t, func(ctx context.Context, _ value.NativeLease) error { return ctx.Err() })
+	done, _ := f.run(t, client, result, f.target, artifact.Digest{1})
+	out := projectionProtocolReceive(t, f.ctx, done)
+	var s interface{ FixedStep() string }
+	if !errors.As(out.err, &s) || s.FixedStep() != "read/approved/commit-get/cancelled" {
+		t.Fatal("worker read stop lost its inner step", out.err)
+	}
+}
