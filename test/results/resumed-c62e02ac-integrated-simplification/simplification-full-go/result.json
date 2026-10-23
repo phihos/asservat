@@ -1,0 +1,13 @@
+{
+  "commit": "bc94a1885ddcfe16825dbf8571934d288a050f44",
+  "argv": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "sql-check",
+    "go-check"
+  ],
+  "exitCode": 2,
+  "elapsedSeconds": 399.683,
+  "sourceCount": 3837,
+  "changedSources": []
+}

@@ -1,0 +1,38 @@
+import hashlib,json,os,pathlib,shutil,subprocess,sys,time
+repo=pathlib.Path('/home/phil/Projekte/asservat-simplify-c62e02ac')
+base=pathlib.Path('/home/phil/.cache/asservat-build/recovered-c62e02ac')
+phase,attempt=sys.argv[1:]
+commands={
+ 'compile':['go','test','-run','^$','./...'],
+ 'design':['make','PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python','spec-check','architecture-check','design-check','go-architecture-check'],
+ 'initial':['make','initial-installation-integration'],
+ 'capacity':['python3','scripts/test-custody.py','--run','^TestCapacityProducerWithRealPostgres$'],
+ 'query':['python3','scripts/test-custody.py','--run','^TestSharedProjectionLifecycleWithRealServices$'],
+ 'execution':['python3','scripts/test-custody.py','--run','^TestContextAdmissionWithRealServices$/^(api-execution-preparation-boundaries|api-execution-retained-check-revoked-during-permission-lock|api-execution-one-preparation-exact-result-historical-publication|download-worker-installed-original-authority|download-response-window-accounting|context-query-ledger-current-audit-bounds-and-uncertainty)$']}
+cmd=commands[phase]
+out=base/('integrated-simplification-'+phase+'-'+attempt)
+out.mkdir(exist_ok=False)
+status=subprocess.check_output(['git','status','--porcelain','-z'],cwd=repo).decode().split('\0')
+unexpected=[x for x in status if x and not x[3:].startswith('test/results/')]
+if unexpected:raise SystemExit('Non-result changes prevent freeze: '+repr(unexpected))
+head=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip()
+def snapshot():
+ files=subprocess.check_output(['git','ls-files','-z'],cwd=repo).decode().split('\0')
+ return {p:hashlib.sha256((repo/p).read_bytes()).hexdigest() for p in sorted(files) if p and not p.startswith('test/results/') and (repo/p).is_file()}
+before=snapshot();(out/'source-before.json').write_text(json.dumps(before,indent=2)+'\n')
+env=dict(os.environ)
+if any(k.startswith('ASSERVAT_') for k in env):raise SystemExit('Unexpected fixture environment')
+overrides=dict(TMPDIR='/home/phil/.cache/asservat-build/tmp',GOTMPDIR='/home/phil/.cache/asservat-build/tmp',GOMAXPROCS='2',GOFLAGS='-buildvcs=false -p=1')
+env.update(overrides)
+started=time.time();record={'commit':head,'argv':cmd,'environment':overrides,'startedUnix':started}
+(out/'invocation.json').write_text(json.dumps(record,indent=2)+'\n')
+print('Starting '+phase+' on '+head,flush=True)
+with (out/'gate.log').open('w') as log:r=subprocess.run(cmd,cwd=repo,env=env,stdout=log,stderr=subprocess.STDOUT)
+after=snapshot();(out/'source-after.json').write_text(json.dumps(after,indent=2)+'\n')
+record.update(exitCode=r.returncode,elapsedSeconds=round(time.time()-started,6),sourceCount=len(before),changedSources=[p for p in sorted(before.keys()|after.keys()) if before.get(p)!=after.get(p)])
+(out/'result.json').write_text(json.dumps(record,indent=2)+'\n')
+for prefix in ['custody','fleet']:
+ for p in (repo/'test/results').glob(prefix+'*'):
+  if p.is_file() and p.stat().st_mtime>=started:shutil.copy2(p,out/p.name)
+print(json.dumps(record),flush=True)
+sys.exit(r.returncode or bool(record['changedSources']))

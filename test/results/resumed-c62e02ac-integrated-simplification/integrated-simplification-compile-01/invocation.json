@@ -1,0 +1,17 @@
+{
+  "commit": "9da475cdc01e78a4978569c4e18b2239db8ade73",
+  "argv": [
+    "go",
+    "test",
+    "-run",
+    "^$",
+    "./..."
+  ],
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "startedUnix": 1792716682.6838174
+}

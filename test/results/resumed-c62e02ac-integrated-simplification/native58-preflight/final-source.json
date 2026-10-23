@@ -1,0 +1,11 @@
+{
+  "files": {
+    "internal/bootstrap/owner_inputs.go": "f6f7fe1d2e55aa59be9d7f814b1a9306b47690f3db2ef51150ec89bda4bca9c2",
+    "test/integration/regional_install_native_test.go": "96b6adf5245dc695608b7c70be44434db6b787a7cd6c15728f4ed01bd8d8415e",
+    "test/integration/installed_projection_native_test.go": "939aba2cf7cba2c20fe04d94adda984a5d0491bee6e3531895db33188efe83f0",
+    "test/integration/installed_projection_unit_test.go": "f6e11edee8878513cba6df5560307751a0ce3559d4bbb0cf037f774a6112fca0",
+    "test/integration/installed_journey_native_test.go": "3ad4702a110b7ff7469cd1d398ab9c56d4a106262d468accdf48e6aa68984ce2",
+    "test/integration/installer_continuation_native_test.go": "6326acc2d21bf1d327e1880784ed2808097c66c1c84dd08f8b0eba9a447d62ae"
+  },
+  "after_focused_test_change": "Added explicit wait.Err() check after final Pod GET and before positive fixture observation. Focused tests predate this three-line cancellation check; pending parent final gates."
+}

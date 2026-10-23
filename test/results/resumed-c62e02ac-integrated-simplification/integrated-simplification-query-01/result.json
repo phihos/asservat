@@ -1,0 +1,20 @@
+{
+  "commit": "bc94a1885ddcfe16825dbf8571934d288a050f44",
+  "argv": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestSharedProjectionLifecycleWithRealServices$"
+  ],
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "startedUnix": 1792717039.136277,
+  "exitCode": 1,
+  "elapsedSeconds": 52.1217,
+  "sourceCount": 3837,
+  "changedSources": []
+}

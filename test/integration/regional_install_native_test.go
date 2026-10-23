@@ -279,40 +279,31 @@ func issueInstalledBootstrap(t *testing.T, ctx context.Context, admin *pgxpool.P
 	if err != nil {
 		t.Fatal("public runtime projection", err)
 	}
-	// These helper-owned issuance pools finish before regional installation
-	// and its journey. Retaining them until the parent test exits would consume
-	// four extra SQL connections throughout the later runtime qualification.
-	var issuancePools []*pgxpool.Pool
-	defer func() {
-		for _, pool := range issuancePools {
-			pool.Close()
-		}
-	}()
-	pool := func(duty string) *pgxpool.Pool {
-		var credential contracts.OwnerSQLCredential
-		if json.Unmarshal(projection.Data["sql-public-fleet-bootstrap-"+duty+".json"], &credential) != nil || credential.Username == "" {
-			t.Fatal("projected issuance login missing", duty)
-		}
-		dsn := url.URL{Scheme: "postgres", User: url.UserPassword(credential.Username, credential.Password), Host: address, Path: "/" + c.Database, RawQuery: "sslmode=disable"}
-		pc, e := pgxpool.ParseConfig(dsn.String())
-		if e != nil {
-			t.Fatal(e)
-		}
-		pc.ConnConfig.TLSConfig, pc.ConnConfig.Fallbacks, pc.MaxConns = tlsConfig, nil, 1
-		out, e := pgxpool.NewWithConfig(ctx, pc)
-		if e != nil {
-			t.Fatal(e)
-		}
-		issuancePools = append(issuancePools, out)
-		return out
+	// All four typed issuance facets share ADR-222's projected hub login.
+	// This helper-owned single-connection pool closes before regional install
+	// and its journey, so it consumes no later runtime allowance.
+	var credential contracts.OwnerSQLCredential
+	if json.Unmarshal(projection.Data["sql-public-hub-runtime.json"], &credential) != nil || credential.Username == "" {
+		t.Fatal("projected issuance login missing")
 	}
-	reserve, err := postgres.NewBootstrapReservations(ctx, pool("reserve"), installation, uuid.NewString)
+	dsn := url.URL{Scheme: "postgres", User: url.UserPassword(credential.Username, credential.Password), Host: address, Path: "/" + c.Database, RawQuery: "sslmode=disable"}
+	pc, err := pgxpool.ParseConfig(dsn.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	pc.ConnConfig.TLSConfig, pc.ConnConfig.Fallbacks, pc.MaxConns = tlsConfig, nil, 1
+	issuance, err := pgxpool.NewWithConfig(ctx, pc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer issuance.Close()
+	reserve, err := postgres.NewBootstrapReservations(ctx, issuance, installation, uuid.NewString)
 	if err != nil {
 		t.Fatal(err)
 	}
 	var issues [3]*postgres.BootstrapIssues
-	for i, duty := range []string{"record", "audit", "activate"} {
-		if issues[i], err = postgres.NewBootstrapIssues(ctx, pool(duty), installation); err != nil {
+	for i := range issues {
+		if issues[i], err = postgres.NewBootstrapIssues(ctx, issuance, installation); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-run",
+    "^(TestProcessingCaptureCoverageDutyPrivileges|TestPublicJourneyDiagnosticsOriginalRegionalRunner)$",
+    "./internal/adapters/postgres",
+    "./test/integration"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 39.845625,
+  "sourceCount": 3837,
+  "changedSources": []
+}

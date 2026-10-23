@@ -1,5 +1,37 @@
 # Sustained implementation progress
 
+## Integrated qualification corrections (2026-10-23)
+
+The stable design repeat on `bc94a188` exits 0 in 13.187 seconds, with all
+3,837 non-result sources unchanged. The complete Go command then exits 2 after
+399.683 seconds. It completes the non-Kubernetes package selection and stops
+before Kubernetes groups because PostgreSQL/bootstrap/integration assertions
+fail; it is not a passing full gate. The failures expose an obsolete installed
+six-owner-pool validation formula and two tests that still assume a retired
+physical role or identical context pointers across execution phases. The
+corrections retain the fixed installed owner pool, logical read-facet checks,
+original deadlines/values and actual caller cancellation.
+
+The first shared-query real-service run omits the harness's `--fleet` flag and
+fails during missing-KMS setup (exit 1, 52.122 seconds). The corrected invocation
+reaches query admission, where PostgreSQL reports ambiguous subtraction inside
+migration 71's JSON expression (exit 1, 27.707 seconds). Parenthesizing the
+extracted profile fixes that expression; real lifecycle qualification must rerun.
+Both attempts preserve source hashes, finish cleanup and independently confirm
+their owned resources absent. These are failures, not SQL lifecycle passes.
+
+Installed preflight review also replaces the fixture's four retired bootstrap
+logins with the actual shared hub credential/pool. Approved inspection and two
+native sessions share the unchanged two-worker limit. The fixture therefore
+observes the original query worker's natural termination, then requires product
+demand cleanup to retain positive retirement before the distinct Stop case.
+It neither rewrites dates nor releases capacity itself. Focused owner/projection
+tests pass in 25.120 seconds; PostgreSQL facet and regional diagnostic race tests
+pass in 39.846 seconds, with recorded sources unchanged. The
+[integrated archive](../test/results/resumed-c62e02ac-integrated-simplification/README.md)
+retains the preceding failures and exact receipts. Full integrated Go/SQL and
+installed qualification remain next; implementation continues.
+
 ## Approved inspection and independent enrollment integrated (2026-10-23)
 
 Candidate `9da475cd` combines ADR-219/221 with ADR-222 and the capture/download

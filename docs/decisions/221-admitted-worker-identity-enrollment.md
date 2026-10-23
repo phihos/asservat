@@ -1,6 +1,6 @@
 # ADR-221 — Enroll the identity of an admitted worker independently
 
-Date: 2026-10-23. Status: accepted design; implementation and qualification pending.
+Date: 2026-10-23. Status: components implemented; integrated qualification in progress.
 Related: [ADR-071](071-download-worker-enrollment.md),
 [ADR-072](072-worker-credential-channel.md),
 [ADR-219](219-shared-approved-acquisition.md).
@@ -129,4 +129,8 @@ renewal; and both parent types. A certificate obtained independently must still
 fail native/key/approved disclosure without fresh exact purpose authority.
 Actual installed qualification must cover cold startup, Pending continuation,
 certificate delivery and authorized acquisition under existing production limits.
-Tests, build, code generation and external fixtures are unrun for this decision.
+Focused component/race, console and browser checks pass; compilation and SQL
+generation pass. The first integrated SQL lifecycle run exposed a migration
+expression defect before enrollment and must rerun after its correction.
+Installed qualification remains pending. Exact commands, failures and evidence
+boundaries are recorded in [implementation progress](../implementation-progress.md).

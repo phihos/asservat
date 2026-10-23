@@ -1,0 +1,12 @@
+{
+  "diagnosis.txt": "a5faeb5b5963c8133e4b481ff73c9d8ceb7d289338b6fcd551aba143552eef98",
+  "fleet-environment.json": "783cf37f296e8eaa06a6b818d9832389d4bfbd1a8959036dd77486982d86e7d6",
+  "fleet-postgres.log": "39ab55e889188c800800c8a678e7c017697c9e0e57b9d76fb4368416362f425b",
+  "fleet.log": "3769a8460659a5ee03656789f1ae6dc9cd22f5ab293ec90ac7088071e6f0823d",
+  "gate.log": "e8afb77e20348951d8625589299199388a83b936c68064e90339ae1d97d495ff",
+  "independent-cleanup.json": "ec250f4f86a143223403ca1a90bb69671be3bc665a615a2ccd5a96bc7efb174c",
+  "invocation.json": "7b8402be127aea8f7e9b8eb9e16b4a38acdcd22af06a8378cd0522b3ef1a2718",
+  "result.json": "1d6a60fc525ec2861d6f8e70c73da158b385fecb3047750d425a3cd44b191655",
+  "source-after.json": "f7e8af5a620df0f64b6aaccb485f402536952024cadc38bfd5f55f6eeaff4424",
+  "source-before.json": "f7e8af5a620df0f64b6aaccb485f402536952024cadc38bfd5f55f6eeaff4424"
+}

@@ -326,8 +326,14 @@ func TestPublicJourneyDiagnosticsOriginalRegionalRunner(t *testing.T) {
 			}
 			f.target = func(c context.Context, r targets.Request) (targets.PodResolution, error) {
 				check(c)
-				if c != readContext || r != target {
+				if r != target {
 					t.Fatal("original target input changed")
+				}
+				// The runner derives a context for each phase; the original
+				// deadline, values and caller cancellation must reach both.
+				cancel()
+				if c.Err() != context.Canceled || readContext.Err() != context.Canceled {
+					t.Fatal("original caller cancellation lost")
 				}
 				return targets.PodResolution{}, private
 			}

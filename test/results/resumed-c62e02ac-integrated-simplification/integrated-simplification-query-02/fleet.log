@@ -1,0 +1,20 @@
+=== RUN   TestSharedProjectionLifecycleWithRealServices
+=== RUN   TestSharedProjectionLifecycleWithRealServices/actual-postgres-function-type-alias
+    capacity_sql_fixture_test.go:133: same_function_oid=true display_uses_timestamp_with_time_zone=true
+=== NAME  TestSharedProjectionLifecycleWithRealServices
+    context_query_ledger_fixture_test.go:107: fixed_role_production_ms=2927
+    context_query_ledger_fixture_test.go:152: managed_policy_roundtrip exact=true non_time_fields=true same_cutoff=true
+=== RUN   TestSharedProjectionLifecycleWithRealServices/processing-read-rejects-uncovered-retention
+=== RUN   TestSharedProjectionLifecycleWithRealServices/managed-admission-rejects-uncovered-retention-without-charge
+=== RUN   TestSharedProjectionLifecycleWithRealServices/managed-admission-original-expiry-after-permission-wait
+=== NAME  TestSharedProjectionLifecycleWithRealServices
+    context_query_ledger_fixture_test.go:152: managed_admission_pair_ms=265 original_request_remaining_ms=4215
+    context_query_ledger_fixture_test.go:179: query admission context projection unavailable
+--- FAIL: TestSharedProjectionLifecycleWithRealServices (6.84s)
+    --- PASS: TestSharedProjectionLifecycleWithRealServices/actual-postgres-function-type-alias (0.00s)
+    --- PASS: TestSharedProjectionLifecycleWithRealServices/processing-read-rejects-uncovered-retention (0.00s)
+    --- PASS: TestSharedProjectionLifecycleWithRealServices/managed-admission-rejects-uncovered-retention-without-charge (0.04s)
+    --- PASS: TestSharedProjectionLifecycleWithRealServices/managed-admission-original-expiry-after-permission-wait (0.40s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	6.915s
+FAIL

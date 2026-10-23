@@ -1,0 +1,199 @@
+TMPDIR="/home/phil/.cache/asservat-build/tmp" /home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-sql-generation.py "/home/phil/.cache/asservat-build/bin/sqlc"
+SQL generation OK: 54 files match sqlc v1.31.1
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py
+manifest schema bundle OK: 8 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle permissions
+permissions schema bundle OK: 13 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle policies
+policies schema bundle OK: 15 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/permission-crds.py
+Permission CRD contracts match reviewed structural/CEL translation
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/manifest-schemas.py --bundle control
+control schema bundle OK: 1 canonical local resources, byte-identical; no runtime network loader
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/start-crd.py
+Local-start CRD matches reviewed immutable spec and spend transitions
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/retention-crd.py
+Retention CRD matches reviewed scope, limits and status contract
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/capacity-crds.py
+Capacity CRDs match the reviewed storage pool and budget policy contracts
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/investigation-schemas.py
+Investigation schemas OK: bounded runtime subsets; all references local; registration remains explicit
+go vet ./...
+# Preserve race/count/deadline checks with exact sequential Kubernetes groups.
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/test-go-shards.py
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK
+/home/phil/.cache/asservat-build/spec-venv/bin/python scripts/check-go-tests.py
++ go list ./...
+asservat.local/asservat/api/v1alpha1
+asservat.local/asservat/cmd/asservat
+asservat.local/asservat/internal/adapters/diagnostics
+asservat.local/asservat/internal/adapters/jose
+asservat.local/asservat/internal/adapters/kms
+asservat.local/asservat/internal/adapters/kubernetes
+asservat.local/asservat/internal/adapters/mounts
+asservat.local/asservat/internal/adapters/mtls
+asservat.local/asservat/internal/adapters/objectstore
+asservat.local/asservat/internal/adapters/objectstore/framed
+asservat.local/asservat/internal/adapters/objectstore/manifest
+asservat.local/asservat/internal/adapters/oidc
+asservat.local/asservat/internal/adapters/postgres
+asservat.local/asservat/internal/adapters/postgres/custodydb
+asservat.local/asservat/internal/adapters/providerconfig
+asservat.local/asservat/internal/application/analysis
+asservat.local/asservat/internal/application/audit
+asservat.local/asservat/internal/application/authorization
+asservat.local/asservat/internal/application/capacity
+asservat.local/asservat/internal/application/capture
+asservat.local/asservat/internal/application/catalog
+asservat.local/asservat/internal/application/configuration
+asservat.local/asservat/internal/application/evidence
+asservat.local/asservat/internal/application/execution
+asservat.local/asservat/internal/application/fleet
+asservat.local/asservat/internal/application/identity
+asservat.local/asservat/internal/application/planning
+asservat.local/asservat/internal/application/privacy
+asservat.local/asservat/internal/application/targets
+asservat.local/asservat/internal/bootstrap
+asservat.local/asservat/internal/console
+asservat.local/asservat/internal/contracts
+asservat.local/asservat/internal/domain/analysis
+asservat.local/asservat/internal/domain/artifact
+asservat.local/asservat/internal/domain/audit
+asservat.local/asservat/internal/domain/authorization
+asservat.local/asservat/internal/domain/capture
+asservat.local/asservat/internal/domain/catalog
+asservat.local/asservat/internal/domain/configuration
+asservat.local/asservat/internal/domain/execution
+asservat.local/asservat/internal/domain/fleet
+asservat.local/asservat/internal/domain/identity
+asservat.local/asservat/internal/domain/planning
+asservat.local/asservat/internal/domain/privacy
+asservat.local/asservat/internal/domain/targets
+asservat.local/asservat/internal/transport/browser
+asservat.local/asservat/internal/transport/clustercredential
+asservat.local/asservat/internal/transport/clusterobservation
+asservat.local/asservat/internal/transport/connectorlifecycle
+asservat.local/asservat/internal/transport/contextstart
+asservat.local/asservat/internal/transport/keyservice
+asservat.local/asservat/internal/transport/mcp
+asservat.local/asservat/internal/transport/native
+asservat.local/asservat/internal/transport/ownerrelay
+asservat.local/asservat/internal/transport/presentation
+asservat.local/asservat/internal/transport/worker
+asservat.local/asservat/migrations
+asservat.local/asservat/test/integration
++ go test -race -count=1 -timeout=15m asservat.local/asservat/api/v1alpha1 asservat.local/asservat/cmd/asservat asservat.local/asservat/internal/adapters/diagnostics asservat.local/asservat/internal/adapters/jose asservat.local/asservat/internal/adapters/kms asservat.local/asservat/internal/adapters/mounts asservat.local/asservat/internal/adapters/mtls asservat.local/asservat/internal/adapters/objectstore asservat.local/asservat/internal/adapters/objectstore/framed asservat.local/asservat/internal/adapters/objectstore/manifest asservat.local/asservat/internal/adapters/oidc asservat.local/asservat/internal/adapters/postgres asservat.local/asservat/internal/adapters/postgres/custodydb asservat.local/asservat/internal/adapters/providerconfig asservat.local/asservat/internal/application/analysis asservat.local/asservat/internal/application/audit asservat.local/asservat/internal/application/authorization asservat.local/asservat/internal/application/capacity asservat.local/asservat/internal/application/capture asservat.local/asservat/internal/application/catalog asservat.local/asservat/internal/application/configuration asservat.local/asservat/internal/application/evidence asservat.local/asservat/internal/application/execution asservat.local/asservat/internal/application/fleet asservat.local/asservat/internal/application/identity asservat.local/asservat/internal/application/planning asservat.local/asservat/internal/application/privacy asservat.local/asservat/internal/application/targets asservat.local/asservat/internal/bootstrap asservat.local/asservat/internal/console asservat.local/asservat/internal/contracts asservat.local/asservat/internal/domain/analysis asservat.local/asservat/internal/domain/artifact asservat.local/asservat/internal/domain/audit asservat.local/asservat/internal/domain/authorization asservat.local/asservat/internal/domain/capture asservat.local/asservat/internal/domain/catalog asservat.local/asservat/internal/domain/configuration asservat.local/asservat/internal/domain/execution asservat.local/asservat/internal/domain/fleet asservat.local/asservat/internal/domain/identity asservat.local/asservat/internal/domain/planning asservat.local/asservat/internal/domain/privacy asservat.local/asservat/internal/domain/targets asservat.local/asservat/internal/transport/browser asservat.local/asservat/internal/transport/clustercredential asservat.local/asservat/internal/transport/clusterobservation asservat.local/asservat/internal/transport/connectorlifecycle asservat.local/asservat/internal/transport/contextstart asservat.local/asservat/internal/transport/keyservice asservat.local/asservat/internal/transport/mcp asservat.local/asservat/internal/transport/native asservat.local/asservat/internal/transport/ownerrelay asservat.local/asservat/internal/transport/presentation asservat.local/asservat/internal/transport/worker asservat.local/asservat/migrations asservat.local/asservat/test/integration
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+?   	asservat.local/asservat/cmd/asservat	[no test files]
+ok  	asservat.local/asservat/internal/adapters/diagnostics	5.523s
+ok  	asservat.local/asservat/internal/adapters/jose	1.724s
+ok  	asservat.local/asservat/internal/adapters/kms	18.800s
+ok  	asservat.local/asservat/internal/adapters/mounts	1.006s
+ok  	asservat.local/asservat/internal/adapters/mtls	35.045s
+ok  	asservat.local/asservat/internal/adapters/objectstore	4.568s
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	7.832s
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	1.445s
+ok  	asservat.local/asservat/internal/adapters/oidc	2.875s
+--- FAIL: TestProcessingCaptureCoveragePurposePrivileges (0.00s)
+    processing_capture_test.go:161: missing purpose
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	1.557s
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+ok  	asservat.local/asservat/internal/adapters/providerconfig	6.570s
+ok  	asservat.local/asservat/internal/application/analysis	1.356s
+ok  	asservat.local/asservat/internal/application/audit	1.176s
+ok  	asservat.local/asservat/internal/application/authorization	1.308s
+ok  	asservat.local/asservat/internal/application/capacity	6.154s
+ok  	asservat.local/asservat/internal/application/capture	10.193s
+ok  	asservat.local/asservat/internal/application/catalog	1.013s
+ok  	asservat.local/asservat/internal/application/configuration	2.181s
+ok  	asservat.local/asservat/internal/application/evidence	3.616s
+ok  	asservat.local/asservat/internal/application/execution	1.263s
+ok  	asservat.local/asservat/internal/application/fleet	15.964s
+ok  	asservat.local/asservat/internal/application/identity	1.071s
+ok  	asservat.local/asservat/internal/application/planning	1.075s
+ok  	asservat.local/asservat/internal/application/privacy	1.158s
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+2026/10/23 03:00:50 http2: server: error reading preface from client 127.0.0.1:52492: read tcp 127.0.0.1:41445->127.0.0.1:52492: read: connection reset by peer
+2026/10/23 03:00:50 http: TLS handshake error from 127.0.0.1:58552: remote error: tls: bad certificate
+2026/10/23 03:00:50 http2: server: error reading preface from client 127.0.0.1:56252: read tcp 127.0.0.1:37593->127.0.0.1:56252: read: connection reset by peer
+2026/10/23 03:00:50 http2: server: error reading preface from client 127.0.0.1:37076: read tcp 127.0.0.1:43027->127.0.0.1:37076: read: connection reset by peer
+2026/10/23 03:00:50 http2: server: error reading preface from client 127.0.0.1:60728: read tcp 127.0.0.1:43141->127.0.0.1:60728: read: connection reset by peer
+2026/10/23 03:00:50 http2: server: error reading preface from client 127.0.0.1:55256: read tcp 127.0.0.1:38267->127.0.0.1:55256: read: connection reset by peer
+2026/10/23 03:00:50 http2: server: error reading preface from client 127.0.0.1:44888: read tcp 127.0.0.1:34635->127.0.0.1:44888: read: connection reset by peer
+2026/10/23 03:00:50 http2: server: error reading preface from client 127.0.0.1:34744: read tcp 127.0.0.1:45213->127.0.0.1:34744: read: connection reset by peer
+2026/10/23 03:00:50 http2: server: error reading preface from client 127.0.0.1:57644: read tcp 127.0.0.1:34411->127.0.0.1:57644: read: connection reset by peer
+2026/10/23 03:00:51 http: TLS handshake error from 127.0.0.1:48564: read tcp 127.0.0.1:36475->127.0.0.1:48564: use of closed network connection
+I1023 03:00:52.346257  476739 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+E1023 03:00:52.450730  476739 leaderelection.go:473] "Error retrieving lease lock" err="permission configuration unavailable" lock="asservat configuration reconciliation"
+E1023 03:00:53.328527  476739 request.go:1198] "Unexpected error when reading response body" err="bounded pod status unavailable"
+owner local claim refused: pending (unavailable)
+owner local claim refused: pending (unavailable)
+owner local claim refused: native-claim (unavailable)
+owner local claim refused: pending (unavailable)
+owner local claim refused: observe/conversation/registration-3 (unavailable)
+owner local claim refused: pending (unavailable)
+owner local claim refused: observe/conversation/registration-3 (unavailable)
+owner local claim refused: pending (unavailable)
+2026/10/23 03:00:59 http2: server: error reading preface from client 127.0.0.1:46126: read tcp 127.0.0.1:36165->127.0.0.1:46126: read: connection reset by peer
+2026/10/23 03:00:59 http2: server: error reading preface from client 127.0.0.1:46110: read tcp 127.0.0.1:36165->127.0.0.1:46110: read: connection reset by peer
+--- FAIL: TestDerivePromotedOwner (0.11s)
+    --- FAIL: TestDerivePromotedOwner/valid (0.02s)
+        owner_promotion_test.go:74: valid validate
+    --- FAIL: TestDerivePromotedOwner/unprojected (0.01s)
+        owner_promotion_test.go:74: unprojected validate
+    --- FAIL: TestDerivePromotedOwner/downloads (0.02s)
+        owner_promotion_test.go:74: downloads validate
+--- FAIL: TestInstalledOwnerPromotionInputs (0.16s)
+    --- FAIL: TestInstalledOwnerPromotionInputs/public (0.02s)
+        owner_provider_inputs_test.go:156: promotion input decision public protected mounted file unavailable
+    --- FAIL: TestInstalledOwnerPromotionInputs/public-empty-lists (0.02s)
+        owner_provider_inputs_test.go:156: promotion input decision public-empty-lists protected mounted file unavailable
+owner port router: started (1)
+owner port router: unknown-name (1)
+owner port router: handoff worker-enrollment (1)
+owner port router: handoff worker-native (1)
+hub-worker worker configuration: unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/bootstrap	34.837s
+ok  	asservat.local/asservat/internal/console	1.053s
+ok  	asservat.local/asservat/internal/contracts	2.092s
+ok  	asservat.local/asservat/internal/domain/analysis	1.013s
+ok  	asservat.local/asservat/internal/domain/artifact	3.735s
+ok  	asservat.local/asservat/internal/domain/audit	1.033s
+ok  	asservat.local/asservat/internal/domain/authorization	1.493s
+ok  	asservat.local/asservat/internal/domain/capture	1.006s
+ok  	asservat.local/asservat/internal/domain/catalog	1.005s
+ok  	asservat.local/asservat/internal/domain/configuration	1.006s
+ok  	asservat.local/asservat/internal/domain/execution	1.006s
+ok  	asservat.local/asservat/internal/domain/fleet	1.034s
+ok  	asservat.local/asservat/internal/domain/identity	1.006s
+ok  	asservat.local/asservat/internal/domain/planning	1.008s
+ok  	asservat.local/asservat/internal/domain/privacy	1.011s
+ok  	asservat.local/asservat/internal/domain/targets	1.006s
+ok  	asservat.local/asservat/internal/transport/browser	7.507s
+?   	asservat.local/asservat/internal/transport/clustercredential	[no test files]
+ok  	asservat.local/asservat/internal/transport/clusterobservation	3.226s
+ok  	asservat.local/asservat/internal/transport/connectorlifecycle	1.189s
+ok  	asservat.local/asservat/internal/transport/contextstart	2.788s
+?   	asservat.local/asservat/internal/transport/keyservice	[no test files]
+ok  	asservat.local/asservat/internal/transport/mcp	12.608s
+ok  	asservat.local/asservat/internal/transport/native	37.603s
+ok  	asservat.local/asservat/internal/transport/ownerrelay	1.453s
+ok  	asservat.local/asservat/internal/transport/presentation	14.893s
+ok  	asservat.local/asservat/internal/transport/worker	1.100s
+?   	asservat.local/asservat/migrations	[no test files]
+--- FAIL: TestPublicJourneyDiagnosticsOriginalRegionalRunner (0.00s)
+    --- FAIL: TestPublicJourneyDiagnosticsOriginalRegionalRunner/target (0.00s)
+        public_context_regional_diagnostics_test.go:330: original target input changed
+2026/10/23 03:03:34 http: TLS handshake error from 127.0.0.1:37430: remote error: tls: bad certificate
+2026/10/23 03:03:34 http: TLS handshake error from 127.0.0.1:34410: remote error: tls: bad certificate
+FAIL
+FAIL	asservat.local/asservat/test/integration	5.292s
+FAIL
+Go test gate failed: Command '['go', 'test', '-race', '-count=1', '-timeout=15m', 'asservat.local/asservat/api/v1alpha1', 'asservat.local/asservat/cmd/asservat', 'asservat.local/asservat/internal/adapters/diagnostics', 'asservat.local/asservat/internal/adapters/jose', 'asservat.local/asservat/internal/adapters/kms', 'asservat.local/asservat/internal/adapters/mounts', 'asservat.local/asservat/internal/adapters/mtls', 'asservat.local/asservat/internal/adapters/objectstore', 'asservat.local/asservat/internal/adapters/objectstore/framed', 'asservat.local/asservat/internal/adapters/objectstore/manifest', 'asservat.local/asservat/internal/adapters/oidc', 'asservat.local/asservat/internal/adapters/postgres', 'asservat.local/asservat/internal/adapters/postgres/custodydb', 'asservat.local/asservat/internal/adapters/providerconfig', 'asservat.local/asservat/internal/application/analysis', 'asservat.local/asservat/internal/application/audit', 'asservat.local/asservat/internal/application/authorization', 'asservat.local/asservat/internal/application/capacity', 'asservat.local/asservat/internal/application/capture', 'asservat.local/asservat/internal/application/catalog', 'asservat.local/asservat/internal/application/configuration', 'asservat.local/asservat/internal/application/evidence', 'asservat.local/asservat/internal/application/execution', 'asservat.local/asservat/internal/application/fleet', 'asservat.local/asservat/internal/application/identity', 'asservat.local/asservat/internal/application/planning', 'asservat.local/asservat/internal/application/privacy', 'asservat.local/asservat/internal/application/targets', 'asservat.local/asservat/internal/bootstrap', 'asservat.local/asservat/internal/console', 'asservat.local/asservat/internal/contracts', 'asservat.local/asservat/internal/domain/analysis', 'asservat.local/asservat/internal/domain/artifact', 'asservat.local/asservat/internal/domain/audit', 'asservat.local/asservat/internal/domain/authorization', 'asservat.local/asservat/internal/domain/capture', 'asservat.local/asservat/internal/domain/catalog', 'asservat.local/asservat/internal/domain/configuration', 'asservat.local/asservat/internal/domain/execution', 'asservat.local/asservat/internal/domain/fleet', 'asservat.local/asservat/internal/domain/identity', 'asservat.local/asservat/internal/domain/planning', 'asservat.local/asservat/internal/domain/privacy', 'asservat.local/asservat/internal/domain/targets', 'asservat.local/asservat/internal/transport/browser', 'asservat.local/asservat/internal/transport/clustercredential', 'asservat.local/asservat/internal/transport/clusterobservation', 'asservat.local/asservat/internal/transport/connectorlifecycle', 'asservat.local/asservat/internal/transport/contextstart', 'asservat.local/asservat/internal/transport/keyservice', 'asservat.local/asservat/internal/transport/mcp', 'asservat.local/asservat/internal/transport/native', 'asservat.local/asservat/internal/transport/ownerrelay', 'asservat.local/asservat/internal/transport/presentation', 'asservat.local/asservat/internal/transport/worker', 'asservat.local/asservat/migrations', 'asservat.local/asservat/test/integration']' returned non-zero exit status 1.
+make: *** [Makefile:55: go-check] Error 1

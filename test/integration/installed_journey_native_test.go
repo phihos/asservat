@@ -327,7 +327,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			t.Fatal("installed deletion verification missing")
 		}
 		t.Logf("installed journey: the regional capture was collected, verified and published")
-		approved := installedApprovedProjection(t, ctx, identity, transport, origin, progress.CaseID, investigation.Artifacts[0].ArtifactID, preview.SelectedPods[0].UID, expires, projectionCheck)
+		approved, checkQueryRetired := installedApprovedProjection(t, ctx, identity, transport, origin, progress.CaseID, investigation.Artifacts[0].ArtifactID, preview.SelectedPods[0].UID, expires, projectionCheck)
 		// A hub-local download worker (ADR-204) prepares the native file; the
 		// same MCP client fetches it with its download-route token.
 		var download installedJourneyDownload
@@ -444,6 +444,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			diagnose()
 			t.Fatal("installed Stop requires one acknowledged distinct nonterminal download", stopReply.RequestID, err)
 		}
+		checkQueryRetired()
 		// Preparing need not advertise a content link. Retain the public route
 		// for this acknowledged ID; no second readiness/worker wait is needed.
 		stopContentPath := "/api/v1/downloads/" + stopDownload.DownloadID + "/content"

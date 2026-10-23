@@ -155,9 +155,14 @@ func validateOwnerInput(c contracts.OwnerDeployment, projected bool) error {
 		return ownerInputCheck("native-observation")
 	}
 	if p := c.Public; p != nil {
-		// Six owner pools plus the hot public purposes must leave cold slots
-		// within the per-replica governor (ADR-177).
-		if _, ok := publicContextHost(p.Origin); !ok || p.Format != contracts.OwnerPublicDeploymentFormat || c.Native == nil || 6*int(c.Postgres.MaxConnections)+hubAPIHotConnections >= contracts.SQLConnectionsPerHubReplica {
+		// Installed owner duties share ADR-222's fixed six-connection pool.
+		// The legacy layout retains six individually sized pools. Both must
+		// leave cold slots within the unchanged per-replica governor.
+		ownerConnections := 6 * int(c.Postgres.MaxConnections)
+		if c.ProviderAuthentication != nil {
+			ownerConnections = contracts.OwnerIdentityPoolConnections
+		}
+		if _, ok := publicContextHost(p.Origin); !ok || p.Format != contracts.OwnerPublicDeploymentFormat || c.Native == nil || ownerConnections+hubAPIHotConnections >= contracts.SQLConnectionsPerHubReplica {
 			return ownerInputCheck("public-origin")
 		}
 		if !authorization.UUID(p.BrowserRootID) || !capacityRuntimeReference(p.BrowserSettings) || !capacityRuntimeReference(p.IdentitySettings) || p.BrowserSettings.Name == p.IdentitySettings.Name || !identity.Text(p.BrowserAudience, 256) || !ownerProviderName.MatchString(p.SessionTransit.Mount) || !ownerProviderName.MatchString(p.SessionTransit.Key) || p.SessionTransit.Mount == c.KeyService.AuditMount || p.SessionTransit.Mount == c.KeyService.PKIMount {
