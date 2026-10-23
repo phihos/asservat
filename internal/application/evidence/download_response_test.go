@@ -7,6 +7,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -27,6 +28,7 @@ type responseTransferFixture struct {
 	badHash, unverified                                        bool
 	advanceBetweenWindows                                      bool
 	backing                                                    []byte
+	windowWrite                                                time.Time
 }
 type responseTestBatch struct {
 	f      *responseTransferFixture
@@ -79,7 +81,11 @@ func (f *responseTransferFixture) BeginDownloadResponse(_ context.Context, _ str
 }
 func (f *responseTransferFixture) BeginDownloadWindow(_ context.Context, _, _, _, id string, a artifact.DownloadAuthority) (audit.DownloadWindowIntent, error) {
 	var e error
-	f.s, f.r, f.w, e = f.r.BeginWindow(f.s, a, id, f.s.ID, f.s.Deadline.Add(time.Minute), f.now)
+	writeUntil := f.s.Deadline.Add(time.Minute)
+	if !f.windowWrite.IsZero() {
+		writeUntil = f.windowWrite
+	}
+	f.s, f.r, f.w, e = f.r.BeginWindow(f.s, a, id, f.s.ID, writeUntil, f.now)
 	f.wi = audit.DownloadWindowIntent{Response: f.r, Window: f.w}
 	return f.wi, e
 }
@@ -270,5 +276,23 @@ func TestResponseTransferEmptyNativeStillHasOneAuditedWindow(t *testing.T) {
 	}
 	if f.s.State != artifact.DownloadCompleted || f.intents != 1 || f.outcomes != 1 || f.chunks != 1 {
 		t.Fatal("empty response lacks bounded completion")
+	}
+}
+
+// Installed native91: the window's audit deadline is its protected-capacity
+// control's, about 24 h ahead; the content transfer must accept it, and a
+// refused window names its stage for the operator report.
+func TestResponseTransferAcceptsCapacityControlWindowDeadline(t *testing.T) {
+	f, s, r := newResponseTransferFixture(t, 2)
+	f.windowWrite = f.now.Add(24*time.Hour + 30*time.Second)
+	if e := s.Transfer(context.Background(), f, r, f, f); e != nil || f.s.State != artifact.DownloadCompleted {
+		t.Fatal("capacity control window deadline refused the transfer", e)
+	}
+	f, s, r = newResponseTransferFixture(t, 2)
+	f.windowWrite = f.now.Add(artifact.MaxDownloadWindowWrite + time.Second)
+	e := s.Transfer(context.Background(), f, r, f, f)
+	var fixed interface{ FixedStep() string }
+	if !errors.Is(e, artifact.ErrInvalid) || !errors.As(e, &fixed) || fixed.FixedStep() != "window" {
+		t.Fatal("refused window did not name its stage", e)
 	}
 }

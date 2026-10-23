@@ -47,6 +47,9 @@ type DownloadContentConfig struct {
 func (c DownloadContentConfig) Resource() string { return c.PublicOrigin + "/api/v1/downloads" }
 
 type DownloadContentHandler struct {
+	// Refused, when set, receives each unavailable (503) or aborted content
+	// response with its closed stage path; it never receives user data.
+	Refused     func(context.Context, string, error)
 	config      DownloadContentConfig
 	sessions    SessionHandler
 	bearer      identities.Resolver
@@ -103,6 +106,36 @@ func (h *DownloadContentHandler) release(p identity.Principal) {
 		delete(h.active, p)
 	}
 }
+
+// contentStep names the closed content stage that refused a response.
+type contentStep struct {
+	step string
+	err  error
+}
+
+func (e *contentStep) Error() string { return e.err.Error() }
+func (e *contentStep) Unwrap() error { return e.err }
+func (e *contentStep) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
+}
+
+// unavailable reports the refused stage and replies 503.
+func (h *DownloadContentHandler) unavailable(ctx context.Context, w http.ResponseWriter, step string, err error) {
+	h.report(ctx, step, err)
+	sessionProblem(w, http.StatusServiceUnavailable)
+}
+func (h *DownloadContentHandler) report(ctx context.Context, step string, err error) {
+	if err == nil {
+		err = artifact.ErrDownloadUnavailable
+	}
+	if h.Refused != nil {
+		h.Refused(ctx, "content", &contentStep{step: step, err: err})
+	}
+}
 func (h *DownloadContentHandler) challenge(w http.ResponseWriter, status int) {
 	w.Header().Set("WWW-Authenticate", `Bearer resource_metadata="`+h.config.PublicOrigin+DownloadContentMetadataPath+`"`)
 	sessionProblem(w, status)
@@ -155,7 +188,7 @@ func (h *DownloadContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	defer end()
 	control := http.NewResponseController(w)
 	if control.SetReadDeadline(preflightUntil) != nil || control.SetWriteDeadline(preflightUntil) != nil {
-		sessionProblem(w, 503)
+		h.unavailable(initial, w, "socket", nil)
 		return
 	}
 	if r.Body != nil {
@@ -171,7 +204,7 @@ func (h *DownloadContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		if errors.Is(err, identity.ErrDenied) || errors.Is(err, identity.ErrInvalid) {
 			h.challenge(w, 401)
 		} else {
-			sessionProblem(w, 503)
+			h.unavailable(initial, w, "authenticate", err)
 		}
 		return
 	}
@@ -184,7 +217,7 @@ func (h *DownloadContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	if !slices.Contains(i.Scopes, "evidence:read") || !slices.Contains(i.Scopes, "evidence:download") {
 		bound, e := h.audit.RejectBeforeDispatch(initial, current, presentation.IngressRejection{RequestedOperation: "download_artifact_content", Kind: presentation.IngressDenied})
 		if e != nil || initial.Err() != nil || !h.config.Now().Before(bound) {
-			sessionProblem(w, 503)
+			h.unavailable(initial, w, "scope-audit", e)
 			return
 		}
 		if e = contentDeniedReply(initial, w, identity.Earlier(bound, preflightUntil), h.config.Now); e != nil {
@@ -196,7 +229,7 @@ func (h *DownloadContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	defer cancel()
 	owner, release, err := h.runtime.BeginContent(owner, id, i.Principal)
 	if err != nil {
-		sessionProblem(w, 503)
+		h.unavailable(initial, w, "begin", err)
 		return
 	}
 	defer release()
@@ -212,19 +245,19 @@ func (h *DownloadContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 		if reader != nil {
 			reader.Close()
 		}
-		sessionProblem(w, 503)
+		h.unavailable(owner, w, "reader", err)
 		return
 	}
 	defer reader.Close()
 	source, err := evidence.NewContextNativeResponse(owner, h.runtime)
 	if err != nil {
-		sessionProblem(w, 503)
+		h.unavailable(owner, w, "source", err)
 		return
 	}
 	defer source.Close()
 	audit, err := presentation.NewNativeContentAuditor(h.audit, presentation.NativeContentInput{DownloadID: id, IfMatch: r.Header.Values("If-Match"), IfNoneMatch: r.Header.Values("If-None-Match"), IfRange: r.Header.Values("If-Range"), Range: r.Header.Values("Range")}, preflightUntil)
 	if err != nil {
-		sessionProblem(w, 503)
+		h.unavailable(owner, w, "auditor", err)
 		return
 	}
 	factory := &contentResponseFactory{writer: w, request: r.WithContext(owner)}
@@ -235,16 +268,18 @@ func (h *DownloadContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	}
 	// Transfer's defers have joined every regional read, write and SQL close.
 	if factory.sent() {
+		h.report(owner, "transfer-sent", err)
 		panic(http.ErrAbortHandler)
 	}
 	status := DownloadConditionStatus(err)
 	if status != http.StatusInternalServerError && !factory.until.IsZero() && owner.Err() == nil && h.config.Now().Before(factory.until) {
 		if e := factory.conditional(owner, status, h.config.Now); e != nil {
+			h.report(owner, "conditional", e)
 			panic(http.ErrAbortHandler)
 		}
 		return
 	}
-	sessionProblem(w, 503)
+	h.unavailable(owner, w, "transfer", err)
 }
 func (h *DownloadContentHandler) authenticate(ctx context.Context, r *http.Request, hard time.Time) (identities.CurrentIdentity, identity.Identity, time.Time, string, string, error) {
 	var zero identity.Identity

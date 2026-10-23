@@ -108,8 +108,12 @@ func (t DownloadResponseTransfer) TransferAudited(ctx context.Context, reader id
 }
 func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identities.ReaderIdentity, request DownloadResponseRequest, source NativeResponseSource, destination DownloadResponseSinkFactory, auditor DownloadContentAuditor) (err error) {
 	if !t.valid() || ctx == nil || reader == nil || source == nil || destination == nil || !authorization.UUID(request.SessionID) || !authorization.UUID(request.ResponseID) || !authorization.UUID(request.OwnerID) || !t.Now().Before(request.HardUntil) || request.HardUntil.After(t.Now().Add(8*time.Hour)) {
-		return artifact.ErrInvalid
+		return stepped("request", artifact.ErrInvalid)
 	}
+	// Every refusal names its closed stage for the operator report; the
+	// wrapper unwraps unchanged and runs after every other deferred close.
+	stage := "identity"
+	defer func() { err = stepped(stage, err) }()
 	defer reader.Close()
 	defer source.Close()
 	work, cancel := context.WithDeadline(ctx, request.HardUntil)
@@ -129,6 +133,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	finished := false
 	initial := i
 	if auditor != nil {
+		stage = "preflight-audit"
 		original := identityvalue.Earlier(i.ValidUntil, t.Now().Add(artifact.DownloadLease))
 		call, end := context.WithDeadline(work, original)
 		defer end()
@@ -195,6 +200,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		}
 		i = fresh
 	}
+	stage = "session"
 	session, e := t.Sessions.LookupDownload(preflightWork, request.SessionID, i.Principal)
 	if e != nil {
 		return e
@@ -203,6 +209,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		return artifact.ErrDownloadUnavailable
 	}
 	current.scope = session.Scope
+	stage = "authority"
 	if t.NewResponseAuthority != nil {
 		owned, close, err := t.NewResponseAuthority(work, session.Scope)
 		if err != nil || owned == nil || close == nil {
@@ -230,6 +237,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	until := identityvalue.Earlier(request.HardUntil, identityvalue.Earlier(session.Deadline, a.AccessUntil))
 	work, cancelResponse := context.WithDeadline(work, until)
 	defer cancelResponse()
+	stage = "describe"
 	describe, stop := context.WithDeadline(preflightWork, a.ValidUntil)
 	var metadata artifact.NativeDownloadMetadata
 	var readLimit int64
@@ -248,6 +256,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		return artifact.ErrDownloadUnavailable
 	}
 	until = identityvalue.Earlier(until, metadata.ReadUntil)
+	stage = "select"
 	selection, e := destination.SelectDownloadResponse(metadata)
 	if e != nil {
 		return e
@@ -259,6 +268,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	if !plan.Valid() {
 		return artifact.ErrInvalid
 	}
+	stage = "preflight-finish"
 	if e = finishPreflight(DownloadContentReady); e != nil {
 		return e
 	}
@@ -269,6 +279,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	if d, ok := work.Deadline(); ok {
 		until = identityvalue.Earlier(until, d)
 	}
+	stage = "body"
 	if receive, ok := destination.(DownloadContentBodyReceiver); ok {
 		if e = receive.BeginDownloadContentBody(work, until); e != nil {
 			return e
@@ -279,6 +290,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	// Close it before admitting content and acquire a distinct current batch;
 	// neither the old observation nor Describe is renewed or replayed.
 	current.closeBatch()
+	stage = "current"
 	a, e = current.get(work)
 	if e != nil {
 		return e
@@ -291,6 +303,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	}
 	work, stopContent := context.WithDeadline(work, until)
 	defer stopContent()
+	stage = "response"
 	r, e := t.Responses.BeginDownloadResponse(work, session.ID, a, artifact.DownloadResponse{ID: request.ResponseID, SessionID: session.ID, OwnerID: request.OwnerID, Plan: plan, Until: until})
 	if e != nil {
 		return e
@@ -311,6 +324,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 			err = closeErr
 		}
 	}()
+	stage = "open"
 	sink, e := destination.OpenDownloadResponse(work, metadata, r)
 	if e != nil {
 		return e
@@ -319,6 +333,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	fullHash := sha256.New()
 	offset := selection.Offset
 	for ordinal := int64(1); ordinal <= plan.Windows(); ordinal++ {
+		stage = "window-current"
 		a, e = current.get(work)
 		if e != nil {
 			return e
@@ -327,6 +342,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		if !authorization.UUID(windowID) {
 			return artifact.ErrInvalid
 		}
+		stage = "window"
 		intent, e := t.Responses.BeginDownloadWindow(work, session.ID, r.ID, r.OwnerID, windowID, a)
 		if e != nil {
 			return e
@@ -334,10 +350,12 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		if !intent.Valid() || intent.Response.ID != r.ID || intent.Window.Ordinal != ordinal || intent.Window.Offset != offset || intent.Window.Authority.Scope != session.Scope {
 			return artifact.ErrIntegrity
 		}
+		stage = "window-audit"
 		result, e := t.Objects.CreateDownloadWindowIntent(work, intent)
 		if e != nil {
 			return e
 		}
+		stage = "window-ack"
 		if e = t.Audit.AcknowledgeDownloadWindowIntent(work, intent, result); e != nil {
 			return e
 		}
@@ -346,11 +364,13 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		verified := false
 		transferErr := func() error {
 			for emitted < intent.Window.Length || intent.Window.Length == 0 && lease.Sequence == 0 {
+				stage = "chunk-current"
 				a, e = current.get(work)
 				if e != nil {
 					return e
 				}
 				if !lease.Valid(t.Now()) {
+					stage = "lease"
 					lease, e = t.Responses.LeaseDownloadResponse(work, session.ID, r.ID, r.OwnerID, windowID, a)
 					if e != nil {
 						return e
@@ -360,6 +380,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 					}
 				}
 				length := min(artifact.DeliveryBytes, intent.Window.Length-emitted)
+				stage = "read"
 				piece, stop := context.WithDeadline(work, lease.Until)
 				var chunk NativeResponseChunk
 				var e error
@@ -390,6 +411,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 					stop()
 					return artifact.ErrIntegrity
 				}
+				stage = "write"
 				n, writeErr := sink.WriteChunk(piece, lease, offset, chunk.Bytes)
 				clear(chunk.Bytes)
 				if n < 0 || n > length {
@@ -403,6 +425,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 				}
 				if writeErr == nil {
 					if remote, ok := source.(NativeResponseDeliveryAcknowledger); ok {
+						stage = "chunk-ack"
 						writeErr = remote.AcknowledgeNativeChunk(piece, lease, offset-n, n)
 						if writeErr == nil && (piece.Err() != nil || !lease.Valid(t.Now())) {
 							writeErr = artifact.ErrDownloadExpired
@@ -433,9 +456,11 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 			return transferErr
 		}
 		if recordErr != nil {
+			stage = "window-outcome"
 			return recordErr
 		}
 	}
+	stage = "finish"
 	if offset != selection.Offset+selection.Length {
 		return artifact.ErrIntegrity
 	}
@@ -443,5 +468,6 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	if e = sink.Finish(work); e != nil {
 		return e
 	}
+	stage = "close"
 	return nil
 }

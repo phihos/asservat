@@ -1,5 +1,26 @@
 # Sustained implementation progress
 
+## Capacity-backed download windows and content refusal stages (2026-10-24)
+
+Installed native91 prepared the native download, then the content GET got a
+bare 503 with no hub log. SQL showed one closed `download_response` with
+`window_count=0`, no `download_window` row and no SQL error: the first
+`BeginWindow` refused in Go. SQL pins a window's `WriteUntil` to its control
+allocation's `audit_write_until`; a protected-capacity control sets it at the
+admission end plus grace (about 24 h, here 2026-10-24 21:56 for a window
+starting 2026-10-23 22:01), but `DownloadWindow.Valid` still capped it at the
+pre-capacity 8 h + 5 min, so every capacity-backed window was `ErrInvalid`.
+The cap is now `MaxDownloadWindowWrite` (24 h admission maximum + 5 min); SQL
+keeps the exact control pin and audit writes keep their 5 s call bounds.
+The content handler and `DownloadResponseTransfer` now report every 503/abort
+as `download content refused: content/<stage>/...` with the closed transfer
+stage (identity, preflight-audit, session, authority, describe, select,
+body, current, response, open, window, window-audit, lease, read, write, ...).
+Unit regressions reproduce the refusal; real SQL capacity-window coverage and
+a new installed run remain to be qualified. `download-worker-*` real-SQL
+subtests other than configuration/short-runtime/native-https already fail at
+`reserve worker` on fa10017c (unchanged by this change).
+
 ## Hub serving observation reuse and download frame-check sharing (2026-10-23)
 
 Installed native89 passed the approved inspection end to end, then failed the

@@ -85,13 +85,16 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 	// paths answer 503 rather than falling through to the console.
 	var content http.Handler
 	if s.Native != nil {
-		if content, e = browser.NewDownloadContentHandler(browser.DownloadContentConfig{
+		handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{
 			PublicOrigin: c.PublicOrigin, Issuer: c.Issuer,
 			MaxConcurrent: c.DownloadConcurrency, MaxPerIdentity: c.DownloadsPerIdentity,
 			MaxDuration: c.DownloadMaxDuration, Now: c.Audit.Now, NewID: c.Audit.NewID,
-		}, sessions, s.DownloadIdentity, s.RefreshPauses, audited, s.Native, s.Transfer); e != nil {
+		}, sessions, s.DownloadIdentity, s.RefreshPauses, audited, s.Native, s.Transfer)
+		if e != nil {
 			return nil, &fixedStepError{"downloads", e}
 		}
+		handler.Refused = downloadRefusalReport(timedEventLog(os.Stderr, "download content refused"), time.Now)
+		content = handler
 	}
 	var fleet http.Handler
 	if s.Fleet != nil {
