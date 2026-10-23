@@ -1,5 +1,22 @@
 # Sustained implementation progress
 
+## Processing snapshot interval for evidence reads (2026-10-23)
+
+Installed native81 (81c8926b) refused the first get_file_excerpt within
+100 ms at `excerpt/authority/environment/processing`. The approved-query
+processing read (`ContextProjectionProcessing` -> `readProcessingSnapshot`)
+builds its snapshot from the evidence observation's `ObservedAt` until the
+earliest of the evidence (now 20 s), evidence-read recovery (now 20 s),
+retention expiry and processing root bounds, and then requires
+`ProcessingSnapshot.Allows`, which still capped the snapshot at five
+seconds; every such snapshot was refused. `Allows` now admits up to
+`identity.EvidenceReadRequestWindow`; download and capture processing
+reads still build five-second snapshots, and the snapshot still ends at its
+earliest real bound. `TestProcessingSnapshotAllowsEvidenceReadInterval`
+failed before the fix and passes after. The real-SQL fixtures passed before
+and after because they drive this read with five-second inputs; installed
+qualification has not rerun.
+
 ## Evidence-read authority, worker proof and lease window (2026-10-23)
 
 Code review after the request-window change showed the approved read was
