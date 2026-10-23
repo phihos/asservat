@@ -11,7 +11,8 @@ review follow-up. The historical stop and no-Git statements below describe
 Start with the [current progress checkpoint](docs/implementation-progress.md),
 [AGENTS.md](AGENTS.md) and the accepted
 [complexity review](docs/reviews/complexity-2026-10-20/README.md). Candidate
-`89bfff49` adds the reviewed response-metadata/start phase correction on top
+`072e42a3` includes ADR-222 credential consolidation and the reviewed
+`89bfff49` response-metadata/start phase correction on top
 of `17e0ff63`: one authority construction per finite download preparation,
 response-owned ordinary-permission reconstruction at 30 seconds, and removal of
 two namespace GETs from candidate-only workload listing. Exact effect checks and
@@ -35,10 +36,11 @@ The implementation mandate remains active. The isolated projection tree
 pod-status inspection through shared acquisition and certificate enrollment based
 on admitted worker identity, independent of the human preparation socket. It also
 replaces separate query capacity/deployment machinery with the actual installed
-shared resources. The isolated credential tree
-`/home/phil/Projekte/asservat-hub-credentials-c62e02ac` drafts ADR-222's same-process
-SQL credential unions and fixed 32-connection allocation. Neither draft is part
-of native57; their testing/integration is in progress. Continue through complete
+shared resources. ADR-222 is integrated in the main simplification tree: exact same-process
+SQL grant unions remove 41 credentials and keep 32 connections. Focused unit,
+Kubernetes adapter, compilation and design checks pass; full current Go and real
+SQL/installed checks remain pending until ADR-219/221 is integrated. These changes
+were not part of native57. Continue through complete
 workflows; status questions and component handoffs do not revoke approval.
 
 ## Historical handoff (2026-10-14)

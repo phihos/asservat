@@ -72,6 +72,17 @@ authorized. Understand why existing mechanisms exist before removing them.
 
 ## Implementation notes
 
+ADR-222 supersedes the earlier same-process credential splits, including ADR-217:
+ordinary hub work shares one exact compiled SQL grant union; owner identity and
+routing share another. Keep the existing 32 physical connections, two reserved
+resolution-audit connections, pinned capture/capacity credentials and separate
+worker-configuration pool needed by nested reads. Key, publisher, federation,
+collector and deletion processes retain their credentials. Browser cleanup has
+no installed consumer and is not provisioned. Read docs/decisions/222-hub-process-sql-credentials.md.
+Component checks pass; real SQL and installed qualification require integrated
+ADR-219/221. Do not describe a whole resolution request as guaranteed to finish
+under ordinary-pool saturation merely because its audit connections are reserved.
+
 ADR-220 gives each original content response one ordinary-entitlement observation
 with a 30-second reconstruction cutoff anchored before its first read. Keep new
 identity/safety facts and every effect/native lease within their original five

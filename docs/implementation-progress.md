@@ -1,5 +1,34 @@
 # Sustained implementation progress
 
+## Shared hub credentials integrated (2026-10-23)
+
+Candidate `072e42a3` integrates ADR-222 on top of the capture phase correction.
+The reviewed exact grant unions remove 41 credential lifecycles: 79 public logins
+become 43 and six owner logins become one. Ten openable pools retain the existing
+32 physical connections. Two resolution-audit connections remain reserved; other
+resolution reads still use the ordinary pool. Actual key/publication/deletion
+process boundaries and database state-transition checks remain. Unused installed
+browser-cleanup credentials are retired; its component still lacks runtime
+composition and this change does not implement it.
+
+The [component archive](../test/results/resumed-c62e02ac-hub-credentials/README.md)
+retains passing focused contract/bootstrap/PostgreSQL tests, integration
+compilation, Kubernetes adapter tests (595.418 seconds), and design/import checks
+(11.142 seconds). All recorded source hashes remain unchanged during their runs.
+Earlier fixture failures and the initial diagnostic interruption are preserved.
+Independent reviews verify the grant unions, pools and adapted real-SQL tests.
+The latter's aggregate-login test now reads PostgreSQL's actual limit and rejects
+a changed value instead of opening 81 connections against a 48-connection fixture;
+per-process 18+2 saturation/cancellation/reuse tests retain their actual assertions.
+No fixture server limit is raised.
+
+ADR-219/221 is still being tested in the isolated projection tree. It removes the
+old worker-owner composition required before this combined hub can start. The
+full current Go gate, real scoped SQL and complete installed journey therefore
+remain pending on the integrated source. Native57's failure is still the latest
+installed result; this component checkpoint does not complete S-02 or the active
+implementation mandate.
+
 ## Capture response metadata no longer shortens startup (2026-10-23)
 
 Candidate `89bfff49` refines ADR-216: submission consumes the exact accepted
