@@ -41,8 +41,6 @@ func downloadRefusalClass(err error) string {
 		err = c.StepCause()
 	}
 	switch {
-	case errors.Is(err, evidence.ErrDownloadBindingStale):
-		return "binding-stale"
 	case errors.Is(err, evidence.ErrDownloadMetadataUnavailable):
 		return "metadata-unavailable"
 	case errors.Is(err, artifact.ErrDownloadExpired):

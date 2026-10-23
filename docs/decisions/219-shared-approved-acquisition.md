@@ -190,3 +190,22 @@ complete acquisition-to-audited-disclosure path at production resource limits.
 This decision is the implementation contract, not evidence that those checks or
 the installed workflow have passed. Track commands, actual exits and remaining
 composition in the implementation-progress record.
+
+## Revision 2026-10-23: reads without workload capacity
+
+Maintainer decision (explicit, 2026-10-23): reading already stored evidence
+must not depend on live capacity observations of the source workload.
+Migration 00076 (schema 76) removes the workload and root capacity
+observation from approved-query reads. `lock_context_query_capacity` checks
+only the immutable accepted anchor (installation incarnation, recovery issuer
+epoch, original `HardUntil`); `context_query_capacity_allocation_current`
+checks only the workload's immutable reserved allocation against the backing;
+`read_shared_context_query_plan` no longer consults
+`capacity_managed_root_until`. The workload's `context_storage_binding`
+freshness, `capacity_workload` revision/pool/policy match and capacity source
+suspension no longer gate query admission, worker batches or polls. Reads stay
+bounded by the shared acquisition worker limit, the original root, principal
+and per-workload query charges, per-principal operation-audit allowances, and
+every permission, retention, recovery, processing, catalog and accepted worker
+configuration check. Evidence of a deleted workload stays queryable within
+retention. Capture admission is unchanged.

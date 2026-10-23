@@ -166,23 +166,11 @@ func (f *capacitySQLFixture) qualifyRegionalExtension(t *testing.T, first app.En
 		if err != nil || len(got) != 1 || got[0].ClusterID != cluster || got[0].Workload.UID != workloadUID || got[0].Namespace.Name != "payments" || got[0].Workload.Name != "api" {
 			t.Fatal("capacity writer demand read", got, err)
 		}
-		// A download re-arms the demand recorded for the workload behind its
-		// download allocation; an unknown allocation changes nothing.
-		var allocation string
-		var before time.Time
-		if err := f.admin.QueryRow(f.ctx, `SELECT w.download_allocation_id::text,d.requested_at FROM capacity_workload w JOIN capacity_refresh_demand d ON d.root_id=w.root_id AND d.workload_uid=w.workload_uid WHERE w.root_id=$1 AND w.workload_uid=$2`, root, workloadUID).Scan(&allocation, &before); err != nil {
-			t.Fatal("demand row", err)
-		}
-		if _, err := f.admin.Exec(f.ctx, `SELECT demand_capacity_refresh_for_download($1,$2)`, root, custodyID()); err != nil {
-			t.Fatal("unknown allocation", err)
-		}
-		if _, err := f.admin.Exec(f.ctx, `SELECT demand_capacity_refresh_for_download($1,$2)`, root, allocation); err != nil {
-			t.Fatal("download demand", err)
-		}
-		var after time.Time
-		var rows int
-		if err := f.admin.QueryRow(f.ctx, `SELECT max(requested_at),count(*) FROM capacity_refresh_demand WHERE root_id=$1`, root).Scan(&after, &rows); err != nil || !after.After(before) || rows != 1 {
-			t.Fatal("download did not re-arm exactly the existing demand", before, after, rows, err)
+		// Migration 00076: reads no longer depend on workload capacity, so a
+		// download has nothing to re-arm and the function is gone.
+		var exists bool
+		if err := f.admin.QueryRow(f.ctx, `SELECT to_regprocedure('demand_capacity_refresh_for_download(uuid,uuid)') IS NOT NULL`).Scan(&exists); err != nil || exists {
+			t.Fatal("download refresh demand remains", exists, err)
 		}
 		other, err := postgres.NewCapacityRefreshDemands(f.ctx, f.roles["capacity-capture"], root)
 		if err != nil {

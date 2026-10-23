@@ -1,5 +1,29 @@
 # Sustained implementation progress
 
+## Reads without workload capacity (2026-10-23)
+
+Maintainer decision (explicit): reading stored evidence (approved pod-status
+queries and native download preparation/transfer) must not depend on live
+capacity observations of the source workload. Migration 00076 (schema 76)
+removes that coupling and adds no machinery or configuration:
+`lock_context_query_capacity`, `context_query_capacity_allocation_current` and
+`read_shared_context_query_plan` check only the immutable accepted anchor,
+the workload's reserved query allocation and the original `HardUntil`;
+`require_capacity_download_snapshot` keeps the original enrollment snapshot
+without the binding check or the capacity-source `NOWAIT` lock; the
+`artifact_download` admission trigger is dropped, and operation audit outside
+the `capture` lane is no longer gated by `capacity_managed_root_until`. The
+download stale-binding retry, `demand_capacity_refresh_for_download`, its grant
+and diagnostic are deleted. Reads remain bounded by the shared two-worker
+acquisition limit, original query/download charges, per-principal audit
+allowances and all authorization, retention, recovery, processing and catalog
+checks. Capture admission is unchanged (ADR-219 and ADR-200 revisions,
+artifact-downloads specification). The new real-SQL
+`TestEvidenceReadsWithoutWorkloadCapacityWithRealPostgres` expires the
+workload binding, asserts capture refusal, then runs download preparation and
+charge plus the complete approved query flow. It and the affected real-SQL
+suites have not run yet; installed qualification has not run.
+
 ## Thirty-second retention source observation (2026-10-23)
 
 Installed native74 refused `get_query_result` at `current/authority/retention`:

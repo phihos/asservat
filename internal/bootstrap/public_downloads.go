@@ -137,13 +137,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		return nil, mounts.ErrUnavailable
 	}
 	stop := evidence.ContextDownloadStopCoordinator{Ledger: publicStopLedger{stops, stopWriter}, Acknowledgements: stopAcks, Objects: stopObjects, Now: time.Now}
-	// ADR-200: a reservation refused for a stale binding re-arms the capacity
-	// refresh demand, with the download-session credentials.
-	refresh, err := postgres.NewCapacityRefreshDemands(ctx, sql["download-session"], root)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: sources, Sources: sources, Authority: gate, Sessions: downloads, Refresh: refresh,
+	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: sources, Sources: sources, Authority: gate, Sessions: downloads,
 		Refused: downloadRefusalReport(eventLog(os.Stderr, "download refused"), time.Now)}
 
 	wa, wp := capacityWorkerGuard(p.WorkerConfiguration.Guard)

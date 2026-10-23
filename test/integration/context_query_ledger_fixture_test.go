@@ -55,6 +55,10 @@ type queryLedgerFixture struct {
 	scenario       captureAdmissionScenario
 	published      artifact.PublishedContext
 	audit          audit.AcceptedCapacityAuditProfiles
+	root           app.RootConfiguration
+	// workloadGone stops refreshing the workload's capacity observation, as
+	// after the source workload's deletion (maintainer decision 2026-10-23).
+	workloadGone bool
 }
 
 func (f *queryLedgerFixture) currentProfile() value.ContextQueryResourceProfile {
@@ -66,9 +70,11 @@ func (f *queryLedgerFixture) currentProfile() value.ContextQueryResourceProfile 
 // producer refreshes the same accepted workload; query charges never refill.
 func (f *queryLedgerFixture) refresh(t *testing.T) {
 	t.Helper()
-	o := f.base.workloadObservation(t, 0)
-	if err := f.base.enrollments.RefreshCapacityEnrollment(f.base.ctx, o, f.enrolled); err != nil {
-		t.Fatal("current managed workload", err)
+	if !f.workloadGone {
+		o := f.base.workloadObservation(t, 0)
+		if err := f.base.enrollments.RefreshCapacityEnrollment(f.base.ctx, o, f.enrolled); err != nil {
+			t.Fatal("current managed workload", err)
+		}
 	}
 	if f.workerObserver != nil {
 		if err := f.workerObserver.Observe(f.base.ctx); err != nil {
@@ -143,7 +149,7 @@ func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *p
 	}
 	// The existing capacity role published the anchor/allocation in its own
 	// transactions. There is no query producer or extra source-observation claim.
-	query := &queryLedgerFixture{base: f, enrolled: enrolled}
+	query := &queryLedgerFixture{base: f, enrolled: enrolled, root: root}
 	processingPools := len(pools)
 	f.initializeManagedProcessing(t, root)
 	for _, p := range pools[processingPools:] {

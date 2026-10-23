@@ -54,5 +54,3 @@ UPDATE download_batch SET outcome_acknowledged_at=clock_timestamp(),outcome_rece
 -- name: AcknowledgeDownloadState :execrows
 UPDATE artifact_download SET state=$3 WHERE id=$1 AND root_id=$2;
 
--- name: DemandDownloadCapacityRefresh :exec
-SELECT demand_capacity_refresh_for_download(sqlc.arg(root_id)::uuid,sqlc.arg(allocation_id)::uuid);

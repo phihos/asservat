@@ -159,11 +159,11 @@ func TestAdmittedEnrollmentNamesRefusingStage(t *testing.T) {
 		t.Fatal("refusal did not name the store stage", err)
 	}
 	s.Bindings = admittedBindingsFunc(func(context.Context, value.AcquisitionParent, string) (value.AcquisitionWorkerIdentity, error) {
-		return value.AcquisitionWorkerIdentity{}, ErrDownloadBindingStale
+		return value.AcquisitionWorkerIdentity{}, ErrDownloadMetadataUnavailable
 	})
 	_, err = s.BeginAcquisitionEnrollment(context.Background(), s.InstallationID, f.w.Intent.Acquisition().Parent, f.w.Intent.ID, []byte("pod-token"), []byte("same-process-csr"))
 	var cause interface{ StepCause() error }
-	if !errors.Is(err, artifact.ErrDownloadUnavailable) || !errors.As(err, &fixed) || fixed.FixedStep() != "identity" || !errors.As(err, &cause) || !errors.Is(cause.StepCause(), ErrDownloadBindingStale) {
+	if !errors.Is(err, artifact.ErrDownloadUnavailable) || !errors.As(err, &fixed) || fixed.FixedStep() != "identity" || !errors.As(err, &cause) || !errors.Is(cause.StepCause(), ErrDownloadMetadataUnavailable) {
 		t.Fatal("identity refusal lost its stage or cause", err)
 	}
 }

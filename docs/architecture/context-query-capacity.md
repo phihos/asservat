@@ -25,7 +25,8 @@ ensure the same exact query allocation. Unknown replies retain the original
 anchor/allocation IDs, charges and dates. They cannot create a new reservation.
 No administrator inserts those rows in the qualification fixture. The same
 original setup receipt, current capacity source, phase-three root readiness,
-permission acknowledgement and recovery/database incarnation remain mandatory.
+permission acknowledgement and recovery/database incarnation remain mandatory
+for creating them; reads use them as described below.
 
 ## Logical accounting and shared physical admission
 
@@ -143,3 +144,13 @@ freshness renewal from an older replay, and the caller's earlier deadline while
 blocked on SQL locks. The full ledger result remains scoped to `51fd2e9`; it was
 not rerun for this restrictive adapter-only change. Installed/public query
 qualification remains pending.
+
+## Reads without workload capacity (2026-10-23)
+
+By explicit maintainer decision, migration 00076 makes query reads independent
+of live capacity observations. The current capacity source, root readiness
+freshness and the workload's binding observation gate collection only. A query
+for evidence of a deleted or unobserved workload uses the workload's original
+immutable allocation, the accepted anchor's `HardUntil`, incarnation and
+recovery epoch, and all current authorization checks. No allowance is
+refunded or replenished.
