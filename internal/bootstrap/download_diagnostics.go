@@ -7,13 +7,14 @@ import (
 
 	"asservat.local/asservat/internal/application/evidence"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
+	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// downloadRefusalReport formats a refused native-download prepare/get like the
-// context start report (ADR-197): the closed stage path, the error class and
-// the coarse remaining request deadline. It never logs error text, identifiers
+// downloadRefusalReport formats a refused native-download prepare/get or an
+// approved query excerpt/result like the context start report (ADR-197): the
+// closed stage path, the error class and the coarse remaining request deadline. It never logs error text, identifiers
 // or user data.
 func downloadRefusalReport(report func(string), now func() time.Time) func(context.Context, string, error) {
 	return func(ctx context.Context, operation string, err error) {
@@ -53,6 +54,10 @@ func downloadRefusalClass(err error) string {
 	case errors.Is(err, artifact.ErrIntegrity):
 		return "integrity"
 	case errors.Is(err, artifact.ErrInvalid):
+		return "invalid"
+	case errors.Is(err, query.ErrExpired):
+		return "expired"
+	case errors.Is(err, query.ErrInvalid):
 		return "invalid"
 	case errors.Is(err, identity.ErrDenied):
 		return "denied"

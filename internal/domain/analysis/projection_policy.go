@@ -44,8 +44,13 @@ func (p ContextProjectionPolicy) WellFormed() bool {
 	return true
 }
 
+// ContextProjectionPolicyInterval bounds reuse of the protected placement
+// observation; it equals the download policy observation interval because both
+// purposes share one installed observation.
+const ContextProjectionPolicyInterval = 60 * time.Second
+
 func (p ContextProjectionPolicy) Valid(now time.Time) bool {
-	return p.WellFormed() && p.ProtectionDigest != (artifact.Digest{}) && identity.Fresh(p.ObservedAt, p.FreshUntil, now, 5*time.Second)
+	return p.WellFormed() && p.ProtectionDigest != (artifact.Digest{}) && identity.Fresh(p.ObservedAt, p.FreshUntil, now, ContextProjectionPolicyInterval)
 }
 
 func (p ContextProjectionPolicy) Permits(actor identity.Principal, target, store, purpose string, now time.Time) bool {

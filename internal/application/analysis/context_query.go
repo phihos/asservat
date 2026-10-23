@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"sync"
 	"time"
@@ -22,6 +23,8 @@ type ContextProjectionResults struct {
 	Reader                                  ContextProjectionReader
 	Now                                     func() time.Time
 	NewID                                   func() string
+	// Refused, when set, reports a refused query once with its closed stage.
+	Refused func(context.Context, string, error)
 }
 
 type ContextProjectionService struct {
@@ -247,7 +250,7 @@ func sameProjectionIdentity(a, b identity.Identity, now time.Time) bool {
 
 func (s ContextProjectionResults) request(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, tool string) (*projectionRequest, error) {
 	if !s.valid() || ctx == nil || ctx.Err() != nil || current == nil || invocation == nil {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("configuration", value.ErrUnavailable)
 	}
 	started := s.Now()
 	until := started.Add(5 * time.Second)
@@ -262,8 +265,11 @@ func (s ContextProjectionResults) request(ctx context.Context, current identitie
 		}
 	}()
 	i, err := current.ResolveIdentity(initialCtx)
-	if err != nil || initialCtx.Err() != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") {
-		return nil, value.ErrUnavailable
+	if err != nil || initialCtx.Err() != nil || !i.Valid(s.Now()) {
+		return nil, queryCollapsed("identity", value.ErrUnavailable, errors.Join(err, initialCtx.Err()))
+	}
+	if !slices.Contains(i.Scopes, "evidence:read") {
+		return nil, queryStepped("read-scope", value.ErrUnavailable)
 	}
 	i.Scopes, i.Groups = slices.Clone(i.Scopes), slices.Clone(i.Groups)
 	until = identity.Earlier(until, i.ValidUntil)
@@ -275,12 +281,12 @@ func (s ContextProjectionResults) request(ctx context.Context, current identitie
 	}()
 	call, err := invocation.Invocation(callCtx)
 	if err != nil || callCtx.Err() != nil || !call.Valid(s.Now()) || call.Tool != tool || call.RootID != s.RootID || call.Principal != i.Principal {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("invocation", value.ErrUnavailable, errors.Join(err, callCtx.Err()))
 	}
 	until = identity.Earlier(until, call.Until)
 	request := value.ContextQueryRequest{Call: call, OwnerID: s.NewID(), HubProcessEpoch: s.HubProcessEpoch}
 	if !request.Valid(s.Now()) || !s.Now().Before(until) {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("request-window", value.ErrUnavailable)
 	}
 	owned, cancel := context.WithCancel(callCtx)
 	o := &projectionRequest{service: s, current: current, initial: i, invocation: invocation, request: request, until: until}
@@ -298,11 +304,11 @@ func (s ContextProjectionResults) request(ctx context.Context, current identitie
 	transferred = true
 	if !o.shorten(until) || invocation.CheckIntent(o.ctx, call) != nil {
 		o.cancel()
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("intent", value.ErrUnavailable)
 	}
 	if _, err = o.checkIdentity(o.ctx); err != nil {
 		o.cancel()
-		return nil, err
+		return nil, queryStepped("identity-recheck", err)
 	}
 	return o, nil
 }
@@ -377,30 +383,39 @@ func (o *projectionRequest) CheckCurrent(ctx context.Context) (value.ContextProj
 		o.authorityAttempted = true
 		a, e := o.service.Authority.CheckProjectionCurrent(checked, o.current, o.query.Scope)
 		if e != nil || !o.query.Current(a, o.service.Now()) || a.Environment.InstallationID != o.service.InstallationID || a.IdentityRevision != o.initial.Policy || checked.Err() != nil {
-			o.authorityError = value.ErrUnavailable
+			o.authorityError = queryCollapsed("authority", value.ErrUnavailable, errors.Join(e, checked.Err()))
 		} else {
 			o.authority = &a
 		}
 	}
-	if o.authorityError != nil || o.authority == nil || checked.Err() != nil || o.ctx.Err() != nil {
-		return value.ContextProjectionAuthority{}, value.ErrUnavailable
+	if o.authorityError != nil {
+		return value.ContextProjectionAuthority{}, o.authorityError
+	}
+	if o.authority == nil || checked.Err() != nil || o.ctx.Err() != nil {
+		return value.ContextProjectionAuthority{}, queryCollapsed("cancelled", value.ErrUnavailable, errors.Join(checked.Err(), o.ctx.Err()))
 	}
 	a := *o.authority
 	if !o.query.Current(a, o.service.Now()) || !o.initial.Valid(o.service.Now()) || !o.shorten(identity.Earlier(o.query.Deadline, a.ValidUntil)) {
-		return value.ContextProjectionAuthority{}, value.ErrUnavailable
+		return value.ContextProjectionAuthority{}, queryStepped("authority-lapsed", value.ErrUnavailable)
 	}
 	o.mu.Lock()
 	a.ValidUntil = identity.Earlier(a.ValidUntil, o.until)
 	o.mu.Unlock()
 	if !a.Valid(o.service.Now()) || checked.Err() != nil || o.ctx.Err() != nil {
-		return value.ContextProjectionAuthority{}, value.ErrUnavailable
+		return value.ContextProjectionAuthority{}, queryStepped("authority-lapsed", value.ErrUnavailable)
 	}
 	return a, nil
 }
 
 func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, selection value.ContextExcerptSelection) (*ContextProjectionDelivery, error) {
+	d, err := s.beginExcerpt(ctx, current, invocation, selection)
+	s.Results.refused(ctx, "excerpt", err)
+	return d, err
+}
+
+func (s ContextProjectionService) beginExcerpt(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, selection value.ContextExcerptSelection) (*ContextProjectionDelivery, error) {
 	if !selection.Valid() || s.Recovery == nil || s.Routes == nil || s.Plans == nil || s.Workers == nil {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("configuration", value.ErrUnavailable)
 	}
 	o, err := s.Results.request(ctx, current, invocation, "get_file_excerpt")
 	if err != nil {
@@ -413,29 +428,29 @@ func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current iden
 		}
 	}()
 	if err = invocation.CheckInput(o.ctx, ContextQueryInput{Selection: selection}); err != nil {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("input", value.ErrUnavailable)
 	}
 	recovery, err := s.Recovery.RecoveryState(o.ctx)
 	if err != nil || !recovery.Valid(s.Results.Now()) || recovery.InstallationID != s.Results.InstallationID || !o.shorten(recovery.FreshUntil) {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("recovery", value.ErrUnavailable, err)
 	}
 	candidate, err := s.Routes.ResolveContextProjection(o.ctx, selection, o.initial, recovery)
 	if err != nil || !candidate.Valid() || candidate.RootID != s.Results.RootID || candidate.CaseID != selection.CaseID ||
 		candidate.ArtifactID != selection.ArtifactID || candidate.Selection != selection.Selection || candidate.Principal != o.initial.Principal {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("route", value.ErrUnavailable, err)
 	}
 	a, err := s.Results.Authority.ResolveProjectionCurrent(o.ctx, current, candidate)
 	if err != nil || !a.Valid(s.Results.Now()) || a.Scope.Candidate() != candidate || a.Environment.InstallationID != s.Results.InstallationID ||
 		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten(a.ValidUntil) {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("authority", value.ErrUnavailable, err)
 	}
 	p, err := s.Plans.ContextQueryPlan(o.ctx, a)
 	if err != nil || !p.Valid(a.Scope, s.Results.Now()) || !o.shorten(p.ValidUntil) {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("plan", value.ErrUnavailable, err)
 	}
 	q, err := value.NewContextQuery(s.Results.NewID(), o.request.Call.ID, s.Results.NewID(), a, p, s.Results.Now())
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("query", err)
 	}
 	o.query = q
 	// ResolveProjectionCurrent already completed this request's exact scope.
@@ -443,21 +458,21 @@ func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current iden
 	o.authority, o.authorityAttempted = &retained, true
 	a, err = o.CheckCurrent(o.ctx)
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("pre-admit", err)
 	}
 	admitted, err := s.Results.Ledger.AdmitQuery(o.ctx, q, o.request, a)
 	if err != nil || !admitted.Fresh || !admitted.Query.Equal(q) {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("admit", value.ErrUnavailable, err)
 	}
 	if _, err = o.CheckCurrent(o.ctx); err != nil {
-		return nil, err
+		return nil, queryStepped("post-admit", err)
 	}
 	if err = s.Workers.AdmitProjectionWorker(o.ctx, q, o); err != nil {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("worker-admission", value.ErrUnavailable, err)
 	}
 	d, err := s.Results.prepare(o, ContextQueryAdmitted)
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("prepare", err)
 	}
 	owned = true
 	return d, nil
@@ -466,8 +481,14 @@ func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current iden
 // GetQueryResult has no reference to ContextProjectionWorkerAdmission.
 // A paid poll and fresh authorization precede status as well as evidence output.
 func (s ContextProjectionResults) GetQueryResult(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, queryID string) (*ContextProjectionDelivery, error) {
+	d, err := s.getQueryResult(ctx, current, invocation, queryID)
+	s.refused(ctx, "result", err)
+	return d, err
+}
+
+func (s ContextProjectionResults) getQueryResult(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, queryID string) (*ContextProjectionDelivery, error) {
 	if !authorization.UUID(queryID) {
-		return nil, value.ErrInvalid
+		return nil, queryStepped("handle", value.ErrInvalid)
 	}
 	o, err := s.request(ctx, current, invocation, "get_query_result")
 	if err != nil {
@@ -480,23 +501,23 @@ func (s ContextProjectionResults) GetQueryResult(ctx context.Context, current id
 		}
 	}()
 	if err = invocation.CheckInput(o.ctx, ContextQueryInput{QueryID: queryID}); err != nil {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("input", value.ErrUnavailable)
 	}
 	q, err := s.Ledger.LookupQuery(o.ctx, o.initial.Principal, queryID)
 	if err != nil || !q.Valid() || q.ID != queryID || q.Scope.RootID != s.RootID || q.Scope.Principal != o.initial.Principal {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("lookup", value.ErrUnavailable, err)
 	}
 	o.query = q
 	a, err := o.CheckCurrent(o.ctx)
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("current", err)
 	}
 	if err = s.Ledger.AdmitQueryPoll(o.ctx, q, o.request, a); err != nil {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("poll", value.ErrUnavailable, err)
 	}
 	d, err := s.prepare(o, ContextQueryPollCharged)
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("prepare", err)
 	}
 	owned = true
 	return d, nil
@@ -504,64 +525,64 @@ func (s ContextProjectionResults) GetQueryResult(ctx context.Context, current id
 
 func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQueryEffect) (*ContextProjectionDelivery, error) {
 	if _, err := o.CheckCurrent(o.ctx); err != nil {
-		return nil, err
+		return nil, queryStepped("current-start", err)
 	}
 	worker, err := s.Reader.ObserveProjectionWorker(o.ctx, o.query, o)
 	if err != nil || !identity.Fresh(worker.ObservedAt, worker.ValidUntil, s.Now(), 5*time.Second) || !o.shorten(worker.ValidUntil) {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("worker-observe", value.ErrUnavailable, err)
 	}
 	a, err := o.CheckCurrent(o.ctx)
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("current-observed", err)
 	}
 	if err = s.Ledger.PermitQuery(o.ctx, o.query, o.request, a); err != nil {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("permit", value.ErrUnavailable, err)
 	}
 	a, err = o.CheckCurrent(o.ctx)
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("current-permitted", err)
 	}
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
 		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
 		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
 		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection}}
 	if !authorization.UUID(d.association.ID) {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("association", value.ErrUnavailable)
 	}
 	if !worker.Ready {
 		if worker.Worker != (value.ContextQueryWorker{}) {
-			return nil, value.ErrUnavailable
+			return nil, queryStepped("worker-pending", value.ErrUnavailable)
 		}
 		if _, err = o.CheckCurrent(o.ctx); err != nil {
-			return nil, err
+			return nil, queryStepped("current-pending", err)
 		}
 		return d, nil
 	}
 	if !worker.Worker.Matches(o.query) {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("worker-match", value.ErrUnavailable)
 	}
 	batchID := s.NewID()
 	if !authorization.UUID(batchID) {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("association", value.ErrUnavailable)
 	}
 	admitted, err := s.Ledger.BeginReadBatch(o.ctx, o.query, o.request, worker.Worker, batchID, a)
 	b := admitted.Batch
 	if err != nil || !admitted.Fresh || !b.Current(o.query, a, s.Now()) || b.Until.After(a.ValidUntil) || b.ID != batchID || b.Worker != worker.Worker || b.Request != o.request {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("batch-begin", value.ErrUnavailable, err)
 	}
 	a, err = o.CheckCurrent(o.ctx)
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("current-batch", err)
 	}
 	if !o.shorten(b.Until) {
-		return nil, value.ErrExpired
+		return nil, queryStepped("batch-expired", value.ErrExpired)
 	}
 	start, err := s.Ledger.ClaimReadBatch(o.ctx, b, a)
 	if err != nil || !start.Fresh || !start.Batch.Equal(b) || !authorization.UUID(start.ClaimID) {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("batch-claim", value.ErrUnavailable, err)
 	}
 	if _, err = o.CheckCurrent(o.ctx); err != nil {
-		return nil, err
+		return nil, queryStepped("current-claimed", err)
 	}
 	d.batch = &b
 	d.effect = ContextQueryReadCharged
@@ -573,11 +594,11 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 		if d.read != nil {
 			_ = d.Close(context.WithoutCancel(o.ctx))
 		}
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("read", value.ErrUnavailable, err)
 	}
 	if _, err = o.CheckCurrent(o.ctx); err != nil {
 		_ = d.Close(context.WithoutCancel(o.ctx))
-		return nil, err
+		return nil, queryStepped("current-read", err)
 	}
 	projection, err := d.read.Projection(o.ctx)
 	if err == nil && projection.NamespaceUID == o.query.Scope.NamespaceUID && projection.PodUID == o.query.Scope.PodUID {
@@ -597,7 +618,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	}
 	if err != nil {
 		_ = d.Close(context.WithoutCancel(o.ctx))
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("projection", value.ErrUnavailable, err)
 	}
 	return d, nil
 }

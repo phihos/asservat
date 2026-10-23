@@ -34,3 +34,9 @@ func downloadRefused(step string, cause error) error {
 func downloadRefusedAs(step string, err error) error {
 	return &downloadCheckStep{step: step, err: err}
 }
+
+// projectionRefused labels an approved-query authority refusal with its closed
+// stage; it unwraps to err only and keeps cause (possibly nil) for its class.
+func projectionRefused(step string, err, cause error) error {
+	return &downloadCheckStep{step: step, err: err, cause: cause}
+}

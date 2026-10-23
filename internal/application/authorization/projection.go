@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"slices"
 	"time"
 
@@ -70,10 +71,10 @@ func (s ContextProjectionAuthority) ResolveProjectionCurrent(ctx context.Context
 func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source identities.CurrentIdentity, candidate analysis.ContextProjectionCandidate, expected *analysis.ContextProjectionScope) (analysis.ContextProjectionAuthority, error) {
 	var zero analysis.ContextProjectionAuthority
 	if ctx == nil || ctx.Err() != nil || source == nil || !value.UUID(s.RootID) || s.Permissions == nil || s.Catalog == nil || s.Retention == nil || s.Environment == nil || s.Now == nil {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("configuration", analysis.ErrUnavailable, nil)
 	}
 	if !candidate.Valid() || candidate.RootID != s.RootID {
-		return zero, analysis.ErrInvalid
+		return zero, projectionRefused("candidate", analysis.ErrInvalid, nil)
 	}
 	started := s.Now()
 	until := started.Add(5 * time.Second)
@@ -95,7 +96,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	i, err := source.ResolveIdentity(call)
 	i = cloneProjectionIdentity(i)
 	if err != nil || !i.Valid(s.Now()) || i.Principal != candidate.Principal || call.Err() != nil {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("identity", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
 	defer shorten(i.ValidUntil)()
 	target := value.Target{ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID}
@@ -103,7 +104,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	p = cloneProjectionPermissions(p)
 	preliminary := value.ScopeEligibility(i, p, value.ReadApproved, target, s.Now())
 	if err != nil || !preliminary.Eligible || call.Err() != nil {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("permissions", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
 	defer shorten(preliminary.ValidUntil)()
 	// The protected source lookup follows current ordinary target eligibility.
@@ -111,13 +112,13 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	record = cloneProjectionEvidence(record)
 	scope := analysis.ContextProjectionScope{RootID: candidate.RootID, CaseID: candidate.CaseID, CaptureID: candidate.CaptureID, ArtifactID: candidate.ArtifactID, ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID, Selection: candidate.Selection, Principal: candidate.Principal, Version: record.Version, SourceProjectionDigest: record.SourceProjectionDigest, SourceFormat: record.SourceFormat, DisplayVersion: analysis.ContextDisplayVersion}
 	if err != nil || !scope.Valid() || expected != nil && scope != *expected || !projectionEvidenceMatches(record, scope, s.Now()) || call.Err() != nil {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("catalog", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
 	r := record.Retained
 	retained := value.Retained{ArtifactID: scope.ArtifactID, Target: target, DataClass: record.DataClass, ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
 	initial := value.Evaluate(i, p, value.ReadApproved, target, &retained, s.Now())
 	if !initial.Eligible {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("audience", analysis.ErrUnavailable, nil)
 	}
 	defer shorten(initial.ValidUntil, record.ValidUntil, r.Effective.ExpiresAt)()
 	resolve := func() (privacy.RetainedResolution, error) {
@@ -126,7 +127,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		v, e := s.Retention.ResolveRetained(call, input, r.Effective, slices.Clone(r.OriginPolicies))
 		v.Policies = slices.Clone(v.Policies)
 		if e != nil || !projectionRetentionMatches(v, record, scope, s.Now()) || call.Err() != nil {
-			return privacy.RetainedResolution{}, analysis.ErrUnavailable
+			return privacy.RetainedResolution{}, projectionRefused("retention", analysis.ErrUnavailable, errors.Join(e, call.Err()))
 		}
 		return v, nil
 	}
@@ -137,7 +138,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	defer shorten(resolved.ValidUntil, resolved.ExpiresAt)()
 	environment, err := s.Environment.ProjectionEnvironment(call, cloneProjectionEvidence(record), i.Principal)
 	if err != nil || !projectionEnvironmentMatches(environment, record, scope, s.Now()) || call.Err() != nil {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("environment", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
 	defer shorten(environment.ValidUntil)()
 
@@ -147,7 +148,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	current, err := source.ResolveIdentity(call)
 	current = cloneProjectionIdentity(current)
 	if err != nil || !sameProjectionIdentity(i, current, s.Now()) || call.Err() != nil {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("identity-again", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
 	defer shorten(current.ValidUntil)()
 	latest, err := s.Permissions.Permissions(call, target)
@@ -155,30 +156,30 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	retained.ExpiresAt = resolved.ExpiresAt
 	final := value.Evaluate(current, latest, value.ReadApproved, target, &retained, s.Now())
 	if err != nil || latest.Revision != p.Revision || !final.Eligible || call.Err() != nil {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("permissions-again", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
 	defer shorten(final.ValidUntil)()
 	lastRetention, err := resolve()
 	if err != nil || !sameProjectionRetention(resolved, lastRetention) {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("retention-again", analysis.ErrUnavailable, err)
 	}
 	defer shorten(lastRetention.ValidUntil, lastRetention.ExpiresAt)()
 	lastEnvironment, err := s.Environment.ProjectionEnvironment(call, cloneProjectionEvidence(record), i.Principal)
 	if err != nil || !projectionEnvironmentMatches(lastEnvironment, record, scope, s.Now()) || !sameProjectionEnvironment(environment, lastEnvironment) || call.Err() != nil {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("environment-again", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
 	defer shorten(lastEnvironment.ValidUntil)()
 	lastIdentity, err := source.ResolveIdentity(call)
 	lastIdentity = cloneProjectionIdentity(lastIdentity)
 	if err != nil || !sameProjectionIdentity(i, lastIdentity, s.Now()) || !sameProjectionIdentity(current, lastIdentity, s.Now()) || call.Err() != nil {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("identity-last", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
 	defer shorten(lastIdentity.ValidUntil)()
 	now := s.Now()
 	// Returning the original proofs keeps their observation identities and
 	// freshness intact. Final readers cannot replace an expired initial proof.
 	if !now.Before(until) || !resolved.Proof.Valid(now) || !environment.Valid(now) || !value.Evaluate(i, p, value.ReadApproved, target, &retained, now).Eligible || !value.Evaluate(lastIdentity, latest, value.ReadApproved, target, &retained, now).Eligible {
-		return zero, analysis.ErrExpired
+		return zero, projectionRefused("expired", analysis.ErrExpired, nil)
 	}
 	out := analysis.ContextProjectionAuthority{Scope: scope, Environment: environment, Retention: resolved.Proof, PermissionRevision: p.Revision, IdentityRevision: i.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy}
 	encoded, err := json.Marshal(struct {
@@ -186,11 +187,11 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		Assignments []artifact.AudienceAssignment
 	}{out, final.ContributingAssignments})
 	if err != nil {
-		return zero, analysis.ErrUnavailable
+		return zero, projectionRefused("decision", analysis.ErrUnavailable, nil)
 	}
 	out.DecisionDigest = sha256.Sum256(encoded)
 	if call.Err() != nil || !out.Valid(s.Now()) {
-		return zero, analysis.ErrExpired
+		return zero, projectionRefused("expired", analysis.ErrExpired, call.Err())
 	}
 	return out, nil
 }

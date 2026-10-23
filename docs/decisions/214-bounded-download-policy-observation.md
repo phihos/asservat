@@ -178,3 +178,18 @@ preparation are fresh; no stored source timestamp or original deadline is renewe
 The actual native response consumes an exact already-checked short authority
 through a private handoff. Qualification is recorded separately; this does not
 claim sustained installed transfer or a native55 preparation fix.
+
+## Approved query shares the observation (2026-10-23)
+
+The installed approved query (`get_file_excerpt`) was composed over the raw
+protected source. Its authority evaluated the placement environment twice, each
+reading the policy twice: four complete protected reads (about 56 observer and
+12 probe requests on the shared 20-QPS client) before query admission, inside
+the same five-second request. Installed native63 refused that call about four
+seconds in with no `context_query` row. The query now uses the download path's
+single observation and its 60-second bound; each call still evaluates its own
+client, purpose, path and regions, and recovery, processing, ordinary
+`ReadApproved` and SQL effect checks are unchanged. Direct administration keeps
+the raw five-second policy. Refusals now name their closed stage
+(`query refused: excerpt/<stage> (<class>) left@<bucket>`), so the next installed
+run confirms or refutes the policy cost as the refusing stage.

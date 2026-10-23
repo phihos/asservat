@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
@@ -11,7 +12,8 @@ import (
 )
 
 // ContextProjectionPolicies selects approved metadata placement from the same
-// protected installation configuration as native delivery. It never consumes a
+// protected installation configuration as native delivery, through the same
+// bounded installed observation (DownloadPolicyObservations). It never consumes a
 // DownloadAuthority or evaluates download entitlement. ReadApproved remains a
 // separate ordinary permission check by ContextProjectionAuthority.
 type ContextProjectionPolicies struct {
@@ -34,8 +36,11 @@ func (s *ContextProjectionPolicies) ContextProjectionPolicy(ctx context.Context,
 	call, stop := context.WithDeadline(ctx, s.now().Add(5*time.Second))
 	defer stop()
 	raw, e := s.source.DownloadPolicy(call)
-	if e != nil || !raw.Valid(s.now()) || raw.Suspended || call.Err() != nil {
-		return out, value.ErrUnavailable
+	if e != nil || call.Err() != nil {
+		return out, projectionRefused("read", value.ErrUnavailable, errors.Join(e, call.Err()))
+	}
+	if !raw.DownloadValid(s.now()) || raw.Suspended {
+		return out, projectionRefused("stale", value.ErrUnavailable, nil)
 	}
 	found := false
 	for _, p := range raw.Paths {
@@ -43,7 +48,7 @@ func (s *ContextProjectionPolicies) ContextProjectionPolicy(ctx context.Context,
 			continue
 		}
 		if found {
-			return value.ContextProjectionPolicy{}, value.ErrUnavailable
+			return value.ContextProjectionPolicy{}, projectionRefused("ambiguous-path", value.ErrUnavailable, nil)
 		}
 		found = true
 		out.Path = value.ContextProjectionPath{Purpose: value.ContextProjectionPurpose, ID: p.ID, TargetClusterID: p.TargetClusterID, StoreID: p.StoreID, StorageRegion: p.StorageRegion,
@@ -51,7 +56,7 @@ func (s *ContextProjectionPolicies) ContextProjectionPolicy(ctx context.Context,
 			HubClusterID: p.HubClusterID, HubRegion: p.HubRegion, WorkerConfiguration: p.WorkerConfiguration, HubConfiguration: p.HubConfiguration}
 	}
 	if !found {
-		return value.ContextProjectionPolicy{}, value.ErrUnavailable
+		return value.ContextProjectionPolicy{}, projectionRefused("no-path", value.ErrUnavailable, nil)
 	}
 	out.RootID, out.InstallationID, out.RecoveryEpoch = raw.RootID, raw.InstallationID, raw.RecoveryEpoch
 	out.Revision, out.ProtectionDigest = raw.Revision, raw.ProtectionDigest
@@ -68,7 +73,7 @@ func (s *ContextProjectionPolicies) ContextProjectionPolicy(ctx context.Context,
 		out.FreshUntil = identity.Earlier(out.FreshUntil, d)
 	}
 	if call.Err() != nil || !out.Valid(s.now()) {
-		return value.ContextProjectionPolicy{}, value.ErrUnavailable
+		return value.ContextProjectionPolicy{}, projectionRefused("expired", value.ErrUnavailable, call.Err())
 	}
 	return out, nil
 }

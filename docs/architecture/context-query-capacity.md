@@ -81,8 +81,9 @@ caller/authority/query limits. Callback success cannot replace these checks.
 Historical backing observation dates do not become a second heartbeat deadline:
 currentness comes from the existing accepted capacity source and configuration.
 
-`ContextProjectionPolicies` selects the exact target/store path from the existing
-raw protected installation policy. It preserves original policy dates and returns
+`ContextProjectionPolicies` selects the exact target/store path from the same
+bounded installed policy observation as native download (ADR-214), not from the
+raw protected source. It preserves original policy dates and returns
 a distinct approved-projection policy; it never consumes a `DownloadAuthority`
 or grants evidence-download permission. The C-03 authorizer still independently
 requires ordinary `ReadApproved`, complete denies, retained audience, retention,

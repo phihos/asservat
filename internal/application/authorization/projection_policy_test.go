@@ -2,6 +2,7 @@ package authorization
 
 import (
 	value "asservat.local/asservat/internal/domain/analysis"
+	"asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"testing"
 	"time"
@@ -29,7 +30,7 @@ func TestProjectionPoliciesUseExactSharedPlacementWithoutDownloadEntitlement(t *
 }
 
 func TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement(t *testing.T) {
-	for _, mode := range []string{"wrong-target", "wrong-store", "ambiguous", "suspended", "expired", "download-only-lease", "cancel-after-read", "short-parent"} {
+	for _, mode := range []string{"wrong-target", "wrong-store", "ambiguous", "suspended", "expired", "beyond-shared-lease", "cancel-after-read", "short-parent"} {
 		t.Run(mode, func(t *testing.T) {
 			f, _, _, _ := newEnvironmentFixture()
 			s, _ := NewContextProjectionPolicies(f, func() time.Time { return f.now })
@@ -49,8 +50,8 @@ func TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement(t *testing.T) {
 				f.policy.Suspended = true
 			case "expired":
 				f.now = f.policy.FreshUntil
-			case "download-only-lease":
-				f.policy.FreshUntil = f.policy.ObservedAt.Add(time.Minute)
+			case "beyond-shared-lease":
+				f.policy.FreshUntil = f.policy.ObservedAt.Add(time.Minute + time.Microsecond)
 			case "cancel-after-read":
 				f.policyHook = stop
 			case "short-parent":
@@ -70,5 +71,35 @@ func TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement(t *testing.T) {
 				t.Fatal("unavailable protected placement accepted")
 			}
 		})
+	}
+}
+
+// The installed approved query shares the download path's bounded policy
+// observation. Composed over the raw protected source, every authority check
+// paid four full live policy reads (each about 14 API reads, 3 probe requests
+// and a denied dry-run) inside one five-second request (native63).
+func TestProjectionPoliciesReuseTheSharedPolicyObservation(t *testing.T) {
+	f, _, _, _ := newEnvironmentFixture()
+	now := func() time.Time { return f.now }
+	shared, err := NewDownloadPolicyObservations(f, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	s, err := NewContextProjectionPolicies(shared, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := f.policy.Paths[0]
+	for range 4 {
+		out, err := s.ContextProjectionPolicy(context.Background(), path.TargetClusterID, path.StoreID)
+		if err != nil || !out.Valid(f.now) || !out.ObservedAt.Equal(f.policy.ObservedAt) {
+			t.Fatal("shared placement observation refused", err)
+		}
+	}
+	if f.policyReads != 1 {
+		t.Fatal("live protected policy reads per query", f.policyReads)
+	}
+	if value.ContextProjectionPolicyInterval != privacy.DownloadPolicyObservationInterval {
+		t.Fatal("projection and download share one observation interval")
 	}
 }

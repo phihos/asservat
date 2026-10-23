@@ -303,7 +303,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	}
 	coordinator.Plans = plans
 	out := &publicDownloads{native: services, downloads: downloads, gate: gate, coordinator: coordinator}
-	out.projection, err = newPublicProjection(ctx, d, environment, processingReads, profile, jobs, dispatch, sql["download-worker"], scope, a)
+	out.projection, err = newPublicProjection(ctx, d, policies, processingReads, profile, jobs, dispatch, sql["download-worker"], scope, a)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
