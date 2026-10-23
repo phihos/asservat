@@ -56,6 +56,7 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 	// ADR-219 adds the same typed query SQL fences and only the existing
 	// irreversible key-consumption write to the isolated acquisition key role.
 	acquisition = append(acquisition, read("context_case_locator", "operation_audit", "operation_audit_lifecycle", "context_query_backing", "context_query_allocation", "context_query_principal", "context_query", "context_query_call", "context_query_worker", "context_query_batch", "context_query_key_binding")...)
+	acquisition = append(acquisition, columns("fleet_trust", "SELECT", "installation_id", "activated_postmaster_at", "activated_database_oid")...)
 	for _, table := range []string{"operation_audit", "context_query_allocation", "context_query_principal", "context_query", "context_query_batch"} {
 		acquisition = append(acquisition, publicRuntimeGrant{"table", table, "id", "UPDATE"})
 	}

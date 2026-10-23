@@ -40,6 +40,9 @@ func publicRuntimeProjectionGrants(purpose string) []publicRuntimeGrant {
 	function("context_query_capacity_allocation_current(uuid,uuid)")
 	function("context_query_shared_profile_current(uuid,jsonb)")
 	if purpose == "key-acquisition" {
+		// queryIntentFence binds the paid invocation to the original database
+		// incarnation; the current-trust view does not expose these columns.
+		add("fleet_trust", "SELECT", "installation_id", "activated_postmaster_at", "activated_database_oid")
 		add("context_query_key_binding", "UPDATE", "used_roles")
 		return out
 	}
