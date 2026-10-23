@@ -125,5 +125,5 @@ func (s *DownloadWorkerJobs) ObserveExpiredProjectionWorker(ctx context.Context,
 	if !worker.Valid() {
 		return out, artifact.ErrIntegrity
 	}
-	return s.acquisitionTermination(call, worker, start, items)
+	return s.acquisitionTermination(call, worker, start, job, items)
 }

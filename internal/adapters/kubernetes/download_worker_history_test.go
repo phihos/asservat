@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"context"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -9,12 +10,109 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestWorkerCleanupUsesAdmittedHistoricalTemplate(t *testing.T) {
+	w, _, pod, jraw, praw := historicalWorkerFixture(t)
+	i := w.Intent
+	driver := &DownloadWorkerJobs{profile: i.Profile}
+	if _, _, err := driver.checkedJob(i, jraw); err == nil {
+		t.Fatal("legacy launch accepted as new template")
+	}
+	if _, _, err := checkedWorkerPod(i, w.Job, praw); err == nil {
+		t.Fatal("legacy Pod accepted for new binding")
+	}
+	if _, err := checkedHistoricalJob(w, jraw); err != nil {
+		t.Fatal("original historical Job rejected", err)
+	}
+	if _, err := checkedHistoricalPod(w, praw); err != nil {
+		t.Fatal("original historical Pod rejected", err)
+	}
+	bad := w
+	bad.Binding.PodSpec = artifact.Digest{7}
+	if _, err := checkedHistoricalPod(bad, praw); err == nil {
+		t.Fatal("substituted spec accepted")
+	}
+	bad = w
+	bad.Job.UID = "replacement"
+	bad.Binding.JobUID = "replacement"
+	if _, err := checkedHistoricalJob(bad, jraw); err == nil {
+		t.Fatal("replacement Job accepted")
+	}
+	if _, err := checkedHistoricalPod(bad, praw); err == nil {
+		t.Fatal("changed Pod owner accepted")
+	}
+	pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, "arbitrary")
+	praw, _ = json.Marshal(pod)
+	if _, err := checkedHistoricalPod(w, praw); err == nil {
+		t.Fatal("changed historical spec accepted")
+	}
+}
+
+// native90: activeDeadlineSeconds killed the shared query worker and the Job
+// controller deleted its Pod. The Job's accounted terminal record is positive
+// termination evidence; Pod absence alone never is.
+func TestWorkerTerminationAcceptsJobControllerRemovedPod(t *testing.T) {
+	w, job, pod, _, _ := historicalWorkerFixture(t)
+	zero := int32(0)
+	killed := func() *batch.Job {
+		j := job.DeepCopy()
+		j.Status = batch.JobStatus{Failed: 1, Ready: &zero, Terminating: &zero, UncountedTerminatedPods: &batch.UncountedTerminatedPods{}, Conditions: []batch.JobCondition{
+			{Type: batch.JobFailureTarget, Status: core.ConditionTrue, Reason: batch.JobReasonDeadlineExceeded},
+			{Type: batch.JobFailed, Status: core.ConditionTrue, Reason: batch.JobReasonDeadlineExceeded, LastTransitionTime: meta.Now()},
+		}}
+		return j
+	}
+	terminalPod := func(phase core.PodPhase) []json.RawMessage {
+		p := pod.DeepCopy()
+		p.Status = core.PodStatus{Phase: phase, ContainerStatuses: []core.ContainerStatus{{Name: "acquisition", State: core.ContainerState{Terminated: &core.ContainerStateTerminated{ContainerID: "containerd://worker", FinishedAt: meta.NewTime(time.Now().Add(-time.Second)), Reason: "Error", ExitCode: 143}}}}}
+		raw, _ := json.Marshal(p)
+		return []json.RawMessage{raw}
+	}
+	for _, tc := range []struct {
+		name  string
+		edit  func(*batch.Job)
+		items []json.RawMessage
+		want  bool
+	}{
+		{"deadline-killed-pod-deleted", func(*batch.Job) {}, nil, true},
+		{"backoff-pod-deleted", func(j *batch.Job) { j.Status.Conditions[1].Reason = batch.JobReasonBackoffLimitExceeded }, nil, true},
+		{"completed-pod-deleted", func(j *batch.Job) {
+			j.Status.Failed, j.Status.Succeeded = 0, 1
+			j.Status.Conditions = []batch.JobCondition{{Type: batch.JobComplete, Status: core.ConditionTrue}}
+		}, nil, true},
+		{"deadline-killed-pod-terminal", func(*batch.Job) {}, terminalPod(core.PodFailed), true},
+		{"pod-absent-job-active", func(j *batch.Job) { j.Status.Active, j.Status.Conditions = 1, nil }, nil, false},
+		{"pod-absent-job-active-counted", func(j *batch.Job) { j.Status.Active = 1 }, nil, false},
+		{"pod-absent-no-condition", func(j *batch.Job) { j.Status.Conditions = nil }, nil, false},
+		{"pod-absent-failure-target-only", func(j *batch.Job) { j.Status.Conditions = j.Status.Conditions[:1] }, nil, false},
+		{"pod-absent-other-failure", func(j *batch.Job) { j.Status.Conditions[1].Reason = "PodFailurePolicy" }, nil, false},
+		{"pod-absent-condition-false", func(j *batch.Job) { j.Status.Conditions[1].Status = core.ConditionFalse }, nil, false},
+		{"pod-absent-terminating", func(j *batch.Job) { one := int32(1); j.Status.Terminating = &one }, nil, false},
+		{"pod-absent-ready", func(j *batch.Job) { one := int32(1); j.Status.Ready = &one }, nil, false},
+		{"pod-absent-uncounted", func(j *batch.Job) { j.Status.UncountedTerminatedPods.Failed = []types.UID{"x"} }, nil, false},
+		{"pod-absent-never-counted", func(j *batch.Job) { j.Status.Failed = 0 }, nil, false},
+		{"pod-absent-job-uid-mismatch", func(j *batch.Job) { j.UID = "replacement" }, nil, false},
+		{"pod-present-running", func(*batch.Job) {}, terminalPod(core.PodRunning), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			j := killed()
+			tc.edit(j)
+			driver := &DownloadWorkerJobs{profile: w.Intent.Profile, client: &PermissionClient{now: time.Now}}
+			got, err := driver.acquisitionTermination(context.Background(), w.Acquisition(), time.Now(), j, tc.items)
+			if (err == nil) != tc.want || tc.want && (!got.Valid(got.ObservedAt) || got.Worker != w.Acquisition() || got.TerminationDigest == (artifact.Digest{})) {
+				t.Fatal("termination evidence", tc.want, err)
+			}
+		})
+	}
+}
+
+func historicalWorkerFixture(t *testing.T) (value.DownloadWorker, *batch.Job, core.Pod, []byte, []byte) {
+	t.Helper()
 	id := "10000000-0000-4000-8000-000000000001"
 	// Use a complete admitted record whose original authority and worker lifetime
 	// have both expired. Historical cleanup consumes its identity/specs, not a
@@ -64,36 +162,5 @@ func TestWorkerCleanupUsesAdmittedHistoricalTemplate(t *testing.T) {
 	if authority.Valid(time.Now()) || time.Now().Before(i.RunUntil) {
 		t.Fatal("historical cleanup fixture is still current")
 	}
-	driver := &DownloadWorkerJobs{profile: p}
-	if _, _, err = driver.checkedJob(i, jraw); err == nil {
-		t.Fatal("legacy launch accepted as new template")
-	}
-	if _, _, err = checkedWorkerPod(i, w.Job, praw); err == nil {
-		t.Fatal("legacy Pod accepted for new binding")
-	}
-	if _, err = checkedHistoricalJob(w, jraw); err != nil {
-		t.Fatal("original historical Job rejected", err)
-	}
-	if _, err = checkedHistoricalPod(w, praw); err != nil {
-		t.Fatal("original historical Pod rejected", err)
-	}
-	bad := w
-	bad.Binding.PodSpec = artifact.Digest{7}
-	if _, err = checkedHistoricalPod(bad, praw); err == nil {
-		t.Fatal("substituted spec accepted")
-	}
-	bad = w
-	bad.Job.UID = "replacement"
-	bad.Binding.JobUID = "replacement"
-	if _, err = checkedHistoricalJob(bad, jraw); err == nil {
-		t.Fatal("replacement Job accepted")
-	}
-	if _, err = checkedHistoricalPod(bad, praw); err == nil {
-		t.Fatal("changed Pod owner accepted")
-	}
-	pod.Spec.Containers[0].Args = append(pod.Spec.Containers[0].Args, "arbitrary")
-	praw, _ = json.Marshal(pod)
-	if _, err = checkedHistoricalPod(w, praw); err == nil {
-		t.Fatal("changed historical spec accepted")
-	}
+	return w, job, pod, jraw, praw
 }

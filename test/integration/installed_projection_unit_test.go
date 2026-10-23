@@ -63,6 +63,20 @@ func TestInstalledProjectionWorkerRequiresOriginalLifetimeAndPositiveTermination
 	if installedProjectionWorkerTerminal(w, nil, pod, now) || installedProjectionWorkerTerminal(w, job, nil, now) {
 		t.Fatal("absence substituted for positive termination")
 	}
+	// native90: activeDeadlineSeconds killed the worker and the Job controller
+	// deleted its Pod. Only the exact Job's accounted terminal record counts.
+	killed := job.DeepCopy()
+	killed.Status = batch.JobStatus{Failed: 1, Ready: ptr.To[int32](0), Conditions: []batch.JobCondition{{Type: batch.JobFailed, Status: core.ConditionTrue, Reason: batch.JobReasonDeadlineExceeded}}}
+	if !installedProjectionWorkerTerminal(w, killed, nil, now) {
+		t.Fatal("deadline-killed Job with removed Pod not terminal")
+	}
+	active := killed.DeepCopy()
+	active.Status.Active = 1
+	replaced := killed.DeepCopy()
+	replaced.UID = "replacement"
+	if installedProjectionWorkerTerminal(w, active, nil, now) || installedProjectionWorkerTerminal(w, replaced, nil, now) || installedProjectionWorkerTerminal(value.AcquisitionWorker{Intent: value.AcquisitionWorkerIntent{RunUntil: now.Add(time.Second)}, Binding: w.Binding}, killed, nil, now) {
+		t.Fatal("active, replaced or live Job accepted with absent Pod")
+	}
 }
 
 func TestInstalledApprovedScopeSelection(t *testing.T) {

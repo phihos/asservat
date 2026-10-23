@@ -508,16 +508,56 @@ func (s *DownloadWorkerJobs) ObserveAcquisitionWorkerTermination(ctx context.Con
 		return out, artifact.ErrDownloadUnavailable
 	}
 	items, e := s.acquisitionPods(ctx, w.Intent)
-	if e != nil || len(items) != 1 {
+	if e != nil || len(items) > 1 {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	return s.acquisitionTermination(ctx, w, start, items)
+	return s.acquisitionTermination(ctx, w, start, j, items)
 }
 
-func (s *DownloadWorkerJobs) acquisitionTermination(ctx context.Context, w value.AcquisitionWorker, start time.Time, items []json.RawMessage) (value.AcquisitionWorkerTermination, error) {
+// WorkerJobReleasedPods reports the Job controller's own positive record that
+// the Job ended and every Pod it created has terminated and been counted. Job
+// Pods carry the job-tracking finalizer, so the API object of a Pod cannot
+// disappear before the controller has recorded its termination; terminal Job
+// conditions are set only after no Pod remains active, ready or terminating.
+// This is the evidence left when activeDeadlineSeconds kills and deletes the
+// Pod. Mere Pod absence, 404 or expiry of a still-active Job is not evidence.
+func WorkerJobReleasedPods(j *batch.Job) bool {
+	if j == nil || j.Status.Active != 0 || j.Status.Failed+j.Status.Succeeded < 1 || (j.Status.Ready != nil && *j.Status.Ready != 0) || (j.Status.Terminating != nil && *j.Status.Terminating != 0) {
+		return false
+	}
+	if u := j.Status.UncountedTerminatedPods; u != nil && len(u.Succeeded)+len(u.Failed) != 0 {
+		return false
+	}
+	for _, c := range j.Status.Conditions {
+		if c.Status != core.ConditionTrue {
+			continue
+		}
+		if c.Type == batch.JobComplete || c.Type == batch.JobFailed && (c.Reason == batch.JobReasonDeadlineExceeded || c.Reason == batch.JobReasonBackoffLimitExceeded) {
+			return true
+		}
+	}
+	return false
+}
+
+// The exact historical Job has already been checked. A remaining Pod must show
+// its own terminal container state; an absent Pod requires the Job controller's
+// accounted termination record instead.
+func (s *DownloadWorkerJobs) acquisitionTermination(ctx context.Context, w value.AcquisitionWorker, start time.Time, j *batch.Job, items []json.RawMessage) (value.AcquisitionWorkerTermination, error) {
 	var out value.AcquisitionWorkerTermination
 	selected := false
 	h := sha256.New()
+	if len(items) == 0 {
+		if j == nil || string(j.UID) != w.Binding.JobUID || !WorkerJobReleasedPods(j) {
+			return out, artifact.ErrDownloadUnavailable
+		}
+		selected = true
+		fmt.Fprintf(h, "job\x00%s\x00%d\x00%d", j.UID, j.Status.Succeeded, j.Status.Failed)
+		for _, c := range j.Status.Conditions {
+			if c.Status == core.ConditionTrue && (c.Type == batch.JobComplete || c.Type == batch.JobFailed) {
+				fmt.Fprintf(h, "\x00%s\x00%s\x00%s", c.Type, c.Reason, c.LastTransitionTime.UTC().Format(time.RFC3339))
+			}
+		}
+	}
 	for _, raw := range items {
 		p, e := checkedHistoricalAcquisitionPod(w, raw)
 		if e != nil || (p.Status.Phase != core.PodSucceeded && p.Status.Phase != core.PodFailed) || len(p.Status.ContainerStatuses) != 1 {

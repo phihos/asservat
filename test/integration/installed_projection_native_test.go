@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/contracts"
 	query "asservat.local/asservat/internal/domain/analysis"
 	value "asservat.local/asservat/internal/domain/authorization"
@@ -19,6 +20,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	batch "k8s.io/api/batch/v1"
 	core "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -79,10 +81,11 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						t.Fatal("approved query worker binding unavailable")
 					}
 					// The next two native sessions share the unchanged two-worker
-					// limit. Wait for this original worker to end naturally before
-					// their demand cleanup; no fixture mutation releases its slot.
+					// limit. Wait for this original worker to end (exit or Job
+					// deadline kill) before their demand cleanup; no fixture
+					// mutation releases its slot.
 					if err = installedProjectionWaitTerminal(ctx, api, observed); err != nil {
-						t.Fatal("approved query worker did not terminate naturally", err)
+						t.Fatal("approved query worker did not terminate", err)
 					}
 					return func() {
 						t.Helper()
@@ -93,7 +96,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 						if err != nil || !retired {
 							t.Fatal("native preparation did not retain positive query-worker retirement", err)
 						}
-						t.Log("installed query worker: original lifetime ended, exact Job/Pod terminated naturally, product demand cleanup retained positive retirement before Stop")
+						t.Log("installed query worker: original lifetime ended, exact Job/Pod terminated, product demand cleanup retained positive retirement before Stop")
 					}
 				}
 				if installedJourneyPause(limit, 100*time.Millisecond) != nil {
@@ -217,17 +220,28 @@ func installedProjectionWaitTerminal(ctx context.Context, api kubernetes.Interfa
 	}
 	for wait.Err() == nil {
 		job, err := api.BatchV1().Jobs(w.Binding.Namespace).Get(wait, w.Binding.Job, meta.GetOptions{})
-		if err != nil {
+		jobGone := apierrors.IsNotFound(err)
+		if err != nil && !jobGone {
 			return err
 		}
 		pod, err := api.CoreV1().Pods(w.Binding.Namespace).Get(wait, w.Binding.Pod, meta.GetOptions{})
-		if err != nil {
+		podGone := apierrors.IsNotFound(err)
+		if err != nil && !podGone {
 			return err
+		}
+		if podGone {
+			pod = nil
 		}
 		if err = wait.Err(); err != nil {
 			return err
 		}
-		if installedProjectionWorkerTerminal(w, job, pod, time.Now()) {
+		// Both objects gone means product cleanup already retired the worker;
+		// the caller's SQL readback still requires its positive retirement.
+		// A Job deleted while its Pod remains is not terminal evidence.
+		if jobGone && podGone {
+			return nil
+		}
+		if !jobGone && installedProjectionWorkerTerminal(w, job, pod, time.Now()) {
 			return nil
 		}
 		if err := installedJourneyPause(wait, 250*time.Millisecond); err != nil {
@@ -237,9 +251,17 @@ func installedProjectionWaitTerminal(ctx context.Context, api kubernetes.Interfa
 	return wait.Err()
 }
 
+// A nil Pod means NotFound: the Job controller removed it (native90:
+// activeDeadlineSeconds). Only the exact Job's accounted terminal record, as
+// product termination requires, makes that absence terminal.
 func installedProjectionWorkerTerminal(w value.AcquisitionWorker, job *batch.Job, pod *core.Pod, now time.Time) bool {
-	if job == nil || pod == nil || now.Before(w.Intent.RunUntil) || job.Namespace != w.Binding.Namespace || job.Name != w.Binding.Job || string(job.UID) != w.Binding.JobUID ||
-		pod.Namespace != w.Binding.Namespace || pod.Name != w.Binding.Pod || string(pod.UID) != w.Binding.PodUID ||
+	if job == nil || now.Before(w.Intent.RunUntil) || job.Namespace != w.Binding.Namespace || job.Name != w.Binding.Job || string(job.UID) != w.Binding.JobUID {
+		return false
+	}
+	if pod == nil {
+		return kube.WorkerJobReleasedPods(job)
+	}
+	if pod.Namespace != w.Binding.Namespace || pod.Name != w.Binding.Pod || string(pod.UID) != w.Binding.PodUID ||
 		(pod.Status.Phase != core.PodSucceeded && pod.Status.Phase != core.PodFailed) || len(pod.Status.ContainerStatuses) != 1 {
 		return false
 	}
