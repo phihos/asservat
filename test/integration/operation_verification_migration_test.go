@@ -130,7 +130,7 @@ func qualifyOperationVerificationMigration(t *testing.T, ctx context.Context, ad
 			}
 			for _, row := range []struct{ table, key string }{{"permission_stream", scenario.a.RootID}, {"authority_audit", initialAudit}} {
 				var raw []byte
-				if e = admin.QueryRow(ctx, "SELECT to_jsonb(t) FROM "+pgx.Identifier{row.table}.Sanitize()+" t WHERE id=$1", row.key).Scan(&raw); e != nil {
+				if e = admin.QueryRow(ctx, "SELECT "+historicalRowJSON(row.table)+" FROM "+pgx.Identifier{row.table}.Sanitize()+" t WHERE id=$1", row.key).Scan(&raw); e != nil {
 					tx.Rollback(ctx)
 					t.Fatal(e)
 				}

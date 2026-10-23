@@ -112,7 +112,7 @@ func qualifyOperationAuditOverdue(t *testing.T, ctx context.Context, admin *pgxp
 			if e != nil {
 				t.Fatal(e)
 			}
-			if ug.Begin(ctx, unknown) != app.ErrUnavailable {
+			if !errors.Is(ug.Begin(ctx, unknown), app.ErrUnavailable) {
 				t.Fatal("unknown write accepted")
 			}
 			// New admission keeps its required v3 backing even when overdue

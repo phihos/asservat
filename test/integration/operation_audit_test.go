@@ -77,14 +77,14 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if e = gate.Begin(ctx, second); e != nil {
 			t.Fatal("second allowed slot", e)
 		}
-		if e = gate.Begin(ctx, in(1, "get_capture")); e != app.ErrUnavailable {
+		if e = gate.Begin(ctx, in(1, "get_capture")); !errors.Is(e, app.ErrUnavailable) {
 			t.Fatal("one principal escaped finite quota", e)
 		}
 		// A new subject can still use its independently backed capacity.
 		if e = gate.Begin(ctx, in(2, "get_capture")); e != nil {
 			t.Fatal("another backed account starved", e)
 		}
-		if e = gate.Begin(ctx, in(3, "get_capture")); e != app.ErrUnavailable {
+		if e = gate.Begin(ctx, in(3, "get_capture")); !errors.Is(e, app.ErrUnavailable) {
 			t.Fatal("lazy account creation unbounded", e)
 		}
 		if e = gates["resolution"].Begin(ctx, in(1, "resolve_capture_request")); e != nil {
@@ -102,7 +102,7 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		resolution := gates["resolution"]
 		resolution.Objects = uncertain
 		request := in(2, "resolve_capture_request")
-		if e = resolution.Begin(ctx, request); e != app.ErrUnavailable {
+		if e = resolution.Begin(ctx, request); !errors.Is(e, app.ErrUnavailable) {
 			t.Fatal("lost response known", e)
 		}
 		if e = resolution.Begin(ctx, request); e != nil || uncertain.creates != 1 || uncertain.finds != 1 {
@@ -141,7 +141,7 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		// accounts; a smaller ceiling cannot erase previous spend.
 		now := time.Now().UTC().Truncate(time.Microsecond)
 		update := app.OperationAuditPool{RootID: s.a.RootID, Lane: "normal", AccountVersion: "accounts-v1", ExpectedRevision: 1, Accounts: 2, RecordsPerAccount: 1, RetainedSeconds: 3600, ObservedAt: now, FreshUntil: now.Add(5 * time.Second), ValidUntil: now.Add(time.Hour)}
-		if e = config.ProvisionOperationAuditPool(ctx, update); e != app.ErrUnavailable {
+		if e = config.ProvisionOperationAuditPool(ctx, update); !errors.Is(e, app.ErrUnavailable) {
 			t.Fatal("backing shrank below charged history", e)
 		}
 		update.RecordsPerAccount = 3
@@ -155,7 +155,7 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", s.recovery.installation); e != nil {
 			t.Fatal(e)
 		}
-		if e = gates["resolution"].Begin(ctx, in(1, "resolve_capture_request")); e != app.ErrUnavailable {
+		if e = gates["resolution"].Begin(ctx, in(1, "resolve_capture_request")); !errors.Is(e, app.ErrUnavailable) {
 			t.Fatal("recovery blocked audit admitted", e)
 		}
 	})
@@ -228,7 +228,7 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if err = tx.Commit(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err = <-done; err != app.ErrUnavailable {
+		if err = <-done; !errors.Is(err, app.ErrUnavailable) {
 			t.Fatal("expired original backing admitted a new audit", err)
 		}
 		var count, charged int64
@@ -278,7 +278,7 @@ func qualifyOperationAudits(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		if e = tx.Commit(ctx); e != nil {
 			t.Fatal(e)
 		}
-		if e = <-done; e != app.ErrUnavailable {
+		if e = <-done; !errors.Is(e, app.ErrUnavailable) {
 			t.Fatal("lock wait renewed original interval", e)
 		}
 		var n int

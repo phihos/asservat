@@ -205,7 +205,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 			if e != nil {
 				t.Fatal(e)
 			}
-			if unknownGate.Begin(ctx, uncertain) != app.ErrUnavailable || unknownGate.Begin(ctx, uncertain) != app.ErrUnavailable || lost.creates != 1 {
+			if !errors.Is(unknownGate.Begin(ctx, uncertain), app.ErrUnavailable) || !errors.Is(unknownGate.Begin(ctx, uncertain), app.ErrUnavailable) || lost.creates != 1 {
 				t.Fatal("uncertain closed write was reconstructed")
 			}
 			legacy, e := postgres.NewOperationJournal(ctx, jp, s.a.RootID, "normal", s.recovery.guard)
@@ -217,11 +217,11 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 			if e = legacyGate.Begin(ctx, legacyIntent); e != nil {
 				t.Fatal(e)
 			}
-			if _, e = cleanup.BeginOperationPurge(ctx, a.ID, "original"); e != app.ErrUnavailable {
+			if _, e = cleanup.BeginOperationPurge(ctx, a.ID, "original"); !errors.Is(e, app.ErrUnavailable) {
 				t.Fatal("purged during retained audit access", e)
 			}
 			for _, id := range []string{uncertain.ID, legacyIntent.ID} {
-				if _, e = cleanup.BeginOperationPurge(ctx, id, "original"); e != app.ErrUnavailable {
+				if _, e = cleanup.BeginOperationPurge(ctx, id, "original"); !errors.Is(e, app.ErrUnavailable) {
 					t.Fatal("legacy/unknown writer eligible", e)
 				}
 			}
@@ -251,7 +251,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 					t.Fatal("excess lifecycle privilege", test.sql, e)
 				}
 			}
-			if e = finalizer.RetireOperationAudit(ctx, a.ID); e != app.ErrUnavailable {
+			if e = finalizer.RetireOperationAudit(ctx, a.ID); !errors.Is(e, app.ErrUnavailable) {
 				t.Fatal("released without audited deletion", e)
 			}
 			wait := func(until time.Time) {
@@ -279,7 +279,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 				if e != nil {
 					t.Fatal("original lease", e)
 				}
-				if _, e = cleanup.ClaimOperationCertificate(ctx, value.OperationRetirement{}); e != app.ErrUnavailable {
+				if _, e = cleanup.ClaimOperationCertificate(ctx, value.OperationRetirement{}); !errors.Is(e, app.ErrUnavailable) {
 					t.Fatal("certificate without original purge", e)
 				}
 				if e = objects.PurgeOperationObjects(ctx, lease); e != nil {
@@ -351,7 +351,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 				if e != nil {
 					t.Fatal("terminal checkpoint", e)
 				}
-				if e = finalizer.RetireOperationAudit(ctx, in.ID); e != app.ErrUnavailable {
+				if e = finalizer.RetireOperationAudit(ctx, in.ID); !errors.Is(e, app.ErrUnavailable) {
 					t.Fatal("cleanup acknowledged its own purge", e)
 				}
 				if e = verifier.VerifyOperationAbsence(ctx, lease); e != nil {
@@ -397,7 +397,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 					if e = lock.Commit(ctx); e != nil {
 						t.Fatal(e)
 					}
-					if e = <-done; e != app.ErrUnavailable {
+					if e = <-done; !errors.Is(e, app.ErrUnavailable) {
 						t.Fatal("post-lock expired original lease released capacity", e)
 					}
 					var count int64
@@ -417,7 +417,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 					if e != nil {
 						t.Fatal(e)
 					}
-					if e = finalizer.RetireOperationAudit(ctx, in.ID); e != app.ErrUnavailable {
+					if e = finalizer.RetireOperationAudit(ctx, in.ID); !errors.Is(e, app.ErrUnavailable) {
 						t.Fatal("old terminal acknowledgement survived renewed fence", e)
 					}
 					if e = verifier.VerifyOperationAbsence(ctx, lease); e != nil {
@@ -484,14 +484,14 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 				for e := range errs {
 					if e == nil {
 						success++
-					} else if e != app.ErrUnavailable {
+					} else if !errors.Is(e, app.ErrUnavailable) {
 						t.Fatal(e)
 					}
 				}
 				if success != 1 {
 					t.Fatal("concurrent finalizers did not release exactly once", success)
 				}
-				if _, e = j.ReserveOperation(ctx, in); e != app.ErrUnavailable {
+				if _, e = j.ReserveOperation(ctx, in); !errors.Is(e, app.ErrUnavailable) {
 					t.Fatal("retired original request reopened", e)
 				}
 			}
@@ -503,7 +503,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 				if e = admin.QueryRow(ctx, "SELECT accounts FROM operation_audit_pool WHERE root_id=$1 AND lane='normal'", a.RootID).Scan(&accounts); e != nil || accounts != 3 {
 					t.Fatal("cooling deleted original account early", accounts, e)
 				}
-				if e = gate.Begin(ctx, intent(4)); e != app.ErrUnavailable {
+				if e = gate.Begin(ctx, intent(4)); !errors.Is(e, app.ErrUnavailable) {
 					t.Fatal("saturated cooling pool admitted another account", e)
 				}
 				var keysToDrain []value.OperationHistoryKey
@@ -512,7 +512,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 					keysToDrain = append(keysToDrain, k)
 					wrong := k
 					wrong.Lane = "resolution"
-					if _, e = finalizer.ReleaseOperationHistory(ctx, wrong); e != app.ErrUnavailable {
+					if _, e = finalizer.ReleaseOperationHistory(ctx, wrong); !errors.Is(e, app.ErrUnavailable) {
 						t.Fatal("cross-lane drain accepted", e)
 					}
 					var eligible, release, deleteBy, hard time.Time
@@ -527,7 +527,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 					if in.ID == b.ID && (!eligible.After(k.ReleaseAt) || !eligible.After(in.Lifecycle.LiveRetireBy.Add(time.Duration(historySeconds)*time.Second))) {
 						t.Fatal("late retirement skipped actual-H floor", eligible)
 					}
-					if _, e = finalizer.ReleaseOperationHistory(ctx, k); e != app.ErrUnavailable {
+					if _, e = finalizer.ReleaseOperationHistory(ctx, k); !errors.Is(e, app.ErrUnavailable) {
 						t.Fatal("history released before actual eligibility", e)
 					}
 				}
@@ -572,7 +572,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 					if key.PrincipalDigest == a.PrincipalDigest {
 						if e := <-admission; e == nil {
 							concurrentAdmission++
-						} else if e != app.ErrUnavailable {
+						} else if !errors.Is(e, app.ErrUnavailable) {
 							t.Fatal("new admission racing exact cooling drain", e)
 						}
 					}
@@ -643,7 +643,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 				if e != nil {
 					t.Fatal(e)
 				}
-				if _, e = other.ReserveOperation(ctx, changedIntent); e != app.ErrUnavailable {
+				if _, e = other.ReserveOperation(ctx, changedIntent); !errors.Is(e, app.ErrUnavailable) {
 					t.Fatal("residual profile switched before final H", e)
 				}
 				var floor time.Time
@@ -676,7 +676,7 @@ func qualifyOperationAuditLifecycle(t *testing.T, ctx context.Context, admin *pg
 			if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", policy.InstallationID); e != nil {
 				t.Fatal(e)
 			}
-			if _, e = cleanup.ReadOperationLifecycle(ctx, uncertain.ID); e != app.ErrUnavailable {
+			if _, e = cleanup.ReadOperationLifecycle(ctx, uncertain.ID); !errors.Is(e, app.ErrUnavailable) {
 				t.Fatal("recovery-blocked historical audit treated as current", e)
 			}
 		})
