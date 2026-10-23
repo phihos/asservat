@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"slices"
 	"sync"
 	"time"
@@ -85,11 +86,29 @@ func (c *RetentionTopologyClient) RetentionTopology(ctx context.Context, target 
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if n := c.client.now(); c.last.Valid(n) && n.Before(c.last.FreshUntil) {
+	// The cached observation is used to its end only while it still covers an
+	// evidence-read request; nearer its end it is re-read on demand (installed
+	// native86: an approved read was cut by this observation 1.27 s after its
+	// authority check). A failed early re-read keeps the still-current
+	// observation and its original end unless the configuration changed.
+	n := c.client.now()
+	cached := c.last.Valid(n) && n.Before(c.last.FreshUntil)
+	if cached && c.last.FreshUntil.Sub(n) >= identity.EvidenceReadRequestWindow {
 		out = c.last
 		out.Sources = slices.Clone(c.last.Sources)
 		return out, nil
 	}
+	out, err := c.readTopology(ctx)
+	if err != nil && cached && !errors.Is(err, value.ErrChanged) && !errors.Is(err, value.ErrInvalid) && !errors.Is(err, value.ErrDenied) && c.client.now().Before(c.last.FreshUntil) {
+		out = c.last
+		out.Sources = slices.Clone(c.last.Sources)
+		return out, nil
+	}
+	return out, err
+}
+
+func (c *RetentionTopologyClient) readTopology(ctx context.Context) (privacy.PolicyTopology, error) {
+	var out privacy.PolicyTopology
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	start := c.client.now()

@@ -1,5 +1,27 @@
 # Sustained implementation progress
 
+## Retention topology observation cut the read (2026-10-23)
+
+Installed native86 refused the poll at `result/until-authority/prepare/read`.
+The stored batch: authority checked 19:33:06.557865417, valid until
+19:33:07.825941307 (1.27 s); environment, batch and native operation ended
+there too, while recovery and processing ran to 19:33:26 and the request
+window to 19:33:26.484. The retention proof carried ObservedAt
+19:32:37.825941307 and ValidUntil 19:33:07.825941307: the hub's retention
+topology client (`RetentionTopologyClient`, 30 s `PolicyTopologyInterval`)
+reused its cached ConfigMap observation to its last instant, so every
+retention resolution, and the authority built on it, inherited that end.
+The topology is now re-read on demand when less than one evidence-read
+window remains (a failed early re-read keeps the still-current observation
+and its original end unless the configuration changed, was removed or is
+invalid). The projection authority carries a report-only `Bound` (not
+serialized or digested) naming the component that ended it, so the query
+report reads `until-authority/<identity|permissions|audience|catalog|expiry|
+retention|environment/<recovery|processing|policy>|window|request>`. Tests:
+the topology pin test's early re-read/fallback case and
+`TestContextProjectionAuthorityNamesItsEarliestBound`. Installed
+qualification has not rerun.
+
 ## Shared frame checks for approved projection conversations (2026-10-23)
 
 Installed native85 read the evidence in the worker in under a second

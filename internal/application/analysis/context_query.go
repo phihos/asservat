@@ -412,7 +412,14 @@ func (o *projectionRequest) CheckCurrent(ctx context.Context) (value.ContextProj
 		return value.ContextProjectionAuthority{}, queryCollapsed("cancelled", value.ErrUnavailable, errors.Join(checked.Err(), o.ctx.Err()))
 	}
 	a := *o.authority
-	if !o.query.Current(a, o.service.Now()) || !o.initial.Valid(o.service.Now()) || !o.shorten("authority", identity.Earlier(o.query.Deadline, a.ValidUntil)) {
+	label := "authority"
+	if a.Bound != "" {
+		label += "/" + a.Bound
+	}
+	if o.query.Deadline.Before(a.ValidUntil) {
+		label = "query-deadline"
+	}
+	if !o.query.Current(a, o.service.Now()) || !o.initial.Valid(o.service.Now()) || !o.shorten(label, identity.Earlier(o.query.Deadline, a.ValidUntil)) {
 		return value.ContextProjectionAuthority{}, queryStepped("authority-lapsed", value.ErrUnavailable)
 	}
 	o.mu.Lock()
@@ -458,7 +465,7 @@ func (s ContextProjectionService) beginExcerpt(ctx context.Context, current iden
 	}
 	a, err := s.Results.Authority.ResolveProjectionCurrent(o.ctx, current, candidate)
 	if err != nil || !a.Valid(s.Results.Now()) || a.Scope.Candidate() != candidate || a.Environment.InstallationID != s.Results.InstallationID ||
-		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten("resolved-authority", a.ValidUntil) {
+		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten("resolved-authority/"+a.Bound, a.ValidUntil) {
 		return nil, queryCollapsed("authority", value.ErrUnavailable, err)
 	}
 	p, err := s.Plans.ContextQueryPlan(o.ctx, a)

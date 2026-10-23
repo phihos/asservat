@@ -77,17 +77,21 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		return zero, projectionRefused("candidate", analysis.ErrInvalid, nil)
 	}
 	started := s.Now()
-	until := started.Add(identity.EvidenceReadRequestWindow)
-	if d, ok := ctx.Deadline(); ok {
-		until = identity.Earlier(until, d)
+	until, bound := started.Add(identity.EvidenceReadRequestWindow), "window"
+	if d, ok := ctx.Deadline(); ok && d.Before(until) {
+		until, bound = d, "request"
 	}
 	call, stop := context.WithDeadline(ctx, until)
 	defer stop()
 	// Every child context retains all earlier intervals, including the initial
 	// caller and empty-deny observations. Fresh reads can only shorten them.
-	shorten := func(bounds ...time.Time) context.CancelFunc {
+	// bound names the component whose interval ends the decision, for the
+	// operator report only (installed native83/84/86 were cut by one).
+	shorten := func(name string, bounds ...time.Time) context.CancelFunc {
 		for _, at := range bounds {
-			until = identity.Earlier(until, at)
+			if at.Before(until) {
+				until, bound = at, name
+			}
 		}
 		var cancel context.CancelFunc
 		call, cancel = context.WithDeadline(call, until)
@@ -98,7 +102,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	if err != nil || !i.Valid(s.Now()) || i.Principal != candidate.Principal || call.Err() != nil {
 		return zero, projectionRefused("identity", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
-	defer shorten(i.ValidUntil)()
+	defer shorten("identity", i.ValidUntil)()
 	target := value.Target{ClusterID: candidate.ClusterID, NamespaceUID: candidate.NamespaceUID, WorkloadUID: candidate.WorkloadUID, PodUID: candidate.PodUID}
 	p, err := s.Permissions.Permissions(call, target)
 	p = cloneProjectionPermissions(p)
@@ -106,7 +110,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	if err != nil || !preliminary.Eligible || call.Err() != nil {
 		return zero, projectionRefused("permissions", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
-	defer shorten(preliminary.ValidUntil)()
+	defer shorten("permissions", preliminary.ValidUntil)()
 	// The protected source lookup follows current ordinary target eligibility.
 	record, err := s.Catalog.ContextProjectionEvidence(call, candidate.ArtifactID)
 	record = cloneProjectionEvidence(record)
@@ -120,7 +124,9 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	if !initial.Eligible {
 		return zero, projectionRefused("audience", analysis.ErrUnavailable, nil)
 	}
-	defer shorten(initial.ValidUntil, record.ValidUntil, r.Effective.ExpiresAt)()
+	defer shorten("audience", initial.ValidUntil)()
+	defer shorten("catalog", record.ValidUntil)()
+	defer shorten("expiry", r.Effective.ExpiresAt)()
 	resolve := func() (privacy.RetainedResolution, error) {
 		input := r.Input
 		input.Parents = slices.Clone(input.Parents)
@@ -135,12 +141,13 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	if err != nil {
 		return zero, err
 	}
-	defer shorten(resolved.ValidUntil, resolved.ExpiresAt)()
+	defer shorten("retention", resolved.ValidUntil)()
+	defer shorten("expiry", resolved.ExpiresAt)()
 	environment, err := s.Environment.ProjectionEnvironment(call, cloneProjectionEvidence(record), i.Principal)
 	if err != nil || !projectionEnvironmentMatches(environment, record, scope, s.Now()) || call.Err() != nil {
 		return zero, projectionRefused("environment", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
-	defer shorten(environment.ValidUntil)()
+	defer shorten(environmentBound(environment), environment.ValidUntil)()
 
 	// Recheck the request-owned identity and ordinary permissions after blocking
 	// reads. Same principal/policy without the original groups/scopes is not the
@@ -150,7 +157,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	if err != nil || !sameProjectionIdentity(i, current, s.Now()) || call.Err() != nil {
 		return zero, projectionRefused("identity-again", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
-	defer shorten(current.ValidUntil)()
+	defer shorten("identity", current.ValidUntil)()
 	latest, err := s.Permissions.Permissions(call, target)
 	latest = cloneProjectionPermissions(latest)
 	retained.ExpiresAt = resolved.ExpiresAt
@@ -158,30 +165,31 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 	if err != nil || latest.Revision != p.Revision || !final.Eligible || call.Err() != nil {
 		return zero, projectionRefused("permissions-again", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
-	defer shorten(final.ValidUntil)()
+	defer shorten("permissions", final.ValidUntil)()
 	lastRetention, err := resolve()
 	if err != nil || !sameProjectionRetention(resolved, lastRetention) {
 		return zero, projectionRefused("retention-again", analysis.ErrUnavailable, err)
 	}
-	defer shorten(lastRetention.ValidUntil, lastRetention.ExpiresAt)()
+	defer shorten("retention", lastRetention.ValidUntil)()
+	defer shorten("expiry", lastRetention.ExpiresAt)()
 	lastEnvironment, err := s.Environment.ProjectionEnvironment(call, cloneProjectionEvidence(record), i.Principal)
 	if err != nil || !projectionEnvironmentMatches(lastEnvironment, record, scope, s.Now()) || !sameProjectionEnvironment(environment, lastEnvironment) || call.Err() != nil {
 		return zero, projectionRefused("environment-again", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
-	defer shorten(lastEnvironment.ValidUntil)()
+	defer shorten(environmentBound(lastEnvironment), lastEnvironment.ValidUntil)()
 	lastIdentity, err := source.ResolveIdentity(call)
 	lastIdentity = cloneProjectionIdentity(lastIdentity)
 	if err != nil || !sameProjectionIdentity(i, lastIdentity, s.Now()) || !sameProjectionIdentity(current, lastIdentity, s.Now()) || call.Err() != nil {
 		return zero, projectionRefused("identity-last", analysis.ErrUnavailable, errors.Join(err, call.Err()))
 	}
-	defer shorten(lastIdentity.ValidUntil)()
+	defer shorten("identity", lastIdentity.ValidUntil)()
 	now := s.Now()
 	// Returning the original proofs keeps their observation identities and
 	// freshness intact. Final readers cannot replace an expired initial proof.
 	if !now.Before(until) || !resolved.Proof.Valid(now) || !environment.Valid(now) || !value.Evaluate(i, p, value.ReadApproved, target, &retained, now).Eligible || !value.Evaluate(lastIdentity, latest, value.ReadApproved, target, &retained, now).Eligible {
 		return zero, projectionRefused("expired", analysis.ErrExpired, nil)
 	}
-	out := analysis.ContextProjectionAuthority{Scope: scope, Environment: environment, Retention: resolved.Proof, PermissionRevision: p.Revision, IdentityRevision: i.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy}
+	out := analysis.ContextProjectionAuthority{Scope: scope, Environment: environment, Retention: resolved.Proof, PermissionRevision: p.Revision, IdentityRevision: i.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Bound: bound}
 	encoded, err := json.Marshal(struct {
 		Authority   analysis.ContextProjectionAuthority
 		Assignments []artifact.AudienceAssignment
@@ -253,4 +261,16 @@ func sameProjectionEnvironment(a, b analysis.ContextProjectionEnvironment) bool 
 	a.Recovery.ObservedAt, b.Recovery.ObservedAt, a.Recovery.FreshUntil, b.Recovery.FreshUntil = time.Time{}, time.Time{}, time.Time{}, time.Time{}
 	a.Processing.ObservedAt, b.Processing.ObservedAt, a.Processing.ValidUntil, b.Processing.ValidUntil = time.Time{}, time.Time{}, time.Time{}, time.Time{}
 	return a == b
+}
+
+// environmentBound names the environment component whose interval ends it.
+func environmentBound(e analysis.ContextProjectionEnvironment) string {
+	switch {
+	case e.ValidUntil.Equal(e.Recovery.FreshUntil):
+		return "environment/recovery"
+	case e.ValidUntil.Equal(e.Processing.ValidUntil):
+		return "environment/processing"
+	default:
+		return "environment/policy"
+	}
 }

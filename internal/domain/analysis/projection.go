@@ -157,6 +157,9 @@ type ContextProjectionAuthority struct {
 	PermissionRevision, IdentityRevision         identity.Revision
 	DecisionDigest                               artifact.Digest
 	CheckedAt, ValidUntil, AccessUntil, DeleteBy time.Time
+	// Bound names the component whose interval set ValidUntil, for the
+	// operator report only. It is never persisted, digested or authority.
+	Bound string `json:"-"`
 }
 
 func (a ContextProjectionAuthority) Valid(now time.Time) bool {
