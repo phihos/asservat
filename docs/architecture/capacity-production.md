@@ -129,7 +129,10 @@ new leader or configuration receipt.
 3. Role70 verifies all original storage, context, control, normal/resolution,
    capture, download, native and Stop backing before publishing Ready.
 
-`capacity_managed_admission_until` is the common managed admission fence.
+`capacity_managed_admission_until` is the common managed admission fence for
+collection (custody attempts, context captures and capture-lane audit). Since
+migration 00076, download sessions, approved queries and other audit lanes do
+not consult it or `capacity_managed_root_until`.
 Early context bindings and paused physical allocations cannot authorize a
 legacy consumer before phase3. A failed or uncertain phase keeps all original
 charges. Exact committed SQL configuration can continue under a new current

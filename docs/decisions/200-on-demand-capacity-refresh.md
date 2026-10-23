@@ -240,3 +240,14 @@ event, a LIST with changed policy state, suspension, takeover and recovery
 blocking still clear the observation at once, bookmarks still never renew it,
 and an unchanged LIST awaiting watch progress keeps only the original
 deadline. Down narrows stored rows back to five seconds.
+
+Revision 2026-10-23 (maintainer decision, migration 00076, schema 76):
+download preparation and approved queries no longer need a fresh workload
+binding, so the download demand path is removed: `demand_capacity_refresh_for_download`,
+its `download-session` grant, the coordinator's stale-binding retry and the
+`binding-stale` diagnostic. `artifact_download` no longer carries the
+`zzz_capacity_new_admission` trigger, and its session snapshot records the
+workload's immutable enrollment identity without checking the binding.
+Operation audit outside the `capture` lane is no longer gated by
+`capacity_managed_root_until`. Capture preview and admission keep the demand
+lane and the binding/root freshness described above.
