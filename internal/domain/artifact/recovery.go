@@ -13,6 +13,8 @@ type RecoveryProof struct {
 	ObservedAt, FreshUntil      time.Time
 }
 
+// Valid admits at most identity.EvidenceReadRequestWindow; producers for
+// purposes other than evidence reads keep their five-second intervals.
 func (p RecoveryProof) Valid(now time.Time) bool {
-	return uuid(p.InstallationID) && uuid(p.IssuerEpoch) && p.Revision.Valid() && identity.Fresh(p.ObservedAt, p.FreshUntil, now, 5*time.Second)
+	return uuid(p.InstallationID) && uuid(p.IssuerEpoch) && p.Revision.Valid() && identity.Fresh(p.ObservedAt, p.FreshUntil, now, identity.EvidenceReadRequestWindow)
 }

@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Evidence-read authority, worker proof and lease window (2026-10-23)
+
+Code review after the request-window change showed the approved read was
+still capped at five seconds by inner agent-authored intervals: the cached
+projection authority, its environment/recovery/processing/catalog evidence
+observations, the worker observation, the acquisition Pod proof, the native
+lease/frame gate (which shrank to each frame's 5 s observation), the hub's
+5 s native request context and 10 s connection lifetime, and the worker's
+command/frame caps. Under the maintainer's relaxed-cadence authorization,
+for approved projection reads only these now allow
+`identity.EvidenceReadRequestWindow` (20 s), still bounded by every
+underlying value (identity, 30 s permission/retention/trust rows,
+evidence expiry, request deadline, `RunUntil`, certificate `NotAfter`).
+Recovery uses a projection-only `RecoveryReader.ForEvidenceReads`; the
+recovery and processing proof validators admit up to 20 s while other
+producers keep five. A projection frame gate spans its operation: each
+frame repeats the complete SQL operation, enrollment, certificate and
+authority checks and must be current, and a failing check closes it. Key
+permits stay five seconds per unwrap. Native connections may reside 30 s.
+Download preparation/get keep their five-second download authority and
+leases (only their request window is 20 s). No SQL constraint enforced
+these bounds, so migration 00077 is unchanged.
+`TestQueryTwelveSecondReadWithinOneEvidenceRequest` and
+`TestNativeFrameGateProjectionSpansOperationAndRefusesRevokedFrame` cover a
+12 s read and next-frame revocation; the existing SQL-fence and
+other-tool five-second tests still pass. The real-SQL fixture's binding
+expiry used two `clock_timestamp()` calls and could exceed the exact 30 s
+CHECK; it now uses one statement timestamp. Installed qualification has not
+rerun.
+
 ## Twenty-second evidence-read request window (2026-10-23)
 
 Installed native78-80 refused approved pod-status reads: one five-second
@@ -18,7 +48,7 @@ the route is known); `WriteUntil` stays 30 s. No authority, identity,
 observation, batch or lease `ValidUntil` is extended, so the request still
 ends at the earliest of them; in particular the cached projection authority
 (five seconds from its check) and the worker's five-second command lease
-still bound the read. Hub `mcp timing` is keyed by tool for evidence reads and
+still bound the read (superseded the same day, below). Hub `mcp timing` is keyed by tool for evidence reads and
 `query refused` carries `q-*` step buckets; the worker prints
 `native read: unwrap-N object-decrypt parse frames, <outcome>`.
 `TestEvidenceReadRequestWindowOutlastsOrdinaryRequests` runs a 12 s

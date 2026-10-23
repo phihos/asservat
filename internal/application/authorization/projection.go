@@ -77,7 +77,7 @@ func (s ContextProjectionAuthority) checkProjection(ctx context.Context, source 
 		return zero, projectionRefused("candidate", analysis.ErrInvalid, nil)
 	}
 	started := s.Now()
-	until := started.Add(5 * time.Second)
+	until := started.Add(identity.EvidenceReadRequestWindow)
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -202,7 +202,7 @@ func projectionEvidenceMatches(r ContextProjectionEvidence, scope analysis.Conte
 		r.Version == scope.Version && r.SourceFormat == artifact.ContextFormat && r.SourceFormat == scope.SourceFormat && r.SourceProjectionDigest == scope.SourceProjectionDigest &&
 		r.SourceProjectionDigest == analysis.ContextSourceProjectionDigest() && r.DataClass == "metadata" && identity.Text(r.PurposeRef, 128) &&
 		r.Retained.Registration.Location.ArtifactID == scope.ArtifactID && r.Retained.Registration.NativeLimit == artifact.MaxContextBytes && r.Retained.Input.Target == target &&
-		r.Retained.Input.EvidenceType == "context" && r.Retained.Input.PrivacyClass == "potentialPersonalData" && identity.Fresh(r.ObservedAt, r.ValidUntil, now, 5*time.Second)
+		r.Retained.Input.EvidenceType == "context" && r.Retained.Input.PrivacyClass == "potentialPersonalData" && identity.Fresh(r.ObservedAt, r.ValidUntil, now, identity.EvidenceReadRequestWindow)
 }
 
 func projectionRetentionMatches(v privacy.RetainedResolution, r ContextProjectionEvidence, scope analysis.ContextProjectionScope, now time.Time) bool {

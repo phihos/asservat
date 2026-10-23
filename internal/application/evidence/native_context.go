@@ -109,7 +109,7 @@ func (r *RegionalContextResult) enter(ctx context.Context, o value.NativeOperati
 		return nil, nil, artifact.ErrDownloadUnavailable
 	}
 	deadline, ok := ctx.Deadline()
-	if !ok || deadline.After(r.now().Add(5*time.Second)) {
+	if !ok || deadline.After(r.now().Add(value.NativeLeaseWindow(o.Kind))) {
 		return nil, nil, artifact.ErrDownloadUnavailable
 	}
 	r.mu.Lock()

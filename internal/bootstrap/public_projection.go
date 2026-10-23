@@ -89,8 +89,10 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 		return nil, err
 	}
 	pc := d.publicContext
+	// Evidence reads observe recovery for up to the evidence-read window.
+	recovery := pc.recovery.ForEvidenceReads()
 	authority := authapp.ContextProjectionAuthority{RootID: root, Permissions: pc.permissions, Catalog: pc.catalog, Retention: pc.retention,
-		Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: pc.recovery, Processing: processing, Now: time.Now}, Now: time.Now}
+		Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: recovery, Processing: processing, Now: time.Now}, Now: time.Now}
 	origins := d.shared.origins
 	origins.Projection = operations
 	client := d.shared.workers[ownerNativeAPIKey{profile.ClusterID, profile.NamespaceUID}]
@@ -106,7 +108,7 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	reader := publicProjectionReader{ledger, runtime}
 	service := &analysisapp.ContextProjectionService{Results: analysisapp.ContextProjectionResults{RootID: root, InstallationID: installation, HubProcessEpoch: d.Runtime.binding.ProcessEpoch,
 		Authority: authority, Ledger: ledger, Reader: reader, Now: time.Now, NewID: ownerRandomID,
-		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "query refused"), time.Now)}, Recovery: pc.recovery, Routes: routes, Plans: plans,
+		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "query refused"), time.Now)}, Recovery: recovery, Routes: routes, Plans: plans,
 		Workers: publicProjectionAdmission{&evidence.ProjectionWorkerAdmission{Cleanup: cleanup, Ledger: workers, Jobs: jobs, Audit: audit.projectionWorkerObjects(), Now: time.Now}}}
 	// The peer adapter is retained by both native admissions. Configure it only
 	// during startup, before any listener/goroutine can observe the pointer.

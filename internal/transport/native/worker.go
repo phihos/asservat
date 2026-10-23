@@ -61,7 +61,7 @@ func commandValues(c contracts.NativeCommand, h contracts.NativeHello, target va
 	var o value.NativeOperation
 	var source evidence.NativeContextSource
 	until, e := time.Parse(time.RFC3339Nano, c.Until)
-	if e != nil || nativeDecode(c.Operation, &o) != nil || !o.Valid() || c.Format != contracts.NativeExchangeFormat || c.Nonce != h.Nonce || c.Reference != nativeReference(o) || o.Reference.InstallationID != target.InstallationID || o.Reference.Parent() != target.Parent() || o.Reference.WorkerID != target.WorkerID || o.WorkerPodUID != target.PodUID || o.WorkerPublicKey != key || o.Until.After(target.RunUntil) || c.Kind != string(o.Kind) || c.ParentID != o.ParentID || c.Generation != o.Generation || !now.Before(until) || until.After(now.Add(5*time.Second)) || until.After(o.Until) {
+	if e != nil || nativeDecode(c.Operation, &o) != nil || !o.Valid() || c.Format != contracts.NativeExchangeFormat || c.Nonce != h.Nonce || c.Reference != nativeReference(o) || o.Reference.InstallationID != target.InstallationID || o.Reference.Parent() != target.Parent() || o.Reference.WorkerID != target.WorkerID || o.WorkerPodUID != target.PodUID || o.WorkerPublicKey != key || o.Until.After(target.RunUntil) || c.Kind != string(o.Kind) || c.ParentID != o.ParentID || c.Generation != o.Generation || !now.Before(until) || until.After(now.Add(value.NativeLeaseWindow(o.Kind))) || until.After(o.Until) {
 		return o, source, until, contracts.ErrNativeProtocol
 	}
 	if o.Kind != value.NativeProjection && len(c.Projection) != 0 {

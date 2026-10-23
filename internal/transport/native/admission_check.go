@@ -29,7 +29,9 @@ func checkNativeAdmission(call context.Context, gate *evidence.NativeFrameGate) 
 	if err != nil {
 		return nil, err
 	}
-	if until, bounded := call.Deadline(); bounded && until.Before(lease.Until) {
+	// The admission call bounds the admission; an approved projection command
+	// instead carries its gate-checked operation bound to the worker.
+	if until, bounded := call.Deadline(); bounded && until.Before(lease.Until) && lease.Operation.Kind != value.NativeProjection {
 		lease.Until = until
 	}
 	checked := &checkedNativeAdmission{gate: gate, call: call, lease: lease}

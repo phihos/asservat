@@ -187,3 +187,11 @@ Hub `mcp timing` (keyed by tool for evidence reads) and `query refused`
 reports now carry `q-*` step buckets, and the worker prints
 `native read: unwrap-N, object-decrypt, parse, frames` with its outcome, so the
 next installed run shows which step consumes the time.
+
+Follow-up the same day: the projection authority, its environment, recovery,
+processing and catalog-evidence observations, the worker observation and Pod
+proof, the projection key binding, the native projection lease and the hub's
+projection conversation now also allow up to the evidence-read window, still
+bounded by each underlying value; a projection frame gate repeats its full
+SQL/peer check on every frame and closes on the first failure. Key permits
+remain five seconds per unwrap.

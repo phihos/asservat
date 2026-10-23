@@ -2,6 +2,7 @@ package mtls
 
 import (
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/tls"
 	"io"
@@ -224,7 +225,9 @@ func (s *NativeClientStream) begin(ctx context.Context, read bool) (func(), erro
 		return nil, contracts.ErrNativeProtocol
 	}
 	d, ok := ctx.Deadline()
-	if !ok || !time.Now().Before(d) || d.After(time.Now().Add(5*time.Second)) {
+	// Frame calls carry the operation's current bound: at most the
+	// evidence-read window for an approved projection read.
+	if !ok || !time.Now().Before(d) || d.After(time.Now().Add(identity.EvidenceReadRequestWindow)) {
 		return nil, contracts.ErrNativeProtocol
 	}
 	s.mu.Lock()

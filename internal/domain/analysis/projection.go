@@ -141,7 +141,7 @@ type ContextProjectionEnvironment struct {
 func (e ContextProjectionEnvironment) Valid(now time.Time) bool {
 	return authorization.UUID(e.RootID) && authorization.UUID(e.InstallationID) && authorization.UUID(e.StoreID) &&
 		e.Location.Validate() == nil && e.Principal.Valid() && e.PolicyRevision.Valid() &&
-		identity.Fresh(e.ObservedAt, e.ValidUntil, now, 5*time.Second) &&
+		identity.Fresh(e.ObservedAt, e.ValidUntil, now, identity.EvidenceReadRequestWindow) &&
 		e.Recovery.Valid(now) && e.Recovery.InstallationID == e.InstallationID && !e.ValidUntil.After(e.Recovery.FreshUntil) &&
 		e.Processing.Valid(now) && e.Processing.RootID == e.RootID && e.Processing.Location == e.Location &&
 		!e.ValidUntil.After(e.Processing.ValidUntil) && e.Path.Valid() && e.Region == e.Path.AcquisitionRegion &&
@@ -165,7 +165,7 @@ func (a ContextProjectionAuthority) Valid(now time.Time) bool {
 		a.Environment.Location.ArtifactID == a.Scope.ArtifactID && a.Environment.Processing.CaptureID == a.Scope.CaptureID &&
 		a.Retention.Valid(now) && a.Retention.Matches(a.Scope.RootID, a.Scope.ClusterID, a.Scope.NamespaceUID, a.Scope.WorkloadUID, a.Scope.PodUID) &&
 		a.PermissionRevision.Valid() && authorization.UUID(a.PermissionRevision.UID) && a.IdentityRevision.Valid() &&
-		a.DecisionDigest != (artifact.Digest{}) && identity.Fresh(a.CheckedAt, a.ValidUntil, now, 5*time.Second) &&
+		a.DecisionDigest != (artifact.Digest{}) && identity.Fresh(a.CheckedAt, a.ValidUntil, now, identity.EvidenceReadRequestWindow) &&
 		!a.ValidUntil.After(a.Environment.ValidUntil) && !a.ValidUntil.After(a.Retention.ValidUntil) &&
 		!a.ValidUntil.After(a.AccessUntil) && a.AccessUntil.Before(a.DeleteBy)
 }

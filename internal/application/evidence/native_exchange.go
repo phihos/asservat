@@ -60,7 +60,7 @@ func NewNativeFrameGate(parent context.Context, check NativeCurrentCheck, now fu
 	if err != nil || bounded.Err() != nil || (!l.Valid(now()) || !l.Operation.CurrentValid(now())) {
 		return nil, artifact.ErrDownloadUnavailable
 	}
-	until := identity.Earlier(started.Add(artifact.DownloadLease), l.Until)
+	until := gateUntil(started, l)
 	if d, ok := parent.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -72,6 +72,21 @@ func NewNativeFrameGate(parent context.Context, check NativeCurrentCheck, now fu
 	context.AfterFunc(ctx, g.Close)
 	return g, nil
 }
+
+// gateUntil bounds a conversation from its first complete check. Approved
+// projection reads span their whole operation (at most the evidence-read
+// window): their 5 s observations must be current at every frame check but no
+// longer end the conversation. Other kinds keep the five-second lease.
+func gateUntil(started time.Time, l value.NativeLease) time.Time {
+	return identity.Earlier(started.Add(value.NativeLeaseWindow(l.Operation.Kind)), gateCeiling(l))
+}
+func gateCeiling(l value.NativeLease) time.Time {
+	if l.Operation.Kind == value.NativeProjection {
+		return l.Operation.Until
+	}
+	return l.Until
+}
+
 func (g *NativeFrameGate) Context() context.Context {
 	if g == nil {
 		c, cancel := context.WithCancel(context.Background())
@@ -138,7 +153,7 @@ func (g *NativeFrameGate) Check(ctx context.Context) (value.NativeLease, error) 
 	g.mu.Lock()
 	valid := err == nil && callErr == nil && !g.closed && g.ctx.Err() == nil && l.Valid(g.now()) && l.Operation.CurrentValid(g.now()) && sameNativeOperation(l.Operation, g.lease.Operation) && l.Certificate == g.lease.Certificate && l.Sequence == g.lease.Sequence
 	if valid {
-		end := identity.Earlier(g.until, l.Until)
+		end := identity.Earlier(g.until, gateCeiling(l))
 		if end.Before(g.until) {
 			g.until = end
 			if g.timer != nil {

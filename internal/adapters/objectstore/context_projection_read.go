@@ -11,6 +11,7 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // ContextProjectionReader belongs only in the regional query worker. Its
@@ -34,7 +35,7 @@ func (r *ContextProjectionReader) ReadProjectionNative(ctx context.Context, sour
 		return value.PodStatusProjection{}, value.ErrUnavailable
 	}
 	deadline, ok := ctx.Deadline()
-	if !ok || deadline.After(until) || deadline.After(time.Now().Add(5*time.Second)) || !time.Now().Before(deadline) {
+	if !ok || deadline.After(until) || deadline.After(time.Now().Add(identity.EvidenceReadRequestWindow)) || !time.Now().Before(deadline) {
 		return value.PodStatusProjection{}, value.ErrUnavailable
 	}
 	// Retain the exact expected audience/retention values across provider waits.

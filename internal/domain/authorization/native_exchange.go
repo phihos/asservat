@@ -72,7 +72,18 @@ type NativeLease struct {
 }
 
 func (l NativeLease) Valid(now time.Time) bool {
-	return l.Operation.Valid() && l.Certificate != (artifact.Digest{}) && l.Sequence > 0 && l.Sequence <= 1<<60 && identity.Fresh(l.ObservedAt, l.Until, now, 5*time.Second) && !l.Until.After(l.Operation.Until)
+	return l.Operation.Valid() && l.Certificate != (artifact.Digest{}) && l.Sequence > 0 && l.Sequence <= 1<<60 && identity.Fresh(l.ObservedAt, l.Until, now, NativeLeaseWindow(l.Operation.Kind)) && !l.Until.After(l.Operation.Until)
+}
+
+// NativeLeaseWindow is the longest native lease/conversation interval of an
+// operation kind: the evidence-read request window for approved projection
+// reads (installed native78-80 needed more than five seconds between command
+// and result), five seconds for every other kind.
+func NativeLeaseWindow(kind NativeOperationKind) time.Duration {
+	if kind == NativeProjection {
+		return identity.EvidenceReadRequestWindow
+	}
+	return 5 * time.Second
 }
 
 // Accepted qualification/backing is supplied by protected installation input,

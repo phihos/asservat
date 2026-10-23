@@ -17,7 +17,7 @@ import (
 func (s *ProcessingReads) ContextProjectionProcessing(ctx context.Context, r app.ContextProjectionEvidence, recovery artifact.RecoveryProof) (artifact.DownloadProcessingProof, error) {
 	var out artifact.DownloadProcessingProof
 	now := time.Now()
-	if s == nil || s.ledger == nil || s.recovery == nil || ctx == nil || ctx.Err() != nil || !identity.Fresh(r.ObservedAt, r.ValidUntil, now, 5*time.Second) || !recovery.Valid(now) || r.CaseID == "" || r.SourceFormat != artifact.ContextFormat || r.SourceProjectionDigest != value.ContextSourceProjectionDigest() || r.DataClass != "metadata" || r.Retained.Registration.NativeLimit != artifact.MaxContextBytes {
+	if s == nil || s.ledger == nil || s.recovery == nil || ctx == nil || ctx.Err() != nil || !identity.Fresh(r.ObservedAt, r.ValidUntil, now, identity.EvidenceReadRequestWindow) || !recovery.Valid(now) || r.CaseID == "" || r.SourceFormat != artifact.ContextFormat || r.SourceProjectionDigest != value.ContextSourceProjectionDigest() || r.DataClass != "metadata" || r.Retained.Registration.NativeLimit != artifact.MaxContextBytes {
 		return out, value.ErrUnavailable
 	}
 	until := identity.Earlier(r.ValidUntil, identity.Earlier(recovery.FreshUntil, r.Retained.Effective.ExpiresAt))
@@ -32,7 +32,7 @@ func (s *ProcessingReads) ContextProjectionProcessing(ctx context.Context, r app
 		if e != nil {
 			return e
 		}
-		if !identity.Fresh(r.ObservedAt, r.ValidUntil, started.Time, 5*time.Second) || !recovery.Valid(started.Time) || ctx.Err() != nil {
+		if !identity.Fresh(r.ObservedAt, r.ValidUntil, started.Time, identity.EvidenceReadRequestWindow) || !recovery.Valid(started.Time) || ctx.Err() != nil {
 			return value.ErrUnavailable
 		}
 		snapshot, p, e := readProcessingSnapshot(ctx, tx, s.root, s.recovery.installation, recovery.IssuerEpoch, r.Retained.Registration.Location.ArtifactID, r.ObservedAt, until)

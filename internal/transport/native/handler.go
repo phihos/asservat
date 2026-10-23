@@ -81,8 +81,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			<-h.slots
 		}
 	}()
-	ctx, stop := context.WithTimeout(r.Context(), 5*time.Second)
-	defer stop()
+	started := time.Now()
 	controller := http.NewResponseController(w)
 	if controller.SetReadDeadline(time.Now().Add(5*time.Second)) != nil {
 		unavailable(w)
@@ -101,6 +100,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		unavailable(w)
 		return
 	}
+	// An approved projection conversation may span its operation (at most the
+	// evidence-read window); every other request keeps five seconds. The
+	// operation, its leases and each frame's current check bound it further.
+	lifetime := 5 * time.Second
+	if hello.Reference.QueryID != "" {
+		lifetime = value.NativeLeaseWindow(value.NativeProjection)
+	}
+	ctx, stop := context.WithDeadline(r.Context(), started.Add(lifetime))
+	defer stop()
 	conversation, err := h.admission.OpenNative(ctx, r.TLS, hello)
 	var idle *evidence.NativeIdle
 	// A parked idle request holds no slot: only admitted work counts. After a

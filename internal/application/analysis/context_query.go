@@ -538,7 +538,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	}
 	mark := time.Now()
 	worker, err := s.Reader.ObserveProjectionWorker(o.ctx, o.query, o)
-	if err != nil || !identity.Fresh(worker.ObservedAt, worker.ValidUntil, s.Now(), 5*time.Second) || !o.shorten(worker.ValidUntil) {
+	if err != nil || !identity.Fresh(worker.ObservedAt, worker.ValidUntil, s.Now(), identity.EvidenceReadRequestWindow) || !o.shorten(worker.ValidUntil) {
 		return nil, queryCollapsed("worker-observe", value.ErrUnavailable, err)
 	}
 	auditapp.MarkStep(o.ctx, "q-worker", mark)

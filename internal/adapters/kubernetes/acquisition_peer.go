@@ -62,6 +62,13 @@ func (s *DispatchedAcquisitionPeerAttester) ReadAcquisitionPeerProof(ctx context
 	}
 	proof.ObservedAt = start
 	proof.FreshUntil = identity.Earlier(proof.FreshUntil, identity.Earlier(observed.FreshUntil, identity.Earlier(start.Add(5*time.Second), w.Intent.RunUntil)))
+	if parent.Purpose == value.AcquisitionProjection {
+		// The enrollment, Job and token observations above are current now;
+		// every frame repeats the certificate, enrollment and SQL operation
+		// checks, so an approved projection read keeps this Pod proof for
+		// up to the evidence-read window (still within RunUntil and NotAfter).
+		proof.FreshUntil = identity.Earlier(start.Add(identity.EvidenceReadRequestWindow), identity.Earlier(w.Intent.RunUntil, peer.NotAfter))
+	}
 	if !proof.Valid(s.client.now()) || bounded.Err() != nil {
 		return zero, artifact.ErrInvalid
 	}

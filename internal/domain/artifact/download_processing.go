@@ -17,7 +17,7 @@ type DownloadProcessingProof struct {
 }
 
 func (p DownloadProcessingProof) Valid(now time.Time) bool {
-	return uuid(p.RootID) && uuid(p.Epoch) && uuid(p.CaptureID) && p.Location.Validate() == nil && p.Sequence > 0 && p.Sequence <= 1<<60 && p.StateDigest != (Digest{}) && identity.Fresh(p.ObservedAt, p.ValidUntil, now, 5*time.Second)
+	return uuid(p.RootID) && uuid(p.Epoch) && uuid(p.CaptureID) && p.Location.Validate() == nil && p.Sequence > 0 && p.Sequence <= 1<<60 && p.StateDigest != (Digest{}) && identity.Fresh(p.ObservedAt, p.ValidUntil, now, identity.EvidenceReadRequestWindow)
 }
 
 func (p DownloadProcessingProof) Equal(q DownloadProcessingProof) bool {

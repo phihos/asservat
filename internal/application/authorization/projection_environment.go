@@ -38,11 +38,11 @@ func (s CurrentProjectionEnvironment) ProjectionEnvironment(ctx context.Context,
 		return zero, projectionRefused("configuration", value.ErrUnavailable, nil)
 	}
 	start := s.Now()
-	until := identity.Earlier(start.Add(5*time.Second), identity.Earlier(r.ValidUntil, r.Retained.Effective.ExpiresAt))
+	until := identity.Earlier(start.Add(identity.EvidenceReadRequestWindow), identity.Earlier(r.ValidUntil, r.Retained.Effective.ExpiresAt))
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
-	if !identity.Fresh(r.ObservedAt, r.ValidUntil, start, 5*time.Second) || !start.Before(until) {
+	if !identity.Fresh(r.ObservedAt, r.ValidUntil, start, identity.EvidenceReadRequestWindow) || !start.Before(until) {
 		return zero, projectionRefused("evidence-expired", value.ErrExpired, nil)
 	}
 	call, cancel := context.WithDeadline(ctx, until)

@@ -79,7 +79,9 @@ func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, cur
 	}
 	root, cancel := context.WithCancel(ctx)
 	defer cancel()
-	residency := 10 * time.Second
+	// A projection worker request may park and then serve its operation for up
+	// to the evidence-read window, so native connections reside up to 30 s.
+	residency := 30 * time.Second
 	prelude := time.Duration(0)
 	if starts != nil {
 		residency, prelude = 30*time.Second, 2*time.Second
@@ -188,7 +190,7 @@ func serve(ctx context.Context, listener net.Listener, roots *x509.CertPool, cur
 			unavailable(w)
 			return
 		}
-		selected, lifetime, slots := http.Handler(handler), 10*time.Second, nativeSlots
+		selected, lifetime, slots := http.Handler(handler), 30*time.Second, nativeSlots
 		if starts != nil && r.RequestURI == contracts.APIContextStartPath {
 			selected, lifetime, slots = starts, 30*time.Second, startSlots
 		} else if r.RequestURI != handler.path {

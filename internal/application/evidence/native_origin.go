@@ -169,7 +169,7 @@ func (s NativeOrigins) CheckAcquisition(ctx context.Context, installation string
 	}
 	// The locator's observation is the same operation read Recheck repeats.
 	s.Recent.put(nativeObservationKey{l.Operation.Reference, peer}, l, start)
-	l.Until = identity.Earlier(l.Until, identity.Earlier(p.FreshUntil, start.Add(5*time.Second)))
+	l.Until = identity.Earlier(l.Until, identity.Earlier(p.FreshUntil, start.Add(value.NativeLeaseWindow(l.Operation.Kind))))
 	if d, ok := call.Deadline(); ok {
 		l.Until = identity.Earlier(l.Until, d)
 	}
@@ -182,10 +182,18 @@ func (s NativeOrigins) CheckAcquisition(ctx context.Context, installation string
 // Recheck reuses only the still-current original Pod proof. The SQL/current-peer
 // observation may shorten but never replace its operation or extend its expiry.
 func (s NativeOrigins) Recheck(ctx context.Context, original NativeOrigin) (value.NativeLease, error) {
-	if ctx == nil || s.Now == nil || !original.Lease.Valid(s.Now()) || !original.Proof.Valid(s.Now()) {
+	// An approved projection conversation spans its operation: the original
+	// admission's observations bounded only that admission, while this call
+	// repeats the current SQL/peer observation and the Pod proof must still be
+	// current. Other purposes keep the original lease bound.
+	bound := original.Lease
+	if bound.Operation.Kind == value.NativeProjection {
+		bound.Until = bound.Operation.Until
+	}
+	if ctx == nil || s.Now == nil || !bound.Valid(s.Now()) || !original.Proof.Valid(s.Now()) {
 		return value.NativeLease{}, artifact.ErrDownloadUnavailable
 	}
-	call, stop := context.WithDeadline(ctx, original.Lease.Until)
+	call, stop := context.WithDeadline(ctx, bound.Until)
 	defer stop()
 	var l value.NativeLease
 	var e error
@@ -214,7 +222,7 @@ func (s NativeOrigins) Recheck(ctx context.Context, original NativeOrigin) (valu
 	if e != nil || !sameNativeOperation(l.Operation, original.Lease.Operation) || l.Sequence != original.Lease.Sequence || l.Certificate != original.Lease.Certificate {
 		return value.NativeLease{}, artifact.ErrDownloadUnavailable
 	}
-	l.Until = identity.Earlier(l.Until, original.Lease.Until)
+	l.Until = identity.Earlier(l.Until, bound.Until)
 	if !l.Valid(s.Now()) || !original.Proof.Valid(s.Now()) || call.Err() != nil {
 		return value.NativeLease{}, artifact.ErrDownloadExpired
 	}

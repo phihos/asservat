@@ -137,7 +137,7 @@ func (s *ProjectionKeys) Resolve(ctx context.Context, peer value.KeyPeer, r valu
 		if e != nil || count != 1 {
 			return auth.ErrKeyDenied
 		}
-		out = value.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: a.Environment.Recovery.IssuerEpoch, Revision: uint64(binding.Batch.Generation), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: identity.Earlier(binding.Until, peer.NotAfter)}
+		out = value.KeyOperationPermit{AuthorityID: r.AuthorityID, RecoveryEpoch: a.Environment.Recovery.IssuerEpoch, Revision: uint64(binding.Batch.Generation), Certificate: peer.Certificate, RequestDigest: r.RequestDigest, ObservedAt: now.Time, ValidUntil: identity.Earlier(now.Time.Add(5*time.Second), identity.Earlier(binding.Until, peer.NotAfter))}
 		after, e := tx.CurrentTime(ctx)
 		if e != nil || !out.Valid(peer, r, after.Time) || !binding.Valid(q, after.Time) {
 			return auth.ErrKeyDenied

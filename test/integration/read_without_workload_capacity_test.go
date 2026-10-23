@@ -49,7 +49,9 @@ func (f *queryLedgerFixture) expireWorkloadObservation(t *testing.T) {
 	if _, err = tx.Exec(b.ctx, "SET LOCAL session_replication_role=replica"); err != nil {
 		t.Fatal(err)
 	}
-	tag, err := tx.Exec(b.ctx, `UPDATE context_storage_binding SET observed_at=clock_timestamp()-interval '1 hour',fresh_until=clock_timestamp()-interval '1 hour'+interval '30 seconds' WHERE root_id=$1 AND allocation_id=$2`, b.input.PermissionRootID, f.enrolled.AllocationID)
+	// One timestamp for both bounds: two clock_timestamp() calls differ and can
+	// exceed the table's exact 30-second CHECK (observed in a fixture run).
+	tag, err := tx.Exec(b.ctx, `UPDATE context_storage_binding SET observed_at=statement_timestamp()-interval '1 hour',fresh_until=statement_timestamp()-interval '1 hour'+interval '30 seconds' WHERE root_id=$1 AND allocation_id=$2`, b.input.PermissionRootID, f.enrolled.AllocationID)
 	if err != nil || tag.RowsAffected() != 1 {
 		t.Fatal("expire workload binding", err)
 	}

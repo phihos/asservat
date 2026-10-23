@@ -54,7 +54,11 @@ An approved projection operation may span the evidence-read request window
 the worker); its command lease, the batch and the projection authority still
 bound the worker's read. The worker reports per-read step buckets (`native
 read: unwrap-1 unwrap-2 unwrap-3 object-decrypt parse frames`, outcome) for
-installed timing.
+installed timing. Since the follow-up, a projection frame gate is bounded by
+its operation instead of each frame's five-second observation: every frame
+must pass its complete current check, the first failure closes the
+conversation, and the hub's projection request and native connections may
+last up to the window (30 s connection residency).
 
 ## Conversation outcomes and recovery
 

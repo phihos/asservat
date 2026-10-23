@@ -47,7 +47,7 @@ func (p ContextProjectionWorkerProof) Matches(q ContextQuery, w ContextQueryWork
 	return p.Binding.Matches(q, w) && p.Peer.Valid(now) && p.Peer.InstallationID == q.Plan.InstallationID && p.Peer.Role == "acquisition" &&
 		p.Peer.PeerID == p.Binding.PodUID && p.Peer.PeerID == w.PeerID && p.Peer.Certificate == w.Certificate && p.ProcessEpoch == w.ProcessEpoch &&
 		p.PublicKey != (artifact.Digest{}) && p.TokenDigest != (artifact.Digest{}) && p.Protection.Valid() &&
-		identity.Fresh(p.ObservedAt, p.ValidUntil, now, 5*time.Second) && !p.ValidUntil.After(p.Peer.NotAfter) &&
+		identity.Fresh(p.ObservedAt, p.ValidUntil, now, identity.EvidenceReadRequestWindow) && !p.ValidUntil.After(p.Peer.NotAfter) &&
 		!p.Peer.NotAfter.After(q.CredentialUntil) && !p.ValidUntil.After(q.WorkerUntil)
 }
 
@@ -88,7 +88,7 @@ type ContextProjectionKeyBinding struct {
 func (b ContextProjectionKeyBinding) Valid(q ContextQuery, now time.Time) bool {
 	return b.Purpose == ContextProjectionPurpose && b.ClaimID == b.Batch.ID && b.Batch.Current(q, b.Authority, now) &&
 		b.SourceVersion == q.Scope.Version && b.Scope.Valid() && b.Scope.Purpose == "artifact" && b.Scope.InstallationID == q.Plan.InstallationID &&
-		b.Worker.Matches(q, b.Batch.Worker, now) && identity.Fresh(b.CreatedAt, b.Until, now, 5*time.Second) &&
+		b.Worker.Matches(q, b.Batch.Worker, now) && identity.Fresh(b.CreatedAt, b.Until, now, identity.EvidenceReadRequestWindow) &&
 		!b.CreatedAt.Before(b.Batch.StartedAt) && !b.Until.After(b.Batch.Until) && !b.Until.After(b.Worker.ValidUntil) &&
 		!b.Until.After(b.Authority.ValidUntil) && !b.Until.After(q.ProviderUntil)
 }

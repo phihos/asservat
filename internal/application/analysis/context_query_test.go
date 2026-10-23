@@ -812,3 +812,42 @@ func TestQuerySQLFenceRefusesNextFrameWithinOneRequest(t *testing.T) {
 		t.Fatal("revocation not enforced at the next frame", f.frameChecks, f.authorityReads)
 	}
 }
+
+// Installed native78-80: an approved read needs more than five seconds between
+// its authority check and the worker's result. Within the evidence-read window
+// a read taking twelve seconds succeeds on the one request authority.
+func TestQueryTwelveSecondReadWithinOneEvidenceRequest(t *testing.T) {
+	f := newProjectionFixture(t)
+	f.p.Profile.Lifetime = value.ContextMaxQueryTime // the installed profile
+	d, _ := f.begin(t)
+	if err := d.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	start := f.now
+	window := start.Add(identity.EvidenceReadRequestWindow)
+	f.i.ValidUntil, f.a.ValidUntil, f.workerUntil = window, window, window
+	f.a.Environment.ValidUntil, f.a.Environment.Recovery.FreshUntil, f.a.Environment.Processing.ValidUntil = window, window, window
+	f.a.Retention.ValidUntil = window
+	if !f.a.Valid(start) {
+		t.Fatal("evidence-read authority interval rejected")
+	}
+	f.authorityReads, f.frames = 0, 8
+	f.frameHook = func(n int) {
+		if n == 1 {
+			f.now = start.Add(12 * time.Second) // key unwraps and object read
+		}
+	}
+	i := f.invocation("get_query_result")
+	i.call.Until = window
+	out, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID)
+	if err != nil {
+		var s interface{ FixedStep() string }
+		_ = errors.As(err, &s)
+		t.Fatal("twelve-second read refused:", s.FixedStep())
+	}
+	i.outcome = out
+	if f.frameChecks != 8 || f.authorityReads != 1 || out.CheckDisclosure(context.Background()) != nil {
+		t.Fatal("read did not complete on one current authority", f.frameChecks, f.authorityReads)
+	}
+	_ = out.Close(context.Background())
+}

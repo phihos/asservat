@@ -175,7 +175,16 @@ type AcquisitionPeerProof struct {
 }
 
 func (p AcquisitionPeerProof) Valid(now time.Time) bool {
-	return p.Binding.Valid() && p.Peer.Valid(now) && p.Peer.Role == "acquisition" && p.Peer.InstallationID == p.Binding.InstallationID && p.Peer.PeerID == p.Binding.PodUID && p.TokenDigest != (artifact.Digest{}) && identity.Fresh(p.ObservedAt, p.FreshUntil, now, 5*time.Second) && !p.FreshUntil.After(p.Peer.NotAfter)
+	return p.Binding.Valid() && p.Peer.Valid(now) && p.Peer.Role == "acquisition" && p.Peer.InstallationID == p.Binding.InstallationID && p.Peer.PeerID == p.Binding.PodUID && p.TokenDigest != (artifact.Digest{}) && identity.Fresh(p.ObservedAt, p.FreshUntil, now, p.window()) && !p.FreshUntil.After(p.Peer.NotAfter)
+}
+
+// A projection worker's Pod proof may stay current for the evidence-read
+// window; it still ends at the peer certificate and the worker's RunUntil.
+func (p AcquisitionPeerProof) window() time.Duration {
+	if p.Binding.Parent.Purpose == AcquisitionProjection {
+		return identity.EvidenceReadRequestWindow
+	}
+	return 5 * time.Second
 }
 
 type AcquisitionWorkerTermination struct {
