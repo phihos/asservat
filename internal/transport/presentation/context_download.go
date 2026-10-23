@@ -125,9 +125,12 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 		return s.cancel(ctx, current, call, input)
 	}
 	initial, err := current.ResolveIdentity(ctx)
-	if err != nil || ctx.Err() != nil || !initial.Valid(s.config.Now()) || !slices.Contains(initial.Scopes, "evidence:read") || !slices.Contains(initial.Scopes, "evidence:download") {
+	if err != nil || ctx.Err() != nil || !initial.Valid(s.config.Now()) {
 		return OperationReply{}, identity.ErrDenied
 	}
+	// A valid session without download scope gets the ordinary audited denial
+	// reply, not a transport failure (an approved-inspection-only login).
+	scoped := slices.Contains(initial.Scopes, "evidence:read") && slices.Contains(initial.Scopes, "evidence:download")
 	if !authorization.UUID(call.requestID) {
 		return OperationReply{}, artifact.ErrDownloadUnavailable
 	}
@@ -136,7 +139,9 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 	defer cancel()
 	var view evidence.ContextDownloadView
 	prepare := name == "prepare_artifact_download"
-	if prepare {
+	if !scoped {
+		err = identity.ErrDenied
+	} else if prepare {
 		view, err = s.downloads.PrepareContextDownload(ctx, current, input.ArtifactID, input.Key)
 	} else {
 		view, err = s.downloads.GetContextDownload(ctx, current, input.DownloadID)
