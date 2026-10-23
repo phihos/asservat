@@ -57,35 +57,36 @@ BEGIN
  IF TG_OP='DELETE' THEN RAISE EXCEPTION 'query child history remains charged' USING ERRCODE='23514'; END IF;
  SELECT * INTO STRICT q FROM public.context_query WHERE id=NEW.query_id FOR UPDATE;
  n:=clock_timestamp();
- IF TG_TABLE_NAME='context_query_batch' AND TG_OP='UPDATE' AND
-  ROW(NEW.native_operation,NEW.native_authority,NEW.native_closed) IS DISTINCT FROM ROW(OLD.native_operation,OLD.native_authority,OLD.native_closed) THEN
-  IF (to_jsonb(NEW)-ARRAY['native_operation','native_authority','native_closed']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['native_operation','native_authority','native_closed']) OR
-   OLD.closed OR OLD.native_closed OR q.active_batch IS DISTINCT FROM NEW.id OR NEW.claim_id IS DISTINCT FROM NEW.id OR
-   n>=(NEW.batch->>'Until')::timestamptz OR n>=q.deadline OR
-   NOT public.context_query_intent_current(q.root_id,NEW.operation_id,q.actor,q.issuer_epoch,NEW.batch->'Request'->'Call') THEN
-   RAISE EXCEPTION 'query native operation unavailable' USING ERRCODE='23514';
-  END IF;
-  IF OLD.native_operation IS NULL THEN
-   IF NEW.native_closed OR NOT public.context_query_complete_object(NEW.native_operation,ARRAY['Path','Processing','Reference','Kind','HubPodUID','HubProcessEpoch','WorkerPodUID','WorkerPublicKey','SourceVersion','ParentID','Generation','StartedAt','Until']) OR
-    NEW.native_operation->>'Kind' IS DISTINCT FROM 'read-approved-context' OR
-    NEW.native_operation->'Reference'->>'QueryID' IS DISTINCT FROM q.id::text OR
-    COALESCE(NEW.native_operation->'Reference'->>'SessionID','')<>'' OR
-    NEW.native_operation->'Reference'->>'WorkerID' IS DISTINCT FROM q.worker_id::text OR
-    NEW.native_operation->'Reference'->>'OperationID' IS DISTINCT FROM NEW.id::text OR
-    (NEW.native_operation->'Reference'->>'Fence')::bigint IS DISTINCT FROM NEW.generation OR
-    NEW.native_operation->>'ParentID' IS DISTINCT FROM NEW.id::text OR
-    (NEW.native_operation->>'Generation')::smallint IS DISTINCT FROM NEW.generation OR
-    (NEW.native_operation->>'StartedAt')::timestamptz>n OR
-    n>=(NEW.native_operation->>'Until')::timestamptz OR
-    (NEW.native_operation->>'Until')::timestamptz>(NEW.batch->>'Until')::timestamptz OR
-    NEW.native_authority->'Scope' IS DISTINCT FROM q.query->'Scope' THEN
-    RAISE EXCEPTION 'query native identity mismatch' USING ERRCODE='23514';
+ IF TG_TABLE_NAME='context_query_batch' AND TG_OP='UPDATE' THEN
+  IF ROW(NEW.native_operation,NEW.native_authority,NEW.native_closed) IS DISTINCT FROM ROW(OLD.native_operation,OLD.native_authority,OLD.native_closed) THEN
+   IF (to_jsonb(NEW)-ARRAY['native_operation','native_authority','native_closed']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['native_operation','native_authority','native_closed']) OR
+    OLD.closed OR OLD.native_closed OR q.active_batch IS DISTINCT FROM NEW.id OR NEW.claim_id IS DISTINCT FROM NEW.id OR
+    n>=(NEW.batch->>'Until')::timestamptz OR n>=q.deadline OR
+    NOT public.context_query_intent_current(q.root_id,NEW.operation_id,q.actor,q.issuer_epoch,NEW.batch->'Request'->'Call') THEN
+    RAISE EXCEPTION 'query native operation unavailable' USING ERRCODE='23514';
    END IF;
-  ELSIF NOT NEW.native_closed OR NEW.native_operation IS DISTINCT FROM OLD.native_operation OR NEW.native_authority IS DISTINCT FROM OLD.native_authority THEN
-   RAISE EXCEPTION 'query native identity immutable' USING ERRCODE='23514';
+   IF OLD.native_operation IS NULL THEN
+    IF NEW.native_closed OR NOT public.context_query_complete_object(NEW.native_operation,ARRAY['Path','Processing','Reference','Kind','HubPodUID','HubProcessEpoch','WorkerPodUID','WorkerPublicKey','SourceVersion','ParentID','Generation','StartedAt','Until']) OR
+     NEW.native_operation->>'Kind' IS DISTINCT FROM 'read-approved-context' OR
+     NEW.native_operation->'Reference'->>'QueryID' IS DISTINCT FROM q.id::text OR
+     COALESCE(NEW.native_operation->'Reference'->>'SessionID','')<>'' OR
+     NEW.native_operation->'Reference'->>'WorkerID' IS DISTINCT FROM q.worker_id::text OR
+     NEW.native_operation->'Reference'->>'OperationID' IS DISTINCT FROM NEW.id::text OR
+     (NEW.native_operation->'Reference'->>'Fence')::bigint IS DISTINCT FROM NEW.generation OR
+     NEW.native_operation->>'ParentID' IS DISTINCT FROM NEW.id::text OR
+     (NEW.native_operation->>'Generation')::smallint IS DISTINCT FROM NEW.generation OR
+     (NEW.native_operation->>'StartedAt')::timestamptz>n OR
+     n>=(NEW.native_operation->>'Until')::timestamptz OR
+     (NEW.native_operation->>'Until')::timestamptz>(NEW.batch->>'Until')::timestamptz OR
+     NEW.native_authority->'Scope' IS DISTINCT FROM q.query->'Scope' THEN
+     RAISE EXCEPTION 'query native identity mismatch' USING ERRCODE='23514';
+    END IF;
+   ELSIF NOT NEW.native_closed OR NEW.native_operation IS DISTINCT FROM OLD.native_operation OR NEW.native_authority IS DISTINCT FROM OLD.native_authority THEN
+    RAISE EXCEPTION 'query native identity immutable' USING ERRCODE='23514';
+   END IF;
+   UPDATE public.context_query SET controls=controls+1 WHERE id=q.id;
+   RETURN NEW;
   END IF;
-  UPDATE public.context_query SET controls=controls+1 WHERE id=q.id;
-  RETURN NEW;
  END IF;
  IF TG_TABLE_NAME='context_query_call' THEN
   IF TG_OP<>'INSERT' OR n>=q.deadline OR NOT public.context_query_complete_object(NEW.request,ARRAY['Call','OwnerID','HubProcessEpoch']) OR NOT public.context_query_intent_current(q.root_id,NEW.operation_id,q.actor,q.issuer_epoch,NEW.request->'Call') OR NEW.request->'Call'->>'ID'<>NEW.operation_id::text OR NEW.request->'Call'->'Principal' IS DISTINCT FROM q.actor OR
