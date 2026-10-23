@@ -287,13 +287,16 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		format = "context-query-input/v1"
 	}
 	var normalized []byte
+	downloadScopeDenied := false
 	if rejection == 0 {
 		if len(name) > 128 || !utf8.ValidString(name) {
 			rejection = IngressInvalid
 		} else if normalized, err = s.normalize(name, raw); err != nil {
 			rejection = IngressInvalid
-		} else if !slices.Contains(initial.Scopes, "evidence:read") || (name == "prepare_artifact_download" || name == "get_artifact_download") && !slices.Contains(initial.Scopes, "evidence:download") {
+		} else if !slices.Contains(initial.Scopes, "evidence:read") {
 			rejection = IngressDenied
+		} else if (name == "prepare_artifact_download" || name == "get_artifact_download") && !slices.Contains(initial.Scopes, "evidence:download") {
+			rejection, downloadScopeDenied = IngressDenied, true
 		}
 	}
 	op := name
@@ -426,6 +429,14 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		clearReply()
 		bound := OperationReply{ValidUntil: identity.Earlier(until, final.ValidUntil)}
 		if errors.Is(callErr, identity.ErrDenied) {
+			// A missing download scope is an ordinary audited refusal for the
+			// client, not a service outage (native61/62).
+			if downloadScopeDenied {
+				if body, ok := s.deniedReply(name, requestID); ok {
+					bound.Body = body
+					return bound, nil
+				}
+			}
 			return bound, identity.ErrDenied
 		}
 		if errors.Is(callErr, contracts.ErrInvestigationWire) {
@@ -630,4 +641,14 @@ func (e *callStop) FixedStep() string {
 func stopped(step string, err error) error { return &callStop{step: step, err: err} }
 func stoppedAt(step string, cause, err error) error {
 	return &callStop{step: step, err: err, cause: cause}
+}
+
+// deniedReply is the tool's ordinary NotAvailable envelope for a scope
+// rejection; false when the tool's output contract cannot carry it.
+func (s *AuditedOperations) deniedReply(name, requestID string) ([]byte, bool) {
+	body, err := json.Marshal(OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: requestID, DataClass: "metadata", Status: "error", Warnings: []string{}, Provenance: []any{}, Data: OperationFailure{Code: "NotAvailable", Message: "This operation is not available with your current access.", Retryable: false}})
+	if err != nil || s.contracts.ValidateOutput(name, body) != nil {
+		return nil, false
+	}
+	return body, true
 }

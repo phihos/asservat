@@ -308,3 +308,14 @@ func TestContinuationAuditBindsExplicitActionWithoutChangingBusinessKey(t *testi
 		t.Fatal("continuation bypassed audited dispatch", err)
 	}
 }
+
+// native61/62: a read-only session asking for a download gets the audited
+// NotAvailable reply, not a transport failure; nothing is dispatched.
+func TestAuditedDownloadWithoutDownloadScopeIsADenialReply(t *testing.T) {
+	s, f, g := auditedFixture(t)
+	f.i.Scopes = []string{"evidence:read"}
+	reply, err := s.Call(context.Background(), f, "prepare_artifact_download", []byte(`{"artifact_id":"00000000-0000-4000-8000-000000000030","idempotency_key":"key"}`))
+	if err != nil || len(g.outcomes) != 1 || g.outcomes[0].Effect != "none" || !bytes.Contains(reply.Body, []byte(`"status":"error"`)) || s.contracts.ValidateOutput("prepare_artifact_download", reply.Body) != nil {
+		t.Fatalf("err=%v outcomes=%d body=%s", err, len(g.outcomes), reply.Body)
+	}
+}
