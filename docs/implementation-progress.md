@@ -1,5 +1,25 @@
 # Sustained implementation progress
 
+## One projection authority per request (2026-10-23)
+
+Installed native78 expired the approved projection read at
+`result/prepare/projection`; the run note attributed it to roughly eleven
+per-frame full authority checks. Code review of the native78 source
+(dee19307) shows the hub already constructs the complete projection authority
+once per public request (`projectionRequest.CheckCurrent`, since 50467c96) and
+downloads already reuse one observation per request (`workerCurrentCheck`).
+Per-frame hub work is SQL only: each native frame passes the operation gate
+(`Origins.Recheck`, an operation lease read) and, for directly connected
+workers, the worker admission gate (enrollment read plus the same lease read).
+Those fences stay. No runtime code changed; new unit tests
+`TestQueryOneAuthorityPerRequestAcrossPrepareAndFrames` and
+`TestQuerySQLFenceRefusesNextFrameWithinOneRequest` pin one reconstruction
+across preparation, eight frames and repeated disclosure checks, and immediate
+refusal on a SQL-level revocation. Reverting the cache makes them fail (23
+reconstructions per request). The remaining read cost (three key unwraps and
+duplicated per-frame lease reads on the two gates) is unmeasured; installed
+qualification has not rerun.
+
 ## Reads without workload capacity (2026-10-23)
 
 Maintainer decision (explicit): reading stored evidence (approved pod-status

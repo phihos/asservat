@@ -36,6 +36,11 @@ type projectionFixture struct {
 	routeHook, planHook, claimHook                                               func(context.Context)
 	workerUntil                                                                  time.Time
 	lastRead                                                                     *projectionReadFake
+	// frames simulates the hub's per-frame native gate: each frame consults the
+	// request owner and an independent SQL operation/row fence (frameErr).
+	frames, frameChecks int
+	frameErr            error
+	frameHook           func(int)
 }
 
 func (f *projectionFixture) next() string {
@@ -187,8 +192,20 @@ func (f *projectionFixture) ObserveProjectionWorker(_ context.Context, q value.C
 	}
 	return o, nil
 }
-func (f *projectionFixture) ReadProjection(_ context.Context, start value.ContextReadStart, _ ContextProjectionRequestOwner) (ContextProjectionRead, error) {
+func (f *projectionFixture) ReadProjection(ctx context.Context, start value.ContextReadStart, owner ContextProjectionRequestOwner) (ContextProjectionRead, error) {
 	f.reads++
+	for n := 0; n < f.frames; n++ {
+		if f.frameHook != nil {
+			f.frameHook(n)
+		}
+		if _, err := owner.CheckCurrent(ctx); err != nil {
+			return nil, err
+		}
+		if f.frameErr != nil {
+			return nil, f.frameErr
+		}
+		f.frameChecks++
+	}
 	f.lastRead = &projectionReadFake{batch: start.Batch, projection: displayProjection(), closeErr: f.closeErr}
 	return f.lastRead, f.errorAfterRead
 }
@@ -738,4 +755,60 @@ func TestQueryPendingReplySkipsPermitFence(t *testing.T) {
 		t.Fatal("pending reply ran the read permit", err)
 	}
 	_ = d.Close(context.Background())
+}
+
+// One public request reconstructs the complete projection authority once and
+// reuses it through prepare, every native frame and disclosure (relaxed
+// bounded cadence, AGENTS.md 2026-10-20). Row-level SQL fences still refuse
+// the very next frame or disclosure without another reconstruction.
+func TestQueryOneAuthorityPerRequestAcrossPrepareAndFrames(t *testing.T) {
+	f := newProjectionFixture(t)
+	d, _ := f.begin(t)
+	if err := d.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.authorityReads, f.frames = 0, 8
+	i := f.invocation("get_query_result")
+	d2, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i.outcome = d2
+	for range 3 {
+		if err = d2.CheckDisclosure(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if f.authorityReads != 1 || f.frameChecks != 8 {
+		t.Fatal("request reconstructed authority more than once", f.authorityReads, f.frameChecks)
+	}
+	// A SQL-level revocation (permission stream suspended, batch row no longer
+	// current) is enforced immediately by the row fence, not by re-observation.
+	f.permitErr = value.ErrUnavailable
+	if d2.CheckDisclosure(context.Background()) == nil || f.authorityReads != 1 {
+		t.Fatal("SQL revocation did not refuse the retained request immediately", f.authorityReads)
+	}
+	f.permitErr = nil
+	_ = d2.Close(context.Background())
+}
+
+func TestQuerySQLFenceRefusesNextFrameWithinOneRequest(t *testing.T) {
+	f := newProjectionFixture(t)
+	d, _ := f.begin(t)
+	if err := d.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.authorityReads, f.frames = 0, 8
+	f.frameHook = func(n int) {
+		if n == 3 {
+			f.frameErr = value.ErrUnavailable // e.g. native operation/batch row revoked
+		}
+	}
+	i := f.invocation("get_query_result")
+	if out, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID); err == nil || out != nil {
+		t.Fatal("frame after SQL revocation was accepted")
+	}
+	if f.frameChecks != 3 || f.authorityReads != 1 {
+		t.Fatal("revocation not enforced at the next frame", f.frameChecks, f.authorityReads)
+	}
 }

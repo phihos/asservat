@@ -91,6 +91,16 @@ requires ordinary `ReadApproved`, complete denies, retained audience, retention,
 recovery and processing checks. Direct administration remains at its existing
 five-second policy interval.
 
+One public `get_file_excerpt`/`get_query_result` request constructs this
+complete projection authority once (`projectionRequest.CheckCurrent`) and
+reuses it for every later step of the same request: preparation, each native
+frame gate and disclosure checks. The retained value keeps its original
+`ValidUntil` and the request deadline and is never extended; the next request
+constructs a fresh one. Revocation inside a request is enforced by the
+per-step SQL fences (query/batch permits, native operation lease observation,
+worker enrollment) and the final identity check, not by repeated
+reconstruction (2026-10-23, maintainer-authorized relaxed cadence).
+
 ## Qualification
 
 The current shared implementation and adapted SQL fixture require their own
