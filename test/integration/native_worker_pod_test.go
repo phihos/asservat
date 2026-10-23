@@ -62,7 +62,7 @@ func (a *nativePodIdleAdmission) OpenNative(ctx context.Context, state *tls.Conn
 	if err != nil {
 		return fail()
 	}
-	idle := &evidence.NativeIdle{Worker: current, Proof: proof, ObservedAt: started, Until: identity.Earlier(started.Add(5*time.Second), identity.Earlier(current.FreshUntil, proof.FreshUntil))}
+	idle := &evidence.NativeIdle{Worker: current.Acquisition(), Proof: proof.Acquisition(), ObservedAt: started, Until: identity.Earlier(started.Add(5*time.Second), identity.Earlier(current.FreshUntil, proof.FreshUntil))}
 	if !idle.Valid(time.Now()) || ctx.Err() != nil {
 		return fail()
 	}

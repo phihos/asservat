@@ -48,11 +48,16 @@ func WorkerCertificateEpoch(w DownloadWorker, now time.Time) (int, time.Time, er
 // A certificate and this value never replace current SQL/token authorization.
 type WorkerCredentialTarget struct {
 	InstallationID, SessionID, WorkerID, PodUID string
+	QueryID                                     string `json:",omitempty"`
 	CreatedAt, RunUntil                         time.Time
 }
 
 func (t WorkerCredentialTarget) Valid() bool {
-	return UUID(t.InstallationID) && UUID(t.SessionID) && UUID(t.WorkerID) && UUID(t.PodUID) && !t.CreatedAt.IsZero() && t.RunUntil.Sub(t.CreatedAt) >= time.Second && t.RunUntil.Sub(t.CreatedAt) <= 8*time.Hour
+	return UUID(t.InstallationID) && t.Parent().Valid() && UUID(t.WorkerID) && UUID(t.PodUID) && !t.CreatedAt.IsZero() && t.RunUntil.Sub(t.CreatedAt) >= time.Second && t.RunUntil.Sub(t.CreatedAt) <= 8*time.Hour
+}
+
+func (t WorkerCredentialTarget) Parent() AcquisitionParent {
+	return AcquisitionParentFor(t.SessionID, t.QueryID)
 }
 
 func (t WorkerCredentialTarget) CertificateEpoch(now time.Time) (int, time.Time, error) {
@@ -102,18 +107,7 @@ type WorkerCertificate struct {
 // Matches checks bounded consistency only. X.509 trust, CSR key and proof of
 // possession must be checked independently by the configured issuer/verifier.
 func (a WorkerCertificateAttempt) Matches(c WorkerCertificate) bool {
-	b := a.Enrollment.Worker.Binding
-	if !a.Valid(a.CheckedAt) || !c.Peer.Valid(a.CheckedAt) || c.Peer.Role != "acquisition" || c.Peer.InstallationID != b.InstallationID || c.Peer.PeerID != b.PodUID || !c.Peer.NotAfter.Equal(a.CertificateNotAfter) || c.Peer.NotBefore.Before(a.CheckedAt.Add(-time.Minute)) || len(c.DER) < 1 || len(c.DER) > 16<<10 || len(c.ChainDER) > 3 {
-		return false
-	}
-	size := len(c.DER)
-	for _, der := range c.ChainDER {
-		if len(der) < 1 || len(der) > 16<<10 {
-			return false
-		}
-		size += len(der)
-	}
-	return size <= 32<<10
+	return a.Valid(a.CheckedAt) && a.Acquisition().Matches(c)
 }
 
 type WorkerCertificateProgress struct {

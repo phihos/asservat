@@ -26,7 +26,7 @@ func routerFixture(t *testing.T) (evidence.NativeOrigin, contracts.NativeHello, 
 	o.Path.StoreID = source.Expectation.Registration.StoreID
 	peer := value.KeyPeer{InstallationID: nativeID, PeerID: nativeID, Role: "acquisition", Certificate: artifact.Digest{3}, NotBefore: n.Add(-time.Minute), NotAfter: n.Add(time.Minute)}
 	binding := value.KeyWorkerBinding{InstallationID: nativeID, DownloadID: nativeID, ClusterID: nativeID, Namespace: "private-workers", NamespaceUID: nativeID, ServiceAccount: "acquisition", ServiceAccountUID: nativeID, Job: "download", JobUID: nativeID, Pod: "download-pod", PodUID: nativeID, JobSpec: artifact.Digest{1}, PodSpec: artifact.Digest{2}}
-	origin := evidence.NativeOrigin{Lease: value.NativeLease{Operation: o, Certificate: peer.Certificate, Sequence: 1, ObservedAt: n, Until: o.Until}, Proof: value.KeyWorkerProof{Binding: binding, Peer: peer, TokenDigest: artifact.Digest{4}, ObservedAt: n, FreshUntil: o.Until}}
+	origin := evidence.NativeOrigin{Lease: value.NativeLease{Operation: o, Certificate: peer.Certificate, Sequence: 1, ObservedAt: n, Until: o.Until}, Proof: (value.KeyWorkerProof{Binding: binding, Peer: peer, TokenDigest: artifact.Digest{4}, ObservedAt: n, FreshUntil: o.Until}).Acquisition()}
 	h := workerHello()
 	h.Reference.OperationID = nativeID
 	h.Reference.Fence = 1

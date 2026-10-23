@@ -19,58 +19,45 @@ import (
 )
 
 type WorkerEnrollments struct {
-	workers *DownloadWorkers
-	newID   func() string
+	identity *admittedWorkerIdentity
+	newID    func() string
 }
 
 var _ evidence.WorkerEnrollmentLedger = (*WorkerEnrollments)(nil)
 var _ evidence.WorkerCertificateActivator = (*WorkerEnrollments)(nil)
 var _ auditapp.WorkerEnrollmentAcknowledgements = (*WorkerEnrollments)(nil)
 
-func NewWorkerEnrollments(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, g DownloadTransactionGuards, newID func() string) (*WorkerEnrollments, error) {
+func NewWorkerEnrollments(ctx context.Context, pool *pgxpool.Pool, root string, p value.DownloadWorkerProfile, newID func() string) (*WorkerEnrollments, error) {
 	if newID == nil {
 		return nil, artifact.ErrInvalid
 	}
-	w, e := NewDownloadWorkers(ctx, pool, root, p, g)
+	w, e := newAdmittedWorkerIdentity(ctx, pool, root, p)
 	if e != nil {
 		return nil, e
 	}
 	return &WorkerEnrollments{w, newID}, nil
 }
-func (s *WorkerEnrollments) withProof(ctx context.Context, p value.WorkerEnrollmentProof, a artifact.DownloadAuthority, f func(context.Context, *custodydb.Queries, time.Time) error) error {
-	if s == nil || ctx == nil || !p.Valid(p.ObservedAt) || p.Worker.Intent.Profile != s.workers.profile || p.Worker.Intent.Authority.Scope != a.Scope {
+func (s *WorkerEnrollments) withProof(ctx context.Context, p value.WorkerEnrollmentProof, f func(context.Context, *custodydb.Queries, admittedWorkerCheck, time.Time) error) error {
+	if s == nil || ctx == nil || !p.Valid(p.ObservedAt) || p.Worker.Intent.Profile != s.identity.profile {
 		return artifact.ErrInvalid
 	}
 	ctx, end := context.WithDeadline(ctx, p.FreshUntil)
 	defer end()
-	return s.workers.withSession(ctx, p.Worker.Intent.SessionID, a, func(q *custodydb.Queries, _ artifact.DownloadSession, _ time.Time) error {
-		row, e := q.LockDownloadWorker(ctx, custodydb.LockDownloadWorkerParams{ID: id(p.Worker.Intent.ID), RootID: id(s.workers.downloads.root)})
-		if e != nil {
-			return e
-		}
-		w, e := currentAuditedWorker(row)
-		if e != nil || w != p.Worker || row.TerminationJson != nil || row.RetiredProofJson != nil {
+	return s.identity.withCurrent(ctx, p.Worker.Intent.Acquisition().Parent, p.Worker.Intent.ID, func(ctx context.Context, q *custodydb.Queries, checked admittedWorkerCheck, now time.Time) error {
+		if checked.download != p.Worker || !p.Valid(now) {
 			return artifact.ErrDownloadExpired
 		}
-		check := func() (time.Time, error) {
-			n, e := q.CurrentTime(ctx)
-			if e != nil {
-				return time.Time{}, e
-			}
-			if !p.Valid(n.Time) {
-				return n.Time, artifact.ErrDownloadExpired
-			}
-			return n.Time, nil
+		if err := f(ctx, q, checked, now); err != nil {
+			return err
 		}
-		now, e := check()
-		if e != nil {
-			return e
+		n, err := q.CurrentTime(ctx)
+		if err != nil {
+			return err
 		}
-		if e = f(ctx, q, now); e != nil {
-			return e
+		if ctx.Err() != nil || !p.Valid(n.Time) {
+			return artifact.ErrDownloadExpired
 		}
-		_, e = check()
-		return e
+		return nil
 	})
 }
 func decodeWorkerEnrollment(r custodydb.DownloadWorkerEnrollment, w value.DownloadWorker) (value.WorkerEnrollment, error) {
@@ -90,11 +77,11 @@ func enrollmentReceipt(r custodydb.DownloadWorkerEnrollment, e value.WorkerEnrol
 	}
 	return receipt, true, nil
 }
-func (s *WorkerEnrollments) ClaimWorkerEnrollment(ctx context.Context, p value.WorkerEnrollmentProof, a artifact.DownloadAuthority) (value.WorkerEnrollment, audit.Receipt, bool, error) {
+func (s *WorkerEnrollments) ClaimWorkerEnrollment(ctx context.Context, p value.WorkerEnrollmentProof) (value.WorkerEnrollment, audit.Receipt, bool, error) {
 	var out value.WorkerEnrollment
 	var receipt audit.Receipt
 	var ack bool
-	err := s.withProof(ctx, p, a, func(ctx context.Context, q *custodydb.Queries, now time.Time) error {
+	err := s.withProof(ctx, p, func(ctx context.Context, q *custodydb.Queries, checked admittedWorkerCheck, now time.Time) error {
 		r, e := q.ReadWorkerEnrollment(ctx, id(p.Worker.Intent.ID))
 		if errors.Is(e, pgx.ErrNoRows) {
 			out = value.WorkerEnrollment{Worker: p.Worker, PublicKeyDigest: p.PublicKeyDigest, ClaimedAt: now.UTC()}
@@ -136,9 +123,9 @@ func decodeWorkerCertificate(r custodydb.DownloadWorkerCertificate, a value.Work
 	}
 	return c, nil
 }
-func (s *WorkerEnrollments) PrepareWorkerCertificate(ctx context.Context, p value.WorkerEnrollmentProof, authority artifact.DownloadAuthority) (value.WorkerCertificateProgress, error) {
+func (s *WorkerEnrollments) PrepareWorkerCertificate(ctx context.Context, p value.WorkerEnrollmentProof) (value.WorkerCertificateProgress, error) {
 	var out value.WorkerCertificateProgress
-	err := s.withProof(ctx, p, authority, func(ctx context.Context, q *custodydb.Queries, now time.Time) error {
+	err := s.withProof(ctx, p, func(ctx context.Context, q *custodydb.Queries, checked admittedWorkerCheck, now time.Time) error {
 		out = value.WorkerCertificateProgress{}
 		r, e := q.ReadWorkerEnrollment(ctx, id(p.Worker.Intent.ID))
 		if e != nil {
@@ -169,7 +156,7 @@ func (s *WorkerEnrollments) PrepareWorkerCertificate(ctx context.Context, p valu
 			if e != nil {
 				return e
 			}
-			if a.Enrollment != enrollment || a.RecoveryEpoch != authority.Environment.RecoveryEpoch || a.EnrollmentAudit != receipt.SHA256 {
+			if a.Enrollment != enrollment || a.RecoveryEpoch != checked.recoveryEpoch || a.EnrollmentAudit != receipt.SHA256 {
 				return artifact.ErrIntegrity
 			}
 			out.Attempt = a
@@ -188,8 +175,8 @@ func (s *WorkerEnrollments) PrepareWorkerCertificate(ctx context.Context, p valu
 				return artifact.ErrDownloadCapacity
 			}
 		}
-		end := identity.Earlier(p.FreshUntil, identity.Earlier(authority.ValidUntil, identity.Earlier(now.Add(5*time.Second), until)))
-		attempt := value.WorkerCertificateAttempt{ID: s.newID(), Epoch: epoch, Ordinal: len(rows) + 1, Enrollment: enrollment, Proof: p, RecoveryEpoch: authority.Environment.RecoveryEpoch, EnrollmentAudit: receipt.SHA256, CheckedAt: now.UTC(), SignBefore: end, CertificateNotAfter: until}
+		end := identity.Earlier(p.FreshUntil, identity.Earlier(checked.freshUntil, identity.Earlier(now.Add(5*time.Second), until)))
+		attempt := value.WorkerCertificateAttempt{ID: s.newID(), Epoch: epoch, Ordinal: len(rows) + 1, Enrollment: enrollment, Proof: p, RecoveryEpoch: checked.recoveryEpoch, EnrollmentAudit: receipt.SHA256, CheckedAt: now.UTC(), SignBefore: end, CertificateNotAfter: until}
 		if !attempt.Valid(now) {
 			return artifact.ErrDownloadExpired
 		}
@@ -215,15 +202,15 @@ func (s *WorkerEnrollments) PrepareWorkerCertificate(ctx context.Context, p valu
 	}
 	return out, nil
 }
-func (s *WorkerEnrollments) StoreWorkerCertificate(ctx context.Context, a value.WorkerCertificateAttempt, c value.WorkerCertificate, authority artifact.DownloadAuthority) error {
-	if !a.Matches(c) || artifact.Digest(sha256.Sum256(c.DER)) != c.Peer.Certificate || a.RecoveryEpoch != authority.Environment.RecoveryEpoch {
+func (s *WorkerEnrollments) StoreWorkerCertificate(ctx context.Context, a value.WorkerCertificateAttempt, c value.WorkerCertificate) error {
+	if !a.Matches(c) || artifact.Digest(sha256.Sum256(c.DER)) != c.Peer.Certificate || a.RecoveryEpoch != a.Enrollment.Worker.Intent.Authority.Environment.RecoveryEpoch {
 		return artifact.ErrInvalid
 	}
 	b, e := json.Marshal(c)
 	if e != nil || len(b) > 48<<10 {
 		return artifact.ErrInvalid
 	}
-	return s.withProof(ctx, a.Proof, authority, func(ctx context.Context, q *custodydb.Queries, now time.Time) error {
+	return s.withProof(ctx, a.Proof, func(ctx context.Context, q *custodydb.Queries, checked admittedWorkerCheck, now time.Time) error {
 		if !a.Valid(now) || !c.Peer.Valid(now) {
 			return artifact.ErrDownloadExpired
 		}
@@ -248,22 +235,22 @@ func (s *WorkerEnrollments) StoreWorkerCertificate(ctx context.Context, a value.
 		if n != 1 {
 			return artifact.ErrDownloadConflict
 		}
-		checked, e := q.CurrentTime(ctx)
+		final, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
 		}
-		if !a.Valid(checked.Time) || !c.Peer.Valid(checked.Time) {
+		if !a.Valid(final.Time) || !c.Peer.Valid(final.Time) {
 			return artifact.ErrDownloadExpired
 		}
 		return nil
 	})
 }
-func (s *WorkerEnrollments) ActivateWorkerCertificate(ctx context.Context, p value.WorkerEnrollmentProof, a value.WorkerCertificateAttempt, authority artifact.DownloadAuthority) (value.WorkerCertificate, error) {
+func (s *WorkerEnrollments) ActivateWorkerCertificate(ctx context.Context, p value.WorkerEnrollmentProof, a value.WorkerCertificateAttempt) (value.WorkerCertificate, error) {
 	var out value.WorkerCertificate
-	if a.Enrollment.Worker != p.Worker || a.Enrollment.PublicKeyDigest != p.PublicKeyDigest || a.RecoveryEpoch != authority.Environment.RecoveryEpoch {
+	if a.Enrollment.Worker != p.Worker || a.Enrollment.PublicKeyDigest != p.PublicKeyDigest || a.RecoveryEpoch != p.Worker.Intent.Authority.Environment.RecoveryEpoch {
 		return out, artifact.ErrInvalid
 	}
-	err := s.withProof(ctx, p, authority, func(ctx context.Context, q *custodydb.Queries, now time.Time) error {
+	err := s.withProof(ctx, p, func(ctx context.Context, q *custodydb.Queries, checked admittedWorkerCheck, now time.Time) error {
 		enrollment, e := currentAuditedWorkerEnrollment(ctx, q, p.Worker)
 		if e != nil || enrollment != a.Enrollment {
 			return artifact.ErrDownloadUnavailable
@@ -295,11 +282,11 @@ func (s *WorkerEnrollments) ActivateWorkerCertificate(ctx context.Context, p val
 		if n != 1 {
 			return artifact.ErrDownloadConflict
 		}
-		checked, e := q.CurrentTime(ctx)
+		final, e := q.CurrentTime(ctx)
 		if e != nil {
 			return e
 		}
-		if !out.Peer.Valid(checked.Time) {
+		if !out.Peer.Valid(final.Time) {
 			return artifact.ErrDownloadExpired
 		}
 		return nil
@@ -313,13 +300,13 @@ func (s *WorkerEnrollments) ActivateWorkerCertificate(ctx context.Context, p val
 // Historical audit acknowledgement never refreshes profile/identity or turns a
 // signed certificate into an active registration. All writers lock the worker.
 func (s *WorkerEnrollments) auditTransaction(ctx context.Context, w value.DownloadWorker, f func(context.Context, *custodydb.Queries) error) error {
-	if s == nil || ctx == nil || !w.Valid() || w.Intent.Profile != s.workers.profile {
+	if s == nil || ctx == nil || !w.Valid() || w.Intent.Profile != s.identity.profile {
 		return artifact.ErrInvalid
 	}
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
-	return s.workers.downloads.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		row, e := q.LockDownloadWorker(ctx, custodydb.LockDownloadWorkerParams{ID: id(w.Intent.ID), RootID: id(s.workers.downloads.root)})
+	return s.identity.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		row, e := q.LockDownloadWorker(ctx, custodydb.LockDownloadWorkerParams{ID: id(w.Intent.ID), RootID: id(s.identity.root)})
 		if e != nil {
 			return e
 		}

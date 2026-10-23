@@ -11,96 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const acceptContextQueryCapacity = `-- name: AcceptContextQueryCapacity :one
-SELECT accept_context_query_capacity($1::uuid,$2::jsonb,$3::jsonb,$4::jsonb)::jsonb
-`
-
-type AcceptContextQueryCapacityParams struct {
-	RootID      pgtype.UUID
-	Proposal    []byte
-	Observation []byte
-	Claim       []byte
-}
-
-func (q *Queries) AcceptContextQueryCapacity(ctx context.Context, arg AcceptContextQueryCapacityParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, acceptContextQueryCapacity,
-		arg.RootID,
-		arg.Proposal,
-		arg.Observation,
-		arg.Claim,
-	)
-	var column_1 []byte
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const allocateContextQueryCapacity = `-- name: AllocateContextQueryCapacity :one
-SELECT allocate_context_query_capacity($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::uuid)::uuid
-`
-
-type AllocateContextQueryCapacityParams struct {
-	RootID       pgtype.UUID
-	AcceptanceID pgtype.UUID
-	ClusterID    pgtype.UUID
-	NamespaceUid string
-	WorkloadUid  string
-	NewID        pgtype.UUID
-}
-
-func (q *Queries) AllocateContextQueryCapacity(ctx context.Context, arg AllocateContextQueryCapacityParams) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, allocateContextQueryCapacity,
-		arg.RootID,
-		arg.AcceptanceID,
-		arg.ClusterID,
-		arg.NamespaceUid,
-		arg.WorkloadUid,
-		arg.NewID,
-	)
-	var column_1 pgtype.UUID
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const beginContextQueryCapacityObservation = `-- name: BeginContextQueryCapacityObservation :one
-SELECT begin_context_query_capacity_observation($1::uuid,$2::jsonb,$3::jsonb,$4::uuid,$5::bigint)::jsonb
-`
-
-type BeginContextQueryCapacityObservationParams struct {
-	RootID      pgtype.UUID
-	Proposal    []byte
-	Observation []byte
-	ClaimID     pgtype.UUID
-	PriorCount  int64
-}
-
-func (q *Queries) BeginContextQueryCapacityObservation(ctx context.Context, arg BeginContextQueryCapacityObservationParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, beginContextQueryCapacityObservation,
-		arg.RootID,
-		arg.Proposal,
-		arg.Observation,
-		arg.ClaimID,
-		arg.PriorCount,
-	)
-	var column_1 []byte
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const completeContextQueryCapacityObservation = `-- name: CompleteContextQueryCapacityObservation :exec
-SELECT complete_context_query_capacity_observation($1::uuid,$2::jsonb,$3::timestamptz)
-`
-
-type CompleteContextQueryCapacityObservationParams struct {
-	RootID  pgtype.UUID
-	Claim   []byte
-	UntilAt pgtype.Timestamptz
-}
-
-func (q *Queries) CompleteContextQueryCapacityObservation(ctx context.Context, arg CompleteContextQueryCapacityObservationParams) error {
-	_, err := q.db.Exec(ctx, completeContextQueryCapacityObservation, arg.RootID, arg.Claim, arg.UntilAt)
-	return err
-}
-
 const contextQueryCapacityAllocationCurrent = `-- name: ContextQueryCapacityAllocationCurrent :one
 SELECT context_query_capacity_allocation_current($1::uuid,$2::uuid)::boolean
 `
@@ -115,6 +25,52 @@ func (q *Queries) ContextQueryCapacityAllocationCurrent(ctx context.Context, arg
 	var column_1 bool
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const contextQuerySharedProfileCurrent = `-- name: ContextQuerySharedProfileCurrent :one
+SELECT context_query_shared_profile_current($1::uuid,$2::jsonb)::boolean
+`
+
+type ContextQuerySharedProfileCurrentParams struct {
+	RootID  pgtype.UUID
+	Profile []byte
+}
+
+func (q *Queries) ContextQuerySharedProfileCurrent(ctx context.Context, arg ContextQuerySharedProfileCurrentParams) (bool, error) {
+	row := q.db.QueryRow(ctx, contextQuerySharedProfileCurrent, arg.RootID, arg.Profile)
+	var column_1 bool
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
+const ensureSharedContextQueryAllocation = `-- name: EnsureSharedContextQueryAllocation :exec
+SELECT ensure_shared_context_query_allocation($1::uuid,$2::uuid,$3::text,$4::text)
+`
+
+type EnsureSharedContextQueryAllocationParams struct {
+	RootID       pgtype.UUID
+	ClusterID    pgtype.UUID
+	NamespaceUid string
+	WorkloadUid  string
+}
+
+func (q *Queries) EnsureSharedContextQueryAllocation(ctx context.Context, arg EnsureSharedContextQueryAllocationParams) error {
+	_, err := q.db.Exec(ctx, ensureSharedContextQueryAllocation,
+		arg.RootID,
+		arg.ClusterID,
+		arg.NamespaceUid,
+		arg.WorkloadUid,
+	)
+	return err
+}
+
+const ensureSharedContextQueryCapacity = `-- name: EnsureSharedContextQueryCapacity :exec
+SELECT ensure_shared_context_query_capacity($1::uuid)
+`
+
+func (q *Queries) EnsureSharedContextQueryCapacity(ctx context.Context, rootID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, ensureSharedContextQueryCapacity, rootID)
+	return err
 }
 
 const lockContextQueryCapacity = `-- name: LockContextQueryCapacity :one
@@ -133,63 +89,33 @@ func (q *Queries) LockContextQueryCapacity(ctx context.Context, arg LockContextQ
 	return column_1, err
 }
 
-const readContextQueryCapacityPlan = `-- name: ReadContextQueryCapacityPlan :one
-SELECT read_context_query_capacity_plan($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::jsonb,$7::bytea,$8::uuid)::jsonb
+const readSharedContextQueryPlan = `-- name: ReadSharedContextQueryPlan :one
+SELECT read_shared_context_query_plan($1::uuid,$2::uuid,$3::text,$4::text,$5::jsonb,$6::bytea,$7::uuid,$8::jsonb)::jsonb
 `
 
-type ReadContextQueryCapacityPlanParams struct {
+type ReadSharedContextQueryPlanParams struct {
 	RootID          pgtype.UUID
-	AcceptanceID    pgtype.UUID
 	ClusterID       pgtype.UUID
 	NamespaceUid    string
 	WorkloadUid     string
 	Actor           []byte
 	PrincipalKey    []byte
 	ProposedAccount pgtype.UUID
+	Path            []byte
 }
 
-func (q *Queries) ReadContextQueryCapacityPlan(ctx context.Context, arg ReadContextQueryCapacityPlanParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, readContextQueryCapacityPlan,
+func (q *Queries) ReadSharedContextQueryPlan(ctx context.Context, arg ReadSharedContextQueryPlanParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, readSharedContextQueryPlan,
 		arg.RootID,
-		arg.AcceptanceID,
 		arg.ClusterID,
 		arg.NamespaceUid,
 		arg.WorkloadUid,
 		arg.Actor,
 		arg.PrincipalKey,
 		arg.ProposedAccount,
+		arg.Path,
 	)
 	var column_1 []byte
 	err := row.Scan(&column_1)
 	return column_1, err
-}
-
-const readContextQueryCapacitySource = `-- name: ReadContextQueryCapacitySource :one
-SELECT read_context_query_capacity_source($1::uuid,$2::jsonb)::jsonb
-`
-
-type ReadContextQueryCapacitySourceParams struct {
-	RootID   pgtype.UUID
-	Recovery []byte
-}
-
-func (q *Queries) ReadContextQueryCapacitySource(ctx context.Context, arg ReadContextQueryCapacitySourceParams) ([]byte, error) {
-	row := q.db.QueryRow(ctx, readContextQueryCapacitySource, arg.RootID, arg.Recovery)
-	var column_1 []byte
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
-const suspendContextQueryCapacity = `-- name: SuspendContextQueryCapacity :exec
-SELECT suspend_context_query_capacity($1::uuid,$2::timestamptz)
-`
-
-type SuspendContextQueryCapacityParams struct {
-	RootID   pgtype.UUID
-	Observed pgtype.Timestamptz
-}
-
-func (q *Queries) SuspendContextQueryCapacity(ctx context.Context, arg SuspendContextQueryCapacityParams) error {
-	_, err := q.db.Exec(ctx, suspendContextQueryCapacity, arg.RootID, arg.Observed)
-	return err
 }

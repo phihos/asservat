@@ -200,7 +200,7 @@ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExcha
 	if e != nil {
 		t.Fatal(e)
 	}
-	enrollment, _, _, e := f.enrollment.ledger.ClaimWorkerEnrollment(ctx, proof, f.authority())
+	enrollment, _, _, e := f.enrollment.ledger.ClaimWorkerEnrollment(ctx, proof)
 	if e != nil {
 		t.Fatal("exact original enrollment", e)
 	}

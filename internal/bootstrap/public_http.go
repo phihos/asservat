@@ -108,7 +108,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	*closers = append(*closers, func() { _ = refresh.Close() })
 
 	operations, err := NewPublicContextOperations(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
-		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native})
+		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection})
 	if err != nil {
 		return nil, &fixedStepError{"operations", mounts.ErrUnavailable}
 	}

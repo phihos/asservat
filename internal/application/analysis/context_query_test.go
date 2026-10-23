@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"testing"
 	"time"
 
@@ -30,6 +29,8 @@ type projectionFixture struct {
 	active                                                                       bool
 	queryFresh, batchFresh, claimFresh, ready                                    bool
 	queryErr, claimErr, closeErr, permitErr, errorAfterRead                      error
+	authorityReads                                                               int
+	authorityErr                                                                 error
 	authorityHook                                                                func()
 	observeHook                                                                  func()
 	routeHook, planHook, claimHook                                               func(context.Context)
@@ -107,13 +108,15 @@ func (f *projectionFixture) ResolveContextProjection(ctx context.Context, _ valu
 	return f.a.Scope.Candidate(), nil
 }
 func (f *projectionFixture) ResolveProjectionCurrent(context.Context, identities.CurrentIdentity, value.ContextProjectionCandidate) (value.ContextProjectionAuthority, error) {
-	return f.a, nil
+	f.authorityReads++
+	return f.a, f.authorityErr
 }
 func (f *projectionFixture) CheckProjectionCurrent(context.Context, identities.CurrentIdentity, value.ContextProjectionScope) (value.ContextProjectionAuthority, error) {
+	f.authorityReads++
 	if f.authorityHook != nil {
 		f.authorityHook()
 	}
-	return f.a, nil
+	return f.a, f.authorityErr
 }
 func (f *projectionFixture) ContextQueryPlan(ctx context.Context, _ value.ContextProjectionAuthority) (value.ContextQueryPlan, error) {
 	if f.planHook != nil {
@@ -140,6 +143,9 @@ func (f *projectionFixture) PermitQuery(context.Context, value.ContextQuery, val
 	return f.permitErr
 }
 func (f *projectionFixture) BeginReadBatch(_ context.Context, q value.ContextQuery, r value.ContextQueryRequest, w value.ContextQueryWorker, id string, a value.ContextProjectionAuthority) (ContextQueryBatchAdmission, error) {
+	if f.permitErr != nil {
+		return ContextQueryBatchAdmission{}, f.permitErr
+	}
 	if f.active || f.batches >= value.ContextMaxReadBatches {
 		return ContextQueryBatchAdmission{}, value.ErrUnavailable
 	}
@@ -454,29 +460,52 @@ func TestQueryPendingPollCannotDispatchAndRequiresOutcomeGuard(t *testing.T) {
 	_ = next.Close(context.Background())
 }
 
-func TestQueryFinalAuthorityAndOriginalRequestCancellation(t *testing.T) {
+func TestQueryRequestObservationAndCurrentSQLFence(t *testing.T) {
+	// ADR219 retains one exact observation inside this request. Changed external
+	// facts are evaluated by the next request; SQL effects still deny immediately.
 	for _, tc := range []struct {
 		name   string
 		mutate func(*projectionFixture)
 	}{
-		{"group-revocation", func(f *projectionFixture) { f.i.Groups = []string{"different"} }},
+		{"group-revocation", func(f *projectionFixture) { f.i.Groups = []string{"different"}; f.authorityErr = value.ErrUnavailable }},
 		{"source-replacement", func(f *projectionFixture) { f.a.Scope.Version[0]++ }},
 		{"retention-cutoff", func(f *projectionFixture) { f.a.AccessUntil = f.now }},
 		{"recovery-change", func(f *projectionFixture) { f.a.Environment.Recovery.Revision.Generation++ }},
 		{"path-change", func(f *projectionFixture) { f.a.Environment.Path.WorkerConfiguration.Generation++ }},
-		{"sql-fence", func(f *projectionFixture) { f.permitErr = value.ErrUnavailable }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newProjectionFixture(t)
 			d, i := f.begin(t)
 			i.outcome = d
-			tc.mutate(f)
-			if d.CheckDisclosure(context.Background()) == nil {
-				t.Fatal("final current fence bypassed")
+			original, err := d.owner.CheckCurrent(context.Background())
+			if err != nil {
+				t.Fatal(err)
 			}
-			_ = d.Close(context.Background())
+			tc.mutate(f)
+			retained, err := d.owner.CheckCurrent(context.Background())
+			if err != nil || retained != original || d.CheckDisclosure(context.Background()) != nil || f.authorityReads != 1 {
+				t.Fatal("request rebuilt or changed its original observation", err, f.authorityReads)
+			}
+			if err = d.Close(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			next := f.invocation("get_query_result")
+			if result, err := f.s.Results.GetQueryResult(context.Background(), f, next, f.q.ID); err == nil || result != nil || f.authorityReads != 2 {
+				t.Fatal("new poll reused prior request authority", err, f.authorityReads)
+			}
 		})
 	}
+	f := newProjectionFixture(t)
+	d, i := f.begin(t)
+	i.outcome = d
+	f.permitErr = value.ErrUnavailable
+	if d.CheckDisclosure(context.Background()) == nil {
+		t.Fatal("current SQL fence bypassed")
+	}
+	_ = d.Close(context.Background())
+}
+
+func TestQueryOriginalRequestCancellation(t *testing.T) {
 	f := newProjectionFixture(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	i := f.invocation("get_file_excerpt")
@@ -502,7 +531,7 @@ func TestQueryFinalAuthorityAndOriginalRequestCancellation(t *testing.T) {
 func TestQueryRechecksAfterBlockingObservation(t *testing.T) {
 	for _, mutate := range []func(*projectionFixture){
 		func(f *projectionFixture) { f.now = f.a.ValidUntil },
-		func(f *projectionFixture) { f.i.Scopes = slices.Delete(slices.Clone(f.i.Scopes), 0, 1) },
+		func(f *projectionFixture) { f.permitErr = value.ErrUnavailable },
 	} {
 		f := newProjectionFixture(t)
 		f.observeHook = func() { mutate(f) }
@@ -558,11 +587,24 @@ func TestQueryRetainsIdentitySnapshotAgainstPortSliceReuse(t *testing.T) {
 	f := newProjectionFixture(t)
 	f.observeHook = func() { f.i.Groups[0] = "changed-in-place" }
 	i := f.invocation("get_file_excerpt")
-	if _, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection); err == nil {
-		t.Fatal("mutable identity slice rewrote original observation")
+	d, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if f.batches+f.reads != 0 {
-		t.Fatal("read admitted after identity replacement")
+	if len(d.owner.initial.Groups) != 1 || d.owner.initial.Groups[0] != "team" || f.authorityReads != 1 {
+		t.Fatal("port slice rewrote the retained original identity")
+	}
+	if err = d.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	next := f.invocation("get_query_result")
+	d, err = f.s.Results.GetQueryResult(context.Background(), f, next, f.q.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close(context.Background())
+	if d.owner.initial.Groups[0] != "changed-in-place" || f.authorityReads != 2 {
+		t.Fatal("new request reused old identity instead of current observation")
 	}
 }
 
@@ -648,8 +690,11 @@ func TestQueryDeliveryTimingDoesNotRenewLatePollOrPreparedCutoff(t *testing.T) {
 	observed, deadline := d.ObservedAt(), d.QueryDeadline()
 	f.a.AccessUntil = f.now.Add(500 * time.Millisecond)
 	f.a.ValidUntil = f.a.AccessUntil
+	// A restrictive SQL retention change is current even though this request
+	// retains its original external observation.
+	f.permitErr = value.ErrExpired
 	if d.CheckDisclosure(context.Background()) == nil {
-		t.Fatal("prepared longer evidence cutoff survived shortening")
+		t.Fatal("current SQL retention fence did not stop prepared disclosure")
 	}
 	if !d.ObservedAt().Equal(observed) || !d.QueryDeadline().Equal(deadline) {
 		t.Fatal("audited prepared metadata mutated after observation")

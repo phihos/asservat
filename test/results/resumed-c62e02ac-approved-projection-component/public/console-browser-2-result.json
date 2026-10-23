@@ -1,0 +1,24 @@
+{
+  "command": [
+    "make",
+    "console-browser-check"
+  ],
+  "cwd": "/home/phil/Projekte/asservat-projection-c62e02ac",
+  "environment": {
+    "VITEST_MAX_WORKERS": "2",
+    "NODE_OPTIONS": "--max-old-space-size=2048",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOCACHE": "/home/phil/.cache/go-build"
+  },
+  "startedAt": "2026-10-23T00:29:30.507951+00:00",
+  "durationSeconds": 39.68865341297351,
+  "exitCode": 0,
+  "sourceCount": 2993,
+  "sourcesUnchanged": true,
+  "changedSources": [],
+  "log": "console-browser-2.log",
+  "qualification": "Console component checks only; no installed approved-native read qualification."
+}

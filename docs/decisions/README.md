@@ -3,7 +3,13 @@
 [ADR-222 — Consolidate SQL credentials within the hub process](222-hub-process-sql-credentials.md)
 uses exact grant unions for ordinary public duties and owner identity/routing,
 with separate pinned/nested readers and unchanged process/connection boundaries.
-Implementation is in progress; no qualification has run for this decision.
+Component checks and independent reviews pass; integrated real SQL and installed
+qualification remain pending.
+
+[ADR-221 — Enroll admitted worker identity independently](221-admitted-worker-identity-enrollment.md)
+removes the certificate-specific human-request registration and forwarding path.
+Current admitted parent, workload, signing and audit checks remain; certificates
+confer no evidence authority. Component checks pass; installed qualification is pending.
 
 [ADR-220 — Response-owned ordinary download permissions](220-response-owned-download-permissions.md)
 selects a fixed 30-second reconstruction cadence within one original response and
@@ -12,6 +18,11 @@ Identity, delivery/native bounds and current SQL permission/safety fences remain
 known changes may deny earlier. Component race checks and independent source
 review pass; real SQL suspension and installed streaming qualification remain
 pending.
+
+[ADR-219 — Share acquisition for approved pod-status reads](219-shared-approved-acquisition.md)
+reuses the isolated acquisition lifecycle with a closed download/query parent,
+independent approved-read authority and shared aggregate capacity. Component and
+console checks pass; integrated SQL and installed projection qualification remain pending.
 
 [ADR-218 — Consume download preflight observations at their phase](218-consumed-download-preflight.md)
 consumes readiness at its check and plan freshness through acknowledged session

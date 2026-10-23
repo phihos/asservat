@@ -1,0 +1,28 @@
+{
+  "passed": true,
+  "checks": [
+    "unavailable session stays hidden; local sign-in; 320px reflow",
+    "real cookie, CSRF and POST-refresh transport; no duplicate pageshow refresh or web storage",
+    "actual session handler rejects wrong-origin logout",
+    "actual canonical catalog/preview, selected pod, custom retention, privacy and stale assessment without forced replacement preview",
+    "explicit same-key acquisition continuation uses retained receipt, no new request or preview; reload remains passive",
+    "same-user session refresh preserves only reviewed handle, uncertain commit retries same key, accepted Pending, Finalizing, exact progress reload, real operation CSRF denial",
+    "authorized capture case link; separate lazy bundle; actual C16 wire and user-data/deletion notices; verified artifact version never labeled as native SHA",
+    "idle artifact expiry removes Download and explains expiry without metadata polling or renewing retention",
+    "missing native-download runtime produces real unavailable response; original request retained; no invented file checksum, content path or successful transfer",
+    "expired or revoked case rights clear metadata on actual recheck without claiming session logout; exact case URL reload works through real static allowlist",
+    "revoked session removes the evidence workspace; sign-in returns to exact case; no browser persistence or synthetic native transfer",
+    "explicit resolution opens accepted capture; lost closure reply retains original pair across refresh; acknowledged closure permits explicit edit only with no automatic preview or capture",
+    "settings outage hides workspace and still permits local logout",
+    "one-click sign-out survives csrf-busy-once; exactly one revocation",
+    "one-click sign-out survives logout-check-busy-once; exactly one revocation",
+    "returning tab uses CSRF and permitted POST refresh for expired access",
+    "revoked session cannot display workspace",
+    "fixed expiry clears visible workspace",
+    "unknown API path is not an HTML shell"
+  ],
+  "errors": [],
+  "external": [],
+  "violations": [],
+  "authority": "synthetic session, typed capture and C16 case metadata; real HTTPS Go handlers, canonical operations and built React; no native-download service, IdP/SQL/collection/audit/deployment qualification"
+}

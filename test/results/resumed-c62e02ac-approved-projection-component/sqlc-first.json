@@ -1,0 +1,9 @@
+{
+  "command": [
+    "/home/phil/.cache/asservat-build/bin/sqlc",
+    "generate"
+  ],
+  "cwd": "/home/phil/Projekte/asservat-projection-c62e02ac",
+  "exit": 0,
+  "elapsed": 0.305783748626709
+}

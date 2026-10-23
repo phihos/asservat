@@ -9,13 +9,15 @@ import (
 // NativeNoOperation is a successful private SQL absence/closed observation,
 // never a conversion of a timeout, denied lookup, expired active row or 404.
 // It is insufficient for an idle wire response until the live Pod proof matches.
-type NativeNoOperation struct{ Worker value.DownloadWorkerIdentity }
+type NativeNoOperation struct {
+	Worker value.AcquisitionWorkerIdentity
+}
 
 func (*NativeNoOperation) Error() string { return "no native operation is currently dispatchable" }
 
 type NativeIdle struct {
-	Worker            value.DownloadWorkerIdentity
-	Proof             value.KeyWorkerProof
+	Worker            value.AcquisitionWorkerIdentity
+	Proof             value.AcquisitionPeerProof
 	ObservedAt, Until time.Time
 }
 

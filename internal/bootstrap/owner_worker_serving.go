@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
+	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
 	native "asservat.local/asservat/internal/transport/native"
@@ -51,18 +52,12 @@ type ownerWorkerServing struct {
 	roots      native.ClientRoots
 }
 
-// ServeDownloadWorkers adds the hub-local download worker's two private paths
-// to the owner port, before Run (ADR-204 decisions 3 and 9). Under the pool's
-// fixed serving name, a ClientHello without h2 reaches worker enrollment
-// (HTTP/1.1, Pod token, no client certificate) and one offering h2 reaches the
-// worker native path (client certificate under roots, the current download
-// profile's acquisition issuer roots, resolved per handshake). The exact
-// process name stays the unchanged owner relay. Both handlers are the existing
-// ones: enrollment goes through this runtime's exact-owner forwarder and
-// locators, and the native path attaches only operations this process owns.
-// Without this call the owner port serves the owner relay alone.
-func (r *OwnerRuntime) ServeDownloadWorkers(roots native.ClientRoots) error {
-	if r == nil || roots == nil || r.native == nil || r.server == nil || r.root == nil || r.root.Err() != nil {
+// ServeAcquisitionWorkers adds the two existing worker paths to the owner port
+// before Run. HTTP/1.1 performs local admitted-worker enrollment; h2 accepts
+// certificate-authenticated native/query operations. Human certificate-owner
+// routing and its exact-process listener are absent (ADR-221).
+func (r *OwnerRuntime) ServeAcquisitionWorkers(roots native.ClientRoots, exchange evidence.AcquisitionEnrollmentExchange) error {
+	if r == nil || roots == nil || exchange == nil || r.native == nil || r.server == nil || r.root == nil || r.root.Err() != nil {
 		return value.ErrInvalid
 	}
 	endpoints, err := ownerWorkerEndpointsFor(r.pool)
@@ -73,7 +68,7 @@ func (r *OwnerRuntime) ServeDownloadWorkers(roots native.ClientRoots) error {
 	if err != nil {
 		return err
 	}
-	enrollment, err := worker.NewHandler(r.binding.InstallationID, r, time.Now, r.concurrency)
+	enrollment, err := worker.NewAcquisitionHandler(r.binding.InstallationID, exchange, time.Now, r.concurrency)
 	if err != nil {
 		return err
 	}
@@ -95,29 +90,25 @@ func (r *OwnerRuntime) ServeDownloadWorkers(roots native.ClientRoots) error {
 }
 
 // launchWorkerServing splits the owner port by ClientHello and launches the
-// two worker servers; it returns the owner relay's own child listener. Each
+// two worker servers. Each
 // child keeps its own TLS profile, client authentication and socket bound.
-func (r *OwnerRuntime) launchWorkerServing(w *ownerWorkerServing, listener net.Listener, launch func(ownerStartupPhase, func() error)) (net.Listener, error) {
-	exact, err := mtls.OwnerServerName(r.binding)
-	if err != nil {
-		return nil, err
-	}
+func (r *OwnerRuntime) launchWorkerServing(w *ownerWorkerServing, listener net.Listener, launch func(ownerStartupPhase, func() error)) error {
 	name := w.endpoints.Name
-	// One raw pre-TLS ceiling for the shared port, the sum of the three
+	// One raw pre-TLS ceiling for the shared port, the sum of the two
 	// servers' own socket bounds: a socket waiting for its classification or
 	// for a full server's hand-off stays counted until it closes.
-	shared := netutil.LimitListener(listener, 2*r.connections+r.native.connections)
+	shared := netutil.LimitListener(listener, r.connections+r.native.connections)
 	router, err := native.NewClientHelloRouter(r.root, shared, func(hello *tls.ClientHelloInfo) string {
 		if hello.ServerName == name && slices.Contains(hello.SupportedProtos, "h2") {
 			return ownerWorkerNativeKey
 		}
 		return hello.ServerName
-	}, exact, name, ownerWorkerNativeKey)
+	}, name, ownerWorkerNativeKey)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	log := eventLog(os.Stderr, "owner port router")
-	names := strings.NewReplacer(" "+exact, " relay", " "+name, " worker-enrollment", " "+ownerWorkerNativeKey, " worker-native")
+	names := strings.NewReplacer(" "+name, " worker-enrollment", " "+ownerWorkerNativeKey, " worker-native")
 	router.Report = func(event string) { log(names.Replace(event)) }
 	enrollment, nativeWorkers := router.Listener(name), router.Listener(ownerWorkerNativeKey)
 	launch(startupRunWorkerRouter, router.Run)
@@ -127,5 +118,5 @@ func (r *OwnerRuntime) launchWorkerServing(w *ownerWorkerServing, listener net.L
 	launch(startupRunWorkerNative, func() error {
 		return native.ServeWorker(r.root, nativeWorkers, w.roots, w.serving, w.native, r.native.connections)
 	})
-	return router.Listener(exact), nil
+	return nil
 }

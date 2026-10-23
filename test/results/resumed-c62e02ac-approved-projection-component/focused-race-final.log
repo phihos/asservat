@@ -1,0 +1,130 @@
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/unaudited
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/wrong-input
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/missing-qualified-dimension
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/replayed-admission
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/unknown-admission
+--- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent (0.00s)
+    --- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/unaudited (0.00s)
+    --- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/wrong-input (0.00s)
+    --- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/missing-qualified-dimension (0.00s)
+    --- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/replayed-admission (0.00s)
+    --- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/unknown-admission (0.00s)
+=== RUN   TestQueryDeliveryRemainsActiveThroughExactOutcomeAndJoinedClose
+--- PASS: TestQueryDeliveryRemainsActiveThroughExactOutcomeAndJoinedClose (0.00s)
+=== RUN   TestQueryLostOutwardReplyUsesFreshPaidBatchWithoutNewWorker
+--- PASS: TestQueryLostOutwardReplyUsesFreshPaidBatchWithoutNewWorker (0.00s)
+=== RUN   TestQueryUncertainPrivateCloseAndUnknownStartStayCharged
+=== RUN   TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/batch-replay
+=== RUN   TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/claim-replay
+=== RUN   TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/claim-unknown
+--- PASS: TestQueryUncertainPrivateCloseAndUnknownStartStayCharged (0.00s)
+    --- PASS: TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/batch-replay (0.00s)
+    --- PASS: TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/claim-replay (0.00s)
+    --- PASS: TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/claim-unknown (0.00s)
+=== RUN   TestQueryPendingPollCannotDispatchAndRequiresOutcomeGuard
+--- PASS: TestQueryPendingPollCannotDispatchAndRequiresOutcomeGuard (0.00s)
+=== RUN   TestQueryRequestObservationAndCurrentSQLFence
+=== RUN   TestQueryRequestObservationAndCurrentSQLFence/group-revocation
+=== RUN   TestQueryRequestObservationAndCurrentSQLFence/source-replacement
+=== RUN   TestQueryRequestObservationAndCurrentSQLFence/retention-cutoff
+=== RUN   TestQueryRequestObservationAndCurrentSQLFence/recovery-change
+=== RUN   TestQueryRequestObservationAndCurrentSQLFence/path-change
+--- PASS: TestQueryRequestObservationAndCurrentSQLFence (0.01s)
+    --- PASS: TestQueryRequestObservationAndCurrentSQLFence/group-revocation (0.00s)
+    --- PASS: TestQueryRequestObservationAndCurrentSQLFence/source-replacement (0.00s)
+    --- PASS: TestQueryRequestObservationAndCurrentSQLFence/retention-cutoff (0.00s)
+    --- PASS: TestQueryRequestObservationAndCurrentSQLFence/recovery-change (0.00s)
+    --- PASS: TestQueryRequestObservationAndCurrentSQLFence/path-change (0.00s)
+=== RUN   TestQueryOriginalRequestCancellation
+--- PASS: TestQueryOriginalRequestCancellation (0.00s)
+=== RUN   TestQueryRechecksAfterBlockingObservation
+--- PASS: TestQueryRechecksAfterBlockingObservation (0.00s)
+=== RUN   TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff
+=== RUN   TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/route
+=== RUN   TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/plan
+=== RUN   TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/claim
+--- PASS: TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff (0.24s)
+    --- PASS: TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/route (0.08s)
+    --- PASS: TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/plan (0.08s)
+    --- PASS: TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/claim (0.08s)
+=== RUN   TestQueryRetainsIdentitySnapshotAgainstPortSliceReuse
+--- PASS: TestQueryRetainsIdentitySnapshotAgainstPortSliceReuse (0.00s)
+=== RUN   TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun
+=== RUN   TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun/first-identity
+=== RUN   TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun/audit-lineage
+--- PASS: TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun (0.08s)
+    --- PASS: TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun/first-identity (0.00s)
+    --- PASS: TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun/audit-lineage (0.08s)
+=== RUN   TestQueryExpiredPublicContextCannotActAsCleanupPermit
+--- PASS: TestQueryExpiredPublicContextCannotActAsCleanupPermit (0.00s)
+=== RUN   TestQueryDeliveryTimingDoesNotRenewLatePollOrPreparedCutoff
+--- PASS: TestQueryDeliveryTimingDoesNotRenewLatePollOrPreparedCutoff (0.00s)
+=== RUN   TestQueryDeliveryDoneTracksOriginalOwner
+--- PASS: TestQueryDeliveryDoneTracksOriginalOwner (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/analysis	1.358s
+=== RUN   TestContextProjectionDetachedAndBounded
+--- PASS: TestContextProjectionDetachedAndBounded (0.00s)
+=== RUN   TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects
+=== RUN   TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/begin
+=== RUN   TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/missing_owner
+=== RUN   TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/request_ID
+=== RUN   TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/range
+=== RUN   TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/artifact
+=== RUN   TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/wrong_branch
+--- PASS: TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects (0.84s)
+    --- PASS: TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/begin (0.14s)
+    --- PASS: TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/missing_owner (0.14s)
+    --- PASS: TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/request_ID (0.14s)
+    --- PASS: TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/range (0.14s)
+    --- PASS: TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/artifact (0.14s)
+    --- PASS: TestContextProjectionBridgeRequiresOriginalAuditInputBeforeEffects/wrong_branch (0.14s)
+=== RUN   TestContextProjectionBridgeReadyAndPollHaveExactAuditedOwners
+--- PASS: TestContextProjectionBridgeReadyAndPollHaveExactAuditedOwners (0.15s)
+=== RUN   TestContextProjectionBridgePendingChargesAndNeverStartsOnPoll
+--- PASS: TestContextProjectionBridgePendingChargesAndNeverStartsOnPoll (0.14s)
+=== RUN   TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup
+=== RUN   TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/finish
+=== RUN   TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/cancel
+=== RUN   TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/retention
+=== RUN   TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/original_lease_expiry
+=== RUN   TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/permission
+=== RUN   TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/expired_request
+=== RUN   TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/uncertain_close
+--- PASS: TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup (0.99s)
+    --- PASS: TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/finish (0.15s)
+    --- PASS: TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/cancel (0.15s)
+    --- PASS: TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/retention (0.14s)
+    --- PASS: TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/original_lease_expiry (0.14s)
+    --- PASS: TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/permission (0.14s)
+    --- PASS: TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/expired_request (0.14s)
+    --- PASS: TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup/uncertain_close (0.14s)
+=== RUN   TestContextProjectionBridgeOwnerExpiryInterruptsBlockedWrite
+--- PASS: TestContextProjectionBridgeOwnerExpiryInterruptsBlockedWrite (0.64s)
+=== RUN   TestContextProjectionBridgeRechecksBeforeActualWrite
+--- PASS: TestContextProjectionBridgeRechecksBeforeActualWrite (0.14s)
+=== RUN   TestContextProjectionBridgeErrorsAfterDispatchStayUnknown
+--- PASS: TestContextProjectionBridgeErrorsAfterDispatchStayUnknown (0.14s)
+=== RUN   TestContextProjectionBridgePollInputCannotSubstituteAnotherQuery
+--- PASS: TestContextProjectionBridgePollInputCannotSubstituteAnotherQuery (0.14s)
+=== RUN   TestInvestigationProjectionIsExplicitAuditedComposition
+--- PASS: TestInvestigationProjectionIsExplicitAuditedComposition (0.15s)
+=== RUN   TestInvestigationProjectionUsesReadScopeAndOriginalLiveOwner
+--- PASS: TestInvestigationProjectionUsesReadScopeAndOriginalLiveOwner (0.16s)
+=== RUN   TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit
+=== RUN   TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/no_read_scope
+=== RUN   TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/begin_failure
+=== RUN   TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/changed_after_begin
+=== RUN   TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/canceled_after_begin
+=== RUN   TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/changed_after_finish
+=== RUN   TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/finish_failure
+--- PASS: TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit (0.88s)
+    --- PASS: TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/no_read_scope (0.14s)
+    --- PASS: TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/begin_failure (0.15s)
+    --- PASS: TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/changed_after_begin (0.15s)
+    --- PASS: TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/canceled_after_begin (0.14s)
+    --- PASS: TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/changed_after_finish (0.15s)
+    --- PASS: TestInvestigationProjectionRefusesLostCurrentIdentityAroundAudit/finish_failure (0.15s)
+PASS
+ok  	asservat.local/asservat/internal/transport/presentation	5.399s

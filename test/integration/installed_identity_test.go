@@ -77,7 +77,7 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	for name, resource := range map[string]string{installedMCPScope: "/mcp", installedDownloadsScope: "/api/v1/downloads"} {
 		kc.json("POST", prefix+"/client-scopes", map[string]any{"name": name, "protocol": "openid-connect", "attributes": map[string]string{"include.in.token.scope": "false"}, "protocolMappers": []any{audience(strings.TrimSuffix(origin, "/") + resource)}})
 	}
-	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "mcp", "protocol": "openid-connect", "publicClient": true, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{"http://127.0.0.1:1/callback"}, "defaultClientScopes": scopes, "optionalClientScopes": []string{installedMCPScope, installedDownloadsScope}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{groups}})
+	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "mcp", "protocol": "openid-connect", "publicClient": true, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{"http://127.0.0.1:1/callback"}, "defaultClientScopes": []string{"basic", "evidence:read"}, "optionalClientScopes": []string{installedMCPScope, installedDownloadsScope, "evidence:download", "evidence:capture"}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{groups}})
 	created := func(path string, value any) string {
 		t.Helper()
 		body, _ := json.Marshal(value)
@@ -122,11 +122,20 @@ type installedJourneyTokenSource struct {
 	tokens           kcTokens
 	subject          string
 	until            time.Time
+	approvedOnly     bool
 }
 
 func (i *installedIdentity) mcpTokenSource(origin string) *installedJourneyTokenSource {
 	return &installedJourneyTokenSource{issuer: i.Issuer, resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now,
 		login:   func() kcTokens { return i.kc.loginScope("mcp", installedMCPScope) },
+		refresh: func(token string) kcTokens { return i.kc.refresh("mcp", token, http.StatusOK) }}
+}
+
+// The same configured MCP client/principal uses a distinct real OAuth session
+// without native-download scope. Refresh keeps that original scope selection.
+func (i *installedIdentity) approvedTokenSource(origin string) *installedJourneyTokenSource {
+	return &installedJourneyTokenSource{issuer: i.Issuer, resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now, approvedOnly: true,
+		login:   func() kcTokens { return i.kc.loginScopes("mcp", "openid evidence:read "+installedMCPScope) },
 		refresh: func(token string) kcTokens { return i.kc.refresh("mcp", token, http.StatusOK) }}
 }
 
@@ -159,6 +168,7 @@ func (s *installedJourneyTokenSource) Token(ctx context.Context) (string, error)
 		Client   string          `json:"azp"`
 		Audience json.RawMessage `json:"aud"`
 		Expires  int64           `json:"exp"`
+		Scope    string          `json:"scope"`
 	}
 	if err != nil || json.Unmarshal(raw, &claims) != nil {
 		return "", errors.New("installed identity token claims")
@@ -177,6 +187,9 @@ func (s *installedJourneyTokenSource) Token(ctx context.Context) (string, error)
 	if claims.Issuer != s.issuer || claims.Subject == "" || s.subject != "" && claims.Subject != s.subject || claims.Client != "mcp" ||
 		len(audiences) != 1 || audiences[0] != s.resource || !s.now().Add(30*time.Second).Before(until) || next.Refresh == "" {
 		return "", errors.New("installed identity refresh changed its principal/resource or returned expired credentials")
+	}
+	if s.approvedOnly && !installedApprovedScopes(claims.Scope) {
+		return "", errors.New("approved session lost read scope or gained download/capture scope")
 	}
 	s.tokens, s.subject, s.until = next, claims.Subject, until
 	return next.Access, nil

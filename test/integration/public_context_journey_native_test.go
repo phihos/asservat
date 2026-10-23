@@ -115,33 +115,45 @@ func (p publicJourneyNativeProof) ReadDownloadPeerProof(c context.Context, s str
 	return (nativeSQLProof{p.jobs.snapshot(), p.token}).ReadDownloadPeerProof(c, s, k)
 }
 
+// This fixture serves only the native-download branch. It forwards to the
+// actual SQL identity reader and cannot create a query identity or authority.
+type publicJourneyEnrollmentBindings struct {
+	evidence.WorkerEnrollmentBindings
+}
+
+func (r publicJourneyEnrollmentBindings) ReadAcquisitionEnrollment(ctx context.Context, parent value.AcquisitionParent, worker string) (value.AcquisitionWorkerIdentity, error) {
+	if parent.Purpose != value.AcquisitionDownload || !parent.Valid() {
+		return value.AcquisitionWorkerIdentity{}, artifact.ErrInvalid
+	}
+	v, err := r.ReadDownloadWorkerEnrollment(ctx, parent.ID, worker)
+	return v.Acquisition(), err
+}
+
 // All pools are purpose-specific existing fixture roles. Native readers, key
 // ledgers, dispatch, enrollment and transfer are real product implementations;
 // accepted bootstrap/backing, readiness, human/Pod proof, Job API and CA remain
 // explicitly synthetic. This is NOT the protected installed OwnerRuntime graph.
 type publicJourneyNative struct {
-	services         bootstrap.ContextNativeDownloadServices
-	coordinator      evidence.ContextDownloadCoordinator
-	gate             authapp.ContextDownloadAuthority
-	gateTrace        journeyGateTrace
-	runtime, audit   *postgres.Downloads
-	allocation       artifact.DownloadAllocation
-	profile          value.DownloadWorkerProfile
-	jobs             *publicJourneyJobs
-	enrollment       workerEnrollmentFixture
-	enrollmentRouter *evidence.WorkerEnrollmentRouter
-	requestOwners    *postgres.WorkerOwners
-	ownerClaims      *publicJourneyOwnerClaims
-	origins          evidence.NativeOrigins
-	router           *native.HubRouter
-	keyAuthority     *postgres.NativeKeyAuthority
-	keys             *publicContextJourneyKeys
-	store            *objectstore.Store
-	storeID          string
-	target           value.WorkerCredentialTarget
-	joined           <-chan nativeSQLWorkerOutcome
-	closeWorker      func()
-	enrollmentTrace  *journeyEnrollmentTrace
+	services           bootstrap.ContextNativeDownloadServices
+	coordinator        evidence.ContextDownloadCoordinator
+	gate               authapp.ContextDownloadAuthority
+	gateTrace          journeyGateTrace
+	runtime, audit     *postgres.Downloads
+	allocation         artifact.DownloadAllocation
+	profile            value.DownloadWorkerProfile
+	jobs               *publicJourneyJobs
+	enrollment         workerEnrollmentFixture
+	enrollmentExchange *evidence.AdmittedWorkerEnrollment
+	origins            evidence.NativeOrigins
+	router             *native.HubRouter
+	keyAuthority       *postgres.NativeKeyAuthority
+	keys               *publicContextJourneyKeys
+	store              *objectstore.Store
+	storeID            string
+	target             value.WorkerCredentialTarget
+	joined             <-chan nativeSQLWorkerOutcome
+	closeWorker        func()
+	enrollmentTrace    *journeyEnrollmentTrace
 }
 
 func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissionScenario, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, artifactKeys *publicContextJourneyKeys, actor identity.Identity, loginUntil time.Time) *publicJourneyNative {
@@ -224,14 +236,7 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	f.keyAuthority, e = postgres.NewNativeKeyAuthority(ctx, open("native_key_read_runtime", "synthetic-native-read"), root, f.profile, artifactKeys.scope, g)
 	publicJourneyRequire(t, "key authority", e)
 	f.enrollment = newWorkerEnrollmentServices(t, ctx, poolFor, root, installation, f.profile, publicJourneyEnrollmentProof{jobs: f.jobs}, g, store, keys, f.gate)
-	f.enrollmentRouter, e = evidence.NewWorkerEnrollmentRouter(ctx, installation, f.enrollment.bindings, time.Now, 1)
-	publicJourneyRequire(t, "enrollment router", e)
-	t.Cleanup(f.enrollmentRouter.Close)
-	f.requestOwners, e = postgres.NewWorkerOwners(ctx, open("worker_owner_runtime", "synthetic-worker-owner"), root, f.profile, g)
-	publicJourneyRequire(t, "request owners", e)
 	ownerPod, epoch := custodyID(), custodyID()
-	f.ownerClaims = newPublicJourneyOwnerClaims(f.requestOwners, ownerPod, epoch)
-	requests := &evidence.WorkerRequestOwners{Router: f.enrollmentRouter, Store: f.ownerClaims, PodUID: ownerPod, ProcessEpoch: epoch, NewID: custodyID}
 	first, e := postgres.NewFirstContextPreparations(f.runtime)
 	publicJourneyRequire(t, "first preparation", e)
 	responses, e := postgres.NewFirstContextResponses(f.runtime)
@@ -245,11 +250,11 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 	publicJourneyRequire(t, "native router", e)
 	t.Cleanup(f.router.Close)
 	enrollment := *f.enrollment.service
-	enrollment.CurrentAuthority = f.gate
 	enrollment = f.enrollmentTrace.Wrap(enrollment)
-	runtime, e := evidence.NewContextNativeRuntime(evidence.ContextNativeRuntimeConfig{Serving: nativeContextServing{loginUntil}, Profile: f.profile, Configuration: configuration, Workers: workers, Preparation: first, Dispatcher: dispatch, Enrollments: enrollment, Proofs: func(token evidence.DownloadPeerToken) (evidence.WorkerEnrollmentProofReader, error) {
+	f.enrollmentExchange = &evidence.AdmittedWorkerEnrollment{InstallationID: installation, Bindings: publicJourneyEnrollmentBindings{f.enrollment.bindings}, Download: enrollment, DownloadProofs: func(token evidence.DownloadPeerToken) (evidence.WorkerEnrollmentProofReader, error) {
 		return journeyEnrollmentPorts{WorkerEnrollmentProofReader: publicJourneyEnrollmentProof{f.jobs, token}, trace: f.enrollmentTrace}, nil
-	}, Requests: requests, Sources: f.runtime, Authority: journeyEnrollmentPorts{CurrentDownloadAuthority: f.gate, trace: f.enrollmentTrace}, Audit: &objectstore.DownloadAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: f.audit, Native: evidence.NativeAttachmentConfig{HubPodUID: ownerPod, HubProcessEpoch: epoch, KeyScope: artifactKeys.scope, Owners: firstOwners, Fences: owners, Origins: f.origins, Registrar: f.router, PreparationKeys: prepKeys, WindowKeys: windowKeys}, Now: time.Now, NewID: custodyID})
+	}, Now: time.Now}
+	runtime, e := evidence.NewContextNativeRuntime(evidence.ContextNativeRuntimeConfig{Serving: nativeContextServing{loginUntil}, Profile: f.profile, Configuration: configuration, Workers: workers, Preparation: first, Dispatcher: dispatch, Sources: f.runtime, Authority: journeyEnrollmentPorts{CurrentDownloadAuthority: f.gate, trace: f.enrollmentTrace}, Audit: &objectstore.DownloadAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: f.audit, Native: evidence.NativeAttachmentConfig{HubPodUID: ownerPod, HubProcessEpoch: epoch, KeyScope: artifactKeys.scope, Owners: firstOwners, Fences: owners, Origins: f.origins, Registrar: f.router, PreparationKeys: prepKeys, WindowKeys: windowKeys}, Now: time.Now, NewID: custodyID})
 	publicJourneyRequire(t, "native runtime before any session", e)
 	t.Cleanup(runtime.Close)
 	control := artifact.DownloadControlAllocation{ID: f.allocation.ID, RootID: root, AuditStoreID: f.storeID, ResponseLimit: 2, WindowLimit: 2, AuditByteLimit: 4 * artifact.DownloadWindowAuditBytes, ValidUntil: f.allocation.ValidUntil, AuditWriteUntil: f.allocation.ValidUntil.Add(time.Minute)}
@@ -280,8 +285,8 @@ func newPublicJourneyNative(t *testing.T, ctx context.Context, s captureAdmissio
 }
 
 // Set up the real credential channel after the first Prepare has actually
-// dispatched its worker. Enroll waits for a real current-request owner; it never
-// publishes one, preactivates a certificate or retries an uncertain POST.
+// dispatched and bound its worker. The existing SQL identity reader and local
+// admitted-worker endpoint do not require a live human preparation socket.
 func (f *publicJourneyNative) credentialClient(t *testing.T, ctx context.Context, session string) *mtls.WorkerCredentials {
 	t.Helper()
 	w := f.jobs.snapshot()
@@ -289,7 +294,7 @@ func (f *publicJourneyNative) credentialClient(t *testing.T, ctx context.Context
 		t.Fatal("actual first preparation did not dispatch its original worker")
 	}
 	f.target = value.WorkerCredentialTarget{InstallationID: w.Binding.InstallationID, SessionID: session, WorkerID: w.Intent.ID, PodUID: w.Binding.PodUID, CreatedAt: w.Intent.CreatedAt, RunUntil: w.Intent.RunUntil}
-	h, e := workertransport.NewHandler(f.target.InstallationID, journeyEnrollmentPorts{WorkerEnrollmentExchange: f.enrollmentRouter, trace: f.enrollmentTrace}, time.Now, 1)
+	h, e := workertransport.NewAcquisitionHandler(f.target.InstallationID, journeyEnrollmentPorts{AcquisitionEnrollmentExchange: f.enrollmentExchange, trace: f.enrollmentTrace}, time.Now, 1)
 	publicJourneyRequire(t, "worker credential handler", e)
 	server, roots := channelServer(t, h)
 	ca := x509.NewCertPool()
@@ -301,14 +306,10 @@ func (f *publicJourneyNative) credentialClient(t *testing.T, ctx context.Context
 }
 func (f *publicJourneyNative) enrollAndStart(t *testing.T, ctx context.Context, c *mtls.WorkerCredentials) {
 	t.Helper()
-	// Observe the original acknowledged claim without a competing SQL poll.
-	// This is scheduling only; Enroll still performs every current check.
-	e := f.ownerClaims.Wait(ctx, f.target)
-	publicJourneyRequire(t, "actual requesting owner claim acknowledged", e)
 	err := c.Enroll(ctx)
 	f.enrollmentTrace.Report(t)
 	f.gateTrace.Report(t)
-	publicJourneyRequire(t, "actual routed enrollment", err)
+	publicJourneyRequire(t, "actual admitted-worker enrollment", err)
 	certificate := *channelCert(t, c)
 	peer, e := c.Peer()
 	publicJourneyRequire(t, "current worker peer", e)

@@ -58,7 +58,7 @@ func (q *Queries) LockWorkerOwner(ctx context.Context, workerID pgtype.UUID) (Do
 }
 
 const readWorkerOwner = `-- name: ReadWorkerOwner :one
-SELECT o.worker_id, o.request_id, o.pod_uid, o.process_epoch, o.fence, o.started_at, o.expires_at, o.released_at, w.id, w.session_id, w.root_id, w.installation_id, w.allocation_id, w.principal_key, w.generation, w.intent_json, w.run_until, w.audit_receipt_json, w.claimed_at, w.job_json, w.binding_json, w.termination_json, w.retired_proof_json FROM download_worker_owner o JOIN download_worker w ON w.id=o.worker_id
+SELECT o.worker_id, o.request_id, o.pod_uid, o.process_epoch, o.fence, o.started_at, o.expires_at, o.released_at, w.id, w.session_id, w.root_id, w.installation_id, w.allocation_id, w.principal_key, w.generation, w.intent_json, w.run_until, w.audit_receipt_json, w.claimed_at, w.job_json, w.binding_json, w.termination_json, w.retired_proof_json, w.query_id, w.query_allocation_id, w.abandoned_at FROM download_worker_owner o JOIN download_worker w ON w.id=o.worker_id
 JOIN artifact_download d ON d.id=w.session_id
 WHERE w.id=$1 AND w.session_id=$2 AND w.root_id=$3 AND w.installation_id=$4
 AND o.released_at IS NULL AND o.expires_at>clock_timestamp()
@@ -112,6 +112,9 @@ func (q *Queries) ReadWorkerOwner(ctx context.Context, arg ReadWorkerOwnerParams
 		&i.DownloadWorker.BindingJson,
 		&i.DownloadWorker.TerminationJson,
 		&i.DownloadWorker.RetiredProofJson,
+		&i.DownloadWorker.QueryID,
+		&i.DownloadWorker.QueryAllocationID,
+		&i.DownloadWorker.AbandonedAt,
 	)
 	return i, err
 }

@@ -21,12 +21,12 @@ func workerEnrollmentCase(t *testing.T, ctx context.Context, mode string, w valu
 	if !strings.HasPrefix(mode, "enrollment-") {
 		return false
 	}
-	if mode == "enrollment-channel" {
-		qualifyWorkerEnrollmentChannel(t, ctx, w, f)
+	if admittedWorkerEnrollmentCase(mode) {
+		qualifyAdmittedWorkerEnrollment(t, ctx, mode, w, f, refresh, admin)
 		return true
 	}
-	if mode == "enrollment-current-request" {
-		qualifyCurrentWorkerEnrollment(t, ctx, w, f, admin)
+	if mode == "enrollment-channel" {
+		qualifyWorkerEnrollmentChannel(t, ctx, w, f)
 		return true
 	}
 	key, e := mtls.EnrollmentKey(f.csr)
@@ -41,7 +41,7 @@ func workerEnrollmentCase(t *testing.T, ctx context.Context, mode string, w valu
 		return p
 	}
 	claim := func() value.WorkerEnrollment {
-		e, _, _, err := f.ledger.ClaimWorkerEnrollment(ctx, proof(), current())
+		e, _, _, err := f.ledger.ClaimWorkerEnrollment(ctx, proof())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -58,12 +58,12 @@ func workerEnrollmentCase(t *testing.T, ctx context.Context, mode string, w valu
 	}
 	if mode == "enrollment-unaudited" {
 		enrollment := claim()
-		if _, e = f.ledger.PrepareWorkerCertificate(ctx, proof(), current()); e == nil {
+		if _, e = f.ledger.PrepareWorkerCertificate(ctx, proof()); e == nil {
 			t.Fatal("unaudited enrollment allowed signing")
 		}
 		acknowledge(enrollment)
 		p := proof()
-		progress, e := f.ledger.PrepareWorkerCertificate(ctx, p, current())
+		progress, e := f.ledger.PrepareWorkerCertificate(ctx, p)
 		if e != nil || !progress.MaySign {
 			t.Fatal("signing attempt", e)
 		}
@@ -71,10 +71,10 @@ func workerEnrollmentCase(t *testing.T, ctx context.Context, mode string, w valu
 		if e != nil {
 			t.Fatal(e)
 		}
-		if e = f.ledger.StoreWorkerCertificate(ctx, progress.Attempt, c, current()); e != nil {
+		if e = f.ledger.StoreWorkerCertificate(ctx, progress.Attempt, c); e != nil {
 			t.Fatal(e)
 		}
-		if _, e = f.activation.ActivateWorkerCertificate(ctx, proof(), progress.Attempt, current()); e == nil {
+		if _, e = f.activation.ActivateWorkerCertificate(ctx, proof(), progress.Attempt); e == nil {
 			t.Fatal("unaudited certificate activated")
 		}
 		c2, e := f.enroll(ctx, w)
@@ -91,18 +91,18 @@ func workerEnrollmentCase(t *testing.T, ctx context.Context, mode string, w valu
 		for ordinal := 1; ordinal <= 2; ordinal++ {
 			p := proof()
 			p.FreshUntil = p.ObservedAt.Add(250 * time.Millisecond)
-			progress, e := f.ledger.PrepareWorkerCertificate(ctx, p, current())
+			progress, e := f.ledger.PrepareWorkerCertificate(ctx, p)
 			if e != nil || !progress.MaySign || progress.Attempt.Ordinal != ordinal {
 				t.Fatal("bounded attempt", ordinal, e)
 			}
 			last = progress.Attempt
-			again, e := f.ledger.PrepareWorkerCertificate(ctx, proof(), current())
+			again, e := f.ledger.PrepareWorkerCertificate(ctx, proof())
 			if e != nil || again.MaySign || again.Attempt != last {
 				t.Fatal("retry re-signed live attempt", e)
 			}
 			time.Sleep(300 * time.Millisecond)
 		}
-		if _, e = f.ledger.PrepareWorkerCertificate(ctx, proof(), current()); e == nil {
+		if _, e = f.ledger.PrepareWorkerCertificate(ctx, proof()); e == nil {
 			t.Fatal("uncertain signing budget refilled")
 		}
 		var count int
@@ -123,9 +123,8 @@ func workerEnrollmentCase(t *testing.T, ctx context.Context, mode string, w valu
 		}
 		p := proof()
 		p.FreshUntil = p.ObservedAt.Add(250 * time.Millisecond)
-		a := current()
 		done := make(chan error, 1)
-		go func() { _, err := f.ledger.PrepareWorkerCertificate(ctx, p, a); done <- err }()
+		go func() { _, err := f.ledger.PrepareWorkerCertificate(ctx, p); done <- err }()
 		time.Sleep(300 * time.Millisecond)
 		if e = tx.Commit(ctx); e != nil {
 			t.Fatal(e)
@@ -141,12 +140,12 @@ func workerEnrollmentCase(t *testing.T, ctx context.Context, mode string, w valu
 	}
 	if mode == "enrollment-parallel" {
 		acknowledge(claim())
-		p, a := proof(), current()
+		p := proof()
 		var wg sync.WaitGroup
 		results := make(chan value.WorkerCertificateProgress, 8)
 		errs := make(chan error, 8)
 		for range 8 {
-			wg.Go(func() { progress, e := f.ledger.PrepareWorkerCertificate(ctx, p, a); results <- progress; errs <- e })
+			wg.Go(func() { progress, e := f.ledger.PrepareWorkerCertificate(ctx, p); results <- progress; errs <- e })
 		}
 		wg.Wait()
 		close(results)

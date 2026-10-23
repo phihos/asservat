@@ -226,18 +226,10 @@ func newPreparationPhaseBudget(t *testing.T) (*preparationPhaseBudget, evidence.
 		t.Fatal("invalid synthetic preparation facts")
 	}
 	unused := &preparationPhaseUnused{}
-	router, err := evidence.NewWorkerEnrollmentRouter(t.Context(), installation, unused, time.Now, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(router.Close)
 	newID := func() string { return ownerID(19104) }
 	dispatcher := &evidence.DownloadDispatcher{Ledger: preparationPhaseLedger{preparationPhaseBudget: f}, Jobs: preparationPhaseJobs{preparationPhaseBudget: f}, Audit: f, Acknowledgements: f, CurrentAuthority: f, Profile: f.profile, Now: time.Now}
 	runtime, err := evidence.NewContextNativeRuntime(evidence.ContextNativeRuntimeConfig{Serving: f, Profile: f.profile, Configuration: f, Workers: f, Preparation: unused, Dispatcher: dispatcher,
-		Enrollments: evidence.WorkerEnrollmentCoordinator{CSR: unused, Ledger: unused, Activation: unused, Audit: unused, Acknowledgements: unused, Issuer: unused, CurrentAuthority: f, Now: time.Now},
-		Proofs: func(evidence.DownloadPeerToken) (evidence.WorkerEnrollmentProofReader, error) {
-			panic("unexpected worker proof")
-		}, Requests: &evidence.WorkerRequestOwners{Router: router, Store: unused, PodUID: id, ProcessEpoch: id, NewID: newID}, Sources: f, Authority: f, Audit: unused, Acknowledgements: unused,
+		Sources: f, Authority: f, Audit: unused, Acknowledgements: unused,
 		Native: evidence.NativeAttachmentConfig{HubPodUID: id, HubProcessEpoch: id, KeyScope: value.KeyScope{InstallationID: installation, Purpose: "artifact", KeyID: "synthetic"}, Owners: unused, Fences: unused, Registrar: unused, Origins: evidence.NativeOrigins{Operations: unused, Now: time.Now}, PreparationKeys: unused, WindowKeys: unused}, Now: time.Now, NewID: newID})
 	if err != nil {
 		t.Fatal("runtime composition", err)

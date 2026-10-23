@@ -1,0 +1,30 @@
+{
+  "reviewer": "recover_decisions",
+  "verdict": "no blockers",
+  "scope": "Read-only C18 original request observation, C03 policy/environment and revised tests. No tests/builds run by reviewer.",
+  "files": {
+    "internal/application/analysis/context_query.go": "9c439b5785cd1da3d130c70bc814525ebf3877147d0a6e068beafd4fab592f32",
+    "internal/application/analysis/context_query_test.go": "d8bdb8b46f7bbb56df26973a6d96f0dec1cd48bbe025c5739f3b9d6b5ac1d458",
+    "internal/application/authorization/projection.go": "50d58da556e0f7baca21f982b4bf2e335a03ce83f8614bf23fa7e88a532c3ab6",
+    "internal/application/authorization/projection_policy.go": "a3ddb12af93f676623eb73668e2182b21b5b8accd553024a30b86bef7c3a7910",
+    "internal/application/authorization/projection_policy_test.go": "18db67b817ad1f0c34d94ad55d86574d37702abe37ab993d6fae843083a64934",
+    "internal/application/authorization/projection_environment.go": "47b4f784911d77b367a39d83e3146f4b05b4d60045be874f6a6cfa01084e453c",
+    "internal/application/authorization/projection_environment_test.go": "55112ae3730674df1efe3eddfd3ec3bfddb511209065c6862ce7b2b98e26e51e",
+    "internal/transport/presentation/context_projection_operations_test.go": "b4c2f6177297bffb720507db81edab0450d8a0c1db8e26b591ab8b33d2b74434",
+    "internal/adapters/postgres/context_query.go": "f193b9483e103a9d280371727c729c52b18d1ac9d51400537a46ab55b1598370",
+    "internal/adapters/postgres/context_query_batch.go": "4ef02a3b7e7aa82e4a0e3efd594554a81d3f1bb6ed5702245c3096def7ce45fc",
+    "docs/decisions/219-shared-approved-acquisition.md": "9ef74e3fedf81f6c42bbcdb44bbc2ccaf3df4b392f9d7266e043a8ff588c9057"
+  },
+  "findings": [
+    "Each request constructs a new projectionRequest with original min(start+5s, caller, identity, audit invocation) and monotonic shortening; no shared authority cache.",
+    "Initial ResolveProjectionCurrent value is retained only after full construction and planning checks; poll starts with empty owner and completes one fresh CheckProjectionCurrent. Failure is remembered and cannot trigger a later refresh in the same owner.",
+    "Current checks preserve exact query scope, installation, identity-policy revision, original authority and dependency bounds. They recheck owned/caller cancellation and clock after blocking mutex/port operations.",
+    "C03 retains initial/final ordinary ReadApproved evaluation and exact protected catalog/retention/environment comparisons; placement selection shares protected configuration only, never DownloadAuthority or download entitlement. Policy keeps raw original five-second dates; no 60-second download lease relabeling.",
+    "PermitQuery/PermitReadBatch still enter real current SQL guards, lock current recovery/permission/backing/query state, compare permission epoch/sequence/digest, retention and processing before/after effects and retain original deadlines.",
+    "Replacement assertions intentionally separate unchanged in-request observation from fresh next-poll reconstruction, source-slice ownership, original cancellation/expiry and immediate SQL refusal. Revised presentation tests use original short authority before the call and SQL retention refusal; they preserve blocked-write cancellation/join and unknown cleanup accounting."
+  ],
+  "limitations": [
+    "Source review only; individual synthetic fence tests do not establish real SQL or installed qualification.",
+    "This review does not claim a measured availability improvement or a mandatory five-second revocation delay; current SQL/transport checks can deny earlier."
+  ]
+}

@@ -21,9 +21,9 @@ type ContextQueryResults interface {
 	GetQueryResult(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, string) (*analysisapp.ContextProjectionDelivery, error)
 }
 
-// This inert adapter deliberately has no ToolNames, Tool or unaudited Call.
-// Existing public composition does not register it. A future explicit runtime
-// composition must supply accepted services and the existing audit wrapper.
+// This adapter deliberately has no ToolNames, Tool or unaudited Call. Explicit
+// installation composition adds its two operations to InvestigationOperations;
+// the existing audit wrapper alone supplies each live invocation owner.
 type ContextProjectionOperations struct {
 	excerpts  ContextExcerptService
 	results   ContextQueryResults

@@ -12,15 +12,18 @@ import (
 	app "asservat.local/asservat/internal/application/capacity"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
+	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 )
 
 // capacityDerived are the values the installer derives from the objects it
 // created or read (ADR-190 decision 5); none comes from the operator.
 type capacityDerived struct {
+	SharedQueries                      bool
 	Root, Installation, AccountVersion string
 	SystemPoolUID, ProcessingSourceUID string
 	ProcessingProtection               artifact.Digest
@@ -107,6 +110,13 @@ func buildCapacityQualification(p contracts.InstallerCapacitySettings, d capacit
 		Backends: []app.CapacityBackendQualification{{Layout: app.CapacityBackendLayout, ID: newID(), Digest: profileDigest("backend", backend), PoolUID: d.SystemPoolUID,
 			StorageProfile: backend.StorageProfile, CapacityID: newID(), PoolID: newID(), EvidenceStoreID: newID(), AuditStoreID: store,
 			Usable: app.BudgetAmount{Bytes: backend.Usable.Bytes, Objects: backend.Usable.Objects}}}}
+	if d.SharedQueries {
+		x, err := installedQueryBudget(p, newID)
+		if err != nil {
+			return zero, err
+		}
+		q.ContextQuery = &x
+	}
 	if !app.ValidateRootBackingInput(in) || !q.Valid() {
 		return zero, mounts.ErrUnavailable
 	}
@@ -167,4 +177,53 @@ func buildConnectorBacking(c contracts.InstallerConnectorSettings, b contracts.I
 		return zero, mounts.ErrUnavailable
 	}
 	return out, nil
+}
+
+// installedQueryBudget declares finite logical work/history under the original
+// operator envelope. Actual Job limits remain the installed shared profile; the
+// global worker/hub/provider admission limits are not multiplied per query.
+// These are configured ceilings, not measured overhead or a new deployment.
+func installedQueryBudget(p contracts.InstallerCapacitySettings, newID func() string) (app.ContextQueryQualification, error) {
+	rev := identity.Revision{UID: newID(), Generation: 1, Digest: profileDigest("shared-query/v1", p)}
+	// Four paid status polls and 32 state transitions bound retained SQL work.
+	// One worker intent, one enrollment and two signing audits are independent.
+	const polls, controls, signs int64 = 4, 32, 2
+	rows := int64(10) + (1 + polls) + controls
+	row := max(p.Footprints.Native.RowBytes, p.Metadata.RecordRowBytes)
+	wal := max(p.Footprints.Native.TransitionWALBytes, p.Metadata.TransitionWALBytes)
+	h := app.QueryHistoryQualification{Layout: app.ContextQueryHistoryLayout, Revision: rev, FixedBytes: p.Metadata.FixedRowBytes, PrincipalBytes: p.Metadata.AccountRowBytes, AllocationBytes: p.Metadata.AccountRowBytes, RowBytes: row, FixedQueryRows: 10, InvocationRows: 1, ControlRows: 1, TransitionWALBytes: wal, BackupCopies: p.Backup.BackupCopies, WALCopies: p.Backup.WALCopies, AuditCipherBytes: 64 << 10, BackupHorizon: time.Duration(p.Backup.HorizonSeconds) * time.Second, RetirementCleanup: time.Duration(p.Backup.CleanupBudgetSeconds) * time.Second}
+	profile := query.ContextQueryResourceProfile{ID: newID(), Source: rev, Qualification: rev, Path: query.ContextProjectionPath{Purpose: query.ContextProjectionPurpose}, Lifetime: query.ContextMaxQueryTime, PollLimit: polls, ControlTransitionLimit: controls,
+		Worker: query.ContextQueryWorkerLimits{CPUMilli: downloadWorkerCPUMillis, MemoryBytes: downloadWorkerMemoryBytes, EphemeralStorageBytes: 4 << 20, WorkerTransientBytes: 8 << 20, HubTransientBytes: 128 << 10, ProviderConcurrency: 1, AuthenticationConcurrency: 1, Runtime: query.ContextMaxQueryTime, CredentialLifetime: 2 * time.Minute, ProviderEffectLifetime: time.Minute, Cleanup: time.Duration(p.Backup.CleanupBudgetSeconds) * time.Second},
+		Cost:   query.ContextQueryCost{Workers: 1, ReadBatches: query.ContextMaxReadBatches, ReadBytes: query.ContextMaxReadBatches * query.ContextBatchReadWork, StructuredBytes: query.ContextMaxReadBatches * query.ContextResultBytes, WireBytes: query.ContextMaxReadBatches * query.ContextWireBytes, UnwrapAttempts: 3 * query.ContextMaxReadBatches, ProviderRequests: 100, AuthenticationRequests: 100, SigningAttempts: signs, AuditObjects: 2*(1+polls) + 2 + signs, SQLRows: rows}}
+	// Operator values are validated by the complete qualification below. Use
+	// checked products here before constructing any persistent declaration.
+	product := func(a, b int64) (int64, bool) {
+		if a <= 0 || b <= 0 || a > (1<<60)/b {
+			return 0, false
+		}
+		return a * b, true
+	}
+	var ok bool
+	if profile.Cost.SQLBytes, ok = product(rows, row); !ok {
+		return app.ContextQueryQualification{}, mounts.ErrUnavailable
+	}
+	if profile.Cost.BackupBytes, ok = product(profile.Cost.SQLBytes, h.BackupCopies); !ok {
+		return app.ContextQueryQualification{}, mounts.ErrUnavailable
+	}
+	// The existing query counter excludes worker/enrollment/certificate rows.
+	// Reserve their configured WAL estimate too, without another counter.
+	if profile.Cost.WALBytes, ok = product(controls+9+4*signs, wal); !ok {
+		return app.ContextQueryQualification{}, mounts.ErrUnavailable
+	}
+	if profile.Cost.WALBytes, ok = product(profile.Cost.WALBytes, h.WALCopies); !ok {
+		return app.ContextQueryQualification{}, mounts.ErrUnavailable
+	}
+	total, ok := product(p.Accounts, p.Records)
+	if !ok {
+		return app.ContextQueryQualification{}, mounts.ErrUnavailable
+	}
+	q := app.ContextQueryQualification{Format: app.ContextQueryQualificationFormat, CapacityID: newID(), Profile: profile, History: h, RootQueries: total, PrincipalQueries: p.Records, PrincipalAccounts: total, WorkloadAccounts: p.Accounts, WorkloadQueries: p.Records, Admission: time.Duration(p.AdmissionSeconds) * time.Second}
+	var err error
+	q.Envelope, err = q.Required()
+	return q, err
 }

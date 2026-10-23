@@ -53,6 +53,16 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 		publicRuntimeGrant{"table", "download_native_owner", "worker_id", "UPDATE"},
 		publicRuntimeGrant{"table", "download_key_binding", "used_roles", "UPDATE"},
 		publicRuntimeGrant{"table", "download_native_key", "used_roles", "UPDATE"})
+	// ADR-219 adds the same typed query SQL fences and only the existing
+	// irreversible key-consumption write to the isolated acquisition key role.
+	acquisition = append(acquisition, read("context_case_locator", "operation_audit", "operation_audit_lifecycle", "context_query_backing", "context_query_allocation", "context_query_principal", "context_query", "context_query_call", "context_query_worker", "context_query_batch", "context_query_key_binding")...)
+	for _, table := range []string{"operation_audit", "context_query_allocation", "context_query_principal", "context_query", "context_query_batch"} {
+		acquisition = append(acquisition, publicRuntimeGrant{"table", table, "id", "UPDATE"})
+	}
+	acquisition = append(acquisition, publicRuntimeGrant{"table", "operation_audit_lifecycle", "operation_id", "UPDATE"}, publicRuntimeGrant{"table", "context_query_backing", "root_id", "UPDATE"}, publicRuntimeGrant{"table", "context_query_key_binding", "used_roles", "UPDATE"})
+	for _, signature := range []string{"lock_context_query_capacity(uuid,uuid)", "context_query_capacity_allocation_current(uuid,uuid)", "context_query_shared_profile_current(uuid,jsonb)"} {
+		acquisition = append(acquisition, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
+	}
 	keys := func(v []publicRuntimeGrant) []string {
 		out := make([]string, len(v))
 		for n, g := range v {
@@ -68,9 +78,9 @@ func TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants(t *testing.
 				t.Fatalf("purpose grants differ: got %v, want %v", keys(got), keys(want))
 			}
 			for _, g := range got {
-				// No purpose deletes, executes a function or updates a whole row,
-				// and only the observer inserts.
-				if g.privilege == "DELETE" || g.kind == "function" || g.privilege == "UPDATE" && g.column == "" || g.privilege == "INSERT" && purpose != "worker-config-observe" {
+				// No purpose deletes or updates a whole row; only the observer
+				// inserts. The key role has the three exact query fences above.
+				if g.privilege == "DELETE" || g.kind == "function" && purpose != "key-acquisition" || g.privilege == "UPDATE" && g.column == "" || g.privilege == "INSERT" && purpose != "worker-config-observe" {
 					t.Fatal("effect beyond the purpose", g.key())
 				}
 			}
@@ -100,10 +110,10 @@ func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
 		fence = append(fence, publicRuntimeGrant{"table", table, "", "SELECT"})
 	}
 	// Downloads (download-session, download-source), DownloadWorkers.withSession
-	// (download-worker, and through it worker-enrollment/-activate, worker-owner,
+	// (download-worker and through it
 	// native-owner, native-key-bind), Downloads.withKeyBatch (download-key-bind)
 	// and the browser refresh effects (refresh-admit, refresh-owner).
-	for _, purpose := range []string{"download-session", "download-source", "download-worker", "worker-enrollment", "worker-enrollment-activate", "worker-owner", "native-owner", "download-key-bind", "native-key-bind", "refresh-admit", "refresh-owner"} {
+	for _, purpose := range []string{"download-session", "download-source", "download-worker", "worker-enrollment", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "refresh-admit", "refresh-owner"} {
 		got, ok := publicRuntimeDutyGrants(purpose)
 		if !ok {
 			t.Fatal("missing purpose", purpose)

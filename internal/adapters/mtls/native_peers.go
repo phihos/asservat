@@ -26,6 +26,7 @@ type NativeWorkerCertificates interface {
 // manufactured hub TLS state or a replacement worker/process.
 type NativePeerChecks struct {
 	Workers           evidence.WorkerEnrollmentBindings
+	Projection        evidence.ProjectionNativeReader
 	WorkerTrust       *WorkerTrustCatalog
 	Certificates      NativeWorkerCertificates
 	Origins           evidence.NativeOrigins
@@ -34,11 +35,34 @@ type NativePeerChecks struct {
 	Now               func() time.Time
 }
 
-func (p *NativePeerChecks) worker(ctx context.Context, h contracts.NativeHello) (value.DownloadWorkerIdentity, *KeyPeerVerifier, error) {
-	if p == nil || ctx == nil || ctx.Err() != nil || p.Workers == nil || p.WorkerTrust == nil || p.Now == nil {
-		return value.DownloadWorkerIdentity{}, nil, artifact.ErrInvalid
+func (p *NativePeerChecks) worker(ctx context.Context, h contracts.NativeHello) (value.AcquisitionWorkerIdentity, *KeyPeerVerifier, error) {
+	if p == nil || ctx == nil || ctx.Err() != nil || p.WorkerTrust == nil || p.Now == nil {
+		return value.AcquisitionWorkerIdentity{}, nil, artifact.ErrInvalid
 	}
-	w, e := p.Workers.ReadDownloadWorkerEnrollment(ctx, h.Reference.SessionID, h.Reference.WorkerID)
+	parent := value.AcquisitionParentFor(h.Reference.SessionID, h.Reference.QueryID)
+	var w value.AcquisitionWorkerIdentity
+	var e error
+	switch parent.Purpose {
+	case value.AcquisitionDownload:
+		if p.Workers == nil {
+			return w, nil, artifact.ErrInvalid
+		}
+		original, err := p.Workers.ReadDownloadWorkerEnrollment(ctx, parent.ID, h.Reference.WorkerID)
+		if err != nil || !original.Valid(p.Now()) {
+			return w, nil, artifact.ErrDownloadUnavailable
+		}
+		w = original.Acquisition()
+	case value.AcquisitionProjection:
+		if p.Projection == nil {
+			return w, nil, artifact.ErrInvalid
+		}
+		w, e = p.Projection.ReadAcquisitionEnrollment(ctx, parent, h.Reference.WorkerID)
+	default:
+		return w, nil, artifact.ErrInvalid
+	}
+	if !parent.Valid() || w.Worker.Intent.Parent != parent || w.Worker.Intent.ID != h.Reference.WorkerID {
+		return w, nil, artifact.ErrDownloadUnavailable
+	}
 	if e != nil || !w.Valid(p.Now()) || w.Worker.Binding.InstallationID != h.Reference.InstallationID {
 		return w, nil, artifact.ErrDownloadUnavailable
 	}
@@ -61,7 +85,7 @@ func (p *NativePeerChecks) CheckWorkerNative(ctx context.Context, state *tls.Con
 	}
 	call, stop := context.WithDeadline(ctx, w.FreshUntil)
 	defer stop()
-	origin, e := p.Origins.Check(call, h.Reference.InstallationID, h.Reference.SessionID, h.Reference.WorkerID, peer, h.WorkerToken)
+	origin, e := p.Origins.CheckAcquisition(call, h.Reference.InstallationID, w.Worker.Intent.Parent, h.Reference.WorkerID, peer, h.WorkerToken)
 	if e != nil {
 		var idle *evidence.NativeIdle
 		if errors.As(e, &idle) && idle != nil {
@@ -83,7 +107,7 @@ func (p *NativePeerChecks) CheckWorkerNative(ctx context.Context, state *tls.Con
 }
 func (p *NativePeerChecks) CheckForwardedNative(ctx context.Context, state *tls.ConnectionState, h contracts.NativeHello) (evidence.NativeOrigin, error) {
 	var zero evidence.NativeOrigin
-	if p == nil || p.ConnectorVerifier == nil || p.Connectors == nil || p.Certificates == nil || len(h.WorkerLeaf) < 1 || len(h.WorkerLeaf) > 16<<10 {
+	if p == nil || p.ConnectorVerifier == nil || p.Connectors == nil || len(h.WorkerLeaf) < 1 || len(h.WorkerLeaf) > 16<<10 {
 		return zero, artifact.ErrInvalid
 	}
 	connector, e := p.ConnectorVerifier.Verify(state)
@@ -100,7 +124,18 @@ func (p *NativePeerChecks) CheckForwardedNative(ctx context.Context, state *tls.
 	if e != nil || w.Worker.Binding.ClusterID != connector.Binding.ClusterID {
 		return zero, artifact.ErrDownloadUnavailable
 	}
-	certificate, e := p.Certificates.ReadNativeWorkerCertificate(call, h.Reference.SessionID, h.Reference.WorkerID, h.WorkerLeaf)
+	var certificate value.WorkerCertificate
+	switch w.Worker.Intent.Parent.Purpose {
+	case value.AcquisitionDownload:
+		if p.Certificates == nil {
+			return zero, artifact.ErrInvalid
+		}
+		certificate, e = p.Certificates.ReadNativeWorkerCertificate(call, h.Reference.SessionID, h.Reference.WorkerID, h.WorkerLeaf)
+	case value.AcquisitionProjection:
+		certificate, e = p.Projection.ReadProjectionWorkerCertificate(call, h.Reference.QueryID, h.Reference.WorkerID, h.WorkerLeaf)
+	default:
+		return zero, artifact.ErrInvalid
+	}
 	if e != nil || !bytes.Equal(certificate.DER, h.WorkerLeaf) {
 		return zero, artifact.ErrDownloadUnavailable
 	}
@@ -116,7 +151,7 @@ func (p *NativePeerChecks) CheckForwardedNative(ctx context.Context, state *tls.
 	if e != nil || peer != certificate.Peer || peer.PeerID != w.Worker.Binding.PodUID {
 		return zero, artifact.ErrDownloadUnavailable
 	}
-	origin, e := p.Origins.Check(call, h.Reference.InstallationID, h.Reference.SessionID, h.Reference.WorkerID, peer, h.WorkerToken)
+	origin, e := p.Origins.CheckAcquisition(call, h.Reference.InstallationID, w.Worker.Intent.Parent, h.Reference.WorkerID, peer, h.WorkerToken)
 	if e != nil {
 		return zero, e
 	}
@@ -130,7 +165,7 @@ func (p *NativePeerChecks) CheckForwardedNative(ctx context.Context, state *tls.
 	return origin, nil
 }
 func nativeWireRef(r value.NativeReference) contracts.NativeReference {
-	return contracts.NativeReference{InstallationID: r.InstallationID, SessionID: r.SessionID, WorkerID: r.WorkerID, OperationID: r.OperationID, Fence: r.Fence}
+	return contracts.NativeReference{InstallationID: r.InstallationID, SessionID: r.SessionID, QueryID: r.QueryID, WorkerID: r.WorkerID, OperationID: r.OperationID, Fence: r.Fence}
 }
 
 // RecheckWorkerNative and RecheckForwardedNative retain the original proof and

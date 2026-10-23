@@ -36,6 +36,7 @@ func ParseWorkerStartup(args []string, podUID string) (WorkerStartup, error) {
 	set.StringVar(&out.ClusterID, "cluster", "", "")
 	set.StringVar(&out.Target.WorkerID, "dispatch", "", "")
 	set.StringVar(&out.Target.SessionID, "session", "", "")
+	set.StringVar(&out.Target.QueryID, "query", "", "")
 	set.StringVar(&created, "created-at", "", "")
 	set.StringVar(&until, "until", "", "")
 	set.StringVar(&digest, "control-sha256", "", "")

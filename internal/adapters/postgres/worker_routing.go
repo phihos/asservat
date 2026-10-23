@@ -22,6 +22,7 @@ type WorkerRouting struct {
 }
 
 var _ evidence.WorkerEnrollmentBindings = (*WorkerRouting)(nil)
+var _ evidence.AcquisitionEnrollmentBindings = (*WorkerRouting)(nil)
 var _ evidence.WorkerOwnerLookup = (*WorkerRouting)(nil)
 
 func NewWorkerRouting(ctx context.Context, pool *pgxpool.Pool, root, installation string) (*WorkerRouting, error) {
@@ -47,6 +48,88 @@ func (s *WorkerRouting) ReadDownloadWorkerEnrollment(ctx context.Context, sessio
 		return value.DownloadWorkerIdentity{}, artifact.ErrInvalid
 	}
 	return o, nil
+}
+
+// ReadAcquisitionEnrollment chooses the profile from admitted state, never from
+// a worker-provided endpoint or a human request. This is identity observation;
+// native operations and key grants still require their own current authority.
+func (s *WorkerRouting) ReadAcquisitionEnrollment(ctx context.Context, parent value.AcquisitionParent, worker string) (value.AcquisitionWorkerIdentity, error) {
+	var out value.AcquisitionWorkerIdentity
+	if s == nil || ctx == nil || ctx.Err() != nil || !parent.Valid() || !value.UUID(worker) {
+		return out, artifact.ErrInvalid
+	}
+	if parent.Purpose == value.AcquisitionDownload {
+		o, err := s.ReadDownloadWorkerEnrollment(ctx, parent.ID, worker)
+		if err != nil {
+			return out, err
+		}
+		return o.Acquisition(), nil
+	}
+	started := time.Now().UTC()
+	ctx, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
+	defer cancel()
+	q := custodydb.New(s.ledger.pool)
+	row, err := q.ReadAcquisitionQuery(ctx, custodydb.ReadAcquisitionQueryParams{ID: id(parent.ID), RootID: id(s.root)})
+	if err != nil {
+		return out, err
+	}
+	query, err := queryFromRow(row)
+	if err != nil || row.Uncertain || query.WorkerID != worker || query.Plan.InstallationID != s.installation {
+		return out, artifact.ErrDownloadUnavailable
+	}
+	stored, err := q.ReadQueryAcquisitionWorker(ctx, custodydb.ReadQueryAcquisitionWorkerParams{QueryID: id(parent.ID), RootID: id(s.root)})
+	if err != nil {
+		return out, err
+	}
+	state, err := projectionWorkerState(stored, query)
+	if err != nil || !state.Audited || !state.Claimed || !state.Worker.Valid() {
+		return out, artifact.ErrDownloadUnavailable
+	}
+	profile := state.Worker.Intent.Profile
+	configuration := &WorkerConfigurations{s.ledger, s.installation, profile.ClusterID, profile.NamespaceUID, profile.Configuration.UID}
+	until, err := configuration.CurrentWorkerConfiguration(ctx, profile)
+	if err != nil {
+		return out, err
+	}
+	// As with the native-download observation, no outer transaction is held
+	// during the configuration check. Reread the exact parent and worker after
+	// that possible wait; enrollment effects acquire their own ordered locks.
+	currentQuery, err := q.ReadAcquisitionQuery(ctx, custodydb.ReadAcquisitionQueryParams{ID: id(parent.ID), RootID: id(s.root)})
+	if err != nil {
+		return out, err
+	}
+	current, err := queryFromRow(currentQuery)
+	if err != nil || currentQuery.Uncertain || !current.Equal(query) {
+		return out, artifact.ErrDownloadUnavailable
+	}
+	currentRow, err := q.ReadQueryAcquisitionWorker(ctx, custodydb.ReadQueryAcquisitionWorkerParams{QueryID: id(parent.ID), RootID: id(s.root)})
+	if err != nil {
+		return out, err
+	}
+	currentState, err := projectionWorkerState(currentRow, query)
+	if err != nil || !currentState.Audited || !currentState.Claimed || currentState.Worker != state.Worker || currentRow.TerminationJson != nil || currentRow.RetiredProofJson != nil {
+		return out, artifact.ErrDownloadUnavailable
+	}
+	trust, err := q.ReadFleetTrust(ctx, id(s.installation))
+	if err != nil {
+		return out, err
+	}
+	now, err := q.CurrentTime(ctx)
+	if err != nil {
+		return out, err
+	}
+	recovery, err := recoveryState(trust, started, now.Time)
+	if err != nil || recovery.InstallationID != s.installation || recovery.IssuerEpoch != query.RecoveryIssuerEpoch {
+		return out, artifact.ErrDownloadUnavailable
+	}
+	deadline, _ := ctx.Deadline()
+	until = identity.Earlier(until, identity.Earlier(recovery.FreshUntil, deadline))
+	until = identity.Earlier(until, identity.Earlier(query.Deadline, identity.Earlier(query.CredentialUntil, state.Worker.Intent.RunUntil)))
+	out = value.AcquisitionWorkerIdentity{Worker: state.Worker, ObservedAt: started, FreshUntil: until}
+	if ctx.Err() != nil || !out.Valid(now.Time) || !out.Valid(time.Now()) {
+		return value.AcquisitionWorkerIdentity{}, artifact.ErrDownloadExpired
+	}
+	return out, nil
 }
 
 func (s *WorkerRouting) ReadWorkerOwner(ctx context.Context, session, worker string) (value.WorkerOwnerLease, error) {

@@ -2,6 +2,7 @@ package evidence
 
 import (
 	identities "asservat.local/asservat/internal/application/identity"
+	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
@@ -21,11 +22,17 @@ type NativePendingExchange interface {
 	Wait(context.Context) (NativeExchange, error)
 	Close()
 }
+type NativeProjectionExchange interface {
+	Projection(context.Context) (query.PodStatusProjection, error)
+	AcknowledgeProjection(context.Context) error
+}
+
 type NativeExchangeRegistration struct {
-	Operation value.NativeOperation
-	Source    NativeContextSource
-	Delivery  artifact.DownloadDeliveryLease
-	Complete  NativeCompletion
+	Operation  value.NativeOperation
+	Projection *query.ContextProjectionScope
+	Source     NativeContextSource
+	Delivery   artifact.DownloadDeliveryLease
+	Complete   NativeCompletion
 }
 
 // The local registrar retains callbacks in the original hub process only.
@@ -151,7 +158,7 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 			return value.NativeLease{}, artifact.ErrDownloadUnavailable
 		}
 		l, e := c.Origins.Recheck(bound, origin)
-		if e != nil || !l.Operation.Equal(operation) || origin.Proof.Binding != c.Enrollment.Worker.Binding {
+		if e != nil || !l.Operation.Equal(operation) || origin.Proof.Binding != c.Enrollment.Worker.Binding.Acquisition() {
 			return value.NativeLease{}, artifact.ErrDownloadUnavailable
 		}
 		l.Until = identity.Earlier(l.Until, identity.Earlier(a.ValidUntil, end))
@@ -171,11 +178,15 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 		}
 		effect, cancel := context.WithDeadline(bound, l.Until)
 		defer cancel()
+		proof, ok := origin.Proof.DownloadProof()
+		if !ok {
+			return artifact.ErrInvalid
+		}
 		switch kind {
 		case value.NativePrepare:
-			e = c.PreparationKeys.BindAttestedDownloadKeys(effect, r.SessionID, a, parent, generation, c.KeyScope, origin.Proof.Peer, origin.Proof)
+			e = c.PreparationKeys.BindAttestedDownloadKeys(effect, r.SessionID, a, parent, generation, c.KeyScope, proof.Peer, proof)
 		case value.NativeResponse:
-			e = c.WindowKeys.BindNativeDownloadKeys(effect, operation.Reference, delivery, c.KeyScope, origin.Proof.Peer, origin.Proof)
+			e = c.WindowKeys.BindNativeDownloadKeys(effect, operation.Reference, delivery, c.KeyScope, proof.Peer, proof)
 		case value.NativeObserve:
 		default:
 			return artifact.ErrInvalid

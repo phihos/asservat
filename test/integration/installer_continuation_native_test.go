@@ -500,7 +500,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
 		installedJourney(t, ctx, identity, publicRoot, publicAddress, origin, diagnose,
-			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose))(cluster, namespace, workload, deny)
+			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, p.RootID))(cluster, namespace, workload, deny)
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)

@@ -39,7 +39,7 @@ func TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection(t *testing.T) {
 	if !slices.Equal(contracts.PublicRuntimeRolePurposes(), want) || !slices.Equal(contracts.PublicRuntimeHubRolePurposes(), wantHub) || PublicRuntimeRoleLayoutDigest() != before {
 		t.Fatal("caller mutation changed source-owned role inventory")
 	}
-	for _, unknown := range []string{"browser-cleanup", "capacity-arbitrary", "capture-source", "administrator", "identity-read ", "identity-read; DROP ROLE postgres"} {
+	for _, unknown := range []string{"browser-cleanup", "worker-owner", "capacity-arbitrary", "capture-source", "administrator", "identity-read ", "identity-read; DROP ROLE postgres"} {
 		if _, known := contracts.PublicRuntimeRoleOrdinal(unknown); known {
 			t.Fatalf("unimplemented purpose acquired an ordinal: %s", unknown)
 		}

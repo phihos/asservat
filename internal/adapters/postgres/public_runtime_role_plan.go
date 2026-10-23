@@ -96,7 +96,7 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		return out, true
 	}
 	if table, ok := publicRuntimeHubExtensionGrantTable[purpose]; ok {
-		return slices.Clone(table), true
+		return ownerIdentityGrantSet(append(slices.Clone(table), publicRuntimeProjectionGrants(purpose)...)), true
 	}
 	// The publisher retains its own narrow identity and retention credentials.
 	// Consolidating hub metadata never expands this separate process's grants.
@@ -424,6 +424,7 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		}
 		add("browser_refresh_owner", "UPDATE", fields...)
 	}
+	out = append(out, publicRuntimeProjectionGrants(purpose)...)
 	slices.SortFunc(out, func(a, b publicRuntimeGrant) int { return strings.Compare(a.key(), b.key()) })
 	return slices.CompactFunc(out, func(a, b publicRuntimeGrant) bool { return a == b }), true
 }

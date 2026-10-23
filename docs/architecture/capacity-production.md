@@ -220,10 +220,11 @@ in implementation progress.
 
 ## Original-installation query extension
 
-[Protected query capacity](context-query-capacity.md) adds an optional closed
-original setup extension and a separate immutable residual reservation. Existing
-base totals stay exact. Accepted query resource/history measurements and four
-independent current deployment proofs are mandatory; absent qualification does
-not inherit download capacity. The first implementation is finite and does not
-replenish on root renewal, query expiry or restart. It supplies no installed
-query roles, native qualification or public availability.
+[Shared query capacity](context-query-capacity.md), under ADR-219, adds a closed
+original setup extension and one immutable logical residual reservation. Existing
+root and workload publication transactions accept it; the separate query source
+observer and four-deployment requirement are removed. Queries and downloads use
+the actual installed acquisition/hub/key/provider limits with distinct authority
+and charged query history. Base totals stay exact, each plan binds the exact
+workload and current accepted worker profile, and renewal/expiry/restart never
+replenish the original query budget. Installed qualification is recorded separately.

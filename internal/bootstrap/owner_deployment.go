@@ -22,7 +22,6 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/application/evidence"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	configuration "asservat.local/asservat/internal/domain/configuration"
@@ -44,7 +43,7 @@ type OwnerDeployment struct {
 	// contextStartStats counts the context-start ingress clients (ADR-208).
 	contextStartStats regionalAPIStats
 	Runtime           *OwnerRuntime
-	Router            *evidence.WorkerEnrollmentRouter
+	workerIdentities  *postgres.WorkerRouting
 	inputs            *ownerInputs
 	trust             *mtls.WorkerTrustCatalog
 	root              context.Context
@@ -202,10 +201,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 	if _, err = d.refreshWorkerTrust(startup); err != nil {
 		return nil, err
 	}
-	d.Router, err = evidence.NewWorkerEnrollmentRouter(root, c.InstallationID, reader, time.Now, c.Concurrency)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
+	d.workerIdentities = reader
 	var nativeConfig *OwnerNativeRuntimeConfig
 	if (c.Native == nil) != (pool.NativePort == 0) {
 		return nil, mounts.ErrUnavailable
@@ -296,9 +292,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 	if parts.readinessProofs != nil {
 		readinessProofs = parts.readinessProofs
 	}
-	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, ReadinessProofs: readinessProofs, Routes: routes, Protection: guard, Requests: func(b value.OwnerBinding) (evidence.WorkerOwnerEnrollment, error) {
-		return &evidence.WorkerRequestOwners{Router: d.Router, PodUID: b.PodUID, ProcessEpoch: b.ProcessEpoch}, nil
-	}, WorkerTrust: d.trust, Workers: reader, Locators: reader, Connections: c.Connections, Concurrency: c.Concurrency, Native: nativeConfig, Observation: observation, Operation: operation})
+	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, ReadinessProofs: readinessProofs, Routes: routes, Protection: guard, Connections: c.Connections, Concurrency: c.Concurrency, Native: nativeConfig, Observation: observation, Operation: operation})
 	if err != nil || startup.Err() != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -361,16 +355,10 @@ func (d *OwnerDeployment) Close() {
 		// Disable both owners before joining either. Runtime.Run owns its
 		// readiness/native children; the router also admits independent control
 		// registrations and retains busy deliveries through their final close.
-		if d.Router != nil {
-			d.Router.Close()
-		}
 		if d.Runtime != nil {
 			d.Runtime.Close()
 		}
 		d.owners.Wait()
-		if d.Router != nil {
-			d.Router.CloseAndJoin()
-		}
 		// Provider lifetimes join before the files and pools they borrow close.
 		if d.providers != nil {
 			_ = d.providers.CloseAndJoin(context.Background())

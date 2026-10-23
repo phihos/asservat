@@ -24,7 +24,8 @@ import (
 // original disclosure/effect/cleanup/history horizons and purpose-specific path. A caller profile or qualification digest is not proof.
 // The callback performs SQL only, at most once. SQL still locks and compares the
 // accepted epochs/profile/accounts: a remote observation cannot make SQL atomic.
-// No production implementation or setup grant is supplied by this component.
+// SharedContextQueryPlans is the installed implementation; current source,
+// allocation and configuration checks remain inside the effect transaction.
 type ContextQueryBackingGuard interface {
 	WithCurrentQueryBacking(context.Context, value.ContextQueryPlan, value.ContextProjectionAuthority, func(context.Context) error) error
 }
@@ -152,13 +153,13 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 	if e != nil {
 		return e
 	}
-	if ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time) || b.Suspended || uid(b.InstallationID) != q.Plan.InstallationID || uid(b.AcceptanceID) != q.Plan.AcceptanceID || !identity.Fresh(b.ObservedAt.Time, b.FreshUntil.Time, now.Time, 5*time.Second) ||
+	if ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time) || b.Suspended || uid(b.InstallationID) != q.Plan.InstallationID || uid(b.AcceptanceID) != q.Plan.AcceptanceID ||
 		a.PermissionRevision.UID != uid(p.Epoch) || a.PermissionRevision.Generation != p.Sequence || !bytes.Equal(a.PermissionRevision.Digest[:], p.ProjectionDigest) || p.Suspended || !p.InitialAuditID.Valid || !now.Time.Before(p.LeaseUntil.Time) || !identity.Fresh(p.ObservedAt.Time, p.FreshUntil.Time, now.Time, 5*time.Second) {
 		return value.ErrUnavailable
 	}
 	var profile value.ContextQueryResourceProfile
 	var pool, policy, qualification identity.Revision
-	if queryDecode(b.Profile, 32768, &profile) != nil || profile != q.Plan.Profile || queryDecode(b.Qualification, 32768, &qualification) != nil || qualification != profile.Qualification ||
+	if queryDecode(b.Profile, 32768, &profile) != nil || profile != q.Plan.Profile.SharedBudget() || queryDecode(b.Qualification, 32768, &qualification) != nil || qualification != profile.Qualification ||
 		!b.HardUntil.Time.Equal(q.Plan.HardUntil) || !b.EffectsUntil.Time.Equal(q.Plan.EffectsUntil) || !b.CleanupUntil.Time.Equal(q.Plan.CleanupUntil) || !b.RetireBy.Time.Equal(q.Plan.RetireBy) || queryDecode(allocation.PoolSource, 4096, &pool) != nil || queryDecode(allocation.PolicySource, 4096, &policy) != nil || pool != q.Plan.PoolSource || policy != q.Plan.PolicySource || allocation.Revision != q.Plan.AllocationRevision || uid(allocation.ClusterID) != q.Scope.ClusterID || allocation.NamespaceUid != q.Scope.NamespaceUID || allocation.WorkloadUid != q.Scope.WorkloadUID {
 		return value.ErrUnavailable
 	}
@@ -198,6 +199,14 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 	if e = s.recovery.check(ctx, tx, recovery, s.root, a.Environment.Recovery); e != nil {
 		return e
 	}
+	profileBody, e := queryJSON(q.Plan.Profile)
+	if e != nil {
+		return value.ErrUnavailable
+	}
+	configured, e := tx.ContextQuerySharedProfileCurrent(ctx, custodydb.ContextQuerySharedProfileCurrentParams{RootID: id(s.root), Profile: profileBody})
+	if e != nil || !configured {
+		return value.ErrUnavailable
+	}
 	// The same root can acquire a restrictive workload/source change. Compare
 	// the exact original allocation to current protected base capacity at the
 	// end of both the pre-effect and post-effect fence, after blocking reads.
@@ -206,7 +215,7 @@ func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q val
 		return value.ErrUnavailable
 	}
 	now, e = tx.CurrentTime(ctx)
-	if e != nil || ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time) || !now.Time.Before(published.EffectiveExpiresAt.Time) || !now.Time.Before(topology.FreshUntil) || !now.Time.Before(b.FreshUntil.Time) || !now.Time.Before(p.FreshUntil.Time) || !now.Time.Before(p.LeaseUntil.Time) {
+	if e != nil || ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time) || !now.Time.Before(published.EffectiveExpiresAt.Time) || !now.Time.Before(topology.FreshUntil) || !now.Time.Before(p.FreshUntil.Time) || !now.Time.Before(p.LeaseUntil.Time) {
 		return value.ErrUnavailable
 	}
 	return nil

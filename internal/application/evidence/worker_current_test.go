@@ -195,7 +195,7 @@ func (f *workerLifecycleFixture) ReadWorkerEnrollmentProof(ctx context.Context, 
 	}
 	return value.WorkerEnrollmentProof{Worker: f.w, PublicKeyDigest: key, TokenDigest: artifact.Digest{1}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, e
 }
-func (f *workerLifecycleFixture) ClaimWorkerEnrollment(ctx context.Context, p value.WorkerEnrollmentProof, _ artifact.DownloadAuthority) (value.WorkerEnrollment, audit.Receipt, bool, error) {
+func (f *workerLifecycleFixture) ClaimWorkerEnrollment(ctx context.Context, p value.WorkerEnrollmentProof) (value.WorkerEnrollment, audit.Receipt, bool, error) {
 	e := f.step(ctx, "claim-enrollment")
 	if f.enrollment.PublicKeyDigest == (artifact.Digest{}) {
 		f.enrollment = value.WorkerEnrollment{Worker: p.Worker, PublicKeyDigest: p.PublicKeyDigest, ClaimedAt: f.Now()}
@@ -209,14 +209,14 @@ func (f *workerLifecycleFixture) WriteWorkerEnrollment(ctx context.Context, e va
 func (f *workerLifecycleFixture) AcknowledgeWorkerEnrollment(ctx context.Context, _ value.WorkerEnrollment, _ audit.Receipt) error {
 	return f.step(ctx, "ack-enrollment-audit")
 }
-func (f *workerLifecycleFixture) PrepareWorkerCertificate(ctx context.Context, p value.WorkerEnrollmentProof, a artifact.DownloadAuthority) (value.WorkerCertificateProgress, error) {
+func (f *workerLifecycleFixture) PrepareWorkerCertificate(ctx context.Context, p value.WorkerEnrollmentProof) (value.WorkerCertificateProgress, error) {
 	e := f.step(ctx, "prepare-certificate")
 	n := f.Now()
 	epoch, until, err := value.WorkerCertificateEpoch(f.w, n)
 	if err != nil {
 		return value.WorkerCertificateProgress{}, err
 	}
-	f.attempt = value.WorkerCertificateAttempt{ID: f.w.Intent.ID, Epoch: epoch, Ordinal: 1, Enrollment: f.enrollment, Proof: p, RecoveryEpoch: a.Environment.RecoveryEpoch, EnrollmentAudit: artifact.Digest{1}, CheckedAt: n, SignBefore: identity.Earlier(p.FreshUntil, a.ValidUntil), CertificateNotAfter: until}
+	f.attempt = value.WorkerCertificateAttempt{ID: f.w.Intent.ID, Epoch: epoch, Ordinal: 1, Enrollment: f.enrollment, Proof: p, RecoveryEpoch: p.Worker.Intent.Authority.Environment.RecoveryEpoch, EnrollmentAudit: artifact.Digest{1}, CheckedAt: n, SignBefore: p.FreshUntil, CertificateNotAfter: until}
 	return value.WorkerCertificateProgress{Attempt: f.attempt, MaySign: true}, e
 }
 func (f *workerLifecycleFixture) SignWorkerCertificate(ctx context.Context, a value.WorkerCertificateAttempt, _ []byte) (value.WorkerCertificate, error) {
@@ -224,7 +224,7 @@ func (f *workerLifecycleFixture) SignWorkerCertificate(ctx context.Context, a va
 	der := []byte("synthetic-certificate-not-a-real-provider")
 	return value.WorkerCertificate{DER: der, ChainDER: [][]byte{}, Peer: value.KeyPeer{InstallationID: f.w.Binding.InstallationID, Role: "acquisition", PeerID: f.w.Binding.PodUID, Certificate: sha256.Sum256(der), NotBefore: f.Now().Add(-time.Second), NotAfter: a.CertificateNotAfter}}, e
 }
-func (f *workerLifecycleFixture) StoreWorkerCertificate(ctx context.Context, _ value.WorkerCertificateAttempt, c value.WorkerCertificate, _ artifact.DownloadAuthority) error {
+func (f *workerLifecycleFixture) StoreWorkerCertificate(ctx context.Context, _ value.WorkerCertificateAttempt, c value.WorkerCertificate) error {
 	e := f.step(ctx, "store-certificate")
 	f.certificate = c
 	return e
@@ -239,7 +239,7 @@ func (f *workerLifecycleFixture) WriteWorkerCertificate(ctx context.Context, c a
 func (f *workerLifecycleFixture) AcknowledgeWorkerCertificate(ctx context.Context, _ audit.WorkerCertificate, _ audit.Receipt) error {
 	return f.step(ctx, "ack-certificate-audit")
 }
-func (f *workerLifecycleFixture) ActivateWorkerCertificate(ctx context.Context, _ value.WorkerEnrollmentProof, _ value.WorkerCertificateAttempt, _ artifact.DownloadAuthority) (value.WorkerCertificate, error) {
+func (f *workerLifecycleFixture) ActivateWorkerCertificate(ctx context.Context, _ value.WorkerEnrollmentProof, _ value.WorkerCertificateAttempt) (value.WorkerCertificate, error) {
 	return f.certificate, f.step(ctx, "activate")
 }
 func newWorkerLifecycleFixture(t *testing.T) (*workerLifecycleFixture, *DownloadDispatcher, WorkerEnrollmentCoordinator, identities.CurrentIdentity) {

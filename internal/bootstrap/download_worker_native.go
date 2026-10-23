@@ -55,7 +55,7 @@ func (l workerNativeLoop) Run(parent context.Context) error {
 			clear(token)
 			return artifact.ErrDownloadUnavailable
 		}
-		h := contracts.NativeHello{Format: contracts.NativeExchangeFormat, Reference: contracts.NativeReference{InstallationID: l.target.InstallationID, SessionID: l.target.SessionID, WorkerID: l.target.WorkerID}, Nonce: l.nonce(), WorkerToken: token}
+		h := contracts.NativeHello{Format: contracts.NativeExchangeFormat, Reference: contracts.NativeReference{InstallationID: l.target.InstallationID, SessionID: l.target.SessionID, QueryID: l.target.QueryID, WorkerID: l.target.WorkerID}, Nonce: l.nonce(), WorkerToken: token}
 		if !contracts.ValidWorkerNonce(h.Nonce) || !contracts.ValidWorkerToken(token) {
 			clear(token)
 			return artifact.ErrInvalid
@@ -197,7 +197,15 @@ func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.Worke
 	if err != nil {
 		return err
 	}
-	result, err := evidence.NewRegionalContextResult(ctx, input.Target, reader, time.Now)
+	var result *evidence.RegionalContextResult
+	switch input.Target.Parent().Purpose {
+	case value.AcquisitionDownload:
+		result, err = evidence.NewRegionalContextResult(ctx, input.Target, reader, time.Now)
+	case value.AcquisitionProjection:
+		result, err = evidence.NewRegionalApprovedResult(ctx, input.Target, reader, time.Now)
+	default:
+		return artifact.ErrInvalid
+	}
 	if err != nil {
 		return err
 	}

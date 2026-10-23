@@ -3,8 +3,8 @@ import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import type { ContextProjection } from './projection';
 
-// Installed composition must explicitly supply this view after query support is
-// qualified. It is not registered in the existing evidence page by default.
+// The evidence page supplies one owner for each saved pod-status artifact.
+// Inspection remains explicit and the server decides current read availability.
 export function ContextProjectionView({ controller, session, scope, caseID, artifactID }: { controller: ContextProjection; session: Session; scope: AbortSignal; caseID: string; artifactID: string }) {
   const snapshot = useSyncExternalStore(controller.subscribe, controller.snapshot);
   // A replacement render must not expose the old target while its passive

@@ -1,428 +1,123 @@
 package integration
 
 import (
-	"context"
-	"crypto/sha256"
-	"crypto/tls"
-	"encoding/json"
-	"errors"
-	"strings"
-	"sync/atomic"
-	"testing"
-	"time"
-
 	"asservat.local/asservat/internal/adapters/objectstore"
-	"asservat.local/asservat/internal/adapters/postgres"
 	app "asservat.local/asservat/internal/application/capacity"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
+	"context"
+	"crypto/tls"
+	"encoding/json"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"testing"
+	"time"
 )
 
-// The declared report/profile and four native deployment guards are synthetic.
-// This verifies actual original installation/role/source/phase-3 provenance and
-// SQL69 accounting. It does NOT qualify worker/provider resource enforcement.
+// SQL qualification of one original shared logical reservation. Deployment
+// observations are fixture input; this does not measure physical resource use.
 func TestContextQueryCapacityWithRealPostgres(t *testing.T) {
 	withCapacityProducerFixture(t, qualifyContextQueryCapacitySQL)
 }
 
-type queryCapacitySyntheticGuard struct{}
-
-func (queryCapacitySyntheticGuard) WithCurrentQueryDeployment(ctx context.Context, _ app.ContextQueryQualification, _ app.QueryDeploymentPin, next func(context.Context) error) error {
-	return next(ctx)
-}
-
-type queryCapacityCountingGuard struct {
-	calls   *atomic.Int64
-	after   chan struct{}
-	release <-chan struct{}
-	fail    bool
-}
-
-func (g queryCapacityCountingGuard) WithCurrentQueryDeployment(ctx context.Context, _ app.ContextQueryQualification, _ app.QueryDeploymentPin, next func(context.Context) error) error {
-	g.calls.Add(1)
-	if g.fail {
-		return value.ErrUnavailable
-	}
-	err := next(ctx)
-	if g.after != nil {
-		close(g.after)
-		select {
-		case <-g.release:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-	}
-	return err
-}
-
-// The real SQL commit succeeds; the test discards its acknowledgement before
-// returning to the producer. This models unknown begin without forging state.
-type queryCapacityLostClaim struct {
-	app.QueryCapacityWriter
-	source app.QueryCapacitySource
-	plan   app.QueryBackingPlan
-	claim  app.QueryCapacityObservation
-}
-
-func (w *queryCapacityLostClaim) BeginQueryCapacityObservation(ctx context.Context, s app.QueryCapacitySource, p app.QueryBackingPlan, id string) (app.QueryCapacityObservation, error) {
-	c, e := w.QueryCapacityWriter.BeginQueryCapacityObservation(ctx, s, p, id)
-	w.source, w.plan, w.claim = s, p, c
-	if e != nil {
-		return app.QueryCapacityObservation{}, e
-	}
-	return app.QueryCapacityObservation{}, value.ErrUnavailable
-}
-
 func syntheticQueryCapacityQualification(t *testing.T, f *capacitySQLFixture) {
 	t.Helper()
-	root, cluster := f.qualification.RootBacking.RootID, f.template.ClusterID
 	rev := identity.Revision{UID: custodyID(), Generation: 1, Digest: artifact.Digest{41}}
-	path := value.ContextProjectionPath{Purpose: value.ContextProjectionPurpose, ID: custodyID(), TargetClusterID: cluster, StoreID: f.qualification.Backends[0].EvidenceStoreID, StorageRegion: "local", AcquisitionClusterID: cluster, AcquisitionRegion: "local", ConnectorClusterID: cluster, ConnectorRegion: "local", HubClusterID: cluster, HubRegion: "local", WorkerConfiguration: rev, HubConfiguration: rev}
-	p := value.ContextQueryResourceProfile{ID: custodyID(), Source: rev, Qualification: rev, Path: path, Lifetime: 10 * time.Second, PollLimit: 4, ControlTransitionLimit: 32,
+	p := value.ContextQueryResourceProfile{ID: custodyID(), Source: rev, Qualification: rev, Path: value.ContextProjectionPath{Purpose: value.ContextProjectionPurpose}, Lifetime: 60 * time.Second, PollLimit: 4, ControlTransitionLimit: 32,
 		Worker: value.ContextQueryWorkerLimits{CPUMilli: 100, MemoryBytes: 64 << 20, EphemeralStorageBytes: 4 << 20, WorkerTransientBytes: 8 << 20, HubTransientBytes: 128 << 10, ProviderConcurrency: 1, AuthenticationConcurrency: 1, Runtime: time.Minute, CredentialLifetime: 2 * time.Minute, ProviderEffectLifetime: time.Minute, Cleanup: time.Minute},
-		Cost:   value.ContextQueryCost{Workers: 1, ReadBatches: 2, ReadBytes: 8 << 20, StructuredBytes: 48 << 10, WireBytes: 128 << 10, UnwrapAttempts: 6, ProviderRequests: 100, AuthenticationRequests: 100, SigningAttempts: 2, AuditObjects: 13, SQLRows: 47, SQLBytes: 4 << 20, WALBytes: 64 << 20, BackupBytes: 8 << 20}}
-	q := app.ContextQueryQualification{Format: app.ContextQueryQualificationFormat, CapacityID: custodyID(), Profile: p, RootQueries: 2, PrincipalQueries: 1, PrincipalAccounts: 2, WorkloadAccounts: 1, WorkloadQueries: 2, SourceTransitionLimit: 6, Admission: 60 * time.Second, PolicyRevision: rev, PermittedRegions: []string{"local"}, Clients: []value.ContextProjectionClient{{Issuer: "https://id.example.test", ID: "console", Kind: identity.Human, Purposes: []string{"diagnostics"}}},
-		History: app.QueryHistoryQualification{Layout: app.ContextQueryHistoryLayout, Revision: rev, FixedBytes: 1 << 20, PrincipalBytes: 4096, AllocationBytes: 4096, RowBytes: 4096, FixedQueryRows: 10, InvocationRows: 1, ControlRows: 1, TransitionWALBytes: 64 << 10, BackupCopies: 2, WALCopies: 2, AuditCipherBytes: 64 << 10, AuthenticationPerCall: 1, ProviderPerCall: 1, AuthenticationPerControl: 1, ProviderPerControl: 1, AuthenticationPerSource: 1, ProviderPerSource: 1, BackupHorizon: time.Hour, RetirementCleanup: time.Minute}}
-	b, _ := json.Marshal(p.Cost)
-	var costs map[string]int64
-	if json.Unmarshal(b, &costs) != nil {
-		t.Fatal("synthetic cost vector")
+		Cost:   value.ContextQueryCost{Workers: 1, ReadBatches: 2, ReadBytes: 8 << 20, StructuredBytes: 48 << 10, WireBytes: 128 << 10, UnwrapAttempts: 6, ProviderRequests: 100, AuthenticationRequests: 100, SigningAttempts: 2, AuditObjects: 14, SQLRows: 47, SQLBytes: 4 << 20, WALBytes: 64 << 20, BackupBytes: 8 << 20}}
+	q := app.ContextQueryQualification{Format: app.ContextQueryQualificationFormat, CapacityID: custodyID(), Profile: p, RootQueries: 2, PrincipalQueries: 1, PrincipalAccounts: 2, WorkloadAccounts: 1, WorkloadQueries: 2, Admission: 60 * time.Second,
+		History: app.QueryHistoryQualification{Layout: app.ContextQueryHistoryLayout, Revision: rev, FixedBytes: 1 << 20, PrincipalBytes: 4096, AllocationBytes: 4096, RowBytes: 4096, FixedQueryRows: 10, InvocationRows: 1, ControlRows: 1, TransitionWALBytes: 64 << 10, BackupCopies: 2, WALCopies: 2, AuditCipherBytes: 64 << 10, BackupHorizon: time.Hour, RetirementCleanup: time.Minute}}
+	var err error
+	q.Envelope, err = q.Required()
+	if err != nil {
+		t.Fatal(err)
 	}
-	for k, n := range costs {
-		costs[k] = n * 2
-	}
-	costs["ProviderRequests"] += 7
-	costs["AuthenticationRequests"] += 7
-	costs["SQLBytes"] = 12 << 20
-	costs["BackupBytes"] = 24 << 20
-	costs["WALBytes"] = 160 << 20
-	b, _ = json.Marshal(costs)
-	if json.Unmarshal(b, &q.Envelope.ContextQueryCost) != nil {
-		t.Fatal("synthetic cost vector")
-	}
-	q.Envelope.QueryProcessEnvelope = app.QueryProcessEnvelope{CPUMilli: 200, MemoryBytes: 128 << 20, EphemeralStorageBytes: 8 << 20, WorkerTransientBytes: 16 << 20, HubTransientBytes: 256 << 10, ProviderConcurrency: 2, AuthenticationConcurrency: 2}
-	pin := func(role string) app.QueryDeploymentPin {
-		return app.QueryDeploymentPin{Role: role, ClusterID: cluster, NamespaceUID: f.template.ControlNamespace.UID, WorkloadUID: role + "-" + root, Image: "synthetic-only@sha256:" + strings.Repeat("a", 64), Configuration: rev, ProtectionDigest: artifact.Digest{42}, EnforcedLimitsDigest: artifact.Digest{43}, Limits: q.Envelope.QueryProcessEnvelope}
-	}
-	b, _ = json.Marshal(p)
-	q.Native = app.QueryNativeQualification{Revision: rev, Format: "context-query-native-qualification/v1", RunID: "synthetic-sql-component-only", ReportDigest: artifact.Digest{44}, SourceTree: artifact.Digest{45}, ProfileDigest: sha256.Sum256(b), Worker: pin("query-worker"), Hub: pin("hub"), KeyService: pin("query-key-service"), Provider: pin("query-provider"), Combined: q.Envelope.QueryProcessEnvelope}
-	q.Native.Combined = app.QueryProcessEnvelope{CPUMilli: q.Envelope.CPUMilli * 4, MemoryBytes: q.Envelope.MemoryBytes * 4, EphemeralStorageBytes: q.Envelope.EphemeralStorageBytes * 4, WorkerTransientBytes: q.Envelope.WorkerTransientBytes * 4, HubTransientBytes: q.Envelope.HubTransientBytes * 4, ProviderConcurrency: q.Envelope.ProviderConcurrency * 4, AuthenticationConcurrency: q.Envelope.AuthenticationConcurrency * 4}
-	q.Envelope.QueryProcessEnvelope = q.Native.Combined
 	f.qualification.ContextQuery = &q
 	if !f.qualification.Valid() {
-		t.Fatal("synthetic query qualification structurally invalid")
+		t.Fatal("synthetic shared query qualification invalid")
 	}
 }
 
 func qualifyContextQueryCapacitySQL(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) { syntheticQueryCapacityQualification(t, f) })
-	qualificationBody, _ := json.Marshal(f.qualification.ContextQuery)
-	baseBody, _ := json.Marshal(f.qualification.RootBacking)
-	for _, mode := range []string{"original", "legacy-history", "missing-limits", "duplicate-deployment", "short-worker", "short-rows", "short-audits", "unknown-profile-field"} {
+	body, _ := json.Marshal(f.qualification.ContextQuery)
+	base, _ := json.Marshal(f.qualification.RootBacking)
+	for _, mode := range []string{"original", "legacy-layout", "root-selected-target", "short-rows", "missing-worker-intent-audit", "missing-identity-wal", "unfunded", "unknown-field"} {
 		var candidate map[string]any
-		if e := json.Unmarshal(qualificationBody, &candidate); e != nil {
-			t.Fatal(e)
+		if json.Unmarshal(body, &candidate) != nil {
+			t.Fatal("decode")
 		}
-		profile := candidate["Profile"].(map[string]any)
+		p := candidate["Profile"].(map[string]any)
 		switch mode {
-		case "legacy-history":
-			candidate["History"].(map[string]any)["Layout"] = "context-query-history/v1"
-		case "missing-limits":
-			delete(candidate["Native"].(map[string]any)["Provider"].(map[string]any), "Limits")
-		case "duplicate-deployment":
-			native := candidate["Native"].(map[string]any)
-			native["Provider"].(map[string]any)["WorkloadUID"] = native["KeyService"].(map[string]any)["WorkloadUID"]
-		case "short-worker":
-			candidate["Native"].(map[string]any)["Worker"].(map[string]any)["Limits"].(map[string]any)["CPUMilli"] = 1
+		case "legacy-layout":
+			candidate["Format"] = "protected-context-query-qualification/v1"
+		case "root-selected-target":
+			p["Path"].(map[string]any)["TargetClusterID"] = scope.ClusterID
 		case "short-rows":
-			profile["Cost"].(map[string]any)["SQLRows"] = 12
-		case "short-audits":
-			profile["Cost"].(map[string]any)["AuditObjects"] = 10
-		case "unknown-profile-field":
-			profile["Other"] = true
+			p["Cost"].(map[string]any)["SQLRows"] = 12
+		case "missing-worker-intent-audit":
+			p["Cost"].(map[string]any)["AuditObjects"] = 13
+		case "missing-identity-wal":
+			p["Cost"].(map[string]any)["WALBytes"] = 32 * (64 << 10) * 2
+		case "unfunded":
+			candidate["Envelope"].(map[string]any)["SQLBytes"] = 1
+		case "unknown-field":
+			p["Other"] = true
 		}
-		body, _ := json.Marshal(candidate)
+		encoded, _ := json.Marshal(candidate)
 		var valid bool
-		if e := admin.QueryRow(ctx, "SELECT context_query_qualification_valid($1::jsonb,$2::jsonb)", body, baseBody).Scan(&valid); e != nil || valid != (mode == "original") {
-			t.Fatal("SQL qualification validation", mode, e)
+		if err := admin.QueryRow(ctx, "SELECT context_query_qualification_valid($1::jsonb,$2::jsonb)", encoded, base).Scan(&valid); err != nil || valid != (mode == "original") {
+			t.Fatal("closed shared qualification", mode, valid, err)
 		}
 	}
-	if _, e := f.producer.InitializeCapacity(ctx, f.input, f.protection); e != nil {
-		t.Fatal("actual original query qualification setup", e)
+	if _, err := f.producer.InitializeCapacity(ctx, f.input, f.protection); err != nil {
+		t.Fatal(err)
 	}
 	f.open(t)
 	o := f.rootObservation(t)
-	root, e := f.roots.ReserveCapacityRoot(ctx, o)
-	if e != nil {
-		t.Fatal("reserve base root", e)
-	}
-	root, e = f.captureRoots.BackCapacityRoot(ctx, o, root)
-	if e != nil {
-		t.Fatal("capture backing", e)
-	}
-	root, e = f.roots.PublishCapacityRoot(ctx, o, root)
-	if e != nil || !root.AdmissionReady(time.Now()) {
-		t.Fatal("publish base root", e)
-	}
-	coordinator := app.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}
-	observation := f.workloadObservation(t, 0)
-	enrolled, e := coordinator.Reconcile(ctx, observation)
-	if e != nil {
-		t.Fatal("actual protected workload", e)
-	}
-	// These narrow grants are fixture-only. Production role layout/bootstrap is
-	// deliberately unchanged by the inert query-capacity component.
-	writerName := pgx.Identifier{f.roles["capacity"].Config().ConnConfig.User}.Sanitize()
-	readerName := pgx.Identifier{f.roles["capacity-profile-read"].Config().ConnConfig.User}.Sanitize()
-	if _, e = admin.Exec(ctx, "GRANT EXECUTE ON FUNCTION read_context_query_capacity_source(uuid,jsonb),read_context_query_capacity_plan(uuid,uuid,uuid,text,text,jsonb,bytea,uuid) TO "+readerName+"; GRANT EXECUTE ON FUNCTION begin_context_query_capacity_observation(uuid,jsonb,jsonb,uuid,bigint),accept_context_query_capacity(uuid,jsonb,jsonb,jsonb),complete_context_query_capacity_observation(uuid,jsonb,timestamptz),allocate_context_query_capacity(uuid,uuid,uuid,text,text,uuid),suspend_context_query_capacity(uuid,timestamptz) TO "+writerName); e != nil {
-		t.Fatal("fixture purpose grants", e)
-	}
-	reads, e := postgres.NewContextQueryCapacityReads(ctx, f.roles["capacity-profile-read"], f.input.PermissionRootID, f.input.InstallationID)
-	if e != nil {
-		t.Fatal(e)
-	}
-	writes, e := postgres.NewContextQueryCapacityProducer(ctx, f.roles["capacity"], f.input.PermissionRootID, f.input.InstallationID)
-	if e != nil {
-		t.Fatal(e)
-	}
-	expectBeginDenied := func(source app.QueryCapacitySource, plan app.QueryBackingPlan, claimID string, prior int64) {
-		t.Helper()
-		proposal, _ := json.Marshal(plan)
-		observation, _ := json.Marshal(map[string]any{"SourceRevision": source.SourceRevision, "SourceDigest": source.SourceDigest, "Recovery": source.Recovery, "ObservedAt": source.ObservedAt, "FreshUntil": source.FreshUntil})
-		var raw []byte
-		err := f.roles["capacity"].QueryRow(ctx, "SELECT begin_context_query_capacity_observation($1,$2,$3,$4,$5)", f.input.PermissionRootID, proposal, observation, claimID, prior).Scan(&raw)
-		var pgErr *pgconn.PgError
-		if !errors.As(err, &pgErr) || pgErr.Code != "23514" {
-			t.Fatalf("SQL source claim denial: %v", err)
-		}
-	}
-	guard := queryCapacitySyntheticGuard{}
-	current := app.ProtectedContextQueryCapacity{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, Store: reads, Recovery: f.source, Deployments: app.QueryDeploymentGuards{Worker: guard, Hub: guard, KeyService: guard, Provider: guard}, Now: time.Now, NewID: custodyID}
-	producer := app.ProtectedContextQueryProducer{Current: current, Writer: writes}
-	refresh := func() {
-		f.fresh(t)
-		fresh := f.workloadObservation(t, 0)
-		if e := f.enrollments.RefreshCapacityEnrollment(ctx, fresh, enrolled); e != nil {
-			t.Fatal("original workload observation", e)
-		}
-	}
-	// Consumer probes run through the separate runtime credential. The fixture
-	// administrator supplies neither a query anchor nor a positive guard result.
-	runtimeConfig, e := pgxpool.ParseConfig("postgres://context_query_runtime:synthetic-context-query@" + address + "/custody_test?sslmode=disable")
-	if e != nil {
-		t.Fatal(e)
-	}
-	runtimeConfig.ConnConfig.TLSConfig = tlsConfig
-	runtimeConfig.ConnConfig.Fallbacks = nil
-	runtimeConfig.MaxConns = 1
-	runtime, e := pgxpool.NewWithConfig(ctx, runtimeConfig)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer runtime.Close()
-	probe := func(statement, argument string, want bool) {
-		t.Helper()
-		bounded, cancel := context.WithTimeout(ctx, 5*time.Second)
-		defer cancel()
-		var got bool
-		if err := runtime.QueryRow(bounded, statement, current.RootID, argument).Scan(&got); err != nil || got != want {
-			t.Fatalf("scoped capacity consumer: got %v, want %v: %v", got, want, err)
-		}
-	}
-	const anchorProbe = "SELECT lock_context_query_capacity($1,$2)"
-	const allocationProbe = "SELECT context_query_capacity_allocation_current($1,$2)"
-	probe(anchorProbe, custodyID(), false)
-	refresh()
-	key := app.WorkloadCapacityKey{RootID: current.RootID, ClusterID: scope.ClusterID, NamespaceUID: f.namespace.UID, WorkloadUID: f.workloads[0].UID}
-	var guardCalls atomic.Int64
-	// A first failed guard reserves the root and its attempt before native work,
-	// but cannot produce positive backing. Its synchronous return is joined.
-	failed := producer
-	failed.Current.Deployments.Worker = queryCapacityCountingGuard{calls: &guardCalls, fail: true}
-	if e = failed.Reconcile(ctx, nil); e == nil {
-		t.Fatal("failed guard accepted source")
-	}
-	var same bool
-	if e = admin.QueryRow(ctx, `SELECT observations=1 AND NOT observation_accepted AND observation_completed AND NOT EXISTS(SELECT 1 FROM context_query_backing WHERE root_id=$1) FROM context_query_capacity WHERE root_id=$1`, current.RootID).Scan(&same); e != nil || !same {
-		t.Fatal("failed native guard lost charge or supplied positive backing", e)
-	}
-	var reservedAcceptance string
-	if e = admin.QueryRow(ctx, `SELECT acceptance_id::text FROM context_query_capacity WHERE root_id=$1`, current.RootID).Scan(&reservedAcceptance); e != nil {
-		t.Fatal(e)
-	}
-	probe(anchorProbe, reservedAcceptance, false)
-	if _, e = current.ContextProjectionPolicy(ctx); e == nil {
-		t.Fatal("reserved-only anchor supplied policy")
-	}
-	refresh()
-	// Hold the outer guard after SQL acceptance. A competing invocation cannot
-	// enter native checks until that actual callback has joined.
-	after, release := make(chan struct{}), make(chan struct{})
-	first := producer
-	first.Current.Deployments.Worker = queryCapacityCountingGuard{calls: &guardCalls, after: after, release: release}
-	finished := make(chan error, 1)
-	go func() { finished <- first.Reconcile(ctx, &key) }()
-	select {
-	case <-after:
-	case err := <-finished:
-		close(release)
-		t.Fatal("source guard did not reach final checks", err)
-	case <-time.After(3 * time.Second):
-		close(release)
-		<-finished
-		t.Fatal("source guard did not enter")
-	}
-	competing := producer
-	competing.Current.Deployments.Worker = queryCapacityCountingGuard{calls: &guardCalls}
-	if e = competing.Reconcile(ctx, nil); e == nil || guardCalls.Load() != 2 {
-		close(release)
-		<-finished
-		t.Fatal("competing source callback entered before joined completion", e)
-	}
-	close(release)
-	if e = <-finished; e != nil {
-		t.Fatal("query original acceptance", e)
-	}
-	policy, e := current.ContextProjectionPolicy(ctx)
-	if e != nil || !policy.Valid(time.Now()) || policy.Path != f.qualification.ContextQuery.Profile.Path {
-		t.Fatal("current accepted query policy", e)
-	}
-	var original []byte
-	var accepted string
-	var observations int64
-	if e = admin.QueryRow(ctx, `SELECT plan,acceptance_id::text,observations FROM context_query_capacity WHERE root_id=$1`, current.RootID).Scan(&original, &accepted, &observations); e != nil || observations != 2 {
-		t.Fatal("accepted query reservation missing", e)
-	}
-	var allocationID string
-	if e = admin.QueryRow(ctx, "SELECT id::text FROM context_query_allocation WHERE root_id=$1", current.RootID).Scan(&allocationID); e != nil {
-		t.Fatal(e)
-	}
-	probe(anchorProbe, accepted, true)
-	probe(anchorProbe, custodyID(), false)
-	probe(allocationProbe, allocationID, true)
-	probe(allocationProbe, custodyID(), false)
-	var baseObjects, baseBytes int64
-	if e = admin.QueryRow(ctx, `SELECT backed_system_bytes,backed_system_objects FROM capacity_pool WHERE root_id=$1 AND source_uid=$2`, current.RootID, f.qualification.RootBacking.SystemPoolUID).Scan(&baseBytes, &baseObjects); e != nil {
-		t.Fatal(e)
-	}
-	refresh()
-	if e = producer.Reconcile(ctx, &key); e != nil {
-		t.Fatal("new paid observation after acknowledged join", e)
-	}
-	if e = admin.QueryRow(ctx, `SELECT plan=$2::jsonb AND acceptance_id=$3::uuid AND observations=3 AND observation_completed FROM context_query_capacity WHERE root_id=$1`, current.RootID, original, accepted).Scan(&same); e != nil || !same {
-		t.Fatal("original reservation changed or final guard never joined", e)
-	}
-	// A delayed restrictive observation still has to invalidate the accepted
-	// backing. Its original timestamp must not become a new freshness interval.
-	negativeAt := time.Now().UTC().Truncate(time.Microsecond)
-	delayed := time.NewTimer(time.Until(negativeAt.Add(5*time.Second + 100*time.Millisecond)))
-	defer delayed.Stop()
-	select {
-	case <-delayed.C:
-	case <-ctx.Done():
-		t.Fatal("waiting for delayed negative", ctx.Err())
-	}
-	if e = writes.SuspendQueryCapacity(ctx, negativeAt); e != nil {
-		t.Fatal("persist negative older than five seconds", e)
-	}
-	checkNegative := func() {
-		t.Helper()
-		if e = admin.QueryRow(ctx, `SELECT a.observations=4 AND a.negative_observed_at=$2 AND b.suspended AND b.observed_at=$2 AND b.fresh_until=$2::timestamptz+interval '1 microsecond' AND b.fresh_until<clock_timestamp() FROM context_query_capacity a JOIN context_query_backing b USING(root_id) WHERE a.root_id=$1`, current.RootID, negativeAt).Scan(&same); e != nil || !same {
-			t.Fatal("negative observation was renewed, replayed or lost", e)
-		}
-	}
-	checkNegative()
-	if e = writes.SuspendQueryCapacity(ctx, negativeAt.Add(-time.Microsecond)); e != nil {
-		t.Fatal("older negative replay", e)
-	}
-	checkNegative()
-	// The restrictive write has its own finite work interval but must retain
-	// the caller's earlier deadline while waiting for the original SQL locks.
-	locked, e := admin.Begin(ctx)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer locked.Rollback(context.Background())
-	if _, e = locked.Exec(ctx, `SELECT 1 FROM context_query_capacity WHERE root_id=$1 FOR UPDATE`, current.RootID); e != nil {
-		t.Fatal(e)
-	}
-	limited, stopNegative := context.WithTimeout(ctx, 50*time.Millisecond)
-	started := time.Now()
-	e = writes.SuspendQueryCapacity(limited, negativeAt.Add(time.Microsecond))
-	stopNegative()
-	if e == nil || time.Since(started) > time.Second {
-		t.Fatal("restrictive write escaped original caller deadline", e)
-	}
-	if e = locked.Rollback(ctx); e != nil {
-		t.Fatal(e)
-	}
-	checkNegative()
-	if _, e = current.ContextProjectionPolicy(ctx); e == nil {
-		t.Fatal("suspended capacity disclosed a policy")
-	}
-	probe(allocationProbe, allocationID, false)
-	refresh()
-	unknown := producer
-	lost := &queryCapacityLostClaim{QueryCapacityWriter: writes}
-	unknown.Writer = lost
-	unknown.Current.Deployments.Worker = queryCapacityCountingGuard{calls: &guardCalls}
-	before := guardCalls.Load()
-	short, stop := context.WithTimeout(ctx, 250*time.Millisecond)
-	if e = unknown.Reconcile(short, nil); e == nil || lost.claim.ID == "" || guardCalls.Load() != before {
-		stop()
-		t.Fatal("unknown committed claim entered native work or lost spend", e)
-	}
-	stop()
-	if e = admin.QueryRow(ctx, `SELECT observations=5 AND NOT observation_accepted AND NOT observation_completed FROM context_query_capacity WHERE root_id=$1`, current.RootID).Scan(&same); e != nil || !same {
-		t.Fatal("unknown claim disappeared", e)
-	}
-	expectBeginDenied(lost.source, lost.plan, lost.claim.ID, lost.source.ObservationCount)
-	// Original expiry cannot prove that unknown work joined. It supplies neither
-	// an acceptance nor a new execution capability, even with a fresh source.
-	time.Sleep(time.Until(lost.claim.ValidUntil) + time.Millisecond)
-	staleSource := lost.source
-	staleSource.ObservationCount = lost.claim.Ordinal
-	if _, e = writes.AcceptQueryCapacity(ctx, staleSource, lost.plan, lost.claim); e == nil {
-		t.Fatal("expired unknown claim finalized")
-	}
-	refresh()
-	// The fifth claim is below the six-attempt ceiling. Its expiry still cannot
-	// release ownership or permit a new source guard.
-	if e = competing.Reconcile(ctx, nil); e == nil || guardCalls.Load() != before {
-		t.Fatal("expired unknown claim released unfinished work", e)
-	}
-	if e = writes.SuspendQueryCapacity(ctx, time.Now().UTC().Truncate(time.Microsecond)); e != nil {
-		t.Fatal("negative after unknown source", e)
-	}
-	refresh()
-	recovery, err := f.source.RecoveryState(ctx)
+	root, err := f.roots.ReserveCapacityRoot(ctx, o)
 	if err != nil {
 		t.Fatal(err)
 	}
-	exhaustedSource, err := reads.ReadQueryCapacitySource(ctx, recovery)
-	if err != nil || exhaustedSource.ObservationCount != 6 {
-		t.Fatal("source count after negative", err)
+	root, err = f.captureRoots.BackCapacityRoot(ctx, o, root)
+	if err != nil {
+		t.Fatal(err)
 	}
-	expectBeginDenied(exhaustedSource, lost.plan, custodyID(), exhaustedSource.ObservationCount)
-	exhausted := producer
-	exhausted.Current.Deployments.Worker = queryCapacityCountingGuard{calls: &guardCalls}
-	if e = exhausted.Reconcile(ctx, nil); e == nil || guardCalls.Load() != before {
-		t.Fatal("exhausted allowance entered external guard", e)
+	root, err = f.roots.PublishCapacityRoot(ctx, o, root)
+	if err != nil {
+		t.Fatal("publish shared original root", err)
 	}
-	if e = writes.SuspendQueryCapacity(ctx, time.Now().UTC().Truncate(time.Microsecond)); e != nil {
-		t.Fatal("prepaid terminal negative unavailable", e)
+	var acceptance, hard string
+	var observations int64
+	if err = admin.QueryRow(ctx, "SELECT acceptance_id::text,plan->>'HardUntil',observations FROM context_query_capacity WHERE root_id=$1", f.input.PermissionRootID).Scan(&acceptance, &hard, &observations); err != nil || acceptance != f.qualification.ContextQuery.CapacityID || observations != 0 {
+		t.Fatal("one installed anchor without query observer", err)
 	}
-	if e = admin.QueryRow(ctx, `SELECT a.plan=$2::jsonb AND a.observations=7 AND NOT a.observation_completed AND b.suspended AND b.allocations=1 AND b.allocated=0 FROM context_query_capacity a JOIN context_query_backing b USING(root_id) WHERE a.root_id=$1`, current.RootID, original).Scan(&same); e != nil || !same {
-		t.Fatal("terminal source state lost original obligations", e)
+	coordinator := app.EnrollmentCoordinator{Store: f.enrollments, Capture: f.captureEnrollments, Accounts: f.accounts, Now: time.Now}
+	enrolled, err := coordinator.Reconcile(ctx, f.workloadObservation(t, 0))
+	if err != nil {
+		t.Fatal("publish shared workload", err)
 	}
-	var bytesAfter, objectsAfter int64
-	if e = admin.QueryRow(ctx, `SELECT backed_system_bytes,backed_system_objects FROM capacity_pool WHERE root_id=$1 AND source_uid=$2`, current.RootID, f.qualification.RootBacking.SystemPoolUID).Scan(&bytesAfter, &objectsAfter); e != nil || bytesAfter != baseBytes || objectsAfter != baseObjects {
-		t.Fatal("additive reservation modified original base graph", e)
+	var allocation string
+	var valid bool
+	if err = admin.QueryRow(ctx, "SELECT id::text,context_query_capacity_allocation_current(root_id,id) FROM context_query_allocation WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3 AND workload_uid=$4", f.input.PermissionRootID, scope.ClusterID, f.namespace.UID, f.workloads[0].UID).Scan(&allocation, &valid); err != nil || !valid {
+		t.Fatal("exact workload allocation", err)
 	}
-	t.Log("actual protected root and additive finite query reservation passed; report, resource measurements and native deployment guards are synthetic; runtime grants unchanged")
+	if err = f.enrollments.RefreshCapacityEnrollment(ctx, f.workloadObservation(t, 0), enrolled); err != nil {
+		t.Fatal(err)
+	}
+	var again, againHard, againAllocation string
+	if err = admin.QueryRow(ctx, "SELECT c.acceptance_id::text,c.plan->>'HardUntil',a.id::text FROM context_query_capacity c JOIN context_query_allocation a USING(root_id) WHERE c.root_id=$1", f.input.PermissionRootID).Scan(&again, &againHard, &againAllocation); err != nil || again != acceptance || againHard != hard || againAllocation != allocation {
+		t.Fatal("source refresh replaced original charge or deadline", err)
+	}
+	// A second workload cannot borrow the one reserved query allocation. Its
+	// existing capacity transaction rolls back; the first charge remains exact.
+	if _, err = coordinator.Reconcile(ctx, f.workloadObservation(t, 1)); err == nil {
+		t.Fatal("unfunded query workload admitted")
+	}
+	var count int
+	if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_query_allocation WHERE root_id=$1", f.input.PermissionRootID).Scan(&count); err != nil || count != 1 {
+		t.Fatal("allocation charge changed", count, err)
+	}
 }

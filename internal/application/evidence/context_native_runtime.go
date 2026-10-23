@@ -22,9 +22,6 @@ type ContextNativeRuntimeConfig struct {
 	Workers          ContextDownloadAttachments
 	Preparation      FirstContextPreparationSessions
 	Dispatcher       *DownloadDispatcher
-	Enrollments      WorkerEnrollmentCoordinator
-	Proofs           WorkerProofFactory
-	Requests         *WorkerRequestOwners
 	Sources          ContextDownloadSources
 	Authority        CurrentDownloadAuthority
 	Audit            auditapp.DownloadWriter
@@ -62,15 +59,11 @@ func (a contextRuntimeAuthority) CheckDownloadCurrent(ctx context.Context, _ ide
 var _ ContextDownloadRuntime = (*ContextNativeRuntime)(nil)
 
 func NewContextNativeRuntime(c ContextNativeRuntimeConfig) (*ContextNativeRuntime, error) {
-	if c.Serving == nil || !c.Profile.Valid() || c.Profile.StoreCredentialSecret == "" || c.Configuration == nil || c.Workers == nil || c.Preparation == nil || c.Dispatcher == nil || c.Dispatcher.Profile != c.Profile || c.Dispatcher.CurrentAuthority == nil || c.Dispatcher.Jobs == nil || c.Dispatcher.Ledger == nil || c.Dispatcher.Audit == nil || c.Dispatcher.Acknowledgements == nil || c.Requests == nil || c.Requests.Router == nil || c.Requests.Store == nil || c.Proofs == nil || c.Sources == nil || c.Authority == nil || c.Audit == nil || c.Acknowledgements == nil || c.Now == nil || c.NewID == nil {
-		return nil, artifact.ErrInvalid
-	}
-	e := c.Enrollments
-	if e.CSR == nil || e.Ledger == nil || e.Activation == nil || e.Audit == nil || e.Acknowledgements == nil || e.Issuer == nil || e.CurrentAuthority == nil || e.Now == nil {
+	if c.Serving == nil || !c.Profile.Valid() || c.Profile.StoreCredentialSecret == "" || c.Configuration == nil || c.Workers == nil || c.Preparation == nil || c.Dispatcher == nil || c.Dispatcher.Profile != c.Profile || c.Dispatcher.CurrentAuthority == nil || c.Dispatcher.Jobs == nil || c.Dispatcher.Ledger == nil || c.Dispatcher.Audit == nil || c.Dispatcher.Acknowledgements == nil || c.Sources == nil || c.Authority == nil || c.Audit == nil || c.Acknowledgements == nil || c.Now == nil || c.NewID == nil {
 		return nil, artifact.ErrInvalid
 	}
 	n := c.Native
-	if n.Enrollment != (value.WorkerEnrollment{}) || n.Registrar == nil || !value.UUID(n.HubPodUID) || !value.UUID(n.HubProcessEpoch) || c.Requests.PodUID != n.HubPodUID || c.Requests.ProcessEpoch != n.HubProcessEpoch || !n.KeyScope.Valid() || n.KeyScope.InstallationID != c.Profile.InstallationID || n.KeyScope.Purpose != "artifact" || n.Owners == nil || n.Fences == nil || n.Origins.Operations == nil || n.Origins.Now == nil || n.PreparationKeys == nil || n.WindowKeys == nil {
+	if n.Enrollment != (value.WorkerEnrollment{}) || n.Registrar == nil || !value.UUID(n.HubPodUID) || !value.UUID(n.HubProcessEpoch) || !n.KeyScope.Valid() || n.KeyScope.InstallationID != c.Profile.InstallationID || n.KeyScope.Purpose != "artifact" || n.Owners == nil || n.Fences == nil || n.Origins.Operations == nil || n.Origins.Now == nil || n.PreparationKeys == nil || n.WindowKeys == nil {
 		return nil, artifact.ErrInvalid
 	}
 	if _, ok := n.Owners.(interface{ FirstContextObservationsOnly() }); !ok {
@@ -136,7 +129,6 @@ func (r *ContextNativeRuntime) beginRequestAuthority(ctx context.Context, curren
 	c := r.config
 	gate := contextRuntimeAuthority{check}
 	c.Authority = gate
-	c.Enrollments.CurrentAuthority = gate
 	dispatcher := *c.Dispatcher
 	dispatcher.CurrentAuthority = gate
 	c.Dispatcher = &dispatcher
@@ -254,71 +246,16 @@ func (r *ContextNativeRuntime) continueContextDownloadAuthority(ctx context.Cont
 		return zero, e
 	}
 	if !active {
-		target := value.WorkerCredentialTarget{InstallationID: worker.Binding.InstallationID, SessionID: session.ID, WorkerID: worker.Intent.ID, PodUID: worker.Binding.PodUID, CreatedAt: worker.Intent.CreatedAt, RunUntil: worker.Intent.RunUntil}
-		operation, e := NewCurrentWorkerEnrollmentOperation(call, r.config.Enrollments, r.config.Proofs, current, target, session.Scope)
-		if e != nil {
-			return zero, e
+		// Enrollment belongs to the admitted worker's finite HTTP request.
+		// Public preparation neither publishes a human owner nor waits for a
+		// certificate. A later deliberate continuation observes the same
+		// immutable worker and activated certificate under current authority.
+		if call.Err() != nil || !r.config.Now().Before(r.bound.Deadline()) || !worker.Valid() {
+			return zero, artifact.ErrDownloadExpired
 		}
-		operation.pinned = r.bound
-		shorten()
-		registration, e := r.config.Requests.Register(call, operation)
-		if e != nil {
-			return zero, e
-		}
-		defer registration.Close(call)
-		// An enrollment produced while this request's registration is open ends
-		// this request: native preparation belongs to the next deliberate
-		// continuation, under its own current identity. Native16 showed enrollment
-		// plus preparation cannot share one original five-second bound, and that
-		// bound is never stretched. A pre-existing enrollment keeps its old path.
-		var entered *value.WorkerEnrollment
-		if observed.Enrollment != nil {
-			e := *observed.Enrollment
-			entered = &e
-		}
-		// Keep one original request registration available for the worker's genuine
-		// enrollment. The finite next POST may observe this exact result; SQL lookup
-		// is not evidence that a currently connected worker authenticated successfully.
-		waitUntil := identity.Earlier(r.config.Now().Add(time.Second), worker.Intent.RunUntil)
-		for {
-			shorten()
-			observed, _, e = r.attachment(call, current, session)
-			if e != nil {
-				return zero, e
-			}
-			if observed.Worker == nil || *observed.Worker != worker {
-				return zero, artifact.ErrDownloadUnavailable
-			}
-			if observed.MetadataAttempted {
-				if observed.Preparation != nil {
-					return zero, nil
-				}
-				return zero, ErrDownloadMetadataUnavailable
-			}
-			// An exchange in flight on this registration is never abandoned: closing
-			// the registration cancels it. Native21-23 lost it after CSR at the
-			// one-second arrival window; native30 lost it after activation, while it
-			// still delivered the certificate, when SQL already showed the enrollment.
-			delivering := registration.Delivering()
-			if observed.Enrollment != nil && observed.ActivatedPeer != nil {
-				if entered != nil && *entered == *observed.Enrollment {
-					break
-				}
-				if !delivering {
-					return ContextDownloadContinuation{Pending: true}, nil
-				}
-			} else if !r.config.Now().Before(waitUntil) && !delivering {
-				return ContextDownloadContinuation{Pending: true}, nil
-			}
-			timer := time.NewTimer(100 * time.Millisecond)
-			select {
-			case <-call.Done():
-				timer.Stop()
-				return zero, artifact.ErrDownloadExpired
-			case <-timer.C:
-			}
-		}
+		return ContextDownloadContinuation{Pending: true}, nil
 	}
+
 	shorten()
 	native, e := r.native(*observed.Enrollment)
 	if e != nil {

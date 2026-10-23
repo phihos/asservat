@@ -197,7 +197,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 		qualifyInstalledDownloadPreparation(t, f.s.nativeSources.ctx, admin, poolFor, store, keys, f.s, f.p, f.allocation, f.gate)
 	})
 
-	for _, mode := range []string{"native-retention-observation", "native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-current-request", "enrollment-audit-versions", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "capacity-held", "expired-claim", "cancelled-parent"} {
+	for _, mode := range []string{"native-retention-observation", "native-content", "native-content-resume", "native-content-interrupted", "native-control-races", "native-control-admission-race", "native-preparation-race", "native-exchange", "routing-two-clusters", "request-owners", "enrollment-channel", "enrollment-audit-versions", "enrollment-replay", "enrollment-unaudited", "enrollment-budget", "enrollment-parallel", "enrollment-change-key", "enrollment-roles", "enrollment-audit-reuse", "enrollment-expired-lock", "enrollment-admitted-detached", "enrollment-admitted-stop-lock", "enrollment-admitted-recovery-lock", "enrollment-admitted-configuration-lock", "enrollment-admitted-activation-stop", "missing-configuration", "configuration-mutated", "configuration-unaudited-rollout", "configuration-roles", "configuration-audit-reuse", "configuration-fence-order", "configuration-identity-expired", "configuration-rollback", "configuration-suspended", "configuration-fenced", "configuration-lock-expired", "coordinator-recovery", "fresh-audit", "short-runtime", "parallel-claim", "unaudited", "binding-replacement", "capacity-held", "expired-claim", "cancelled-parent"} {
 		t.Run("download-worker-"+mode, func(t *testing.T) {
 			ctx := ctx // This subtest owns any native source-observer cancellation.
 			var nativeScope authorization.KeyScope
@@ -209,7 +209,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 					nativeScope, wrapping, nativeBackend = localDownloadKeys(t, installation)
 					return wrapping, wrapping
 				})
-			} else if mode == "enrollment-audit-versions" {
+			} else if mode == "enrollment-audit-versions" || mode == "enrollment-admitted-detached" {
 				// This matrix outlives a single source observation. Its existing
 				// joined fixture owner observes the original synthetic roots;
 				// selected operation proofs and the login keep their fixed ends.
@@ -598,13 +598,7 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 			countedAudit := &countedWorkerAudit{writer: objectAudit}
 			service := &evidence.DownloadDispatcher{Ledger: ledger, Jobs: jobs, Audit: countedAudit, Acknowledgements: ack, Authority: f.gate, Profile: profile, Now: time.Now}
 			var w authorization.DownloadWorker
-			if mode == "enrollment-current-request" {
-				service.CurrentAuthority = f.gate
-				current, _ := browserCurrentForWorkerTest(t, ctx, f.gate, 5*time.Second)
-				w, e = service.EnsureCurrent(ctx, current, session.ID, intentID, a.Scope)
-			} else {
-				w, e = service.Ensure(ctx, "synthetic-reference", session.ID, intentID, a.Scope)
-			}
+			w, e = service.Ensure(ctx, "synthetic-reference", session.ID, intentID, a.Scope)
 			if mode == "coordinator-recovery" {
 				if e == nil {
 					t.Fatal("lost create response not reported")

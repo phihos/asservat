@@ -47,7 +47,7 @@ type runtimeFixture struct {
 	mutateProof        func(*value.OwnerEnrollmentProof)
 	mutateRegistration func(*value.OwnerRegistrationObservation)
 	// bootstrapSAN adds the pool's fixed serving name to server leaves, as an
-	// owner-bootstrap/v1 pool's issuer does; ownerReads counts locator reads.
+	// owner-bootstrap/v1 pool's issuer does; ownerReads counts local enrollment calls.
 	bootstrapSAN bool
 	ownerReads   atomic.Int32
 }
@@ -130,11 +130,8 @@ func (f *runtimeFixture) ReadOwnerProtection(context.Context, value.OwnerPool) (
 func (f *runtimeFixture) ReadDownloadWorkerEnrollment(context.Context, string, string) (authorization.DownloadWorkerIdentity, error) {
 	return authorization.DownloadWorkerIdentity{}, artifact.ErrDownloadUnavailable
 }
-func (f *runtimeFixture) ReadWorkerOwner(context.Context, string, string) (authorization.WorkerOwnerLease, error) {
+func (f *runtimeFixture) BeginAcquisitionEnrollment(context.Context, string, authorization.AcquisitionParent, string, []byte, []byte) (evidence.WorkerEnrollmentDelivery, error) {
 	f.ownerReads.Add(1)
-	return authorization.WorkerOwnerLease{}, artifact.ErrDownloadUnavailable
-}
-func (f *runtimeFixture) BeginOwnedWorkerEnrollment(context.Context, authorization.WorkerOwnerLease, []byte, []byte) (evidence.WorkerEnrollmentDelivery, error) {
 	return nil, artifact.ErrDownloadUnavailable
 }
 
@@ -160,11 +157,7 @@ func newRuntimeFixture(t *testing.T) (*runtimeFixture, OwnerRuntimeConfig, net.L
 	roots.AddCert(ca)
 	p := value.OwnerPool{InstallationID: runtimeID, ClusterID: runtimeID, IssuerEpoch: runtimeID, Namespace: "hub", NamespaceUID: runtimeID, Service: "owner", ServiceUID: runtimeID, Deployment: "owner", DeploymentUID: runtimeID, ServiceAccount: "owner", AccountUID: runtimeID, Port: l.Addr().(*net.TCPAddr).Port}
 	f := &runtimeFixture{ca: ca, key: key, roots: roots, identities: map[string]runtimeIdentity{}, configuration: value.OwnerConfiguration{Pool: p, Revision: identity.Revision{UID: runtimeID, Generation: 1, Digest: artifact.Digest{1}}, ProtectionDigest: artifact.Digest{5}, IssuerRoots: [][]byte{der}}}
-	trust, err := mtls.NewWorkerTrustCatalog(runtimeID, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	c := OwnerRuntimeConfig{Pool: p, PodUID: runtimeID, SourceUID: runtimeID, Configuration: f, ServerEnrollment: f, ClientEnrollment: f, Registry: f, Proofs: f, Routes: f, Protection: f, Requests: func(value.OwnerBinding) (evidence.WorkerOwnerEnrollment, error) { return f, nil }, WorkerTrust: trust, Workers: f, Locators: f, Connections: 2, Concurrency: 1}
+	c := OwnerRuntimeConfig{Pool: p, PodUID: runtimeID, SourceUID: runtimeID, Configuration: f, ServerEnrollment: f, ClientEnrollment: f, Registry: f, Proofs: f, Routes: f, Protection: f, Connections: 2, Concurrency: 1}
 	return f, c, l
 }
 
@@ -206,18 +199,12 @@ func TestOwnerRuntimeReadinessAndShutdown(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer synthetic.token")
 	resp, err := (&http.Client{Transport: tr, Timeout: time.Second}).Do(req)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode != 403 {
-		t.Fatal("readiness substituted for current peer/route authority", resp.StatusCode)
+	if err == nil {
+		resp.Body.Close()
+		t.Fatal("retired certificate relay remained reachable")
 	}
 	f.denyProof.Store(true)
 	waitOwnerState(t, func() bool { return !r.Ready() })
-	if d, e := r.BeginWorkerEnrollment(ctx, runtimeID, runtimeID, runtimeID, []byte("synthetic.token"), nil); e == nil || d != nil {
-		t.Fatal("unready runtime forwarded")
-	}
 	f.denyProof.Store(false)
 	waitOwnerState(t, r.Ready)
 	cancel()

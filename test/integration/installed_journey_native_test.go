@@ -65,7 +65,7 @@ type installedJourneyDownload struct {
 	ExpiresAt           time.Time `json:"expires_at"`
 }
 
-func installedJourney(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func()) func(cluster, namespace, workload string, deny func(bool)) {
+func installedJourney(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func(), projectionCheck installedProjectionCheck) func(cluster, namespace, workload string, deny func(bool)) {
 	return func(cluster, namespace, workload string, deny func(bool)) {
 		t.Helper()
 		if identity == nil {
@@ -327,6 +327,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			t.Fatal("installed deletion verification missing")
 		}
 		t.Logf("installed journey: the regional capture was collected, verified and published")
+		approved := installedApprovedProjection(t, ctx, identity, transport, origin, progress.CaseID, investigation.Artifacts[0].ArtifactID, preview.SelectedPods[0].UID, expires, projectionCheck)
 		// A hub-local download worker (ADR-204) prepares the native file; the
 		// same MCP client fetches it with its download-route token.
 		var download installedJourneyDownload
@@ -377,6 +378,9 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			json.Unmarshal(native, &projected) != nil || projected.Format != artifact.ContextFormat || projected.PodUID != preview.SelectedPods[0].UID {
 			diagnose()
 			t.Fatal("installed native download differs from its metadata or selected Pod", response.StatusCode, size, err)
+		}
+		if err := installedProjectionMatchesNative(approved, native); err != nil {
+			t.Fatal(err)
 		}
 		t.Logf("installed journey: the Keycloak user downloaded the native pod-status file (%d bytes) through the hub-local worker", size)
 		// Revocation: with the Deny binding the case is no longer available;

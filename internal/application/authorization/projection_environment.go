@@ -12,15 +12,15 @@ import (
 )
 
 type ContextProjectionPolicyReader interface {
-	ContextProjectionPolicy(context.Context) (value.ContextProjectionPolicy, error)
+	ContextProjectionPolicy(context.Context, string, string) (value.ContextProjectionPolicy, error)
 }
 type ContextProjectionProcessingReader interface {
 	ContextProjectionProcessing(context.Context, ContextProjectionEvidence, artifact.RecoveryProof) (artifact.DownloadProcessingProof, error)
 }
 
 // CurrentProjectionEnvironment joins accepted query placement with current
-// recovery and complete durable processing state. It cannot consume a download
-// policy or a download evidence DTO. The original earliest bound survives every
+// recovery and complete durable processing state. Its placement policy is a purpose-specific view of shared installed
+// configuration; it never consumes download authority or a download evidence DTO. The original earliest bound survives every
 // blocking read, including the final repeated source checks.
 type CurrentProjectionEnvironment struct {
 	RootID, InstallationID string
@@ -50,7 +50,7 @@ func (s CurrentProjectionEnvironment) ProjectionEnvironment(ctx context.Context,
 	// Every subsequent context derives from the preceding one. In particular a
 	// late second observation cannot grant a fresh five-second interval.
 	narrow := func(d time.Time) { until = identity.Earlier(until, d) }
-	p, e := s.Policies.ContextProjectionPolicy(call)
+	p, e := s.Policies.ContextProjectionPolicy(call, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID)
 	if e != nil || !p.Valid(s.Now()) || p.RootID != s.RootID || p.InstallationID != s.InstallationID || !p.Permits(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, s.Now()) {
 		return zero, value.ErrUnavailable
 	}
@@ -79,7 +79,7 @@ func (s CurrentProjectionEnvironment) ProjectionEnvironment(ctx context.Context,
 	narrow(processing.ValidUntil)
 	call, c3 := context.WithDeadline(call, until)
 	defer c3()
-	last, e := s.Policies.ContextProjectionPolicy(call)
+	last, e := s.Policies.ContextProjectionPolicy(call, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID)
 	if e != nil || !last.Valid(s.Now()) || last.RootID != p.RootID || last.InstallationID != p.InstallationID || last.RecoveryEpoch != p.RecoveryEpoch || last.Revision != p.Revision || last.ProtectionDigest != p.ProtectionDigest || last.Path != p.Path || !last.Permits(actor, r.Retained.Input.Target.ClusterID, r.Retained.Registration.StoreID, r.PurposeRef, s.Now()) {
 		return zero, value.ErrUnavailable
 	}

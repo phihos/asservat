@@ -1,5 +1,15 @@
 # Shared worker request locator
 
+Current installed composition is revised by [ADR-219](../decisions/219-shared-approved-acquisition.md)
+and [ADR-221](../decisions/221-admitted-worker-identity-enrollment.md): one closed
+acquisition parent selects native download or approved pod-status. Certificate
+enrollment uses the exact admitted worker and its own bounded HTTP request,
+without a human certificate-owner registry/locator/relay. Native-operation
+ownership and each purpose's current key/evidence authority remain separate.
+The older certificate-routing components and their tests below are historical
+component evidence, not the installed certificate path. Shared composition
+qualification is still pending.
+
 [ADR-075](../decisions/075-worker-owner-locator.md) extends [local request routing](worker-request-routing.md) under REQ-FED-001, REQ-DLD-003, REQ-DEP-003 and REQ-CAP-003. C-14 owns local registration and the exact-owner receiver; C-15 owns the minimized transactional locator. C-21's PostgreSQL adapter implements `WorkerOwnerStore`. This is an internal part of I-13, not a public permission or routing API.
 
 ## Publish a current local request

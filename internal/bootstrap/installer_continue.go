@@ -1393,7 +1393,7 @@ func (k *InstallerContinuation) Capacity(ctx context.Context, inventory kube.Ini
 	}
 	// ADR-192: identities and the setup time derive from the role setup, so a
 	// replay rebuilds the input its committed claim bound.
-	q, err := buildCapacityQualification(*p, capacityDerived{Root: owner.PermissionRootID, Installation: installation, AccountVersion: roles.State.MAC.AccountVersion,
+	q, err := buildCapacityQualification(*p, capacityDerived{SharedQueries: k.downloadsEnabled(), Root: owner.PermissionRootID, Installation: installation, AccountVersion: roles.State.MAC.AccountVersion,
 		SystemPoolUID: pool, ProcessingSourceUID: sources.ProcessingSource.UID, ProcessingProtection: proofs.Processing,
 		NamespaceGuards: []capacityapp.CapacityNamespaceQualification{{ClusterID: cluster, Digest: proofs.NamespaceDigest, Keys: keys}}, Now: roles.State.CreatedAt}, capacityIDs(roles.State.OperationID))
 	if err != nil {

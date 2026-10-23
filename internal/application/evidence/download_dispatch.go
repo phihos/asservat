@@ -69,14 +69,15 @@ func (s *DownloadDispatcher) Retire(ctx context.Context, w value.DownloadWorker)
 // reconciled by exact lookup; it never causes another create call. Waiting for
 // scheduling uses later current authority, not an extended effect lease.
 type DownloadDispatcher struct {
-	Ledger           DownloadWorkerLedger
-	Jobs             DownloadWorkerJobs
-	Audit            auditapp.DownloadWorkerWriter
-	Acknowledgements auditapp.DownloadWorkerAcknowledgements
-	Authority        DownloadAuthorityGate
-	CurrentAuthority CurrentDownloadAuthority
-	Profile          value.DownloadWorkerProfile
-	Now              func() time.Time
+	Ledger            DownloadWorkerLedger
+	Jobs              DownloadWorkerJobs
+	Audit             auditapp.DownloadWorkerWriter
+	Acknowledgements  auditapp.DownloadWorkerAcknowledgements
+	Authority         DownloadAuthorityGate
+	CurrentAuthority  CurrentDownloadAuthority
+	Profile           value.DownloadWorkerProfile
+	Now               func() time.Time
+	ProjectionCleanup *ProjectionWorkerCleanup
 }
 
 func (s *DownloadDispatcher) Ensure(ctx context.Context, credential, session, intentID string, scope artifact.DownloadScope) (value.DownloadWorker, error) {
@@ -116,6 +117,9 @@ func (s *DownloadDispatcher) ensureChecked(ctx context.Context, session, intentI
 		}
 		shorten()
 		return a, nil
+	}
+	if s.ProjectionCleanup != nil {
+		s.ProjectionCleanup.CleanupProjectionWorkers(ctx)
 	}
 	a, e := current()
 	if e != nil {

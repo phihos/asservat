@@ -106,7 +106,8 @@ func (s ContextProjectionScope) Candidate() ContextProjectionCandidate {
 }
 
 // ContextProjectionPath is accepted placement for this query purpose. It is not
-// a DownloadPath alias and cannot derive acceptance from a download policy.
+// a DownloadPath alias. ADR-219 shares the protected processing placement,
+// while ReadApproved remains an independently evaluated disclosure authority.
 type ContextProjectionPath struct {
 	Purpose, ID, TargetClusterID, StoreID   string
 	StorageRegion                           string
@@ -188,4 +189,13 @@ func ContextQueryDeadline(start time.Time, lifetime time.Duration, accessUntil t
 		return time.Time{}, ErrExpired
 	}
 	return until, nil
+}
+
+// AcquisitionPath extracts placement only. The caller retains the closed query
+// purpose and independent ReadApproved authority; this is never DownloadAuthority.
+func (p ContextProjectionPath) AcquisitionPath() artifact.DownloadPath {
+	if !p.Valid() {
+		return artifact.DownloadPath{}
+	}
+	return artifact.DownloadPath{ID: p.ID, TargetClusterID: p.TargetClusterID, StoreID: p.StoreID, StorageRegion: p.StorageRegion, AcquisitionClusterID: p.AcquisitionClusterID, AcquisitionRegion: p.AcquisitionRegion, ConnectorClusterID: p.ConnectorClusterID, ConnectorRegion: p.ConnectorRegion, HubClusterID: p.HubClusterID, HubRegion: p.HubRegion, WorkerConfiguration: p.WorkerConfiguration, HubConfiguration: p.HubConfiguration}
 }

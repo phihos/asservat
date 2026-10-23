@@ -5,6 +5,7 @@ package native
 import (
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
+	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -83,19 +84,23 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	hello, err := contracts.DecodeNativeHello(f.Payload)
 	clear(f.Payload)
 	defer clear(hello.WorkerToken)
-	if err != nil || hello.Format != contracts.NativeExchangeFormat || !contracts.ValidWorkerNonce(hello.Nonce) || !contracts.ValidWorkerToken(hello.WorkerToken) || len(hello.WorkerLeaf) > 16<<10 || h.path == contracts.NativeWorkerPath && len(hello.WorkerLeaf) != 0 || h.path == contracts.NativeOwnerPath && len(hello.WorkerLeaf) == 0 || h.path == contracts.NativeWorkerPath && (hello.Reference.OperationID != "" || hello.Reference.Fence != 0) {
+	if err != nil || !value.AcquisitionParentFor(hello.Reference.SessionID, hello.Reference.QueryID).Valid() || !value.UUID(hello.Reference.InstallationID) || !value.UUID(hello.Reference.WorkerID) || hello.Format != contracts.NativeExchangeFormat || !contracts.ValidWorkerNonce(hello.Nonce) || !contracts.ValidWorkerToken(hello.WorkerToken) || len(hello.WorkerLeaf) > 16<<10 || h.path == contracts.NativeWorkerPath && len(hello.WorkerLeaf) != 0 || h.path == contracts.NativeOwnerPath && len(hello.WorkerLeaf) == 0 || h.path == contracts.NativeWorkerPath && (hello.Reference.OperationID != "" || hello.Reference.Fence != 0) {
 		unavailable(w)
 		return
 	}
 	conversation, err := h.admission.OpenNative(ctx, r.TLS, hello)
 	var idle *evidence.NativeIdle
-	if conversation == nil && h.path == contracts.NativeWorkerPath && errors.As(err, &idle) && idle.Valid(time.Now()) && idle.Worker.Worker.Intent.ID == hello.Reference.WorkerID && idle.Worker.Worker.Intent.SessionID == hello.Reference.SessionID && idle.Proof.Binding.InstallationID == hello.Reference.InstallationID && ctx.Err() == nil {
+	if conversation == nil && h.path == contracts.NativeWorkerPath && errors.As(err, &idle) && idle.Valid(time.Now()) && idle.Worker.Worker.Intent.ID == hello.Reference.WorkerID && idle.Worker.Worker.Intent.Parent == value.AcquisitionParentFor(hello.Reference.SessionID, hello.Reference.QueryID) && idle.Proof.Binding.InstallationID == hello.Reference.InstallationID && ctx.Err() == nil {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Asservat-Native-Disposition", "no-command")
 		w.Header().Set("Asservat-Native-Nonce", hello.Nonce)
 		w.Header().Set("Asservat-Native-Installation", hello.Reference.InstallationID)
-		w.Header().Set("Asservat-Native-Session", hello.Reference.SessionID)
+		if hello.Reference.QueryID != "" {
+			w.Header().Set("Asservat-Native-Query", hello.Reference.QueryID)
+		} else {
+			w.Header().Set("Asservat-Native-Session", hello.Reference.SessionID)
+		}
 		w.Header().Set("Asservat-Native-Worker", hello.Reference.WorkerID)
 		w.Header().Set("Asservat-Native-Until", idle.Until.UTC().Format(time.RFC3339Nano))
 		w.Header().Set("Retry-After", "1")
@@ -117,7 +122,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	lease, err := gate.Check(ctx)
 	ref := hello.Reference
-	if err != nil || lease.Operation.Reference.InstallationID != ref.InstallationID || lease.Operation.Reference.SessionID != ref.SessionID || lease.Operation.Reference.WorkerID != ref.WorkerID || h.path == contracts.NativeOwnerPath && (lease.Operation.Reference.OperationID != ref.OperationID || lease.Operation.Reference.Fence != ref.Fence) {
+	if err != nil || lease.Operation.Reference.InstallationID != ref.InstallationID || lease.Operation.Reference.Parent() != value.AcquisitionParentFor(ref.SessionID, ref.QueryID) || lease.Operation.Reference.WorkerID != ref.WorkerID || h.path == contracts.NativeOwnerPath && (lease.Operation.Reference.OperationID != ref.OperationID || lease.Operation.Reference.Fence != ref.Fence) {
 		unavailable(w)
 		return
 	}

@@ -1,0 +1,7 @@
+{
+  "reason": "Operator interruption of redundant cold-cache compilation; warm existing default cache confirmed by CI agent. Not a test failure or completed qualification.",
+  "wrapperPID": 402489,
+  "goPID": 402625,
+  "signal": "SIGINT",
+  "command": "go test -count=1 -run ^TestConsole(Browser|NativeRestart)WithBuiltPackage$ -v ./test/integration"
+}

@@ -265,7 +265,7 @@ func (s *NativeOwners) LocateNativeOperation(ctx context.Context, installation, 
 		if readErr != nil || observation.Worker.Intent.ID != worker || ctx.Err() != nil {
 			return value.NativeLease{}, artifact.ErrDownloadUnavailable
 		}
-		return value.NativeLease{}, &evidence.NativeNoOperation{Worker: observation}
+		return value.NativeLease{}, &evidence.NativeNoOperation{Worker: observation.Acquisition()}
 	}
 	if e != nil {
 		return value.NativeLease{}, artifact.ErrDownloadUnavailable

@@ -5,7 +5,7 @@ package postgres
 //
 // ADR-204: every purpose here whose adapter runs Downloads.downloadFence
 // (download-session, download-worker, worker-enrollment and -activate,
-// worker-owner, download-key-bind, native-owner, native-key-bind) also
+// download-key-bind, native-owner, native-key-bind) also
 // reads processing_root, context_processing and processing_rule
 // (readProcessingSnapshot) and the five retention source tables
 // (RetentionTransactionGuard.check). The fixture grants these separately.
@@ -420,47 +420,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 		{"table", "retention_source", "", "SELECT"},
 		{"table", "retention_source", "root_id", "UPDATE"},
 	},
-	"worker-owner": {
-		{"schema", "public", "", "USAGE"},
-		{"table", "artifact_download", "", "SELECT"},
-		{"table", "artifact_download", "id", "UPDATE"},
-		{"table", "authority_audit", "", "SELECT"},
-		{"table", "context_capture", "", "SELECT"},
-		{"table", "context_catalog", "", "SELECT"},
-		{"table", "context_processing", "", "SELECT"},
-		{"table", "context_verification", "", "SELECT"},
-		{"table", "custody_attempt", "", "SELECT"},
-		{"table", "download_batch", "", "SELECT"},
-		{"table", "download_worker", "", "SELECT"},
-		{"table", "download_worker", "id", "UPDATE"},
-		{"table", "download_worker_configuration", "", "SELECT"},
-		{"table", "download_worker_configuration", "source_uid", "UPDATE"},
-		{"table", "download_worker_configuration_revision", "", "SELECT"},
-		{"table", "download_worker_owner", "", "INSERT"},
-		{"table", "download_worker_owner", "", "SELECT"},
-		{"table", "download_worker_owner", "expires_at", "UPDATE"},
-		{"table", "download_worker_owner", "fence", "UPDATE"},
-		{"table", "download_worker_owner", "pod_uid", "UPDATE"},
-		{"table", "download_worker_owner", "process_epoch", "UPDATE"},
-		{"table", "download_worker_owner", "released_at", "UPDATE"},
-		{"table", "download_worker_owner", "request_id", "UPDATE"},
-		{"table", "download_worker_owner", "started_at", "UPDATE"},
-		{"table", "fleet_current_trust", "", "SELECT"},
-		{"table", "fleet_current_trust", "installation_id", "UPDATE"},
-		{"table", "fleet_trust", "", "SELECT"},
-		{"table", "fleet_trust", "installation_id", "UPDATE"},
-		{"table", "goose_db_version", "", "SELECT"},
-		{"table", "permission_stream", "", "SELECT"},
-		{"table", "permission_stream", "id", "UPDATE"},
-		{"table", "processing_root", "", "SELECT"},
-		{"table", "processing_rule", "", "SELECT"},
-		{"table", "retention_catchup", "", "SELECT"},
-		{"table", "retention_catchup_effect", "", "SELECT"},
-		{"table", "retention_checkpoint", "", "SELECT"},
-		{"table", "retention_decision", "", "SELECT"},
-		{"table", "retention_source", "", "SELECT"},
-		{"table", "retention_source", "root_id", "UPDATE"},
-	},
+
 	"native-owner": {
 		{"schema", "public", "", "USAGE"},
 		{"table", "artifact_download", "", "SELECT"},

@@ -1,0 +1,14 @@
+Scope: optional complete installed service advertises exactly two audited approved-read operations; each eligible saved metadata artifact gets one explicit UI view. No new service, endpoint family, credential, queue, watch, cache, tuning knob, download authorization or quota change. Existing ContextProjection owns clearing/cancellation; live server authority is authoritative. Existing actual C18/audit bridge fixtures remain synthetic SQL/native authority, not installed qualification.
+Complexity questions:
+1. Missing console entry is source-proven; frequency unmeasured. It prevents the specified saved approved-result workflow.
+2. User explicitly requires approved inspection and native download as separate capabilities; accepted simplification preserves both.
+3. Typical saved pod-status workflow benefits; other formats unchanged.
+4. Reuses existing in-project audited operation and UI contracts; no novel external mechanism or comparable-project claim.
+5. Zero additional privileges/credentials/network destinations; same-origin authenticated existing operation routes.
+6. Zero new result states; reuses idle/loading/pending/result/expired/unavailable.
+7. Zero new configuration knobs.
+8. Same existing React/browser/server dependencies; no added dependency.
+9. Zero API calls on mount. Explicit initial read plus explicit same-handle polls under existing finite runtime caps. Per visible artifact owner/listeners; 64KiB wire ceiling and original result lifetime unchanged. CPU/latency unmeasured.
+10. Unconfigured service retains old server advertisement; partial composition fails construction. Component tests authored, unrun. No persisted layout change.
+11. Minimal mounting and existing operation composition satisfy the missing entry; no new discovery endpoint or autonomous polling is needed.
+Qualification proposal: targeted presentation TestInvestigationProjection and existing TestContextProjectionBridge; bootstrap TestPublicContextProjection and existing TestPublicContextOperations; console TypeScript + new EvidenceWorkspace.projection tests + existing evidence/projection suite; full console gates/browser and installed approved reads remain root-coordinated.

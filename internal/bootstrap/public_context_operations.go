@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	analysisapp "asservat.local/asservat/internal/application/analysis"
 	executionapp "asservat.local/asservat/internal/application/execution"
 	"time"
 
@@ -24,6 +25,7 @@ type PublicContextOperationServices struct {
 	Cases         catalogapp.ContextCaseService
 	Downloads     evidence.ContextDownloadCoordinator
 	Native        ContextNativeDownloadServices
+	Projection    *analysisapp.ContextProjectionService
 }
 
 type PublicContextOperationsConfig struct {
@@ -62,7 +64,19 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 	if err != nil {
 		return nil, err
 	}
-	return presentation.NewInvestigationOperations(captures, cases, downloads)
+	operations, err := presentation.NewInvestigationOperations(captures, cases, downloads)
+	if err != nil || s.Projection == nil {
+		return operations, err
+	}
+	q := s.Projection
+	if q.Results.RootID != c.RootID || q.Results.InstallationID != c.InstallationID || !authorization.UUID(q.Results.HubProcessEpoch) || q.Results.Authority == nil || q.Results.Ledger == nil || q.Results.Reader == nil || q.Results.Now == nil || q.Results.NewID == nil || q.Recovery == nil || q.Routes == nil || q.Plans == nil || q.Workers == nil {
+		return nil, presentation.ErrOperationsConfiguration
+	}
+	projection, err := presentation.NewContextProjectionOperations(*q, q.Results)
+	if err != nil {
+		return nil, err
+	}
+	return presentation.NewInvestigationProjectionOperations(operations, projection)
 }
 
 func composePublicContextUseCases(c PublicContextOperationsConfig, s PublicContextOperationServices) (publicContextUseCases, error) {

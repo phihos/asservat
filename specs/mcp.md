@@ -79,6 +79,14 @@ For `get_query_result`, validate the nested result against the original tool's o
 
 The initial [approved pod-status read profile](../docs/architecture/context-projection.md)
 uses the existing `get_file_excerpt` input and a fixed `pod-status.txt` projection.
+The installed shared-acquisition profile explicitly selects a finite 60-second
+query lifetime for cold Job startup and independent worker enrollment (ADR-219
+and ADR-221), shortened by original evidence/access/backing limits. This is a
+configured bound, not a measured startup guarantee. Each public request retains
+its own original at-most-five-second authority interval; polls reconstruct that
+request authority and never renew the query. Four paid polls and two paid read
+batches remain the profile ceilings. Clients honor the returned not-before
+interval and original expiry rather than immediately spending all polls.
 Ordinary reads require no extra caller idempotency key (SC-AUT-005). A pending
 handle binds the original tool, principal/client, exact committed source/display
 version, line selection, finite budgets and query deadline. `get_query_result`

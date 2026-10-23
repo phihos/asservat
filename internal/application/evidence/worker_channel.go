@@ -18,6 +18,21 @@ type WorkerEnrollmentExchange interface {
 	BeginWorkerEnrollment(context.Context, string, string, string, []byte, []byte) (WorkerEnrollmentDelivery, error)
 }
 
+// The closed parent is routing identity only. Each implementation must bind it
+// to its original admitted worker; certificate identity does not grant evidence access.
+type AcquisitionEnrollmentExchange interface {
+	BeginAcquisitionEnrollment(context.Context, string, value.AcquisitionParent, string, []byte, []byte) (WorkerEnrollmentDelivery, error)
+}
+
+type DownloadEnrollmentExchange struct{ Download WorkerEnrollmentExchange }
+
+func (e DownloadEnrollmentExchange) BeginAcquisitionEnrollment(ctx context.Context, installation string, parent value.AcquisitionParent, worker string, token, csr []byte) (WorkerEnrollmentDelivery, error) {
+	if e.Download == nil || !parent.Valid() || parent.Purpose != value.AcquisitionDownload {
+		return nil, artifact.ErrInvalid
+	}
+	return e.Download.BeginWorkerEnrollment(ctx, installation, parent.ID, worker, token, csr)
+}
+
 // Delivery retains the original request owner's cancellation/deadline through
 // the response write. Close is mandatory even when no response bytes are sent.
 // This is a private in-process lifetime, never a serialized bearer capability.
@@ -82,7 +97,7 @@ type WorkerEnrollmentOperation struct {
 // thirty seconds). It is not a durable token store or a worker routing registry.
 // An owner relay must reconnect it to current browser/MCP authority on retry.
 func NewWorkerEnrollmentOperation(parent context.Context, service WorkerEnrollmentCoordinator, proofs WorkerProofFactory, credential string, target value.WorkerCredentialTarget, scope artifact.DownloadScope) (*WorkerEnrollmentOperation, error) {
-	if parent == nil || parent.Err() != nil || service.Now == nil || service.CSR == nil || service.Ledger == nil || service.Activation == nil || service.Audit == nil || service.Acknowledgements == nil || service.Issuer == nil || service.Authority == nil || proofs == nil || len(credential) == 0 || len(credential) > 32<<10 || !target.Valid() || !scope.Valid() {
+	if parent == nil || parent.Err() != nil || service.Now == nil || service.CSR == nil || service.Ledger == nil || service.Activation == nil || service.Audit == nil || service.Acknowledgements == nil || service.Issuer == nil || service.Authority == nil || proofs == nil || len(credential) == 0 || len(credential) > 32<<10 || !target.Valid() || target.Parent().Purpose != value.AcquisitionDownload || !scope.Valid() {
 		return nil, artifact.ErrInvalid
 	}
 	until := service.Now().Add(30 * time.Second)
@@ -101,7 +116,7 @@ func NewWorkerEnrollmentOperation(parent context.Context, service WorkerEnrollme
 // NewCurrentWorkerEnrollmentOperation retains the actual request-owned identity
 // in the hub. No personal credential or CurrentIdentity crosses the private wire.
 func NewCurrentWorkerEnrollmentOperation(parent context.Context, service WorkerEnrollmentCoordinator, proofs WorkerProofFactory, source identities.CurrentIdentity, target value.WorkerCredentialTarget, scope artifact.DownloadScope) (*WorkerEnrollmentOperation, error) {
-	if parent == nil || parent.Err() != nil || service.Now == nil || service.CSR == nil || service.Ledger == nil || service.Activation == nil || service.Audit == nil || service.Acknowledgements == nil || service.Issuer == nil || service.CurrentAuthority == nil || proofs == nil || !target.Valid() || !scope.Valid() {
+	if parent == nil || parent.Err() != nil || service.Now == nil || service.CSR == nil || service.Ledger == nil || service.Activation == nil || service.Audit == nil || service.Acknowledgements == nil || service.Issuer == nil || service.CurrentAuthority == nil || proofs == nil || !target.Valid() || target.Parent().Purpose != value.AcquisitionDownload || !scope.Valid() {
 		return nil, artifact.ErrInvalid
 	}
 	check, err := newWorkerCurrentCheck(parent, source, service.CurrentAuthority, scope, service.Now)

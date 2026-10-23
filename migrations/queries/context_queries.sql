@@ -47,3 +47,35 @@ WHERE a.id=$1 AND a.root_id=$2 AND a.lane='normal' AND l.lane='normal' FOR SHARE
 
 -- name: ContextQueryCaseExists :one
 SELECT EXISTS(SELECT 1 FROM context_case_locator WHERE root_id=$1 AND case_id=$2 AND capture_id=$3 AND artifact_id=$4);
+
+
+-- name: ReadAcquisitionQuery :one
+SELECT * FROM context_query WHERE id=$1 AND root_id=$2;
+
+-- name: ReadProjectionNativeBatch :one
+SELECT b.* FROM context_query_batch b JOIN context_query q ON q.active_batch=b.id
+WHERE q.id=$1 AND q.root_id=$2 AND q.worker_id=$3 AND NOT b.closed;
+
+-- name: OpenProjectionNativeBatch :execrows
+UPDATE context_query_batch SET native_operation=$3,native_authority=$4
+WHERE id=$1 AND query_id=$2 AND claim_id=id AND NOT closed AND native_operation IS NULL;
+
+-- name: CloseProjectionNativeBatch :execrows
+UPDATE context_query_batch SET native_closed=true
+WHERE id=$1 AND query_id=$2 AND NOT closed AND NOT native_closed AND native_operation=$3;
+
+-- name: InsertProjectionQueryWorker :exec
+INSERT INTO context_query_worker(query_id,worker_id,binding,proof) VALUES($1,$2,$3,$4);
+
+-- name: ReadProjectionKeyBinding :one
+SELECT * FROM context_query_key_binding WHERE batch_id=$1;
+
+-- name: LockProjectionKeyBinding :one
+SELECT * FROM context_query_key_binding WHERE batch_id=$1 FOR UPDATE;
+
+-- name: InsertProjectionKeyBinding :exec
+INSERT INTO context_query_key_binding(batch_id,query_id,binding) VALUES($1,$2,$3);
+
+-- name: ConsumeProjectionKeyRole :execrows
+UPDATE context_query_key_binding SET used_roles=used_roles|sqlc.arg(role)::smallint
+WHERE batch_id=sqlc.arg(batch_id) AND (used_roles&sqlc.arg(role)::smallint)=0;

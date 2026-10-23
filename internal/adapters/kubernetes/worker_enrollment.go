@@ -35,15 +35,50 @@ func (s *WorkerEnrollmentAttester) ReadWorkerEnrollmentProof(ctx context.Context
 	if e != nil || !o.Valid(s.client.now()) || o.Worker.Intent.ID != worker || o.Worker.Intent.SessionID != session {
 		return zero, artifact.ErrInvalid
 	}
-	w, p := o.Worker, o.Worker.Intent.Profile
-	if s.client.clusterID != p.ClusterID || s.client.control.Name != p.Namespace || s.client.control.UID != p.NamespaceUID {
+	proof, e := acquisitionEnrollmentProof(ctx, s.client, s.tokens, o.Acquisition(), key, start)
+	if e != nil {
+		return zero, e
+	}
+	return value.WorkerEnrollmentProof{Worker: o.Worker, PublicKeyDigest: proof.PublicKeyDigest, TokenDigest: proof.TokenDigest, ObservedAt: proof.ObservedAt, FreshUntil: proof.FreshUntil}, nil
+}
+
+type AcquisitionEnrollmentAttester struct {
+	client   *PermissionClient
+	bindings app.AcquisitionEnrollmentBindings
+	tokens   app.DownloadPeerToken
+}
+
+func NewAcquisitionEnrollmentAttester(c *PermissionClient, b app.AcquisitionEnrollmentBindings, t app.DownloadPeerToken) (*AcquisitionEnrollmentAttester, error) {
+	if c == nil || b == nil || t == nil {
+		return nil, artifact.ErrInvalid
+	}
+	return &AcquisitionEnrollmentAttester{c, b, t}, nil
+}
+func (s *AcquisitionEnrollmentAttester) ReadAcquisitionEnrollmentProof(ctx context.Context, parent value.AcquisitionParent, worker string, key artifact.Digest) (value.AcquisitionWorkerProof, error) {
+	var zero value.AcquisitionWorkerProof
+	if s == nil || ctx == nil || !parent.Valid() || !value.UUID(worker) || key == (artifact.Digest{}) {
 		return zero, artifact.ErrInvalid
 	}
-	jobs := &DownloadWorkerJobs{client: s.client, profile: p}
+	ctx, end := context.WithTimeout(ctx, 5*time.Second)
+	defer end()
+	start := s.client.now()
+	o, e := s.bindings.ReadAcquisitionEnrollment(ctx, parent, worker)
+	if e != nil || !o.Valid(s.client.now()) || o.Worker.Intent.ID != worker || o.Worker.Intent.Parent != parent {
+		return zero, artifact.ErrInvalid
+	}
+	return acquisitionEnrollmentProof(ctx, s.client, s.tokens, o, key, start)
+}
+func acquisitionEnrollmentProof(ctx context.Context, client *PermissionClient, tokens app.DownloadPeerToken, o value.AcquisitionWorkerIdentity, key artifact.Digest, start time.Time) (value.AcquisitionWorkerProof, error) {
+	var zero value.AcquisitionWorkerProof
+	w, p := o.Worker, o.Worker.Intent.Profile
+	if client.clusterID != p.ClusterID || client.control.Name != p.Namespace || client.control.UID != p.NamespaceUID {
+		return zero, artifact.ErrInvalid
+	}
+	jobs := &DownloadWorkerJobs{client: client, profile: p}
 	if jobs.sources(ctx) != nil {
 		return zero, artifact.ErrInvalid
 	}
-	attester, e := NewDownloadPeerAttester(s.client, w.Binding, s.tokens)
+	attester, e := NewAcquisitionPeerAttester(client, w.Binding, tokens)
 	if e != nil {
 		return zero, e
 	}
@@ -51,8 +86,8 @@ func (s *WorkerEnrollmentAttester) ReadWorkerEnrollmentProof(ctx context.Context
 	if e != nil || jobs.sources(ctx) != nil {
 		return zero, artifact.ErrInvalid
 	}
-	out := value.WorkerEnrollmentProof{Worker: w, PublicKeyDigest: key, TokenDigest: digest, ObservedAt: start, FreshUntil: identity.Earlier(o.FreshUntil, identity.Earlier(until, start.Add(5*time.Second)))}
-	if !out.Valid(s.client.now()) || ctx.Err() != nil {
+	out := value.AcquisitionWorkerProof{Worker: w, PublicKeyDigest: key, TokenDigest: digest, ObservedAt: start, FreshUntil: identity.Earlier(o.FreshUntil, identity.Earlier(until, start.Add(5*time.Second)))}
+	if !out.Valid(client.now()) || ctx.Err() != nil {
 		return zero, artifact.ErrDownloadExpired
 	}
 	return out, nil

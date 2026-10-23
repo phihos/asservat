@@ -12,6 +12,13 @@ func WorkerCertificateURI(a value.WorkerCertificateAttempt) (*url.URL, error) {
 	if !a.Valid(a.CheckedAt) {
 		return nil, artifact.ErrInvalid
 	}
+	return AcquisitionCertificateURI(a.Acquisition())
+}
+
+func AcquisitionCertificateURI(a value.AcquisitionCertificateAttempt) (*url.URL, error) {
+	if !a.Valid(a.CheckedAt) {
+		return nil, artifact.ErrInvalid
+	}
 	b := a.Enrollment.Worker.Binding
 	return &url.URL{Scheme: "spiffe", Host: "asservat." + b.InstallationID, Path: "/key-client/acquisition/" + b.PodUID}, nil
 }
@@ -19,6 +26,13 @@ func WorkerCertificateURI(a value.WorkerCertificateAttempt) (*url.URL, error) {
 // CheckWorkerCertificate validates an actual issuer response. It does not
 // manufacture a TLS handshake or activate the certificate in the registry.
 func (v *KeyPeerVerifier) CheckWorkerCertificate(a value.WorkerCertificateAttempt, csr, der []byte, chain [][]byte) (value.WorkerCertificate, error) {
+	if v == nil || v.now == nil || !a.Valid(v.now()) {
+		return value.WorkerCertificate{}, artifact.ErrInvalid
+	}
+	return v.CheckAcquisitionCertificate(a.Acquisition(), csr, der, chain)
+}
+
+func (v *KeyPeerVerifier) CheckAcquisitionCertificate(a value.AcquisitionCertificateAttempt, csr, der []byte, chain [][]byte) (value.WorkerCertificate, error) {
 	var out value.WorkerCertificate
 	if v == nil || v.now == nil || !a.Valid(v.now()) || len(der) < 1 || len(der) > 16<<10 || len(chain) > 3 {
 		return out, artifact.ErrInvalid

@@ -1,0 +1,26 @@
+{
+  "worktree": "/home/phil/Projekte/asservat-projection-c62e02ac",
+  "head": "98f7e181bca3d075c3b42adefc604a993f22e1ac",
+  "scope": "Source-only public approved-result composition. Tests authored; no tests/builds/codegen performed by this task. Shared tree qualification pending.",
+  "files": {
+    "internal/transport/presentation/investigation_operations.go": "cfa60fbcbd419948254af6e97fd5e0c2eb1a5028cd8051bb649de6c176f4a780",
+    "internal/transport/presentation/context_projection_operations.go": "4b6cc216d6b02da2bea40efcd95f336c01728149be56d9c706c5a796bc13a885",
+    "internal/transport/presentation/investigation_projection_test.go": "c9e3c92fb7b9b65b044818794ee9eb067566f22e0be5326009e993994747e203",
+    "internal/bootstrap/public_context_operations.go": "2fb9d103408def0d87ec25032a3f8680c5a2f008b509b45993431f39a8a2e3bf",
+    "internal/bootstrap/public_context_projection_test.go": "e6645e2d62b2a8ed94405288917c9a09ac553813782c3d435632a87ef720d254",
+    "web/src/evidence/EvidenceWorkspace.tsx": "2656c4d36126dd2af740318069be5e8200af977b58f6fe8712fad48910769e39",
+    "web/src/evidence/EvidenceWorkspace.projection.test.tsx": "92ec00b8f1eb6020a4ab3651f1f9da3fa35884ab8c9b2f9a6c1bad67c3f19f9f",
+    "web/src/projection/ContextProjectionView.tsx": "70468c693867f0491b7f842c519d0330ed414da8a1c2872972a6c468840ae418",
+    "web/src/projection/http.ts": "b546886ac1e8fea9a3f2f25aafb60a1c5a1bd9313dbf8f0a0f3a8ed21b9eaee7",
+    "docs/architecture/context-projection.md": "d7dd9c51ee145e4a4de8fff786b5d1a05c583bb42feb24de51ad761b9496b004"
+  },
+  "shared_document": "Only introduction and Public composition candidate section owned here; CI may update final capacity section.",
+  "checks": {
+    "gofmt": "completed on five owned Go files",
+    "git_diff_check": 0,
+    "go_tests": null,
+    "console_tests": null,
+    "installed_qualification": null
+  },
+  "baseline": "before/ contains exact pre-task production files for future genuine UI regression RED; no RED result claimed."
+}

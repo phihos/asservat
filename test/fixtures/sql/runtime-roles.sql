@@ -626,7 +626,7 @@ GRANT UPDATE(root_id) ON retention_source,context_query_backing TO context_query
 GRANT UPDATE(operation_id) ON operation_audit_lifecycle TO context_query_runtime;
 GRANT INSERT ON context_query_principal,context_query,context_query_call,context_query_batch TO context_query_runtime;
 GRANT UPDATE(claim_id,closed) ON context_query_batch TO context_query_runtime;
-GRANT EXECUTE ON FUNCTION lock_context_query_capacity(uuid,uuid),context_query_capacity_allocation_current(uuid,uuid) TO context_query_runtime;
+GRANT EXECUTE ON FUNCTION lock_context_query_capacity(uuid,uuid),context_query_capacity_allocation_current(uuid,uuid),context_query_shared_profile_current(uuid,jsonb) TO context_query_runtime;
 CREATE ROLE context_query_key_fixture LOGIN NOINHERIT PASSWORD 'synthetic-context-query-key';
 GRANT CONNECT ON DATABASE custody_test TO context_query_key_fixture;
 GRANT USAGE ON SCHEMA public TO context_query_key_fixture;

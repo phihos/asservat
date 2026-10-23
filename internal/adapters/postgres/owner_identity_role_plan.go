@@ -53,7 +53,7 @@ func ownerIdentityDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	// can dispatch, enroll, claim or bind keys.
 	switch purpose {
 	case "routing":
-		for _, table := range []string{"goose_db_version", "download_worker_owner", "download_worker", "artifact_download", "fleet_trust", "fleet_current_trust", "download_worker_configuration", "download_worker_configuration_revision"} {
+		for _, table := range []string{"goose_db_version", "context_query", "download_worker", "artifact_download", "fleet_trust", "fleet_current_trust", "download_worker_configuration", "download_worker_configuration_revision"} {
 			add(table, "SELECT")
 		}
 		add("fleet_trust", "UPDATE", "installation_id")

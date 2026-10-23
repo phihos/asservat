@@ -197,18 +197,22 @@ func (d *ContextProjectionDelivery) Close(ctx context.Context) error {
 }
 
 type projectionRequest struct {
-	service    ContextProjectionResults
-	ctx        context.Context
-	cancel     context.CancelFunc
-	current    identities.CurrentIdentity
-	initial    identity.Identity
-	invocation ContextQueryInvocation
-	request    value.ContextQueryRequest
-	query      value.ContextQuery
-	mu         sync.Mutex
-	until      time.Time
-	closed     bool
-	timer      *time.Timer
+	service            ContextProjectionResults
+	ctx                context.Context
+	cancel             context.CancelFunc
+	current            identities.CurrentIdentity
+	initial            identity.Identity
+	invocation         ContextQueryInvocation
+	request            value.ContextQueryRequest
+	query              value.ContextQuery
+	mu                 sync.Mutex
+	until              time.Time
+	closed             bool
+	timer              *time.Timer
+	authorityMu        sync.Mutex
+	authority          *value.ContextProjectionAuthority
+	authorityError     error
+	authorityAttempted bool
 }
 
 // Every port sees the same monotonically shortened deadline. The underlying
@@ -357,27 +361,38 @@ func (o *projectionRequest) shorten(until time.Time) bool {
 	return !o.closed && o.ctx.Err() == nil && o.service.Now().Before(o.until)
 }
 
+// One completed authorization belongs to this exact request. Later helpers
+// validate its original cutoff and scope locally; transactional effects still
+// enforce current SQL permission, recovery, retention and processing state.
+// A new poll creates a new owner and performs its own complete authorization.
 func (o *projectionRequest) CheckCurrent(ctx context.Context) (value.ContextProjectionAuthority, error) {
 	checked, cancel, err := o.context(ctx)
 	if err != nil {
 		return value.ContextProjectionAuthority{}, err
 	}
 	defer cancel()
-	if _, err := o.checkIdentity(checked); err != nil {
-		return value.ContextProjectionAuthority{}, err
+	o.authorityMu.Lock()
+	defer o.authorityMu.Unlock()
+	if !o.authorityAttempted {
+		o.authorityAttempted = true
+		a, e := o.service.Authority.CheckProjectionCurrent(checked, o.current, o.query.Scope)
+		if e != nil || !o.query.Current(a, o.service.Now()) || a.Environment.InstallationID != o.service.InstallationID || a.IdentityRevision != o.initial.Policy || checked.Err() != nil {
+			o.authorityError = value.ErrUnavailable
+		} else {
+			o.authority = &a
+		}
 	}
-	a, err := o.service.Authority.CheckProjectionCurrent(checked, o.current, o.query.Scope)
-	if err != nil || !o.query.Current(a, o.service.Now()) || a.Environment.InstallationID != o.service.InstallationID ||
-		a.IdentityRevision != o.initial.Policy || !o.shorten(identity.Earlier(o.query.Deadline, a.ValidUntil)) {
+	if o.authorityError != nil || o.authority == nil || checked.Err() != nil || o.ctx.Err() != nil {
 		return value.ContextProjectionAuthority{}, value.ErrUnavailable
 	}
-	if _, err = o.checkIdentity(checked); err != nil {
-		return value.ContextProjectionAuthority{}, err
+	a := *o.authority
+	if !o.query.Current(a, o.service.Now()) || !o.initial.Valid(o.service.Now()) || !o.shorten(identity.Earlier(o.query.Deadline, a.ValidUntil)) {
+		return value.ContextProjectionAuthority{}, value.ErrUnavailable
 	}
 	o.mu.Lock()
 	a.ValidUntil = identity.Earlier(a.ValidUntil, o.until)
 	o.mu.Unlock()
-	if !a.Valid(o.service.Now()) {
+	if !a.Valid(o.service.Now()) || checked.Err() != nil || o.ctx.Err() != nil {
 		return value.ContextProjectionAuthority{}, value.ErrUnavailable
 	}
 	return a, nil
@@ -423,6 +438,9 @@ func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current iden
 		return nil, err
 	}
 	o.query = q
+	// ResolveProjectionCurrent already completed this request's exact scope.
+	retained := a
+	o.authority, o.authorityAttempted = &retained, true
 	a, err = o.CheckCurrent(o.ctx)
 	if err != nil {
 		return nil, err

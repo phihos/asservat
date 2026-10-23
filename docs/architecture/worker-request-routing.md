@@ -1,5 +1,15 @@
 # Worker request routing and delivery lifetime
 
+Current installed composition is revised by [ADR-219](../decisions/219-shared-approved-acquisition.md)
+and [ADR-221](../decisions/221-admitted-worker-identity-enrollment.md): one closed
+acquisition parent selects native download or approved pod-status. Certificate
+enrollment uses the exact admitted worker and its own bounded HTTP request,
+without a human certificate-owner registry/locator/relay. Native-operation
+ownership and each purpose's current key/evidence authority remain separate.
+The older certificate-routing components and their tests below are historical
+component evidence, not the installed certificate path. Shared composition
+qualification is still pending.
+
 [ADR-074](../decisions/074-worker-request-routing.md) refines the [credential channel](worker-credential-channel.md) under REQ-DEP-003, REQ-DLD-003 and REQ-CAP-003. C-14 owns the process-local active request registry and response lifetime. C-20's private handler consumes that lifetime; C-15 remains authoritative for worker identity, activation and spend. This is part of I-13, with no new public endpoint or serialized capability.
 
 ## Register an active owner

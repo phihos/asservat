@@ -16,7 +16,8 @@ const WorkerEnrollmentMaxToken = 16 << 10
 type WorkerEnrollmentRequest struct {
 	Format         string `json:"format"`
 	InstallationID string `json:"installationID"`
-	SessionID      string `json:"sessionID"`
+	SessionID      string `json:"sessionID,omitempty"`
+	QueryID        string `json:"queryID,omitempty"`
 	WorkerID       string `json:"workerID"`
 	Nonce          string `json:"nonce"`
 	CSR            []byte `json:"csr"`
@@ -25,7 +26,8 @@ type WorkerEnrollmentRequest struct {
 type WorkerEnrollmentResponse struct {
 	Format         string   `json:"format"`
 	InstallationID string   `json:"installationID"`
-	SessionID      string   `json:"sessionID"`
+	SessionID      string   `json:"sessionID,omitempty"`
+	QueryID        string   `json:"queryID,omitempty"`
 	WorkerID       string   `json:"workerID"`
 	Nonce          string   `json:"nonce"`
 	Certificate    []byte   `json:"certificate"`

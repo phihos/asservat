@@ -14,8 +14,6 @@ import (
 // These tests exercise the actual Continue orchestration with synthetic current
 // Pod/SQL/identity ports. They stop at an unknown first batch admission; no
 // network, provider, key or native conversation success is inferred.
-var errUnusedEnrollmentOwner = errors.New("synthetic enrollment owner must not be used")
-
 type activePreparationSessions struct {
 	*downloadResultFixture
 	lookup         *boundWorkerAttachments
@@ -50,7 +48,6 @@ type unusedActiveNativePorts struct {
 type activeEnrollmentFixture struct {
 	boundWorkerFixture
 	preparation *activePreparationSessions
-	claims      int
 }
 
 func newActiveEnrollmentFixture(t *testing.T) *activeEnrollmentFixture {
@@ -63,10 +60,6 @@ func newActiveEnrollmentFixture(t *testing.T) *activeEnrollmentFixture {
 	f.f.lostBeginReply = true
 	f.preparation = &activePreparationSessions{downloadResultFixture: f.f, lookup: f.lookup}
 	f.r.config.Preparation, f.r.config.Audit, f.r.config.Acknowledgements = f.preparation, f.f, f.f
-	f.r.config.Requests.Store = testWorkerOwnerStore{claim: func(context.Context, value.WorkerOwnerRequest) (value.WorkerOwnerLease, error) {
-		f.claims++
-		return value.WorkerOwnerLease{}, errUnusedEnrollmentOwner
-	}}
 	ports := &unusedActiveNativePorts{}
 	f.r.config.Native = NativeAttachmentConfig{HubPodUID: en.Worker.Binding.PodUID, HubProcessEpoch: en.Worker.Intent.ID, KeyScope: value.KeyScope{InstallationID: en.Worker.Binding.InstallationID, Purpose: "artifact", KeyID: "synthetic"}, Owners: ports, Fences: ports, Origins: NativeOrigins{Operations: ports, Now: f.r.config.Now}, Registrar: ports, PreparationKeys: ports, WindowKeys: ports}
 	if !f.lookup.value.Valid(f.f.now) {
@@ -85,8 +78,8 @@ func TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim(t *testing.T) {
 	defer cancel()
 	f.launch.hooks["observe-job"] = func() { f.advance(100 * time.Millisecond) }
 	out, err := f.r.ContinueContextDownload(ctx, f.f, original, f.source)
-	if err == nil || errors.Is(err, errUnusedEnrollmentOwner) || out.Pending || f.claims != 0 || f.f.count("begin") != 1 {
-		t.Fatal("already active preparation used enrollment or missed original first batch", out.Pending, f.claims, f.f.count("begin"), err)
+	if err == nil || out.Pending || f.f.count("begin") != 1 {
+		t.Fatal("already active preparation used enrollment or missed original first batch", out.Pending, f.f.count("begin"), err)
 	}
 	f.noLaunchEffects(t)
 	if f.lookup.reads != 2 || f.launch.count("observe-job") != 1 || f.launch.count("read-enrollment") != 0 {
@@ -99,7 +92,7 @@ func TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim(t *testing.T) {
 		t.Fatal("unknown first batch lost spend or changed original session/backing")
 	}
 	_, err = f.r.ContinueContextDownload(ctx, f.f, original, f.source)
-	if !errors.Is(err, ErrDownloadMetadataUnavailable) || f.f.count("begin") != 1 || f.f.count("finish") != 0 || f.claims != 0 || f.f.s.Requests != 1 || f.f.s.ChargedRead != ContextDownloadReadWork {
+	if !errors.Is(err, ErrDownloadMetadataUnavailable) || f.f.count("begin") != 1 || f.f.count("finish") != 0 || f.f.s.Requests != 1 || f.f.s.ChargedRead != ContextDownloadReadWork {
 		t.Fatal("unknown first admission was replayed, repaired or refunded", err)
 	}
 }
@@ -149,8 +142,8 @@ func TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState(t *testing.T) {
 				}
 			}
 			out, err := f.r.ContinueContextDownload(ctx, f.f, f.f.s, f.source)
-			if err == nil || out.Pending || f.claims != 0 || f.f.count("begin") != 0 {
-				t.Fatal("changed active identity started enrollment or preparation", out.Pending, f.claims, f.f.count("begin"), err)
+			if err == nil || out.Pending || f.f.count("begin") != 0 {
+				t.Fatal("changed active identity started enrollment or preparation", out.Pending, f.f.count("begin"), err)
 			}
 			if mode == "revoked-before" && (f.lookup.reads != 0 || f.launch.count("observe-job") != 0) {
 				t.Fatal("ordinary deny followed evidence lookup")
@@ -159,7 +152,7 @@ func TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState(t *testing.T) {
 	}
 }
 
-func TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute(t *testing.T) {
+func TestContextRuntimeIncompleteOrShortPeerReturnsPending(t *testing.T) {
 	for _, mode := range []string{"no-enrollment", "no-peer", "short-peer"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newActiveEnrollmentFixture(t)
@@ -173,9 +166,9 @@ func TestContextRuntimeIncompleteOrShortPeerRetainsEnrollmentRoute(t *testing.T)
 				p.NotAfter = f.f.now.Add(3 * time.Second)
 				f.lookup.value.ActivatedPeer = &p
 			}
-			_, err := f.r.ContinueContextDownload(context.Background(), f.f, f.f.s, f.source)
-			if !errors.Is(err, errUnusedEnrollmentOwner) || f.claims != 1 || f.f.count("begin") != 0 {
-				t.Fatal("needed enrollment path skipped", mode, f.claims, err)
+			out, err := f.r.ContinueContextDownload(context.Background(), f.f, f.f.s, f.source)
+			if err != nil || !out.Pending || f.f.count("begin") != 0 || f.lookup.reads != 2 {
+				t.Fatal("incomplete independent enrollment did not remain pending", mode, err)
 			}
 		})
 	}
@@ -234,7 +227,7 @@ func TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation(t *testing.
 			out, err := f.r.ContinueContextDownload(t.Context(), f.f, original, f.source)
 			// This fixture deliberately loses the first SQL batch reply. A bounded
 			// observation must reach that unchanged, non-replayable admission once.
-			if err == nil || out.Pending || f.f.count("begin") != 1 || f.f.count("current-authority") != 1 || f.claims != 0 {
+			if err == nil || out.Pending || f.f.count("begin") != 1 || f.f.count("current-authority") != 1 {
 				t.Fatal("original observation did not reach the existing first preparation", err, f.f.count("begin"), f.f.count("current-authority"))
 			}
 			f.noLaunchEffects(t)
