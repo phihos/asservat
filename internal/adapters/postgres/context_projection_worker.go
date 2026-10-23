@@ -32,26 +32,28 @@ func NewProjectionWorkers(queries *ContextQueries, profile value.DownloadWorkerP
 }
 func (s *ProjectionWorkers) current(ctx context.Context, q query.ContextQuery, r query.ContextQueryRequest, a query.ContextProjectionAuthority, f func(context.Context, *custodydb.Queries) error) error {
 	if s == nil || s.queries == nil || q.Plan.InstallationID != s.profile.InstallationID || a.Environment.Path.AcquisitionClusterID != s.profile.ClusterID || a.Environment.Path.WorkerConfiguration != s.profile.Configuration {
-		return query.ErrUnavailable
+		return queryRefusal("worker-profile", nil)
 	}
 	return s.queries.current(ctx, q, r, a, func(ctx context.Context, tx *custodydb.Queries, _ custodydb.ContextQueryBacking, _ custodydb.ContextQueryAllocation) error {
 		row, e := queryExact(ctx, tx, q)
 		if e != nil || row.Uncertain {
-			return query.ErrUnavailable
+			return queryRefusal("worker-query", e)
 		}
 		call, e := tx.ReadContextQueryCall(ctx, custodydb.ReadContextQueryCallParams{OperationID: id(r.Call.ID), QueryID: id(q.ID)})
 		var original query.ContextQueryRequest
 		if e != nil || queryDecode(call.Request, 8192, &original) != nil || !sameAuditJSON(original, r) {
-			return query.ErrUnavailable
+			return queryRefusal("worker-call", e)
 		}
 		if _, e = currentWorkerConfiguration(ctx, tx, s.profile, q.RecoveryIssuerEpoch); e != nil {
-			return e
+			return queryRefusal("worker-configuration", e)
 		}
 		if e = f(ctx, tx); e != nil {
-			return e
+			return queryRefusal("worker-effect", e)
 		}
-		_, e = currentWorkerConfiguration(ctx, tx, s.profile, q.RecoveryIssuerEpoch)
-		return e
+		if _, e = currentWorkerConfiguration(ctx, tx, s.profile, q.RecoveryIssuerEpoch); e != nil {
+			return queryRefusal("worker-configuration-after", e)
+		}
+		return nil
 	})
 }
 func projectionWorkerState(row custodydb.DownloadWorker, q query.ContextQuery) (evidence.ProjectionWorkerState, error) {
@@ -145,21 +147,24 @@ func (s *ProjectionWorkers) ClaimProjectionWorker(ctx context.Context, i query.C
 	e := s.current(ctx, i.Query, r, a, func(ctx context.Context, tx *custodydb.Queries) error {
 		row, e := tx.LockDownloadWorker(ctx, custodydb.LockDownloadWorkerParams{ID: id(i.Worker.ID), RootID: id(i.Query.Scope.RootID)})
 		if e != nil || row.TerminationJson != nil || row.RetiredProofJson != nil {
-			return query.ErrUnavailable
+			return queryRefusal("claim-lock", e)
 		}
 		old, e := projectionWorkerState(row, i.Query)
-		if e != nil || !sameAuditJSON(old.Intent, i) {
-			return query.ErrUnavailable
+		if e != nil {
+			return queryRefusal("claim-state", e)
+		}
+		if !sameAuditJSON(old.Intent, i) {
+			return queryRefusal("claim-intent", nil)
 		}
 		raw, _ := json.Marshal(receipt)
 		if old.Audited {
 			if !bytes.Equal(raw, row.AuditReceiptJson) {
-				return query.ErrUnavailable
+				return queryRefusal("claim-receipt", nil)
 			}
 		} else {
 			n, e := tx.AuditDownloadWorker(ctx, custodydb.AuditDownloadWorkerParams{ID: row.ID, RootID: row.RootID, AuditReceiptJson: raw})
 			if e != nil || n != 1 {
-				return query.ErrUnavailable
+				return queryRefusal("claim-audit", e)
 			}
 		}
 		now, e := tx.CurrentTime(ctx)
@@ -168,21 +173,21 @@ func (s *ProjectionWorkers) ClaimProjectionWorker(ctx context.Context, i query.C
 		}
 		out = value.AcquisitionWorkerLaunch{Intent: i.Worker, CheckedAt: now.Time.UTC(), Until: identity.Earlier(i.Query.Deadline, identity.Earlier(a.ValidUntil, r.Call.Until)), MayCreate: !old.Claimed}
 		if !out.Valid(now.Time) {
-			return query.ErrUnavailable
+			return queryRefusal("claim-launch", nil)
 		}
 		if out.MayCreate {
 			if out.Until.Sub(now.Time) < time.Second {
-				return query.ErrUnavailable
+				return queryRefusal("claim-time", nil)
 			}
 			n, e := tx.ClaimDownloadWorker(ctx, custodydb.ClaimDownloadWorkerParams{ID: row.ID, RootID: row.RootID})
 			if e != nil || n != 1 {
-				return query.ErrUnavailable
+				return queryRefusal("claim-row", e)
 			}
 		}
 		return nil
 	})
 	if e != nil {
-		return value.AcquisitionWorkerLaunch{}, query.ErrUnavailable
+		return value.AcquisitionWorkerLaunch{}, queryRefusal("claim", e)
 	}
 	return out, nil
 }
