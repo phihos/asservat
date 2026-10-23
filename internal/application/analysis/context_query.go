@@ -211,6 +211,7 @@ type projectionRequest struct {
 	query              value.ContextQuery
 	mu                 sync.Mutex
 	until              time.Time
+	bound              string
 	closed             bool
 	timer              *time.Timer
 	authorityMu        sync.Mutex
@@ -303,7 +304,7 @@ func (s ContextProjectionResults) request(ctx context.Context, current identitie
 		o.mu.Unlock()
 	}
 	transferred = true
-	if !o.shorten(until) || invocation.CheckIntent(o.ctx, call) != nil {
+	if !o.shorten("request", until) || invocation.CheckIntent(o.ctx, call) != nil {
 		o.cancel()
 		return nil, queryStepped("intent", value.ErrUnavailable)
 	}
@@ -348,17 +349,20 @@ func (o *projectionRequest) checkIdentity(ctx context.Context) (identity.Identit
 	if err != nil || checked.Err() != nil || o.ctx.Err() != nil || !sameProjectionIdentity(o.initial, i, o.service.Now()) {
 		return identity.Identity{}, value.ErrUnavailable
 	}
-	if !o.shorten(i.ValidUntil) {
+	if !o.shorten("identity", i.ValidUntil) {
 		return identity.Identity{}, value.ErrExpired
 	}
 	return i, nil
 }
 
-func (o *projectionRequest) shorten(until time.Time) bool {
+func (o *projectionRequest) shorten(bound string, until time.Time) bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	earliest := identity.Earlier(o.until, until)
 	if o.timer == nil || earliest.Before(o.until) {
+		if o.timer == nil || until.Before(o.until) {
+			o.bound = bound
+		}
 		o.until = earliest
 		if o.timer != nil {
 			o.timer.Stop()
@@ -366,6 +370,18 @@ func (o *projectionRequest) shorten(until time.Time) bool {
 		o.timer = time.AfterFunc(time.Until(earliest), o.cancel)
 	}
 	return !o.closed && o.ctx.Err() == nil && o.service.Now().Before(o.until)
+}
+
+// cut labels a refusal caused by this request reaching its own shortened
+// deadline with the observation that set it, for the operator report only.
+func (o *projectionRequest) cut(err error) error {
+	o.mu.Lock()
+	bound, until := o.bound, o.until
+	o.mu.Unlock()
+	if err == nil || o.ctx.Err() == nil || bound == "" || o.service.Now().Before(until) {
+		return err
+	}
+	return queryStepped("until-"+bound, err)
 }
 
 // One completed authorization belongs to this exact request. Later helpers
@@ -396,7 +412,7 @@ func (o *projectionRequest) CheckCurrent(ctx context.Context) (value.ContextProj
 		return value.ContextProjectionAuthority{}, queryCollapsed("cancelled", value.ErrUnavailable, errors.Join(checked.Err(), o.ctx.Err()))
 	}
 	a := *o.authority
-	if !o.query.Current(a, o.service.Now()) || !o.initial.Valid(o.service.Now()) || !o.shorten(identity.Earlier(o.query.Deadline, a.ValidUntil)) {
+	if !o.query.Current(a, o.service.Now()) || !o.initial.Valid(o.service.Now()) || !o.shorten("authority", identity.Earlier(o.query.Deadline, a.ValidUntil)) {
 		return value.ContextProjectionAuthority{}, queryStepped("authority-lapsed", value.ErrUnavailable)
 	}
 	o.mu.Lock()
@@ -432,7 +448,7 @@ func (s ContextProjectionService) beginExcerpt(ctx context.Context, current iden
 		return nil, queryStepped("input", value.ErrUnavailable)
 	}
 	recovery, err := s.Recovery.RecoveryState(o.ctx)
-	if err != nil || !recovery.Valid(s.Results.Now()) || recovery.InstallationID != s.Results.InstallationID || !o.shorten(recovery.FreshUntil) {
+	if err != nil || !recovery.Valid(s.Results.Now()) || recovery.InstallationID != s.Results.InstallationID || !o.shorten("recovery", recovery.FreshUntil) {
 		return nil, queryCollapsed("recovery", value.ErrUnavailable, err)
 	}
 	candidate, err := s.Routes.ResolveContextProjection(o.ctx, selection, o.initial, recovery)
@@ -442,11 +458,11 @@ func (s ContextProjectionService) beginExcerpt(ctx context.Context, current iden
 	}
 	a, err := s.Results.Authority.ResolveProjectionCurrent(o.ctx, current, candidate)
 	if err != nil || !a.Valid(s.Results.Now()) || a.Scope.Candidate() != candidate || a.Environment.InstallationID != s.Results.InstallationID ||
-		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten(a.ValidUntil) {
+		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten("resolved-authority", a.ValidUntil) {
 		return nil, queryCollapsed("authority", value.ErrUnavailable, err)
 	}
 	p, err := s.Plans.ContextQueryPlan(o.ctx, a)
-	if err != nil || !p.Valid(a.Scope, s.Results.Now()) || !o.shorten(p.ValidUntil) {
+	if err != nil || !p.Valid(a.Scope, s.Results.Now()) || !o.shorten("plan", p.ValidUntil) {
 		return nil, queryCollapsed("plan", value.ErrUnavailable, err)
 	}
 	q, err := value.NewContextQuery(s.Results.NewID(), o.request.Call.ID, s.Results.NewID(), a, p, s.Results.Now())
@@ -473,7 +489,7 @@ func (s ContextProjectionService) beginExcerpt(ctx context.Context, current iden
 	}
 	d, err := s.Results.prepare(o, ContextQueryAdmitted)
 	if err != nil {
-		return nil, queryStepped("prepare", err)
+		return nil, o.cut(queryStepped("prepare", err))
 	}
 	owned = true
 	return d, nil
@@ -526,7 +542,7 @@ func (s ContextProjectionResults) getQueryResult(ctx context.Context, current id
 	auditapp.MarkStep(o.ctx, "q-poll", mark)
 	d, err := s.prepare(o, ContextQueryPollCharged)
 	if err != nil {
-		return nil, queryStepped("prepare", err)
+		return nil, o.cut(queryStepped("prepare", err))
 	}
 	owned = true
 	return d, nil
@@ -538,7 +554,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	}
 	mark := time.Now()
 	worker, err := s.Reader.ObserveProjectionWorker(o.ctx, o.query, o)
-	if err != nil || !identity.Fresh(worker.ObservedAt, worker.ValidUntil, s.Now(), identity.EvidenceReadRequestWindow) || !o.shorten(worker.ValidUntil) {
+	if err != nil || !identity.Fresh(worker.ObservedAt, worker.ValidUntil, s.Now(), identity.EvidenceReadRequestWindow) || !o.shorten("worker", worker.ValidUntil) {
 		return nil, queryCollapsed("worker-observe", value.ErrUnavailable, err)
 	}
 	auditapp.MarkStep(o.ctx, "q-worker", mark)
@@ -591,7 +607,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	if err != nil {
 		return nil, queryStepped("current-batch", err)
 	}
-	if !o.shorten(b.Until) {
+	if !o.shorten("batch", b.Until) {
 		return nil, queryStepped("batch-expired", value.ErrExpired)
 	}
 	auditapp.MarkStep(o.ctx, "q-batch", mark)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	value "asservat.local/asservat/internal/domain/analysis"
 )
@@ -52,5 +53,28 @@ func TestQueryRefusalNamesTheRefusingStage(t *testing.T) {
 	f.s.Results.Refused = func(context.Context, string, error) { reported++ }
 	if _, i := f.begin(t); i == nil || reported != 0 {
 		t.Fatal("successful excerpt reported as refused")
+	}
+}
+
+// native83: a poll refused "read (cancelled)" with its public request window
+// still open; the report now names the observation that cut the request.
+func TestProjectionRequestCutNamesEarliestBound(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	o := &projectionRequest{service: ContextProjectionResults{Now: time.Now}, ctx: ctx}
+	o.cancel = cancel
+	now := time.Now()
+	o.until = now.Add(20 * time.Second)
+	o.shorten("request", o.until)
+	o.shorten("worker", now.Add(40*time.Millisecond))
+	o.shorten("batch", now.Add(time.Second))
+	refused := queryStepped("prepare", queryCollapsed("read", value.ErrUnavailable, context.Canceled))
+	if o.cut(refused) != refused {
+		t.Fatal("a live request was labelled as cut")
+	}
+	<-ctx.Done()
+	var fixed interface{ FixedStep() string }
+	if err := o.cut(refused); !errors.As(err, &fixed) || fixed.FixedStep() != "until-worker/prepare/read" {
+		t.Fatal("cut request did not name its earliest bound", err)
 	}
 }
