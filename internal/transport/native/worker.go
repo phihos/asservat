@@ -119,7 +119,10 @@ func RunWorkerConversation(ctx context.Context, s Stream, h contracts.NativeHell
 	}
 	return disposition, err
 }
-func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target value.WorkerCredentialTarget, key artifact.Digest, result *evidence.RegionalContextResult, disposition *contracts.NativeConversationResult) error {
+func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target value.WorkerCredentialTarget, key artifact.Digest, result *evidence.RegionalContextResult, disposition *contracts.NativeConversationResult) (err error) {
+	// The closed stage of a failed conversation, for the worker's stop report.
+	stage := "command"
+	defer func() { err = step(stage, err) }()
 	if ctx == nil || s == nil || result == nil || !target.Valid() || key == (artifact.Digest{}) || h.Reference.InstallationID != target.InstallationID || value.AcquisitionParentFor(h.Reference.SessionID, h.Reference.QueryID) != target.Parent() || h.Reference.WorkerID != target.WorkerID || h.Reference.OperationID != "" || h.Reference.Fence != 0 || len(h.WorkerLeaf) != 0 {
 		return contracts.ErrNativeProtocol
 	}
@@ -177,6 +180,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		}
 	}()
 	take := func(kind contracts.NativeFrameKind, phase string, n int64) error {
+		stage = "acknowledge"
 		r := <-received
 		joined = true
 		if r.err != nil {
@@ -185,6 +189,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		}
 		return exactAck(r.frame, kind, c, phase, n)
 	}
+	stage = "read"
 	switch o.Kind {
 	case value.NativeProjection:
 		projection, e := result.ReadApproved(work, o, source, approvedScope)
@@ -197,6 +202,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 			clear(b)
 			return contracts.ErrNativeProtocol
 		}
+		stage = "result"
 		e = sendControl(work, s, contracts.NativeMetadataFrame, contracts.NativeMetadata{Format: c.Format, Reference: c.Reference, Nonce: c.Nonce, Metadata: b})
 		clear(b)
 		if e != nil {
@@ -205,6 +211,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		if e = take(contracts.NativeAcknowledgeFrame, "approved", 0); e != nil {
 			return e
 		}
+		stage = "close"
 		if e = sendControl(work, s, contracts.NativeDoneFrame, ack(c, "closed", 0)); e != nil {
 			return e
 		}
@@ -222,6 +229,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		if e != nil {
 			return e
 		}
+		stage = "result"
 		e = sendControl(work, s, contracts.NativeMetadataFrame, contracts.NativeMetadata{Format: c.Format, Reference: c.Reference, Nonce: c.Nonce, Metadata: b})
 		clear(b)
 		if e != nil {
@@ -230,9 +238,11 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		if e = take(contracts.NativeCommitFrame, "prepared", 0); e != nil {
 			return e
 		}
+		stage = "commit"
 		if e = result.Commit(work, o); e != nil {
 			return e
 		}
+		stage = "close"
 		if e = sendControl(work, s, contracts.NativeAcknowledgeFrame, ack(c, "prepared", 0)); e != nil {
 			return e
 		}
@@ -250,6 +260,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		if e != nil {
 			return e
 		}
+		stage = "result"
 		e = sendControl(work, s, contracts.NativeMetadataFrame, contracts.NativeMetadata{Format: c.Format, Reference: c.Reference, Nonce: c.Nonce, Metadata: b})
 		clear(b)
 		if e != nil {
@@ -262,6 +273,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		if e != nil {
 			return e
 		}
+		stage = "result"
 		if e = s.Send(work, contracts.NativeFrame{Kind: contracts.NativeDataFrame, Payload: body}); e != nil {
 			return e
 		}
@@ -269,6 +281,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 			return e
 		}
 		clear(body)
+		stage = "close"
 		if e = sendControl(work, s, contracts.NativeDoneFrame, ack(c, "closed", 0)); e != nil {
 			return e
 		}

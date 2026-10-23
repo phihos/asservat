@@ -143,6 +143,12 @@ func TestHubWorkerAdmissionAttachesOnlyThisProcessOperation(t *testing.T) {
 			if mode == "separate-connector" && serving.hub.Load() != 0 {
 				t.Fatal("a path with another connector reached the owner check")
 			}
+			// The refusal names its closed stage for the operator report only.
+			var fixed interface{ FixedStep() string }
+			want := map[string]string{"foreign-owner": "hub", "separate-connector": "path", "serving-unavailable": "serving", "forwarded-hello": "hello"}[mode]
+			if !errors.As(err, &fixed) || fixed.FixedStep() != want {
+				t.Fatal("refusal stage missing", mode, err)
+			}
 			if (mode == "serving-unavailable" || mode == "forwarded-hello") && peers.worker.Load() != 0 {
 				t.Fatal("worker proof read before serving/shape checks")
 			}

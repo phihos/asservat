@@ -322,6 +322,9 @@ func (o *HubOperation) finish(ctx context.Context, s Stream, phase string) error
 }
 
 func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
+	// The closed stage of a failed conversation, for the operator report only.
+	stage := "attach"
+	defer func() { err = step(stage, err) }()
 	o.mu.Lock()
 	if !o.reserved || o.attached || o.closed || s == nil {
 		o.mu.Unlock()
@@ -335,9 +338,11 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 	defer cancel()
 	stop := context.AfterFunc(ctx, cancel)
 	defer stop()
+	stage = "command"
 	if e := sendControl(work, s, contracts.NativeCommandFrame, o.command); e != nil {
 		return e
 	}
+	stage = "result"
 	if o.command.Kind == "read-context-response" {
 		f, e := s.Receive(work)
 		if e != nil {
@@ -377,6 +382,7 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 			return work.Err()
 		}
 	}
+	stage = "consumer"
 	var action nativeAction
 	select {
 	case action = <-o.action:
@@ -384,6 +390,7 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 		return work.Err()
 	}
 	defer func() { action.done <- err }()
+	stage = "close"
 	// Do not close a successful observation before the original hub caller has
 	// consumed it under the still-current gate. No extra wire authority is
 	// introduced: this local acknowledgement only permits normal stream close.

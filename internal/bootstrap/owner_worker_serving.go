@@ -81,6 +81,7 @@ func (r *OwnerRuntime) ServeAcquisitionWorkers(roots native.ClientRoots, exchang
 	if err != nil {
 		return err
 	}
+	handler.Refused = downloadRefusalReport(eventLog(os.Stderr, "worker native refused"), time.Now)
 	r.compose.Lock()
 	defer r.compose.Unlock()
 	if r.started.Load() || r.workers != nil {

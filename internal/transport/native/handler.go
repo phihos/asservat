@@ -29,17 +29,27 @@ type Admission interface {
 	OpenNative(context.Context, *tls.ConnectionState, contracts.NativeHello) (Conversation, error)
 }
 
+// Parker is implemented by an admission whose idle workers may wait for
+// their own operation instead of being answered at once (HubWorkerAdmission).
+type Parker interface {
+	ParkNative(context.Context, contracts.NativeHello, *evidence.NativeIdle) bool
+}
+
 type Handler struct {
 	path, host string
 	admission  Admission
 	slots      chan struct{}
+	// Refused, when set, reports a refused admission or conversation with its
+	// closed stage only (ADR-197). It is set before serving and never changes
+	// a response.
+	Refused func(context.Context, string, error)
 }
 
 func NewHandler(path, host string, admission Admission, limit int) (*Handler, error) {
 	if path != contracts.NativeWorkerPath && path != contracts.NativeOwnerPath || host == "" || strings.ContainsAny(host, "/\\ \r\n\t") || admission == nil || limit < 1 || limit > 16 {
 		return nil, contracts.ErrNativeProtocol
 	}
-	return &Handler{path, host, admission, make(chan struct{}, limit)}, nil
+	return &Handler{path: path, host: host, admission: admission, slots: make(chan struct{}, limit)}, nil
 }
 func unavailable(w http.ResponseWriter) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -61,13 +71,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	select {
-	case h.slots <- struct{}{}:
-		defer func() { <-h.slots }()
-	default:
+	if !h.acquire() {
 		unavailable(w)
 		return
 	}
+	held := true
+	defer func() {
+		if held {
+			<-h.slots
+		}
+	}()
 	ctx, stop := context.WithTimeout(r.Context(), 5*time.Second)
 	defer stop()
 	controller := http.NewResponseController(w)
@@ -90,6 +103,18 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	conversation, err := h.admission.OpenNative(ctx, r.TLS, hello)
 	var idle *evidence.NativeIdle
+	// A parked idle request holds no slot: only admitted work counts. After a
+	// wake-up the complete admission runs again under a newly taken slot; if
+	// none is free, or it is still idle, the request answers idle as before.
+	if parker, ok := h.admission.(Parker); ok && conversation == nil && h.path == contracts.NativeWorkerPath && errors.As(err, &idle) && idle != nil {
+		<-h.slots
+		held = false
+		if parker.ParkNative(ctx, hello, idle) && h.acquire() {
+			held = true
+			conversation, err = h.admission.OpenNative(ctx, r.TLS, hello)
+			idle = nil
+		}
+	}
 	if conversation == nil && h.path == contracts.NativeWorkerPath && errors.As(err, &idle) && idle.Valid(time.Now()) && idle.Worker.Worker.Intent.ID == hello.Reference.WorkerID && idle.Worker.Worker.Intent.Parent == value.AcquisitionParentFor(hello.Reference.SessionID, hello.Reference.QueryID) && idle.Proof.Binding.InstallationID == hello.Reference.InstallationID && ctx.Err() == nil {
 		w.Header().Set("Cache-Control", "no-store")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -111,6 +136,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if conversation != nil {
 			conversation.Close()
 		}
+		h.refused(ctx, "admission", err)
 		unavailable(w)
 		return
 	}
@@ -122,6 +148,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	lease, err := gate.Check(ctx)
 	ref := hello.Reference
+	if err != nil {
+		h.refused(ctx, "check", err)
+	}
 	if err != nil || lease.Operation.Reference.InstallationID != ref.InstallationID || lease.Operation.Reference.Parent() != value.AcquisitionParentFor(ref.SessionID, ref.QueryID) || lease.Operation.Reference.WorkerID != ref.WorkerID || h.path == contracts.NativeOwnerPath && (lease.Operation.Reference.OperationID != ref.OperationID || lease.Operation.Reference.Fence != ref.Fence) {
 		unavailable(w)
 		return
@@ -141,7 +170,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if controller.Flush() != nil {
 		return
 	}
-	_ = conversation.Serve(stream.Context(), stream)
+	h.refused(stream.Context(), "serve", conversation.Serve(stream.Context(), stream))
+}
+func (h *Handler) acquire() bool {
+	select {
+	case h.slots <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+func (h *Handler) refused(ctx context.Context, stage string, err error) {
+	if err != nil && h.Refused != nil {
+		h.Refused(ctx, stage, err)
+	}
 }
 
 type serverStream struct {

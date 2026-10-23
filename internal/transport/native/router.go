@@ -23,6 +23,9 @@ type HubRouter struct {
 	limit   int
 	closed  bool
 	entries map[string]*NativeRegistration
+	// changed is closed and replaced on every Register and on Close, waking
+	// parked idle workers (awaitPublished) to look up their entry again.
+	changed chan struct{}
 }
 type NativeRegistration struct {
 	router            *HubRouter
@@ -34,6 +37,8 @@ type NativeRegistration struct {
 	attaching, closed bool
 	attached          chan struct{}
 	ready             chan struct{}
+	published         chan struct{}
+	publishOnce       sync.Once
 	result            *HubOperation
 	err               error
 	once              sync.Once
@@ -43,7 +48,7 @@ func NewHubRouter(limit int) (*HubRouter, error) {
 	if limit < 1 || limit > 16 {
 		return nil, artifact.ErrInvalid
 	}
-	return &HubRouter{limit: limit, entries: make(map[string]*NativeRegistration)}, nil
+	return &HubRouter{limit: limit, entries: make(map[string]*NativeRegistration), changed: make(chan struct{})}, nil
 }
 func (r *HubRouter) Register(ctx context.Context, o value.NativeOperation, f NativeOperationFactory) (*NativeRegistration, error) {
 	if r == nil || ctx == nil || ctx.Err() != nil || !o.Valid() || !time.Now().Before(o.Until) || f == nil {
@@ -55,8 +60,10 @@ func (r *HubRouter) Register(ctx context.Context, o value.NativeOperation, f Nat
 		return nil, artifact.ErrDownloadCapacity
 	}
 	call, cancel := context.WithDeadline(ctx, o.Until)
-	entry := &NativeRegistration{router: r, operation: o, factory: f, ctx: call, cancel: cancel, attached: make(chan struct{}), ready: make(chan struct{})}
+	entry := &NativeRegistration{router: r, operation: o, factory: f, ctx: call, cancel: cancel, attached: make(chan struct{}), ready: make(chan struct{}), published: make(chan struct{})}
 	r.entries[o.Reference.WorkerID] = entry
+	close(r.changed)
+	r.changed = make(chan struct{})
 	context.AfterFunc(call, entry.Close)
 	return entry, nil
 }
@@ -120,6 +127,9 @@ func (r *NativeRegistration) Wait(ctx context.Context) (*HubOperation, error) {
 	if r == nil || ctx == nil {
 		return nil, artifact.ErrInvalid
 	}
+	// Both owners call Wait only after their SQL locator claim committed, so
+	// the operation is now locatable: wake this worker's parked connection.
+	r.publishOnce.Do(func() { close(r.published) })
 	select {
 	case <-r.ready:
 		r.mu.Lock()
@@ -161,11 +171,44 @@ func (r *NativeRegistration) Close() {
 		r.router.mu.Unlock()
 	})
 }
+// awaitPublished blocks until this process's registration for the worker has
+// been published (its owner waits for attachment), the registration closes,
+// the router closes or ctx ends. True only for a published live registration.
+// It grants nothing: the caller repeats the complete worker/SQL admission.
+func (r *HubRouter) awaitPublished(ctx context.Context, worker string) bool {
+	for {
+		r.mu.Lock()
+		if r.closed || ctx.Err() != nil {
+			r.mu.Unlock()
+			return false
+		}
+		entry, changed := r.entries[worker], r.changed
+		r.mu.Unlock()
+		if entry != nil {
+			select {
+			case <-entry.published:
+				return entry.ctx.Err() == nil
+			case <-entry.ctx.Done():
+				return false
+			case <-ctx.Done():
+				return false
+			}
+		}
+		select {
+		case <-changed:
+		case <-ctx.Done():
+			return false
+		}
+	}
+}
 func (r *HubRouter) Close() {
 	if r == nil {
 		return
 	}
 	r.mu.Lock()
+	if !r.closed {
+		close(r.changed)
+	}
 	r.closed = true
 	entries := make([]*NativeRegistration, 0, len(r.entries))
 	for _, e := range r.entries {
