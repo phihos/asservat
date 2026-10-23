@@ -127,12 +127,12 @@ func TestIdentityPolicyObservationReusesOriginalIntervalAndRefreshesRevision(t *
 		t.Fatal(err)
 	}
 	f.set(t, 2, "replacement-team")
-	f.api.clock.Add(int64(24 * time.Second))
+	f.api.clock.Add(int64(9 * time.Second)) // more than one evidence-read window remains
 	again, err := f.read(t.Context())
 	if err != nil || !reflect.DeepEqual(again, first) || f.reads.Load() != 1 {
 		t.Fatal("unchanged original interval caused another policy read or renewed facts", err, f.reads.Load())
 	}
-	f.api.clock.Add(int64(6 * time.Second))
+	f.api.clock.Add(int64(21 * time.Second))
 	changed, err := f.read(t.Context())
 	if err != nil || changed.Revision.Generation != 2 || changed.Revision.Digest == first.Revision.Digest || changed.ObservedAt != first.FreshUntil || changed.FreshUntil != first.FreshUntil.Add(30*time.Second) || f.reads.Load() != 2 {
 		t.Fatal("expired observation did not read the new revision under its own original interval", err)
@@ -169,7 +169,7 @@ func TestIdentityPolicyObservationNearExpiryRefreshHasNoStaleFallback(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.api.clock.Store(first.FreshUntil.Add(-5*time.Second + time.Nanosecond).UnixNano())
+	f.api.clock.Store(first.FreshUntil.Add(-identity.EvidenceReadRequestWindow + time.Nanosecond).UnixNano())
 	f.status.Store(http.StatusForbidden)
 	out, err := f.read(t.Context())
 	if err == nil || !reflect.DeepEqual(out, identity.Policy{}) || f.reads.Load() != 2 {
@@ -183,14 +183,14 @@ func TestIdentityPolicyObservationNearExpiryRefreshPreservesOwnedRequest(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.api.clock.Store(first.FreshUntil.Add(-5 * time.Second).UnixNano())
+	f.api.clock.Store(first.FreshUntil.Add(-identity.EvidenceReadRequestWindow).UnixNano())
 	service := identities.Service{Policies: f.reader, Now: f.api.client.now, Tokens: identityObservationVerifier(func(context.Context, string) (identity.Claims, error) {
 		now := f.api.client.now()
 		return identity.Claims{Issuer: first.Issuer, Subject: "developer", ClientID: "asservat-console", Groups: []string{"platform-developers"}, IssuedAt: now, ExpiresAt: now.Add(time.Minute), KeyUntil: now.Add(time.Minute)}, nil
 	})}
-	current, initial, err := identities.NewBearerRequest(t.Context(), service, "synthetic", f.api.client.now)
+	current, initial, err := identities.NewBearerRequestWithin(t.Context(), service, "synthetic", f.api.client.now, identity.EvidenceReadRequestWindow)
 	if err != nil || initial.ValidUntil != first.FreshUntil || f.reads.Load() != 1 {
-		t.Fatal("exact five-second cache boundary did not preserve the original observation", err)
+		t.Fatal("exact evidence-read-window cache boundary did not preserve the original observation", err)
 	}
 	f.api.clock.Add(int64(time.Second))
 	again, err := current.ResolveIdentity(t.Context())
@@ -201,9 +201,11 @@ func TestIdentityPolicyObservationNearExpiryRefreshPreservesOwnedRequest(t *test
 	if _, err := current.ResolveIdentity(t.Context()); !errors.Is(err, identity.ErrDenied) {
 		t.Fatal("fresh policy revived the expired original request", err)
 	}
-	_, fresh, err := identities.NewBearerRequest(t.Context(), service, "synthetic", f.api.client.now)
-	if err != nil || !fresh.ValidUntil.After(initial.ValidUntil) || f.reads.Load() != 2 {
-		t.Fatal("independent new request did not use the original refreshed observation", err)
+	_, fresh, err := identities.NewBearerRequestWithin(t.Context(), service, "synthetic", f.api.client.now, identity.EvidenceReadRequestWindow)
+	// The refreshed observation has less than one evidence-read window left
+	// at this instant, so the new request reads once more on demand.
+	if err != nil || !fresh.ValidUntil.After(initial.ValidUntil) || f.reads.Load() != 3 {
+		t.Fatal("independent new request did not use a current observation", err, f.reads.Load())
 	}
 }
 

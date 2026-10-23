@@ -42,11 +42,17 @@ func NewIdentityPolicyClient(client *PermissionClient, name, uid, issuer string)
 }
 
 // Retain one successful observation only until its original thirty-second
-// FreshUntil, refreshing on demand when less than the existing five-second
-// operation budget remains. Token/session validation remains outside this
+// FreshUntil, refreshing on demand when less than identityPolicyMargin
+// remains. Token/session validation remains outside this
 // reader. A refresh belongs to its initiating caller; concurrent callers may
 // join it while preserving their own cancellation, without background I/O or
 // implicit retry. Already-owned requests retain their original cutoffs.
+// identityPolicyMargin is how much of the cached observation must remain:
+// one evidence-read request window, so a request does not inherit an
+// observation ending mid-read (installed native84 showed the same cut through
+// the key snapshot). Refreshes stay on demand and at most every ten seconds.
+const identityPolicyMargin = value.EvidenceReadRequestWindow
+
 func (c *IdentityPolicyClient) IdentityPolicy(ctx context.Context, issuer string) (value.Policy, error) {
 	var zero value.Policy
 	if c == nil {
@@ -61,7 +67,7 @@ func (c *IdentityPolicyClient) IdentityPolicy(ctx context.Context, issuer string
 		c.mu.Unlock()
 		return zero, err
 	}
-	if c.policy.Validate(now) == nil && c.policy.FreshUntil.Sub(now) >= 5*time.Second {
+	if c.policy.Validate(now) == nil && c.policy.FreshUntil.Sub(now) >= identityPolicyMargin {
 		out := cloneIdentityPolicy(c.policy)
 		c.mu.Unlock()
 		return out, nil
@@ -83,7 +89,7 @@ func (c *IdentityPolicyClient) IdentityPolicy(ctx context.Context, issuer string
 		if read.err != nil {
 			return zero, read.err
 		}
-		if read.policy.Validate(now) != nil || read.policy.FreshUntil.Sub(now) < 5*time.Second {
+		if read.policy.Validate(now) != nil || read.policy.FreshUntil.Sub(now) < identityPolicyMargin {
 			return zero, value.ErrUnavailable
 		}
 		return cloneIdentityPolicy(read.policy), nil

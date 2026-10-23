@@ -105,9 +105,25 @@ func (p *OwnerRequestPeers) CheckNativeHub(ctx context.Context, operation permis
 	if p == nil || p.Authenticator == nil || p.Server == nil {
 		return time.Time{}, value.ErrInvalid
 	}
-	observed, e := p.Authenticator.ObserveOwnerServing(ctx, p.Server)
-	if e != nil || !operation.CurrentValid(p.Authenticator.Now()) || observed.Pool.InstallationID != operation.Reference.InstallationID || observed.Pool.ClusterID != operation.Path.HubClusterID || observed.ConfigurationRevision != operation.Path.HubConfiguration || observed.Certificate.Binding.PodUID != operation.HubPodUID || observed.Certificate.Binding.ProcessEpoch != operation.HubProcessEpoch {
-		return time.Time{}, value.ErrDenied
+	// The refusal keeps its decision (ErrDenied) and names the closed stage:
+	// the serving authentication step with its remaining-deadline bucket, the
+	// operation's own validity, or the hub placement (installed native84).
+	var refused string
+	observed, e := p.Authenticator.ObserveOwnerServing(app.ChainRefusalSteps(ctx, func(step string) {
+		if refused == "" {
+			refused = step
+		}
+	}), p.Server)
+	switch {
+	case e != nil:
+		if refused == "" {
+			refused = "unknown"
+		}
+		return time.Time{}, answerStep("serving/"+refused, value.ErrDenied, nil)
+	case !operation.CurrentValid(p.Authenticator.Now()):
+		return time.Time{}, answerStep("operation"+app.RemainingBucket(ctx, p.Authenticator.Now()), value.ErrDenied, nil)
+	case observed.Pool.InstallationID != operation.Reference.InstallationID || observed.Pool.ClusterID != operation.Path.HubClusterID || observed.ConfigurationRevision != operation.Path.HubConfiguration || observed.Certificate.Binding.PodUID != operation.HubPodUID || observed.Certificate.Binding.ProcessEpoch != operation.HubProcessEpoch:
+		return time.Time{}, answerStep("placement", value.ErrDenied, nil)
 	}
 	return identity.Earlier(observed.ValidUntil, operation.Until), nil
 }

@@ -12,6 +12,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -295,9 +296,17 @@ func (v *Verifier) key(ctx context.Context, kid string) (crypto.PublicKey, time.
 		return nil, time.Time{}, ctx.Err()
 	}
 	now := v.now()
+	var cached crypto.PublicKey
 	if !now.Before(v.cache.observed) && now.Before(v.cache.until) {
 		if key, ok := v.cache.keys[kid]; ok {
-			return key, v.cache.until, nil
+			// A snapshot is used to its end only while it still covers an
+			// evidence-read request; nearer its end it is refreshed on demand
+			// (installed native84: a request authenticated 1.4 s before the
+			// snapshot expired was cut there, mid-read).
+			if v.cache.until.Sub(now) >= keyRefreshMargin || now.Before(v.nextRefresh) {
+				return key, v.cache.until, nil
+			}
+			cached = key
 		}
 	}
 	// Global per-issuer cooldown: attacker-selected kids never grow a cache or
@@ -305,6 +314,20 @@ func (v *Verifier) key(ctx context.Context, kid string) (crypto.PublicKey, time.
 	if now.Before(v.nextRefresh) {
 		return nil, time.Time{}, identity.ErrUnavailable
 	}
+	key, until, err := v.refresh(ctx, kid, now)
+	// A failed early refresh keeps the still-current snapshot and its own
+	// original end; a fetched set without this key is a revocation.
+	if err != nil && cached != nil && !errors.Is(err, identity.ErrDenied) && v.now().Before(v.cache.until) {
+		return cached, v.cache.until, nil
+	}
+	return key, until, err
+}
+
+// keyRefreshMargin is how much of a key snapshot must remain for it to be
+// used without an on-demand refresh: one evidence-read request window.
+const keyRefreshMargin = identity.EvidenceReadRequestWindow
+
+func (v *Verifier) refresh(ctx context.Context, kid string, now time.Time) (crypto.PublicKey, time.Time, error) {
 	v.nextRefresh = now.Add(time.Second)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, v.trust.JWKSURL, nil)
 	if err != nil {

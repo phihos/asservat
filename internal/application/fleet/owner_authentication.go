@@ -78,6 +78,17 @@ func WithRefusalSteps(ctx context.Context, report func(string)) context.Context 
 	return context.WithValue(ctx, refusalStepKey{}, report)
 }
 
+// ChainRefusalSteps adds report to any sink ctx already carries.
+func ChainRefusalSteps(ctx context.Context, report func(string)) context.Context {
+	outer, _ := ctx.Value(refusalStepKey{}).(func(string))
+	return WithRefusalSteps(ctx, func(step string) {
+		report(step)
+		if outer != nil {
+			outer(step)
+		}
+	})
+}
+
 func refusalStep(ctx context.Context, step string) {
 	if ctx == nil {
 		return

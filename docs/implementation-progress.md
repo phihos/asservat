@@ -1,5 +1,32 @@
 # Sustained implementation progress
 
+## Identity key snapshot cut the read; hub refusal stages (2026-10-23)
+
+Installed native84 refused the projection worker at
+`admission/gate/check/hub (denied)`. `OwnerRequestPeers.CheckNativeHub`
+mapped every serving-authentication failure, the operation's own validity and
+the placement comparison to a bare `ErrDenied`. The stored batch shows why
+the conversation was ending: the poll's projection authority was checked at
+18:27:16.058 and valid only until 18:27:17.325354278 (1.27 s), and so were
+its environment, retention proof, batch and native operation, while recovery
+(18:27:36), processing (18:27:35) and the request window (18:27:35.96) ran
+much longer. The nanosecond-precision end came from the request identity:
+the OIDC verifier used its JWKS key snapshot (`KeyMaxAge` one minute) to its
+last instant, so the identity's `KeyUntil` cut the whole poll 1.36 s after
+it started, and the worker gate's hub check ran against that ending
+operation (the gate was built 31 ms before it). The key snapshot is now
+refreshed on demand when less than one evidence-read window remains (one
+JWKS fetch at most every ~40 s; a failed early refresh keeps the
+still-current snapshot and its original end; a set without the key revokes
+it), and the identity-policy cache uses the same margin instead of five
+seconds. `CheckNativeHub` keeps `ErrDenied` but names the stage
+(`hub/serving/<authentication step>@<remaining>`, `hub/operation@...`,
+`hub/placement`). Tests: `TestKeySnapshotRefreshedBeforeItsLastRequestWindow`,
+the native placement `deadline-during-route` case
+(`serving/route-read@0`), updated identity-policy boundary tests. The exact
+authentication sub-step of native84 is not in its log; the next run prints
+it. Installed qualification has not rerun.
+
 ## Projection worker attachment over the read window (2026-10-23)
 
 Installed native82 (f0fc6ec4) refused the projection worker at

@@ -2,6 +2,7 @@ package mtls
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 // Actual process-owned P-256 credentials and the current registry/route/guard
 // authenticator, with explicit synthetic accepted deployment observations.
 func TestNativeHubPlacementRequiresActualCurrentServingIdentity(t *testing.T) {
-	for _, mode := range []string{"valid", "other-hub-cluster", "other-hub-configuration", "other-pod", "other-process", "closed-key", "expired-after-route", "configuration-changed-after-route"} {
+	for _, mode := range []string{"valid", "other-hub-cluster", "other-hub-configuration", "other-pod", "other-process", "closed-key", "expired-after-route", "configuration-changed-after-route", "deadline-during-route"} {
 		t.Run(mode, func(t *testing.T) {
 			server, fixture := newOwnerCredentialFixture(t, "server")
 			if err := server.Enroll(context.Background()); err != nil {
@@ -43,7 +44,11 @@ func TestNativeHubPlacementRequiresActualCurrentServingIdentity(t *testing.T) {
 				}
 				return out, err
 			})
-			routes := forwardRoutes(func(_ context.Context, b fleet.OwnerBinding) (fleet.OwnerRoute, error) {
+			routes := forwardRoutes(func(ctx context.Context, b fleet.OwnerBinding) (fleet.OwnerRoute, error) {
+				if mode == "deadline-during-route" {
+					<-ctx.Done() // the native operation's own deadline (installed native84)
+					return fleet.OwnerRoute{}, ctx.Err()
+				}
 				if mode == "expired-after-route" {
 					fixture.clock.Store(n.Add(3 * time.Second).UnixNano())
 				}
@@ -68,7 +73,19 @@ func TestNativeHubPlacementRequiresActualCurrentServingIdentity(t *testing.T) {
 			case "closed-key":
 				server.Close()
 			}
-			until, err := peers.CheckNativeHub(context.Background(), operation)
+			ctx := context.Background()
+			if mode == "deadline-during-route" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 50*time.Millisecond)
+				defer cancel()
+			}
+			until, err := peers.CheckNativeHub(ctx, operation)
+			if mode == "deadline-during-route" {
+				var s interface{ FixedStep() string }
+				if !errors.As(err, &s) || s.FixedStep() != "serving/route-read@0" || !errors.Is(err, fleet.ErrDenied) {
+					t.Fatal("hub refusal did not name its serving step", err)
+				}
+			}
 			if mode == "valid" {
 				if err != nil || !until.After(fixture.now()) || until.After(operation.Until) {
 					t.Fatal("actual accepted serving path rejected", err)
