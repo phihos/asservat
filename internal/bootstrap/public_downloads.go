@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"errors"
+	"os"
 	"strings"
 	"time"
 
@@ -142,7 +143,8 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: sources, Sources: sources, Authority: gate, Sessions: downloads, Refresh: refresh}
+	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: sources, Sources: sources, Authority: gate, Sessions: downloads, Refresh: refresh,
+		Refused: downloadRefusalReport(eventLog(os.Stderr, "download refused"), time.Now)}
 
 	wa, wp := capacityWorkerGuard(p.WorkerConfiguration.Guard)
 	sourceObserver, sourceProbe, sourceControl, err := d.workerSourceClients(observer, probe, control, closers)

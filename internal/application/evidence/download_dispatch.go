@@ -106,14 +106,14 @@ func (s *DownloadDispatcher) EnsureCurrent(ctx context.Context, source identitie
 func (s *DownloadDispatcher) ensureChecked(ctx context.Context, session, intentID string, scope artifact.DownloadScope, check contextDownloadCheck, bound func() time.Time) (value.DownloadWorker, error) {
 	var zero value.DownloadWorker
 	if s == nil || ctx == nil || ctx.Err() != nil || s.Ledger == nil || s.Jobs == nil || s.Audit == nil || s.Acknowledgements == nil || check == nil || s.Now == nil || !s.Profile.Valid() || !value.UUID(session) || !value.UUID(intentID) || !scope.Valid() {
-		return zero, artifact.ErrInvalid
+		return zero, collapsed("configuration", artifact.ErrInvalid, nil)
 	}
 	shorten, finish := workerEffectContext(&ctx, bound)
 	defer finish()
 	current := func() (artifact.DownloadAuthority, error) {
 		a, e := check(ctx)
 		if e != nil || !a.Valid(s.Now()) || a.Scope != scope || ctx.Err() != nil {
-			return a, artifact.ErrDownloadExpired
+			return a, collapsed("current", artifact.ErrDownloadExpired, e)
 		}
 		shorten()
 		return a, nil
@@ -127,50 +127,50 @@ func (s *DownloadDispatcher) ensureChecked(ctx context.Context, session, intentI
 	}
 	i, e := s.Ledger.ReserveDownloadWorker(ctx, session, intentID, a, s.Profile)
 	if e != nil {
-		return zero, e
+		return zero, stepped("reserve", e)
 	}
 	if !i.Valid() || i.SessionID != session || i.Profile != s.Profile || i.Authority.Scope != scope {
-		return zero, artifact.ErrIntegrity
+		return zero, collapsed("reserve", artifact.ErrIntegrity, nil)
 	}
 	r, acknowledged, e := s.Ledger.ReadDownloadWorkerIntentReceipt(ctx, i)
 	if e != nil {
-		return zero, e
+		return zero, stepped("audit-receipt", e)
 	}
 	if acknowledged {
 		if !r.ValidDownloadWorker(i) {
-			return zero, artifact.ErrIntegrity
+			return zero, collapsed("audit-receipt", artifact.ErrIntegrity, nil)
 		}
 	} else {
 		if _, e = current(); e != nil {
-			return zero, e
+			return zero, stepped("audit", e)
 		}
 		r, e = s.Audit.WriteDownloadWorkerIntent(ctx, i)
 		if e != nil {
-			return zero, e
+			return zero, stepped("audit", e)
 		}
 		if !r.ValidDownloadWorker(i) {
-			return zero, artifact.ErrIntegrity
+			return zero, collapsed("audit", artifact.ErrIntegrity, nil)
 		}
 		if _, e = current(); e != nil {
-			return zero, e
+			return zero, stepped("audit-ack", e)
 		}
 		if e = s.Acknowledgements.AcknowledgeDownloadWorkerIntent(ctx, i, r); e != nil {
-			return zero, e
+			return zero, stepped("audit-ack", e)
 		}
 	}
 	a, e = current()
 	if e != nil {
-		return zero, e
+		return zero, stepped("claim", e)
 	}
 	l, e := s.Ledger.ClaimDownloadWorker(ctx, i, a)
 	if e != nil {
-		return zero, e
+		return zero, stepped("claim", e)
 	}
 	if !l.Valid(s.Now()) || l.Intent != i {
-		return zero, artifact.ErrIntegrity
+		return zero, collapsed("claim", artifact.ErrIntegrity, nil)
 	}
 	if _, e = current(); e != nil {
-		return zero, e
+		return zero, stepped("job", e)
 	}
 	var job value.DownloadWorkerJob
 	if l.MayCreate {
@@ -181,29 +181,29 @@ func (s *DownloadDispatcher) ensureChecked(ctx context.Context, session, intentI
 		job, e = s.Jobs.FindDownloadWorkerJob(ctx, i)
 	}
 	if e != nil {
-		return zero, e
+		return zero, stepped("job", e)
 	}
 	if !job.Valid(i) {
-		return zero, artifact.ErrIntegrity
+		return zero, collapsed("job", artifact.ErrIntegrity, nil)
 	}
 	// An observed effect may be recorded after its launch permit expires. That
 	// record cannot authorize a replacement, start work or extend the session.
 	if _, e = current(); e != nil {
-		return zero, e
+		return zero, stepped("job-record", e)
 	}
 	if e = s.Ledger.RecordDownloadWorkerJob(ctx, i, job); e != nil {
-		return zero, e
+		return zero, stepped("job-record", e)
 	}
 	w, e := s.Jobs.ObserveDownloadWorker(ctx, i, job)
 	if e != nil {
 		var pending *DownloadWorkerPending
 		if errors.As(e, &pending) {
 			if !pending.Valid(s.Now()) || pending.Intent != i || pending.Job != job {
-				return zero, artifact.ErrIntegrity
+				return zero, collapsed("pod", artifact.ErrIntegrity, nil)
 			}
 			latest, err := current()
 			if err != nil {
-				return zero, err
+				return zero, stepped("pod", err)
 			}
 			observed := *pending
 			observed.ValidUntil = identity.Earlier(observed.ValidUntil, latest.ValidUntil)
@@ -211,31 +211,31 @@ func (s *DownloadDispatcher) ensureChecked(ctx context.Context, session, intentI
 				observed.ValidUntil = identity.Earlier(observed.ValidUntil, deadline)
 			}
 			if !observed.Valid(s.Now()) || ctx.Err() != nil {
-				return zero, artifact.ErrDownloadExpired
+				return zero, collapsed("pod-pending", artifact.ErrDownloadExpired, ctx.Err())
 			}
 			return zero, &observed
 		}
-		return zero, e
+		return zero, stepped("pod", e)
 	}
 	if !w.Valid() || w.Intent != i || w.Job != job {
-		return zero, artifact.ErrIntegrity
+		return zero, collapsed("pod", artifact.ErrIntegrity, nil)
 	}
 	a, e = current()
 	if e != nil {
-		return zero, e
+		return zero, stepped("bind", e)
 	}
 	if e = s.Ledger.BindDownloadWorker(ctx, w, a); e != nil {
-		return zero, e
+		return zero, stepped("bind", e)
 	}
 	out, e := s.Ledger.ReadDownloadWorker(ctx, session, a)
 	if e != nil {
-		return zero, e
+		return zero, stepped("bind-read", e)
 	}
 	if _, e = current(); e != nil {
-		return zero, e
+		return zero, stepped("bind-read", e)
 	}
 	if out != w {
-		return zero, artifact.ErrIntegrity
+		return zero, collapsed("bind-read", artifact.ErrIntegrity, nil)
 	}
 	return out, nil
 }

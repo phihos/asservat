@@ -65,10 +65,10 @@ func (s ContextDownloadAuthority) CheckDownloadCurrent(ctx context.Context, sour
 func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, source identities.CurrentIdentity, scope artifact.DownloadScope, ordinary **downloadEntitlement) (artifact.DownloadAuthority, error) {
 	var out artifact.DownloadAuthority
 	if !value.UUID(s.RootID) || source == nil || s.Permissions == nil || s.Catalog == nil || s.Retention == nil || s.Environment == nil || s.Now == nil || ctx.Err() != nil {
-		return out, artifact.ErrDownloadUnavailable
+		return out, downloadRefused("configuration", ctx.Err())
 	}
 	if !scope.Valid() || scope.RootID != s.RootID {
-		return out, artifact.ErrInvalid
+		return out, downloadRefusedAs("scope", artifact.ErrInvalid)
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -76,13 +76,13 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	target := value.Target{ClusterID: scope.ClusterID, NamespaceUID: scope.NamespaceUID, WorkloadUID: scope.WorkloadUID, PodUID: scope.PodUID}
 	i, err := source.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) || i.Principal != scope.Principal {
-		return out, artifact.ErrDownloadUnavailable
+		return out, downloadRefused("identity", err)
 	}
 	var accepted *downloadEntitlement
 	if ordinary != nil {
 		accepted = *ordinary
 		if accepted != nil && s.Now().Before(accepted.observedAt) {
-			return out, artifact.ErrDownloadUnavailable
+			return out, downloadRefused("entitlement", nil)
 		}
 		if accepted != nil && (!accepted.current(s.Now()) || !accepted.sameIdentity(i)) {
 			accepted, *ordinary = nil, nil
@@ -92,16 +92,16 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	if accepted == nil {
 		p, err = s.Permissions.Permissions(ctx, target)
 		if err != nil || !value.ScopeEligibility(i, p, value.DownloadApproved, target, s.Now()).Eligible {
-			return out, artifact.ErrDownloadUnavailable
+			return out, downloadRefused("permission", err)
 		}
 	}
 	record, err := s.Catalog.ContextDownloadEvidence(ctx, scope.ArtifactID)
 	if err != nil {
-		return out, artifact.ErrDownloadUnavailable
+		return out, downloadRefused("catalog", err)
 	}
 	r := record.Retained
 	if !r.Valid() || r.RootID != s.RootID || r.Registration.Location.ArtifactID != scope.ArtifactID || r.Input.Target != target || r.Input.EvidenceType != "context" || r.Input.PrivacyClass != "potentialPersonalData" || !identity.Text(record.PurposeRef, 128) || record.CaptureID != scope.CaptureID || record.Version != scope.Version || !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
-		return out, artifact.ErrDownloadUnavailable
+		return out, downloadRefused("catalog-record", nil)
 	}
 	r.OriginPolicies = slices.Clone(r.OriginPolicies)
 	retained := value.Retained{ArtifactID: scope.ArtifactID, Target: target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
@@ -112,15 +112,15 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 		initial = accepted.evaluate(i, scope, retained, s.Now())
 	}
 	if !initial.Eligible {
-		return out, artifact.ErrDownloadUnavailable
+		return out, downloadRefused("audience", nil)
 	}
 	resolved, err := s.Retention.ResolveRetained(ctx, r.Input, r.Effective, slices.Clone(r.OriginPolicies))
 	if err != nil || resolved.Target != target || resolved.PurposeRef != record.PurposeRef || !resolved.Deadlines.ValidRetained() || !resolved.AnchorAt.Equal(r.Effective.AnchorAt) || resolved.ExpiresAt.After(r.Effective.ExpiresAt) || resolved.DeleteBy.After(r.Effective.DeleteBy) || !resolved.PolicyRevision.Valid() || resolved.Proof.Policy != resolved.PolicyRevision || !resolved.Proof.Matches(s.RootID, scope.ClusterID, scope.NamespaceUID, scope.WorkloadUID, scope.PodUID) || !resolved.Proof.Valid(s.Now()) || resolved.ValidUntil.After(resolved.Proof.ValidUntil) {
-		return out, artifact.ErrDownloadUnavailable
+		return out, downloadRefused("retention", err)
 	}
 	environment, err := s.Environment.DownloadEnvironment(ctx, record, i.Principal)
 	if err != nil || !environment.Valid(s.Now()) || environment.RootID != s.RootID || environment.Location != r.Registration.Location || environment.StoreID != r.Registration.StoreID || environment.Principal != i.Principal {
-		return out, artifact.ErrDownloadUnavailable
+		return out, downloadRefused("environment", err)
 	}
 	// Identity and safety facts remain current after blocking I/O. A new ordinary
 	// observation also checks the permission revision again. A response hit uses
@@ -128,14 +128,14 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	// freshness; SQL effects still reject known contrary permission revisions.
 	current, err := source.ResolveIdentity(ctx)
 	if err != nil || current.Principal != i.Principal || current.Policy != i.Policy {
-		return out, artifact.ErrDownloadUnavailable
+		return out, downloadRefused("identity-final", err)
 	}
 	permission := p.Revision
 	var final value.Result
 	if accepted == nil {
 		latest, err := s.Permissions.Permissions(ctx, target)
 		if err != nil || latest.Revision != p.Revision {
-			return out, artifact.ErrDownloadUnavailable
+			return out, downloadRefused("permission-final", err)
 		}
 		permission = latest.Revision
 		final = value.Evaluate(current, latest, value.DownloadApproved, target, &retained, s.Now())
@@ -145,7 +145,7 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	}
 	now := s.Now()
 	if !final.Eligible || ctx.Err() != nil || !now.Before(resolved.ExpiresAt) {
-		return out, artifact.ErrDownloadUnavailable
+		return out, downloadRefused("audience-final", ctx.Err())
 	}
 	until := started.Add(5 * time.Second)
 	if ordinary != nil {
@@ -165,11 +165,11 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 		Assignments []artifact.AudienceAssignment
 	}{out, environment, final.ContributingAssignments})
 	if err != nil {
-		return artifact.DownloadAuthority{}, artifact.ErrDownloadUnavailable
+		return artifact.DownloadAuthority{}, downloadRefused("decision", nil)
 	}
 	out.DecisionDigest = sha256.Sum256(encoded)
 	if !out.Valid(now) {
-		return artifact.DownloadAuthority{}, artifact.ErrDownloadExpired
+		return artifact.DownloadAuthority{}, downloadRefusedAs("decision-expired", artifact.ErrDownloadExpired)
 	}
 	if ordinary != nil && accepted == nil {
 		// Commit the private observation only after the complete short authority

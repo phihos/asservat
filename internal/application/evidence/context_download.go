@@ -169,7 +169,7 @@ func (w ContextDownloadWorker) PrepareCurrent(ctx context.Context, current ident
 func (w ContextDownloadWorker) prepareCurrentRetained(ctx context.Context, current identities.CurrentIdentity, r ContextDownloadRequest, retain func(artifact.PreparedDownload) error) (DownloadMetadata, error) {
 	check, err := w.identityCheck(ctx, current, r)
 	if err != nil {
-		return DownloadMetadata{}, err
+		return DownloadMetadata{}, stepped("identity", err)
 	}
 	return w.prepareChecked(ctx, r, check, retain)
 }
@@ -192,7 +192,7 @@ func (w ContextDownloadWorker) prepareChecked(ctx context.Context, r ContextDown
 	}
 	i, err := w.beginChecked(ctx, r, artifact.DownloadMetadata, DownloadSelection{}, check)
 	if err != nil {
-		return out, err
+		return out, stepped("begin", err)
 	}
 	ctx, cancel := context.WithDeadline(ctx, i.Batch.LeaseUntil)
 	defer cancel()
@@ -203,11 +203,11 @@ func (w ContextDownloadWorker) prepareChecked(ctx context.Context, r ContextDown
 		}
 	}()
 	if err = w.ackIntent(ctx, i); err != nil {
-		return out, err
+		return out, stepped("audit", err)
 	}
 	a, err := w.permitChecked(ctx, r, i, check)
 	if err != nil {
-		return out, err
+		return out, stepped("permit", err)
 	}
 	readCtx, stopRead := context.WithDeadline(ctx, a.ValidUntil)
 	defer stopRead()
@@ -219,32 +219,32 @@ func (w ContextDownloadWorker) prepareChecked(ctx context.Context, r ContextDown
 			defer remote.Close()
 		}
 		if err != nil {
-			return out, err
+			return out, stepped("regional", err)
 		}
 		if remote == nil || !validRegionalMetadata(r, metadata) {
-			return out, artifact.ErrIntegrity
+			return out, collapsed("regional", artifact.ErrIntegrity, nil)
 		}
 	} else {
 		native, readErr := w.read(readCtx, r, i, a)
 		defer clear(native)
 		if readErr != nil {
-			return out, readErr
+			return out, stepped("read", readErr)
 		}
 		if len(native) == 0 || len(native) > artifact.MaxContextBytes {
-			return out, artifact.ErrIntegrity
+			return out, collapsed("read", artifact.ErrIntegrity, nil)
 		}
 		metadata = contextDownloadMetadata(r, native)
 	}
 	if _, err = w.permitChecked(ctx, r, i, check); err != nil {
-		return out, err
+		return out, stepped("permit-final", err)
 	}
 	finished = true // an uncertain finish must never be rewritten as failure
 	if err = w.finish(ctx, i, 0, true, false); err != nil {
-		return out, err
+		return out, stepped("finish", err)
 	}
 	if remote != nil {
 		if err = remote.Commit(ctx); err != nil {
-			return out, err
+			return out, stepped("commit", err)
 		}
 	}
 	// This private retention point follows acknowledged immutable accounting.
@@ -253,18 +253,18 @@ func (w ContextDownloadWorker) prepareChecked(ctx context.Context, r ContextDown
 	if retain != nil {
 		prepared := artifact.PreparedDownload{Preparation: artifact.DownloadPreparation{SessionID: r.SessionID, BatchID: i.Batch.ID, Generation: i.Batch.Generation}, Scope: r.Scope, Native: metadata}
 		if !prepared.Valid() {
-			return out, artifact.ErrIntegrity
+			return out, collapsed("retain", artifact.ErrIntegrity, nil)
 		}
 		if err = retain(prepared); err != nil {
-			return out, err
+			return out, stepped("retain", err)
 		}
 	}
 	a, err = check(ctx)
 	if err != nil {
-		return out, err
+		return out, stepped("ready", err)
 	}
 	if err = w.Sessions.PermitDownloadMetadata(ctx, r.SessionID, a, i.Batch.ID, i.Batch.Generation); err != nil {
-		return out, err
+		return out, stepped("ready", err)
 	}
 	metadata.ReadUntil = a.AccessUntil
 	metadata.DeleteBy = a.DeleteBy
@@ -350,7 +350,7 @@ func (w ContextDownloadWorker) identityCheck(ctx context.Context, current identi
 	initialErr := initialCtx.Err()
 	stopInitial()
 	if err != nil || initialErr != nil || !initial.Valid(w.Now()) || initial.Principal != r.Scope.Principal || !slices.Contains(initial.Scopes, "evidence:read") || !slices.Contains(initial.Scopes, "evidence:download") {
-		return nil, artifact.ErrDownloadUnavailable
+		return nil, collapsed("initial", artifact.ErrDownloadUnavailable, err)
 	}
 	initial.Groups = slices.Clone(initial.Groups)
 	initial.Scopes = slices.Clone(initial.Scopes)
@@ -360,29 +360,29 @@ func (w ContextDownloadWorker) identityCheck(ctx context.Context, current identi
 	}
 	return func(call context.Context) (artifact.DownloadAuthority, error) {
 		if call == nil || call.Err() != nil || !w.Now().Before(until) {
-			return artifact.DownloadAuthority{}, artifact.ErrDownloadExpired
+			return artifact.DownloadAuthority{}, collapsed("expired", artifact.ErrDownloadExpired, nil)
 		}
 		bounded, stop := context.WithDeadline(call, until)
 		defer stop()
 		latest, err := current.ResolveIdentity(bounded)
 		if err != nil || !downloadSameIdentity(initial, latest, w.Now()) {
-			return artifact.DownloadAuthority{}, artifact.ErrDownloadUnavailable
+			return artifact.DownloadAuthority{}, collapsed("identity", artifact.ErrDownloadUnavailable, err)
 		}
 		until = identity.Earlier(until, latest.ValidUntil)
 		authorityCtx, stopAuthority := context.WithDeadline(bounded, until)
 		defer stopAuthority()
 		a, err := w.CurrentAuthority.CheckDownloadCurrent(authorityCtx, current, r.Scope)
 		if err != nil || authorityCtx.Err() != nil || !a.Valid(w.Now()) || !a.Environment.Valid(w.Now()) || !a.Retention.Valid(w.Now()) || a.Environment.StoreID != r.Expectation.Registration.StoreID || a.Environment.Location != r.Expectation.Registration.Location || a.Scope != r.Scope || a.AccessUntil.After(r.Expectation.Registration.ExpiresAt) || a.DeleteBy.IsZero() || a.DeleteBy.After(r.Expectation.Registration.DeleteBy) {
-			return artifact.DownloadAuthority{}, artifact.ErrDownloadUnavailable
+			return artifact.DownloadAuthority{}, collapsed("authority", artifact.ErrDownloadUnavailable, err)
 		}
 		latest, err = current.ResolveIdentity(authorityCtx)
 		if err != nil || !downloadSameIdentity(initial, latest, w.Now()) {
-			return artifact.DownloadAuthority{}, artifact.ErrDownloadUnavailable
+			return artifact.DownloadAuthority{}, collapsed("identity-final", artifact.ErrDownloadUnavailable, err)
 		}
 		until = identity.Earlier(until, identity.Earlier(latest.ValidUntil, a.ValidUntil))
 		a.ValidUntil = until
 		if authorityCtx.Err() != nil || !a.Valid(w.Now()) {
-			return artifact.DownloadAuthority{}, artifact.ErrDownloadExpired
+			return artifact.DownloadAuthority{}, collapsed("expired", artifact.ErrDownloadExpired, authorityCtx.Err())
 		}
 		return a, nil
 	}, nil

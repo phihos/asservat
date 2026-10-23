@@ -84,12 +84,12 @@ func (r *ContextNativeRuntime) CheckContextDownloadRuntime(ctx context.Context, 
 	defer end()
 	serving, e := c.Serving.ContextNativeReady(call)
 	if e != nil {
-		return time.Time{}, e
+		return time.Time{}, stepped("serving", e)
 	}
 	until, e := c.Configuration.CurrentWorkerConfiguration(call, c.Profile)
 	until = identity.Earlier(until, identity.Earlier(original, serving))
 	if e != nil || call.Err() != nil || !c.Now().Before(until) {
-		return time.Time{}, artifact.ErrDownloadUnavailable
+		return time.Time{}, collapsed("worker-configuration", artifact.ErrDownloadUnavailable, e)
 	}
 	return until, nil
 }
@@ -191,28 +191,28 @@ func (r *ContextNativeRuntime) continueContextDownloadAuthority(ctx context.Cont
 	var zero ContextDownloadContinuation
 	bound, call, end, initial, e := r.beginRequestAuthority(ctx, current, session, handoff)
 	if e != nil {
-		return zero, e
+		return zero, stepped("runtime-authority", e)
 	}
 	defer end()
 	r = bound
 	shorten, finish := workerEffectContext(&call, r.bound.Deadline)
 	defer finish()
 	if session.State != artifact.DownloadPreparing || !source.Valid(r.config.Now()) || source.Scope != session.Scope {
-		return zero, artifact.ErrDownloadUnavailable
+		return zero, collapsed("source", artifact.ErrDownloadUnavailable, nil)
 	}
 	if _, e = r.bound.narrow(source.ValidUntil); e != nil {
-		return zero, e
+		return zero, stepped("source-bound", e)
 	}
 	shorten()
 	observed, _, e := r.attachmentWithAuthority(call, session, initial)
 	if e != nil {
-		return zero, e
+		return zero, stepped("attachment", e)
 	}
 	if observed.MetadataAttempted {
 		if observed.Preparation != nil {
 			return zero, nil
 		}
-		return zero, ErrDownloadMetadataUnavailable
+		return zero, collapsed("metadata-attempted", ErrDownloadMetadataUnavailable, nil)
 	}
 	intent := r.config.NewID()
 	if observed.Found {
@@ -229,14 +229,16 @@ func (r *ContextNativeRuntime) continueContextDownloadAuthority(ctx context.Cont
 			original.Worker, original.Enrollment, original.ActivatedPeer = &w, &en, &peer
 		}
 		observed, e = r.observeBoundWorker(call, current, session, original)
+		e = stepped("worker-observe", e)
 		if e == nil {
 			worker = *observed.Worker
 			if active && (!sameActiveContextEnrollment(original, observed) || !activeContextEnrollment(observed, r.config.Now(), r.bound.Deadline())) {
-				return zero, artifact.ErrDownloadUnavailable
+				return zero, collapsed("enrollment-changed", artifact.ErrDownloadUnavailable, nil)
 			}
 		}
 	} else {
 		worker, e = r.config.Dispatcher.ensureChecked(call, session.ID, intent, session.Scope, r.bound.Check, r.bound.Deadline)
+		e = stepped("dispatch", e)
 	}
 	if e != nil {
 		var pending *DownloadWorkerPending
@@ -251,7 +253,7 @@ func (r *ContextNativeRuntime) continueContextDownloadAuthority(ctx context.Cont
 		// certificate. A later deliberate continuation observes the same
 		// immutable worker and activated certificate under current authority.
 		if call.Err() != nil || !r.config.Now().Before(r.bound.Deadline()) || !worker.Valid() {
-			return zero, artifact.ErrDownloadExpired
+			return zero, collapsed("enrollment-wait", artifact.ErrDownloadExpired, call.Err())
 		}
 		return ContextDownloadContinuation{Pending: true}, nil
 	}
@@ -259,7 +261,7 @@ func (r *ContextNativeRuntime) continueContextDownloadAuthority(ctx context.Cont
 	shorten()
 	native, e := r.native(*observed.Enrollment)
 	if e != nil {
-		return zero, e
+		return zero, stepped("native", e)
 	}
 	preparation := ContextDownloadWorker{Sessions: r.config.Preparation, AuditAcknowledgements: r.config.Acknowledgements, Audit: r.config.Audit, CurrentAuthority: r.config.Authority, RegionalPreparation: native, Now: r.config.Now, NewID: r.config.NewID}
 	var retained *artifact.PreparedDownload
@@ -277,7 +279,7 @@ func (r *ContextNativeRuntime) continueContextDownloadAuthority(ctx context.Cont
 			r.metadata.handoff(p)
 		}
 	}
-	return zero, e
+	return zero, stepped("prepare", e)
 }
 
 // A bound worker has already completed launch admission, acknowledged intent,

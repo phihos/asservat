@@ -431,7 +431,9 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		if errors.Is(callErr, contracts.ErrInvestigationWire) {
 			return bound, contracts.ErrInvestigationWire
 		}
-		return bound, auditapp.ErrUnavailable
+		// The service's own closed stage, if any, names this refusal in the
+		// transport report; the returned class is unchanged.
+		return bound, stoppedAt("service", callErr, auditapp.ErrUnavailable)
 	}
 	if !s.config.Now().Before(reply.ValidUntil) {
 		clearReply()
