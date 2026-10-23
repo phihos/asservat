@@ -50,7 +50,7 @@ func (s *ProjectionWorkerAdmission) AdmitProjectionWorker(ctx context.Context, q
 	}
 	a, e := owner.CheckCurrent(ctx)
 	if e != nil || !q.Current(a, s.Now()) || ctx.Err() != nil {
-		return query.ErrUnavailable
+		return collapsed("current", query.ErrUnavailable, e)
 	}
 	r := owner.Request()
 	call, stop := context.WithDeadline(ctx, a.ValidUntil)
@@ -58,20 +58,26 @@ func (s *ProjectionWorkerAdmission) AdmitProjectionWorker(ctx context.Context, q
 	current := func() bool { return call.Err() == nil && q.Current(a, s.Now()) && r.Valid(s.Now()) }
 	state, e := s.Ledger.ReserveProjectionWorker(call, q, r, a)
 	if e != nil || !state.Intent.Valid() || !state.Intent.Query.Equal(q) || !current() {
-		return query.ErrUnavailable
+		return collapsed("reserve", query.ErrUnavailable, e)
 	}
 	receipt := state.Receipt
 	if !state.Audited {
 		receipt, e = s.Audit.WriteProjectionWorkerIntent(call, state.Intent)
-		if e != nil || !receipt.ValidProjectionWorker(state.Intent) || !current() {
-			return query.ErrUnavailable
+		if e != nil {
+			return collapsed("audit", query.ErrUnavailable, e)
+		}
+		if !receipt.ValidProjectionWorker(state.Intent) {
+			return collapsed("audit-receipt", query.ErrUnavailable, nil)
+		}
+		if !current() {
+			return collapsed("audit-current", query.ErrUnavailable, nil)
 		}
 	} else if !receipt.ValidProjectionWorker(state.Intent) {
-		return query.ErrUnavailable
+		return collapsed("audit-replay", query.ErrUnavailable, nil)
 	}
 	launch, e := s.Ledger.ClaimProjectionWorker(call, state.Intent, r, a, receipt)
 	if e != nil || !launch.Valid(s.Now()) || launch.Intent != state.Intent.Worker || !current() {
-		return query.ErrUnavailable
+		return collapsed("claim", query.ErrUnavailable, e)
 	}
 	// Initial admission is the only holder of Create. An uncertain claim cannot
 	// be repeated; an acknowledged replay allows exact lookup only.
@@ -84,10 +90,10 @@ func (s *ProjectionWorkerAdmission) AdmitProjectionWorker(ctx context.Context, q
 		job, e = s.Jobs.FindAcquisitionWorkerJob(call, launch.Intent)
 	}
 	if e != nil || !job.ValidAcquisition(launch.Intent) || !current() {
-		return query.ErrUnavailable
+		return collapsed("job", query.ErrUnavailable, e)
 	}
 	if e = s.Ledger.RecordProjectionWorkerJob(call, state.Intent, job, r, a); e != nil || !current() {
-		return query.ErrUnavailable
+		return collapsed("job-record", query.ErrUnavailable, e)
 	}
 	return nil
 }
