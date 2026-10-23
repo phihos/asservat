@@ -136,7 +136,7 @@ func newWorkerEnrollmentServices(t *testing.T, ctx context.Context, poolFor func
 		t.Fatal(e)
 	}
 	issuer := newSyntheticWorkerIssuer(t, installation)
-	svc := &evidence.WorkerEnrollmentCoordinator{CSR: mtls.EnrollmentProof{}, Proofs: proof, Ledger: l, Activation: active, Audit: &objectstore.WorkerEnrollmentAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: a, Issuer: issuer, Now: time.Now}
+	svc := &evidence.WorkerEnrollmentCoordinator{CSR: mtls.EnrollmentProof{}, Proofs: proof, Ledger: l, Activation: active, Audit: &objectstore.WorkerEnrollmentAuditObjects{Store: store, Seal: keys, Open: keys}, Acknowledgements: a, Issuer: issuer, Authority: authority, Now: time.Now}
 	return workerEnrollmentFixture{bindings, svc, l, a, active, issuer, csr}
 }
 func (f workerEnrollmentFixture) enroll(ctx context.Context, w value.DownloadWorker) (value.WorkerCertificate, error) {

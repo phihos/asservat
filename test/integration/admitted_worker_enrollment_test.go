@@ -112,7 +112,7 @@ func qualifyAdmittedWorkerEnrollment(t *testing.T, ctx context.Context, mode str
 	}
 	switch mode {
 	case "enrollment-admitted-stop-lock", "enrollment-admitted-activation-stop":
-		_, err = blocker.Exec(ctx, "UPDATE artifact_download SET state='cancelled' WHERE id=$1", w.Intent.SessionID)
+		_, err = blocker.Exec(ctx, "UPDATE artifact_download SET state='Cancelled' WHERE id=$1", w.Intent.SessionID)
 	case "enrollment-admitted-recovery-lock":
 		_, err = blocker.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", w.Intent.Profile.InstallationID)
 	case "enrollment-admitted-configuration-lock":

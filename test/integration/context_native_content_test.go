@@ -342,7 +342,7 @@ func qualifyContextNativeControlRaces(t *testing.T, ctx context.Context, f nativ
 			t.Fatal(e)
 		}
 		now := time.Now().UTC().Truncate(time.Microsecond)
-		return value.NativeOperation{Path: a.Environment.Path, Processing: a.Environment.Processing, Reference: value.NativeReference{InstallationID: f.worker.Binding.InstallationID, SessionID: prep.SessionID, WorkerID: f.worker.Intent.ID, OperationID: custodyID(), Fence: fence}, Kind: value.NativeObserve, HubPodUID: pod, HubProcessEpoch: epoch, WorkerPodUID: f.worker.Binding.PodUID, WorkerPublicKey: en.PublicKeyDigest, SourceVersion: a.Scope.Version, ParentID: prep.BatchID, Generation: prep.Generation, StartedAt: now, Until: minPublicationTime(now.Add(5*time.Second), a.ValidUntil)}
+		return value.NativeOperation{Path: a.Environment.Path, Processing: a.Environment.Processing, Reference: value.NativeReference{InstallationID: f.worker.Binding.InstallationID, SessionID: prep.SessionID, WorkerID: f.worker.Intent.ID, OperationID: custodyID(), Fence: fence}, Kind: value.NativeObserve, HubPodUID: pod, HubProcessEpoch: epoch, WorkerPodUID: f.worker.Binding.PodUID, WorkerPublicKey: en.PublicKeyDigest, SourceVersion: a.Scope.Version, ParentID: prep.BatchID, Generation: prep.Generation, StartedAt: now, Until: minPublicationTime(now.Add(5*time.Second), a.ValidUntil).UTC().Truncate(time.Microsecond)}
 	}
 	newResponse := func() artifact.DownloadResponse {
 		return artifact.DownloadResponse{ID: custodyID(), SessionID: prep.SessionID, OwnerID: custodyID(), Plan: artifact.DownloadResponsePlan{Version: artifact.DownloadResponseVersion, Selection: artifact.DownloadSelection{Length: 1}, WindowReadLimit: evidence.ContextDownloadReadWork}, Until: f.worker.Intent.RunUntil}
