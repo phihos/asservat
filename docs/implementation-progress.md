@@ -1,5 +1,35 @@
 # Sustained implementation progress
 
+## Shared native operation observation (2026-10-23)
+
+Installed native79 parked the idle worker request as intended (7e72396b); the
+poll published its operation, the woken request attached, and the hub then
+refused at `serve/command` at the same instant the worker stopped waiting for
+its first frame and the poll failed at `result/prepare/projection`. No SQL
+lock waits over 300 ms were logged (`log_lock_waits` on) and the key binding
+was unused, so the command was never written. Code review shows the transport
+is not at fault (the park test, extended to receive the command over real
+TLS/h2, passes with a 0.7–2.8 s park): between the wake-up and the command
+frame the hub ran about eleven sequential complete checks — the re-admission
+locator, the operation gate's creation, attachment `before`/admission checks,
+the worker gate's creation (worker recheck plus nested operation gate), the
+handler's check and the send's pre-write check — each a fenced SQL
+transaction (~0.2 s installed, consistent with native78), and the poll's
+five-second projection authority expired first. `NativeOrigins.Recheck` now
+shares one successful operation observation, keyed by its exact inputs
+(operation reference and peer), for `NativeRecheckInterval` (one second, the
+maintainer-authorized relaxed recheck interval); the locator's observation
+seeds it. Every gate still runs its complete check against its own original
+origin, lease and deadlines; failed reads are never reused and revocation
+takes effect within the second. A gate-wide reuse was tried first and
+rejected: it broke deliberate admission/post-effect/terminal check contracts.
+The new `installed-cost` mode of
+`TestHubWorkerParkedRequestAttachesLaterPublishedOperation` (250 ms per
+observation through `Origins.Recheck` on both gates, 1.5 s left after
+publication) fails without the memo (refused before the command) and passes
+with it (at most two reads); `TestOriginsRecheckSharesObservationWithinInterval`
+pins the bound. Installed qualification has not rerun.
+
 ## One projection authority per request (2026-10-23)
 
 Installed native78 expired the approved projection read at

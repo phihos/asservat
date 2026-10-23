@@ -17,9 +17,16 @@ import (
 
 func routerFixture(t *testing.T) (evidence.NativeOrigin, contracts.NativeHello, native.NativeOperationFactory) {
 	t.Helper()
+	return routerFixtureFor(t, 4*time.Second, nil)
+}
+
+// routerFixtureFor bounds the operation to lifetime. A non-nil recheck is the
+// operation gate's current check, as the hub's runtimes use Origins.Recheck.
+func routerFixtureFor(t *testing.T, lifetime time.Duration, recheck func(context.Context, evidence.NativeOrigin) (value.NativeLease, error)) (evidence.NativeOrigin, contracts.NativeHello, native.NativeOperationFactory) {
+	t.Helper()
 	source := flowSourceValue(t)
 	n := time.Now()
-	o := value.NativeOperation{Reference: value.NativeReference{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, OperationID: nativeID, Fence: 1}, Kind: value.NativePrepare, HubPodUID: nativeID, HubProcessEpoch: nativeID, WorkerPodUID: nativeID, WorkerPublicKey: artifact.Digest{1}, SourceVersion: evidence.ContextCopiesDigest(source.Copies), ParentID: nativeID, Generation: 1, StartedAt: n, Until: n.Add(4 * time.Second)}
+	o := value.NativeOperation{Reference: value.NativeReference{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, OperationID: nativeID, Fence: 1}, Kind: value.NativePrepare, HubPodUID: nativeID, HubProcessEpoch: nativeID, WorkerPodUID: nativeID, WorkerPublicKey: artifact.Digest{1}, SourceVersion: evidence.ContextCopiesDigest(source.Copies), ParentID: nativeID, Generation: 1, StartedAt: n, Until: n.Add(lifetime)}
 	o = syntheticProcessingPath(o)
 	o.Processing.Location = source.Expectation.Registration.Location
 	o.Path.TargetClusterID = o.Processing.Location.ClusterID
@@ -34,7 +41,12 @@ func routerFixture(t *testing.T) (evidence.NativeOrigin, contracts.NativeHello, 
 		if !got.Lease.Operation.Equal(o) {
 			return nil, artifact.ErrDownloadUnavailable
 		}
-		gate, e := evidence.NewNativeFrameGate(owner, func(context.Context) (value.NativeLease, error) { return origin.Lease, nil }, time.Now)
+		gate, e := evidence.NewNativeFrameGate(owner, func(c context.Context) (value.NativeLease, error) {
+			if recheck != nil {
+				return recheck(c, got)
+			}
+			return origin.Lease, nil
+		}, time.Now)
 		if e != nil {
 			return nil, e
 		}

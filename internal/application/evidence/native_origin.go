@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"sync"
 	"time"
 )
 
@@ -39,6 +40,66 @@ type NativeOrigins struct {
 	Now              func() time.Time
 	Projection       ProjectionNativeReader
 	ProjectionProofs ProjectionNativeProofFactory
+	// Recent, when set, lets Recheck reuse one operation observation for
+	// NativeRecheckInterval. Nil repeats the SQL observation on every call.
+	Recent *NativeRecentObservations
+}
+
+// NativeRecheckInterval is the relaxed, bounded recheck interval of a live
+// native conversation's operation observation (AGENTS.md maintainer
+// clarification). Installed native79: between a parked worker's wake-up and
+// its first command frame the nested worker and operation gates, attachment
+// and frame checks repeated this same fenced SQL observation about eleven
+// times (~0.2 s each installed), and the poll's five-second projection
+// authority expired before the command was written. Within one second every
+// caller still gets its own complete check of the observation against its
+// original origin, lease and deadlines; only the identical SQL read of the
+// same operation and peer is shared. Revocation, recovery and permission
+// changes take effect within that second; nothing extends a lease.
+const NativeRecheckInterval = time.Second
+
+// NativeRecentObservations is the process's bounded memo of successful
+// operation observations, keyed by exactly the observation's inputs.
+type NativeRecentObservations struct {
+	mu      sync.Mutex
+	entries map[nativeObservationKey]nativeObservation
+}
+type nativeObservationKey struct {
+	ref  value.NativeReference
+	peer value.KeyPeer
+}
+type nativeObservation struct {
+	lease value.NativeLease
+	at    time.Time
+}
+
+func NewNativeRecentObservations() *NativeRecentObservations {
+	return &NativeRecentObservations{entries: map[nativeObservationKey]nativeObservation{}}
+}
+func (r *NativeRecentObservations) get(k nativeObservationKey, now time.Time) (value.NativeLease, bool) {
+	if r == nil {
+		return value.NativeLease{}, false
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	o, ok := r.entries[k]
+	if !ok || now.Before(o.at) || now.Sub(o.at) >= NativeRecheckInterval || !o.lease.Valid(now) {
+		return value.NativeLease{}, false
+	}
+	return o.lease, true
+}
+func (r *NativeRecentObservations) put(k nativeObservationKey, l value.NativeLease, at time.Time) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for key, o := range r.entries {
+		if at.Sub(o.at) >= NativeRecheckInterval || !o.lease.Valid(at) {
+			delete(r.entries, key)
+		}
+	}
+	r.entries[k] = nativeObservation{l, at}
 }
 
 func (s NativeOrigins) Check(ctx context.Context, installation, session, worker string, peer value.KeyPeer, token []byte) (NativeOrigin, error) {
@@ -106,6 +167,8 @@ func (s NativeOrigins) CheckAcquisition(ctx context.Context, installation string
 	if e != nil || !l.Valid(s.Now()) || l.Operation.WorkerPodUID != p.Binding.PodUID || l.Operation.Reference.WorkerID != worker {
 		return zero, artifact.ErrDownloadUnavailable
 	}
+	// The locator's observation is the same operation read Recheck repeats.
+	s.Recent.put(nativeObservationKey{l.Operation.Reference, peer}, l, start)
 	l.Until = identity.Earlier(l.Until, identity.Earlier(p.FreshUntil, start.Add(5*time.Second)))
 	if d, ok := call.Deadline(); ok {
 		l.Until = identity.Earlier(l.Until, d)
@@ -127,19 +190,26 @@ func (s NativeOrigins) Recheck(ctx context.Context, original NativeOrigin) (valu
 	var l value.NativeLease
 	var e error
 	ref := original.Lease.Operation.Reference
-	switch ref.Parent().Purpose {
-	case value.AcquisitionDownload:
+	key := nativeObservationKey{ref, original.Proof.Peer}
+	observedAt := s.Now()
+	l, recent := s.Recent.get(key, observedAt)
+	switch {
+	case recent:
+	case ref.Parent().Purpose == value.AcquisitionDownload:
 		if s.Operations == nil {
 			return value.NativeLease{}, artifact.ErrInvalid
 		}
 		l, e = s.Operations.ObserveNativeOperation(call, ref, original.Proof.Peer)
-	case value.AcquisitionProjection:
+	case ref.Parent().Purpose == value.AcquisitionProjection:
 		if s.Projection == nil {
 			return value.NativeLease{}, artifact.ErrInvalid
 		}
 		l, e = s.Projection.ObserveProjectionNativeOperation(call, ref, original.Proof.Peer)
 	default:
 		return value.NativeLease{}, artifact.ErrInvalid
+	}
+	if e == nil && !recent && call.Err() == nil {
+		s.Recent.put(key, l, observedAt)
 	}
 	if e != nil || !sameNativeOperation(l.Operation, original.Lease.Operation) || l.Sequence != original.Lease.Sequence || l.Certificate != original.Lease.Certificate {
 		return value.NativeLease{}, artifact.ErrDownloadUnavailable

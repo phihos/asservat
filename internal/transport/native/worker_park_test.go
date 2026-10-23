@@ -23,6 +23,7 @@ type parkPeers struct {
 	idle      *evidence.NativeIdle
 	published atomic.Bool
 	checks    atomic.Int32
+	origins   *evidence.NativeOrigins
 }
 
 func (p *parkPeers) CheckWorkerNative(_ context.Context, state *tls.ConnectionState, h contracts.NativeHello) (evidence.NativeOrigin, error) {
@@ -39,8 +40,32 @@ func (p *parkPeers) CheckWorkerNative(_ context.Context, state *tls.ConnectionSt
 func (p *parkPeers) CheckForwardedNative(context.Context, *tls.ConnectionState, contracts.NativeHello) (evidence.NativeOrigin, error) {
 	return evidence.NativeOrigin{}, contracts.ErrNativeProtocol
 }
-func (p *parkPeers) RecheckWorkerNative(_ context.Context, _ *tls.ConnectionState, origin evidence.NativeOrigin) (value.NativeLease, error) {
+func (p *parkPeers) RecheckWorkerNative(ctx context.Context, _ *tls.ConnectionState, origin evidence.NativeOrigin) (value.NativeLease, error) {
+	if p.origins != nil {
+		return p.origins.Recheck(ctx, origin)
+	}
 	return origin.Lease, nil
+}
+
+// slowOperations is the hub's operation observation with an installed cost:
+// one fenced SQL transaction took about 0.2 s in native78/79.
+type slowOperations struct {
+	lease atomic.Pointer[value.NativeLease]
+	reads atomic.Int32
+}
+
+func (s *slowOperations) ObserveNativeOperation(ctx context.Context, ref value.NativeReference, _ value.KeyPeer) (value.NativeLease, error) {
+	s.reads.Add(1)
+	l := s.lease.Load()
+	if l == nil || ref != l.Operation.Reference {
+		return value.NativeLease{}, contracts.ErrNativeProtocol
+	}
+	select {
+	case <-time.After(250 * time.Millisecond):
+		return *l, nil
+	case <-ctx.Done():
+		return value.NativeLease{}, ctx.Err()
+	}
 }
 func (p *parkPeers) RecheckForwardedNative(context.Context, *tls.ConnectionState, evidence.NativeOrigin) (value.NativeLease, error) {
 	return value.NativeLease{}, contracts.ErrNativeProtocol
@@ -53,8 +78,16 @@ func (p *parkPeers) RecheckForwardedNative(context.Context, *tls.ConnectionState
 // The parked request now attaches as soon as the owner publishes the
 // operation. Worker/SQL authority is synthetic; the production handler,
 // HubWorkerAdmission, router, registration, TLS/h2 and NativeClient are real.
+//
+// "installed-cost" reproduces installed native79: both the worker gate and the
+// operation gate recheck through Origins.Recheck, whose operation observation
+// takes 250 ms (a fenced SQL transaction there), and the published operation
+// has 1.5 s left of its request's authority. Without the bounded recheck
+// interval the attachment and nested gates repeated that observation eight
+// times between the wake-up and the command frame and the lease ran out
+// first (installed native79 died at serve/command; this run at the response).
 func TestHubWorkerParkedRequestAttachesLaterPublishedOperation(t *testing.T) {
-	for _, mode := range []string{"published", "unpublished"} {
+	for _, mode := range []string{"published", "unpublished", "installed-cost"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
@@ -70,6 +103,14 @@ func TestHubWorkerParkedRequestAttachesLaterPublishedOperation(t *testing.T) {
 			}
 			defer router.Close()
 			peers := &parkPeers{idle: syntheticNativeIdle(t)}
+			lifetime := 4 * time.Second
+			var recheck func(context.Context, evidence.NativeOrigin) (value.NativeLease, error)
+			operations := &slowOperations{}
+			if mode == "installed-cost" {
+				lifetime = 1500 * time.Millisecond
+				peers.origins = &evidence.NativeOrigins{Operations: operations, Now: time.Now, Recent: evidence.NewNativeRecentObservations()}
+				recheck = peers.origins.Recheck
+			}
 			serving := &hubWorkerServing{until: time.Now().Add(9 * time.Second), pod: nativeID}
 			admission, err := native.NewHubWorkerAdmission(peers, serving, router, time.Now)
 			if err != nil {
@@ -91,10 +132,11 @@ func TestHubWorkerParkedRequestAttachesLaterPublishedOperation(t *testing.T) {
 			// The human request claims and publishes its operation while the
 			// worker's request is already waiting at the hub.
 			attached := make(chan *native.HubOperation, 1)
-			if mode == "published" {
+			if mode != "unpublished" {
 				go func() {
 					time.Sleep(700 * time.Millisecond)
-					origin, _, factory := routerFixture(t)
+					origin, _, factory := routerFixtureFor(t, lifetime, recheck)
+					operations.lease.Store(&origin.Lease)
 					registration, err := router.Register(ctx, origin.Lease.Operation, factory)
 					if err != nil {
 						attached <- nil
@@ -124,6 +166,18 @@ func TestHubWorkerParkedRequestAttachesLaterPublishedOperation(t *testing.T) {
 				t.Fatal("the worker request did not attach the later published operation", err, peers.checks.Load())
 			}
 			defer stream.Close()
+			// The woken conversation is served at once: the worker receives
+			// its command on the parked request's own stream.
+			receive, stopReceive := context.WithTimeout(ctx, 2*time.Second)
+			f, err := stream.Receive(receive)
+			stopReceive()
+			clear(f.Payload)
+			if err != nil || f.Kind != contracts.NativeCommandFrame {
+				t.Fatal("the woken worker did not receive its command", err, f.Kind, time.Since(started))
+			}
+			if n := operations.reads.Load(); mode == "installed-cost" && n > 2 {
+				t.Fatal("the gates repeated the operation observation within one recheck interval", n)
+			}
 			select {
 			case operation := <-attached:
 				if operation == nil {
@@ -136,5 +190,34 @@ func TestHubWorkerParkedRequestAttachesLaterPublishedOperation(t *testing.T) {
 				t.Fatal("the woken request did not repeat the complete worker check exactly once", peers.checks.Load())
 			}
 		})
+	}
+}
+
+// The shared operation observation is bounded: a revoked operation is refused
+// at the first recheck after NativeRecheckInterval, and a failed read is never
+// reused.
+func TestOriginsRecheckSharesObservationWithinInterval(t *testing.T) {
+	origin, _, _ := routerFixtureFor(t, 4*time.Second, nil)
+	operations := &slowOperations{}
+	operations.lease.Store(&origin.Lease)
+	origins := evidence.NativeOrigins{Operations: operations, Now: time.Now, Recent: evidence.NewNativeRecentObservations()}
+	ctx := context.Background()
+	for range 3 {
+		if _, err := origins.Recheck(ctx, origin); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if operations.reads.Load() != 1 {
+		t.Fatal("rechecks within one interval repeated the observation", operations.reads.Load())
+	}
+	operations.lease.Store(nil) // e.g. the operation row was revoked
+	time.Sleep(evidence.NativeRecheckInterval)
+	for range 2 {
+		if _, err := origins.Recheck(ctx, origin); err == nil {
+			t.Fatal("revocation outlived the recheck interval")
+		}
+	}
+	if operations.reads.Load() != 3 {
+		t.Fatal("a failed observation was reused", operations.reads.Load())
 	}
 }
