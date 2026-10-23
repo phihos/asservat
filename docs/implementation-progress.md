@@ -1,5 +1,40 @@
 # Sustained implementation progress
 
+## Approved inspection and independent enrollment integrated (2026-10-23)
+
+Candidate `9da475cd` combines ADR-219/221 with ADR-222 and the capture/download
+phase corrections. Approved pod-status inspection reuses the isolated acquisition
+Job, binary, enrollment and native transport. The console and MCP expose explicit
+inspection and same-query polling; the hub receives only the approved DTO.
+ReadApproved remains separate from native-download scope. The existing worker
+endpoint enrolls an exact admitted worker independently of a human preparation
+socket; current admitted parent/workload/configuration/recovery, audit and finite
+signing checks remain. No certificate alone authorizes evidence or key access.
+Four dedicated query deployment/capacity components are replaced by the actual
+shared installed resources and logical query charges. Cleanup is bounded work
+on demand; unknown physical state remains charged.
+
+The [component archive](../test/results/resumed-c62e02ac-approved-projection-component/README.md)
+records passing focused tests, complete affected evidence/native/worker race tests
+(43.204 seconds), console check/build and browser checks. The console check runs
+168 tests; the browser gate covers 19 journeys plus native restart. Actual HTTP/2
+projection tests cover joined delivery, cancellation, wrong identity and spent
+batches. A separate real SQL/S3 lifecycle qualifier compiles but has not executed.
+Its merged fixture now gives every hub facet the same compiled `hub-runtime` pool;
+A-KEY and capacity profile reading remain separate. Independent source reviews
+pass. Earlier compile/assertion failures and the deliberately interrupted overly
+broad test selection remain archived. Revised tests explicitly retain original
+observation expiry and current SQL refusal rather than expecting repeated external
+reads within one short request.
+
+Combined compilation of all packages exits 0 in 85.767 seconds. The design,
+specification and dependency commands exit 0 in 12.212 seconds. Their outer source
+check records one generated documentation change (`validation.json`, positive
+checks 1321 to 1314); all Go/SQL sources stayed unchanged. The generated report is
+retained for a stable repeat. Full current Go, scoped real SQL and the installed
+workflow remain pending. Native57 is still the latest installed result, and the
+complete specification remains the active implementation task.
+
 ## Shared hub credentials integrated (2026-10-23)
 
 Candidate `072e42a3` integrates ADR-222 on top of the capture phase correction.

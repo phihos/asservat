@@ -31,17 +31,16 @@ are spent under the fixture's configured allowance. No download is attempted.
 All 2,792 source hashes match; diagnostics are archived and all owned resources
 are independently confirmed removed. No complete installed journey is claimed.
 
-The implementation mandate remains active. The isolated projection tree
-`/home/phil/Projekte/asservat-projection-c62e02ac` implements ADR-219/221: approved
-pod-status inspection through shared acquisition and certificate enrollment based
-on admitted worker identity, independent of the human preparation socket. It also
-replaces separate query capacity/deployment machinery with the actual installed
-shared resources. ADR-222 is integrated in the main simplification tree: exact same-process
-SQL grant unions remove 41 credentials and keep 32 connections. Focused unit,
-Kubernetes adapter, compilation and design checks pass; full current Go and real
-SQL/installed checks remain pending until ADR-219/221 is integrated. These changes
-were not part of native57. Continue through complete
-workflows; status questions and component handoffs do not revoke approval.
+The implementation mandate remains active. ADR-219/221 from the isolated
+projection tree is now integrated (`1d46304e`, followed by contract alignment
+`9da475cd`): approved inspection shares acquisition, worker enrollment no longer
+needs the human preparation socket, and shared capacity replaces four dedicated
+query components. ADR-222 gives those hub facets one exact SQL grant union/pool;
+key acquisition and pinned readers remain separate. Component/race/console checks
+pass; combined compilation and design commands pass, with one generated design
+report update retained for a stable repeat. Full Go, scoped real SQL and installed
+qualification are next. Continue through complete workflows; status questions and
+component handoffs do not revoke approval.
 
 ## Historical handoff (2026-10-14)
 

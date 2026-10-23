@@ -13,8 +13,8 @@ import (
 	value "asservat.local/asservat/internal/domain/authorization"
 )
 
-// Reuse the existing identity write/audit/activation credential boundaries.
-// These are the same three pools already held by this process for downloads.
+// Reuse the typed identity write/audit/activation facets. ADR-222 gives all
+// three the same ordinary hub pool already held for native downloads.
 type projectionEnrollmentEffects struct {
 	*postgres.ProjectionEnrollments
 	acknowledgements, activation *postgres.ProjectionEnrollments

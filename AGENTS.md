@@ -72,6 +72,17 @@ authorized. Understand why existing mechanisms exist before removing them.
 
 ## Implementation notes
 
+ADR-219/221 reuses the acquisition Job/binary/native transport for approved
+pod-status reads and native downloads through a closed typed parent. Certificate
+enrollment uses current admitted worker identity under the worker request; it
+needs no live human preparation socket. Certificates alone grant no evidence or
+key access. Approved reads require ReadApproved, use one original short authority
+observation per public request and retain current SQL fences; each paid poll
+reconstructs authority. No dummy download session or separate query deployment is
+created. Query cleanup is bounded work on demand and retains uncertain charges.
+Read the two ADRs and docs/architecture/context-projection.md. Component and
+console checks pass; real SQL and installed qualification are pending.
+
 ADR-222 supersedes the earlier same-process credential splits, including ADR-217:
 ordinary hub work shares one exact compiled SQL grant union; owner identity and
 routing share another. Keep the existing 32 physical connections, two reserved
