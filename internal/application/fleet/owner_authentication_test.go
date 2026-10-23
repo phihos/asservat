@@ -51,7 +51,7 @@ func TestOwnerServingRequiresAllCurrentBoundaries(t *testing.T) {
 func testOwnerCurrentBoundaries(t *testing.T, kind string) {
 	const id = "11111111-1111-4111-8111-111111111111"
 	const other = "22222222-2222-4222-8222-222222222222"
-	for _, mode := range []string{"valid", "expired-first-registry", "cached-first-registry", "retired-during-route", "changed-config", "changed-enrollment", "wrong-registry-certificate", "wrong-route-process", "wrong-route-pool", "wrong-pod-name", "wrong-replica", "protection-missing", "protection-changed", "protection-wrong-pool", "protection-invalid", "protection-after-invalid", "protection-after-wrong-pool", "protection-native-step", "protection-private-step", "protection-deadline", "protection-canceled", "protection-unreported", "removed-root", "connection-changed", "cancelled", "expired-during-crypto"} {
+	for _, mode := range []string{"valid", "expired-first-registry", "cached-first-registry", "retired-during-route", "changed-config", "changed-enrollment", "wrong-registry-certificate", "wrong-route-process", "wrong-route-pool", "wrong-pod-name", "wrong-replica", "protection-missing", "protection-wrong-pool", "protection-invalid", "protection-native-step", "protection-private-step", "protection-deadline", "protection-canceled", "protection-unreported", "removed-root", "connection-changed", "cancelled", "expired-during-crypto"} {
 		t.Run(mode, func(t *testing.T) {
 			now := time.Now().UTC()
 			start := now
@@ -112,14 +112,6 @@ func testOwnerCurrentBoundaries(t *testing.T, kind string) {
 					out.Pool.NamespaceUID = other
 				case "protection-invalid":
 					out.FreshUntil = now
-				case "protection-after-invalid":
-					if guards > 1 {
-						out.FreshUntil = now
-					}
-				case "protection-after-wrong-pool":
-					if guards > 1 {
-						out.Pool.NamespaceUID = other
-					}
 				case "protection-native-step":
 					return out, ownerProtectionDiagnosticError{"source.guard-policy-read", false}
 				case "protection-private-step":
@@ -130,10 +122,6 @@ func testOwnerCurrentBoundaries(t *testing.T, kind string) {
 					return out, context.DeadlineExceeded
 				case "protection-canceled":
 					return out, context.Canceled
-				case "protection-changed":
-					if guards > 1 {
-						out.Digest[0]++
-					}
 				}
 				return out, nil
 			})
@@ -184,16 +172,13 @@ func testOwnerCurrentBoundaries(t *testing.T, kind string) {
 				deadline = got.ValidUntil
 			}
 			wantReport := map[string]string{
-				"protection-missing":          "protection-before/read/other",
-				"protection-wrong-pool":       "protection-before/pool",
-				"protection-invalid":          "protection-before/invalid",
-				"protection-after-invalid":    "protection-after/invalid",
-				"protection-after-wrong-pool": "protection-after/pool",
-				"protection-changed":          "protection-after/digest",
-				"protection-native-step":      "protection-before/read/source.guard-policy-read",
-				"protection-private-step":     "protection-before/read/other",
-				"protection-deadline":         "protection-before/read/deadline",
-				"protection-canceled":         "protection-before/read/canceled",
+				"protection-missing":      "protection-before/read/other",
+				"protection-wrong-pool":   "protection-before/pool",
+				"protection-invalid":      "protection-before/invalid",
+				"protection-native-step":  "protection-before/read/source.guard-policy-read",
+				"protection-private-step": "protection-before/read/other",
+				"protection-deadline":     "protection-before/read/deadline",
+				"protection-canceled":     "protection-before/read/canceled",
 			}[mode]
 			if wantReport != "" && (len(reports) != 1 || !strings.HasPrefix(reports[0], wantReport+"@") || !errors.Is(err, value.ErrUnavailable)) {
 				t.Fatalf("protection refusal lost its closed reason or error class: %v, %v", reports, err)
@@ -208,7 +193,7 @@ func testOwnerCurrentBoundaries(t *testing.T, kind string) {
 			if mode == "cached-first-registry" {
 				until = start.Add(4 * time.Second)
 			}
-			if err != nil || ((kind == "peer" || kind == "client-observation") && (!got.Valid(now) || got.Certificate != cert || got.EnrollmentID != enrollment.ID)) || !deadline.Equal(until) || reads != 2 || guards != 2 || crypto != 2 {
+			if err != nil || ((kind == "peer" || kind == "client-observation") && (!got.Valid(now) || got.Certificate != cert || got.EnrollmentID != enrollment.ID)) || !deadline.Equal(until) || reads != 2 || guards != 1 || crypto != 2 {
 				t.Fatal("lost current boundary or original deadline", err, got, reads, guards, crypto)
 			}
 		})

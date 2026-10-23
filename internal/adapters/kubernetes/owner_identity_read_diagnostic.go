@@ -19,11 +19,6 @@ const (
 	ownerReadProjections
 	ownerReadInitialDeployment
 	ownerReadInitialPod
-	ownerReadFinalTokenReview
-	ownerReadFinalPod
-	ownerReadFinalDeployment
-	ownerReadFinalJournal
-	ownerReadFinalGuard
 	ownerReadFinalDeadline
 	ownerReadJournalRead
 	ownerReadJournalMetadata
@@ -52,7 +47,6 @@ const (
 	ownerReadDeploymentTemplate
 	ownerReadAccountRead
 	ownerReadAccountContent
-	ownerReadFinalPodChanged
 	ownerReadLiveDigest
 	ownerReadLiveNamespaceRead
 	ownerReadLiveNamespaceContent
@@ -88,16 +82,6 @@ func (v OwnerIdentityReadCheck) String() string {
 		return "initial-deployment"
 	case ownerReadInitialPod:
 		return "initial-pod"
-	case ownerReadFinalTokenReview:
-		return "final-token-review"
-	case ownerReadFinalPod:
-		return "final-pod"
-	case ownerReadFinalDeployment:
-		return "final-deployment"
-	case ownerReadFinalJournal:
-		return "final-journal"
-	case ownerReadFinalGuard:
-		return "final-guard"
 	case ownerReadFinalDeadline:
 		return "final-deadline"
 	case ownerReadJournalRead:
@@ -154,8 +138,6 @@ func (v OwnerIdentityReadCheck) String() string {
 		return "account-read"
 	case ownerReadAccountContent:
 		return "account-content"
-	case ownerReadFinalPodChanged:
-		return "final-pod-changed"
 	case ownerReadLiveDigest:
 		return "live-digest"
 	case ownerReadLiveNamespaceRead:

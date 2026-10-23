@@ -680,12 +680,11 @@ func (d *OwnerDeployment) clusterCatalogChanged(ctx context.Context) bool {
 // contextStartOwnerAuthenticator gives the context-start ingress self-checks
 // their own observer/probe clients with the same guard plan and pins: on the
 // owner's shared clients they queued behind other request paths and overran
-// the original five seconds (installed native 54). They use the
-// kube.WithOpeningBurst limiter (ADR-208, installed native 55/57). Checks are
-// unchanged.
+// the original five seconds (installed native 54). The guard proof is reused
+// for kube.OwnerProtectionReuse, so they keep the default client limiter.
 func contextStartOwnerAuthenticator(in *ownerInputs, c contracts.OwnerDeployment, guard *kube.OwnerWorkloadProtection, pool value.OwnerPool, configs *postgres.OwnerConfigurations, registry *postgres.OwnerEnrollments, stats *regionalAPIStats) (*app.OwnerAuthenticator, error) {
 	control := configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
-	observerConfig, probeConfig := kube.WithOpeningBurst(in.kubernetes("kube-observer.token")), kube.WithOpeningBurst(in.kubernetes("kube-probe.token"))
+	observerConfig, probeConfig := in.kubernetes("kube-observer.token"), in.kubernetes("kube-probe.token")
 	observerConfig.Wrap(stats.wrap)
 	probeConfig.Wrap(stats.wrap)
 	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)

@@ -27,7 +27,7 @@ import (
 // This exercises the concrete adapter against a synthetic HTTPS API. It does
 // not qualify native TokenReview, admission or installation provenance.
 func TestClusterObservationCallerExactNativeReadBoundary(t *testing.T) {
-	for _, mode := range []string{"valid", "parent-cap", "token-cap", "wrong-audience", "unbound", "wrong-account", "extra-admin-group", "duplicate-group", "revoked-review", "replaced-account", "replaced-pod", "replaced-controller", "two-controllers", "changed-template", "changed-pod-command", "changed-after-read", "scaled-down", "deleted-pod", "lost-guard", "other-policy", "late-final-guard", "original-expired", "cancelled"} {
+	for _, mode := range []string{"valid", "parent-cap", "token-cap", "wrong-audience", "unbound", "wrong-account", "extra-admin-group", "duplicate-group", "revoked-review", "replaced-account", "replaced-pod", "replaced-controller", "two-controllers", "changed-template", "changed-pod-command", "changed-after-read", "scaled-down", "deleted-pod", "other-policy", "original-expired", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			start := time.Now().UTC()
 			var clock atomic.Int64
@@ -75,10 +75,6 @@ func TestClusterObservationCallerExactNativeReadBoundary(t *testing.T) {
 				case "/api/v1/namespaces/owners":
 					permissionReply(w, v.ns)
 				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/owner-workload":
-					if mode == "lost-guard" && reviews.Load() == 2 {
-						http.NotFound(w, r)
-						return
-					}
 					permissionReply(w, policy)
 				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/owner-workload":
 					permissionReply(w, binding)
@@ -94,10 +90,7 @@ func TestClusterObservationCallerExactNativeReadBoundary(t *testing.T) {
 					if r.Method != http.MethodPut || r.URL.Query().Get("dryRun") != "All" {
 						t.Error("non-dry-run guard request")
 					}
-					n := probes.Add(1)
-					if mode == "late-final-guard" && n == 2 {
-						clock.Store(start.Add(3 * time.Second).UnixNano())
-					}
+					probes.Add(1)
 					message := "ValidatingAdmissionPolicy 'owner-workload' with binding 'owner-workload' denied request: " + ownerWorkloadDenial
 					if mode == "other-policy" {
 						message = strings.ReplaceAll(message, "owner-workload", "other-policy")
@@ -202,7 +195,7 @@ func TestClusterObservationCallerExactNativeReadBoundary(t *testing.T) {
 			request := fleet.ClusterObservationRequest{ID: ownerID(70), Challenge: ownerID(71), RootID: pin.RootID, ClusterID: ownerID(72), Purpose: fleet.ObserveCapacityNamespaceGuard, RequestedAt: start, NotAfter: start.Add(5 * time.Second)}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			if mode == "parent-cap" || mode == "late-final-guard" {
+			if mode == "parent-cap" {
 				var stop context.CancelFunc
 				ctx, stop = context.WithDeadline(ctx, start.Add(2*time.Second))
 				defer stop()
@@ -215,7 +208,7 @@ func TestClusterObservationCallerExactNativeReadBoundary(t *testing.T) {
 			}
 			got, e := a.ObserveClusterObservationCaller(ctx, token, string(pod.UID), request)
 			if mode == "valid" || mode == "parent-cap" || mode == "token-cap" {
-				if e != nil || !got.Matches(request, now()) || got.Pin != pin || got.PodUID != string(pod.UID) || reviews.Load() != 2 || podReads.Load() != 2 || probes.Load() != 2 {
+				if e != nil || !got.Matches(request, now()) || got.Pin != pin || got.PodUID != string(pod.UID) || reviews.Load() != 2 || podReads.Load() != 2 || probes.Load() != 1 {
 					t.Fatalf("exact current caller denied: %v", e)
 				}
 				if d, ok := ctx.Deadline(); ok && got.FreshUntil.After(d) {

@@ -201,11 +201,11 @@ func TestOwnerObservationRoutingPeersActualTLSBothNamesAndFreshReads(t *testing.
 			if err != nil || !first.Valid(time.Now()) || first.Interval.FreshUntil.After(x.callerEnd) {
 				t.Fatal("original peer check", err)
 			}
-			if x.registry != 4 || x.route != 2 || x.guard != 4 || x.work != 2 {
+			if x.registry != 4 || x.route != 2 || x.guard != 2 || x.work != 2 {
 				t.Fatal("current independent traversals", x.registry, x.route, x.guard, x.work)
 			}
 			last, err := x.checker.CheckObservationRouting(ctx, &x.state, x.query)
-			if err != nil || !first.SamePeers(last) || x.registry != 8 || x.route != 4 || x.guard != 8 || x.work != 4 {
+			if err != nil || !first.SamePeers(last) || x.registry != 8 || x.route != 4 || x.guard != 4 || x.work != 4 {
 				t.Fatal("second check reused old proofs", err)
 			}
 			x.mode = "revoked"

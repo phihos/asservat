@@ -23,7 +23,7 @@ import (
 )
 
 func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
-	for _, mode := range []string{"valid", "guard-missing", "guard-lost", "allowing-probe", "wrong-token-pod", "wrong-token-account", "token-revoked", "token-read-error", "pod-owner-changed", "pod-unassigned", "late-guard", "cancelled", "startup-pending", "startup-guard-lost", "startup-token-revoked", "startup-launch-replaced", "startup-after-receipt-changed", "startup-receipt-regressed", "startup-receipt-replaced"} {
+	for _, mode := range []string{"valid", "guard-missing", "allowing-probe", "wrong-token-pod", "wrong-token-account", "token-read-error", "pod-owner-changed", "pod-unassigned", "cancelled", "startup-pending", "startup-token-revoked", "startup-launch-replaced", "startup-after-receipt-changed", "startup-receipt-replaced"} {
 		t.Run(mode, func(t *testing.T) {
 			x := newOwnerIdentityObjectFixture(t)
 			in := x.reader.input
@@ -58,7 +58,7 @@ func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
 			var reviews atomic.Int32
 			startupMode := strings.HasPrefix(mode, "startup-")
 			receipt := x.state.OwnerLaunch.Receipt
-			if startupMode && mode != "startup-receipt-regressed" {
+			if startupMode {
 				x.state.OwnerLaunch.Receipt = nil
 				x.writeJournal(t)
 			}
@@ -80,9 +80,7 @@ func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
 						x.writeJournal(t)
 					}
 					if n == 2 {
-						if mode == "startup-receipt-regressed" {
-							x.state.OwnerLaunch.Receipt = nil
-						} else if mode == "startup-launch-replaced" {
+						if mode == "startup-launch-replaced" {
 							x.state.OwnerLaunch.OperationID = ownerID(3900)
 						} else {
 							x.state.OwnerLaunch.Receipt = receipt
@@ -93,7 +91,7 @@ func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
 				case "/api/v1/namespaces/" + in.Namespace.Name:
 					permissionReply(w, ns)
 				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + g.Name:
-					if mode == "guard-missing" || mode == "guard-lost" && reviews.Load() >= 2 || mode == "startup-guard-lost" && reviews.Load() >= 1 {
+					if mode == "guard-missing" {
 						http.NotFound(w, r)
 					} else {
 						permissionReply(w, policy)
@@ -131,11 +129,8 @@ func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
 					if mode == "wrong-token-account" {
 						reply.Status.User.UID = ownerID(3501)
 					}
-					if (mode == "token-revoked" || mode == "startup-token-revoked") && n == 2 {
+					if mode == "startup-token-revoked" && n == 2 {
 						reply.Status.Authenticated = false
-					}
-					if mode == "late-guard" && n == 2 {
-						offset.Store(int64(5 * time.Second))
 					}
 					permissionReply(w, reply)
 				case "/api/v1/namespaces/" + in.Namespace.Name + "/pods/" + pod.Name:
@@ -172,10 +167,7 @@ func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
 				verify = reader.VerifyStartup
 			}
 			until, e := verify(ctx, x.manifest, x.mounted)
-			if mode == "startup-receipt-regressed" && journalReads.Load() != 2 {
-				t.Fatal("receipt regression was treated as retryable pending", journalReads.Load())
-			}
-			if mode == "startup-pending" && (journalReads.Load() != 4 || reviews.Load() != 3) {
+			if mode == "startup-pending" && (journalReads.Load() != 3 || reviews.Load() != 2) {
 				t.Fatal("pending startup omitted full fresh native proof", journalReads.Load(), reviews.Load())
 			}
 			if mode == "valid" || mode == "startup-pending" {
@@ -187,11 +179,11 @@ func TestOwnerIdentityReaderRequiresCurrentPodAndOriginalGuard(t *testing.T) {
 			}
 			if mode != "valid" && mode != "startup-pending" && mode != "startup-launch-replaced" {
 				expected := map[string]OwnerIdentityReadCheck{
-					"guard-missing": ownerReadInitialGuard, "guard-lost": ownerReadFinalGuard, "allowing-probe": ownerReadInitialGuard,
-					"wrong-token-pod": ownerReadInitialTokenReview, "wrong-token-account": ownerReadInitialTokenReview, "token-revoked": ownerReadFinalTokenReview,
+					"guard-missing": ownerReadInitialGuard, "allowing-probe": ownerReadInitialGuard,
+					"wrong-token-pod": ownerReadInitialTokenReview, "wrong-token-account": ownerReadInitialTokenReview,
 					"token-read-error": ownerReadTokenRead, "pod-owner-changed": ownerReadInitialPod, "pod-unassigned": ownerReadInitialPod,
-					"late-guard": ownerReadFinalDeployment, "cancelled": ownerReadInput,
-					"startup-guard-lost": ownerReadInitialGuard, "startup-token-revoked": ownerReadInitialTokenReview, "startup-after-receipt-changed": ownerReadInitialJournal, "startup-receipt-regressed": ownerReadFinalJournal, "startup-receipt-replaced": ownerReadInitialJournal,
+					"cancelled":             ownerReadInput,
+					"startup-token-revoked": ownerReadInitialTokenReview, "startup-after-receipt-changed": ownerReadInitialJournal, "startup-receipt-replaced": ownerReadInitialJournal,
 				}[mode]
 				var failure *OwnerIdentityReadFailure
 				if !errors.As(e, &failure) || failure.Check() != expected {

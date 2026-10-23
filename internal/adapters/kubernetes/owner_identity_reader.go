@@ -3,6 +3,7 @@ package kubernetes
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"time"
@@ -26,6 +27,16 @@ type InstalledOwnerIdentityReader struct {
 	activation contracts.OwnerIdentityActivation
 	tokens     app.OwnerPodToken
 	podUID     string
+	reuse      *ownerIdentityReuse
+}
+
+// ownerIdentityReuse holds the last successful Verify for one exact mounted
+// bundle. Like the guard proof it is reused for at most OwnerProtectionReuse,
+// never past its token or guard bound; failures are never stored.
+type ownerIdentityReuse struct {
+	slot  chan struct{}
+	key   [32]byte
+	until time.Time
 }
 
 func NewInstalledOwnerIdentityReader(client *PermissionClient, protection *OwnerWorkloadProtection, input contracts.OwnerDeployment, activation contracts.OwnerIdentityActivation, tokens app.OwnerPodToken, podUID string) (*InstalledOwnerIdentityReader, error) {
@@ -45,7 +56,7 @@ func NewInstalledOwnerIdentityReader(client *PermissionClient, protection *Owner
 	if e != nil || json.Unmarshal(raw, &copied) != nil {
 		return nil, cfg.ErrInvalid
 	}
-	return &InstalledOwnerIdentityReader{client, protection, copied.Input, copied.Activation, tokens, podUID}, nil
+	return &InstalledOwnerIdentityReader{client, protection, copied.Input, copied.Activation, tokens, podUID, &ownerIdentityReuse{slot: make(chan struct{}, 1)}}, nil
 }
 
 func (s *InstalledOwnerIdentityReader) get(ctx context.Context, path string, out any) error {
@@ -112,8 +123,39 @@ func (s *InstalledOwnerIdentityReader) journal(ctx context.Context) (result cont
 // Verify compares the complete fixed mounted provider bundle with the immutable
 // native Secret and checks the original positive launch. Current configuration,
 // recovery, exact SQL roles and process registration remain later prerequisites.
+// One successful proof of an identical bundle is reused by every caller for at
+// most OwnerProtectionReuse (2026-10-23 revision of ADR-208); it proves the
+// hub's own installation, which the trust model already trusts.
 func (s *InstalledOwnerIdentityReader) Verify(ctx context.Context, manifest contracts.OwnerIdentityCredentialManifest, mounted map[string][]byte) (result time.Time, err error) {
-	return s.verify(ctx, manifest, mounted, nil)
+	if s == nil || ctx == nil || s.reuse == nil {
+		return time.Time{}, cfg.ErrInvalid
+	}
+	raw, e := json.Marshal(struct {
+		Manifest contracts.OwnerIdentityCredentialManifest
+		Mounted  map[string][]byte
+	}{manifest, mounted})
+	key := sha256.Sum256(raw)
+	clear(raw)
+	if e != nil {
+		return time.Time{}, cfg.ErrInvalid
+	}
+	if e = ctx.Err(); e != nil {
+		return time.Time{}, &OwnerIdentityReadFailure{check: ownerReadInput, cause: cfg.ErrInvalid}
+	}
+	select {
+	case s.reuse.slot <- struct{}{}:
+	case <-ctx.Done():
+		return time.Time{}, &OwnerIdentityReadFailure{check: ownerReadInput, cause: errors.Join(cfg.ErrUnavailable, ctx.Err())}
+	}
+	defer func() { <-s.reuse.slot }()
+	if s.reuse.key != key || !s.client.now().Add(ownerProtectionRefresh).Before(s.reuse.until) {
+		until, err := s.verify(ctx, manifest, mounted, nil)
+		if err != nil {
+			return time.Time{}, err
+		}
+		s.reuse.key, s.reuse.until = key, until
+	}
+	return callerBound(ctx, s.reuse.until), nil
 }
 
 func (s *InstalledOwnerIdentityReader) verify(ctx context.Context, manifest contracts.OwnerIdentityCredentialManifest, mounted map[string][]byte, expected *contracts.InitialRuntimeResourceState) (result time.Time, err error) {
@@ -125,15 +167,13 @@ func (s *InstalledOwnerIdentityReader) verify(ctx context.Context, manifest cont
 	started := s.client.now()
 	call, end := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer end()
-	until, _ := call.Deadline()
+	until := started.Add(OwnerProtectionReuse)
 	check = ownerReadInitialGuard
-	guard, bound, e := s.protection.Current(call)
+	_, bound, e := s.protection.reused(call)
 	if e != nil {
 		return time.Time{}, e
 	}
 	until = identity.Earlier(until, bound)
-	call, narrow := context.WithDeadline(call, until)
-	defer narrow()
 	in := s.activation.Input
 	check = ownerReadTokenRead
 	token, e := s.tokens.ReadOwnerPodToken(call)
@@ -152,8 +192,6 @@ func (s *InstalledOwnerIdentityReader) verify(ctx context.Context, manifest cont
 		return time.Time{}, errors.Join(cfg.ErrDenied, e)
 	}
 	until = identity.Earlier(until, expiry)
-	call, narrowToken := context.WithDeadline(call, until)
-	defer narrowToken()
 	check = ownerReadInitialJournal
 	before, e := s.journal(call)
 	if e != nil {
@@ -175,40 +213,10 @@ func (s *InstalledOwnerIdentityReader) verify(ctx context.Context, manifest cont
 	pool := value.OwnerPool{InstallationID: in.InstallationID, ClusterID: in.ClusterID, Namespace: in.Namespace.Name, NamespaceUID: in.Namespace.UID, Deployment: in.Deployment.Name, DeploymentUID: in.Deployment.UID, ServiceAccount: in.ServiceAccount.Name, AccountUID: in.ServiceAccount.UID}
 	reader := &OwnerEnrollmentAttester{client: s.client}
 	check = ownerReadInitialPod
-	first, e := reader.live(call, pool, value.OwnerBinding{PodUID: s.podUID}, name)
-	if e != nil {
+	if _, e = reader.live(call, pool, value.OwnerBinding{PodUID: s.podUID}, name); e != nil {
 		return time.Time{}, e
-	}
-	check = ownerReadFinalTokenReview
-	again, e := reviewBoundPodToken(call, s.client, token, OwnerEnrollmentAudience(in.InstallationID), in.Namespace.Name, in.ServiceAccount.Name, in.ServiceAccount.UID, s.podUID)
-	if e != nil || again != name {
-		return time.Time{}, errors.Join(cfg.ErrDenied, e)
-	}
-	check = ownerReadFinalPod
-	last, e := reader.live(call, pool, value.OwnerBinding{PodUID: s.podUID}, name)
-	if e != nil {
-		return time.Time{}, e
-	}
-	if first != last {
-		check = ownerReadFinalPodChanged
-		return time.Time{}, cfg.ErrChanged
-	}
-	check = ownerReadFinalDeployment
-	if e = s.deployment(call, before); e != nil {
-		return time.Time{}, e
-	}
-	check = ownerReadFinalJournal
-	after, e := s.journal(call)
-	if e != nil || !equalJSON(before, after) {
-		return time.Time{}, errors.Join(cfg.ErrChanged, e)
-	}
-	check = ownerReadFinalGuard
-	lastGuard, lastBound, e := s.protection.Current(call)
-	if e != nil || guard != lastGuard {
-		return time.Time{}, errors.Join(cfg.ErrUnavailable, e)
 	}
 	check = ownerReadFinalDeadline
-	until = identity.Earlier(until, lastBound)
 	if e = initialHandoverDeadline(call, s.client.now, until); e != nil {
 		return time.Time{}, e
 	}

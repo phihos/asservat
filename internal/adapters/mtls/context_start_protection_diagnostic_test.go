@@ -20,8 +20,9 @@ func (contextProtectionDiagnosticError) FixedStep() string {
 }
 
 // This composes the successful attachment check and the separate work-send
-// check over actual TLS/H2. The fourth protection read of the latter is the
-// closing local authenticator's protection-after boundary seen in native44.
+// check over actual TLS/H2. The first armed protection read is the latter's
+// single local authenticator boundary (the closing re-read seen in native44
+// was removed in the 2026-10-23 reuse revision).
 // Synthetic proof failures do not qualify native Kubernetes performance.
 func TestContextStartActualHTTP2DispatchProtectionDiagnostic(t *testing.T) {
 	for _, mode := range []string{"native-error", "cancellation"} {
@@ -44,7 +45,7 @@ func TestContextStartActualHTTP2DispatchProtectionDiagnostic(t *testing.T) {
 			unblock := func() { releaseOnce.Do(func() { close(release) }) }
 			var proofDeadline time.Time
 			hubOwners.Protection = forwardGuard(func(ctx context.Context, pool value.OwnerPool) (value.OwnerProtection, error) {
-				if !armed.Load() || guards.Add(1) != 4 {
+				if !armed.Load() || guards.Add(1) != 1 {
 					return original.ReadOwnerProtection(ctx, pool)
 				}
 				proofDeadline, _ = ctx.Deadline()
@@ -125,15 +126,15 @@ func TestContextStartActualHTTP2DispatchProtectionDiagnostic(t *testing.T) {
 			attachment.Close()
 			<-joined
 			<-regionalDone
-			if ran.Load() || regional.prepared || regional.captures != 0 || guards.Load() != 4 || f.dials.Load() != 1 {
+			if ran.Load() || regional.prepared || regional.captures != 0 || guards.Load() != 1 || f.dials.Load() != 1 {
 				t.Fatal("refusal changed check count, replayed, or reached an execution effect")
 			}
 			if proofDeadline.IsZero() || proofDeadline.After(parentUntil) {
 				t.Fatal("closing proof escaped the inherited deadline", proofDeadline, parentUntil)
 			}
-			want := "final-local/protection-after/read/protection.guard-last/source.guard-policy-read@"
+			want := "local/protection-before/read/protection.guard-last/source.guard-policy-read@"
 			if mode == "cancellation" {
-				want = "final-local/protection-after/read/canceled@"
+				want = "local/protection-before/read/canceled@"
 			}
 			mu.Lock()
 			defer mu.Unlock()
