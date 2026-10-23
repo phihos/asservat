@@ -1,5 +1,26 @@
 # Sustained implementation progress
 
+## Shared frame checks for approved projection conversations (2026-10-23)
+
+Installed native85 read the evidence in the worker in under a second
+(`native read: unwrap-1..3@<100ms object-decrypt@<100ms parse@<100ms
+frames@<250ms, stopped at acknowledge`), but the hub held the command frame
+for more than three seconds and then refused at `serve/command`: the hub
+stream ran a complete current check (owner serving authentication, worker
+enrollment/certificate, operation) before and again after every frame, and
+the refusal after the command write discarded the gate's cause. A projection
+conversation's frame checks now share one successful complete check for
+`NativeRecheckInterval` (one second, the maintainer-authorized relaxed
+cadence); revocation is seen at the first frame check after it, and
+admission, consumption, acknowledgement and completion checks stay complete.
+Downloads keep a complete check at every frame (an earlier gate-wide reuse
+again broke their admission/terminal contracts and was not kept). Frame
+refusals now carry their stage and the gate's cause
+(`serve/command/gate-after/check/...`, `.../read`, `.../write`).
+`TestNativeApprovedProjectionSharesFrameChecksWithinInterval` (real TLS/h2,
+250 ms per complete check) completes with 8 complete checks in 1.5 s; without
+sharing it made 15 in 3.3 s. Installed qualification has not rerun.
+
 ## Identity key snapshot cut the read; hub refusal stages (2026-10-23)
 
 Installed native84 refused the projection worker at

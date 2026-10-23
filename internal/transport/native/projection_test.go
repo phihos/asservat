@@ -105,7 +105,12 @@ func (a projectionProtocolAdmission) OpenNative(ctx context.Context, peer *tls.C
 
 func (f projectionProtocolFixture) operation(t *testing.T, complete evidence.NativeCompletion) (*native.HubOperation, *mtls.NativeClient) {
 	t.Helper()
-	gate, err := evidence.NewNativeFrameGate(f.ctx, func(context.Context) (value.NativeLease, error) { return f.lease, nil }, time.Now)
+	return f.operationChecked(t, complete, func(context.Context) (value.NativeLease, error) { return f.lease, nil })
+}
+
+func (f projectionProtocolFixture) operationChecked(t *testing.T, complete evidence.NativeCompletion, check evidence.NativeCurrentCheck) (*native.HubOperation, *mtls.NativeClient) {
+	t.Helper()
+	gate, err := evidence.NewNativeFrameGate(f.ctx, check, time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -381,5 +386,41 @@ func TestNativeApprovedProjectionBatchCannotBeReadAgain(t *testing.T) {
 				t.Fatal("reconnected batch repeated source/key work", reader.calls.Load())
 			}
 		})
+	}
+}
+
+// Installed native85: each complete hub check (owner serving, worker
+// enrollment, operation) costs a few hundred milliseconds, and the hub ran two
+// around every frame, so the projection read took more than three seconds
+// before its first acknowledgement. Frame checks of one approved projection
+// conversation now share a complete check for NativeRecheckInterval.
+func TestNativeApprovedProjectionSharesFrameChecksWithinInterval(t *testing.T) {
+	f := newProjectionProtocolFixture(t)
+	result := f.result(t, f.reader())
+	var checks atomic.Int32
+	op, client := f.operationChecked(t, func(ctx context.Context, _ value.NativeLease) error { return ctx.Err() }, func(ctx context.Context) (value.NativeLease, error) {
+		checks.Add(1)
+		select {
+		case <-time.After(250 * time.Millisecond): // one installed complete check
+		case <-ctx.Done():
+			return value.NativeLease{}, ctx.Err()
+		}
+		return f.lease, nil
+	})
+	started := time.Now()
+	done, _ := f.run(t, client, result, f.target, artifact.Digest{1})
+	if _, err := op.Projection(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := op.AcknowledgeProjection(f.ctx); err != nil {
+		t.Fatal(err)
+	}
+	out := projectionProtocolReceive(t, f.ctx, done)
+	t.Logf("complete checks=%d elapsed=%s", checks.Load(), time.Since(started))
+	// Gate creation, both admissions, the handler's attachment check, the
+	// consumption, acknowledgement and completion checks stay complete (7);
+	// all frame checks share one. Without sharing this run made 15.
+	if out.err != nil || out.state.State != contracts.NativeJoined || checks.Load() > 8 {
+		t.Fatal("frame checks were not shared within the recheck interval", out.err, checks.Load())
 	}
 }

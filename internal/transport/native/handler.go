@@ -205,6 +205,8 @@ type serverStream struct {
 	reads, writes, readFrames, writeFrames int
 	closed, interrupted, doneClosed        bool
 	done                                   chan struct{}
+	checked                                value.NativeLease
+	checkedAt                              time.Time
 }
 
 func newServerStream(r *http.Request, w http.ResponseWriter, gate *evidence.NativeFrameGate) *serverStream {
@@ -215,6 +217,29 @@ func newServerStream(r *http.Request, w http.ResponseWriter, gate *evidence.Nati
 	return s
 }
 func (s *serverStream) Context() context.Context { return s.ctx }
+
+// frameCheck is the per-frame current check. An approved projection
+// conversation shares one successful complete check across its frame checks
+// for evidence.NativeRecheckInterval (installed native85: two complete
+// worker/hub/operation checks around every frame cost the read more than
+// three seconds). Revocation is seen at the first frame check after that
+// interval; admission, consumption and terminal checks remain complete.
+// Downloads keep a complete check at every frame.
+func (s *serverStream) frameCheck(ctx context.Context) (value.NativeLease, error) {
+	s.mu.Lock()
+	l, at := s.checked, s.checkedAt
+	s.mu.Unlock()
+	if now := time.Now(); !at.IsZero() && l.Operation.Kind == value.NativeProjection && !now.Before(at) && now.Sub(at) < evidence.NativeRecheckInterval && now.Before(l.Until) && s.gate.Context().Err() == nil && ctx.Err() == nil {
+		return l, nil
+	}
+	l, err := s.gate.Check(ctx)
+	if err == nil {
+		s.mu.Lock()
+		s.checked, s.checkedAt = l, time.Now()
+		s.mu.Unlock()
+	}
+	return l, err
+}
 func (s *serverStream) finishLocked() {
 	if s.closed && s.interrupted && s.reads == 0 && s.writes == 0 && !s.doneClosed {
 		s.doneClosed = true
@@ -244,14 +269,14 @@ func (s *serverStream) begin(ctx context.Context, read, terminal bool) (context.
 	if ctx == nil || ctx.Err() != nil {
 		return nil, nil, contracts.ErrNativeProtocol
 	}
-	check := s.gate.Check
+	check := s.frameCheck
 	if terminal {
 		check = s.gate.TerminalLease
 	}
 	lease, err := check(ctx)
 	if err != nil {
 		s.interrupt()
-		return nil, nil, contracts.ErrNativeProtocol
+		return nil, nil, frameRefusal("gate", err)
 	}
 	s.mu.Lock()
 	if s.closed || s.ctx.Err() != nil || read && (s.reads != 0 || s.readFrames >= contracts.NativeMaximumFrames) || !read && (s.writes != 0 || s.writeFrames >= contracts.NativeMaximumFrames) {
@@ -302,13 +327,15 @@ func (s *serverStream) Receive(ctx context.Context) (contracts.NativeFrame, erro
 	}
 	defer end()
 	f, err := contracts.ReadNativeFrame(s.r.Body)
+	stage := "read"
 	if err == nil {
-		_, err = s.gate.Check(call)
+		stage = "gate-after"
+		_, err = s.frameCheck(call)
 	}
 	if err != nil || call.Err() != nil || s.ctx.Err() != nil {
 		clear(f.Payload)
 		s.interrupt()
-		return contracts.NativeFrame{}, contracts.ErrNativeProtocol
+		return contracts.NativeFrame{}, frameRefusal(stage, err)
 	}
 	return f, nil
 }
@@ -369,13 +396,35 @@ func (s *serverStream) send(ctx context.Context, f contracts.NativeFrame, termin
 		}
 		return nil
 	}
+	stage := "write"
 	if err == nil {
-		_, err = s.gate.Check(call)
+		stage = "gate-after"
+		_, err = s.frameCheck(call)
 	}
 	deadline, bounded := call.Deadline()
 	if err != nil || !bounded || !time.Now().Before(deadline) || call.Err() != nil || s.ctx.Err() != nil || s.gate.Context().Err() != nil {
 		s.interrupt()
-		return contracts.ErrNativeProtocol
+		return frameRefusal(stage, err)
 	}
 	return nil
+}
+
+// frameRefusal keeps the protocol refusal and names the frame stage with the
+// gate's own closed stage, if any, for the operator report only.
+func frameRefusal(stage string, cause error) error {
+	return step(stage, &causeLabel{contracts.ErrNativeProtocol, cause})
+}
+
+// causeLabel unwraps only to its returned error; the cause contributes its
+// closed FixedStep label and nothing else.
+type causeLabel struct{ err, cause error }
+
+func (e *causeLabel) Error() string { return e.err.Error() }
+func (e *causeLabel) Unwrap() error { return e.err }
+func (e *causeLabel) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if e.cause != nil && errors.As(e.cause, &inner) {
+		return inner.FixedStep()
+	}
+	return "refused"
 }
