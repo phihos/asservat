@@ -227,18 +227,18 @@ func newServerStream(r *http.Request, w http.ResponseWriter, gate *evidence.Nati
 }
 func (s *serverStream) Context() context.Context { return s.ctx }
 
-// frameCheck is the per-frame current check. An approved projection
-// conversation shares one successful complete check across its frame checks
-// for evidence.NativeRecheckInterval (installed native85: two complete
+// frameCheck is the per-frame current check. A native conversation shares
+// one successful complete check across its frame checks for
+// evidence.NativeRecheckInterval (installed native85: two complete
 // worker/hub/operation checks around every frame cost the read more than
-// three seconds). Revocation is seen at the first frame check after that
-// interval; admission, consumption and terminal checks remain complete.
-// Downloads keep a complete check at every frame.
+// three seconds; native89 the same for a download). Revocation is seen at the
+// first frame check after that interval; admission, consumption,
+// acknowledgement and completion checks remain complete.
 func (s *serverStream) frameCheck(ctx context.Context) (value.NativeLease, error) {
 	s.mu.Lock()
 	l, at := s.checked, s.checkedAt
 	s.mu.Unlock()
-	if now := time.Now(); !at.IsZero() && l.Operation.Kind == value.NativeProjection && !now.Before(at) && now.Sub(at) < evidence.NativeRecheckInterval && now.Before(l.Until) && s.gate.Context().Err() == nil && ctx.Err() == nil {
+	if now := time.Now(); !at.IsZero() && !now.Before(at) && now.Sub(at) < evidence.NativeRecheckInterval && now.Before(l.Until) && s.gate.Context().Err() == nil && ctx.Err() == nil {
 		return l, nil
 	}
 	l, err := s.gate.Check(ctx)
@@ -415,7 +415,12 @@ func (s *serverStream) send(ctx context.Context, f contracts.NativeFrame, termin
 	stage := "write"
 	if err == nil {
 		stage = "gate-after"
-		_, err = s.frameCheck(call)
+		// A written evidence data frame keeps its own complete check.
+		if f.Kind == contracts.NativeDataFrame {
+			_, err = s.gate.Check(call)
+		} else {
+			_, err = s.frameCheck(call)
+		}
 	}
 	deadline, bounded := call.Deadline()
 	if err != nil || !bounded || !time.Now().Before(deadline) || call.Err() != nil || s.ctx.Err() != nil || s.gate.Context().Err() != nil {

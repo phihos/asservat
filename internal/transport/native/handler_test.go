@@ -155,6 +155,9 @@ func TestNativeHandlerActualDuplexAndCurrentRevocation(t *testing.T) {
 				}
 				if mode == "revoked" {
 					a.deny.Store(true)
+					// Frame checks share one complete check for the recheck
+					// interval; the revocation is seen at the next one after it.
+					time.Sleep(evidence.NativeRecheckInterval)
 				}
 				e = s.Send(ctx, contracts.NativeFrame{Kind: contracts.NativeAcknowledgeFrame, Payload: []byte(`{"bytes":4}`)})
 				if e == nil {

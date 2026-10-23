@@ -3,6 +3,7 @@ package mtls
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -94,5 +95,65 @@ func TestNativeHubPlacementRequiresActualCurrentServingIdentity(t *testing.T) {
 				t.Fatal("wrong or expired processor accepted", mode, until)
 			}
 		})
+	}
+}
+
+// Installed native89: every frame of a download conversation re-read the
+// hub's own Kubernetes route through CheckNativeHub and one read failed under
+// load. The hub's own serving observation is reused process-wide for up to
+// OwnerServingReuse, renewed on demand when less than one evidence-read window
+// remains; a failed renewal keeps the still-current observation, a failure is
+// never stored, and each caller keeps a five-second serving window.
+func TestOwnerServingObservationReusedRenewedAndNeverStoresFailure(t *testing.T) {
+	server, fixture := newOwnerCredentialFixture(t, "server")
+	if err := server.Enroll(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := server.Certificate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	original, err := fixture.ReadOwnerRegistration(context.Background(), certificate)
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := fixture.now()
+	p := original.Configuration.Configuration.Pool
+	var routeReads atomic.Int32
+	var routeDown atomic.Bool
+	routes := forwardRoutes(func(_ context.Context, b fleet.OwnerBinding) (fleet.OwnerRoute, error) {
+		routeReads.Add(1)
+		if routeDown.Load() {
+			return fleet.OwnerRoute{}, errors.New("synthetic endpoints read failure")
+		}
+		now := fixture.now()
+		cfg := fleet.OwnerConfigurationObservation{Configuration: original.Configuration.Configuration.Clone(), ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+		return fleet.OwnerRoute{Configuration: cfg, Endpoint: fleet.OwnerEndpoint{Binding: b, Pool: p, Pod: original.Enrollment.Pod, ReplicaSetUID: original.Enrollment.ReplicaSetUID, Addresses: []string{"10.0.0.8"}, ObservedAt: now, FreshUntil: cfg.FreshUntil}, ObservedAt: now, FreshUntil: cfg.FreshUntil}, nil
+	})
+	guard := forwardGuard(func(_ context.Context, p fleet.OwnerPool) (fleet.OwnerProtection, error) {
+		now := fixture.now()
+		return fleet.OwnerProtection{Pool: p, Digest: artifact.Digest{4}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
+	})
+	peers := OwnerRequestPeers{Server: server, Authenticator: &app.OwnerAuthenticator{Registry: fixture, Routes: routes, Protection: guard, Now: fixture.now}}
+	check := func() (time.Time, error) { return peers.CheckOwnerServing(context.Background()) }
+	if until, err := check(); err != nil || until.After(fixture.now().Add(5*time.Second)) || routeReads.Load() != 1 {
+		t.Fatal("first serving observation", err, routeReads.Load())
+	}
+	fixture.clock.Store(n.Add(9 * time.Second).UnixNano())
+	if _, err := check(); err != nil || routeReads.Load() != 1 {
+		t.Fatal("own serving observation re-read within its reuse", err, routeReads.Load())
+	}
+	fixture.clock.Store(n.Add(11 * time.Second).UnixNano()) // less than one window left
+	routeDown.Store(true)
+	if _, err := check(); err != nil || routeReads.Load() != 2 {
+		t.Fatal("failed early renewal dropped the still-current observation", err, routeReads.Load())
+	}
+	fixture.clock.Store(n.Add(31 * time.Second).UnixNano())
+	if _, err := check(); err == nil {
+		t.Fatal("expired serving observation reused")
+	}
+	routeDown.Store(false)
+	if _, err := check(); err != nil {
+		t.Fatal("a failed observation was stored", err)
 	}
 }

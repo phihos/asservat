@@ -1,5 +1,32 @@
 # Sustained implementation progress
 
+## Hub serving observation reuse and download frame-check sharing (2026-10-23)
+
+Installed native89 passed the approved inspection end to end, then failed the
+native download at
+`serve/result/gate-after/check/hub/serving/route-read/endpoints/read/other`:
+download conversations still ran a complete check at every frame, and each
+`CheckNativeHub` re-authenticated the hub's own serving identity, re-reading
+its Kubernetes Endpoints; one read failed under load. By maintainer decision
+(relaxed cadence, like the hub's self-protection proof): the hub's own
+serving observation (`OwnerRequestPeers`, process-wide per authenticator and
+serving credentials) is reused for up to `OwnerServingReuse` (30 s), renewed
+on demand when less than one evidence-read window remains; a failed renewal
+keeps the still-current observation, failures are never stored, the current
+serving certificate must still match, and every caller still gets at most a
+five-second serving bound. Remote peers are still authenticated per request.
+Download native conversations now share frame checks for
+`NativeRecheckInterval` like projections; a written evidence data frame keeps
+its own complete post-write check, and admission, consumption,
+acknowledgement and completion checks stay complete. Tests:
+`TestOwnerServingObservationReusedRenewedAndNeverStoresFailure`,
+`TestNativeDownloadPreparationSharesFrameChecksWithinInterval` (250 ms
+complete checks: without sharing the preparation outlived its 4 s
+operation), the handler revocation test now revokes after the recheck
+interval. Real-SQL `TestSharedProjectionLifecycleWithRealServices` and
+`TestContextAdmissionWithRealServices/download-worker-installed-original-authority`
+pass. Installed qualification has not rerun.
+
 ## Final close through the peer gate (2026-10-23)
 
 Installed native88 completed the approved read in the worker (all three key

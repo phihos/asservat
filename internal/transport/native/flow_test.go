@@ -326,3 +326,48 @@ func TestNativeTwoHopPreparationObservationAndFinalHTTPSink(t *testing.T) {
 		t.Fatal("incorrect preparation/content reads")
 	}
 }
+
+// Installed native89: a download preparation conversation ran a complete
+// current check (owner serving route, worker, operation) around every frame
+// and failed one under load. Its frame checks now share one complete check for
+// NativeRecheckInterval like an approved projection's.
+func TestNativeDownloadPreparationSharesFrameChecksWithinInterval(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	source := flowSourceValue(t)
+	now := time.Now()
+	target := value.WorkerCredentialTarget{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, PodUID: nativeID, CreatedAt: now, RunUntil: now.Add(time.Minute)}
+	result, e := evidence.NewRegionalContextResult(ctx, target, &flowSource{}, time.Now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer func() { result.Close(); result.Wait(context.Background()) }()
+	var checks atomic.Int32
+	prep, client, _ := flowOperationWithConnector(t, ctx, source, value.NativePrepare, 1, artifact.DownloadDeliveryLease{}, func(a *flowAdmission) native.Admission {
+		a.check = func(c context.Context) (value.NativeLease, error) {
+			checks.Add(1)
+			select {
+			case <-time.After(250 * time.Millisecond): // one installed complete check
+			case <-c.Done():
+				return value.NativeLease{}, c.Err()
+			}
+			return a.lease, nil
+		}
+		return a
+	})
+	started := time.Now()
+	done := flowRunWorker(t, ctx, client, target, result)
+	if _, e = prep.Prepared(ctx); e != nil {
+		t.Fatal(e)
+	}
+	if e = prep.Commit(ctx); e != nil {
+		t.Fatal(e)
+	}
+	if e = <-done; e != nil {
+		t.Fatal("preparation did not complete", e)
+	}
+	// With a complete check at every frame this preparation outlived its
+	// four-second operation; with shared frame checks it completes (13
+	// complete checks here, most in the connector relay's own path).
+	t.Logf("connector complete checks=%d elapsed=%s", checks.Load(), time.Since(started))
+}
