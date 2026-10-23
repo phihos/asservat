@@ -35,12 +35,16 @@ type acquisitionEnrollmentFlow interface {
 	activate(context.Context, value.AcquisitionWorkerProof, value.AcquisitionCertificateAttempt) (value.WorkerCertificate, error)
 }
 
-func enrollAcquisition(ctx context.Context, flow acquisitionEnrollmentFlow, csr []byte, key artifact.Digest, now func() time.Time) (value.WorkerCertificate, error) {
+// Each refusal is labelled with the closed stage it occurred in (ADR-197).
+func enrollAcquisition(ctx context.Context, flow acquisitionEnrollmentFlow, csr []byte, key artifact.Digest, now func() time.Time) (_ value.WorkerCertificate, err error) {
 	var zero value.WorkerCertificate
+	stage := "current"
+	defer func() { err = stepped(stage, err) }()
 	p, err := flow.current(ctx)
 	if err != nil {
 		return zero, err
 	}
+	stage = "claim"
 	e, receipt, acknowledged, err := flow.claim(ctx, p)
 	if err != nil {
 		return zero, err
@@ -48,6 +52,7 @@ func enrollAcquisition(ctx context.Context, flow acquisitionEnrollmentFlow, csr 
 	if !e.Valid() || e.Worker != p.Worker || e.PublicKeyDigest != key {
 		return zero, artifact.ErrIntegrity
 	}
+	stage = "enrollment-audit"
 	if !acknowledged {
 		if _, err = flow.current(ctx); err != nil {
 			return zero, err
@@ -62,6 +67,7 @@ func enrollAcquisition(ctx context.Context, flow acquisitionEnrollmentFlow, csr 
 		if _, err = flow.current(ctx); err != nil {
 			return zero, err
 		}
+		stage = "enrollment-ack"
 		if err = flow.acknowledgeEnrollment(ctx, e, receipt); err != nil {
 			return zero, err
 		}
@@ -72,6 +78,7 @@ func enrollAcquisition(ctx context.Context, flow acquisitionEnrollmentFlow, csr 
 	if err != nil {
 		return zero, err
 	}
+	stage = "prepare"
 	progress, err := flow.prepare(ctx, p)
 	if err != nil {
 		return zero, err
@@ -87,29 +94,34 @@ func enrollAcquisition(ctx context.Context, flow acquisitionEnrollmentFlow, csr 
 		if progress.Signed != nil || !attempt.Valid(now()) {
 			return zero, artifact.ErrDownloadExpired
 		}
+		stage = "sign"
 		signing, cancel := context.WithDeadline(ctx, attempt.SignBefore)
 		c, err := flow.sign(signing, attempt, csr)
 		cancel()
 		if err != nil {
 			return zero, err
 		}
+		stage = "certificate-check"
 		if !attempt.Valid(now()) || !attempt.Matches(c) || artifact.Digest(sha256.Sum256(c.DER)) != c.Peer.Certificate {
 			return zero, artifact.ErrIntegrity
 		}
 		if _, err = flow.current(ctx); err != nil {
 			return zero, err
 		}
+		stage = "store"
 		if err = flow.store(ctx, attempt, c); err != nil {
 			return zero, err
 		}
 		progress.Signed = &c
 	}
+	stage = "signed"
 	if progress.Signed == nil {
 		return zero, artifact.ErrDownloadUnavailable
 	}
 	if !attempt.Matches(*progress.Signed) || artifact.Digest(sha256.Sum256(progress.Signed.DER)) != progress.Signed.Peer.Certificate {
 		return zero, artifact.ErrIntegrity
 	}
+	stage = "certificate-receipt"
 	r, ok, err := flow.readCertificateReceipt(ctx, attempt, *progress.Signed)
 	if err != nil {
 		return zero, err
@@ -118,6 +130,7 @@ func enrollAcquisition(ctx context.Context, flow acquisitionEnrollmentFlow, csr 
 		if _, err = flow.current(ctx); err != nil {
 			return zero, err
 		}
+		stage = "certificate-audit"
 		r, err = flow.writeCertificate(ctx, attempt, *progress.Signed)
 		if err != nil {
 			return zero, err
@@ -128,6 +141,7 @@ func enrollAcquisition(ctx context.Context, flow acquisitionEnrollmentFlow, csr 
 		if _, err = flow.current(ctx); err != nil {
 			return zero, err
 		}
+		stage = "certificate-ack"
 		if err = flow.acknowledgeCertificate(ctx, attempt, *progress.Signed, r); err != nil {
 			return zero, err
 		}
@@ -138,10 +152,12 @@ func enrollAcquisition(ctx context.Context, flow acquisitionEnrollmentFlow, csr 
 	if err != nil {
 		return zero, err
 	}
+	stage = "activate"
 	c, err := flow.activate(ctx, p, attempt)
 	if err != nil {
 		return zero, err
 	}
+	stage = "final"
 	if !attempt.Matches(c) || c.Peer != progress.Signed.Peer || artifact.Digest(sha256.Sum256(c.DER)) != c.Peer.Certificate || !p.Valid(now()) || !c.Peer.Valid(now()) || ctx.Err() != nil {
 		return zero, artifact.ErrIntegrity
 	}

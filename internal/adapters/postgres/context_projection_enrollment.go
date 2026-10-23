@@ -245,8 +245,8 @@ func (s *ProjectionEnrollments) StoreAcquisitionCertificate(ctx context.Context,
 		if e != nil {
 			return e
 		}
-		frozen, e := decodeAcquisitionCertificateAttempt(r)
-		if e != nil || frozen != a {
+		_, e = decodeAcquisitionCertificateAttempt(r)
+		if e != nil || !storedAttempt(r.AttemptJson, a) {
 			return artifact.ErrIntegrity
 		}
 		if r.CertificateJson != nil {
@@ -290,8 +290,8 @@ func (s *ProjectionEnrollments) ActivateAcquisitionCertificate(ctx context.Conte
 		if e != nil {
 			return e
 		}
-		frozen, e := decodeAcquisitionCertificateAttempt(r)
-		if e != nil || frozen != a {
+		_, e = decodeAcquisitionCertificateAttempt(r)
+		if e != nil || !storedAttempt(r.AttemptJson, a) {
 			return artifact.ErrIntegrity
 		}
 		out, e = decodeAcquisitionCertificate(r, a)
@@ -387,7 +387,7 @@ func (s *ProjectionEnrollments) certificateAuditRow(ctx context.Context, q *cust
 		return r, e
 	}
 	a, e := decodeAcquisitionCertificateAttempt(r)
-	if e != nil || a != c.Attempt {
+	if e != nil || !storedAttempt(r.AttemptJson, c.Attempt) {
 		return r, artifact.ErrIntegrity
 	}
 	issued, e := decodeAcquisitionCertificate(r, a)

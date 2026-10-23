@@ -64,3 +64,14 @@ func downloadRefusalClass(err error) string {
 	}
 	return regionalCause(err)
 }
+
+// DownloadWorkerDiagnostic is the worker executable's stop message: its fixed
+// startup step and closed error class only (no secrets or dependency text).
+func DownloadWorkerDiagnostic(err error) string {
+	step := "startup"
+	var inner interface{ FixedStep() string }
+	if errors.As(err, &inner) {
+		step = inner.FixedStep()
+	}
+	return "service stopped at " + step + " (" + downloadRefusalClass(err) + "): protected configuration, credentials or original deadline unavailable"
+}

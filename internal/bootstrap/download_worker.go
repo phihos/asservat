@@ -115,38 +115,38 @@ func waitWorker(ctx context.Context, d time.Duration) error {
 func RunDownloadWorker(ctx context.Context, args []string, podUID string, status io.Writer) error {
 	input, err := ParseWorkerStartup(args, podUID)
 	if err != nil || ctx == nil || status == nil {
-		return artifact.ErrInvalid
+		return &fixedStepError{"arguments", artifact.ErrInvalid}
 	}
 	if err = disableWorkerCoreDumps(); err != nil {
-		return artifact.ErrDownloadUnavailable
+		return &fixedStepError{"core-dumps", artifact.ErrDownloadUnavailable}
 	}
 	root, err := os.OpenRoot(filepath.Dir(contracts.WorkerControlPath))
 	if err != nil {
-		return artifact.ErrDownloadUnavailable
+		return &fixedStepError{"control-open", artifact.ErrDownloadUnavailable}
 	}
 	defer root.Close()
 	raw, err := mounts.Read(ctx, root, filepath.Base(contracts.WorkerControlPath), contracts.WorkerControlMaxBytes)
 	if err != nil {
-		return artifact.ErrDownloadUnavailable
+		return &fixedStepError{"control-read", artifact.ErrDownloadUnavailable}
 	}
 	trust, err := LoadWorkerTrust(input, raw, time.Now())
 	if err != nil {
-		return err
+		return &fixedStepError{"control-trust", err}
 	}
 	server, issuer, err := trust.Roots(time.Now())
 	if err != nil {
-		return err
+		return &fixedStepError{"trust-roots", err}
 	}
 	var nativeCredentials contracts.WorkerStoreCredentials
 	if trust.Native() != nil {
 		nativeCredentials, err = loadWorkerNativeCredentials(ctx, input.Target.RunUntil)
 		if err != nil {
-			return err
+			return &fixedStepError{"store-credentials", err}
 		}
 	}
 	client, err := mtls.NewWorkerCredentialsVia(trust.Endpoint, trust.Address, input.Target, server, issuer, mtls.NewProjectedWorkerToken(), time.Now)
 	if err != nil {
-		return err
+		return &fixedStepError{"credential-client", err}
 	}
 	ready := make(chan value.KeyPeer, 1)
 	statusCtx, stopStatus := context.WithCancel(ctx)
@@ -157,16 +157,25 @@ func RunDownloadWorker(ctx context.Context, args []string, podUID string, status
 	if native := trust.Native(); native != nil {
 		report := make(chan value.KeyPeer, 1)
 		go reportWorkerMessage(statusCtx, report, status, "worker credentials established\n")
-		return runWorkerNativePair(ctx, ready, supervisor.Run, func(work context.Context) error {
+		return runWorkerNativePair(ctx, ready, func(c context.Context) error { return workerStep("credentials", supervisor.Run(c)) }, func(work context.Context) error {
 			select {
 			case report <- value.KeyPeer{}:
 			default:
 			}
-			return runWorkerNative(work, input, native, client, nativeCredentials)
+			return workerStep("native", runWorkerNative(work, input, native, client, nativeCredentials))
 		})
 	}
 	go reportWorkerStatus(statusCtx, ready, status)
-	return supervisor.Run(ctx)
+	return workerStep("credentials", supervisor.Run(ctx))
+}
+
+// workerStep labels a worker phase's stop for the operator report; nil stays
+// nil, so the native pair still sees an early credential return.
+func workerStep(step string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return &fixedStepError{step, err}
 }
 
 func reportWorkerStatus(ctx context.Context, ready <-chan value.KeyPeer, status io.Writer) {

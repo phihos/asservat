@@ -72,6 +72,7 @@ func (r *OwnerRuntime) ServeAcquisitionWorkers(roots native.ClientRoots, exchang
 	if err != nil {
 		return err
 	}
+	enrollment.Refused = downloadRefusalReport(eventLog(os.Stderr, "worker enrollment refused"), time.Now)
 	admission, err := native.NewHubWorkerAdmission(r.native.peers, r.native.hub, r.native.router, time.Now)
 	if err != nil {
 		return err

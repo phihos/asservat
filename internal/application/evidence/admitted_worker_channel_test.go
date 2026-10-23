@@ -2,9 +2,11 @@ package evidence
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 )
 
@@ -137,5 +139,31 @@ func TestAdmittedEnrollmentJoinsOriginalCancellation(t *testing.T) {
 				t.Fatal("original shorter HTTP lifetime changed", f.deadlines[phase])
 			}
 		})
+	}
+}
+
+type refusedStoreLedger struct{ WorkerEnrollmentLedger }
+
+func (refusedStoreLedger) StoreWorkerCertificate(context.Context, value.WorkerCertificateAttempt, value.WorkerCertificate) error {
+	return artifact.ErrIntegrity
+}
+
+// Installed native72 refused after signing with no hub report. The refusal
+// now names its closed stage path and keeps the returned error class.
+func TestAdmittedEnrollmentNamesRefusingStage(t *testing.T) {
+	f, s := admittedChannelFixture(t)
+	s.Download.Ledger = refusedStoreLedger{s.Download.Ledger}
+	d, err := s.BeginAcquisitionEnrollment(context.Background(), s.InstallationID, f.w.Intent.Acquisition().Parent, f.w.Intent.ID, []byte("pod-token"), []byte("same-process-csr"))
+	var fixed interface{ FixedStep() string }
+	if d != nil || !errors.Is(err, artifact.ErrIntegrity) || !errors.As(err, &fixed) || fixed.FixedStep() != "enroll/store" {
+		t.Fatal("refusal did not name the store stage", err)
+	}
+	s.Bindings = admittedBindingsFunc(func(context.Context, value.AcquisitionParent, string) (value.AcquisitionWorkerIdentity, error) {
+		return value.AcquisitionWorkerIdentity{}, ErrDownloadBindingStale
+	})
+	_, err = s.BeginAcquisitionEnrollment(context.Background(), s.InstallationID, f.w.Intent.Acquisition().Parent, f.w.Intent.ID, []byte("pod-token"), []byte("same-process-csr"))
+	var cause interface{ StepCause() error }
+	if !errors.Is(err, artifact.ErrDownloadUnavailable) || !errors.As(err, &fixed) || fixed.FixedStep() != "identity" || !errors.As(err, &cause) || !errors.Is(cause.StepCause(), ErrDownloadBindingStale) {
+		t.Fatal("identity refusal lost its stage or cause", err)
 	}
 }

@@ -109,6 +109,16 @@ func (s *WorkerEnrollments) ClaimWorkerEnrollment(ctx context.Context, p value.W
 	}
 	return out, receipt, ack, nil
 }
+
+// storedAttempt reports whether a certificate attempt is the one frozen in its
+// row. The row holds exactly json.Marshal(attempt) from preparation, so compare
+// those bytes: Go == on a decoded copy also compares each time.Time's
+// monotonic reading and location, which the hub's own attempt carries and the
+// row cannot (installed native72 refused every signed certificate).
+func storedAttempt(stored []byte, a any) bool {
+	b, err := json.Marshal(a)
+	return err == nil && bytes.Equal(stored, b)
+}
 func decodeWorkerCertificateAttempt(r custodydb.DownloadWorkerCertificate) (value.WorkerCertificateAttempt, error) {
 	var a value.WorkerCertificateAttempt
 	if json.Unmarshal(r.AttemptJson, &a) != nil || !a.Valid(a.CheckedAt) || a.ID != uid(r.ID) || a.Enrollment.Worker.Intent.ID != uid(r.WorkerID) || int(r.Epoch) != a.Epoch || int(r.Ordinal) != a.Ordinal {
@@ -218,8 +228,8 @@ func (s *WorkerEnrollments) StoreWorkerCertificate(ctx context.Context, a value.
 		if e != nil {
 			return e
 		}
-		frozen, e := decodeWorkerCertificateAttempt(r)
-		if e != nil || frozen != a {
+		_, e = decodeWorkerCertificateAttempt(r)
+		if e != nil || !storedAttempt(r.AttemptJson, a) {
 			return artifact.ErrIntegrity
 		}
 		if r.CertificateJson != nil {
@@ -260,8 +270,8 @@ func (s *WorkerEnrollments) ActivateWorkerCertificate(ctx context.Context, p val
 		if e != nil {
 			return e
 		}
-		frozen, e := decodeWorkerCertificateAttempt(r)
-		if e != nil || frozen != a {
+		_, e = decodeWorkerCertificateAttempt(r)
+		if e != nil || !storedAttempt(r.AttemptJson, a) {
 			return artifact.ErrIntegrity
 		}
 		out, e = decodeWorkerCertificate(r, a)
@@ -353,7 +363,7 @@ func (s *WorkerEnrollments) certificateAuditRow(ctx context.Context, q *custodyd
 		return r, e
 	}
 	a, e := decodeWorkerCertificateAttempt(r)
-	if e != nil || a != c.Attempt {
+	if e != nil || !storedAttempt(r.AttemptJson, c.Attempt) {
 		return r, artifact.ErrIntegrity
 	}
 	issued, e := decodeWorkerCertificate(r, a)

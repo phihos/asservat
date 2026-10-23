@@ -121,11 +121,11 @@ func (s *WorkerEnrollmentCoordinator) EnrollAdmitted(ctx context.Context, sessio
 	defer cancel()
 	key, err := s.CSR.EnrollmentKey(csr)
 	if err != nil || key == (artifact.Digest{}) {
-		return zero, artifact.ErrInvalid
+		return zero, collapsed("csr", artifact.ErrInvalid, err)
 	}
 	p, err := s.Proofs.ReadWorkerEnrollmentProof(call, session, worker, key)
 	if err != nil || !p.Valid(s.Now()) || p.Worker.Intent.SessionID != session || p.Worker.Intent.ID != worker || p.PublicKeyDigest != key || call.Err() != nil {
-		return zero, artifact.ErrDownloadUnavailable
+		return zero, collapsed("proof", artifact.ErrDownloadUnavailable, err)
 	}
 	proofCall, stop := context.WithDeadline(call, p.FreshUntil)
 	defer stop()

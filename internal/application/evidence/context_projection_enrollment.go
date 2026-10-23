@@ -44,11 +44,11 @@ func (s *ProjectionEnrollmentCoordinator) EnrollProjection(ctx context.Context, 
 	defer cancel()
 	key, e := s.CSR.EnrollmentKey(csr)
 	if e != nil || key == (artifact.Digest{}) {
-		return zero, query.ErrUnavailable
+		return zero, collapsed("csr", query.ErrUnavailable, e)
 	}
 	p, e := s.Proofs.ReadAcquisitionEnrollmentProof(call, parent, worker, key)
 	if e != nil || !p.Valid(s.Now()) || p.Worker.Intent.Parent != parent || p.Worker.Intent.ID != worker || p.PublicKeyDigest != key || call.Err() != nil {
-		return zero, query.ErrUnavailable
+		return zero, collapsed("proof", query.ErrUnavailable, e)
 	}
 	proofCall, stop := context.WithDeadline(call, p.FreshUntil)
 	defer stop()

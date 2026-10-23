@@ -63,3 +63,19 @@ func TestDownloadRefusalReportNamesTheRefusingStage(t *testing.T) {
 		}
 	}
 }
+
+// The worker executable names its fixed startup phase and closed class; the
+// generic text alone left native72's 30-second stop unexplained.
+func TestDownloadWorkerDiagnosticNamesStartupStep(t *testing.T) {
+	err := workerStep("credentials", fmt.Errorf("%w: provider detail must not appear", artifact.ErrDownloadExpired))
+	got := DownloadWorkerDiagnostic(err)
+	if !strings.HasPrefix(got, "service stopped at credentials (expired): ") || strings.Contains(got, "provider detail") {
+		t.Fatal(got)
+	}
+	if got := DownloadWorkerDiagnostic(errors.New("unlabelled")); !strings.HasPrefix(got, "service stopped at startup (unavailable): ") {
+		t.Fatal(got)
+	}
+	if workerStep("native", nil) != nil {
+		t.Fatal("a nil phase result became a stop")
+	}
+}

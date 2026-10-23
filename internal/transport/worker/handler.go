@@ -22,6 +22,9 @@ type Handler struct {
 	installation string
 	now          func() time.Time
 	slots        chan struct{}
+	// Refused, if set before serving, receives the parent purpose and the
+	// staged error of a refused enrollment. The response stays a bare 503.
+	Refused func(context.Context, string, error)
 }
 
 func NewHandler(installation string, enrollment evidence.WorkerEnrollmentExchange, now func() time.Time, concurrency int) (*Handler, error) {
@@ -35,7 +38,7 @@ func NewAcquisitionHandler(installation string, enrollment evidence.AcquisitionE
 	if !value.UUID(installation) || enrollment == nil || now == nil || concurrency < 1 || concurrency > 16 {
 		return nil, artifact.ErrInvalid
 	}
-	return &Handler{enrollment, installation, now, make(chan struct{}, concurrency)}, nil
+	return &Handler{enrollment: enrollment, installation: installation, now: now, slots: make(chan struct{}, concurrency)}, nil
 }
 
 // The private listener must pin server trust, enforce TLS 1.3, header/idle/time
@@ -92,6 +95,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		defer delivery.Close()
 	}
 	if err != nil || delivery == nil || delivery.Context() == nil {
+		if err != nil && h.Refused != nil {
+			h.Refused(ctx, string(parent.Purpose), err)
+		}
 		fail(503)
 		return
 	}
