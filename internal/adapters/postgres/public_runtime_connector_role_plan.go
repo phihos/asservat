@@ -78,7 +78,7 @@ func publicRuntimeConnectorGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	case "connector-owner-read":
 		// ADR-172: the hub-api owner registry reads, for owner discovery and
 		// authentication on behalf of regions. No owner write is granted.
-		return ownerIdentityRoleGrants("registry")
+		return ownerIdentityDutyGrants("registry")
 	case "connector-cleanup":
 		functions("detach_connector_identity(uuid,uuid)", "close_connector_retirement_admission(uuid,uuid)", "close_connector_retirement_writer_reference(uuid,uuid)", "delete_connector_retirement_ticket(uuid,uuid)")
 		lifecycle("lease", "lease_fence", "retirement", "certificate_started", "certificate_completion", "terminal_purge", "overdue_selected_at", "overdue_purge")
