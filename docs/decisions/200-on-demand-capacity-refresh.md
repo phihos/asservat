@@ -189,3 +189,17 @@ The refresh receipt returned to the caller keeps its original interval; the
 root source, trust, permission, recovery and request bounds are unchanged, and
 a workload or namespace change still takes effect at the next refresh, within
 30 seconds. Demand refresh stays as described above.
+
+Migration 00073 (schema 73) applies the same 30-second lifetime to the root
+`capacity_source` observation that `capacity_managed_root_until` requires for
+every capture, query and download admission. `accept_capacity_source` stores
+`fresh_until = observed_at + 30 seconds` for an accepted observation and the
+table CHECK accepts at most 30 seconds; installed runs showed the separate
+hub-worker source refresh failing under load (`capacity demand refresh:
+guarded-read (unavailable)`), so the five-second source window lapsed even
+when the binding was current. The acceptance receipt keeps its original
+five-second interval (Go `CapacitySourceInterval` is unchanged), negative and
+invalidating observations keep their original intervals and take effect
+immediately, and trust, permission-stream, recovery and request bounds are
+unchanged. A capacity source change still takes effect at the next accepted
+or invalidating observation.
