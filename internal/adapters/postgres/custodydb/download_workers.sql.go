@@ -395,3 +395,56 @@ func (q *Queries) RetireDownloadWorker(ctx context.Context, arg RetireDownloadWo
 	}
 	return result.RowsAffected(), nil
 }
+
+const unretiredBoundDownloadWorkers = `-- name: UnretiredBoundDownloadWorkers :many
+SELECT id, session_id, root_id, installation_id, allocation_id, principal_key, generation, intent_json, run_until, audit_receipt_json, claimed_at, job_json, binding_json, termination_json, retired_proof_json, query_id, query_allocation_id, abandoned_at FROM download_worker
+WHERE root_id=$1 AND installation_id=$2 AND session_id IS NOT NULL AND binding_json IS NOT NULL
+ AND retired_proof_json IS NULL AND abandoned_at IS NULL
+ORDER BY run_until,id LIMIT 16
+`
+
+type UnretiredBoundDownloadWorkersParams struct {
+	RootID         pgtype.UUID
+	InstallationID pgtype.UUID
+}
+
+// Native download workers can end before run_until; cleanup still requires
+// positive Kubernetes termination evidence for each exact bound row.
+func (q *Queries) UnretiredBoundDownloadWorkers(ctx context.Context, arg UnretiredBoundDownloadWorkersParams) ([]DownloadWorker, error) {
+	rows, err := q.db.Query(ctx, unretiredBoundDownloadWorkers, arg.RootID, arg.InstallationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DownloadWorker{}
+	for rows.Next() {
+		var i DownloadWorker
+		if err := rows.Scan(
+			&i.ID,
+			&i.SessionID,
+			&i.RootID,
+			&i.InstallationID,
+			&i.AllocationID,
+			&i.PrincipalKey,
+			&i.Generation,
+			&i.IntentJson,
+			&i.RunUntil,
+			&i.AuditReceiptJson,
+			&i.ClaimedAt,
+			&i.JobJson,
+			&i.BindingJson,
+			&i.TerminationJson,
+			&i.RetiredProofJson,
+			&i.QueryID,
+			&i.QueryAllocationID,
+			&i.AbandonedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

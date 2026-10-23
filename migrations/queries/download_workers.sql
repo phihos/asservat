@@ -56,3 +56,11 @@ ORDER BY run_until,id LIMIT 16;
 UPDATE download_worker SET abandoned_at=clock_timestamp()
 WHERE id=$1 AND root_id=$2 AND query_id IS NOT NULL AND claimed_at IS NULL
  AND run_until<=clock_timestamp() AND abandoned_at IS NULL;
+
+-- Native download workers can end before run_until; cleanup still requires
+-- positive Kubernetes termination evidence for each exact bound row.
+-- name: UnretiredBoundDownloadWorkers :many
+SELECT * FROM download_worker
+WHERE root_id=$1 AND installation_id=$2 AND session_id IS NOT NULL AND binding_json IS NOT NULL
+ AND retired_proof_json IS NULL AND abandoned_at IS NULL
+ORDER BY run_until,id LIMIT 16;

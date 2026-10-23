@@ -118,3 +118,14 @@ func (s *syntheticDownloadJobs) RetireDownloadWorker(_ context.Context, p value.
 	now := time.Now().UTC()
 	return value.DownloadWorkerRetirement{Termination: p, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}, nil
 }
+
+// noQueryWorkerCleanup isolates native download retirement in the shared
+// admission cleanup; it offers no query workers.
+type noQueryWorkerCleanup struct {
+	evidence.ProjectionCleanupLedger
+	evidence.ProjectionCleanupJobs
+}
+
+func (noQueryWorkerCleanup) ExpiredProjectionWorkers(context.Context) ([]evidence.ProjectionCleanupCandidate, error) {
+	return nil, nil
+}

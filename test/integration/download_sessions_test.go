@@ -829,8 +829,19 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				t.Fatal("uncertain deletion refunded")
 			}
 			// Losing the process-local termination snapshot is harmless: SQL holds it.
+			// The next admission's shared acquisition cleanup frees the slot.
 			jobs.stopped = false
-			if e = service.Retire(ctx, w); e != nil {
+			listed, e := ledger.UnretiredDownloadWorkers(ctx)
+			if e != nil || !slices.ContainsFunc(listed, func(c evidence.DownloadCleanupCandidate) bool {
+				return c.Worker == w && c.Termination.Valid(c.Termination.ObservedAt)
+			}) {
+				t.Fatal("terminated worker not offered to admission cleanup", e)
+			}
+			cleanup := &evidence.ProjectionWorkerCleanup{Ledger: noQueryWorkerCleanup{}, Jobs: noQueryWorkerCleanup{}, Downloads: ledger, DownloadJobs: jobs, Now: time.Now}
+			for range listed {
+				cleanup.CleanupProjectionWorkers(ctx)
+			}
+			if listed, e = ledger.UnretiredDownloadWorkers(ctx); e != nil || slices.ContainsFunc(listed, func(c evidence.DownloadCleanupCandidate) bool { return c.Worker == w }) {
 				t.Fatal("retirement reconciliation", e)
 			}
 			if jobs.terminations != 2 || jobs.deletes != 2 {

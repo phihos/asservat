@@ -102,7 +102,13 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	origins.ProjectionProofs = func(token evidence.DownloadPeerToken) (evidence.AcquisitionPeerProofReader, error) {
 		return kube.NewDispatchedAcquisitionPeerAttester(client, operations, token)
 	}
-	cleanup := &evidence.ProjectionWorkerCleanup{Ledger: workers, Jobs: jobs, Now: time.Now, Report: eventLog(os.Stderr, "query worker cleanup")}
+	// Native download workers share the acquisition slots, so the same
+	// admission-time cleanup retires them once their termination is observed.
+	downloads, ok := dispatch.Ledger.(evidence.DownloadCleanupLedger)
+	if !ok || dispatch.Jobs == nil {
+		return nil, mounts.ErrUnavailable
+	}
+	cleanup := &evidence.ProjectionWorkerCleanup{Ledger: workers, Jobs: jobs, Downloads: downloads, DownloadJobs: dispatch.Jobs, Now: time.Now, Report: eventLog(os.Stderr, "acquisition worker cleanup")}
 	runtime := &evidence.ProjectionRuntime{Cleanup: cleanup, Workers: workers, Identities: workers, Jobs: jobs, Sources: operations, Operations: operations, Origins: origins, Registrar: d.Runtime,
 		KeyScope: scope, HubPodUID: d.Runtime.binding.PodUID, HubProcessEpoch: d.Runtime.binding.ProcessEpoch, Now: time.Now}
 	reader := publicProjectionReader{ledger, runtime}
