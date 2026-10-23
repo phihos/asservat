@@ -335,6 +335,13 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				if err = admin.QueryRow(ctx, "SELECT count(*) FROM context_execution WHERE root_id=$1", s.a.RootID).Scan(&records); err != nil || records != 1 {
 					t.Fatal("execution identity duplicated", records, err)
 				}
+				// The completed execution qualifier no longer uses its deliberately
+				// saturated 18+2 hub pools. Join their closure before starting the
+				// separate cleaner fixture on the unchanged bounded SQL server.
+				sharedPools.ordinary.Close()
+				for _, reserved := range sharedPools.resolution {
+					reserved.Close()
+				}
 				qualifyPositiveContextDeletion(t, ctx, admin, poolFor, store, bound, keys, s, accepted)
 			})
 		}

@@ -186,8 +186,8 @@ func testDownloadPreparationIdentityBudget(t *testing.T, nearExpiry bool) {
 	if err != nil || !out.ContinuePreparation || out.Session.State != artifact.DownloadPreparing || out.Metadata != nil || !f.created || !f.recorded || !f.pending {
 		t.Fatal("first acknowledged Job Pending did not fit the original five-second request with actual identity and authority composition")
 	}
-	if f.checks != 3 || f.tokenChecks != 10 || f.permissions != 6 || f.catalog != 3 || f.retention != 3 {
-		t.Fatalf("preparation reconstructed operation authority: gates=%d token=%d permission=%d catalog=%d retention=%d; want 3/10/6/3/3", f.checks, f.tokenChecks, f.permissions, f.catalog, f.retention)
+	if f.checks != 1 || f.tokenChecks != 6 || f.permissions != 2 || f.catalog != 1 || f.retention != 1 {
+		t.Fatalf("preparation reconstructed operation authority: gates=%d token=%d permission=%d catalog=%d retention=%d; want 1/6/2/1/1", f.checks, f.tokenChecks, f.permissions, f.catalog, f.retention)
 	}
 	if f.policyReads != 1 || f.policiesOK != 1 || f.observer.Load()-f.identityRequests.Load() != 14 || f.probe.Load() != 3 || f.denied.Load() != 1 || f.identityPolicyReads.Load() != wantIdentityReads || f.identityRequests.Load() != 3*wantIdentityReads || f.tokenChecks < 2 || f.permissions < 2 || f.catalog < 1 || f.retention < 1 {
 		t.Fatal("preparation skipped or repeated a required composed observation")

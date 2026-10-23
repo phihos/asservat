@@ -189,7 +189,12 @@ func (f *capacitySQLFixture) qualifySharedMetadataReaders(t *testing.T, s captur
 				t.Fatalf("excluded metadata privilege: statement=%s sqlstate=%s", statement, capacitySQLState(err))
 			}
 		}
-		qualifyOrdinaryHubPoolBound(t, call, pools)
+		// Both compiled execution cases qualify this shared pool helper
+		// at its full 18+2 bound. Keep this fixture focused on all seven
+		// readers while independent capacity setup pools remain in use.
+		if pool.Config().MaxConns != contracts.PublicRuntimeHubOrdinaryConnections {
+			t.Fatal("shared metadata pool size differs from the installed hub")
+		}
 		f.qualifyMetadataReadDeadline(t, pool, progress, query)
 		t.Log("compiled_metadata_adapters=7 shared_hub_pool_max=18 governor_limit=32 excluded_privileges_denied=true")
 	}) {

@@ -470,9 +470,19 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 	if e = admin.QueryRow(ctx, "SELECT rolconnlimit FROM pg_roles WHERE rolname=$1", firstName).Scan(&actualLimit); e != nil || actualLimit != roleLimit {
 		t.Fatal("installed role-wide connection ceiling differs", actualLimit, e)
 	}
+	assertOriginalPoolLock := func() {
+		t.Helper()
+		var columnUpdate, tableUpdate bool
+		if err := admin.QueryRow(ctx, "SELECT has_column_privilege($1, 'public.custody_pool', 'id', 'UPDATE'), has_table_privilege($1, 'public.custody_pool', 'UPDATE')", firstName).Scan(&columnUpdate, &tableUpdate); err != nil || !columnUpdate || tableUpdate {
+			t.Fatal("original exact custody pool lock privilege changed", columnUpdate, tableUpdate, err)
+		}
+	}
+	assertOriginalPoolLock()
 	for _, mutation := range []struct{ name, grant, undo string }{
 		{"connection-limit", "ALTER ROLE " + pgx.Identifier{firstName}.Sanitize() + " CONNECTION LIMIT 82", "ALTER ROLE " + pgx.Identifier{firstName}.Sanitize() + " CONNECTION LIMIT 81"},
-		{"direct-extra", "GRANT UPDATE ON public.custody_pool TO " + pgx.Identifier{firstName}.Sanitize(), "REVOKE UPDATE ON public.custody_pool FROM " + pgx.Identifier{firstName}.Sanitize()},
+		// Table-level REVOKE also removes original column grants; restore only
+		// the installed API execution lock privilege after removing this fault.
+		{"direct-extra", "GRANT UPDATE ON public.custody_pool TO " + pgx.Identifier{firstName}.Sanitize(), "REVOKE UPDATE ON public.custody_pool FROM " + pgx.Identifier{firstName}.Sanitize() + "; GRANT UPDATE(id) ON public.custody_pool TO " + pgx.Identifier{firstName}.Sanitize()},
 		{"public-table", "GRANT SELECT ON public.custody_pool TO PUBLIC", "REVOKE SELECT ON public.custody_pool FROM PUBLIC"},
 		{"public-column", "GRANT UPDATE(recovery_blocked) ON public.fleet_trust TO PUBLIC", "REVOKE UPDATE(recovery_blocked) ON public.fleet_trust FROM PUBLIC"},
 		{"public-schema", "GRANT CREATE ON SCHEMA public TO PUBLIC", "REVOKE CREATE ON SCHEMA public FROM PUBLIC"},
@@ -493,6 +503,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		if denied == nil {
 			t.Fatal("accepted excess direct/ambient authority", mutation.name)
 		}
+		assertOriginalPoolLock()
 	}
 	refresh()
 	// A changed password in private storage cannot be adopted or repaired.
