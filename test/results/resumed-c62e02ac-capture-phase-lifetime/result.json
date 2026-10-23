@@ -1,0 +1,52 @@
+{
+  "base": "8fef8e40b49dce4147b7b8405416018425074027",
+  "scope": "Application composition using actual investigation, current identity, submission and audit publisher; SQL/start ports and clock are synthetic. No installed, real SQL/provider, or sustained-availability qualification.",
+  "runs": [
+    {
+      "label": "red",
+      "exit": 1,
+      "session": 30728,
+      "terminalChunk": "3b4b87",
+      "wallSeconds": 3.667600309010595,
+      "packages": {
+        "capture": "FAIL 0.012s",
+        "audit": "PASS 0.002s"
+      },
+      "sourceCount": 2613,
+      "sourceUnchanged": true
+    },
+    {
+      "label": "green",
+      "exit": 0,
+      "session": 57664,
+      "terminalChunk": "443db3",
+      "wallSeconds": 0.9887281749979593,
+      "packages": {
+        "capture": "PASS 0.019s",
+        "audit": "PASS 0.002s"
+      },
+      "sourceCount": 2613,
+      "sourceUnchanged": true
+    },
+    {
+      "label": "green-race",
+      "exit": 0,
+      "session": 69645,
+      "terminalChunk": "47b9c8",
+      "wallSeconds": 18.94858450704487,
+      "packages": {
+        "capture": "PASS 10.162s",
+        "audit": "PASS 1.173s"
+      },
+      "sourceCount": 2613,
+      "sourceUnchanged": true
+    }
+  ],
+  "independentReview": {
+    "reviewer": "parent /root",
+    "result": "no blockers",
+    "scope": "metadata consumption before effects; exact expectation and identity on final read-only replay; original caller/current identity/recovery/audit first-write cutoffs; unchanged admission/start count; replacement/cancel/expiry regressions and actual audit publisher"
+  },
+  "externalFixture": "not run",
+  "native57Cause": "The archived minimum does not identify its winning source; this regression establishes the separate response-metadata phase coupling only."
+}

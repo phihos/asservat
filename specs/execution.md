@@ -64,6 +64,16 @@ a new start observes them again. No observation crosses requests or renews a
 deadline. A transport result is not artifact
 publication or a successful download.
 
+The admission receipt's metadata freshness is response-only. Consume its exact
+accepted identity while current; do not use that cutoff as authority for the
+subsequent independently checked start. Preserve the original caller/identity,
+persisted audit first-write, capture, write and execution deadlines. If receipt
+metadata expires during a successful start, one current exact-key read-only
+lookup may supply response metadata for the identical accepted operation. It
+must not read a replacement capture, extend stored dates, repeat admission or
+retry any effect. A failed lookup returns an error with the known admission;
+ordinary accepted replay remains passive.
+
 Before any capture exists, preview and request target resolution use pre-work
 target queries on an idle standby under
 [ADR-179](../docs/decisions/179-outbound-only-first-installed-profile.md). The

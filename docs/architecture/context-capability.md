@@ -44,8 +44,14 @@ giving public hub processes collector SQL credentials, wrap keys or acquisition
 access, and no deployed command currently constructs it.
 
 Downstream failure preserves the accepted value internally with an error; it
-does not undo admission or claim no effect. Metadata still expires at its
-original response bound. Accepted replay stays passive, including after target
+does not undo admission or claim no effect. Admission metadata is consumed while
+current to select the exact accepted operation. Its response-only cutoff does
+not shorten the separately authorized start; original caller/identity, audit
+first-write, capture and write cutoffs still apply. Metadata still expires at
+its original response bound. After a successful start, expired metadata requires
+one current read-only lookup of the identical accepted operation before a
+successful response. Failure never repeats admission, audit or start. Unexpired
+metadata is returned without renewal. Accepted replay stays passive, including after target
 or preview disappearance. Explicit acquisition continuation after a lost or late
 admission now uses the explicit `continue_acquisition: true` request branch in
 [ADR-134](../decisions/134-explicit-capture-continuation.md). It never admits a

@@ -1,0 +1,21 @@
+{
+  "README.md": "8d401e241f08fbdc10d7cdfa3ebd4281435e6dd73ee3b02ac21f08f761cf6798",
+  "green-race-result.json": "996c32d83192258e67409ccd2284a24d510cf24d8f7b6e048b44058230c8c2cb",
+  "green-race-source-after.json": "975f4c5a8c01e1368cc179ff29ea98f5e732ce22778933068d1ca1ff26cae9fd",
+  "green-race-source-before.json": "975f4c5a8c01e1368cc179ff29ea98f5e732ce22778933068d1ca1ff26cae9fd",
+  "green-race.log": "5dfb858fc779af15faa0b13a4aaf8222e075e0ccce18cdba2ea8bd6530690472",
+  "green-result.json": "83d039490cbda18b6b0d5fb6ca546826d98ad8aa6a5db3a4adb28746bb20f0d3",
+  "green-source-after.json": "975f4c5a8c01e1368cc179ff29ea98f5e732ce22778933068d1ca1ff26cae9fd",
+  "green-source-before.json": "975f4c5a8c01e1368cc179ff29ea98f5e732ce22778933068d1ca1ff26cae9fd",
+  "green.log": "b4148455a271c460110e8b591dc54d81f5dd286fe389c888679ec222bd0bfca2",
+  "red-result.json": "506425a1b55f9034e2891bc033463a74a4bfb97f35e47e2510cb899b204406d6",
+  "red-source/internal/application/audit/capture_operation_phase_test.go.txt": "f7b22f9ce7a9d65a6720a24565c49b536d6a40f54924a43800cce0b66a921ac0",
+  "red-source/internal/application/capture/context_submission.go.txt": "038fbb34b88d5dadd21370f0f93d2ec5549c7b118500ee5aebc48a34227fe69e",
+  "red-source/internal/application/capture/context_submission_phase_test.go.txt": "0c611551553013ebb3ad621799b648e69f5f87f69da685006dc5a40b04eb5f2d",
+  "red-source-after.json": "43939f128ef96e65a9af6a0c243f51d392430ea1e679dfa4004c8a2aa684b2bb",
+  "red-source-before.json": "43939f128ef96e65a9af6a0c243f51d392430ea1e679dfa4004c8a2aa684b2bb",
+  "red.log": "8d92ad38a3ca8f5e66b4efa1f90c2e5a9b58cc5430f1c44376223761fcb35ca7",
+  "result.json": "ca3bd09a8bc5b488c729a7eafc31aad8ecbe6f3810bdc2b307fa12ecca6530cb",
+  "run-check.py": "c0fbcb26aa1f323cb316544359fff2b2c8302b259c4531331e97d47f21c6da47",
+  "source-ready.json": "bcde74187a994eb4f1dfb55b089193c0f862c50ed90564cece8c7d5421c17a9c"
+}

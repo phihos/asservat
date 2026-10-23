@@ -107,3 +107,41 @@ It then fails native-download preparation with an acknowledged unavailable reply
 That result demonstrates a successful installed capture path, not sustained
 availability or a complete investigation. See the current
 [qualification record](../implementation-progress.md).
+
+## Admission metadata and the start phase
+
+`Accepted.MetadataValidUntil` is a response observation, not an execution permit.
+The submission coordinator previously copied it into the context deadline for
+intent acknowledgement and the independently authorized start. A deterministic
+composition reproduces the resulting failure: a still-current 100 ms metadata
+observation limits a five-second caller even though the start obtains its own
+current authority. Work consuming 200 ms then fails before start or after its
+effect. Native57's short accepted interval motivated this check; its archived
+minimum does not identify which individual source supplied the winning cutoff.
+
+Consume the exact accepted identity while its metadata is current, without
+turning that response-only cutoff into a deadline for later phases. The original
+caller, identity, capture and write deadlines remain binding. The audit publisher
+keeps its persisted first-write `RequestUntil`; the start keeps its own original
+permission, recovery, capability, work and prepared-execution bounds. This is a
+refinement of the existing phase separation, not a larger request interval.
+
+If the original metadata is still current after a successful start, return it
+without extending it. If it expired, make one existing read-only exact-key lookup
+under current identity and recovery, requiring the identical capture, scope,
+pin, expectation, creation time and deadline. Only that observation can supply
+new response metadata. Failure preserves the known admission with an error;
+there is no admission, audit or start retry. Ordinary accepted replay remains
+passive and does not acquire this extra lookup merely to extend its response.
+
+This affects the ordinary first capture and explicit continuation. It adds zero
+privileges, credentials, endpoints, configuration, durable states or background
+work. A successful start whose metadata expired adds one recovery observation
+and one existing SQL replay transaction, followed by the existing current-identity
+check; all other paths retain their read count.
+There is no measured installed latency claim or comparable-project assumption.
+No migration is needed; older code retains its more restrictive phase coupling.
+Simply increasing a timeout would preserve that coupling. Focused regressions
+exercise the real investigation, request-owned identity, submission and audit
+publisher with synthetic SQL/start ports, including unchanged first-write expiry.
+Installed qualification of this refinement remains pending.
