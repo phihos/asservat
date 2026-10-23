@@ -108,7 +108,7 @@ func installedProjectionSQLCheck(t *testing.T, ctx context.Context, admin *pgxpo
 
 // This adds at most six audited normal operations: one scoped denial, one
 // get_file_excerpt and four already-budgeted result polls. Existing normal64 /
-// resolution2 fixture allocations are unchanged; no unknown call is replayed.
+// resolution8 fixture allocations are unchanged; no unknown call is replayed.
 func installedApprovedProjection(t *testing.T, ctx context.Context, identity *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID, pod string, expires time.Time, check installedProjectionCheck) (query.ContextExcerpt, func()) {
 	t.Helper()
 	if check == nil {
