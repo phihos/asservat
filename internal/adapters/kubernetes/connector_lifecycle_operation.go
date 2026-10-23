@@ -42,6 +42,7 @@ func NewConnectorLifecycleReader(c *PermissionClient, source *ConnectorIdentityS
 	if err != nil || work.digest != guard.digest {
 		return nil, cfg.ErrInvalid
 	}
+	work = guard.share(work)
 	var sourcePlan cfg.ConfigMapAdministration
 	raw, err = json.Marshal(source.protection.plan)
 	if err != nil || json.Unmarshal(raw, &sourcePlan) != nil {

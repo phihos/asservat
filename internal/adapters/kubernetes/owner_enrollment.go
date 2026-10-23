@@ -196,16 +196,12 @@ func (s *OwnerEnrollmentAttester) ReadOwnerEnrollmentProof(ctx context.Context, 
 	if err != nil || before != after {
 		return zero, fmt.Errorf("owner proof repeated workload: %w", value.ErrUnavailable)
 	}
-	lastGuard, lastGuardUntil, err := s.protection.Current(ctx)
-	if err != nil || lastGuard != guard {
-		return zero, fmt.Errorf("owner proof final protection: %w", value.ErrUnavailable)
-	}
 	last, err := s.configuration.ReadOwnerConfiguration(ctx)
 	if err != nil || !last.Valid(s.client.now()) || !last.Configuration.Equal(first.Configuration) || ctx.Err() != nil {
 		return zero, fmt.Errorf("owner proof final configuration: %w", value.ErrUnavailable)
 	}
 	until := start.Add(5 * time.Second)
-	for _, deadline := range []time.Time{first.FreshUntil, last.FreshUntil, guardUntil, lastGuardUntil, expires} {
+	for _, deadline := range []time.Time{first.FreshUntil, last.FreshUntil, guardUntil, expires} {
 		until = identity.Earlier(until, deadline)
 	}
 	out := value.OwnerEnrollmentProof{Binding: b, Usage: r.Usage, Configuration: first, Pod: name, ReplicaSet: before.ReplicaSet, ReplicaSetUID: before.ReplicaSetUID, PublicKeyDigest: key, TokenDigest: artifact.Digest(sha256.Sum256(token)), WorkloadDigest: before.Digest, ProtectionDigest: guard, ObservedAt: start, FreshUntil: until}

@@ -9,7 +9,6 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"asservat.local/asservat/internal/domain/identity"
 	core "k8s.io/api/core/v1"
 )
 
@@ -46,14 +45,12 @@ func (s *InstalledOwnerIdentityReader) ReadProviderAuditCredential(ctx context.C
 	if len(object.Data) != 1 || !bytes.Equal(object.Data[contracts.OwnerProviderAuditCredentialFile], credential) {
 		return zero, time.Time{}, materialStep("secret-content", cfg.ErrChanged)
 	}
-	guard, observed, err := s.protection.Current(call)
-	until = identity.Earlier(until, observed)
-	switch {
-	case err != nil:
-		return zero, time.Time{}, materialStep("guard", cfg.ErrUnavailable)
-	case s.input.Observation == nil || hex.EncodeToString(guard[:]) != s.input.Observation.ProtectionDigest:
+	// Verify already covers the reused guard proof; its static digest must
+	// still be the one this input observed.
+	if s.input.Observation == nil || hex.EncodeToString(s.protection.digest[:]) != s.input.Observation.ProtectionDigest {
 		return zero, time.Time{}, materialStep("guard-digest", cfg.ErrUnavailable)
-	case initialHandoverDeadline(call, s.client.now, until) != nil:
+	}
+	if err = initialHandoverDeadline(call, s.client.now, until); err != nil {
 		return zero, time.Time{}, materialStep("deadline", cfg.ErrUnavailable)
 	}
 	out, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(credential))

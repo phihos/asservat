@@ -413,22 +413,18 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 	issuers := map[string]*kms.OwnerCertificateIssuer{}
 	if c.ProviderAuthentication != nil {
 		*phase = startupProviderEffects
-		// ADR-173: every provider login and renewal runs two full native proofs
-		// (before and after the OpenBao call) within the first proof's window. On
-		// the shared observer they overran it, and every refresh failed at
-		// final-proof. They get their own clients, guard and reader; the proof is
-		// unchanged.
-		providerReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.providerStats, false)
+		// ADR-173: provider login and renewal use their own clients, guard copy
+		// and reader. The native self-proof is reused for
+		// kube.OwnerProtectionReuse (2026-10-23 revision), so a login rarely
+		// repeats it.
+		providerReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.providerStats)
 		if err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
-		// Each audit object write reads its storage credential under a full
-		// native proof too. Behind a refresh's proofs on one client it ran out
-		// of its five seconds (credentials-verify/identity), so it gets its own.
-		// Each read makes about 50–70 sequential calls and runs twice inside one
-		// audited request's original five seconds; at 20/20 it took 1–3 s
-		// (installed native 62), so it uses the opening limiter (ADR-208).
-		credentialReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.credentialStats, true)
+		// Each audit object write reads its storage credential under the same
+		// reused native proof, on its own clients so it never queues behind a
+		// provider refresh. Within the reuse window a read is one Secret GET.
+		credentialReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.credentialStats)
 		if err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
@@ -552,11 +548,8 @@ func ownerReadinessProofs(in *ownerInputs, cluster string, control configuration
 
 // ownerProviderProofReader is the provider effects' own identity reader, on
 // separate observer and probe clients with the same guard plan and pins.
-func ownerProviderProofReader(in *ownerInputs, c contracts.OwnerDeployment, control configuration.NamespaceRef, guard *kube.OwnerWorkloadProtection, activation contracts.OwnerIdentityActivation, podUID string, stats *regionalAPIStats, requestPath bool) (*kube.InstalledOwnerIdentityReader, error) {
+func ownerProviderProofReader(in *ownerInputs, c contracts.OwnerDeployment, control configuration.NamespaceRef, guard *kube.OwnerWorkloadProtection, activation contracts.OwnerIdentityActivation, podUID string, stats *regionalAPIStats) (*kube.InstalledOwnerIdentityReader, error) {
 	observerConfig, probeConfig := in.kubernetes("kube-observer.token"), in.kubernetes("kube-probe.token")
-	if requestPath {
-		observerConfig, probeConfig = kube.WithOpeningBurst(observerConfig), kube.WithOpeningBurst(probeConfig)
-	}
 	observerConfig.Wrap(stats.wrap)
 	probeConfig.Wrap(stats.wrap)
 	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)

@@ -218,23 +218,6 @@ func (s *OwnerAuthenticator) authenticate(ctx context.Context, certificateFrom f
 		return zero, value.ErrUnavailable
 	}
 	route.Configuration.Configuration = route.Configuration.Configuration.Clone()
-	after, err := s.Protection.ReadOwnerProtection(ctx, pool)
-	if err != nil {
-		protectionReadRefusal(ctx, "protection-after", err)
-		return zero, value.ErrUnavailable
-	}
-	if !after.Valid(s.Now()) {
-		refusalStep(ctx, "protection-after/invalid")
-		return zero, value.ErrUnavailable
-	}
-	if after.Pool != pool {
-		refusalStep(ctx, "protection-after/pool")
-		return zero, value.ErrUnavailable
-	}
-	if after.Digest != before.Digest {
-		refusalStep(ctx, "protection-after/digest")
-		return zero, value.ErrUnavailable
-	}
 	last, err := s.Registry.ReadOwnerRegistration(ctx, certificate)
 	if err != nil || !last.Valid(s.Now()) || last.Certificate != certificate || last.Enrollment != first.Enrollment || !last.Configuration.Configuration.Equal(first.Configuration.Configuration) {
 		refusalStep(ctx, "registration-last")
@@ -246,12 +229,12 @@ func (s *OwnerAuthenticator) authenticate(ctx context.Context, certificateFrom f
 		return zero, value.ErrDenied
 	}
 	now := s.Now()
-	if ctx.Err() != nil || !first.Valid(now) || !last.Valid(now) || !before.Valid(now) || !after.Valid(now) || !route.Valid(now) || !certificate.Valid(now) {
+	if ctx.Err() != nil || !first.Valid(now) || !last.Valid(now) || !before.Valid(now) || !route.Valid(now) || !certificate.Valid(now) {
 		refusalStep(ctx, "expired")
 		return zero, value.ErrUnavailable
 	}
 	until := start.Add(5 * time.Second)
-	for _, deadline := range []time.Time{first.FreshUntil, last.FreshUntil, route.FreshUntil, before.FreshUntil, after.FreshUntil, certificate.NotAfter} {
+	for _, deadline := range []time.Time{first.FreshUntil, last.FreshUntil, route.FreshUntil, before.FreshUntil, certificate.NotAfter} {
 		until = identity.Earlier(until, deadline)
 	}
 	out := value.AuthenticatedOwner{Certificate: certificate, EnrollmentID: first.Enrollment.ID, Pool: pool, Pod: route.Endpoint.Pod, ReplicaSetUID: route.Endpoint.ReplicaSetUID, ConfigurationRevision: first.Configuration.Configuration.Revision, ProtectionDigest: before.Digest, VerifiedAt: start, ValidUntil: until}
@@ -277,8 +260,8 @@ func (s *OwnerAuthenticator) ObserveOwnerServing(ctx context.Context, server Own
 }
 
 // ObserveOwnerClient returns the same full current observation as local client
-// admission. It retains the actual private client identity and both independent
-// registry/guard reads; it does not fabricate a remote TLS connection.
+// admission. It retains the actual private client identity and its registry
+// reads and current guard proof; it does not fabricate a remote TLS connection.
 func (s *OwnerAuthenticator) ObserveOwnerClient(ctx context.Context, client OwnerClientIdentity) (value.AuthenticatedOwner, error) {
 	if client == nil {
 		return value.AuthenticatedOwner{}, value.ErrInvalid

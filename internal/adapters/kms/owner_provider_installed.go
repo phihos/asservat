@@ -205,9 +205,9 @@ func (s *InstalledOwnerProviderEffects) mounted(ctx context.Context) (contracts.
 	return m, out, nil
 }
 
-// Every control operation repeats current native proof and current SQL recovery
-// checks, while retaining its first interval and exact accepted revision through
-// all blocking work. Revision changes do not adopt replacement roots or pools.
+// Every control operation reads the current accepted configuration once and
+// uses the reused native self-proof, retaining the first interval through all
+// blocking work. Revision changes do not adopt replacement roots or pools.
 func (s *InstalledOwnerProviderEffects) current(ctx context.Context) (time.Time, error) {
 	if s == nil || ctx == nil || ctx.Err() != nil || s.root.Err() != nil {
 		return time.Time{}, ErrKeyService
@@ -233,12 +233,8 @@ func (s *InstalledOwnerProviderEffects) current(ctx context.Context) (time.Time,
 		// Keep the reader's fixed check for the startup diagnostic.
 		return time.Time{}, errors.Join(ErrKeyService, err)
 	}
-	call, narrow := context.WithDeadline(call, until)
-	defer narrow()
-	last, err := s.configuration.ReadOwnerConfiguration(call)
-	until = identity.Earlier(until, last.FreshUntil)
-	if err != nil || !s.currentConfiguration(last) || !first.Configuration.Equal(last.Configuration) || call.Err() != nil || !time.Now().Before(until) {
-		return time.Time{}, ownerProviderConfigurationFailure("configuration-final", err)
+	if call.Err() != nil || !time.Now().Before(until) {
+		return time.Time{}, ownerProviderConfigurationFailure("configuration-final", call.Err())
 	}
 	return until, nil
 }
@@ -441,14 +437,8 @@ func (s *InstalledOwnerProviderEffects) ReadAuditCredentials(ctx context.Context
 	if err != nil {
 		return zero, time.Time{}, auditCredentialStepFrom("verify", err)
 	}
-	call, narrow := context.WithDeadline(call, until)
-	defer narrow()
-	mark = time.Now()
-	last, err := s.configuration.ReadOwnerConfiguration(call)
-	auditapp.MarkStep(ctx, "credentials-final", mark)
-	until = identity.Earlier(until, last.FreshUntil)
-	if err != nil || !s.currentConfiguration(last) || !first.Configuration.Equal(last.Configuration) || call.Err() != nil || !time.Now().Before(until) {
-		return zero, time.Time{}, auditCredentialStepFrom("final", err)
+	if call.Err() != nil || !time.Now().Before(until) {
+		return zero, time.Time{}, auditCredentialStepFrom("final", call.Err())
 	}
 	return credential, until, nil
 }

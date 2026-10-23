@@ -49,10 +49,14 @@ func (s *InstalledOwnerIdentityReader) VerifyStartup(ctx context.Context, manife
 	if !errors.As(err, &pending) || errors.Is(err, cfg.ErrChanged) || errors.Is(err, cfg.ErrDenied) || errors.Is(err, cfg.ErrInvalid) {
 		return until, err
 	}
-	return awaitOwnerLaunchReceipt(startup, pending.state, s.client.now, s.journal,
+	until, err = awaitOwnerLaunchReceipt(startup, pending.state, s.client.now, s.journal,
 		func(call context.Context, completed contracts.InitialRuntimeResourceState) (time.Time, error) {
 			return s.verify(call, manifest, mounted, &completed)
 		})
+	if err != nil {
+		return time.Time{}, err
+	}
+	return callerBound(ctx, until), nil
 }
 
 // read is only the exact original journal GET; verify is the full native

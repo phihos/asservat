@@ -39,14 +39,12 @@ func TestOwnerIdentityReadDiagnosticSeparatesReadAndChangedIdentity(t *testing.T
 		step  OwnerIdentityReadCheck
 		cause error
 		want  string
-	}{{ownerReadLivePodRead, context.DeadlineExceeded, "final-pod/live-pod-read/deadline"}, {ownerReadLivePodRead, cfg.ErrUnavailable, "final-pod/live-pod-read"}, {ownerReadFinalPodChanged, cfg.ErrChanged, "final-pod-changed"}} {
+	}{{ownerReadLivePodRead, context.DeadlineExceeded, "initial-pod/live-pod-read/deadline"}, {ownerReadLivePodRead, cfg.ErrUnavailable, "initial-pod/live-pod-read"}} {
 		e := tc.cause
 		step := tc.step
 		ownerReadAnnotate(&step, &e)
-		if step != ownerReadFinalPodChanged {
-			step = ownerReadFinalPod
-			ownerReadAnnotate(&step, &e)
-		}
+		step = ownerReadInitialPod
+		ownerReadAnnotate(&step, &e)
 		var diagnostic interface{ FixedStep() string }
 		if !errors.As(e, &diagnostic) || diagnostic.FixedStep() != tc.want {
 			t.Fatal("unsafe or indistinguishable failure", e)

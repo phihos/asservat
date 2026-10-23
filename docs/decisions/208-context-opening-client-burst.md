@@ -107,3 +107,29 @@ The kube-apiserver's API Priority and Fairness remains the server-side bound.
 Each dedicated client can send up to 100 calls at once and 50 per
 second sustained. A further increase needs the measured context-start call
 rate first.
+
+## Revision (2026-10-23)
+
+The hub's proof of its own installed protection is now a process-local reused
+observation (`kube.OwnerProtectionReuse`, 30 s): one successful
+`OwnerWorkloadProtection.Current` and one successful
+`InstalledOwnerIdentityReader.Verify` per exact mounted bundle serve every
+caller until 30 s after the proof began, never past the token, guard or
+caller bound. A stored proof is renewed once less than five seconds remain, so
+a caller never receives an almost expired one. Failures are not stored and
+concurrent callers share one in-flight proof.
+The trust model ([security.md](../security.md#trust-model)) trusts cluster
+administrators, so re-proving the hub's own guard per request added API load
+without an integrity guarantee. In-call duplicates are removed: Verify's
+repeated tail, the audit credential's third guard read, the second accepted
+configuration read in the provider credential paths, the second protection
+read in owner authentication and the closing `ObserveOwnerServing` of the
+context-start ingress. Per-request identity, authorization, registry/route and
+SQL checks, remote-peer token reviews and worker attestation are unchanged.
+
+An audited request's credential reads fall from 51 calls each (102 per
+request) to one cold proof plus one Secret GET per read, and one Secret GET once
+warm. A hub context-start opening falls from four guard proofs to at most one,
+and none within the reuse window. The hub context-start and audit credential
+clients therefore return to the default limiter. `kube.WithOpeningBurst`
+remains for the regional clients and the hub preview/catalog clients.

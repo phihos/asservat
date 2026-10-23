@@ -41,7 +41,7 @@ func (f connectorSourceFunc) ReadConnectorIdentitySource(c context.Context) (val
 	return f(c)
 }
 func TestConnectorProcessProofBeforeReadinessAndCurrentProtection(t *testing.T) {
-	for _, mode := range []string{"observation/valid", "observation/configuration-changed", "observation/revoked-review", "observation/lost-protection", "observation/roles-changed", "observation/cancelled", "valid", "pending", "not-ready", "status-change", "short-token", "cached-configuration", "invalid-csr", "same-key", "foreign-binding", "suspended", "configuration-unavailable", "configuration-changed", "configuration-expired", "missing-protection", "lost-protection", "wrong-audience", "unbound", "wrong-account", "wrong-pod", "path-pod", "denied-review", "revoked-review", "duplicate-exp", "expired-token", "unbounded-token", "token-read-error", "token-error-redaction", "whitespace-token", "wrong-namespace", "wrong-live-account", "wrong-deployment", "wrong-replica", "wrong-owner", "two-owners", "wrong-selector", "unassigned", "host-network", "host-pid", "host-ipc", "injected-process", "deleted-pod", "failed-pod", "scaled-down", "template-account", "spec-changed", "late", "cancelled"} {
+	for _, mode := range []string{"observation/valid", "observation/configuration-changed", "observation/revoked-review", "observation/roles-changed", "observation/cancelled", "valid", "pending", "not-ready", "status-change", "short-token", "cached-configuration", "invalid-csr", "same-key", "foreign-binding", "suspended", "configuration-unavailable", "configuration-changed", "configuration-expired", "missing-protection", "wrong-audience", "unbound", "wrong-account", "wrong-pod", "path-pod", "denied-review", "revoked-review", "duplicate-exp", "expired-token", "unbounded-token", "token-read-error", "token-error-redaction", "whitespace-token", "wrong-namespace", "wrong-live-account", "wrong-deployment", "wrong-replica", "wrong-owner", "two-owners", "wrong-selector", "unassigned", "host-network", "host-pid", "host-ipc", "injected-process", "deleted-pod", "failed-pod", "scaled-down", "template-account", "spec-changed", "late", "cancelled"} {
 		t.Run(mode, func(t *testing.T) {
 			observation := strings.HasPrefix(mode, "observation/")
 			mode = strings.TrimPrefix(mode, "observation/")
@@ -122,7 +122,7 @@ func TestConnectorProcessProofBeforeReadinessAndCurrentProtection(t *testing.T) 
 					}
 					permissionReply(w, p)
 				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/owner-workload":
-					if mode == "missing-protection" || mode == "lost-protection" && n == 2 {
+					if mode == "missing-protection" {
 						http.NotFound(w, r)
 						return
 					}

@@ -221,9 +221,8 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		cancels = append(cancels, cancel)
 	}
 	// The hub's own serving identity is independent of the connector reads, so
-	// both opening reads run together within the same original bound; the
-	// closing pair below starts only after both have returned. Each result is
-	// still checked and narrows the bound, so no interval is extended.
+	// both run together within the same original bound. Each result is still
+	// checked and narrows the bound, so no interval is extended.
 	opening, cancelOpening := context.WithCancel(call)
 	var abandoned atomic.Bool
 	var local value.AuthenticatedOwner
@@ -295,33 +294,14 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		return zero, value.ErrDenied
 	}
 	narrow(local.ValidUntil)
-	closing := call
-	var finalLocal value.AuthenticatedOwner
-	var finalLocalErr error
-	finalDone := make(chan struct{})
-	go func() {
-		defer close(finalDone)
-		finalLocal, finalLocalErr = s.owners.ObserveOwnerServing(app.WithRefusalSteps(closing, s.refuseStep("final-local/")), s.local)
-	}()
-	finalJoined := false
-	defer func() {
-		if !finalJoined {
-			<-finalDone
-		}
-	}()
-	finalSource, e := sources.ReadConnectorIdentitySource(closing)
-	<-finalDone
-	finalJoined = true
+	// The hub's own serving observation above already rests on the reused
+	// self-protection proof; only the connector source is read again.
+	finalSource, e := sources.ReadConnectorIdentitySource(call)
 	if e != nil || !finalSource.Valid(s.now()) || !finalSource.Observation.SameSource(source.Observation) || finalSource.Roles != source.Roles {
 		s.refuse("final-source")
 		return zero, value.ErrDenied
 	}
 	narrow(finalSource.Observation.FreshUntil)
-	if finalLocalErr != nil || !finalLocal.Valid(s.now()) || !sameForwardPeer(finalLocal, local) {
-		s.refuse("final-local/" + refusalClass(finalLocalErr, finalLocal.Valid(s.now()), sameForwardPeer(finalLocal, local)) + app.RemainingBucket(closing, s.now()))
-		return zero, value.ErrDenied
-	}
-	narrow(finalLocal.ValidUntil)
 	out := value.APIContextReceiver{Channel: channel, ObservedAt: started, ValidUntil: until}
 	if call.Err() != nil || !out.Valid(s.now()) || !source.Valid(s.now()) || !registered.Valid(s.now()) || !local.Valid(s.now()) {
 		s.refuse("expired")

@@ -1,5 +1,19 @@
 # Sustained implementation progress
 
+## Reused hub self-protection proof (2026-10-23)
+
+The hub's proof of its own installed guard (`OwnerWorkloadProtection.Current`)
+and installed identity (`InstalledOwnerIdentityReader.Verify`) is now one
+process-local observation reused for at most 30 seconds and renewed when less
+than five seconds remain; failures are never reused and concurrent callers
+share one proof (ADR-208/ADR-173 revisions). Duplicate in-call rechecks are
+removed. Measured in the component tests: an audited request's credential
+reads drop from 51 native calls each (102 per single-phase request) to 23
+cold and 2 warm; a hub context-start opening drops from four guard proofs
+(about 40 calls) to at most one (10 calls cold, 0 warm). The hub context-start
+and audit credential clients return to the default limiter. Installed native
+qualification of this change has not run.
+
 ## Integrated qualification corrections (2026-10-23)
 
 The stable design repeat on `bc94a188` exits 0 in 13.187 seconds, with all

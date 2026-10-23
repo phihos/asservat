@@ -21,12 +21,18 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+// ownerProviderColdProofCalls is the native API cost of one unreused proof
+// (guard plus identity, without the Secret GET). Before the 2026-10-23 reuse
+// revision every credential read cost 51 calls (102 per audited request).
+const ownerProviderColdProofCalls = 21
+
 // Real C08 coordinator, S3 SDK signing, and independently limited native
 // observer/probe clients. SQL/audit key authority, ciphertext and API responses
 // are synthetic. This measures proof multiplication and complete intent/outcome
 // request time; it does not qualify provider latency or the installed preview.
 // No QPS, burst, retry or freshness override is used. Three-second cases model
 // an already observed original source bound, not a newly shortened product TTL.
+// With the reused proof every case now fits its original bound.
 func exerciseProviderCredentialAuditBudget(t *testing.T, reader *InstalledOwnerIdentityReader, x *ownerIdentityObjectFixture, mounted []byte) {
 	for _, scenario := range []struct {
 		scoped    bool
@@ -35,6 +41,8 @@ func exerciseProviderCredentialAuditBudget(t *testing.T, reader *InstalledOwnerI
 	}{{false, 5 * time.Second, false}, {false, 3 * time.Second, false}, {true, 3 * time.Second, false}, {false, 5 * time.Second, true}, {true, 5 * time.Second, true}} {
 		scoped := scenario.scoped
 		t.Run(fmt.Sprintf("operation-scoped-%t-original-tail-%s-outcome-%t", scoped, scenario.remaining, scenario.finish), func(t *testing.T) {
+			// Each scenario starts cold: no reused guard or identity proof.
+			reader.reuse.until, reader.protection.reuse.until = time.Time{}, time.Time{}
 			var api, proofs, puts, gets atomic.Int32
 			original := x.extra
 			x.extra = func(w http.ResponseWriter, r *http.Request) bool { api.Add(1); return original(w, r) }
@@ -110,16 +118,14 @@ func exerciseProviderCredentialAuditBudget(t *testing.T, reader *InstalledOwnerI
 			if scenario.finish {
 				phases = 2
 			}
-			if scoped {
-				if e != nil || proofs.Load() != phases || api.Load() != 51*phases || puts.Load() != phases || gets.Load() != phases {
-					t.Fatal("original bounded audit operation did not complete", e)
-				}
-			} else if scenario.remaining == 5*time.Second && !scenario.finish {
-				if e != nil || proofs.Load() != 2 || api.Load() != 102 {
-					t.Fatal("fresh five-second single-phase baseline changed", e)
-				}
-			} else if e == nil {
-				t.Fatal("per-SDK proof multiplication unexpectedly fit the original request/source bound")
+			// One cold proof (the guard and identity proof reused afterwards
+			// for OwnerProtectionReuse) plus one Secret GET per credential read.
+			reads := phases
+			if !scoped {
+				reads = 2 * phases
+			}
+			if e != nil || proofs.Load() != reads || api.Load() != ownerProviderColdProofCalls+reads || puts.Load() != phases || gets.Load() != phases {
+				t.Fatal("audit operation did not complete within its call budget", e)
 			}
 		})
 	}

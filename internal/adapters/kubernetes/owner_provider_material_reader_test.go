@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"sync/atomic"
@@ -27,7 +26,7 @@ import (
 // original receipts and token identity remain explicitly synthetic; no SQL or
 // external storage authority is inferred from this component regression.
 func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
-	for _, mode := range []string{"valid", "rotated-current", "stale-mount", "replaced-secret", "wrong-secret-kind", "wrong-secret-version", "extra-key", "placeholder", "missing-receipt", "guard-lost", "allowing-probe", "wrong-token-pod", "token-revoked", "late-secret", "cancelled", "sdk-budget", "final-pod-changed", "final-pod-read"} {
+	for _, mode := range []string{"valid", "rotated-current", "stale-mount", "replaced-secret", "wrong-secret-kind", "wrong-secret-version", "extra-key", "placeholder", "missing-receipt", "allowing-probe", "wrong-token-pod", "late-secret", "cancelled", "sdk-budget"} {
 		t.Run(mode, func(t *testing.T) {
 			x := providerOwnerObjectFixture(t)
 			in := x.reader.input
@@ -119,17 +118,13 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 					}
 					storageReads.Add(1)
 					if mode == "late-secret" {
-						offset.Store(int64(6 * time.Second))
+						offset.Store(int64(OwnerProtectionReuse + time.Second))
 					}
 					permissionReply(w, currentSecret.Load())
 				case "/api/v1/namespaces/" + in.Namespace.Name:
 					permissionReply(w, ns)
 				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + g.Name:
-					if mode == "guard-lost" && storageReads.Load() > 0 {
-						http.NotFound(w, r)
-					} else {
-						permissionReply(w, policy)
-					}
+					permissionReply(w, policy)
 				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/" + g.Name:
 					permissionReply(w, binding)
 				case "/apis/authentication.k8s.io/v1/selfsubjectreviews":
@@ -143,7 +138,7 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 					if r.URL.Query().Get("dryRun") != "All" {
 						t.Error("persistent guard probe attempted")
 					}
-					if mode == "allowing-probe" && storageReads.Load() > 0 {
+					if mode == "allowing-probe" {
 						permissionReply(w, x.deployment)
 						break
 					}
@@ -151,7 +146,7 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 					w.WriteHeader(403)
 					permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonForbidden, Code: 403, Details: &meta.StatusDetails{Group: "apps", Kind: "deployments", Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy '" + g.Name + "' with binding '" + g.Name + "' denied request: " + ownerWorkloadDenial}}}})
 				case "/apis/authentication.k8s.io/v1/tokenreviews":
-					n := reviews.Add(1)
+					reviews.Add(1)
 					var request auth.TokenReview
 					if json.NewDecoder(r.Body).Decode(&request) != nil || request.Spec.Token != string(token) || len(request.Spec.Audiences) != 1 || request.Spec.Audiences[0] != OwnerEnrollmentAudience(in.InstallationID) {
 						t.Error("wrong original token or audience")
@@ -160,23 +155,8 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 					if mode == "wrong-token-pod" {
 						reply.Status.User.Extra["authentication.kubernetes.io/pod-uid"] = auth.ExtraValue{ownerID(3501)}
 					}
-					if mode == "token-revoked" && n == 2 {
-						reply.Status.Authenticated = false
-					}
 					permissionReply(w, reply)
 				case "/api/v1/namespaces/" + in.Namespace.Name + "/pods/" + pod.Name:
-					if reviews.Load() == 2 {
-						if mode == "final-pod-read" {
-							http.Error(w, "synthetic unavailable", 503)
-							break
-						}
-						if mode == "final-pod-changed" {
-							changed := pod.DeepCopy()
-							changed.Spec.Containers[0].Image = "different-synthetic-image"
-							permissionReply(w, changed)
-							break
-						}
-					}
 					permissionReply(w, pod)
 				case "/apis/apps/v1/namespaces/" + in.Namespace.Name + "/replicasets/" + rs.Name:
 					permissionReply(w, rs)
@@ -261,16 +241,6 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 				stopFresh()
 				if err != nil || fresh.AccessKeyID != "synthetic-rotated" || !freshUntil.After(time.Now()) || freshUntil.After(freshStart.Add(5*time.Second)) || storageReads.Load() != 3 {
 					t.Fatal("same original Secret could not rotate current mounted credentials", err)
-				}
-			}
-			if mode == "final-pod-changed" || mode == "final-pod-read" {
-				want := "identity/final-pod-changed"
-				if mode == "final-pod-read" {
-					want = "identity/final-pod/live-pod-read"
-				}
-				var named interface{ FixedStep() string }
-				if !errors.As(e, &named) || named.FixedStep() != want {
-					t.Fatal("indistinguishable Pod failure", e)
 				}
 			}
 			if string(x.journal.Data["state.json"]) != originalJournal {
