@@ -101,7 +101,9 @@ func (s *RetentionSources) ObserveRetention(ctx context.Context, o app.Retention
 		}
 		observed := identity.Earlier(o.List.Snapshot.ObservedAt, p.ObservedAt).UTC().Truncate(time.Microsecond)
 		input := identity.Earlier(o.List.Snapshot.FreshUntil, p.FreshUntil)
-		input = identity.Earlier(input, f.LeaseUntil)
+		// Same microsecond precision as observed, or the five-second span check
+		// fails by the truncated nanoseconds (native75-77).
+		input = identity.Earlier(input, f.LeaseUntil).UTC().Truncate(time.Microsecond)
 		// The LIST and guard proof must still be inside their original five
 		// seconds now; only the stored observation lives longer.
 		if !identity.Fresh(observed, input, now, 5*time.Second) {

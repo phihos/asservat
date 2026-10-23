@@ -43,7 +43,9 @@ func qualifyRetentionObservation(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 		publisher := app.RetentionAcceptancePublisher{Journal: auditor, Writer: &objectstore.RetentionAcceptanceObjects{Store: store, Seal: keys, Open: keys}}
 		observe := func(rv string, lifetime time.Duration) app.RetentionObservation {
-			now := time.Now().UTC().Truncate(time.Microsecond)
+			// Real LIST/guard observations carry nanoseconds; native75-77 refused
+			// every one when only part of the bound was truncated.
+			now := time.Now().UTC().Truncate(time.Microsecond).Add(789 * time.Nanosecond)
 			list := cp.Transition.List
 			list.ResourceVersion = rv
 			list.Snapshot.ObservedAt, list.Snapshot.FreshUntil = now, now.Add(lifetime)

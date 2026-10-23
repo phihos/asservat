@@ -1,0 +1,86 @@
+2026-10-23T13:49:30.148604426Z owner port router: started (1)
+2026-10-23T13:49:30.148620526Z owner router: started (1)
+2026-10-23T13:49:35.025067787Z owner router: handoff observation (1)
+2026-10-23T13:49:36.540305070Z owner router: handoff observation (2)
+2026-10-23T13:49:40.339133232Z owner router: handoff observation (4)
+2026-10-23T13:49:46.039157123Z owner router: handoff observation (8)
+2026-10-23T13:49:57.039835929Z owner observer 462 calls 330ms, operation 0 calls 0s, readiness 548 calls 390ms, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:50:01.238703007Z owner router: handoff observation (16)
+2026-10-23T13:50:27.039771794Z owner observer 952 calls 680ms, operation 0 calls 0s, readiness 1134 calls 800ms, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:50:31.602264827Z owner router: handoff observation (32)
+2026-10-23T13:50:57.038984449Z owner observer 1384 calls 1s, operation 0 calls 0s, readiness 1732 calls 1.22s, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:51:27.039849786Z owner observer 1830 calls 1.31s, operation 0 calls 0s, readiness 2330 calls 1.63s, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:51:32.774114403Z owner router: handoff observation (64)
+2026-10-23T13:51:57.040031121Z owner observer 2328 calls 1.66s, operation 0 calls 0s, readiness 2916 calls 2.04s, identity 3 calls 0s, provider 22 calls 20ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:52:27.039676677Z owner observer 2767 calls 1.97s, operation 0 calls 0s, readiness 3502 calls 2.45s, identity 3 calls 0s, provider 22 calls 20ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:52:57.039497790Z owner observer 3213 calls 2.29s, operation 0 calls 0s, readiness 4110 calls 2.87s, identity 3 calls 0s, provider 22 calls 20ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:53:27.039277912Z owner observer 3707 calls 2.64s, operation 0 calls 0s, readiness 4706 calls 3.29s, identity 3 calls 0s, provider 22 calls 20ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:53:33.544055841Z owner router: handoff observation (128)
+2026-10-23T13:53:57.039398768Z owner observer 4148 calls 2.96s, operation 0 calls 0s, readiness 5294 calls 3.69s, identity 3 calls 0s, provider 33 calls 30ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:54:27.039175898Z owner observer 4585 calls 3.27s, operation 0 calls 0s, readiness 5880 calls 4.1s, identity 3 calls 0s, provider 33 calls 30ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:54:57.039622529Z owner observer 5086 calls 3.63s, operation 0 calls 0s, readiness 6466 calls 4.51s, identity 3 calls 0s, provider 33 calls 30ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:55:27.039779258Z owner observer 5514 calls 3.94s, operation 0 calls 0s, readiness 7076 calls 4.94s, identity 3 calls 0s, provider 33 calls 30ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:55:29.061057063Z owner provider refresh: audit-wrap renew (1)
+2026-10-23T13:55:29.067115975Z owner provider refresh: audit-unwrap renew (1)
+2026-10-23T13:55:29.072922367Z owner provider refresh: server-sign renew (1)
+2026-10-23T13:55:29.078936760Z owner provider refresh: client-sign renew (1)
+2026-10-23T13:55:29.084627911Z owner provider refresh: browser-seal renew (1)
+2026-10-23T13:55:29.090495943Z owner provider refresh: browser-open renew (1)
+2026-10-23T13:55:29.096440776Z owner provider refresh: work-sign renew (1)
+2026-10-23T13:55:29.102221777Z owner provider refresh: worker-issue renew (1)
+2026-10-23T13:55:57.039681859Z owner observer 5956 calls 4.25s, operation 0 calls 0s, readiness 7662 calls 5.35s, identity 3 calls 0s, provider 44 calls 40ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:56:27.040009495Z owner observer 6442 calls 4.61s, operation 0 calls 0s, readiness 8258 calls 5.78s, identity 3 calls 0s, provider 44 calls 40ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:56:57.039321795Z owner observer 6899 calls 4.95s, operation 0 calls 0s, readiness 8844 calls 6.21s, identity 3 calls 0s, provider 44 calls 40ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:57:27.039191375Z owner observer 7331 calls 5.26s, operation 0 calls 0s, readiness 9430 calls 6.61s, identity 3 calls 0s, provider 44 calls 40ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:57:32.077587128Z owner provider refresh: audit-wrap renew (2)
+2026-10-23T13:57:32.090410197Z owner provider refresh: audit-unwrap renew (2)
+2026-10-23T13:57:32.096895041Z owner provider refresh: server-sign renew (2)
+2026-10-23T13:57:32.103102634Z owner provider refresh: client-sign renew (2)
+2026-10-23T13:57:32.109319008Z owner provider refresh: browser-seal renew (2)
+2026-10-23T13:57:32.115970653Z owner provider refresh: browser-open renew (2)
+2026-10-23T13:57:32.122780878Z owner provider refresh: work-sign renew (2)
+2026-10-23T13:57:32.128361039Z owner provider refresh: worker-issue renew (2)
+2026-10-23T13:57:38.408245446Z owner router: handoff observation (256)
+2026-10-23T13:57:57.039577958Z owner observer 7817 calls 5.61s, operation 0 calls 0s, readiness 10039 calls 7.04s, identity 3 calls 0s, provider 55 calls 50ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:58:03.045602001Z owner provider refresh: audit-wrap renew (4)
+2026-10-23T13:58:03.051428513Z owner provider refresh: audit-unwrap renew (4)
+2026-10-23T13:58:03.056768293Z owner provider refresh: server-sign renew (4)
+2026-10-23T13:58:03.062261534Z owner provider refresh: client-sign renew (4)
+2026-10-23T13:58:03.067615864Z owner provider refresh: browser-seal renew (4)
+2026-10-23T13:58:03.072891684Z owner provider refresh: browser-open renew (4)
+2026-10-23T13:58:03.078070793Z owner provider refresh: work-sign renew (4)
+2026-10-23T13:58:03.083407633Z owner provider refresh: worker-issue renew (4)
+2026-10-23T13:58:19.068532201Z owner provider refresh: audit-wrap renew (8)
+2026-10-23T13:58:19.074034441Z owner provider refresh: audit-unwrap renew (8)
+2026-10-23T13:58:19.079656002Z owner provider refresh: server-sign renew (8)
+2026-10-23T13:58:19.085123803Z owner provider refresh: client-sign renew (8)
+2026-10-23T13:58:19.090547143Z owner provider refresh: browser-seal renew (8)
+2026-10-23T13:58:19.096138044Z owner provider refresh: browser-open renew (8)
+2026-10-23T13:58:19.101676105Z owner provider refresh: work-sign renew (8)
+2026-10-23T13:58:19.107055405Z owner provider refresh: worker-issue renew (8)
+2026-10-23T13:58:27.039148469Z owner observer 8267 calls 5.93s, operation 0 calls 0s, readiness 10626 calls 7.47s, identity 3 calls 0s, provider 87 calls 70ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:58:29.044947313Z owner provider refresh: audit-wrap login (1)
+2026-10-23T13:58:29.050107842Z owner provider refresh: audit-unwrap login (1)
+2026-10-23T13:58:29.055308402Z owner provider refresh: server-sign login (1)
+2026-10-23T13:58:29.060604771Z owner provider refresh: client-sign login (1)
+2026-10-23T13:58:29.065765411Z owner provider refresh: browser-seal login (1)
+2026-10-23T13:58:29.070840740Z owner provider refresh: browser-open login (1)
+2026-10-23T13:58:29.075939089Z owner provider refresh: work-sign login (1)
+2026-10-23T13:58:29.081167569Z owner provider refresh: worker-issue login (1)
+2026-10-23T13:58:32.044917620Z owner provider refresh: audit-wrap login (2)
+2026-10-23T13:58:32.050156520Z owner provider refresh: audit-unwrap login (2)
+2026-10-23T13:58:32.055294979Z owner provider refresh: server-sign login (2)
+2026-10-23T13:58:32.060425278Z owner provider refresh: client-sign login (2)
+2026-10-23T13:58:32.065711908Z owner provider refresh: browser-seal login (2)
+2026-10-23T13:58:32.070852598Z owner provider refresh: browser-open login (2)
+2026-10-23T13:58:32.076030177Z owner provider refresh: work-sign login (2)
+2026-10-23T13:58:32.081106986Z owner provider refresh: worker-issue login (2)
+2026-10-23T13:58:46.055768780Z owner provider refresh: audit-wrap login (4)
+2026-10-23T13:58:46.060932279Z owner provider refresh: audit-unwrap login (4)
+2026-10-23T13:58:46.066060108Z owner provider refresh: server-sign login (4)
+2026-10-23T13:58:46.071242648Z owner provider refresh: client-sign login (4)
+2026-10-23T13:58:46.076524338Z owner provider refresh: browser-seal login (4)
+2026-10-23T13:58:46.081634757Z owner provider refresh: browser-open login (4)
+2026-10-23T13:58:46.086822316Z owner provider refresh: work-sign login (4)
+2026-10-23T13:58:46.092055146Z owner provider refresh: worker-issue login (4)
+2026-10-23T13:58:57.039684478Z owner observer 8710 calls 6.24s, operation 0 calls 0s, readiness 11212 calls 7.88s, identity 3 calls 0s, provider 98 calls 80ms, credentials 15 calls 10ms, context-start 0 calls 0s total
