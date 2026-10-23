@@ -1,0 +1,3 @@
+2026-10-23T18:57:55.444316265Z worker credentials established
+2026-10-23T18:58:07.719787790Z native read: unwrap-1@<100ms unwrap-2@<100ms unwrap-3@<100ms object-decrypt@<100ms parse@<100ms frames@<250ms, stopped at acknowledge
+2026-10-23T18:58:07.719865811Z service stopped at native/conversation/acknowledge (unavailable): protected configuration, credentials or original deadline unavailable
