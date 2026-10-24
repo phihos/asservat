@@ -1,5 +1,11 @@
 # Decision records
 
+[ADR-223 — Lost regional completion replies end Indeterminate](223-lost-regional-completion-reply.md)
+does not import a committed regional artifact whose reply was lost; the
+hub-worker deletion sweep's existing login marks elapsed capture deadlines so
+such captures end Indeterminate and keep their charge until normal deletion.
+Unit checks pass; real SQL and installed qualification are pending.
+
 [ADR-222 — Consolidate SQL credentials within the hub process](222-hub-process-sql-credentials.md)
 uses exact grant unions for ordinary public duties and owner identity/routing,
 with separate pinned/nested readers and unchanged process/connection boundaries.

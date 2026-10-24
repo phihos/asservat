@@ -33,6 +33,9 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	defer readPool.Close()
 	deadlinePool := poolFor("context_deadline_runtime", "synthetic-context-deadline")
 	defer deadlinePool.Close()
+	// ADR-223: installed, the hub-worker's cleaner login observes deadlines.
+	cleanupPool := poolFor("context_cleanup_runtime", "synthetic-context-cleanup")
+	defer cleanupPool.Close()
 	reader := func(t *testing.T, s captureAdmissionScenario) *postgres.ContextProgressReads {
 		t.Helper()
 		r, err := postgres.NewContextProgressReads(ctx, readPool, s.a.RootID, s.recovery.guard)
@@ -44,6 +47,14 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	observer := func(t *testing.T, s captureAdmissionScenario) *postgres.ContextDeadlines {
 		t.Helper()
 		r, err := postgres.NewContextDeadlineObserver(ctx, deadlinePool, s.a.RootID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	installedObserver := func(t *testing.T, s captureAdmissionScenario) *postgres.ContextDeadlines {
+		t.Helper()
+		r, err := postgres.NewContextDeadlineObserver(ctx, cleanupPool, s.a.RootID)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -196,9 +207,14 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		var wg sync.WaitGroup
 		counts := make(chan int64, 4)
 		errs := make(chan error, 4)
-		for range 4 {
+		installed := installedObserver(t, s)
+		for i := range 4 {
 			wg.Add(1)
-			go func() { defer wg.Done(); n, e := o.ObserveOverdueContextCaptures(ctx, 16); counts <- n; errs <- e }()
+			x := o
+			if i%2 == 1 {
+				x = installed
+			}
+			go func() { defer wg.Done(); n, e := x.ObserveOverdueContextCaptures(ctx, 16); counts <- n; errs <- e }()
 		}
 		wg.Wait()
 		close(counts)
@@ -224,8 +240,10 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			t.Fatal("uncertainty refunded capacity", charged, err)
 		}
 		for _, sql := range []string{"UPDATE context_capture SET deadline_observed_at=NULL WHERE root_id=$1", "UPDATE context_capture SET deadline_observed_at=clock_timestamp() WHERE root_id=$1"} {
-			if _, err = deadlinePool.Exec(ctx, sql, s.a.RootID); err == nil {
-				t.Fatal("deadline observer rewrote history")
+			for _, p := range []*pgxpool.Pool{deadlinePool, cleanupPool} {
+				if _, err = p.Exec(ctx, sql, s.a.RootID); err == nil {
+					t.Fatal("deadline observer rewrote history")
+				}
 			}
 		}
 	})

@@ -90,6 +90,12 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 			return value.ContextProgressObservation{}, value.ErrUnavailable
 		}
 		switch executions[0].Phase {
+		case "prepared":
+			// The regional preparation is recorded, but no acquisition start is:
+			// dispatch remains unconfirmed until the start is recorded.
+			out.Phase = "Pending"
+			out.ActionPhase = "Pending"
+			out.ReasonCode = "DispatchUnconfirmed"
 		case "started":
 			out.Phase = "Running"
 			out.ActionPhase = "Running"
@@ -108,6 +114,8 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 			out.Phase = "Finalizing"
 			out.ActionPhase = "Finalizing"
 			out.ReasonCode = "VerificationPending"
+		default:
+			return value.ContextProgressObservation{}, value.ErrUnavailable
 		}
 	}
 	if c.DeadlineObservedAt.Valid {

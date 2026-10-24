@@ -96,14 +96,18 @@ func TestAPIVerificationAuditRequiresExactCompletedResult(t *testing.T) {
 }
 func TestAPIExecutionProgressUsesItsDurableOutcome(t *testing.T) {
 	f, r, _ := apiCompletedFixture(t)
-	for _, tc := range []struct{ state, phase, reason string }{{"started", "Running", "AcquisitionStarted"}, {"captureFailed", "Failed", "AcquisitionFailed"}, {"storeUnconfirmed", "Indeterminate", "StorageOutcomeUnconfirmed"}, {"stored", "Finalizing", "VerificationPending"}} {
+	for _, tc := range []struct{ state, phase, reason string }{{"prepared", "Pending", "DispatchUnconfirmed"}, {"started", "Running", "AcquisitionStarted"}, {"captureFailed", "Failed", "AcquisitionFailed"}, {"storeUnconfirmed", "Indeterminate", "StorageOutcomeUnconfirmed"}, {"stored", "Finalizing", "VerificationPending"}} {
 		t.Run(tc.state, func(t *testing.T) {
 			x := r
 			x.Phase = tc.state
 			if tc.state != "stored" {
 				x.Copies = artifact.Copies{}
 			}
-			if tc.state == "started" {
+			if tc.state == "prepared" {
+				x.ObjectUID = ""
+				x.StartedAt = time.Time{}
+			}
+			if tc.state == "started" || tc.state == "prepared" {
 				x.AcquiredAt = time.Time{}
 				x.CompletedAt = time.Time{}
 			}
@@ -115,5 +119,32 @@ func TestAPIExecutionProgressUsesItsDurableOutcome(t *testing.T) {
 				t.Fatal(out, err)
 			}
 		})
+	}
+}
+
+// A start whose outcome never reaches SQL (for example a lost regional
+// completion reply) stays Running until the deadline observer marks it; it
+// then reports Indeterminate rather than an inferred failure or success.
+func TestAPIExecutionUnrecordedOutcomeEndsIndeterminateAfterDeadline(t *testing.T) {
+	f, r, _ := apiCompletedFixture(t)
+	for _, phase := range []string{"prepared", "started"} {
+		t.Run(phase, func(t *testing.T) {
+			x := r
+			x.Phase, x.Copies, x.AcquiredAt, x.CompletedAt = phase, artifact.Copies{}, time.Time{}, time.Time{}
+			if phase == "prepared" {
+				x.ObjectUID, x.StartedAt = "", time.Time{}
+			}
+			g := f
+			g.ContextCapture.DeadlineObservedAt = ts(g.ContextCapture.Deadline.Time.Add(time.Second))
+			out, err := progressFacts(g, x)
+			if err != nil || out.Phase != "Indeterminate" || out.ActionPhase != "Indeterminate" || out.ReasonCode != "DeadlineOutcomeUnconfirmed" {
+				t.Fatal(out, err)
+			}
+		})
+	}
+	x := r
+	x.Phase = "unknown"
+	if _, err := progressFacts(f, x); err == nil {
+		t.Fatal("unknown execution phase projected")
 	}
 }

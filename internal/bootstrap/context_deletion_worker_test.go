@@ -270,3 +270,82 @@ func TestContextDeletionLoginsFollowTheWorkerConfigurationLogins(t *testing.T) {
 		t.Fatal("deletion child opened without its flag", err)
 	}
 }
+
+type deadlineObserverFunc func(context.Context, int) (int64, error)
+
+func (f deadlineObserverFunc) ObserveOverdueContextCaptures(ctx context.Context, limit int) (int64, error) {
+	return f(ctx, limit)
+}
+
+// ADR-223: full pages continue within one sweep up to the fixed bound; a
+// short page or a failure ends it. Every page is bounded by its own deadline.
+func TestContextDeadlineObservationPagesAreBounded(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		pages []int64
+		fail  int
+		calls int
+		ok    bool
+	}{
+		{"empty", []int64{0}, -1, 1, true},
+		{"short-second-page", []int64{16, 3}, -1, 2, true},
+		{"backlog-bound", []int64{16, 16, 16, 16, 16, 16, 16, 16, 16}, -1, contextDeadlinePages, true},
+		{"failure", []int64{16, 0}, 1, 2, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			outcome := observeContextDeadlines(t.Context(), func(ctx context.Context, limit int) (int64, error) {
+				defer func() { calls++ }()
+				if deadline, ok := ctx.Deadline(); !ok || time.Until(deadline) > 5*time.Second || limit != 16 {
+					t.Fatal("unbounded deadline page", limit)
+				}
+				if calls == tc.fail {
+					return 0, errors.New("synthetic SQL failure")
+				}
+				return tc.pages[calls], nil
+			})
+			if calls != tc.calls || (outcome == "") != tc.ok {
+				t.Fatal("deadline paging", calls, outcome)
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if outcome := observeContextDeadlines(ctx, func(context.Context, int) (int64, error) {
+		t.Fatal("canceled sweep observed deadlines")
+		return 0, nil
+	}); outcome != "" {
+		t.Fatal(outcome)
+	}
+}
+
+// The installed sweep observes deadlines on every pass, including before the
+// capacity projection supplies the deletion pins, and stops with its Lease.
+func TestContextDeletionSweepObservesDeadlinesWithoutDeletionPins(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	observed := 0
+	w := &contextDeletionWorker{
+		deadlines: deadlineObserverFunc(func(context.Context, int) (int64, error) {
+			observed++
+			cancel()
+			return 1, nil
+		}),
+		section: func() (contracts.ContextDeletionDeployment, string, bool) {
+			return contracts.ContextDeletionDeployment{}, "", false
+		},
+	}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		w.run(ctx)
+	}()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("sweep did not stop with its context")
+	}
+	if observed != 1 || w.cleaner != nil {
+		t.Fatal("deadline observation did not run independently of deletion", observed)
+	}
+}
