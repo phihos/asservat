@@ -135,6 +135,12 @@ func podWorkerTLSChannel(t *testing.T, ctx context.Context, localImage string, h
 		t.Fatal(err)
 	} // parent remains private 0700
 	name := "asservat-worker-channel-" + custodyID()
+	// The relay must share the kind nodes' Docker network. The harness puts
+	// them on its own per-run network; plain kind uses the shared "kind".
+	network := os.Getenv("KIND_EXPERIMENTAL_DOCKER_NETWORK")
+	if network == "" {
+		network = "kind"
+	}
 	command := func(args ...string) []byte {
 		t.Helper()
 		out, err := exec.CommandContext(ctx, "docker", args...).Output()
@@ -143,7 +149,7 @@ func podWorkerTLSChannel(t *testing.T, ctx context.Context, localImage string, h
 		}
 		return out
 	}
-	command("create", "--name", name, "--label", "asservat.test=worker-channel-fixture", "--network", "kind", "--user", "65532:65532", "--read-only", "--memory", "64m", "--cpus", "0.25", "--pids-limit", "64", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--mount", "type=bind,src="+path+",dst=/channel.sock", "--entrypoint", "/fixture", localImage, "fixture-proxy")
+	command("create", "--name", name, "--label", "asservat.test=worker-channel-fixture", "--network", network, "--user", "65532:65532", "--read-only", "--memory", "64m", "--cpus", "0.25", "--pids-limit", "64", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--mount", "type=bind,src="+path+",dst=/channel.sock", "--entrypoint", "/fixture", localImage, "fixture-proxy")
 	t.Cleanup(func() {
 		cleanup, end := context.WithTimeout(context.Background(), 10*time.Second)
 		defer end()
@@ -157,7 +163,7 @@ func podWorkerTLSChannel(t *testing.T, ctx context.Context, localImage string, h
 	if json.Unmarshal(raw, &networks) != nil {
 		t.Fatal("invalid relay network")
 	}
-	ip := net.ParseIP(networks["kind"].IPAddress)
+	ip := net.ParseIP(networks[network].IPAddress)
 	if ip == nil || ip.IsUnspecified() {
 		t.Fatal("missing owned relay address")
 	}
