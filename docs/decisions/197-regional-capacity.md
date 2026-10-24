@@ -268,8 +268,9 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     presented plan's digests, so the Go side is unchanged. A non-additive
     change (any existing policy or cluster entry edited) keeps the earlier
     frozen behaviour.
-  - *Hub-api scope.* The v2 server holds one regional capacity cluster, the
-    first profile's one slot. A second needs one standby handler per cluster.
+  - *Hub-api scope.* The v2 server holds every regional capacity cluster in
+    the catalog (up to its eight slots, ADR-196 addendum), and picks each
+    standby's profile from its hello.
   - *Regional clients.* The region's standby uses its own observer and probe
     client instances at the same fixed 20 QPS, so capacity observation never
     spends the executor's proof budget (ADR-199). No limit is raised.
