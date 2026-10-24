@@ -18,7 +18,8 @@ five-second read deadline after all blocking database work.
 | Durable facts | Capture and action phase | Reason |
 | --- | --- | --- |
 | Accepted intent awaiting audit | Pending | IntentAuditPending |
-| Audited intent without stored outcome | Pending | DispatchUnconfirmed |
+| Audited intent without stored outcome, or a prepared API execution without a recorded start | Pending | DispatchUnconfirmed |
+| API execution start recorded, no outcome | Running | AcquisitionStarted |
 | Stored outcome without semantic verification | Finalizing | VerificationPending |
 | Verified outcome awaiting audit acknowledgement | Finalizing | VerificationAuditPending |
 | Audited verified outcome awaiting publication | Finalizing | PublicationPending |
@@ -44,7 +45,9 @@ transactions update revisions through fixed triggers. The overflow sentinel
 There is no use of `xmin`, data hashes or process-local counters as revision.
 
 `ContextDeadlines.ObserveOverdueContextCaptures` is a distinct bounded mutation
-facet, called by future protected supervision. It locks the permission root and
+facet. The installed hub-worker context deletion sweep calls it every 30 seconds
+under the `context-cleanup` login, up to eight full pages per pass
+([ADR-223](../decisions/223-lost-regional-completion-reply.md)). It locks the permission root and
 marks at most sixteen unpublished admissions whose original deadline elapsed.
 The timestamp is SQL-assigned, immutable, and does not establish writer
 quiescence, refund capacity or change accepted identities. Multiple workers
@@ -53,9 +56,10 @@ leaves the last durable phase visible. This is explicit operational uncertainty,
 not an automatically inferred Failed/TimedOut/Running status.
 
 The read SQL role can SELECT the relevant projections and take the existing
-identity-column root locks. The deadline role can update only its timestamp
-column. Neither can change original scope, deadline, intent audit, revision,
-custody or publication. The migration owner owns the fixed SECURITY DEFINER
+identity-column root locks. The deadline grants update only its timestamp
+column; installed, the `context-cleanup` login holds them alongside its deletion
+grants. Neither grant set can change original scope, deadline, intent audit,
+revision or publication. The migration owner owns the fixed SECURITY DEFINER
 revision function, whose pinned trusted search path and revoked public EXECUTE
 are described in ADR-105. Runtime roles cannot attach arbitrary triggers.
 
@@ -68,7 +72,7 @@ retention shortening at revision exhaustion, and verification/audit/publication
 revision transitions. Native qualification must be recorded after the owned
 custody suite runs; compiling/skipping that fixture is not a passing SQL run.
 
-Pending composition includes overdue supervision, protected capability
+Pending composition includes protected capability
 production, case navigation, distributed execution/publication and public
 runtime/bootstrap. Historical-row retirement and admission fairness are tracked
 separately by U13 and are not solved by this projection.

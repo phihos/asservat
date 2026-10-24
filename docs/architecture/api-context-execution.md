@@ -32,6 +32,17 @@ former grant union and existing SQL methods are retained. This does not join
 regional acquisition, audit, publication, key-service or deletion credentials.
 The hub physical connection governor remains 32.
 
+## Lost regional replies
+
+[ADR-223](../decisions/223-lost-regional-completion-reply.md): when the region
+has committed its copies but the acquisition or `CompleteStored` reply does not
+reach the hub, SQL keeps `started` and the hub does not import the artifact.
+Retries return `AlreadyStarted`; collection is never repeated. Progress reports
+Running until the hub-worker deadline observer marks the original deadline, then
+Indeterminate/DeadlineOutcomeUnconfirmed. The storage charge stays held until
+the normal deletion lifecycle releases it. A `prepared` row without a recorded
+start reports Pending/DispatchUnconfirmed.
+
 ## Exact class and target
 
 `artifact.ContextExecutionClass` has two supported values. The empty value is

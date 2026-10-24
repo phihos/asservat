@@ -9,7 +9,8 @@ import (
 
 // ADR-205 decision 2: closed allow-lists, including lock columns, equal to the
 // ADR-111 fixture roles context_cleanup_runtime, context_cleanup_audit_runtime
-// and context_cleanup_finalize_runtime in test/fixtures/sql/runtime-roles.sql.
+// and context_cleanup_finalize_runtime in test/fixtures/sql/runtime-roles.sql;
+// the cleaner additionally holds context_deadline_runtime's grants (ADR-223).
 // A broader table grant or an extra privilege must fail.
 func TestContextDeletionRolesHaveExactFixtureGrants(t *testing.T) {
 	table := func(name, privilege string, columns ...string) []publicRuntimeGrant {
@@ -32,7 +33,10 @@ func TestContextDeletionRolesHaveExactFixtureGrants(t *testing.T) {
 		table("custody_pool", "UPDATE", "id"), table("custody_allocation", "UPDATE", "id"), table("custody_attempt", "UPDATE", "id"))
 	cleanup := join(common, custody,
 		table("custody_attempt", "UPDATE", "state", "deletion_fence", "lease_until"),
-		table("context_deletion_checkpoint", "INSERT"))
+		table("context_deletion_checkpoint", "INSERT"),
+		// ADR-223: the fixture context_deadline_runtime grants.
+		table("context_capture", "SELECT"), table("context_catalog", "SELECT"),
+		table("context_capture", "UPDATE", "deadline_observed_at"))
 	acknowledge := join(common,
 		table("context_deletion_checkpoint", "UPDATE", "attempt_id", "audit_receipt_json", "audit_acknowledged_at"))
 	finalize := join(common, custody,

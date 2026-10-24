@@ -402,6 +402,9 @@ GRANT SELECT ON custody_pool,custody_allocation,custody_attempt,custody_copy TO 
 GRANT UPDATE(id) ON custody_pool,custody_allocation,custody_attempt TO context_cleanup_runtime,context_cleanup_finalize_runtime;
 GRANT UPDATE(state,deletion_fence,lease_until) ON custody_attempt TO context_cleanup_runtime;
 GRANT INSERT ON context_deletion_checkpoint TO context_cleanup_runtime;
+-- ADR-223: the installed cleaner login also holds context_deadline_runtime's grants.
+GRANT SELECT ON context_capture,context_catalog TO context_cleanup_runtime;
+GRANT UPDATE(deadline_observed_at) ON context_capture TO context_cleanup_runtime;
 GRANT UPDATE(attempt_id) ON context_deletion_checkpoint TO context_cleanup_audit_runtime,context_cleanup_finalize_runtime;
 GRANT UPDATE(audit_receipt_json,audit_acknowledged_at) ON context_deletion_checkpoint TO context_cleanup_audit_runtime;
 GRANT UPDATE(charged_bytes,charged_objects) ON custody_allocation TO context_cleanup_finalize_runtime;

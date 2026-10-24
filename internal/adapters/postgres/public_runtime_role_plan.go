@@ -322,6 +322,11 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			// Claim the deletion lease and record the fenced purge only.
 			add("custody_attempt", "UPDATE", "state", "deletion_fence", "lease_until")
 			add("context_deletion_checkpoint", "INSERT")
+			// The same sweep marks elapsed capture deadlines (ADR-223), exactly the
+			// fixture context_deadline_runtime grants: the immutable observation
+			// timestamp only, never scope, intent, revision or publication.
+			read("context_capture", "context_catalog")
+			add("context_capture", "UPDATE", "deadline_observed_at")
 		case "context-cleanup-audit":
 			// One receipt on an unacknowledged checkpoint; the identity column
 			// admits its FOR UPDATE lock, and the guard trigger refuses changes.
