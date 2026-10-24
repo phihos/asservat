@@ -33,6 +33,8 @@ type InvestigationHandler struct {
 	mu            sync.Mutex
 	active        map[identity.Principal]int
 	stopActive    map[identity.Principal]int
+	// Report receives a fixed stage label for every 503 (diagnostics only).
+	Report func(string)
 }
 
 // NewInvestigationHandler is an unaudited component/test constructor, never
@@ -108,6 +110,21 @@ func (h *InvestigationHandler) rejectIngress(w http.ResponseWriter, r *http.Requ
 	sessionProblem(w, status)
 }
 
+func (h *InvestigationHandler) unavailable(w http.ResponseWriter, stage string) {
+	if h.Report != nil {
+		h.Report(stage)
+	}
+	sessionProblem(w, 503)
+}
+
+// failure is sessionFailure, reporting the stage when it answers 503.
+func (h *InvestigationHandler) failure(w http.ResponseWriter, stage string, err error) {
+	if h.Report != nil && !errors.Is(err, identity.ErrSessionBusy) && !errors.Is(err, identity.ErrDenied) && !errors.Is(err, identity.ErrInvalid) && !errors.Is(err, identity.ErrSessionCapacity) {
+		h.Report(stage)
+	}
+	sessionFailure(w, err)
+}
+
 func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if !h.sessions.base(w, r) {
 		h.security.Add(presentation.IngressPreAdmission)
@@ -160,13 +177,13 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	controller := http.NewResponseController(w)
 	deadline, _ := ctx.Deadline()
 	if controller.SetReadDeadline(deadline) != nil || controller.SetWriteDeadline(deadline) != nil {
-		sessionProblem(w, 503)
+		h.unavailable(w, "deadline-setup")
 		return
 	}
 	current, view, err := h.sessions.AuthenticateCurrentWithin(w, r, window)
 	if err != nil {
 		h.security.Add(presentation.IngressPreAdmission)
-		sessionFailure(w, err)
+		h.failure(w, "session", err)
 		return
 	}
 	if invalidMedia {
@@ -241,12 +258,12 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	var out presentation.OperationReply
 	if name == "prepare_artifact_download" && h.audited != nil {
 		if h.refreshOwners == nil {
-			sessionProblem(w, 503)
+			h.unavailable(w, "download-owners")
 			return
 		}
 		cookie, e := cookieValue(r, SessionCookie)
 		if e != nil {
-			sessionFailure(w, e)
+			h.failure(w, "download-cookie", e)
 			return
 		}
 		origin, csrf := r.Header.Get("Origin"), r.Header.Get("X-CSRF-Token")
@@ -267,20 +284,20 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		if h.audited != nil {
 			if out.ValidUntil.IsZero() {
 				h.security.Add(presentation.IngressAuditUnavailable)
-				sessionProblem(w, 503)
+				h.unavailable(w, "call-no-outcome")
 				return
 			}
 			final, e := current.ResolveIdentity(ctx)
 			until := identity.Earlier(out.ValidUntil, final.ValidUntil)
 			if e != nil || ctx.Err() != nil || !time.Now().Before(until) || controller.SetWriteDeadline(until) != nil {
-				sessionProblem(w, 503)
+				h.unavailable(w, "call-final-identity")
 				return
 			}
 		}
 		if errors.Is(err, contracts.ErrInvestigationWire) {
 			sessionProblem(w, 400)
 		} else {
-			sessionFailure(w, err)
+			h.failure(w, "call", err)
 		}
 		return
 	}
@@ -289,7 +306,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	// confirmed failure; the original key remains usable through the service.
 	finalIdentity, err := current.ResolveIdentity(ctx)
 	if err != nil || ctx.Err() != nil {
-		sessionFailure(w, identity.ErrDenied)
+		h.failure(w, "final-identity", identity.ErrDenied)
 		return
 	}
 	if view.Identity.ValidUntil.Before(deadline) {
@@ -297,13 +314,13 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 	deadline = identity.Earlier(deadline, identity.Earlier(out.ValidUntil, finalIdentity.ValidUntil))
 	if !time.Now().Before(deadline) {
-		sessionProblem(w, 503)
+		h.unavailable(w, "final-identity-expired")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	writeCtx, finishWrite := out.ResponseContext(ctx)
 	defer finishWrite()
 	if sent, err := presentation.WriteOperationResponse(writeCtx, w, http.StatusOK, out.Body, deadline, out.CheckDisclosure); err != nil && !sent {
-		sessionProblem(w, 503)
+		h.unavailable(w, "response-write")
 	}
 }
