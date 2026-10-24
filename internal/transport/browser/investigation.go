@@ -120,6 +120,10 @@ func (h *InvestigationHandler) unavailable(w http.ResponseWriter, stage string) 
 // failure is sessionFailure, reporting the stage when it answers 503.
 func (h *InvestigationHandler) failure(w http.ResponseWriter, stage string, err error) {
 	if h.Report != nil && !errors.Is(err, identity.ErrSessionBusy) && !errors.Is(err, identity.ErrDenied) && !errors.Is(err, identity.ErrInvalid) && !errors.Is(err, identity.ErrSessionCapacity) {
+		var step interface{ FixedStep() string }
+		if errors.As(err, &step) {
+			stage += "/" + step.FixedStep()
+		}
 		h.Report(stage)
 	}
 	sessionFailure(w, err)
