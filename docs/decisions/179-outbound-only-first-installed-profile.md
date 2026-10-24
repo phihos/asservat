@@ -65,7 +65,9 @@ cluster. Regional facts arrive only as delegated proof.
    own cluster, as delegated proof with its original five-second freshness. The
    hub caps that freshness at the receiver's validity. Queries are not
    operations: a region still executes no operation without verified work.
-   Each exchange answers at most four queries.
+   Each exchange answers at most eight queries (four until 2026-10-24; raised after an
+   installed run exhausted one standby's budget within its 30 s life; the 2 MiB exchange cap
+   bounds the per-query source frames to about 16).
 
    The [ADR-144](144-cluster-local-observations.md)/[150](150-operation-owned-native-observation-proof.md)
    cluster observation channel was considered and rejected for this purpose.

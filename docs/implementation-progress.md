@@ -10,10 +10,12 @@ Range/If-Range resume, catalog minimization, an unrelated eligible user refused 
 absent objects, Stop, Deny, failed cleanup retaining charges and verified deletion. Fixes: browser
 operations now get MCP's per-operation request window (20 s evidence reads; the 5 s cap returned
 503 on a download preparation that enrolls a worker), target reads no longer reveal whether a
-workload exists, the regional router withdraws an idle standby whose four queries are spent so a
-waiting query gets a fresh one, and the hub-worker now observes elapsed capture deadlines
+workload exists, each regional standby answers eight target queries instead of four (one standby's
+budget ran out within its 30 s life), and the hub-worker now observes elapsed capture deadlines
 (ADR-223; a lost regional completion reply is not imported, never repeated). Open: the second
-workload cluster's join (one catalog slot; join always wrote slot 1).
+workload cluster's join (one catalog slot; join always wrote slot 1), now 8 slots with the
+slot derived by the join and per-cluster capacity standbys. Simplification candidate: the
+per-query source observation frame (ADR-178) is what limits queries per exchange.
 
 ## Installed journey passes end to end (2026-10-24)
 

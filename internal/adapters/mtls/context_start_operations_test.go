@@ -1,6 +1,7 @@
 package mtls
 
 import (
+	"asservat.local/asservat/internal/contracts"
 	"context"
 	"errors"
 	"net"
@@ -345,7 +346,7 @@ func TestContextStartActualHTTP2EOFJoinsBlockedOperation(t *testing.T) {
 
 // ADR-179 over actual TLS1.3/H2: the hub's pre-work target queries are answered
 // while the region waits; a closed failure keeps the exchange, and the same
-// standby then serves the work. The fifth query has no standby budget left.
+// standby then serves the work. A query beyond the budget has no standby.
 func TestContextStartActualHTTP2TargetQueriesKeepTheStandby(t *testing.T) {
 	f := newContextStartTLSFixture(t)
 	regional := &regionalOperationsFixture{t: t, process: f.api}
@@ -379,13 +380,15 @@ func TestContextStartActualHTTP2TargetQueriesKeepTheStandby(t *testing.T) {
 	if _, err = hub.ResolvePod(ctx, targets.Request{}); !errors.Is(err, targets.ErrInvalid) {
 		t.Fatal("invalid request reached the region", err)
 	}
-	if _, err = hub.ResolvePod(ctx, resolved.Request); err != nil {
-		t.Fatal("fourth query", err)
+	for i := 4; i <= contracts.APIContextMaximumQueries; i++ {
+		if _, err = hub.ResolvePod(ctx, resolved.Request); err != nil {
+			t.Fatal("query within the budget", i, err)
+		}
 	}
 	if _, err = hub.ResolvePod(ctx, resolved.Request); !errors.Is(err, value.ErrUnavailable) {
 		t.Fatal("query beyond the exchange budget", err)
 	}
-	if regional.resolved != 4 {
+	if regional.resolved != contracts.APIContextMaximumQueries {
 		t.Fatal("region answered", regional.resolved)
 	}
 	attachment, err := f.router.Attach(ctx, cluster, ownerTestID)

@@ -48,7 +48,7 @@ const (
 
 // ADR-179 pre-work target queries reuse the operation and reply DTOs; their
 // sequence counts queries, 1 to APIContextMaximumQueries.
-const APIContextMaximumQueries = 4
+const APIContextMaximumQueries = 8
 
 // ADR-171 hub-run execution: one regional operation per request/response.
 const (
