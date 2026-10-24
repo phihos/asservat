@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"asservat.local/asservat/internal/domain/audit"
 	"context"
 	"encoding/json"
 	"errors"
@@ -151,7 +152,9 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		sessionProblem(w, 429)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	// Same per-operation window as MCP: evidence reads get the longer window.
+	window := audit.OperationRequestWindow(name)
+	ctx, cancel := context.WithTimeout(r.Context(), window)
 	defer cancel()
 	r = r.WithContext(ctx)
 	controller := http.NewResponseController(w)
@@ -160,7 +163,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		sessionProblem(w, 503)
 		return
 	}
-	current, view, err := h.sessions.AuthenticateCurrent(w, r)
+	current, view, err := h.sessions.AuthenticateCurrentWithin(w, r, window)
 	if err != nil {
 		h.security.Add(presentation.IngressPreAdmission)
 		sessionFailure(w, err)
