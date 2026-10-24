@@ -4,6 +4,11 @@ package postgres
 // migration 00065's two regional capacity tables (ADR-197) and migration
 // 00066's refresh demands (ADR-200), 00067 deletion and 00068 queries.
 // Missing or unknown relations reject first activation.
+// initialTransientTables exist only part way through migration replay: 00043
+// creates them and 00078 drops them (ADR-224). They never belong to a
+// complete schema.
+var initialTransientTables = []string{"browser_refresh_consumer", "browser_refresh_owner"}
+
 var initialInstallationTables = []string{
 	"artifact_download",
 	"authority_audit",
