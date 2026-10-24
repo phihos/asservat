@@ -1,5 +1,17 @@
 # Sustained implementation progress
 
+## S-02 installed exit in two workload clusters (2026-10-24)
+
+[native107](../test/results/resumed-c62e02ac-native107/README.md) passes the installed journey
+with a second workload cluster joined through the same hub (catalog slot 2). Fixes from
+native99–106: the join derives its catalog slot (8 slots), refresh owners removed (ADR-224),
+transient refresh tables tolerated during initial replay, router ceilings summed per cluster,
+per-cluster capacity discovery loops with priority for demanded clusters. Final gates on the
+merged branch: vet, full Go gate, custody (468 PASS), initial installation and context suites
+pass; two context tests that expected the pre-#47 instantaneous workload-guard checks now
+wait out the 30 s proof reuse. Open: reconnect import (ADR-223 limitation), Partial states
+(component only), hub-worker exit-137 restarts under load (cause not determined).
+
 ## Browser download refresh owners removed (2026-10-24)
 
 [ADR-224](decisions/224-remove-download-refresh-owners.md) removes ADR-114's refresh owners:

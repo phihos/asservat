@@ -303,7 +303,13 @@ func exerciseOwnerWorkloadProtection(t *testing.T, ctx context.Context, admin ku
 	if err = admin.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(ctx, plan.Name, meta.DeleteOptions{}); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err = guard.Current(ctx); err == nil {
+	// A current proof is reused for OwnerProtectionReuse, so loss is observed
+	// once that window ends, not immediately.
+	until = time.Now().Add(kube.OwnerProtectionReuse + 10*time.Second)
+	for _, _, err = guard.Current(ctx); err == nil && time.Now().Before(until); _, _, err = guard.Current(ctx) {
+		time.Sleep(time.Second)
+	}
+	if err == nil {
 		t.Fatal("missing workload protection remained current")
 	}
 	// Negative control proves this is admission enforcement, not ordinary RBAC
