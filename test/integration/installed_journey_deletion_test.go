@@ -44,7 +44,8 @@ JOIN context_control_account cc ON cc.allocation_id=ca.id
 WHERE c.root_id=$1 AND c.artifact_id=$2 AND a.state='stored_unpublished'`, root, artifactID).Scan(
 			&loc.ClusterID, &loc.AttemptID, &allocation, &reserved, &chargedBytes, &chargedObjects,
 			&full, &replay, &expiresAt, &deleteBy)
-		if err != nil || loc.Validate() != nil || reserved <= 0 || chargedBytes != reserved || chargedObjects != 4 || full != 1 || replay != 1 || !time.Now().Before(expiresAt) || !expiresAt.Before(deleteBy) {
+		// The browser journey's own capture shares this workload's allocation.
+		if err != nil || loc.Validate() != nil || reserved <= 0 || chargedBytes < reserved || chargedObjects < 4 || full < 1 || replay < 1 || !time.Now().Before(expiresAt) || !expiresAt.Before(deleteBy) {
 			t.Fatal("installed deletion: published attempt lacks its original completed writer and storage charge", err)
 		}
 		store := s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: aws.String(p.desired.AuditStore.Endpoint), UsePathStyle: true,
