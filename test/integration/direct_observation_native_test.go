@@ -194,6 +194,10 @@ func TestDirectHolderObservationWithRealKubernetes(t *testing.T) {
 			FullInstalledHWORKBackground bool
 		}
 	}
+	if e == nil && json.Unmarshal(raw, &selection) == nil && selection.DirectObservation.HelperSHA256 == "" {
+		// Only the exact --run selection builds the helper image into both clusters.
+		t.Skip("run scripts/test-context-storage.py --run '^TestDirectHolderObservationWithRealKubernetes$'")
+	}
 	if e != nil || json.Unmarshal(raw, &f) != nil || json.Unmarshal(raw, &selection) != nil || len(f.Clusters) != 2 || len(selection.DirectObservation.HelperSHA256) != 64 || selection.DirectObservation.RuntimeSelection || selection.DirectObservation.FullInstalledHWORKBackground {
 		t.Fatal("exact native helper selection unavailable")
 	}

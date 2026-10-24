@@ -22,7 +22,6 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/bootstrap"
 	"asservat.local/asservat/internal/contracts"
-	"github.com/jackc/pgx/v5/pgxpool"
 	auth "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
@@ -118,11 +117,7 @@ func TestInitialPreparationProvidersWithRealServices(t *testing.T) {
 		materialRef = contracts.WorkerObjectReference{Name: secret.Name, UID: string(secret.UID)}
 	}
 	initialPreparationSupervisorNativePlan(t, true, false, setup, func(ctx context.Context, kc *rest.Config, api kubernetes.Interface, _, _ *kube.PermissionClient, c contracts.InitialPreparer) {
-		admin, e := pgxpool.New(ctx, f.Postgres)
-		if e != nil {
-			t.Fatal(e)
-		}
-		defer admin.Close()
+		admin := initialFreshDatabase(t, ctx, f.Postgres)
 		endpoint, e := url.Parse(f.Postgres)
 		if e != nil {
 			t.Fatal(e)
@@ -190,7 +185,7 @@ func TestInitialPreparationProvidersWithRealServices(t *testing.T) {
 			t.Fatal("fixture public fleet")
 		}
 		fleet.InstallationID = c.Plan.InstallationID
-		c.Services = &contracts.InitialPreparationServices{Format: contracts.InitialPreparationServicesFormat, Fleet: fleet, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: native.Host, Roots: [][]byte{block.Bytes}}, Postgres: contracts.OwnerPostgresEndpoint{Host: host, Port: port, Database: "custody_test", Roots: [][]byte{sqlRoot}, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: storage.URL, Roots: [][]byte{storage.Certificate().Raw}, Region: "us-east-1", Bucket: "initial-provider"}, KeyService: contracts.ConfigurationKeyService{Endpoint: keys.URL, Roots: [][]byte{keys.Certificate().Raw}, AuditMount: "initial-provider-transit", AuditKey: "audit"}}
+		c.Services = &contracts.InitialPreparationServices{Format: contracts.InitialPreparationServicesFormat, Fleet: fleet, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: native.Host, Roots: [][]byte{block.Bytes}}, Postgres: contracts.OwnerPostgresEndpoint{Host: host, Port: port, Database: admin.Config().ConnConfig.Database, Roots: [][]byte{sqlRoot}, MaxConnections: 2}, AuditStore: contracts.OwnerAuditStore{Endpoint: storage.URL, Roots: [][]byte{storage.Certificate().Raw}, Region: "us-east-1", Bucket: "initial-provider"}, KeyService: contracts.ConfigurationKeyService{Endpoint: keys.URL, Roots: [][]byte{keys.Certificate().Raw}, AuditMount: "initial-provider-transit", AuditKey: "audit"}}
 		c.Kubernetes = c.Services.Kubernetes
 		c.SQLMaterial = &materialRef
 		c.Providers = &profile

@@ -75,7 +75,7 @@ class BootstrapSelection(unittest.TestCase):
         self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "60m")
 
     def test_owner_only_aggregate_timeout_keeps_existing_modes(self):
-        self.assertIsNone(fixture.qualification_go_timeout())
+        self.assertEqual(fixture.qualification_go_timeout(), "30m")
         self.assertEqual(fixture.qualification_go_timeout(helm_bootstrap=True), "12m")
         self.assertEqual(fixture.qualification_go_timeout(runtime_provider_owner=True), "14m")
 

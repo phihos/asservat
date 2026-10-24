@@ -571,7 +571,9 @@ func qualifyOwnerBridgeConcurrentObservers(t *testing.T, ctx context.Context, ad
 			return e
 		}
 		currentEnd, _ := call.Deadline()
-		if afterVersion != beforeVersion || !afterObserved.Equal(candidate.ObservedAt) || !afterObserved.After(beforeObserved) || !afterUntil.Equal(candidate.FreshUntil) || !afterUntil.After(originalEnd) || !currentEnd.Equal(originalEnd) {
+		// Migration 00074 stores the positive row for 30 seconds from its own
+		// observation; the caller's five-second interval bounds only the call.
+		if afterVersion != beforeVersion || !afterObserved.Equal(candidate.ObservedAt) || !afterObserved.After(beforeObserved) || !afterUntil.Equal(candidate.ObservedAt.Add(30*time.Second)) || !afterUntil.After(originalEnd) || !currentEnd.Equal(originalEnd) {
 			return errors.New("positive renewal changed semantic identity or the in-flight original cutoff")
 		}
 		renewed = true
