@@ -18,7 +18,6 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
-	"github.com/jackc/pgx/v5/pgxpool"
 	auth "k8s.io/api/authentication/v1"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -89,11 +88,7 @@ func TestInitialPreparationSQLWithRealKubernetesPostgres(t *testing.T) {
 		if e != nil || json.Unmarshal(raw, &f) != nil || f.Postgres == "" {
 			t.Fatal("SQL fixture unavailable")
 		}
-		sql, e := pgxpool.New(ctx, f.Postgres)
-		if e != nil {
-			t.Fatal(e)
-		}
-		defer sql.Close()
+		sql := initialFreshDatabase(t, ctx, f.Postgres)
 		u, e := url.Parse(f.Postgres)
 		if e != nil {
 			t.Fatal("fixture SQL endpoint")
