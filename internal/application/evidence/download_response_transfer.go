@@ -9,6 +9,7 @@ import (
 	identityvalue "asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"time"
 )
 
@@ -65,7 +66,7 @@ func (c *responseCurrent) get(ctx context.Context) (artifact.DownloadAuthority, 
 		return c.value, nil
 	}
 	c.closeBatch()
-	b, e := c.reader.BeginBatch(ctx)
+	b, e := c.begin(ctx)
 	if e != nil {
 		return artifact.DownloadAuthority{}, e
 	}
@@ -87,6 +88,36 @@ func (c *responseCurrent) get(ctx context.Context) (artifact.DownloadAuthority, 
 	}
 	c.value = a
 	return a, nil
+}
+
+// sessionBusyWait bounds how long a response waits, with no output, while
+// another request (normally the console tab) finishes refreshing the same
+// browser session. Nothing is refreshed here.
+const sessionBusyWait = 2 * time.Second
+
+// begin starts the next identity batch. A session that is only busy is retried
+// until it reads current again, for at most sessionBusyWait and never past the
+// original deadline in ctx; then it fails closed with the busy error.
+func (c *responseCurrent) begin(ctx context.Context) (identities.IdentityBatch, error) {
+	b, e := c.reader.BeginBatch(ctx)
+	if !errors.Is(e, identityvalue.ErrSessionBusy) {
+		return b, e
+	}
+	wait, stop := context.WithTimeout(ctx, sessionBusyWait)
+	defer stop()
+	retry := time.NewTicker(100 * time.Millisecond)
+	defer retry.Stop()
+	for {
+		select {
+		case <-wait.Done():
+			return nil, e
+		case <-retry.C:
+		}
+		b, e = c.reader.BeginBatch(ctx)
+		if !errors.Is(e, identityvalue.ErrSessionBusy) {
+			return b, e
+		}
+	}
 }
 
 // Transfer does not return native contents and does not install a public route.

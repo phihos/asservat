@@ -28,10 +28,15 @@ owner admission failed. MCP prepared the same download without an owner.
    either in the background or inline. If the session, token or group freshness
    is no longer current, the GET fails closed: a bounded problem response
    before any bytes, or an aborted connection once bytes have been sent.
-3. The console resumes with `Range` after its own explicit POST refresh, the
+3. A session that is only busy, because another request (normally the open
+   console tab) is refreshing it, is not stale. Between delivery leases, with
+   no output, the response retries the identity read every 100 ms for at most
+   two seconds and never past the original deadline, then fails closed. It
+   refreshes nothing.
+4. The console resumes with `Range` after its own explicit POST refresh, the
    same as after any interrupted transfer, within the original transfer, grant
    and session deadlines.
-4. Migration 00078 drops `browser_refresh_owner`, `browser_refresh_consumer`,
+5. Migration 00078 drops `browser_refresh_owner`, `browser_refresh_consumer`,
    their guard functions and `browser_owned_refresh_busy`. The browser-session
    capacity trigger stays, and now counts only browser sessions. The three
    refresh role purposes are removed from the public runtime role plan.
