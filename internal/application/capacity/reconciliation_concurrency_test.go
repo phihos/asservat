@@ -3,6 +3,7 @@ package capacity
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -105,5 +106,53 @@ func TestCapacityGuardedReadRetriesOnlyNoStandbyOnce(t *testing.T) {
 				t.Fatal("guarded reads", reads.calls, err)
 			}
 		})
+	}
+}
+
+type capacityGuardedRuntime struct {
+	*capacityRuntimeReader
+	guarded atomic.Int32
+}
+
+func (f *capacityGuardedRuntime) ReadCapacityGuardedWorkload(context.Context, cfg.NamespaceRef, cfg.WorkloadRef, []string) (CapacityNamespaceProtection, CapacityWorkloadObservation, error) {
+	f.guarded.Add(1)
+	return CapacityNamespaceProtection{}, CapacityWorkloadObservation{}, cfg.ErrUnavailable
+}
+
+// A demanded regional cluster's discovery starts no read while its demand
+// lasts, so the demand lane's refreshes get that cluster's shared budgets
+// first; another cluster's discovery continues, and discovery resumes when
+// the demand ends.
+func TestCapacityReconcilerDemandHasPriorityOverSameClusterDiscovery(t *testing.T) {
+	source, f := capacityObserverTestFixture()
+	q, _ := capacityQualificationFixture()
+	q.ID, q.Digest = f.accepted.QualificationID, f.accepted.QualificationDigest
+	q.RootBacking.RootID, q.RootBacking.InstallationID = f.accepted.RootID, f.accepted.InstallationID
+	q.RootBacking.QualificationID, q.RootBacking.QualificationDigest = q.ID, q.Digest
+	other := q.NamespaceGuards[0]
+	other.ClusterID = "00000000-0000-4000-8000-0000000000b2"
+	q.NamespaceGuards = append(q.NamespaceGuards, other)
+	demanded := &capacityGuardedRuntime{capacityRuntimeReader: &capacityRuntimeReader{recovery: f.recovery}}
+	free := &capacityGuardedRuntime{capacityRuntimeReader: &capacityRuntimeReader{recovery: f.recovery}}
+	work := &CapacityWorkReconciler{Qualification: q, Recovery: demanded, Permissions: demanded, Processing: demanded, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: demanded, Now: func() time.Time { return f.now }}
+	cluster := q.NamespaceGuards[0].ClusterID
+	var reports atomic.Int32
+	runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{
+		{ClusterID: cluster, Workloads: demanded, Guard: demanded, Guarded: demanded},
+		{ClusterID: other.ClusterID, Workloads: free, Guard: free, Guarded: free},
+	}, Demands: staticCapacityDemands{{ClusterID: cluster, Namespace: cfg.NamespaceRef{Name: "payments", UID: "ns-uid"}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: "api-uid"}, NotAfter: f.now.Add(time.Minute)}},
+		DemandReport: func(error, time.Duration, time.Duration, string) { reports.Add(1) }}
+	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
+	_ = runner.Run(ctx)
+	cancel()
+	if reports.Load() < 2 || demanded.guarded.Load() < 2 {
+		t.Fatal("demand lane did not refresh", reports.Load(), demanded.guarded.Load())
+	}
+	if demanded.discovered.Load() > 1 || free.discovered.Load() < 1 {
+		t.Fatal("discovery did not yield only for the demanded cluster", demanded.discovered.Load(), free.discovered.Load())
+	}
+	runner.demanded.publish(nil, f.now)
+	if runner.demanded.active(cluster, f.now) {
+		t.Fatal("ended demand kept discovery paused")
 	}
 }

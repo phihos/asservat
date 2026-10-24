@@ -568,3 +568,14 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     cluster plus the demand lane (never fewer than the original two).
   - Regional capacity log lines carry the cluster ID
     (`capacity regional <cluster ID> ...`).
+- native106 (2026-10-24, with the per-cluster loops): the second cluster
+  reached `ready_at`, but its demand refreshes failed. With two discovery
+  loops and the demand lane reading at once, a guarded read took 4–5 s
+  (locate up to 3 s) and ran out of the five-second step at `claim/post`.
+  Both regions served similar numbers of reads and no standby hello was
+  refused, so standby starvation by the other region was not observed and
+  no per-region holder quota was added. The shared holder, owner and
+  Kubernetes API budgets are the contended resource. A regional cluster's
+  discovery now starts no read while that cluster has an active refresh
+  demand (at most a minute after the admission that asked for it), so the
+  demand lane gets its budgets first; other clusters' discovery continues.

@@ -42,6 +42,35 @@ type CapacityReconciler struct {
 	// refresh's context and returns its fixed stage marks.
 	DemandContext func(context.Context) (context.Context, func() string)
 	running       atomic.Bool
+	demanded      capacityDemandedClusters
+}
+
+// capacityDemandedClusters is the demand lane's last read: each demanded
+// cluster until its latest demand's NotAfter (at most a minute). A regional
+// cluster's discovery yields to the demand lane while its cluster is listed,
+// so a demanded refresh does not compete with that cluster's discovery for
+// the shared holder, owner and API budgets. It confers nothing.
+type capacityDemandedClusters struct {
+	mu    sync.Mutex
+	until map[string]time.Time
+}
+
+func (d *capacityDemandedClusters) publish(demands []CapacityRefreshDemand, now time.Time) {
+	until := make(map[string]time.Time, len(demands))
+	for _, v := range demands {
+		if v.Valid(now) && v.NotAfter.After(until[v.ClusterID]) {
+			until[v.ClusterID] = v.NotAfter
+		}
+	}
+	d.mu.Lock()
+	d.until = until
+	d.mu.Unlock()
+}
+
+func (d *capacityDemandedClusters) active(cluster string, now time.Time) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return now.Before(d.until[cluster])
 }
 
 // CapacitySourceInvocation is only the existing source invocation boundary.
@@ -254,6 +283,12 @@ func (s *CapacityReconciler) runDiscovery(root context.Context, current *capacit
 	var stage atomic.Pointer[string]
 	mark := func(v string) { stage.Store(&v) }
 	capacitySerialLoop(root, 250*time.Millisecond, func(call context.Context) {
+		// The demand lane has priority for a demanded regional cluster: its
+		// discovery starts no read until the demand ends (at most a minute
+		// after the last admission that asked for it).
+		if cluster.Guarded != nil && s.demanded.active(cluster.ClusterID, s.Work.Now()) {
+			return
+		}
 		if p := cluster.Pace; p > 0 {
 			if s.Work.Now().Before(ended.Add(p)) {
 				return
@@ -328,7 +363,11 @@ func (s *CapacityReconciler) runDemands(root context.Context, current *capacityC
 	turn := 0
 	capacitySerialLoop(root, 250*time.Millisecond, func(call context.Context) {
 		demands, err := s.Demands.ReadCapacityRefreshDemands(call)
-		if err != nil || len(demands) == 0 || call.Err() != nil {
+		if err != nil || call.Err() != nil {
+			demands = nil
+		}
+		s.demanded.publish(demands, s.Work.Now())
+		if len(demands) == 0 {
 			return
 		}
 		d := demands[turn%len(demands)]
