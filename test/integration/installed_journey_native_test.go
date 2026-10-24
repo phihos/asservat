@@ -567,6 +567,9 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			}
 			t.Log("installed journey: request for a deleted pinned Pod returned TargetGone and started no capture")
 		}
+		// Measures how much of installedJourneyRetention the journey leaves
+		// idle, so the retention can be set no longer than it needs.
+		t.Logf("installed journey: %s after acceptance, waiting %s for the original expiry", time.Since(accepted.AcceptedAt).Round(time.Second), time.Until(expires).Round(time.Second))
 		if err := installedJourneyPause(ctx, time.Until(expires)); err != nil {
 			t.Fatal("installed expiry wait", err)
 		}
