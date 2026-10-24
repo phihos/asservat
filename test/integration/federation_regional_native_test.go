@@ -61,6 +61,11 @@ func TestFederationRegionalProductWithRealKubernetes(t *testing.T) {
 	}
 	raw, e := os.ReadFile(path)
 	var f fixture
+	var selection struct{ TwoClusterPods bool }
+	if e == nil && json.Unmarshal(raw, &selection) == nil && !selection.TwoClusterPods {
+		// Only the exact --run selection loads the product image into the regional cluster.
+		t.Skip("run scripts/test-context-storage.py --run '^TestFederationRegionalProductWithRealKubernetes$'")
+	}
 	if e != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 2 || f.WorkerImage == "" {
 		t.Fatal("owned product fixture unavailable")
 	}

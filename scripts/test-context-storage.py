@@ -468,6 +468,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 fixture["identity"] = start_keycloak(work, network, run_id, containers, report)
             if direct_observation:
                 fixture["directObservation"] = report["directObservation"]
+            # Product Pods in the second cluster need the image loaded there too.
+            fixture["twoClusterPods"] = two_cluster_pods
             if helm_bootstrap:
                 fixture["helmBootstrap"] = {"registryConfig": registry.material(), "productBinary": str(image_dir/"asservat"), "chartArchive": str(chart_archive)}
             for index in range(cluster_count):
