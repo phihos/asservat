@@ -67,6 +67,21 @@ func TestJoinRegionalClusterCreatesSlotAndAppendsExactly(t *testing.T) {
 	if _, err = JoinRegionalCluster(context.Background(), config, other); err == nil {
 		t.Fatal("a second cluster joined beyond the slot")
 	}
+	// Slot 0 derives the slot: the joined cluster reruns exactly in slot 1 and
+	// a second cluster takes slot 2.
+	derived := plan
+	derived.Slot = 0
+	if again, err = JoinRegionalCluster(context.Background(), config, derived); err != nil || !equalJSON(again, first) {
+		t.Fatal("derived rerun not exact", err)
+	}
+	other.Slot = 0
+	second, err := JoinRegionalCluster(context.Background(), config, other)
+	if err != nil || second.Capability.Source.Name != contracts.OwnerClusterSourceName(installation, 2, "capability") || second.Topology.Name != contracts.OwnerClusterSourceName(installation, 2, "topology") {
+		t.Fatal("second cluster not joined in slot 2", err)
+	}
+	if c := read(); len(c.Clusters) != 2 || !equalJSON(c.Clusters[1], second) {
+		t.Fatal("second catalog entry not appended")
+	}
 }
 
 // ADR-204 decision 4: after the catalog entry the join adds the cluster's
