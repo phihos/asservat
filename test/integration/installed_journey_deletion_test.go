@@ -33,7 +33,7 @@ func installedJourneyDeletion(t *testing.T, ctx context.Context, admin *pgxpool.
 		defer cancel()
 		err := admin.QueryRow(before, `
 SELECT a.cluster_id::text, a.id::text, a.allocation_id::text,
-       a.reserved_bytes, ca.charged_bytes, ca.charged_objects,
+       a.reserved_bytes, ca.charged_bytes-(SELECT coalesce(sum(x.reserved_bytes),0) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), ca.charged_objects-4*(SELECT count(*) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'),
        cc.charged_full, cc.charged_replay,
        a.effective_expires_at, a.effective_delete_by
 FROM context_catalog c
@@ -44,8 +44,9 @@ JOIN context_control_account cc ON cc.allocation_id=ca.id
 WHERE c.root_id=$1 AND c.artifact_id=$2 AND a.state='stored_unpublished'`, root, artifactID).Scan(
 			&loc.ClusterID, &loc.AttemptID, &allocation, &reserved, &chargedBytes, &chargedObjects,
 			&full, &replay, &expiresAt, &deleteBy)
-		// The browser journey's own capture shares this workload's allocation.
-		if err != nil || loc.Validate() != nil || reserved <= 0 || chargedBytes < reserved || chargedObjects < 4 || full < 1 || replay < 1 || !time.Now().Before(expiresAt) || !expiresAt.Before(deleteBy) {
+		// Charges are this attempt's share: the browser journey's own capture
+		// shares the workload's allocation and is deleted independently.
+		if err != nil || loc.Validate() != nil || reserved <= 0 || chargedBytes != reserved || chargedObjects != 4 || full < 1 || replay < 1 || !time.Now().Before(expiresAt) || !expiresAt.Before(deleteBy) {
 			t.Fatal("installed deletion: published attempt lacks its original completed writer and storage charge", err)
 		}
 		store := s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: aws.String(p.desired.AuditStore.Endpoint), UsePathStyle: true,
@@ -213,7 +214,7 @@ WHERE a.id=$2 AND a.artifact_id=$3`, root, loc.AttemptID, artifactID).Scan(&stat
 			var finalExpires, finalDeleteBy time.Time
 			err := admin.QueryRow(wait, `
 SELECT a.deleted_at, d.purged_at, d.audit_acknowledged_at, d.audit_receipt_json,
-       ca.charged_bytes, ca.charged_objects, cc.charged_full, cc.charged_replay,
+       ca.charged_bytes-(SELECT coalesce(sum(x.reserved_bytes),0) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), ca.charged_objects-4*(SELECT count(*) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), cc.charged_full, cc.charged_replay,
        (SELECT count(*) FROM custody_copy cp WHERE cp.attempt_id=a.id AND cp.ciphertext_bytes IS NOT NULL),
        a.effective_expires_at, a.effective_delete_by, d.purge_fence
 FROM custody_attempt a

@@ -182,7 +182,7 @@ func readInstalledDeletionState(ctx context.Context, pool *pgxpool.Pool, root st
 	err := pool.QueryRow(call, `
 SELECT clock_timestamp(), a.state, a.allocation_id::text, a.deletion_fence, a.lease_until,
        a.effective_expires_at, a.effective_delete_by, a.deleted_at IS NOT NULL, d.attempt_id IS NOT NULL,
-       ca.charged_bytes, ca.charged_objects, cc.charged_full, cc.charged_replay,
+       ca.charged_bytes-(SELECT coalesce(sum(x.reserved_bytes),0) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), ca.charged_objects-4*(SELECT count(*) FROM custody_attempt x WHERE x.allocation_id=a.allocation_id AND x.id<>a.id AND x.state<>'deleted'), cc.charged_full, cc.charged_replay,
        (SELECT count(*) FROM custody_copy cp WHERE cp.attempt_id=a.id AND cp.ciphertext_bytes IS NOT NULL),
        (SELECT jsonb_agg(jsonb_build_array(cp.role, cp.ciphertext_bytes, cp.ciphertext_sha256, cp.etag, cp.version_id) ORDER BY cp.role)
         FROM custody_copy cp WHERE cp.attempt_id=a.id), w.completion_digest
