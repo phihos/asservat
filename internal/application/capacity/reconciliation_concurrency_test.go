@@ -167,8 +167,8 @@ func TestCapacityReconcilerDemandDefersDiscoveryOnlyBoundedly(t *testing.T) {
 	q.RootBacking.QualificationID, q.RootBacking.QualificationDigest = q.ID, q.Digest
 	demanded := &capacityGuardedRuntime{capacityRuntimeReader: &capacityRuntimeReader{recovery: f.recovery}}
 	start := time.Now()
-	// Twenty simulated seconds per real second: 1.2 s covers two deferrals.
-	now := func() time.Time { return f.now.Add(20 * time.Since(start)) }
+	// Sixty simulated seconds per real second: 1.2 s covers two deferrals.
+	now := func() time.Time { return f.now.Add(60 * time.Since(start)) }
 	work := &CapacityWorkReconciler{Qualification: q, Recovery: demanded, Permissions: demanded, Processing: demanded, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: demanded, Now: now}
 	cluster := q.NamespaceGuards[0].ClusterID
 	runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{

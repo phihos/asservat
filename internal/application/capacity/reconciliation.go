@@ -51,7 +51,7 @@ type CapacityReconciler struct {
 // so a demanded refresh does not compete with that cluster's discovery for
 // the shared holder, owner and API budgets. It confers nothing.
 // capacityDemandDeferral bounds how long a demand defers one discovery step.
-const capacityDemandDeferral = 10 * time.Second
+const capacityDemandDeferral = 30 * time.Second
 
 type capacityDemandedClusters struct {
 	mu    sync.Mutex
