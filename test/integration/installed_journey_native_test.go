@@ -482,9 +482,9 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			}
 		}
 		healthy()
-		// The installed three-record backing admits two sessions without
-		// refunding the completed first one: 16 KiB output and 32 MiB read
-		// remain within its 24 KiB/36 MiB allocation. Stop needs a nonterminal
+		// The installed four-record backing admits the MCP, browser and Stop
+		// sessions without refunding completed ones: 24 KiB output and 48 MiB
+		// read fit its 32 KiB/48 MiB allocation. Stop needs a nonterminal
 		// session; stopping the completed first download proves AlreadyTerminal.
 		stopReply, err := readReply(ctx, "prepare_artifact_download", map[string]string{
 			"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": "installed-journey-stop-download",
