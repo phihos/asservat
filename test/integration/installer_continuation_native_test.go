@@ -829,7 +829,7 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	lane := func(accounts, records int64) contracts.InstallerCapacityLane {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
-	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 3, AdmissionSeconds: 86400,
+	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 4, AdmissionSeconds: 86400,
 		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 64), Resolution: lane(4, 8), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},

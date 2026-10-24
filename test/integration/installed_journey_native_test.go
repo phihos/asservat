@@ -157,6 +157,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		if dir := os.Getenv("ASSERVAT_JOURNEY_HOLD"); dir != "" {
 			installedJourneyHold(t, ctx, dir, wire, session, previewArguments, diagnose)
 		}
+		qualifyInstalledBrowserSubmission(t, ctx, identity, cert, address, origin, previewArguments, diagnose)
 		var preview struct {
 			PreviewID      string `json:"preview_id"`
 			CaptureEnabled bool   `json:"capture_enabled"`
@@ -384,6 +385,8 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		installedJourneyResumeSpent(t, ctx, admin, contentClient, root, originalDownload, contentURL, identity.downloadToken(), size)
 		installedJourneyCatalogMinimized(t, ctx, admin, root, investigation.Artifacts[0].ArtifactID, native)
+		qualifyInstalledBrowserJourney(t, ctx, identity, cert, address, origin, readReply, previewArguments,
+			progress.CaseID, investigation.Artifacts[0].ArtifactID, approved, native, projectionCheck, diagnose)
 		installedJourneyUnrelated(t, ctx, wire, identity.unrelated(), transport, origin, target, preview.PreviewID, progress.CaseID, investigation.Artifacts[0].ArtifactID)
 		// Revocation: with the Deny binding the case is no longer available;
 		// without it, it is again. Expiry: once the artifact's access ends,
