@@ -113,8 +113,8 @@ def qualification_selection(test_pattern, initial_handover, initial_schema_hando
             raise ValueError("Installation qualification owns its exact database selection")
         name = "TestHelmBootstrapWithRealServices" if helm_bootstrap else "TestInitialBootstrapChainWithRealServices" if initial_bootstrap_chain else ("TestInitialSchemaHandoverWithRealServices" if initial_schema_handover else "TestInitialPreparationHandoverWithRealServices")
         # ADR-193 step 5: the continuation qualification also installs a
-        # regional connector into a second owned cluster.
-        return "^" + name + "$", 2 if installer_continuation else 1
+        # regional connector into two further owned workload clusters (S-02 exit).
+        return "^" + name + "$", 3 if installer_continuation else 1
     return test_pattern, 2
 
 
@@ -308,8 +308,9 @@ def qualify_direct_helper_issuer(env, report):
 
 def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False, installer_continuation=False):
     if installer_continuation:
-        # The installed journey waits for its capture's ten-minute expiry.
-        return "50m"
+        # The installed journey waits for its capture's ten-minute expiry; the
+        # second workload cluster adds an enrollment and a short journey.
+        return "60m"
     # Aggregate test envelope only. Product authority/root/token dates are unchanged.
     return "14m" if runtime_provider_owner else ("12m" if helm_bootstrap else None)
 
@@ -324,7 +325,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     if helm_cluster:
         test_pattern = "^" + helm_test + "$"
     direct_observation = test_pattern == "^TestDirectHolderObservationWithRealKubernetes$"
-    # Product federation/connector Pods also run in both owned clusters.
+    # Product federation/connector Pods also run in every owned cluster.
     two_cluster_pods = direct_observation or test_pattern == "^TestFederationRegionalProductWithRealKubernetes$" or installer_continuation
     test_package = "./internal/adapters/kms" if owner_provider_auth else "./internal/adapters/kubernetes" if runtime_object_roundtrip else "./test/integration"
     cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home()/".cache"))/"asservat-build"
@@ -342,7 +343,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         registry = None
         registry_nodes = []
         build_scratch = None
-        report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "installerContinuationQualification": installer_continuation, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation) or "10m (Go default)", "bootstrapFixtureSeconds": (2100 if installer_continuation else 720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap and not helm_cluster, "helmClusterQualification": helm_cluster, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
+        report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "installerContinuationQualification": installer_continuation, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation) or "10m (Go default)", "bootstrapFixtureSeconds": (2700 if installer_continuation else 720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap and not helm_cluster, "helmClusterQualification": helm_cluster, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
         exit_code = 1
         try:
             if runtime_provider_pair or direct_observation:
