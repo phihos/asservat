@@ -62,14 +62,6 @@ standby as well. A completed-query transition needs exclusive phase ownership.
    unsuccessful attempt. Original work deadlines, final current checks,
    conservative spend and joined resource accounting remain binding.
 
-7. Addendum after installed native 95: a burst of previews spent the only
-   standby's four queries and later queries failed at `router` for the rest
-   of its thirty-second residency. A query that finds no selectable standby
-   now withdraws idle, unattached standbys of its cluster whose budget is
-   spent, then keeps waiting within its original deadline for the region's
-   fresh registration. Without a waiting query a spent standby remains
-   available for work. The spent count is never refunded.
-
 Busy-to-idle notification may wake waiting query selectors, but their existing
 original deadline and reserved time for execution remain unchanged. Frame,
 source, query, byte, connection and capture ceilings are unchanged.

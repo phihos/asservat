@@ -81,9 +81,6 @@ region answers while it still waits for work, from its own cluster, after a
 current check of the hub owner. The hub uses an answer only while the region
 receiver checked for that query remains valid. A query executes no operation
 and confers no capture authority. Each exchange answers at most four queries.
-A query that finds no usable standby withdraws idle standbys that have spent
-that budget, so the region opens a fresh exchange instead of holding the
-cluster's reservation for the rest of its residency; nothing is refunded.
 Under [ADR-211](../docs/decisions/211-completed-query-standby-transition.md), a
 fully matched and completed hub query may return its socket deadlines to the
 original passive standby cutoff after joining its I/O callbacks. Its result

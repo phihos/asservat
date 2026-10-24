@@ -277,16 +277,6 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 			r.mu.Unlock()
 			break
 		}
-		// An idle standby that has spent its query budget can never answer this
-		// query, yet it would hold the cluster's standby reservation until its
-		// thirty-second residency ends (installed native 95). Withdraw it so the
-		// region opens a fresh exchange under complete new checks; nothing is
-		// refunded and a query that is waiting is the only trigger.
-		for _, s := range r.standby {
-			if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && !s.queryBusy && s.queries >= contracts.APIContextMaximumQueries && s.liveLocked() {
-				s.cancel()
-			}
-		}
 		registered := r.registered
 		r.mu.Unlock()
 		wait := time.Until(deadline.Add(-queryReserve))
