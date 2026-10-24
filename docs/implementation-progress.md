@@ -10,7 +10,9 @@ per-cluster capacity discovery loops with priority for demanded clusters. Final 
 merged branch: vet, full Go gate, custody (468 PASS), initial installation and context suites
 pass; two context tests that expected the pre-#47 instantaneous workload-guard checks now
 wait out the 30 s proof reuse. Open: reconnect import (ADR-223 limitation), Partial states
-(component only), hub-worker exit-137 restarts under load (cause not determined).
+(component only). The hub-worker "exit 137" seen in failing-run diagnostics is the journey's
+own `crictl stop` crash injection (`installerCrashHubWorker`); container status keeps only the
+latest termination, so the cause of the one earlier restart was not recorded.
 
 ## Browser download refresh owners removed (2026-10-24)
 

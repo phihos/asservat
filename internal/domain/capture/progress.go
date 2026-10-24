@@ -43,7 +43,7 @@ func (p ContextProgressObservation) Valid(now time.Time) bool {
 	case "Running":
 		return p.ActionPhase == "Running" && p.ReasonCode == "AcquisitionStarted"
 	case "Failed":
-		return p.ActionPhase == "Failed" && p.ReasonCode == "AcquisitionFailed"
+		return p.ActionPhase == "Failed" && p.ReasonCode == "AcquisitionFailed" || p.ActionPhase == "TargetGone" && p.ReasonCode == "PinnedPodGone" || p.ActionPhase == "Denied" && p.ReasonCode == "PodStatusDenied"
 	case "Finalizing":
 		return p.ActionPhase == "Finalizing" && (p.ReasonCode == "VerificationPending" || p.ReasonCode == "VerificationAuditPending" || p.ReasonCode == "PublicationPending")
 	case "Succeeded":

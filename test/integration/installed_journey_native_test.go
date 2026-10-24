@@ -74,8 +74,8 @@ type installedJourneyDownload struct {
 // download with its SHA-256 check, after the full journey has initialized
 // processing. Its idempotency keys carry the cluster so they never collide
 // with the full journey's keys.
-func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func(), projectionCheck installedProjectionCheck) func(cluster, namespace, workload string, deny func(bool)) {
-	return func(cluster, namespace, workload string, deny func(bool)) {
+func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func(), projectionCheck installedProjectionCheck) func(cluster, namespace, workload string, deny func(bool), gone func(podUID string)) {
+	return func(cluster, namespace, workload string, deny func(bool), gone func(podUID string)) {
 		t.Helper()
 		if identity == nil {
 			t.Fatal("installed journey requires the harness identity provider")
@@ -547,6 +547,26 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		t.Log("installed journey: Stop after accepted Deny remained Cancelled on exact-key replay and restored access; original content route returned only a bounded problem response (no active-stream interruption tested)")
 		t.Log("installed journey: accepted Deny accompanied refusal; removing it restored the original artifact")
+		if gone != nil {
+			// S-02 exit item 2: a reviewed Pod deleted before submission is a
+			// useful, non-retryable TargetGone, not an uncertain outcome.
+			var gonePreview struct {
+				PreviewID    string `json:"preview_id"`
+				SelectedPods []struct {
+					UID string `json:"uid"`
+				} `json:"selected_pods"`
+			}
+			call(ctx, "preview_capture", previewArguments, &gonePreview)
+			if gonePreview.PreviewID == "" || len(gonePreview.SelectedPods) != 1 || gonePreview.SelectedPods[0].UID == "" {
+				t.Fatal("installed preview before Pod deletion", gonePreview)
+			}
+			gone(gonePreview.SelectedPods[0].UID)
+			if code := requestCapture(map[string]any{"preview_id": gonePreview.PreviewID, "idempotency_key": keys + "-gone"}); code != "TargetGone" {
+				diagnose()
+				t.Fatal("installed request for a deleted pinned Pod", code)
+			}
+			t.Log("installed journey: request for a deleted pinned Pod returned TargetGone and started no capture")
+		}
 		if err := installedJourneyPause(ctx, time.Until(expires)); err != nil {
 			t.Fatal("installed expiry wait", err)
 		}

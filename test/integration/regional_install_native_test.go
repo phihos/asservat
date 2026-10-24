@@ -53,7 +53,7 @@ import (
 // product fleet-bootstrap purposes the continuation provisioned; only the
 // fleet operator authority is fixture setup. Hub operations use the accepted
 // runner; the original observer retains diagnostic log access only.
-func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index int, admin *pgxpool.Pool, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
+func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index int, admin *pgxpool.Pool, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
 	t.Helper()
 	var offer contracts.RegionalOffer
 	if json.Unmarshal([]byte(offerJSON), &offer) != nil {
@@ -584,7 +584,7 @@ func nodeInternalIP(t *testing.T, ctx context.Context, api kubernetes.Interface,
 // hub-worker enrolls that workload through v2 to ready_at with a fresh binding.
 // Workload cluster index n adds its own policy, binding and pool slot; the
 // pool then holds n revisions.
-func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, hubObserver, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation, index int) {
+func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, hubObserver, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool), gone func(string)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation, index int) {
 	t.Helper()
 	suffix := ""
 	if index > 1 {
@@ -818,7 +818,33 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 					regionalLogs(t, diagnostic, region)
 				}
 			}()
-			journey(cluster, ns.Name, app.Name, deny)
+			// Deletes the reviewed Pod and waits until it is gone; the
+			// Deployment replaces it under a new UID.
+			gone := func(uid string) {
+				pods, err := region.CoreV1().Pods(ns.Name).List(ctx, meta.ListOptions{LabelSelector: meta.FormatLabelSelector(app.Spec.Selector)})
+				if err != nil {
+					t.Fatal("reviewed Pod list", err)
+				}
+				for _, pod := range pods.Items {
+					if string(pod.UID) != uid {
+						continue
+					}
+					if err = region.CoreV1().Pods(ns.Name).Delete(ctx, pod.Name, meta.DeleteOptions{GracePeriodSeconds: ptr.To(int64(0)), Preconditions: &meta.Preconditions{UID: &pod.UID}}); err != nil {
+						t.Fatal("reviewed Pod deletion", err)
+					}
+					for until := time.Now().Add(time.Minute); ; time.Sleep(time.Second) {
+						current, err := region.CoreV1().Pods(ns.Name).Get(ctx, pod.Name, meta.GetOptions{})
+						if apierrors.IsNotFound(err) || err == nil && current.UID != pod.UID {
+							return
+						}
+						if time.Now().After(until) {
+							t.Fatal("reviewed Pod not deleted", err)
+						}
+					}
+				}
+				t.Fatal("reviewed Pod not found", uid)
+			}
+			journey(cluster, ns.Name, app.Name, deny, gone)
 		}()
 	}
 }

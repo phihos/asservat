@@ -48,3 +48,12 @@ func TestTargetReadDenialIsNotAnExistenceOracle(t *testing.T) {
 		}
 	}
 }
+
+func TestRequestForAGonePinnedPodIsTargetGone(t *testing.T) {
+	if f := publicCaptureFailure(targets.ErrChanged, true); f.Code != "TargetGone" || f.Retryable {
+		t.Fatalf("request: %+v", f)
+	}
+	if f := publicCaptureFailure(targets.ErrChanged, false); f.Code != "NotAvailable" {
+		t.Fatalf("preview stays nondisclosing: %+v", f)
+	}
+}
