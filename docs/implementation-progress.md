@@ -1,5 +1,20 @@
 # Sustained implementation progress
 
+## S-02 exit checks in the installed journey (2026-10-24)
+
+Installed runs native93–99 added the remaining S-02 exit checks to the installed journey and
+fixed what they exposed. [native99](../test/results/resumed-c62e02ac-native99/README.md) passes
+all of them in one regional workload cluster: browser submission, MCP/browser preview, case,
+approved extract and native download parity, exact duplicate replay and idempotency Conflict,
+Range/If-Range resume, catalog minimization, an unrelated eligible user refused exactly as for
+absent objects, Stop, Deny, failed cleanup retaining charges and verified deletion. Fixes: browser
+operations now get MCP's per-operation request window (20 s evidence reads; the 5 s cap returned
+503 on a download preparation that enrolls a worker), target reads no longer reveal whether a
+workload exists, the regional router withdraws an idle standby whose four queries are spent so a
+waiting query gets a fresh one, and the hub-worker now observes elapsed capture deadlines
+(ADR-223; a lost regional completion reply is not imported, never repeated). Open: the second
+workload cluster's join (one catalog slot; join always wrote slot 1).
+
 ## Installed journey passes end to end (2026-10-24)
 
 Installed native92 on `aa4eac9a` exits 0 (1886.8 s): install with resumed installer,
