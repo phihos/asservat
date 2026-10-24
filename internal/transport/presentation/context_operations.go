@@ -233,6 +233,12 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 		return OperationFailure{"ProcessingCoverageUnavailable", "Evidence cannot currently be kept for the selected duration. Ask an administrator to review the retention limits and available capacity.", false}
 	case errors.Is(err, value.ErrCapacity):
 		return OperationFailure{"CapacityUnavailable", "Capacity is unavailable. Retry the same request after capacity becomes available.", true}
+	case !request && (errors.Is(err, value.ErrDenied) || errors.Is(err, identity.ErrDenied) || errors.Is(err, targets.ErrDenied)):
+		// Target reads resolve the named workload before authorizing it, so an
+		// absent target fails as unavailable. A denied existing one must project
+		// identically, or the reply becomes an existence oracle (specs/mcp.md:
+		// uniform not-found/not-authorized projection).
+		return OperationFailure{"NotAvailable", "The operation is unavailable. Check your access or retry when the service is available.", true}
 	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied), errors.Is(err, targets.ErrDenied):
 		return OperationFailure{"NotAvailable", "This operation is not available with your current access.", false}
 	case errors.Is(err, value.ErrInvalid), errors.Is(err, value.ErrDiagnosticUnavailable):

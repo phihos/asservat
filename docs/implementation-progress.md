@@ -1,5 +1,44 @@
 # Sustained implementation progress
 
+## S-02 installed exit in two workload clusters (2026-10-24)
+
+[native107](../test/results/resumed-c62e02ac-native107/README.md) passes the installed journey
+with a second workload cluster joined through the same hub (catalog slot 2). Fixes from
+native99–106: the join derives its catalog slot (8 slots), refresh owners removed (ADR-224),
+transient refresh tables tolerated during initial replay, router ceilings summed per cluster,
+per-cluster capacity discovery loops with priority for demanded clusters. Final gates on the
+merged branch: vet, full Go gate, custody (468 PASS), initial installation and context suites
+pass; two context tests that expected the pre-#47 instantaneous workload-guard checks now
+wait out the 30 s proof reuse. Open: reconnect import (ADR-223 limitation), Partial states
+(component only), hub-worker exit-137 restarts under load (cause not determined).
+
+## Browser download refresh owners removed (2026-10-24)
+
+[ADR-224](decisions/224-remove-download-refresh-owners.md) removes ADR-114's refresh owners:
+browser prepare is the ordinary audited call (as MCP), the content GET reads the current session
+and fails closed when it needs refreshing, and the console resumes with Range. Migration 00078
+drops the owner/consumer tables, guard functions and busy function; the three refresh SQL logins
+are gone and the shared schema is 78. Known limitation: a long download with a closed or frozen
+console tab stops at the next needed refresh. Unit/race, vet, sqlc, architecture and spec gates
+pass; the real-SQL custody, browser-session (Keycloak) and installed journey runs are pending.
+
+## S-02 exit checks in the installed journey (2026-10-24)
+
+Installed runs native93–99 added the remaining S-02 exit checks to the installed journey and
+fixed what they exposed. [native99](../test/results/resumed-c62e02ac-native99/README.md) passes
+all of them in one regional workload cluster: browser submission, MCP/browser preview, case,
+approved extract and native download parity, exact duplicate replay and idempotency Conflict,
+Range/If-Range resume, catalog minimization, an unrelated eligible user refused exactly as for
+absent objects, Stop, Deny, failed cleanup retaining charges and verified deletion. Fixes: browser
+operations now get MCP's per-operation request window (20 s evidence reads; the 5 s cap returned
+503 on a download preparation that enrolls a worker), target reads no longer reveal whether a
+workload exists, each regional standby answers eight target queries instead of four (one standby's
+budget ran out within its 30 s life), and the hub-worker now observes elapsed capture deadlines
+(ADR-223; a lost regional completion reply is not imported, never repeated). Open: the second
+workload cluster's join (one catalog slot; join always wrote slot 1), now 8 slots with the
+slot derived by the join and per-cluster capacity standbys. Simplification candidate: the
+per-query source observation frame (ADR-178) is what limits queries per exchange.
+
 ## Installed journey passes end to end (2026-10-24)
 
 Installed native92 on `aa4eac9a` exits 0 (1886.8 s): install with resumed installer,
@@ -9346,7 +9385,7 @@ The reviewed SQL43 package is integrated after all 25 base/payload hash checks;
 Migration 43 now precedes 44; the schema head remains 44 and the exact initial
 installation inventory includes 70 tables. The [handoff](../test/results/browser-refresh-owner-stage-HANDOFF.md)
 records focused staged race/vet checks and the limits of its compile-only native hooks.
-The [owner contract](architecture/browser-refresh-owner.md) binds explicit browser
+The owner contract (removed by ADR-224) bound explicit browser
 POST consent to the original session, current accepted download, finite demand,
 one-use provider refresh and positive joined cleanup. Logout removes authority
 without refunding unjoined work. Public operation attachment, native browser

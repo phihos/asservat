@@ -295,6 +295,14 @@ func TestOwnerObservationReceiverOriginalBudgetWithRealServices(t *testing.T) {
 	if measured.FirstError != "none" {
 		t.Fatal("first concrete pair proof did not finish; pre/post counterexample not yet established", measured.FirstError)
 	}
+	if measured.LastError == "none" {
+		// Proofs reused for OwnerProtectionReuse now fit the original budget.
+		if handlerCalls.Load() != 1 || measured.TotalNanos > int64(5*time.Second) {
+			t.Fatal("original admission retried or exceeded its budget", handlerCalls.Load(), measured.TotalNanos)
+		}
+		t.Log("original nested pre/post completed within the original budget; the earlier availability counterexample no longer reproduces")
+		return
+	}
 	if measured.LastError != "deadline" && measured.LastError != "cancelled" && measured.LastError != "unavailable" {
 		t.Fatal("original nested pre/post unexpectedly completed or failed outside timed availability", measured.LastError)
 	}

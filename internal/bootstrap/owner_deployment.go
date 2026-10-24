@@ -303,7 +303,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		d.publicDownloads, err = newPublicDownloads(startup, d, observer, probe, catalog, a, &closers)
 		if err == nil {
 			phase = startupPublicHandler
-			d.publicHandler, err = newPublicHandler(startup, d, a, &app.OwnerAuthenticator{Registry: ledgers["registry"], Routes: routes, Protection: guard, Now: time.Now}, &closers)
+			d.publicHandler, err = newPublicHandler(startup, d, a)
 		}
 		d.closers = append(d.closers, closers...)
 		if err != nil {

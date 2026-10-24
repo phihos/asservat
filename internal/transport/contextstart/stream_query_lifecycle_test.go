@@ -142,14 +142,15 @@ func TestContextQueryCompletedAnswerRetainsProofAndFiniteCounts(t *testing.T) {
 					t.Fatal("completed caller cancellation closed standby")
 				}
 			}
-			if f.readRestores.Load() != 4 || f.writeRestores.Load() != 4 {
+			n := int32(contracts.APIContextMaximumQueries)
+			if f.readRestores.Load() != n || f.writeRestores.Load() != n {
 				t.Fatal("both original passive deadlines were not restored", f.readRestores.Load(), f.writeRestores.Load())
 			}
-			if f.stream.querySeq != 4 || f.stream.sourceSeq != 4 || f.stream.frames != 16 {
+			if f.stream.querySeq != int(n) || f.stream.sourceSeq != int(n) || f.stream.frames != 4*int(n) {
 				t.Fatal("finite sequence/frame accounting changed", f.stream.querySeq, f.stream.sourceSeq, f.stream.frames)
 			}
 			if _, err := f.stream.query(parent, queryResolvePod, struct{}{}, &struct{}{}); err == nil {
-				t.Fatal("fifth query accepted")
+				t.Fatal("query beyond the budget accepted")
 			}
 		})
 	}

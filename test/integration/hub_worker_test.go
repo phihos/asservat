@@ -352,11 +352,21 @@ func runHubConfigurationWorker(t *testing.T, native bool) {
 		t.Fatal("observer cleared recovery")
 	}
 	// The only fixture authority transition; ordinary runtime observation cannot
-	// execute it, and no background fixture refresh follows it.
-	if _, err = db.Exec(ctx, "UPDATE fleet_trust SET activated_postmaster_at=pg_catalog.pg_postmaster_start_time(),activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),recovery_blocked=false WHERE installation_id=$1", installation); err != nil {
+	// execute it, and no background fixture refresh follows it. The blocked
+	// observations left the root suspended, and the seed requires an unsuspended
+	// root; one transaction keeps the running observer from fencing in between.
+	activation, err := db.Begin(ctx)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = seedSyntheticFleetObservation(ctx, db, installation); err != nil {
+	defer activation.Rollback(context.Background())
+	if _, err = activation.Exec(ctx, "UPDATE fleet_trust SET activated_postmaster_at=pg_catalog.pg_postmaster_start_time(),activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),suspended=false,recovery_blocked=false WHERE installation_id=$1", installation); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = seedSyntheticFleetObservation(ctx, activation, installation); err != nil {
+		t.Fatal(err)
+	}
+	if err = activation.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
 	await("audited current owner configuration", func() bool { _, e := current.ReadOwnerConfiguration(ctx); return e == nil })

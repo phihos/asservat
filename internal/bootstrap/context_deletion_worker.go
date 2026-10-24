@@ -13,6 +13,7 @@ import (
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
+	captureapp "asservat.local/asservat/internal/application/capture"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
@@ -37,6 +38,7 @@ const contextDeletionSweep = 30 * time.Second
 type contextDeletionWorker struct {
 	installation, root string
 	facets             []*postgres.ContextDeletions
+	deadlines          captureapp.ContextDeadlineObserver
 	recovery           *postgres.RecoveryReader
 	base               *os.Root
 	writer             *installedConfigurationAudit
@@ -73,6 +75,10 @@ func openContextDeletion(ctx context.Context, c contracts.PermissionDeployment, 
 		return nil, &fixedStepError{"recovery", mounts.ErrUnavailable}
 	}
 	w.recovery = recovery
+	// ADR-223: the cleaner's login also marks elapsed capture deadlines.
+	if w.deadlines, err = postgres.NewContextDeadlineObserver(ctx, pools["context-cleanup"], c.RootID); err != nil {
+		return nil, &fixedStepError{"sql/context-deadlines", mounts.ErrUnavailable}
+	}
 	return w, nil
 }
 
@@ -129,8 +135,19 @@ func (w *contextDeletionWorker) prepare(v contracts.ContextDeletionDeployment, s
 // the previous sweep's.
 func (w *contextDeletionWorker) run(ctx context.Context) {
 	last := map[artifact.Location]string{}
+	lastDeadline := ""
 	var cursor postgres.ContextDeletionCursor
 	for ctx.Err() == nil {
+		// Deadline observation needs no store or signing pins, so it runs even
+		// before the capacity projection arrives.
+		if outcome := observeContextDeadlines(ctx, w.deadlines.ObserveOverdueContextCaptures); outcome != lastDeadline && ctx.Err() == nil {
+			shown := outcome
+			if shown == "" {
+				shown = "ok"
+			}
+			fmt.Fprintln(os.Stderr, "hub-worker context deadlines: "+shown)
+			lastDeadline = outcome
+		}
 		outcomes := map[artifact.Location]string{}
 		if w.cleaner == nil {
 			if v, storeID, ok := w.section(); !ok {
@@ -180,6 +197,33 @@ func sweepContextDeletionPage(ctx context.Context, cursor postgres.ContextDeleti
 		outcomes[loc] = regionalOutcome(clean(ctx, loc))
 	}
 	return page.Next, outcomes
+}
+
+// contextDeadlinePages bounds one sweep's deadline observation: sixteen
+// captures per SQL page, so at most 128 captures per 30-second sweep. A larger
+// backlog continues in the next sweep.
+const contextDeadlinePages = 8
+
+// observeContextDeadlines marks unpublished captures whose original deadline
+// elapsed (ADR-223), page by page while pages are full. The mark is SQL-timed
+// and immutable; it cancels nothing and releases no charge. It returns an
+// empty outcome on success and a fixed outcome on the first failed page.
+func observeContextDeadlines(ctx context.Context, observe func(context.Context, int) (int64, error)) string {
+	for range contextDeadlinePages {
+		if ctx.Err() != nil {
+			return ""
+		}
+		page, end := context.WithTimeout(ctx, 5*time.Second)
+		n, err := observe(page, 16)
+		end()
+		if err != nil {
+			return "deadline observation " + regionalOutcome(err)
+		}
+		if n < 16 {
+			return ""
+		}
+	}
+	return ""
 }
 
 // evidenceDeleteStorage reads the operator's evidence delete credential for

@@ -11,9 +11,9 @@ DELETE FROM browser_logout AS target WHERE target.root_id=$1 AND target.id IN (S
 -- name: CountBrowserLogins :one
 SELECT count(*) FROM browser_login WHERE root_id=$1;
 -- name: CountBrowserSessions :one
-SELECT count(*) FROM (SELECT s.id FROM browser_session s WHERE s.root_id=$1 UNION SELECT o.session_id FROM browser_refresh_owner o WHERE o.root_id=$1) occupied;
+SELECT count(*) FROM browser_session WHERE root_id=$1;
 -- name: CountBrowserSubject :one
-SELECT count(*) FROM (SELECT s.id FROM browser_session s WHERE s.root_id=$1 AND s.issuer=$2 AND s.client_id=$3 AND s.subject=$4 UNION SELECT o.session_id FROM browser_refresh_owner o WHERE o.root_id=$1 AND o.actor_key=$5) occupied;
+SELECT count(*) FROM browser_session WHERE root_id=$1 AND issuer=$2 AND client_id=$3 AND subject=$4;
 -- name: CountBrowserLogout :one
 SELECT count(*) FROM browser_logout WHERE root_id=$1;
 -- name: InsertBrowserLogin :exec
@@ -41,13 +41,3 @@ INSERT INTO browser_logout(root_id,epoch,id,issuer,client_id,subject,provider_se
 -- name: RevokeBrowserProviderSessions :exec
 DELETE FROM browser_session WHERE root_id=$1 AND epoch=$2 AND issuer=$3 AND client_id=$4 AND ((sqlc.arg(provider_session)::text<>'' AND provider_session=sqlc.arg(provider_session) AND (sqlc.arg(subject)::text='' OR subject=sqlc.arg(subject))) OR (sqlc.arg(provider_session)::text='' AND subject=sqlc.arg(subject) AND authenticated_at<=sqlc.arg(issued_at)));
 
--- name: PruneJoinedBrowserRefreshOwners :exec
-DELETE FROM browser_refresh_owner o WHERE o.root_id=$1 AND o.session_id IN
- (SELECT c.session_id FROM browser_refresh_owner c WHERE c.root_id=$1 AND c.joined_at IS NOT NULL
- AND NOT EXISTS(SELECT 1 FROM browser_session s WHERE s.root_id=c.root_id AND s.id=c.session_id)
- AND NOT EXISTS(SELECT 1 FROM browser_refresh_consumer d WHERE d.owner_id=c.owner_id AND d.owner_generation=c.generation)
- ORDER BY c.joined_at,c.session_id LIMIT 256 FOR UPDATE SKIP LOCKED);
--- name: WakeBrowserOwnedRefresh :execrows
-UPDATE browser_session SET refresh_at=least(refresh_at,clock_timestamp()) WHERE root_id=$1 AND epoch=$2 AND id=$3 AND version=$4 AND refresh_claim IS NULL AND created_at<clock_timestamp() AND clock_timestamp()<expires_at;
--- name: BrowserOwnedRefreshBusy :one
-SELECT browser_owned_refresh_busy(sqlc.arg(root_id)::uuid,sqlc.arg(session_id)::bytea)::boolean AS busy;

@@ -46,13 +46,14 @@ import (
 
 // qualifyRegionalInstall is ADR-193 step 5 on top of the installed hub: a
 // product BootstrapIssuer slot, the operator's read of the KV record, then
-// `installer-cluster` against the second owned cluster. Both leaves must
+// `installer-cluster` against owned workload cluster f.Clusters[index]
+// (index 1 or 2; Clusters[0] is the hub). Both leaves must
 // activate, a Pod restart is readmitted, a rerun is idempotent and a
 // non-administrator source write is denied. The issuance logins are the
 // product fleet-bootstrap purposes the continuation provisioned; only the
 // fleet operator authority is fixture setup. Hub operations use the accepted
 // runner; the original observer retains diagnostic log access only.
-func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin *pgxpool.Pool, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
+func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index int, admin *pgxpool.Pool, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), providers *initialRuntimeNativeProviders, offerJSON string, installation string) {
 	t.Helper()
 	var offer contracts.RegionalOffer
 	if json.Unmarshal([]byte(offerJSON), &offer) != nil {
@@ -62,7 +63,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin 
 	if err != nil {
 		t.Fatal("partial executor offer", err)
 	}
-	config, err := clientcmd.BuildConfigFromFlags("", f.Clusters[1].Config)
+	config, err := clientcmd.BuildConfigFromFlags("", f.Clusters[index].Config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,14 +77,14 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin 
 		// reads discovery only and never installs or adopts a shared CRD.
 		installRegionalStartCRD(t, ctx, region)
 	}
-	record := issueInstalledBootstrap(t, ctx, admin, hub, namespace, providers, installation)
+	record := issueInstalledBootstrap(t, ctx, admin, hub, namespace, providers, installation, index)
 	dir := t.TempDir()
 	offerFile, recordFile := filepath.Join(dir, "regional-offer.json"), filepath.Join(dir, "bootstrap.json")
 	if os.WriteFile(offerFile, []byte(offerJSON), 0o600) != nil || os.WriteFile(recordFile, record, 0o600) != nil {
 		t.Fatal("operator files")
 	}
 	clear(record)
-	args := []string{"--kubeconfig", f.Clusters[1].Config, "--offer", offerFile, "--bootstrap", recordFile, "--namespace", "asservat-connector"}
+	args := []string{"--kubeconfig", f.Clusters[index].Config, "--offer", offerFile, "--bootstrap", recordFile, "--namespace", "asservat-connector"}
 	envelope, err := kms.DecodeBootstrapRecord(mustRead(t, recordFile))
 	if err != nil {
 		t.Fatal(err)
@@ -126,9 +127,9 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, admin 
 	t.Log("installer-cluster connector enrolled generation 1 and both leaves")
 	if executor {
 		qualifyRegionalExecutor(t, ctx, admin, region, offer, installed, peer)
-		qualifyRegionalJoin(t, ctx, hub, hubObserver, hubKubeconfig, namespace, installation, *installed.Join)
+		qualifyRegionalJoin(t, ctx, hub, hubObserver, hubKubeconfig, namespace, installation, *installed.Join, index)
 		if offer.Capacity != nil {
-			qualifyRegionalCapacity(t, ctx, admin, hub, hubObserver, region, namespace, issuer, journey, installation, offer, installed)
+			qualifyRegionalCapacity(t, ctx, admin, hub, hubObserver, region, namespace, issuer, journey, installation, offer, installed, index)
 		}
 	}
 	// A rerun reopens every object unchanged.
@@ -223,8 +224,9 @@ func installRegionalStartCRD(t *testing.T, ctx context.Context, api kubernetes.I
 // issueInstalledBootstrap issues one slot through the product BootstrapIssuer
 // on the installed hub's SQL trust with the projected product issuance
 // logins, then reads the KV record as the operator would. It returns that
-// record's data object.
-func issueInstalledBootstrap(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub kubernetes.Interface, namespace string, p *initialRuntimeNativeProviders, installation string) []byte {
+// record's data object. Each workload cluster index has its own operator key
+// digest: the reservation is unique per actor and key.
+func issueInstalledBootstrap(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub kubernetes.Interface, namespace string, p *initialRuntimeNativeProviders, installation string, index int) []byte {
 	t.Helper()
 	const profile = "regional-installer"
 	id := strings.ReplaceAll(uuid.NewString()[:8], "-", "")
@@ -323,7 +325,7 @@ func issueInstalledBootstrap(t *testing.T, ctx context.Context, admin *pgxpool.P
 			IdentityRevision: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{1}}, AdministrationRevision: trust, CheckedAt: now, ValidUntil: now.Add(5 * time.Second), MaxActiveBootstraps: 8, MaxBootstrapHistory: 16, MaxClusters: 16}, nil
 	})
 	issuer := fleetapp.BootstrapIssuer{Authority: authority, Reservations: reserve, Credentials: channel, Records: issues[0], Audits: issues[1], Objects: &objectstore.BootstrapIssueObjects{Store: store, Seal: seal, Open: open}, Activation: issues[2], Now: time.Now}
-	intent, err := issuer.Issue(ctx, "synthetic-operator", fleetapp.BootstrapInput{KeyDigest: artifact.Digest{2}, DisplayName: "synthetic region", Region: "eu-test", DeliveryProfile: profile})
+	intent, err := issuer.Issue(ctx, "synthetic-operator", fleetapp.BootstrapInput{KeyDigest: artifact.Digest{byte(1 + index)}, DisplayName: "synthetic region " + strconv.Itoa(index), Region: "eu-test", DeliveryProfile: profile})
 	if err != nil || !intent.Issued {
 		t.Fatal("audited bootstrap issuance on the installed hub", err)
 	}
@@ -439,10 +441,11 @@ func qualifyRegionalExecutor(t *testing.T, ctx context.Context, admin *pgxpool.P
 }
 
 // qualifyRegionalJoin runs the hub-side join twice (ADR-196 step 5): the
-// rerun is exact, the catalog holds the printed entry, and the hub-api
+// rerun is exact, the catalog holds the printed entry (one per joined
+// workload cluster, so index entries), and the hub-api
 // restarts its container in the same Pod, reads the entry at start and is
 // Ready again.
-func qualifyRegionalJoin(t *testing.T, ctx context.Context, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, installation string, join contracts.RegionalJoin) {
+func qualifyRegionalJoin(t *testing.T, ctx context.Context, hub, hubObserver kubernetes.Interface, hubKubeconfig, namespace, installation string, join contracts.RegionalJoin, index int) {
 	t.Helper()
 	raw, err := json.Marshal(join)
 	if err != nil {
@@ -471,7 +474,7 @@ func qualifyRegionalJoin(t *testing.T, ctx context.Context, hub, hubObserver kub
 		t.Fatal(err)
 	}
 	catalog, err := contracts.DecodeOwnerClusterCatalog(strings.NewReader(stored.Data[contracts.OwnerClusterCatalogFile]))
-	if err != nil || len(catalog.Clusters) != 1 || !reflect.DeepEqual(catalog.Clusters[0], entry) {
+	if err != nil || len(catalog.Clusters) != index || !slices.ContainsFunc(catalog.Clusters, func(c contracts.OwnerPublicCluster) bool { return reflect.DeepEqual(c, entry) }) {
 		t.Fatal("catalog does not hold the joined entry", err)
 	}
 	t.Log("installer-cluster-join wrote the slot's sources, topology and catalog entry; the rerun was exact")
@@ -579,8 +582,15 @@ func nodeInternalIP(t *testing.T, ctx context.Context, api kubernetes.Interface,
 // the owner's operation port, and after the operator adds a regional budget
 // policy, a labeled regional workload and its maintainer binding, the
 // hub-worker enrolls that workload through v2 to ready_at with a fresh binding.
-func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, hubObserver, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation) {
+// Workload cluster index n adds its own policy, binding and pool slot; the
+// pool then holds n revisions.
+func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.Pool, hub, hubObserver, region kubernetes.Interface, namespace, issuer string, journey func(cluster, namespace, workload string, deny func(bool)), installation string, offer contracts.RegionalOffer, installed kube.RegionalInstallation, index int) {
 	t.Helper()
+	suffix := ""
+	if index > 1 {
+		suffix = "-" + strconv.Itoa(index)
+	}
+	policyName, bindingName := "regional"+suffix, "regional-maintainers"+suffix
 	j := installed.Join
 	if j == nil || j.Capacity == nil || !slices.Equal(j.Capacity.Keys, slices.Sorted(slices.Values(offer.Capacity.Keys))) {
 		t.Fatal("join record lacks the region's capacity assertion")
@@ -622,13 +632,14 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		return map[string]int64{"bytes": bytes, "objects": objects}
 	}
 	base := "/apis/asservat.io/v1alpha1/namespaces/" + namespace + "/"
-	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": "regional"}, "spec": map[string]any{
+	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "EvidenceBudgetPolicy", "metadata": map[string]any{"name": policyName}, "spec": map[string]any{
 		"poolRef": "capacity", "scope": map[string]any{"clusterID": cluster, "namespaceSelector": map[string]any{"matchLabels": map[string]string{"team": "regional"}}},
 		"namespaceEnvelope": map[string]int64{"maxWorkloadAccounts": 1, "maxStoredBytes": 2147483648, "maxObjects": 2000},
-		// The context reserve fits the root's qualified protocol (Records: 3):
-		// records = min(bytes/1544192, objects/4, 512) = 3. A larger reserve is
+		// The context reserve fits the root's qualified protocol (Records: 4):
+		// records = min(bytes/1544192, objects/4, 512) = 4, which is also the
+		// workload's download sessions (MCP, browser, Stop). A larger reserve is
 		// refused at reservation as above the qualified protocol ceiling.
-		"workload": map[string]any{"protected": amount(1073741824, 1000), "hardLimit": amount(2147483648, 2000), "contextReserve": amount(3*1544192, 12),
+		"workload": map[string]any{"protected": amount(1073741824, 1000), "hardLimit": amount(2147483648, 2000), "contextReserve": amount(4*1544192, 16),
 			"dump":                   map[string]int64{"burst": 1, "minimumIntervalSeconds": 900, "maxStartsPerRollingHour": 2, "maxInputBytesPerRollingHour": 4294967296},
 			"maxConcurrentExpensive": 1, "maxQueuedExpensive": 1, "maxQueueAgeSeconds": 30, "upload": map[string]int64{"bytesPerSecond": 33554432, "burstBytes": 4194304}, "maxUploadRequestsPerSecond": 20, "maxSpoolBytes": 2147483648, "onFull": "RejectNewExpensive"},
 		"node": map[string]any{"maxConcurrentExpensive": 2, "maxQueuedExpensive": 10, "upload": map[string]int64{"bytesPerSecond": 67108864, "burstBytes": 8388608}, "maxSpoolBytes": 4294967296, "impactProfileRef": "standard-node", "unhealthySamples": 3, "sampleIntervalSeconds": 5, "recoveryHealthySeconds": 60}}}
@@ -645,8 +656,8 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		t.Fatal("pool")
 	}
 	spec := pool["spec"].(map[string]any)
-	spec["capacity"] = amount(137438953472+1073741824, 100000+1000)
-	spec["protectedAllocations"] = append(spec["protectedAllocations"].([]any), map[string]any{"budgetPolicyRef": "regional", "workloadSlots": 1, "protectedPerWorkload": amount(1073741824, 1000)})
+	spec["capacity"] = amount(137438953472+int64(index)*1073741824, 100000+int64(index)*1000)
+	spec["protectedAllocations"] = append(spec["protectedAllocations"].([]any), map[string]any{"budgetPolicyRef": policyName, "workloadSlots": 1, "protectedPerWorkload": amount(1073741824, 1000)})
 	body, _ = json.Marshal(pool)
 	if err = client.Put().AbsPath(base + "evidencestoragepools/capacity").Body(body).Do(ctx).Error(); err != nil {
 		t.Fatal("operator pool extension", err)
@@ -669,7 +680,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	if err != nil {
 		t.Fatal("regional workload", err)
 	}
-	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "regional-maintainers"}, "spec": map[string]any{"effect": "Allow",
+	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": bindingName}, "spec": map[string]any{"effect": "Allow",
 		"subjects": []any{map[string]any{"kind": "Group", "issuer": issuer, "id": "synthetic-group"}}, "roles": []any{"workload-maintainer"},
 		"scope":  map[string]any{"clusterID": cluster, "namespaceRef": map[string]any{"name": ns.Name, "uid": string(ns.UID)}, "workloads": []any{map[string]any{"kind": "Deployment", "name": app.Name, "uid": string(app.UID)}}},
 		"reason": "ADR-197 native regional capacity"}}
@@ -722,10 +733,10 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		t.Fatal("regional binding was not refreshed on demand", len(observed), usable)
 	}
 	var revisions int
-	if err = admin.QueryRow(ctx, `SELECT count(*) FROM capacity_pool_revision WHERE root_id=$1`, root).Scan(&revisions); err != nil || revisions != 1 {
+	if err = admin.QueryRow(ctx, `SELECT count(*) FROM capacity_pool_revision WHERE root_id=$1`, root).Scan(&revisions); err != nil || revisions != index {
 		t.Fatal("pool revision chain", revisions, err)
 	}
-	t.Log("regional workload enrolled through v2 to ready_at; a refresh demand kept refreshing its binding; the pool extended once")
+	t.Logf("regional workload enrolled through v2 to ready_at; a refresh demand kept refreshing its binding; the pool holds %d extension revision(s)", index)
 	if journey != nil {
 		// The real adapter rejects administrator/plaintext fixture pools. Read
 		// through the installed scoped permission login and verified TLS,
@@ -774,7 +785,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		// and scope, then its removal. The original Allow assignment stays.
 		deny := func(on bool) {
 			t.Helper()
-			path := base + "accessbindings/regional-maintainers-revoked"
+			path := base + "accessbindings/" + bindingName + "-revoked"
 			if !on {
 				if err := client.Delete().AbsPath(path).Do(ctx).Error(); err != nil {
 					t.Fatal("operator removes the revoking binding", err)
@@ -782,7 +793,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 				observeDeny(false)
 				return
 			}
-			revoke := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "regional-maintainers-revoked"}, "spec": map[string]any{"effect": "Deny",
+			revoke := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": bindingName + "-revoked"}, "spec": map[string]any{"effect": "Deny",
 				"subjects": binding["spec"].(map[string]any)["subjects"], "roles": []any{"workload-maintainer"}, "scope": binding["spec"].(map[string]any)["scope"], "reason": "installed journey revocation"}}
 			body, _ := json.Marshal(revoke)
 			raw, err := client.Post().AbsPath(base + "accessbindings").Body(body).DoRaw(ctx)

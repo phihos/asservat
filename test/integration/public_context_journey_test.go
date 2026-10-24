@@ -155,7 +155,7 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	pools.Snapshot(ctx, admin, "before-audit")
 	shared := nativeOperationAuditServices(t, t, ctx, s.a.RootID, s.recovery.installation, s.a.Registration.StoreID, postgres.DownloadTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard}, admin, poolFor, store, keys, operations, 32, diagnostic)
 	pools.Snapshot(ctx, admin, "assembly-ready")
-	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: actor.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: actor.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, nativeContentNoRefresh{}, shared, native.services.Runtime, native.services.Transfer)
+	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: actor.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: actor.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, shared, native.services.Runtime, native.services.Transfer)
 	publicJourneyRequire(t, "shared authenticated native GET", e)
 	var completed <-chan struct{}
 	server.Config.Handler, completed = nativeContentJoinedHandler(handler)

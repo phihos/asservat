@@ -114,7 +114,7 @@ func initialSchemaInventory(ctx context.Context, q initialSchemaQuery, complete,
 	for rows.Next() {
 		var name, kind, persistence string
 		var rls, force, owner bool
-		if e = rows.Scan(&name, &kind, &persistence, &rls, &force, &owner); e != nil || kind != "r" || persistence != "p" || rls || force || !owner || !slices.Contains(initialInstallationTables, name) {
+		if e = rows.Scan(&name, &kind, &persistence, &rls, &force, &owner); e != nil || kind != "r" || persistence != "p" || rls || force || !owner || !slices.Contains(initialInstallationTables, name) && (complete || !slices.Contains(initialTransientTables, name)) {
 			rows.Close()
 			return cfg.ErrChanged
 		}

@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -14,13 +15,18 @@ import (
 func TestClusterCatalogClosedSnapshot(t *testing.T) {
 	const source = "11111111-1111-4111-8111-111111111114"
 	empty := `{"format":"` + contracts.OwnerClusterCatalogFormat + `","clusters":[]}`
+	slots := func(n int) string {
+		raw, _ := json.Marshal(contracts.OwnerClusterCatalog{Format: contracts.OwnerClusterCatalogFormat, Clusters: make([]contracts.OwnerPublicCluster, n)})
+		return string(raw)
+	}
 	for _, tc := range []struct{ name, raw string }{
 		{"valid-empty", empty},
 		{"unknown", strings.Replace(empty, `"clusters"`, `"admin":true,"clusters"`, 1)},
 		{"null-clusters", strings.Replace(empty, `[]`, `null`, 1)},
 		{"duplicate", strings.Replace(empty, `"clusters":[]`, `"clusters":[],"clusters":[]`, 1)},
 		{"other-format", strings.Replace(empty, contracts.OwnerClusterCatalogFormat, "asservat-owner-cluster-catalog/v0", 1)},
-		{"over-slots", strings.Replace(empty, `[]`, `[{},{}]`, 1)},
+		{"valid-full", slots(contracts.OwnerClusterCatalogSlots)},
+		{"over-slots", slots(contracts.OwnerClusterCatalogSlots + 1)},
 		{"trailing", empty + `{}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -33,14 +39,14 @@ func TestClusterCatalogClosedSnapshot(t *testing.T) {
 			})
 			s := &ClusterCatalogSource{client: f.client, name: "cluster-catalog", uid: source}
 			_, c, e := s.snapshot(context.Background())
-			if tc.name != "valid-empty" {
+			if !strings.HasPrefix(tc.name, "valid-") {
 				if e == nil {
 					t.Fatal("invalid catalog accepted")
 				}
 				return
 			}
-			if e != nil || c.Clusters == nil || len(c.Clusters) != 0 {
-				t.Fatal("valid empty catalog", e)
+			if want := strings.Count(tc.raw, `"connector"`); e != nil || c.Clusters == nil || len(c.Clusters) != want {
+				t.Fatal("valid catalog", e)
 			}
 		})
 	}

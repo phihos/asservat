@@ -1,0 +1,38 @@
+installer-cluster-join wrote the slot's sources, topology and catalog entry; the rerun was exact
+hub-api restarted its process on the catalog change and is Ready with the joined entry
+hub-api recorded the join's write-once capacity qualification
+demand lane: 6 distinct binding observations and 57 samples with at least 1 s left in 15 s
+regional workload enrolled through v2 to ready_at; a refresh demand kept refreshing its binding; the pool holds 1 extension revision(s)
+installed journey: the processing operator initialized processing through the console
+installed browser journey: the console session submitted, resolved and saw publication of its own pod-status capture
+installed journey: MCP preview, request and resolution of a regional pod-status capture in cluster df23297b-bd73-48a4-b13f-81c402677c16 as the Keycloak user
+installed journey: an exact duplicate request_capture replayed the original capture and a changed request under the same key was Conflict, with one admission row
+installed journey: the regional capture in cluster df23297b-bd73-48a4-b13f-81c402677c16 was collected, verified and published
+installed approved query: one exact shared worker, 2 paid poll(s), 1 joined batch(es), three consumed key roles per batch; no native session
+installed journey: real read-only OAuth scope received approved pod-status content through shared acquisition; native-download scope was absent and preparation refused
+installed journey: the Keycloak user downloaded the native pod-status file (354 bytes) of cluster df23297b-bd73-48a4-b13f-81c402677c16 through the hub-local worker
+installed journey: range plus If-Range resume matched the full native file; the Completed session refused another range and kept its charges (708 output, 16777216 read bytes)
+installed journey: the SQL catalog, verification, capture and custody rows of the published artifact contain no native evidence text
+installed browser journey: console and MCP previews agree on scope, selected Pod, impact/unknowns, blockers/warnings, data exposure and retention/deletion
+installed approved query: one exact shared worker, 2 paid poll(s), 1 joined batch(es), three consumed key roles per batch; no native session
+installed browser journey: console case and approved pod-status extract equal the MCP replies
+installed query worker: original lifetime ended, exact Job/Pod terminated, product demand cleanup retained positive retirement before Stop
+installed browser journey: the console session downloaded the native pod-status file (354 bytes, SHA-256 equal to the MCP download)
+installed journey: an unrelated eligible Keycloak user was refused on MCP diagnostics, preview, request, case and download preparation exactly as for absent objects
+installed query worker: original lifetime ended, exact Job/Pod terminated, product demand cleanup retained positive retirement before Stop
+installed Stop call 1: download bcc0393b-b56e-45ad-a918-cdf659e26ea2 request f0f7691d-289c-41b4-94be-aa9c96c64a67 state Cancelled audit recorded
+installed Stop call 2: download bcc0393b-b56e-45ad-a918-cdf659e26ea2 request f0f7691d-289c-41b4-94be-aa9c96c64a67 state Cancelled audit recorded
+installed journey: Stop after accepted Deny remained Cancelled on exact-key replay and restored access; original content route returned only a bounded problem response (no active-stream interruption tested)
+installed journey: accepted Deny accompanied refusal; removing it restored the original artifact
+installed journey: an installed cleanup lease expired under the exact inventory denial; original evidence, receipts, deadlines and storage/control charges remain, with no purge checkpoint
+installed journey: all evidence objects, versions, markers and multipart uploads are absent; acknowledged audit receipt matches its immutable ciphertext version; evidence storage refunded while control charges remain
+installed journey: after original expiry, case and new preparation refused while current workload diagnostics succeeded; independent deletion verified
+installer-cluster-join wrote the slot's sources, topology and catalog entry; the rerun was exact
+hub-api restarted its process on the catalog change and is Ready with the joined entry
+hub-api recorded the join's write-once capacity qualification
+demand lane: 4 distinct binding observations and 42 samples with at least 1 s left in 15 s
+regional workload enrolled through v2 to ready_at; a refresh demand kept refreshing its binding; the pool holds 2 extension revision(s)
+installed journey: MCP preview, request and resolution of a regional pod-status capture in cluster fa83197a-878e-41e4-9168-baf0bf406ec5 as the Keycloak user
+installed journey: the regional capture in cluster fa83197a-878e-41e4-9168-baf0bf406ec5 was collected, verified and published
+installed journey: the Keycloak user downloaded the native pod-status file (354 bytes) of cluster fa83197a-878e-41e4-9168-baf0bf406ec5 through the hub-local worker
+installed journey: short journey in cluster fa83197a-878e-41e4-9168-baf0bf406ec5 complete; its native file names Pod 741ff2cd-075f-4c47-84d9-b9971d0fa7b3 in namespace 6c6be029-fe6b-49dd-b508-3b1ae239c820

@@ -301,7 +301,7 @@
     },
     "configurationProbes": {
       "type": "array",
-      "maxItems": 12,
+      "maxItems": 26,
       "uniqueItems": true,
       "description": "Installation-owned same-namespace source probes. Only dry-run ConfigMap UPDATE may pass the workload guard; the source guard must independently deny. Runtime additionally checks DNS subdomain names.",
       "items": {

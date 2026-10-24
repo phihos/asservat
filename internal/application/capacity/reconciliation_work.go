@@ -188,10 +188,45 @@ func (s *CapacityWorkReconciler) ReadGuardedCandidate(ctx context.Context, clust
 		return zero, capacityStage("pin", cfg.ErrUnavailable)
 	}
 	guard, workload, err := cluster.Guarded.ReadCapacityGuardedWorkload(ctx, namespace, candidate, pin.Keys)
+	// A positively observed absence of a free standby is retried once after
+	// a short wait, like discovery's list retry, only while the step's
+	// original deadline still leaves room. Any other failure is not retried.
+	if errors.Is(err, ErrCapacityNoStandby) && capacityStandbyRetryFits(ctx, s.Now()) {
+		timer := time.NewTimer(capacityStandbyRetryWait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+		case <-timer.C:
+			guard, workload, err = cluster.Guarded.ReadCapacityGuardedWorkload(ctx, namespace, candidate, pin.Keys)
+		}
+	}
+	if err == nil && ctx.Err() != nil {
+		err = ctx.Err()
+	}
 	if err != nil {
 		return zero, capacityStage("guarded-read", errors.Join(cfg.ErrUnavailable, err))
 	}
 	return CapacityGuardedFacts{Guard: guard, Workload: workload}, nil
+}
+
+// ErrCapacityNoStandby is a guarded reader's authenticated "no free standby
+// for this cluster right now" outcome. It confers nothing.
+var ErrCapacityNoStandby = errors.New("capacity regional standby absent")
+
+// CapacityRegionalLoopLimit bounds the per-cluster regional discovery loops
+// (the catalog's eight regional slots).
+const CapacityRegionalLoopLimit = 8
+
+// capacityStandbyRetryWait is the one retry's pause; a guarded read takes
+// about two seconds, so the retry fits a five-second step only when at least
+// the wait plus that read remain.
+var capacityStandbyRetryWait = time.Second
+
+const capacityStandbyRetryRead = 2 * time.Second
+
+func capacityStandbyRetryFits(ctx context.Context, now time.Time) bool {
+	end, ok := ctx.Deadline()
+	return ok && ctx.Err() == nil && now.Add(capacityStandbyRetryWait+capacityStandbyRetryRead).Before(end)
 }
 
 // ReconcileGuardedWorkload reconciles with facts from ReadGuardedCandidate.

@@ -306,7 +306,7 @@ func TestRegionalOperationActualFramedCoordinator(t *testing.T) {
 				server.Close()
 				t.Fatal(e)
 			}
-			handler, e = regionalObservationOperationHandler(net.JoinHostPort(common, port), holder, regional.pin, ingress, regional, time.Now)
+			handler, e = regionalObservationOperationHandler(net.JoinHostPort(common, port), holder, []regionalOperationCluster{{regional.pin, regional}}, ingress, time.Now)
 			if e != nil {
 				server.Close()
 				t.Fatal(e)

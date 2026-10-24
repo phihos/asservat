@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"asservat.local/asservat/internal/domain/audit"
 	"context"
 	"encoding/json"
 	"errors"
@@ -20,18 +21,19 @@ import (
 // InvestigationHandler is inert until protected bootstrap mounts it. It shares
 // the exact application operations with MCP; it contains no permission evaluator.
 type InvestigationHandler struct {
-	sessions      SessionHandler
-	operations    presentation.Operations
-	audited       *presentation.AuditedOperations
-	refreshOwners *identities.BrowserRefreshOwners
-	security      presentation.IngressCounters
-	ingress       chan struct{}
-	contracts     *contracts.InvestigationContracts
-	slots         chan struct{}
-	stopSlots     chan struct{}
-	mu            sync.Mutex
-	active        map[identity.Principal]int
-	stopActive    map[identity.Principal]int
+	sessions   SessionHandler
+	operations presentation.Operations
+	audited    *presentation.AuditedOperations
+	security   presentation.IngressCounters
+	ingress    chan struct{}
+	contracts  *contracts.InvestigationContracts
+	slots      chan struct{}
+	stopSlots  chan struct{}
+	mu         sync.Mutex
+	active     map[identity.Principal]int
+	stopActive map[identity.Principal]int
+	// Report receives a fixed stage label for every 503 (diagnostics only).
+	Report func(string)
 }
 
 // NewInvestigationHandler is an unaudited component/test constructor, never
@@ -62,10 +64,10 @@ func NewAuditedInvestigationHandler(sessions SessionHandler, operations *present
 	return h, err
 }
 
-// Native browser preparation always attaches the concrete POST-admitted
-// refresh owner. It is never inferred from GET/status or carried through MCP.
-func NewAuditedDownloadInvestigationHandler(sessions SessionHandler, operations *presentation.AuditedOperations, owners *identities.BrowserRefreshOwners, maxConcurrent int) (*InvestigationHandler, error) {
-	if operations == nil || owners == nil {
+// NewAuditedDownloadInvestigationHandler also serves the native download
+// operations. Browser preparation is the same audited call as MCP's.
+func NewAuditedDownloadInvestigationHandler(sessions SessionHandler, operations *presentation.AuditedOperations, maxConcurrent int) (*InvestigationHandler, error) {
+	if operations == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	if _, ok := operations.Tool("prepare_artifact_download"); !ok {
@@ -77,7 +79,6 @@ func NewAuditedDownloadInvestigationHandler(sessions SessionHandler, operations 
 	h, e := NewInvestigationHandler(sessions, operations, maxConcurrent)
 	if e == nil {
 		h.audited = operations
-		h.refreshOwners = owners
 	}
 	return h, e
 }
@@ -105,6 +106,25 @@ func (h *InvestigationHandler) rejectIngress(w http.ResponseWriter, r *http.Requ
 		}
 	}
 	sessionProblem(w, status)
+}
+
+func (h *InvestigationHandler) unavailable(w http.ResponseWriter, stage string) {
+	if h.Report != nil {
+		h.Report(stage)
+	}
+	sessionProblem(w, 503)
+}
+
+// failure is sessionFailure, reporting the stage when it answers 503.
+func (h *InvestigationHandler) failure(w http.ResponseWriter, stage string, err error) {
+	if h.Report != nil && !errors.Is(err, identity.ErrSessionBusy) && !errors.Is(err, identity.ErrDenied) && !errors.Is(err, identity.ErrInvalid) && !errors.Is(err, identity.ErrSessionCapacity) {
+		var step interface{ FixedStep() string }
+		if errors.As(err, &step) {
+			stage += "/" + step.FixedStep()
+		}
+		h.Report(stage)
+	}
+	sessionFailure(w, err)
 }
 
 func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -151,19 +171,21 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		sessionProblem(w, 429)
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	// Same per-operation window as MCP: evidence reads get the longer window.
+	window := audit.OperationRequestWindow(name)
+	ctx, cancel := context.WithTimeout(r.Context(), window)
 	defer cancel()
 	r = r.WithContext(ctx)
 	controller := http.NewResponseController(w)
 	deadline, _ := ctx.Deadline()
 	if controller.SetReadDeadline(deadline) != nil || controller.SetWriteDeadline(deadline) != nil {
-		sessionProblem(w, 503)
+		h.unavailable(w, "deadline-setup")
 		return
 	}
-	current, view, err := h.sessions.AuthenticateCurrent(w, r)
+	current, view, err := h.sessions.AuthenticateCurrentWithin(w, r, window)
 	if err != nil {
 		h.security.Add(presentation.IngressPreAdmission)
-		sessionFailure(w, err)
+		h.failure(w, "session", err)
 		return
 	}
 	if invalidMedia {
@@ -236,48 +258,26 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		}
 	}()
 	var out presentation.OperationReply
-	if name == "prepare_artifact_download" && h.audited != nil {
-		if h.refreshOwners == nil {
-			sessionProblem(w, 503)
-			return
-		}
-		cookie, e := cookieValue(r, SessionCookie)
-		if e != nil {
-			sessionFailure(w, e)
-			return
-		}
-		origin, csrf := r.Header.Get("Origin"), r.Header.Get("X-CSRF-Token")
-		// Synchronous callback is discarded when this original POST ends. The owner
-		// keeps its own already admitted session binding, never this request/cookie.
-		out, err = h.audited.CallBrowserDownload(ctx, current, name, body, func(call context.Context, id string) (time.Time, error) {
-			observation, e := h.refreshOwners.Admit(call, origin, cookie, csrf, id)
-			if e != nil {
-				return time.Time{}, e
-			}
-			return observation.ValidUntil, nil
-		})
-	} else {
-		out, err = h.operations.Call(ctx, current, name, body)
-	}
+	out, err = h.operations.Call(ctx, current, name, body)
 	defer func() { _ = out.Close(ctx); clear(out.Body) }()
 	if err != nil {
 		if h.audited != nil {
 			if out.ValidUntil.IsZero() {
 				h.security.Add(presentation.IngressAuditUnavailable)
-				sessionProblem(w, 503)
+				h.unavailable(w, "call-no-outcome")
 				return
 			}
 			final, e := current.ResolveIdentity(ctx)
 			until := identity.Earlier(out.ValidUntil, final.ValidUntil)
 			if e != nil || ctx.Err() != nil || !time.Now().Before(until) || controller.SetWriteDeadline(until) != nil {
-				sessionProblem(w, 503)
+				h.unavailable(w, "call-final-identity")
 				return
 			}
 		}
 		if errors.Is(err, contracts.ErrInvestigationWire) {
 			sessionProblem(w, 400)
 		} else {
-			sessionFailure(w, err)
+			h.failure(w, "call", err)
 		}
 		return
 	}
@@ -286,7 +286,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	// confirmed failure; the original key remains usable through the service.
 	finalIdentity, err := current.ResolveIdentity(ctx)
 	if err != nil || ctx.Err() != nil {
-		sessionFailure(w, identity.ErrDenied)
+		h.failure(w, "final-identity", identity.ErrDenied)
 		return
 	}
 	if view.Identity.ValidUntil.Before(deadline) {
@@ -294,13 +294,13 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 	}
 	deadline = identity.Earlier(deadline, identity.Earlier(out.ValidUntil, finalIdentity.ValidUntil))
 	if !time.Now().Before(deadline) {
-		sessionProblem(w, 503)
+		h.unavailable(w, "final-identity-expired")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	writeCtx, finishWrite := out.ResponseContext(ctx)
 	defer finishWrite()
 	if sent, err := presentation.WriteOperationResponse(writeCtx, w, http.StatusOK, out.Body, deadline, out.CheckDisclosure); err != nil && !sent {
-		sessionProblem(w, 503)
+		h.unavailable(w, "response-write")
 	}
 }

@@ -163,15 +163,6 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 			return OperationReply{}, stopped("download-view", e)
 		}
 		until = identity.Earlier(until, view.ValidUntil)
-		// The callback exists only on this original authenticated browser POST.
-		// It stores scheduling ownership, never changes download/identity rights.
-		if prepare && !view.Session.State.Terminal() && call.downloadAttachment != nil {
-			attachmentUntil, e := call.downloadAttachment(ctx, view.Session.ID)
-			if e != nil {
-				return OperationReply{}, stopped("download-attachment", artifact.ErrDownloadUnavailable)
-			}
-			until = identity.Earlier(until, attachmentUntil)
-		}
 		out.Data = data
 	}
 	final, e := current.ResolveIdentity(ctx)

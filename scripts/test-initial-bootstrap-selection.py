@@ -63,7 +63,7 @@ class BootstrapSelection(unittest.TestCase):
 
     def test_installer_continuation_replaces_fixture_continuation(self):
         options = dict(initial_bootstrap_chain=True, runtime_provider_pair=True, installer_continuation=True)
-        self.assertEqual(fixture.qualification_selection(None, False, False, **options), ("^TestInitialBootstrapChainWithRealServices$", 2))
+        self.assertEqual(fixture.qualification_selection(None, False, False, **options), ("^TestInitialBootstrapChainWithRealServices$", 3))
         for extra in ({"runtime_provider_pair": False}, {"runtime_provider_worker": True}):
             with self.assertRaises(ValueError):
                 fixture.qualification_selection(None, False, False, **{**options, **extra})
@@ -72,10 +72,10 @@ class BootstrapSelection(unittest.TestCase):
         self.assertNotIn("ASSERVAT_INITIAL_RUNTIME_PROVIDER_WORKER", selected)
         stale = fixture.qualification_environment({"ASSERVAT_INSTALLER_CONTINUATION": "1"}, Path("fixture"), Path("work"), False, False, True, runtime_provider_pair=True)
         self.assertNotIn("ASSERVAT_INSTALLER_CONTINUATION", stale)
-        self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "50m")
+        self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "60m")
 
     def test_owner_only_aggregate_timeout_keeps_existing_modes(self):
-        self.assertIsNone(fixture.qualification_go_timeout())
+        self.assertEqual(fixture.qualification_go_timeout(), "30m")
         self.assertEqual(fixture.qualification_go_timeout(helm_bootstrap=True), "12m")
         self.assertEqual(fixture.qualification_go_timeout(runtime_provider_owner=True), "14m")
 

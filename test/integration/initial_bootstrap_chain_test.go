@@ -52,7 +52,7 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	}
 	var f fixture
 	raw, err := os.ReadFile(os.Getenv("ASSERVAT_CONTEXT_FIXTURES"))
-	if err != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 1 && (len(f.Clusters) != 2 || os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") != "1") || f.WorkerImage == "" || f.NativeProviders.Postgres == "" {
+	if err != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 1 && (len(f.Clusters) != 3 || os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") != "1") || f.WorkerImage == "" || f.NativeProviders.Postgres == "" {
 		t.Fatal("owned single-cluster/native services unavailable")
 	}
 	installedMode := os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") == "1"
@@ -64,7 +64,9 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	// product operation and root/token/credential deadline within the fixture.
 	duration := initialBootstrapFixtureDuration(ownerMode)
 	if os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") == "1" {
-		duration = 35 * time.Minute // the original 30-minute continuation window plus bootstrap
+		// The original 30-minute continuation window plus bootstrap, and the
+		// second workload cluster's enrollment and short journey.
+		duration = 45 * time.Minute
 	}
 	if os.Getenv("ASSERVAT_JOURNEY_HOLD") != "" {
 		duration += 90 * time.Minute // local debugging hold only (installedJourneyHold)

@@ -112,9 +112,8 @@ func TestDownloadFencePurposesReadProcessingAndRetention(t *testing.T) {
 	}
 	// Downloads (download-session, download-source), DownloadWorkers.withSession
 	// (download-worker and through it
-	// native-owner, native-key-bind), Downloads.withKeyBatch (download-key-bind)
-	// and the browser refresh effects (refresh-admit, refresh-owner).
-	for _, purpose := range []string{"download-session", "download-source", "download-worker", "worker-enrollment", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "refresh-admit", "refresh-owner"} {
+	// native-owner, native-key-bind) and Downloads.withKeyBatch (download-key-bind).
+	for _, purpose := range []string{"download-session", "download-source", "download-worker", "worker-enrollment", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind"} {
 		got, ok := publicRuntimeDutyGrants(purpose)
 		if !ok {
 			t.Fatal("missing purpose", purpose)

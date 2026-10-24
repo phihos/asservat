@@ -256,3 +256,22 @@ func TestBrowserCurrentRequestRefreshesOnlyAtIngress(t *testing.T) {
 		t.Fatal("invalid source accepted")
 	}
 }
+
+func TestBrowserRequestWithinMatchesEvidenceReadWindow(t *testing.T) {
+	now := time.Now()
+	i := requestIdentity(now)
+	i.ValidUntil = now.Add(time.Hour)
+	s := &refreshSession{i: i}
+	clock := func() time.Time { return now }
+	_, v, err := NewBrowserRequestWithin(context.Background(), s, "synthetic-cookie", false, clock, value.EvidenceReadRequestWindow)
+	if err != nil || !v.Identity.ValidUntil.Equal(now.Add(value.EvidenceReadRequestWindow)) {
+		t.Fatal("browser evidence read not bounded by its window", err, v.Identity.ValidUntil.Sub(now))
+	}
+	_, v, err = NewBrowserRequest(context.Background(), s, "synthetic-cookie", false, clock)
+	if err != nil || !v.Identity.ValidUntil.Equal(now.Add(5*time.Second)) {
+		t.Fatal("ordinary browser request not five seconds", err)
+	}
+	if _, _, err = NewBrowserRequestWithin(context.Background(), s, "synthetic-cookie", false, clock, value.EvidenceReadRequestWindow+time.Second); !errors.Is(err, value.ErrUnavailable) {
+		t.Fatal("browser window beyond the evidence-read maximum accepted")
+	}
+}

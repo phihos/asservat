@@ -125,6 +125,9 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 	f, receivedUntil, e := s.receive(call)
 	markQuery(ctx, "q-answer", answered)
 	if e != nil {
+		// The sent query is now unanswered; a caller cancelled before receive
+		// began is only recorded there, so close the stream here.
+		s.interruptAt(streamReceiveCall, streamErrorReason(e))
 		return time.Time{}, e
 	}
 	defer clear(f.Payload)

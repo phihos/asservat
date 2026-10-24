@@ -15,10 +15,15 @@ const (
 	OwnerClusterCatalogFormat   = "asservat-owner-cluster-catalog/v1"
 	OwnerClusterCatalogFile     = "cluster-catalog.json"
 	OwnerClusterCatalogMaxBytes = 128 << 10
-	// OwnerClusterCatalogSlots is the first installed profile's regional
-	// capacity: the owner workload guard's probe list has room for one
-	// cluster's capability and work-trust sources.
-	OwnerClusterCatalogSlots = 1
+	// OwnerClusterCatalogSlots is the installation's fixed regional capacity.
+	// Slot names are deterministic, so the owner Role and the namespace
+	// workload guard name every slot's capability and work-trust sources
+	// (two dry-run probe pairs per slot) at install time; an unused slot's
+	// names grant nothing because its sources do not exist. Eight covers the
+	// S-02 second cluster with headroom, keeps the catalog (about 6 KiB per
+	// entry) well under its 128 KiB bound and stays below the context-start
+	// router's 16-cluster limit.
+	OwnerClusterCatalogSlots = 8
 )
 
 type OwnerClusterCatalog struct {

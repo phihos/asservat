@@ -385,7 +385,21 @@ func qualifyDownloadWorkerPod(t *testing.T, nativeMode bool) {
 		t.Fatal(e)
 	}
 	if e = exec.CommandContext(ctx, "kubectl", "--kubeconfig", f.Clusters[0].Config, "--request-timeout=5s", "exec", "-n", ns.Name, worker.Binding.Pod, "--", "/fixture", "fixture-stop").Run(); e != nil {
-		t.Fatal("synthetic worker stop", e)
+		// A native idle exchange during the changed-source window is denied, and
+		// the worker fails closed by exiting. Then there is nothing left to stop.
+		stopped := false
+		// Kubelet reports the exit shortly after exec already fails.
+		for until := time.Now().Add(5 * time.Second); nativeMode && nativeIdle.rejected.Load() > 0 && !stopped && time.Now().Before(until); time.Sleep(100 * time.Millisecond) {
+			if pod, err := admin.CoreV1().Pods(ns.Name).Get(ctx, worker.Binding.Pod, meta.GetOptions{}); err == nil {
+				for _, status := range pod.Status.ContainerStatuses {
+					stopped = stopped || status.State.Terminated != nil
+				}
+			}
+		}
+		if !stopped {
+			t.Fatal("synthetic worker stop", e)
+		}
+		t.Log("native worker exited after its idle exchange was denied under the changed source")
 	}
 	var termination value.DownloadWorkerTermination
 	limit = time.Now().Add(20 * time.Second)

@@ -65,7 +65,8 @@ func TestInitialBootstrapPassiveWithRealKubernetes(t *testing.T) {
 		defer stop()
 		// All names derive from this test's random namespace and fixed plan. Read
 		// current UIDs before exact deletion; remove guards before namespace GC.
-		for _, name := range []string{guard, nsName + "-" + desired.Name + "-continuity", desired.TargetNamespace + "-" + desired.Name + "-staging"} {
+		owned := []string{guard, nsName + "-" + desired.Name + "-continuity", desired.TargetNamespace + "-" + desired.Name + "-staging"}
+		for _, name := range owned {
 			binding, e := api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Get(clean, name, meta.GetOptions{})
 			if e == nil {
 				e = api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Delete(clean, name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &binding.UID}})
@@ -86,7 +87,9 @@ func TestInitialBootstrapPassiveWithRealKubernetes(t *testing.T) {
 			if e == nil || apierrors.IsNotFound(e) {
 				break
 			}
-			if !initialBootstrapGuardDenial(e, guard) || clean.Err() != nil {
+			// The API server's admission cache can briefly keep any just-deleted
+			// owned policy, not only the bootstrap guard.
+			if !initialBootstrapGuardDenial(e, guard) && !ownedPolicyDenial(e, owned) || clean.Err() != nil {
 				t.Error("owned namespace deletion", e)
 				return
 			}
@@ -297,4 +300,22 @@ func (s *initialBootstrapPassiveTrace) RoundTrip(r *http.Request) (*http.Respons
 		}
 	}
 	return response, err
+}
+
+// ownedPolicyDenial reports an admission denial by one of the named policies.
+func ownedPolicyDenial(err error, policies []string) bool {
+	var status apierrors.APIStatus
+	if !errors.As(err, &status) {
+		return false
+	}
+	s := status.Status()
+	if !(s.Code == 422 && s.Reason == meta.StatusReasonInvalid || s.Code == 403 && s.Reason == meta.StatusReasonForbidden) {
+		return false
+	}
+	for _, policy := range policies {
+		if strings.Contains(s.Message, "ValidatingAdmissionPolicy '"+policy+"' with binding '"+policy+"' denied request") {
+			return true
+		}
+	}
+	return false
 }

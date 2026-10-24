@@ -111,7 +111,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 		// ADR-185: synthetic browser identity settings exercise the public sources step.
 		Public: &contracts.InstallerPublicSettings{Origin: origin, Issuer: issuer, ClientID: "console",
 			MaxLifetimeSeconds: 3600, MaxLogins: 8, MaxSessions: 8, MaxLogoutEvents: 8, Clients: clients,
-			EligibleGroups: []string{"synthetic-group"}, GroupMaxAgeSeconds: 300,
+			EligibleGroups: []string{"synthetic-group", installedUnrelatedGroup}, GroupMaxAgeSeconds: 300,
 			// ADR-190: the operator's synthetic capacity profile and release operator.
 			Capacity: nativeCapacityProfile(),
 			// ADR-210: the synthetic group's console users are the processing
@@ -499,11 +499,17 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
-		installedJourney(t, ctx, identity, publicRoot, publicAddress, origin, diagnose,
+		installedJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose,
 			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))(cluster, namespace, workload, deny)
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
-	qualifyRegionalInstall(t, ctx, f, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
+	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
+	// S-02 exit: a second workload cluster through the same hub, product
+	// installer path and offer. Its short journey (no Deny closure) stops after
+	// the native download; the first cluster covers Stop, Deny, expiry and
+	// deletion.
+	short := func(cluster, namespace, workload string, _ func(bool)) { journey(cluster, namespace, workload, nil) }
+	qualifyRegionalInstall(t, ctx, f, 2, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, short, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
 	// After the guard bridge, the same five-command profile replays (as on
 	// upgrade), finds the installation complete and preserves guard/journal state.
 	guard, err := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, original.Plan.Workload.WorkloadGuard, meta.GetOptions{})
@@ -591,9 +597,11 @@ func installerEvidenceCredential(t *testing.T, ctx context.Context, p *initialRu
 		t.Fatal("owned S3 container identity missing", err)
 	}
 	clear(raw)
+	// One IAM user per workload cluster: s3.configure merges keys and actions
+	// into an existing user, which would let one cluster's key write another's.
 	key, secret := "regional-evidence-"+cluster[:8], "regional-evidence-secret-"+cluster[:8]
 	shell := "s3.configure -user=administrator -access_key=synthetic-only -secret_key=synthetic-only-secret -actions=Admin,Read,Write,List -apply\n" +
-		"s3.configure -user=regional-evidence -access_key=" + key + " -secret_key=" + secret + " -actions=Write:" + bucket + "/v1/" + cluster + "/* -apply\n"
+		"s3.configure -user=regional-evidence-" + cluster[:8] + " -access_key=" + key + " -secret_key=" + secret + " -actions=Write:" + bucket + "/v1/" + cluster + "/* -apply\n"
 	command := exec.CommandContext(ctx, "docker", "exec", "-i", native.Container, "/usr/bin/weed", "shell", "-master=localhost:9333", "-filer=localhost:8888")
 	command.Stdin = strings.NewReader(shell)
 	if output, e := command.CombinedOutput(); e != nil {
@@ -822,6 +830,10 @@ func installShippedPermissionCRDs(t *testing.T, ctx context.Context, api kuberne
 // one-day maximum (local hold 12). Each renewal also spends one lifetime
 // processing root transition and one configuration transition; 8 and 100 with
 // 60 s renewals expired the root nine minutes after install (local hold 10).
+// Every MCP call, including status polls, charges one normal-lane record to the
+// same Keycloak MCP principal until its 10000 s retention; the second workload
+// cluster's short journey runs as that principal after the full journey, so
+// the normal lane holds 128 records rather than 64.
 func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	f := func(row, wal int64) contracts.InstallerCapacityFootprint {
 		return contracts.InstallerCapacityFootprint{RowBytes: row, TransitionWALBytes: wal}
@@ -829,8 +841,8 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	lane := func(accounts, records int64) contracts.InstallerCapacityLane {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
-	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 3, AdmissionSeconds: 86400,
-		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 64), Resolution: lane(4, 8), Processing: lane(2, 16)},
+	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 4, AdmissionSeconds: 86400,
+		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 128), Resolution: lane(4, 8), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
 		Footprints:          contracts.InstallerCapacityFootprints{Capture: f(128<<10, 256<<10), Operation: f(128<<10, 256<<10), Processing: f(128<<10, 256<<10), Native: f(64<<10, 128<<10), Stop: f(128<<10, 256<<10), ProcessingState: f(16<<10, 64<<10)},

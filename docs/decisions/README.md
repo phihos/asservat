@@ -1,5 +1,17 @@
 # Decision records
 
+[ADR-224 — Remove download-owned browser refresh](224-remove-download-refresh-owners.md)
+supersedes ADR-114: browser prepare is the ordinary audited call, the content
+GET reads the current session and fails closed when it needs refreshing, and
+the console resumes with Range. Migration 00078 drops the owner tables.
+Unit checks pass; real SQL and installed qualification are pending.
+
+[ADR-223 — Lost regional completion replies end Indeterminate](223-lost-regional-completion-reply.md)
+does not import a committed regional artifact whose reply was lost; the
+hub-worker deletion sweep's existing login marks elapsed capture deadlines so
+such captures end Indeterminate and keep their charge until normal deletion.
+Unit checks pass; real SQL and installed qualification are pending.
+
 [ADR-222 — Consolidate SQL credentials within the hub process](222-hub-process-sql-credentials.md)
 uses exact grant unions for ordinary public duties and owner identity/routing,
 with separate pinned/nested readers and unchanged process/connection boundaries.
@@ -529,9 +541,7 @@ Selected native cleanup and full custody regressions pass; runtime supervision,
 historical reconciliation and actual backup-profile qualification remain pending.
 
 [ADR-114 — Browser refresh owned by an active download](114-download-owned-browser-refresh.md)
-keeps explicitly requested downloads independent of console tab timers, using
-bounded server ownership and the existing fixed-session refresh claims.
-Implementation and native download qualification remain in progress.
+is superseded and removed by ADR-224.
 
 [ADR-113 — Whole native responses with bounded accounting windows](113-large-native-response-accounting.md)
 separates long HTTP responses, prepaid 64 MiB accounting windows and five-second

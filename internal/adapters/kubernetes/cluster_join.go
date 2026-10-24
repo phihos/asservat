@@ -28,7 +28,9 @@ import (
 type ClusterJoinPlan struct {
 	Control      cfg.NamespaceRef
 	Installation string
-	Slot         int
+	// Slot 0 derives it from the catalog: the cluster's existing position on
+	// an exact rerun, otherwise the next free slot.
+	Slot int
 	Admins       []cfg.KubernetesActor
 	Catalog      contracts.WorkerObjectReference
 	Topology     contracts.RetentionTopologySettings
@@ -97,7 +99,7 @@ func ReadRegionalOffer(ctx context.Context, config *rest.Config, namespace, inst
 // optional download path additions follow it.
 func JoinRegionalCluster(ctx context.Context, config *rest.Config, p ClusterJoinPlan) (contracts.OwnerPublicCluster, error) {
 	e := p.Entry
-	if ctx == nil || config == nil || p.Slot < 1 || p.Slot > contracts.OwnerClusterCatalogSlots || len(p.Admins) == 0 || !authorization.UUID(p.Control.UID) || !authorization.UUID(p.Catalog.UID) || !authorization.UUID(e.ClusterID) || p.Topology.TargetClusterID != e.ClusterID {
+	if ctx == nil || config == nil || p.Slot < 0 || p.Slot > contracts.OwnerClusterCatalogSlots || len(p.Admins) == 0 || !authorization.UUID(p.Control.UID) || !authorization.UUID(p.Catalog.UID) || !authorization.UUID(e.ClusterID) || p.Topology.TargetClusterID != e.ClusterID {
 		return e, cfg.ErrInvalid
 	}
 	if d := p.Downloads; d != nil {
@@ -116,6 +118,11 @@ func JoinRegionalCluster(ctx context.Context, config *rest.Config, p ClusterJoin
 	}
 	call, end := context.WithTimeout(ctx, time.Minute)
 	defer end()
+	if p.Slot == 0 {
+		if p.Slot, err = catalogSlot(call, api, p, e.ClusterID); err != nil {
+			return e, err
+		}
+	}
 	capability, err := json.Marshal(e.Settings)
 	if err != nil {
 		return e, cfg.ErrInvalid
@@ -246,6 +253,26 @@ func ensureImmutableData(ctx context.Context, api kubernetes.Interface, namespac
 		return contracts.WorkerObjectReference{}, cfg.ErrUnavailable
 	}
 	return contracts.WorkerObjectReference{Name: c.Name, UID: string(c.UID)}, nil
+}
+
+// catalogSlot is the cluster's 1-based catalog position, or the next free
+// slot when the catalog does not name it yet.
+func catalogSlot(ctx context.Context, api kubernetes.Interface, p ClusterJoinPlan, cluster string) (int, error) {
+	c, err := api.CoreV1().ConfigMaps(p.Control.Name).Get(ctx, p.Catalog.Name, meta.GetOptions{})
+	if err != nil || string(c.UID) != p.Catalog.UID || len(c.Data) != 1 {
+		return 0, cfg.ErrUnavailable
+	}
+	catalog, err := contracts.DecodeOwnerClusterCatalog(strings.NewReader(c.Data[contracts.OwnerClusterCatalogFile]))
+	if err != nil || catalog.Format != contracts.OwnerClusterCatalogFormat || catalog.Clusters == nil {
+		return 0, cfg.ErrInvalid
+	}
+	if i := slices.IndexFunc(catalog.Clusters, func(v contracts.OwnerPublicCluster) bool { return v.ClusterID == cluster }); i >= 0 {
+		return i + 1, nil
+	}
+	if len(catalog.Clusters) >= contracts.OwnerClusterCatalogSlots {
+		return 0, cfg.ErrUnavailable
+	}
+	return len(catalog.Clusters) + 1, nil
 }
 
 // appendCatalogEntry adds the slot's entry by resourceVersion CAS. An equal

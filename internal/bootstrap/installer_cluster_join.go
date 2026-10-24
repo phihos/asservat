@@ -92,7 +92,7 @@ func RunInstallerClusterJoin(ctx context.Context, args []string, out io.Writer) 
 	if err != nil {
 		return err
 	}
-	joined, err := kube.JoinRegionalCluster(ctx, config, kube.ClusterJoinPlan{Control: control, Installation: join.InstallationID, Slot: 1, Admins: admins, Catalog: owner.Public.ClusterCatalog.Source, Topology: topology, Entry: entry, Downloads: downloads})
+	joined, err := kube.JoinRegionalCluster(ctx, config, kube.ClusterJoinPlan{Control: control, Installation: join.InstallationID, Admins: admins, Catalog: owner.Public.ClusterCatalog.Source, Topology: topology, Entry: entry, Downloads: downloads})
 	if err != nil {
 		return err
 	}

@@ -16,25 +16,64 @@ import (
 	"asservat.local/asservat/internal/transport/clusterobservation"
 )
 
-// NewRegionalObservationOperationHandler composes one original installed
-// regional profile with its concrete SQL49 registry and actual receiving
-// stream/TLS state. It does not enable a listener or choose a profile from wire.
-// The holder and listener retain their independent process/socket ceilings.
-func NewRegionalObservationOperationHandler(host string, holder *clusterobservation.HubObservationOperationHolder, pin value.ConnectorObservationPin, ingress *mtls.OwnerObservationOperationIngress, registry *postgres.ConnectorObservationOperationRegistry, now func() time.Time) (*clusterobservation.HubObservationOperationHandler, error) {
-	if registry == nil {
+// RegionalObservationOperationCluster is one joined regional capacity
+// cluster's original installed profile and its concrete SQL49 registry.
+type RegionalObservationOperationCluster struct {
+	Pin      value.ConnectorObservationPin
+	Registry *postgres.ConnectorObservationOperationRegistry
+}
+
+// NewRegionalObservationOperationHandler composes the joined regional
+// profiles with their concrete SQL49 registries and actual receiving
+// stream/TLS state. A standby's hello selects its cluster's profile; the
+// coordinator still requires the authenticated peer to be that profile's
+// exact binding, so one region cannot stand by for another. It does not
+// enable a listener or choose a profile from wire. The holder and listener
+// retain their independent process/socket ceilings.
+func NewRegionalObservationOperationHandler(host string, holder *clusterobservation.HubObservationOperationHolder, clusters []RegionalObservationOperationCluster, ingress *mtls.OwnerObservationOperationIngress, now func() time.Time) (*clusterobservation.HubObservationOperationHandler, error) {
+	out := make([]regionalOperationCluster, 0, len(clusters))
+	for _, c := range clusters {
+		if c.Registry == nil {
+			return nil, value.ErrInvalid
+		}
+		out = append(out, regionalOperationCluster{c.Pin, c.Registry})
+	}
+	return regionalObservationOperationHandler(host, holder, out, ingress, now)
+}
+
+type regionalOperationCluster struct {
+	pin      value.ConnectorObservationPin
+	registry app.ConnectorObservationOperationRegistry
+}
+
+// regionalOperationClusters indexes the profiles by cluster: at least one,
+// each valid, under one root, and no cluster twice.
+func regionalOperationClusters(clusters []regionalOperationCluster) (map[string]regionalOperationCluster, error) {
+	if len(clusters) < 1 || len(clusters) > 16 {
 		return nil, value.ErrInvalid
 	}
-	return regionalObservationOperationHandler(host, holder, pin, ingress, registry, now)
+	out := make(map[string]regionalOperationCluster, len(clusters))
+	for _, c := range clusters {
+		id := c.pin.Profile.Binding.ClusterID
+		if !c.pin.Valid() || c.registry == nil || c.pin.Profile.RootID != clusters[0].pin.Profile.RootID {
+			return nil, value.ErrInvalid
+		}
+		if _, dup := out[id]; dup {
+			return nil, value.ErrInvalid
+		}
+		out[id] = regionalOperationCluster{c.pin.Clone(), c.registry}
+	}
+	return out, nil
 }
 
 // The private seam permits deterministic tests of current SQL failure. Only the
 // public constructor above is used by installed composition, with the fixed
-// concrete registry. No wire/request can supply this dependency.
-func regionalObservationOperationHandler(host string, holder *clusterobservation.HubObservationOperationHolder, pin value.ConnectorObservationPin, ingress *mtls.OwnerObservationOperationIngress, registry app.ConnectorObservationOperationRegistry, now func() time.Time) (*clusterobservation.HubObservationOperationHandler, error) {
-	if !pin.Valid() || ingress == nil || registry == nil || now == nil {
+// concrete registries. No wire/request can supply this dependency.
+func regionalObservationOperationHandler(host string, holder *clusterobservation.HubObservationOperationHolder, clusters []regionalOperationCluster, ingress *mtls.OwnerObservationOperationIngress, now func() time.Time) (*clusterobservation.HubObservationOperationHandler, error) {
+	byCluster, err := regionalOperationClusters(clusters)
+	if err != nil || ingress == nil || now == nil {
 		return nil, value.ErrInvalid
 	}
-	pin = pin.Clone()
 	// One closed refusal stage and cause per change, for operator
 	// diagnostics (ADR-197); never remote or SQL text.
 	var mu sync.Mutex
@@ -49,11 +88,12 @@ func regionalObservationOperationHandler(host string, holder *clusterobservation
 		}
 	}
 	return clusterobservation.NewHubObservationOperationHandler(host, holder, func(root, setup context.Context, state *tls.ConnectionState, hello contracts.ClusterObservationHello, stream *clusterobservation.HubObservationOperationStream) (clusterobservation.HubObservationOperationConversation, error) {
-		if setup == nil || setup.Err() != nil || hello.RootID != pin.Profile.RootID || hello.ClusterID != pin.Profile.Binding.ClusterID {
+		c, known := byCluster[hello.ClusterID]
+		if setup == nil || setup.Err() != nil || !known || hello.RootID != c.pin.Profile.RootID {
 			refused("hello", value.ErrUnavailable)
 			return nil, value.ErrUnavailable
 		}
-		coordinator, err := mtls.NewHubConnectorObservationOperation(root, pin, ingress, registry, stream, state, hello, now)
+		coordinator, err := mtls.NewHubConnectorObservationOperation(root, c.pin, ingress, c.registry, stream, state, hello, now)
 		if err != nil {
 			refused("coordinator", err)
 			return nil, err

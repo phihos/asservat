@@ -634,19 +634,6 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		t.Fatal("logged out cookie remained accepted")
 	}
 
-	t.Run("explicit-post-owned-provider-refresh-without-tab-polling", func(t *testing.T) {
-		csrf, _ := login()
-		var cookie string
-		for _, c := range jar.Cookies(currentOrigin) {
-			if c.Name == browser.SessionCookie {
-				cookie = c.Value
-			}
-		}
-		if cookie == "" {
-			t.Fatal("actual owner-consent cookie absent")
-		}
-		qualifyBrowserRefreshProvider(t, admin, sessions, store, root, server.URL, cookie, csrf)
-	})
 	_, _ = login()
 	consoleURL, _ := url.Parse(server.URL)
 	var activeCookie string

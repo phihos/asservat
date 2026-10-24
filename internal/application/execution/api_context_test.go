@@ -162,6 +162,10 @@ func (f *apiRunnerFixture) RecordAPIStart(_ context.Context, _ APIExecutionCheck
 func (f *apiRunnerFixture) RecordAPIOutcome(_ context.Context, r value.APIExecution, p value.APIProcessObservation) (value.APIExecution, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.mode == "lost-acquire-reply" {
+		// The exchange that lost the acquisition reply cannot record either.
+		return value.APIExecution{}, value.ErrUnavailable
+	}
 	if !r.Valid() || p.Binding != r.Process {
 		return value.APIExecution{}, value.ErrDenied
 	}
@@ -323,5 +327,66 @@ func TestAPIContextRunnerAcquiringOutputCapturesAtTheOutput(t *testing.T) {
 		if _, err := s.Execute(context.Background(), current, f.work.Accepted.CaptureID); err == nil || !f.spent.Load() || f.record.Phase != phase {
 			t.Fatal("acquisition failure not spent with its phase", mode, err, f.record.Phase)
 		}
+	}
+}
+
+// lostReplyPrepared is a regional output whose region captured and committed
+// the copies, but whose reply never reached the hub: either the acquisition
+// reply or the later CompleteStored reply is lost on the exchange.
+type lostReplyPrepared struct {
+	*acquiringPrepared
+	mode string
+}
+
+func (p lostReplyPrepared) AcquireContext(ctx context.Context, pin artifact.PinnedPod, started, until time.Time) (time.Time, artifact.Copies, error) {
+	acquired, copies, err := p.acquiringPrepared.AcquireContext(ctx, pin, started, until)
+	if err == nil && p.mode == "lost-acquire-reply" {
+		return time.Time{}, artifact.Copies{}, value.ErrUnavailable
+	}
+	return acquired, copies, err
+}
+func (p lostReplyPrepared) CompleteStored() (artifact.ContextWriterCompletion, error) {
+	if _, err := p.acquiringPrepared.CompleteStored(); err != nil || p.mode == "lost-complete-reply" {
+		return artifact.ContextWriterCompletion{}, value.ErrUnavailable
+	}
+	return p.acquiringPrepared.CompleteStored()
+}
+
+type lostReplyOutput struct {
+	f    *apiRunnerFixture
+	mode string
+}
+
+func (o lostReplyOutput) PrepareContext(ctx context.Context, e artifact.ContextExpectation) (evidence.PreparedContext, error) {
+	p, err := acquiringOutput{o.f}.PrepareContext(ctx, e)
+	if err != nil {
+		return nil, err
+	}
+	return lostReplyPrepared{acquiringPrepared: p.(*acquiringPrepared), mode: o.mode}, nil
+}
+
+// ADR-223: a committed regional artifact whose reply is lost is not imported
+// and never collected again. SQL keeps the durable "started" phase, which
+// progress reports as Running until the deadline observer marks it
+// Indeterminate (TestAPIExecutionUnrecordedOutcomeEndsIndeterminateAfterDeadline).
+func TestAPIContextRunnerLostRegionalReplyNeverReacquires(t *testing.T) {
+	for _, mode := range []string{"lost-complete-reply", "lost-acquire-reply"} {
+		t.Run(mode, func(t *testing.T) {
+			f, s, current := apiRunner(t)
+			s.Output, s.Collector = lostReplyOutput{f, mode}, refusingCollector{t}
+			if mode == "lost-acquire-reply" {
+				f.mode = mode
+			}
+			out, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
+			if err == nil || out.State != "Indeterminate" || f.captures.Load() != 1 || f.stores.Load() != 1 || f.record.Phase != "started" {
+				t.Fatal("lost reply", out.State, err, f.captures.Load(), f.stores.Load(), f.record.Phase)
+			}
+			for range 3 {
+				out, err = s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
+				if err != nil || out.State != "AlreadyStarted" || f.captures.Load() != 1 || f.stores.Load() != 1 || f.record.Phase != "started" {
+					t.Fatal("retry repeated collection or rewrote the outcome", out.State, err, f.record.Phase)
+				}
+			}
+		})
 	}
 }

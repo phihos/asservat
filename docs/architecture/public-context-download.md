@@ -14,13 +14,9 @@ reader, current SQL generation, prepaid accounting and fresh short delivery
 leases. This package does not mount the byte route or construct worker authority.
 
 Prepare/get use the exact same operation-audit owner as other investigation
-operations. The server request ID used by audit is the envelope ID. The browser
-strict constructor additionally requires concrete `BrowserRefreshOwners`.
-Its synchronous private callback invokes Admit with the original authenticated
-POST's cookie, origin, CSRF value and accepted download ID. The callback is
-neither serialized nor kept by background preparation. Status and MCP have no
-such callback. The owner independently rechecks current session, serving process,
-accepted download and SQL43 backing; its original deadline caps the response.
+operations. The server request ID used by audit is the envelope ID. Browser and MCP
+preparation are the same audited call; neither admits a refresh owner
+([ADR-224](../decisions/224-remove-download-refresh-owners.md)).
 
 Only an acknowledged explicit prepare may say `continue_preparation: true`, and
 only for Preparing. The console repeats the same prepare key every two seconds

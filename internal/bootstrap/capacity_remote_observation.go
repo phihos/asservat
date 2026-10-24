@@ -27,7 +27,8 @@ type capacityRemoteObservation struct {
 	rootID, clusterID string
 	now               func() time.Time
 	// diagnose logs one closed purpose and outcome per change, with its
-	// elapsed time, labelled "regional" or "local" (ADR-197); never remote text.
+	// elapsed time, labelled "local" or "regional <cluster ID>" (ADR-197);
+	// never remote text.
 	diagnose string
 	mu       sync.Mutex
 	last     string
@@ -111,6 +112,9 @@ func (s *capacityRemoteObservation) observe(ctx context.Context, r fleet.Cluster
 			fmt.Fprintf(os.Stderr, "capacity %s observation %s after %s\n", s.diagnose, line, s.now().Sub(started).Round(10*time.Millisecond))
 		}
 		s.mu.Unlock()
+	}
+	if errors.Is(err, errHolderNoStandby) {
+		return zero, errors.Join(mounts.ErrUnavailable, app.ErrCapacityNoStandby)
 	}
 	if err != nil {
 		return zero, mounts.ErrUnavailable

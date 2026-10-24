@@ -13,8 +13,9 @@ import (
 )
 
 // CapacityReconciler is scheduled by the existing protected A-HWORK Lease.
-// The Lease is not effect authority. Three bounded serial loops separately
-// observe the source, maintain root backing, and enumerate/enroll workloads.
+// The Lease is not effect authority. Bounded serial loops separately observe
+// the source, maintain root backing, and enumerate/enroll each cluster's
+// workloads (one loop per cluster, at most CapacityRegionalLoopLimit regional).
 // SQL retains every current source/recovery/permission fence after its locks.
 // No candidate or caller credential survives this process lifetime.
 type CapacityReconciler struct {
@@ -27,10 +28,9 @@ type CapacityReconciler struct {
 	// RootReport, when set, receives each root reconciliation's outcome from
 	// the single root loop. Diagnostics only.
 	RootReport func(error)
-	// Stalled, when set, is told once when one workload-loop step is still
-	// running two source intervals after it started: the loop is shared by
-	// all clusters, so one stuck step starves every other cluster. ADR-197
-	// runs 20a/20c went silent after enrolling. Diagnostics only.
+	// Stalled, when set, is told once when one cluster's discovery step is
+	// still running two source intervals after it started. ADR-197 runs
+	// 20a/20c went silent after enrolling. Diagnostics only.
 	Stalled func(clusterID, stage string)
 	// Demands, when set, adds the ADR-200 demand lane: workloads whose
 	// admission asked for a fresh binding are reconciled first, back to
@@ -42,6 +42,38 @@ type CapacityReconciler struct {
 	// refresh's context and returns its fixed stage marks.
 	DemandContext func(context.Context) (context.Context, func() string)
 	running       atomic.Bool
+	demanded      capacityDemandedClusters
+}
+
+// capacityDemandedClusters is the demand lane's last read: each demanded
+// cluster until its latest demand's NotAfter (at most a minute). A regional
+// cluster's discovery yields to the demand lane while its cluster is listed,
+// so a demanded refresh does not compete with that cluster's discovery for
+// the shared holder, owner and API budgets. It confers nothing.
+// capacityDemandDeferral bounds how long a demand defers one discovery step.
+const capacityDemandDeferral = 10 * time.Second
+
+type capacityDemandedClusters struct {
+	mu    sync.Mutex
+	until map[string]time.Time
+}
+
+func (d *capacityDemandedClusters) publish(demands []CapacityRefreshDemand, now time.Time) {
+	until := make(map[string]time.Time, len(demands))
+	for _, v := range demands {
+		if v.Valid(now) && v.NotAfter.After(until[v.ClusterID]) {
+			until[v.ClusterID] = v.NotAfter
+		}
+	}
+	d.mu.Lock()
+	d.until = until
+	d.mu.Unlock()
+}
+
+func (d *capacityDemandedClusters) active(cluster string, now time.Time) bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return now.Before(d.until[cluster])
 }
 
 // CapacitySourceInvocation is only the existing source invocation boundary.
@@ -145,6 +177,9 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 	if s == nil || ctx == nil || ctx.Err() != nil || s.Source == nil || s.Source.Now == nil || s.Source.Source == nil || s.Source.Protection == nil || s.Source.Recovery == nil || s.Source.Journal == nil || s.Work == nil || s.Work.Now == nil || s.Work.Recovery == nil || s.Work.Permissions == nil || s.Work.Processing == nil || s.Work.Root == nil || s.Work.Enrollment == nil || s.Work.Bindings == nil || !s.Work.Qualification.Valid() || s.Source.RootID != s.Work.Qualification.RootBacking.RootID || s.Source.InstallationID != s.Work.Qualification.RootBacking.InstallationID || s.Source.QualificationID != s.Work.Qualification.ID || s.Source.QualificationDigest != s.Work.Qualification.Digest || len(s.Clusters) != len(s.Work.Qualification.NamespaceGuards)+len(s.Work.Regional) {
 		return cfg.ErrInvalid
 	}
+	if len(s.Work.Regional) > CapacityRegionalLoopLimit {
+		return cfg.ErrInvalid
+	}
 	seen := map[string]bool{}
 	for _, c := range s.Clusters {
 		if s.Work.namespacePin(c.ClusterID) == nil || seen[c.ClusterID] || c.Workloads == nil || c.Guard == nil {
@@ -160,7 +195,7 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 	var current capacityCurrentSource
 	defer current.clear()
 	var owners sync.WaitGroup
-	owners.Add(3)
+	owners.Add(2 + len(s.Clusters))
 	if s.Demands != nil {
 		owners.Add(1)
 	}
@@ -217,52 +252,16 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 			}
 		})
 	}()
-	go func() {
-		defer owners.Done()
-		cursors := make([]capacityDiscoveryCursor, len(s.Clusters))
-		ended := make([]time.Time, len(s.Clusters))
-		reported := make([]time.Time, len(s.Clusters))
-		steps, candidates := make([]int64, len(s.Clusters)), make([]int64, len(s.Clusters))
-		next := 0
-		var stage atomic.Pointer[string]
-		mark := func(v string) { stage.Store(&v) }
-		capacitySerialLoop(root, 250*time.Millisecond, func(call context.Context) {
-			i := next
-			next = (next + 1) % len(s.Clusters)
-			if p := s.Clusters[i].Pace; p > 0 {
-				if s.Work.Now().Before(ended[i].Add(p)) {
-					return
-				}
-				defer func() { ended[i] = s.Work.Now() }()
-			}
-			mark("discover")
-			if s.Stalled != nil {
-				id := s.Clusters[i].ClusterID
-				t := time.AfterFunc(2*CapacitySourceInterval, func() { s.Stalled(id, *stage.Load()) })
-				defer t.Stop()
-			}
-			ns, candidate, found, err := cursors[i].next(call, s.Clusters[i].Workloads)
-			steps[i]++
-			if found {
-				candidates[i]++
-			}
-			if report := s.Clusters[i].Progress; report != nil && (reported[i].IsZero() || !s.Work.Now().Before(reported[i].Add(30*time.Second))) {
-				reported[i] = s.Work.Now()
-				c := cursors[i]
-				report(CapacityDiscoveryProgress{Steps: steps[i], Candidates: candidates[i], NamespaceIndex: c.namespaceIndex, NamespaceCount: len(c.namespaces), KindIndex: c.kindIndex, WorkloadIndex: c.workloadIndex, WorkloadCount: len(c.workloads)})
-			}
-			if err != nil || !found || call.Err() != nil {
-				return
-			}
-			// The candidate LIST does not confer freshness. The exact read gets a
-			// separate original source interval; no already-issued permit changes.
-			started := s.Work.Now()
-			_, err = s.reconcileCandidate(call, &current, s.Clusters[i], ns, candidate, mark)
-			if report := s.Clusters[i].Report; report != nil {
-				report(err, s.Work.Now().Sub(started))
-			}
-		})
-	}()
+	// One discovery loop per cluster, each with its own cursor, pace and
+	// stall watchdog, so one cluster's pass never delays another's and the
+	// pass time does not grow with the cluster count. Each loop keeps the
+	// original per-step source interval; all join before run returns.
+	for i := range s.Clusters {
+		go func() {
+			defer owners.Done()
+			s.runDiscovery(root, &current, s.Clusters[i])
+		}()
+	}
 	if s.Demands != nil {
 		go func() {
 			defer owners.Done()
@@ -275,6 +274,58 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 	// would release the fixed SQL/process envelope with work still running.
 	owners.Wait()
 	return root.Err()
+}
+
+// runDiscovery is one cluster's own discovery loop: one LIST or one
+// candidate per step, at the cluster's pace, under the step's original
+// source interval.
+func (s *CapacityReconciler) runDiscovery(root context.Context, current *capacityCurrentSource, cluster CapacityClusterReaders) {
+	var cursor capacityDiscoveryCursor
+	var ended, reported, stepped time.Time
+	var steps, candidates int64
+	var stage atomic.Pointer[string]
+	mark := func(v string) { stage.Store(&v) }
+	capacitySerialLoop(root, 250*time.Millisecond, func(call context.Context) {
+		// The demand lane has priority for a demanded regional cluster: its
+		// discovery starts no read while the demand lasts, except one step per
+		// capacityDemandDeferral so a continuously demanded cluster still
+		// enumerates and enrolls new workloads.
+		if cluster.Guarded != nil && s.demanded.active(cluster.ClusterID, s.Work.Now()) && s.Work.Now().Before(stepped.Add(capacityDemandDeferral)) {
+			return
+		}
+		stepped = s.Work.Now()
+		if p := cluster.Pace; p > 0 {
+			if s.Work.Now().Before(ended.Add(p)) {
+				return
+			}
+			defer func() { ended = s.Work.Now() }()
+		}
+		mark("discover")
+		if s.Stalled != nil {
+			id := cluster.ClusterID
+			t := time.AfterFunc(2*CapacitySourceInterval, func() { s.Stalled(id, *stage.Load()) })
+			defer t.Stop()
+		}
+		ns, candidate, found, err := cursor.next(call, cluster.Workloads)
+		steps++
+		if found {
+			candidates++
+		}
+		if report := cluster.Progress; report != nil && (reported.IsZero() || !s.Work.Now().Before(reported.Add(30*time.Second))) {
+			reported = s.Work.Now()
+			report(CapacityDiscoveryProgress{Steps: steps, Candidates: candidates, NamespaceIndex: cursor.namespaceIndex, NamespaceCount: len(cursor.namespaces), KindIndex: cursor.kindIndex, WorkloadIndex: cursor.workloadIndex, WorkloadCount: len(cursor.workloads)})
+		}
+		if err != nil || !found || call.Err() != nil {
+			return
+		}
+		// The candidate LIST does not confer freshness. The exact read gets a
+		// separate original source interval; no already-issued permit changes.
+		started := s.Work.Now()
+		_, err = s.reconcileCandidate(call, current, cluster, ns, candidate, mark)
+		if report := cluster.Report; report != nil {
+			report(err, s.Work.Now().Sub(started))
+		}
+	})
 }
 
 // reconcileCandidate runs one candidate through the regional guarded path
@@ -317,7 +368,12 @@ func (s *CapacityReconciler) runDemands(root context.Context, current *capacityC
 	turn := 0
 	capacitySerialLoop(root, 250*time.Millisecond, func(call context.Context) {
 		demands, err := s.Demands.ReadCapacityRefreshDemands(call)
-		if err != nil || len(demands) == 0 || call.Err() != nil {
+		if err != nil || call.Err() != nil {
+			// The previous set stays in force until its own NotAfter.
+			return
+		}
+		s.demanded.publish(demands, s.Work.Now())
+		if len(demands) == 0 {
 			return
 		}
 		d := demands[turn%len(demands)]

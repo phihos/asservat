@@ -402,6 +402,9 @@ GRANT SELECT ON custody_pool,custody_allocation,custody_attempt,custody_copy TO 
 GRANT UPDATE(id) ON custody_pool,custody_allocation,custody_attempt TO context_cleanup_runtime,context_cleanup_finalize_runtime;
 GRANT UPDATE(state,deletion_fence,lease_until) ON custody_attempt TO context_cleanup_runtime;
 GRANT INSERT ON context_deletion_checkpoint TO context_cleanup_runtime;
+-- ADR-223: the installed cleaner login also holds context_deadline_runtime's grants.
+GRANT SELECT ON context_capture,context_catalog TO context_cleanup_runtime;
+GRANT UPDATE(deadline_observed_at) ON context_capture TO context_cleanup_runtime;
 GRANT UPDATE(attempt_id) ON context_deletion_checkpoint TO context_cleanup_audit_runtime,context_cleanup_finalize_runtime;
 GRANT UPDATE(audit_receipt_json,audit_acknowledged_at) ON context_deletion_checkpoint TO context_cleanup_audit_runtime;
 GRANT UPDATE(charged_bytes,charged_objects) ON custody_allocation TO context_cleanup_finalize_runtime;
@@ -455,37 +458,6 @@ GRANT EXECUTE ON FUNCTION finish_operation_audit_history(uuid,text,bytea,timesta
 -- Overdue cleanup can fence certificate creation and record a result only.
 GRANT UPDATE(overdue_selected_at,overdue_purge) ON operation_audit_lifecycle TO operation_audit_cleanup_runtime;
 -- No runtime role can reset or directly increment proof_window_missed.
-
--- Migration43: explicit POST admission, same-owner maintenance and read-only
--- pause use distinct credentials. None can admit/spend download bytes/windows.
-CREATE ROLE browser_refresh_admission_runtime LOGIN PASSWORD 'synthetic-refresh-admission';
-CREATE ROLE browser_refresh_owner_runtime LOGIN PASSWORD 'synthetic-refresh-owner';
-CREATE ROLE browser_refresh_read_runtime LOGIN PASSWORD 'synthetic-refresh-read';
-GRANT CONNECT ON DATABASE custody_test TO browser_refresh_admission_runtime,browser_refresh_owner_runtime,browser_refresh_read_runtime;
-GRANT USAGE ON SCHEMA public TO browser_refresh_admission_runtime,browser_refresh_owner_runtime,browser_refresh_read_runtime;
-GRANT SELECT ON goose_db_version,browser_session_root,browser_session,browser_refresh_owner,browser_refresh_consumer,fleet_current_trust,artifact_download,download_response,context_catalog,context_capture,context_verification,custody_attempt TO browser_refresh_admission_runtime,browser_refresh_owner_runtime,browser_refresh_read_runtime;
-GRANT UPDATE(installation_id) ON fleet_current_trust TO browser_refresh_admission_runtime,browser_refresh_owner_runtime,browser_refresh_read_runtime;
-GRANT UPDATE(id) ON browser_session_root TO browser_refresh_admission_runtime,browser_refresh_owner_runtime,browser_refresh_read_runtime;
-GRANT UPDATE(id) ON browser_session,artifact_download TO browser_refresh_admission_runtime,browser_refresh_owner_runtime;
-GRANT SELECT ON permission_stream,authority_audit,retention_source,retention_checkpoint,retention_source_epoch,retention_catchup,retention_catchup_effect,retention_decision TO browser_refresh_admission_runtime,browser_refresh_owner_runtime;
-GRANT UPDATE(id) ON permission_stream TO browser_refresh_admission_runtime,browser_refresh_owner_runtime;
-GRANT UPDATE(root_id) ON retention_source TO browser_refresh_admission_runtime,browser_refresh_owner_runtime;
-GRANT UPDATE(session_id) ON browser_refresh_owner TO browser_refresh_admission_runtime,browser_refresh_owner_runtime;
-GRANT UPDATE(download_id) ON browser_refresh_consumer TO browser_refresh_admission_runtime,browser_refresh_owner_runtime;
-GRANT INSERT ON browser_refresh_owner,browser_refresh_consumer TO browser_refresh_admission_runtime;
-GRANT UPDATE(owner_id,generation,installation_id,cluster_id,pod_uid,process_epoch,started_at,lease_until,session_expires_at,joined_at,claim,claim_version,claim_until,claim_joined_at,claim_download_id,claim_response_id,claim_response_owner,claim_response_generation) ON browser_refresh_owner TO browser_refresh_admission_runtime;
-GRANT UPDATE(owner_id,owner_generation) ON browser_refresh_consumer TO browser_refresh_admission_runtime,browser_refresh_owner_runtime;
-GRANT UPDATE(lease_until,joined_at,claim,claim_version,claim_until,claim_joined_at,claim_download_id,claim_response_id,claim_response_owner,claim_response_generation) ON browser_refresh_owner TO browser_refresh_owner_runtime;
-GRANT UPDATE(refresh_claim,claim_until) ON browser_session TO browser_refresh_owner_runtime;
-GRANT DELETE ON browser_refresh_owner TO browser_refresh_owner_runtime;
--- Ordinary sessions see only bounded capacity/cleanup bookkeeping and the
--- definer function's busy bit; they gain no evidence catalog read permission.
-GRANT SELECT ON browser_refresh_owner,browser_refresh_consumer TO browser_runtime,browser_cleanup_runtime;
-GRANT UPDATE(session_id) ON browser_refresh_owner TO browser_runtime,browser_cleanup_runtime;
-GRANT DELETE ON browser_refresh_owner TO browser_cleanup_runtime;
-GRANT EXECUTE ON FUNCTION browser_owned_refresh_busy(uuid,bytea) TO browser_runtime;
-
-GRANT SELECT ON browser_logout TO browser_refresh_owner_runtime;
 
 -- Prepaid native stop: fixture identities represent independently wired roles.
 -- The public stop writer has no ordinary catalog/native metadata permission.
@@ -554,7 +526,7 @@ GRANT UPDATE(id,applied_at,audit_digest) ON processing_decision TO processing_de
 GRANT SELECT ON context_processing,processing_rule TO processing_read_runtime;
 -- Existing effect consumers run the same current processing fence; these are
 -- read-only projections and confer no independent authorization or mutation.
-GRANT SELECT ON processing_root,context_processing,processing_rule TO context_catalog_read_runtime,context_case_read_runtime,download_runtime,download_key_bind_runtime,download_key_read_runtime,download_worker_runtime,download_worker_identity_runtime,browser_refresh_admission_runtime,browser_refresh_owner_runtime;
+GRANT SELECT ON processing_root,context_processing,processing_rule TO context_catalog_read_runtime,context_case_read_runtime,download_runtime,download_key_bind_runtime,download_key_read_runtime,download_worker_runtime,download_worker_identity_runtime;
 -- Enrollment, activation and active-request ownership call the same current
 -- download fence before their effects. Audit-only and locator-read facets do not.
 GRANT SELECT ON processing_root,context_processing,processing_rule TO worker_enrollment_runtime,worker_enrollment_activate_runtime,worker_owner_runtime;

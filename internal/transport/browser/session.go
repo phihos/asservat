@@ -300,11 +300,17 @@ func (h SessionHandler) Authenticate(w http.ResponseWriter, r *http.Request) (ap
 // HTTP request and current server-side session. Only the ingress may refresh;
 // no provider credential or indefinitely reusable identity leaves the service.
 func (h SessionHandler) AuthenticateCurrent(w http.ResponseWriter, r *http.Request) (app.CurrentIdentity, app.SessionView, error) {
+	return h.AuthenticateCurrentWithin(w, r, 5*time.Second)
+}
+
+// AuthenticateCurrentWithin is AuthenticateCurrent bounded by an operation's
+// own request window.
+func (h SessionHandler) AuthenticateCurrentWithin(w http.ResponseWriter, r *http.Request, lifetime time.Duration) (app.CurrentIdentity, app.SessionView, error) {
 	c, mutating, e := h.authenticateCookie(w, r)
 	if e != nil {
 		return nil, app.SessionView{}, e
 	}
-	return app.NewBrowserRequest(r.Context(), h.Sessions, c, mutating, time.Now)
+	return app.NewBrowserRequestWithin(r.Context(), h.Sessions, c, mutating, time.Now, lifetime)
 }
 
 func (h SessionHandler) authenticateCookie(w http.ResponseWriter, r *http.Request) (string, bool, error) {

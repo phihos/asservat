@@ -268,8 +268,9 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     presented plan's digests, so the Go side is unchanged. A non-additive
     change (any existing policy or cluster entry edited) keeps the earlier
     frozen behaviour.
-  - *Hub-api scope.* The v2 server holds one regional capacity cluster, the
-    first profile's one slot. A second needs one standby handler per cluster.
+  - *Hub-api scope.* The v2 server holds every regional capacity cluster in
+    the catalog (up to its eight slots, ADR-196 addendum), and picks each
+    standby's profile from its hello.
   - *Regional clients.* The region's standby uses its own observer and probe
     client instances at the same fixed 20 QPS, so capacity observation never
     spends the executor's proof budget (ADR-199). No limit is raised.
@@ -545,3 +546,36 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     only when its three-second poll lands in the window after enrollment.
     This is a design gap, not a race: [ADR-200](200-on-demand-capacity-refresh.md)
     refreshes a workload's binding when admission needs it.
+- Two regional clusters (native105, 2026-10-24): the second joined
+  cluster's workload missed `ready_at` within five minutes. Routing was
+  checked and is per cluster at every hop (holder lookup/claim, hello
+  profile, authenticated binding, request digest; distinct guard digests
+  would fail `guard-pin`). The cause was discovery throughput: one serial
+  loop shared by every cluster made a regional pass about 43 steps of about
+  4.6 s, and a guarded read that found no free standby lost the candidate
+  until the next pass. Changes:
+  - Each cluster now has its own discovery loop with its own cursor, pace
+    and stall watchdog (at most eight regional loops), all joined on
+    shutdown. Pass time no longer grows with the cluster count, apart
+    from the shared Kubernetes client QPS limits, which are unchanged.
+  - A guarded read whose every candidate owner authenticated and replied
+    that it holds no free standby (`ErrCapacityNoStandby`) is retried once
+    after one second, only when the step's original deadline still leaves
+    the wait plus a two-second read. Unknown or failed replies are not
+    retried.
+  - The hub-worker holder client, the owner's local receiver and its proof
+    connections admit one concurrent capacity observation per regional
+    cluster plus the demand lane (never fewer than the original two).
+  - Regional capacity log lines carry the cluster ID
+    (`capacity regional <cluster ID> ...`).
+- native106 (2026-10-24, with the per-cluster loops): the second cluster
+  reached `ready_at`, but its demand refreshes failed. With two discovery
+  loops and the demand lane reading at once, a guarded read took 4–5 s
+  (locate up to 3 s) and ran out of the five-second step at `claim/post`.
+  Both regions served similar numbers of reads and no standby hello was
+  refused, so standby starvation by the other region was not observed and
+  no per-region holder quota was added. The shared holder, owner and
+  Kubernetes API budgets are the contended resource. A regional cluster's
+  discovery now starts no read while that cluster has an active refresh
+  demand (at most a minute after the admission that asked for it), so the
+  demand lane gets its budgets first; other clusters' discovery continues.

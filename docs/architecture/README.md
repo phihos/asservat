@@ -122,10 +122,9 @@ constructor remains unmounted. Backup qualification, uncertain writers and
 outage/recovery paths remain required.
 
 [Download-owned browser refresh](../decisions/114-download-owned-browser-refresh.md)
-adds bounded server ownership to the accepted download POST so session refresh
-does not depend on an open console tab. [Credential scheduling](browser-refresh-owner.md)
-uses verified token and group deadlines. The live GET remains read-only; runtime
-ownership and complete browser-native qualification remain in progress.
+was removed by [ADR-224](../decisions/224-remove-download-refresh-owners.md). The
+live content GET reads the current session and stops when it needs refreshing;
+the console resumes with Range after its own explicit refresh.
 
 [Whole native responses](../decisions/113-large-native-response-accounting.md)
 separate a long authenticated HTTP reader from prepaid accounting windows and

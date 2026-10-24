@@ -19,6 +19,7 @@ declare -A suites=(
   [context]="make context-integration"
   [continuation]="$context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [direct-observation]="$context --run ^TestDirectHolderObservationWithRealKubernetes\$"
+  [federation-regional]="$context --run ^TestFederationRegionalProductWithRealKubernetes\$"
   [initial-handover]="$context --initial-handover"
   [initial-schema-handover]="$context --initial-schema-handover"
   [helm-bootstrap]="$context --helm-bootstrap"

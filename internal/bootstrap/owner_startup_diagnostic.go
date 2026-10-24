@@ -375,7 +375,12 @@ func OwnerStartupDiagnostic(err error) string {
 	if errors.As(err, &p) {
 		sql, sqlReason = p.Check().String(), p.Reason().String()
 	}
-	return "owner startup failed: phase=" + phase.String() + " role=" + role + " reason=" + ownerStartupReason(err) + " native=" + native + " detail=" + detail + " sql=" + sql + " sql-reason=" + sqlReason
+	step := "unspecified"
+	var fixed interface{ FixedStep() string }
+	if errors.As(err, &fixed) {
+		step = fixed.FixedStep()
+	}
+	return "owner startup failed: phase=" + phase.String() + " role=" + role + " reason=" + ownerStartupReason(err) + " native=" + native + " detail=" + detail + " sql=" + sql + " sql-reason=" + sqlReason + " step=" + step
 }
 
 // OwnerStartupDiagnosticLine accepts exactly the bounded closed log record.
@@ -386,10 +391,10 @@ func OwnerStartupDiagnosticLine(line string) (string, bool) {
 		return "", false
 	}
 	fields := strings.Split(line, " ")
-	if len(fields) != 10 || fields[0] != "owner" || fields[1] != "startup" || fields[2] != "failed:" {
+	if len(fields) != 11 || fields[0] != "owner" || fields[1] != "startup" || fields[2] != "failed:" {
 		return "", false
 	}
-	keys := []string{"phase=", "role=", "reason=", "native=", "detail=", "sql=", "sql-reason="}
+	keys := []string{"phase=", "role=", "reason=", "native=", "detail=", "sql=", "sql-reason=", "step="}
 	for i, key := range keys {
 		if !strings.HasPrefix(fields[i+3], key) {
 			return "", false
@@ -432,6 +437,9 @@ func OwnerStartupDiagnosticLine(line string) (string, bool) {
 					break
 				}
 			}
+		case 7:
+			// Fixed steps are compile-time labels: lowercase words, digits, '-' and '/'.
+			valid = len(v) > 0 && len(v) <= 160 && strings.Trim(v, "abcdefghijklmnopqrstuvwxyz0123456789-/") == ""
 		}
 		if !valid {
 			return "", false

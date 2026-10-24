@@ -218,7 +218,7 @@ func (s *AuditedOperations) RejectBeforeDispatch(ctx context.Context, current id
 	if in.Kind != IngressInvalid && in.Kind != IngressDenied {
 		return time.Time{}, auditapp.ErrUnavailable
 	}
-	reply, err := s.call(ctx, current, in.RequestedOperation, in.Input, in.Kind, nil)
+	reply, err := s.call(ctx, current, in.RequestedOperation, in.Input, in.Kind)
 	if !reply.ValidUntil.IsZero() && (in.Kind == IngressInvalid && errors.Is(err, contracts.ErrInvestigationWire) || in.Kind == IngressDenied && errors.Is(err, identity.ErrDenied)) {
 		return reply.ValidUntil, nil
 	}
@@ -226,18 +226,10 @@ func (s *AuditedOperations) RejectBeforeDispatch(ctx context.Context, current id
 }
 
 func (s *AuditedOperations) Call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage) (OperationReply, error) {
-	return s.call(ctx, current, name, raw, 0, nil)
+	return s.call(ctx, current, name, raw, 0)
 }
 
-// CallBrowserDownload retains an exact original POST callback only for this call.
-// MCP and ordinary Call never carry browser credentials or acquire an owner.
-func (s *AuditedOperations) CallBrowserDownload(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage, attachment func(context.Context, string) (time.Time, error)) (OperationReply, error) {
-	if name != "prepare_artifact_download" || attachment == nil {
-		return OperationReply{}, auditapp.ErrUnavailable
-	}
-	return s.call(ctx, current, name, raw, 0, attachment)
-}
-func (s *AuditedOperations) call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage, rejection IngressRejectionKind, attachment func(context.Context, string) (time.Time, error)) (OperationReply, error) {
+func (s *AuditedOperations) call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage, rejection IngressRejectionKind) (OperationReply, error) {
 	// Transport inputs are bounded before authentication/audit admission. Leave
 	// room for the fixed MAC framing; never allocate from an unbounded name.
 	if s == nil || ctx == nil || current == nil || ctx.Err() != nil || len(raw) > 32<<10 || len(name) > 8192 {
@@ -382,7 +374,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		if e != nil || !sameAuditIdentity(initial, fresh, s.config.Now()) || ctx.Err() != nil {
 			callErr = identity.ErrDenied
 		} else {
-			call := OperationCall{requestID: requestID, downloadAttachment: attachment}
+			call := OperationCall{requestID: requestID}
 			if queryOperation(name) {
 				// The private owner exists only after this invocation's existing
 				// Begin acknowledgement. Neither a DTO nor a public context value

@@ -241,12 +241,22 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		limits.Clusters = append(limits.Clusters, contextstart.ClusterLimit{ClusterID: v.ClusterID, Standby: v.Standby, Captures: v.Captures})
 	}
+	// The installation-wide ceilings cover every joined cluster's own
+	// reservation; each cluster stays bounded by its catalog entry.
+	standby, captures := 0, 0
+	for _, v := range limits.Clusters {
+		standby, captures = standby+v.Standby, captures+v.Captures
+	}
+	limits.Standby, limits.Captures = max(limits.Standby, standby), max(limits.Captures, captures)
+	if limits.Standby > 64 || limits.Captures > 16 || c.Native.Connections+limits.Standby > 64 {
+		return nil, mounts.ErrUnavailable
+	}
 	router, err := contextstart.NewRouter(limits)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	*closers = append(*closers, router.Close)
-	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Admissions: admissions, Connections: p.Standby, Preflight: p.Standby}
+	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Admissions: admissions, Connections: limits.Standby, Preflight: limits.Standby}
 
 	recovery := shared.guards.Recovery
 	if out.permissions, err = postgres.NewPermissions(ctx, sql["hub-metadata-read"], root); err != nil {

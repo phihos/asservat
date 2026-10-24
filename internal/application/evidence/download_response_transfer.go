@@ -9,6 +9,7 @@ import (
 	identityvalue "asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/sha256"
+	"errors"
 	"time"
 )
 
@@ -41,9 +42,6 @@ type responseCurrent struct {
 	scope        artifact.DownloadScope
 	value        artifact.DownloadAuthority
 	now          func() time.Time
-	response     identityvalue.RefreshResponseBinding
-	pauseUsed    bool
-	lastPause    identityvalue.RefreshPause
 	endAuthority func()
 }
 
@@ -90,6 +88,36 @@ func (c *responseCurrent) get(ctx context.Context) (artifact.DownloadAuthority, 
 	}
 	c.value = a
 	return a, nil
+}
+
+// sessionBusyWait bounds how long a response waits, with no output, while
+// another request (normally the console tab) finishes refreshing the same
+// browser session. Nothing is refreshed here.
+const sessionBusyWait = 2 * time.Second
+
+// begin starts the next identity batch. A session that is only busy is retried
+// until it reads current again, for at most sessionBusyWait and never past the
+// original deadline in ctx; then it fails closed with the busy error.
+func (c *responseCurrent) begin(ctx context.Context) (identities.IdentityBatch, error) {
+	b, e := c.reader.BeginBatch(ctx)
+	if !errors.Is(e, identityvalue.ErrSessionBusy) {
+		return b, e
+	}
+	wait, stop := context.WithTimeout(ctx, sessionBusyWait)
+	defer stop()
+	retry := time.NewTicker(100 * time.Millisecond)
+	defer retry.Stop()
+	for {
+		select {
+		case <-wait.Done():
+			return nil, e
+		case <-retry.C:
+		}
+		b, e = c.reader.BeginBatch(ctx)
+		if !errors.Is(e, identityvalue.ErrSessionBusy) {
+			return b, e
+		}
+	}
 }
 
 // Transfer does not return native contents and does not install a public route.
@@ -311,7 +339,6 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	if !r.Valid() || r.Plan != plan || r.ID != request.ResponseID || r.SessionID != session.ID || r.OwnerID != request.OwnerID || r.Until.After(until) {
 		return artifact.ErrIntegrity
 	}
-	current.response = identityvalue.RefreshResponseBinding{DownloadID: session.ID, ResponseID: r.ID, ResponseOwnerID: r.OwnerID, ResponseGeneration: r.Generation}
 	// Always join writes before closing the durable response. Cleanup only closes
 	// this exact owner; an unknown close reply never releases accounting credit.
 	defer func() {

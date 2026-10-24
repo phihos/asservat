@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -20,7 +21,9 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
+	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
+	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -65,11 +68,21 @@ type installedJourneyDownload struct {
 	ExpiresAt           time.Time `json:"expires_at"`
 }
 
-func installedJourney(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func(), projectionCheck installedProjectionCheck) func(cluster, namespace, workload string, deny func(bool)) {
+// installedJourney returns the installed S-02 journey for one regional
+// workload. A nil deny selects the short journey for a further workload
+// cluster: preview, request, collection/publication, get_case and the native
+// download with its SHA-256 check, after the full journey has initialized
+// processing. Its idempotency keys carry the cluster so they never collide
+// with the full journey's keys.
+func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func(), projectionCheck installedProjectionCheck) func(cluster, namespace, workload string, deny func(bool)) {
 	return func(cluster, namespace, workload string, deny func(bool)) {
 		t.Helper()
 		if identity == nil {
 			t.Fatal("installed journey requires the harness identity provider")
+		}
+		short, keys := deny == nil, "installed-journey"
+		if short {
+			keys += "-" + cluster
 		}
 		cert, err := x509.ParseCertificate(publicRoot)
 		if err != nil {
@@ -88,7 +101,9 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			t.Fatal("installed wire contracts", err)
 		}
 		// ADR-210: processing is initialized once, before any preview.
-		identity.initializeProcessing(t, ctx, cert, address, origin, diagnose)
+		if !short {
+			identity.initializeProcessing(t, ctx, cert, address, origin, diagnose)
+		}
 		tokens := identity.mcpTokenSource(origin)
 		client := sdk.NewClient(&sdk.Implementation{Name: "installed-journey", Version: "1"}, &sdk.ClientOptions{Capabilities: &sdk.ClientCapabilities{}})
 		session, err := client.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, tokens.Token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
@@ -152,14 +167,21 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 		target := map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload}
 		previewArguments := map[string]any{"target_ref": target,
 			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": installedJourneyRetention}
-		if dir := os.Getenv("ASSERVAT_JOURNEY_HOLD"); dir != "" {
+		if dir := os.Getenv("ASSERVAT_JOURNEY_HOLD"); dir != "" && !short {
 			installedJourneyHold(t, ctx, dir, wire, session, previewArguments, diagnose)
+		}
+		if !short {
+			qualifyInstalledBrowserSubmission(t, ctx, identity, cert, address, origin, previewArguments, diagnose)
 		}
 		var preview struct {
 			PreviewID      string `json:"preview_id"`
 			CaptureEnabled bool   `json:"capture_enabled"`
-			SelectedPods   []struct {
-				UID string `json:"uid"`
+			TargetRef      struct {
+				ClusterID string `json:"cluster_id"`
+			} `json:"target_ref"`
+			SelectedPods []struct {
+				UID       string `json:"uid"`
+				ClusterID string `json:"cluster_id"`
 			} `json:"selected_pods"`
 		}
 		var accepted installedJourneyAcceptedReceipt
@@ -199,7 +221,12 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			if !preview.CaptureEnabled || len(preview.SelectedPods) != 1 || preview.PreviewID == "" || preview.SelectedPods[0].UID == "" {
 				t.Fatal("installed preview did not pin the regional Pod", preview)
 			}
-			request = map[string]any{"preview_id": preview.PreviewID, "idempotency_key": fmt.Sprintf("installed-journey-capture-%d", attempt)}
+			// No cross-cluster mixup: the preview names the requested cluster
+			// for both the target and its one selected Pod.
+			if preview.TargetRef.ClusterID != cluster || preview.SelectedPods[0].ClusterID != cluster {
+				t.Fatal("installed preview names another cluster", preview.TargetRef.ClusterID, preview.SelectedPods[0].ClusterID, cluster)
+			}
+			request = map[string]any{"preview_id": preview.PreviewID, "idempotency_key": fmt.Sprintf("%s-capture-%d", keys, attempt)}
 			closed, err := installedJourneyRecoverCapture(ctx, requestCapture(request), func() (installedJourneyDisposition, error) {
 				reply, err := readReply(ctx, "resolve_capture_request", request)
 				if err != nil {
@@ -254,7 +281,10 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 		if accepted.CaptureID == "" || accepted.AcceptedAt.IsZero() {
 			t.Fatal("installed capture lost its acknowledged original receipt")
 		}
-		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture as the Keycloak user")
+		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture in cluster %s as the Keycloak user", cluster)
+		if !short {
+			installedJourneyIdempotency(t, ctx, admin, root, accepted.CaptureID, request, requestCapture)
+		}
 		// The regional executor collects; the publisher verifies and publishes
 		// (ADR-203). A successful capture may omit its independently authorized
 		// case link. Keep both passive waits inside one original phase deadline.
@@ -319,19 +349,30 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 		if expires.IsZero() || !time.Now().Before(expires) || expires.After(accepted.AcceptedAt.Add(installedJourneyRetention*time.Second)) {
 			t.Fatal("installed capture returned an invalid original retention deadline", expires)
 		}
-		if deletionCheck == nil {
-			t.Fatal("installed journey requires independent deletion verification")
+		// Operator readback: the published attempt is stored under this cluster.
+		var stored []string
+		if err := admin.QueryRow(ctx, `SELECT coalesce(array_agg(DISTINCT a.cluster_id::text),'{}') FROM context_catalog c JOIN custody_attempt a ON a.artifact_id=c.artifact_id WHERE c.root_id=$1 AND c.artifact_id=$2`, root, investigation.Artifacts[0].ArtifactID).Scan(&stored); err != nil || len(stored) != 1 || stored[0] != cluster {
+			t.Fatal("installed artifact is not stored under the requested cluster", stored, err)
 		}
-		checkDeleted := deletionCheck(investigation.Artifacts[0].ArtifactID)
-		if checkDeleted == nil {
-			t.Fatal("installed deletion verification missing")
+		var checkDeleted func()
+		if !short {
+			if deletionCheck == nil {
+				t.Fatal("installed journey requires independent deletion verification")
+			}
+			if checkDeleted = deletionCheck(investigation.Artifacts[0].ArtifactID); checkDeleted == nil {
+				t.Fatal("installed deletion verification missing")
+			}
 		}
-		t.Logf("installed journey: the regional capture was collected, verified and published")
-		approved, checkQueryRetired := installedApprovedProjection(t, ctx, identity, transport, origin, progress.CaseID, investigation.Artifacts[0].ArtifactID, preview.SelectedPods[0].UID, expires, projectionCheck)
+		t.Logf("installed journey: the regional capture in cluster %s was collected, verified and published", cluster)
+		var approved query.ContextExcerpt
+		var checkQueryRetired func()
+		if !short {
+			approved, checkQueryRetired = installedApprovedProjection(t, ctx, identity, transport, origin, progress.CaseID, investigation.Artifacts[0].ArtifactID, preview.SelectedPods[0].UID, expires, projectionCheck)
+		}
 		// A hub-local download worker (ADR-204) prepares the native file; the
 		// same MCP client fetches it with its download-route token.
 		var download installedJourneyDownload
-		prepare := map[string]string{"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": "installed-journey-download"}
+		prepare := map[string]string{"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": keys + "-download"}
 		call(ctx, "prepare_artifact_download", prepare, &download)
 		originalDownload, downloadUntil := download.DownloadID, download.ExpiresAt
 		if originalDownload == "" || downloadUntil.IsZero() || downloadUntil.After(expires) {
@@ -356,33 +397,44 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			diagnose()
 			t.Fatal("installed download was not prepared", download.State, download.ContentPath)
 		}
-		get, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(origin, "/")+download.ContentPath, nil)
-		if err != nil {
-			t.Fatal(err)
+		contentURL, contentClient := strings.TrimSuffix(origin, "/")+download.ContentPath, &http.Client{Transport: transport, Timeout: 2 * time.Minute}
+		var head, tail []byte
+		if !short {
+			head, tail = installedJourneyResume(t, ctx, contentClient, contentURL, identity.downloadToken(), *download.SizeBytes)
 		}
-		get.Header.Set("Authorization", "Bearer "+identity.downloadToken())
-		response, err := (&http.Client{Transport: transport, Timeout: 2 * time.Minute}).Do(get)
-		if err != nil {
-			diagnose()
-			t.Fatal("installed download content", err)
-		}
+		response := installedJourneyContent(t, ctx, contentClient, contentURL, identity.downloadToken(), nil)
 		native, err := io.ReadAll(io.LimitReader(response.Body, artifact.MaxContextBytes+1))
 		response.Body.Close()
 		digest := sha256.Sum256(native)
 		size := int64(len(native))
 		var projected struct {
-			Format string `json:"format"`
-			PodUID string `json:"podUID"`
+			Format       string `json:"format"`
+			NamespaceUID string `json:"namespaceUID"`
+			PodUID       string `json:"podUID"`
 		}
 		if err != nil || response.StatusCode != http.StatusOK || size != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 ||
 			json.Unmarshal(native, &projected) != nil || projected.Format != artifact.ContextFormat || projected.PodUID != preview.SelectedPods[0].UID {
 			diagnose()
 			t.Fatal("installed native download differs from its metadata or selected Pod", response.StatusCode, size, err)
 		}
-		if err := installedProjectionMatchesNative(approved, native); err != nil {
-			t.Fatal(err)
+		if !short {
+			if err := installedProjectionMatchesNative(approved, native); err != nil {
+				t.Fatal(err)
+			}
 		}
-		t.Logf("installed journey: the Keycloak user downloaded the native pod-status file (%d bytes) through the hub-local worker", size)
+		t.Logf("installed journey: the Keycloak user downloaded the native pod-status file (%d bytes) of cluster %s through the hub-local worker", size, cluster)
+		if short {
+			t.Logf("installed journey: short journey in cluster %s complete; its native file names Pod %s in namespace %s", cluster, projected.PodUID, projected.NamespaceUID)
+			return
+		}
+		if !bytes.Equal(append(head, tail...), native) {
+			t.Fatal("installed resumed ranges differ from the full native download")
+		}
+		installedJourneyResumeSpent(t, ctx, admin, contentClient, root, originalDownload, contentURL, identity.downloadToken(), size)
+		installedJourneyCatalogMinimized(t, ctx, admin, root, investigation.Artifacts[0].ArtifactID, native)
+		qualifyInstalledBrowserJourney(t, ctx, identity, cert, address, origin, readReply, previewArguments,
+			progress.CaseID, investigation.Artifacts[0].ArtifactID, approved, native, projectionCheck, diagnose)
+		installedJourneyUnrelated(t, ctx, wire, identity.unrelated(), transport, origin, target, preview.PreviewID, progress.CaseID, investigation.Artifacts[0].ArtifactID)
 		// Revocation: with the Deny binding the case is no longer available;
 		// without it, it is again. Expiry: once the artifact's access ends,
 		// the case no longer offers it and a new preparation is refused.
@@ -430,9 +482,9 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			}
 		}
 		healthy()
-		// The installed three-record backing admits two sessions without
-		// refunding the completed first one: 16 KiB output and 32 MiB read
-		// remain within its 24 KiB/36 MiB allocation. Stop needs a nonterminal
+		// The installed four-record backing admits the MCP, browser and Stop
+		// sessions without refunding completed ones: 24 KiB output and 48 MiB
+		// read fit its 32 KiB/48 MiB allocation. Stop needs a nonterminal
 		// session; stopping the completed first download proves AlreadyTerminal.
 		stopReply, err := readReply(ctx, "prepare_artifact_download", map[string]string{
 			"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": "installed-journey-stop-download",

@@ -87,7 +87,13 @@ func NewBearerRequestWithin(ctx context.Context, resolver Resolver, token string
 // requested; every later current check is read-only. Provider tokens never cross
 // this boundary, and a replacement login cannot continue an old request.
 func NewBrowserRequest(ctx context.Context, sessions BrowserSessionResolver, cookie string, allowRefresh bool, now func() time.Time) (CurrentIdentity, SessionView, error) {
-	if ctx == nil || sessions == nil || now == nil || ctx.Err() != nil {
+	return NewBrowserRequestWithin(ctx, sessions, cookie, allowRefresh, now, 5*time.Second)
+}
+
+// NewBrowserRequestWithin is NewBrowserRequest for an operation whose request
+// window (audit.OperationRequestWindow) may be an evidence read, matching MCP.
+func NewBrowserRequestWithin(ctx context.Context, sessions BrowserSessionResolver, cookie string, allowRefresh bool, now func() time.Time, lifetime time.Duration) (CurrentIdentity, SessionView, error) {
+	if ctx == nil || sessions == nil || now == nil || ctx.Err() != nil || lifetime <= 0 || lifetime > value.EvidenceReadRequestWindow {
 		return nil, SessionView{}, value.ErrUnavailable
 	}
 	started := now()
@@ -113,7 +119,7 @@ func NewBrowserRequest(ctx context.Context, sessions BrowserSessionResolver, coo
 		current.Identity.ValidUntil = value.Earlier(current.Identity.ValidUntil, current.ExpiresAt)
 		return current.Identity, nil
 	}
-	h, i, err := bindCurrentRequest(ctx, started, 5*time.Second, v.Identity, resolve, now)
+	h, i, err := bindCurrentRequest(ctx, started, lifetime, v.Identity, resolve, now)
 	if err != nil {
 		return nil, SessionView{}, err
 	}

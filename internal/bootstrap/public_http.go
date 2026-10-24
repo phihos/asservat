@@ -11,21 +11,18 @@ import (
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
-	fleetapp "asservat.local/asservat/internal/application/fleet"
-	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/audit"
-	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
 // newPublicHandler is the ADR-180 P5 assembly: both audited operation lanes,
-// browser refresh owners, the complete operation set and the HTTP routes.
-func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStore, owners *fleetapp.OwnerAuthenticator, closers *[]func()) (http.Handler, error) {
+// the complete operation set and the HTTP routes.
+func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStore) (http.Handler, error) {
 	in, id, pc, dl := d.inputs, d.publicID, d.publicContext, d.publicDownloads
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
-	if p == nil || id == nil || pc == nil || dl == nil || d.Runtime == nil || owners == nil {
+	if p == nil || id == nil || pc == nil || dl == nil || d.Runtime == nil {
 		return nil, &fixedStepError{"inputs", mounts.ErrUnavailable}
 	}
 	// ADR-190: the normal and resolution lanes read their current accepted
@@ -84,36 +81,13 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		return nil, &fixedStepError{"audit-resolution", mounts.ErrUnavailable}
 	}
 
-	settings := id.settings
-	b := d.Runtime.binding
-	process := identity.RefreshProcessBinding{RootID: settings.RootID, Epoch: settings.Epoch, InstallationID: installation, ClusterID: b.ClusterID, PodUID: b.PodUID, ProcessEpoch: b.ProcessEpoch}
-	refreshSQL := map[string]*postgres.BrowserSessions{}
-	for _, purpose := range []string{"refresh-admit", "refresh-owner", "refresh-read"} {
-		pool, err := d.public.open(ctx, purpose)
-		if err != nil {
-			return nil, &fixedStepError{"refresh-sql", err}
-		}
-		if refreshSQL[purpose], err = postgres.NewBrowserSessions(ctx, pool, settings.Binding()); err != nil {
-			return nil, &fixedStepError{"refresh-sql", mounts.ErrUnavailable}
-		}
-	}
-	journal, err := postgres.NewBrowserRefreshOwners(postgres.BrowserRefreshDatabases{Admission: refreshSQL["refresh-admit"], Maintenance: refreshSQL["refresh-owner"], Reader: refreshSQL["refresh-read"]}, dl.downloads, dl.gate, d.Runtime.server, owners, process, time.Now)
-	if err != nil {
-		return nil, &fixedStepError{"refresh-journal", mounts.ErrUnavailable}
-	}
-	refresh, err := identities.NewBrowserRefreshOwners(d.root, *id.sessions, journal, process, p.Origin, ownerRandomID)
-	if err != nil {
-		return nil, &fixedStepError{"refresh-owners", mounts.ErrUnavailable}
-	}
-	*closers = append(*closers, func() { _ = refresh.Close() })
-
 	operations, err := NewPublicContextOperations(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
 		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection})
 	if err != nil {
 		return nil, &fixedStepError{"operations", mounts.ErrUnavailable}
 	}
 	o := p.OperationAudit
-	services := PublicContextServices{Sessions: id.sessions, RefreshOwners: refresh, RefreshPauses: journal, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
+	services := PublicContextServices{Sessions: id.sessions, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
 	if pc.fleet != nil {
 		services.Fleet = pc.fleet
 	}
@@ -129,7 +103,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		}
 		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, recovery: pc.recovery, decisions: decisions, audit: normal, mac: pc.mac, refused: eventLog(os.Stderr, "processing change refused")}
 	}
-	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: settings.Issuer, Version: p.Version,
+	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: id.settings.Issuer, Version: p.Version,
 		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxDuration: time.Duration(p.DownloadMaxSeconds) * time.Second,
 		Audit: presentation.AuditedOperationsConfig{RootID: root, Retention: time.Duration(o.RetentionSeconds) * time.Second, NormalConcurrency: o.NormalConcurrency, ResolutionConcurrency: o.ResolutionConcurrency, PerPrincipalConcurrency: o.PerPrincipalConcurrency, NormalPerSecond: o.NormalPerSecond, ResolutionPerSecond: o.ResolutionPerSecond, Now: time.Now, NewID: ownerRandomID}},
 		services, os.DirFS(contracts.OwnerPublicConsoleRoot))
