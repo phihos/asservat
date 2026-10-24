@@ -156,3 +156,30 @@ func TestCapacityReconcilerDemandHasPriorityOverSameClusterDiscovery(t *testing.
 		t.Fatal("ended demand kept discovery paused")
 	}
 }
+
+// A continuously demanded cluster still runs one discovery step per
+// capacityDemandDeferral.
+func TestCapacityReconcilerDemandDefersDiscoveryOnlyBoundedly(t *testing.T) {
+	source, f := capacityObserverTestFixture()
+	q, _ := capacityQualificationFixture()
+	q.ID, q.Digest = f.accepted.QualificationID, f.accepted.QualificationDigest
+	q.RootBacking.RootID, q.RootBacking.InstallationID = f.accepted.RootID, f.accepted.InstallationID
+	q.RootBacking.QualificationID, q.RootBacking.QualificationDigest = q.ID, q.Digest
+	demanded := &capacityGuardedRuntime{capacityRuntimeReader: &capacityRuntimeReader{recovery: f.recovery}}
+	start := time.Now()
+	// Twenty simulated seconds per real second: 1.2 s covers two deferrals.
+	now := func() time.Time { return f.now.Add(20 * time.Since(start)) }
+	work := &CapacityWorkReconciler{Qualification: q, Recovery: demanded, Permissions: demanded, Processing: demanded, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: demanded, Now: now}
+	cluster := q.NamespaceGuards[0].ClusterID
+	runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{
+		{ClusterID: cluster, Workloads: demanded, Guard: demanded, Guarded: demanded},
+	}, Demands: staticCapacityDemands{{ClusterID: cluster, Namespace: cfg.NamespaceRef{Name: "payments", UID: "ns-uid"}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: "api-uid"}, NotAfter: f.now.Add(time.Minute)}}}
+	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
+	_ = runner.Run(ctx)
+	cancel()
+	// One step counts its LIST and its candidate read; only the first step
+	// would run without the bound.
+	if n := demanded.discovered.Load(); n < 3 || n > 6 {
+		t.Fatal("demand did not defer discovery boundedly", n)
+	}
+}

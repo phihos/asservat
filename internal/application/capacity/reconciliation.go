@@ -50,6 +50,9 @@ type CapacityReconciler struct {
 // cluster's discovery yields to the demand lane while its cluster is listed,
 // so a demanded refresh does not compete with that cluster's discovery for
 // the shared holder, owner and API budgets. It confers nothing.
+// capacityDemandDeferral bounds how long a demand defers one discovery step.
+const capacityDemandDeferral = 10 * time.Second
+
 type capacityDemandedClusters struct {
 	mu    sync.Mutex
 	until map[string]time.Time
@@ -278,17 +281,19 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 // source interval.
 func (s *CapacityReconciler) runDiscovery(root context.Context, current *capacityCurrentSource, cluster CapacityClusterReaders) {
 	var cursor capacityDiscoveryCursor
-	var ended, reported time.Time
+	var ended, reported, stepped time.Time
 	var steps, candidates int64
 	var stage atomic.Pointer[string]
 	mark := func(v string) { stage.Store(&v) }
 	capacitySerialLoop(root, 250*time.Millisecond, func(call context.Context) {
 		// The demand lane has priority for a demanded regional cluster: its
-		// discovery starts no read until the demand ends (at most a minute
-		// after the last admission that asked for it).
-		if cluster.Guarded != nil && s.demanded.active(cluster.ClusterID, s.Work.Now()) {
+		// discovery starts no read while the demand lasts, except one step per
+		// capacityDemandDeferral so a continuously demanded cluster still
+		// enumerates and enrolls new workloads.
+		if cluster.Guarded != nil && s.demanded.active(cluster.ClusterID, s.Work.Now()) && s.Work.Now().Before(stepped.Add(capacityDemandDeferral)) {
 			return
 		}
+		stepped = s.Work.Now()
 		if p := cluster.Pace; p > 0 {
 			if s.Work.Now().Before(ended.Add(p)) {
 				return
@@ -364,7 +369,8 @@ func (s *CapacityReconciler) runDemands(root context.Context, current *capacityC
 	capacitySerialLoop(root, 250*time.Millisecond, func(call context.Context) {
 		demands, err := s.Demands.ReadCapacityRefreshDemands(call)
 		if err != nil || call.Err() != nil {
-			demands = nil
+			// The previous set stays in force until its own NotAfter.
+			return
 		}
 		s.demanded.publish(demands, s.Work.Now())
 		if len(demands) == 0 {
