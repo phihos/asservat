@@ -105,7 +105,7 @@ func qualifyContextNativeInterrupted(t *testing.T, ctx context.Context, f native
 	if e != nil {
 		t.Fatal("interruption current identity", e)
 	}
-	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: state.sessions}, nativeContentDeniedBearer{}, nativeContentNoRefresh{}, state.shared, runtime, transfer)
+	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: state.sessions}, nativeContentDeniedBearer{}, state.shared, runtime, transfer)
 	if e != nil {
 		t.Fatal("interruption content handler", e)
 	}

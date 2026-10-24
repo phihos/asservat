@@ -1,6 +1,6 @@
 # ADR-114: Browser refresh owned by an active download
 
-- Status: accepted design; implementation and native qualification in progress
+- Status: superseded by [ADR-224](224-remove-download-refresh-owners.md) (2026-10-24); removed, historical only
 - Date: 2026-10-11
 - Requirements: REQ-AUT-001, REQ-DLD-003, REQ-DLD-004
 - Owners: C-02 Identity, C-14 Evidence delivery

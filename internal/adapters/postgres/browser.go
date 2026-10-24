@@ -38,9 +38,6 @@ func (s *BrowserSessions) Cleanup(ctx context.Context) error {
 		if e = q.PruneBrowserSessions(ctx, custodydb.PruneBrowserSessionsParams{RootID: id(s.root), Epoch: id(s.epoch)}); e != nil {
 			return e
 		}
-		if e = q.PruneJoinedBrowserRefreshOwners(ctx, id(s.root)); e != nil {
-			return e
-		}
 		return q.PruneBrowserLogout(ctx, custodydb.PruneBrowserLogoutParams{RootID: id(s.root), Epoch: id(s.epoch)})
 	})
 	if err != nil {
@@ -178,7 +175,7 @@ func (s *BrowserSessions) CreateSession(ctx context.Context, r value.BrowserSess
 		if n >= int64(root.MaxSessions) {
 			return value.ErrSessionCapacity
 		}
-		n, e = q.CountBrowserSubject(ctx, custodydb.CountBrowserSubjectParams{RootID: id(s.root), Issuer: r.Principal.Issuer, ClientID: r.Principal.ClientID, Subject: r.Principal.Subject, ActorKey: digest(r.Principal)})
+		n, e = q.CountBrowserSubject(ctx, custodydb.CountBrowserSubjectParams{RootID: id(s.root), Issuer: r.Principal.Issuer, ClientID: r.Principal.ClientID, Subject: r.Principal.Subject})
 		if e != nil {
 			return e
 		}
@@ -253,8 +250,7 @@ func (s *BrowserSessions) ClaimRefresh(ctx context.Context, key [32]byte, versio
 	if claim == ([32]byte{}) {
 		return value.ErrInvalid
 	}
-	busy := false
-	err := s.transaction(ctx, true, func(q *custodydb.Queries, _ custodydb.BrowserSessionRoot) error {
+	return s.transaction(ctx, true, func(q *custodydb.Queries, _ custodydb.BrowserSessionRoot) error {
 		r, e := q.LockBrowserSession(ctx, custodydb.LockBrowserSessionParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:]})
 		if errors.Is(e, pgx.ErrNoRows) {
 			return value.ErrDenied
@@ -278,29 +274,8 @@ func (s *BrowserSessions) ClaimRefresh(ctx context.Context, key [32]byte, versio
 		if r.Version != version {
 			return value.ErrSessionBusy
 		}
-		owned, e := q.BrowserOwnedRefreshBusy(ctx, custodydb.BrowserOwnedRefreshBusyParams{RootID: id(s.root), SessionID: key[:]})
-		if e != nil {
-			return e
-		}
-		if owned {
-			// This POST may have seen a stricter current group policy than the
-			// persisted due time. Wake the already admitted loop; do not claim a
-			// competing provider rotation or extend ownership/attachment grace.
-			if _, e = q.WakeBrowserOwnedRefresh(ctx, custodydb.WakeBrowserOwnedRefreshParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:], Version: version}); e != nil {
-				return e
-			}
-			busy = true
-			return nil // Commit the shortening before reporting temporary Busy.
-		}
 		return q.ClaimBrowserRefresh(ctx, custodydb.ClaimBrowserRefreshParams{RootID: id(s.root), Epoch: id(s.epoch), ID: key[:], RefreshClaim: claim[:], ClaimUntil: ts(value.Earlier(r.ExpiresAt.Time, now.Time.Add(10*time.Second)))})
 	})
-	if err != nil {
-		return err
-	}
-	if busy {
-		return value.ErrSessionBusy
-	}
-	return nil
 }
 func (s *BrowserSessions) FinishRefresh(ctx context.Context, key [32]byte, version int64, claim [32]byte, blob []byte, refreshAt time.Time) error {
 	return s.transaction(ctx, false, func(q *custodydb.Queries, _ custodydb.BrowserSessionRoot) error {

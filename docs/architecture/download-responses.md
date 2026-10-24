@@ -34,7 +34,7 @@ Migration 00042 adds `download_control_allocation`, `download_response` and `dow
 
 The source port is a protected regional adapter, not public JSON or a worker capability inferred from a certificate. No production implementation of that byte port or I-13 native exchange is supplied here. The existing worker certificate channel remains certificate-only. Personal credentials, CurrentIdentity and provider tokens never become worker messages. The hub receives bounded plaintext only for authorized native delivery; it gains no object unwrap credentials.
 
-A response-generation/owner/current-lease row is available for a separately admitted browser refresh owner. Stale Streaming state or the many-hour response deadline is not proof of active demand. Refresh ownership and a protected, finite no-output wait during an already-owned refresh claim are separate C02 work; ordinary GET does not create or refresh that owner. The current coordinator stops on an identity acquisition error and preserves spent windows.
+Stale Streaming state or the many-hour response deadline is not proof of active demand. A GET never refreshes the browser session ([ADR-224](../decisions/224-remove-download-refresh-owners.md)). The coordinator stops on an identity acquisition error, including a session that needs refreshing, and preserves spent windows; the client resumes with Range.
 
 Window-audit retirement, independently verified object cleanup, finite backup cooling and slot release remain unimplemented. All current response/window records and reservations remain charged. Operation-audit migration 00041 is purpose-specific and does not provide this lifecycle. These missing producers prevent runtime enablement; increasing constants is not a substitute.
 

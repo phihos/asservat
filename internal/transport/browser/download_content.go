@@ -54,7 +54,6 @@ type DownloadContentHandler struct {
 	sessions    SessionHandler
 	bearer      identities.Resolver
 	credentials identities.CredentialObserver
-	pauses      identities.BrowserRefreshPauseReader
 	audit       *presentation.AuditedOperations
 	runtime     *evidence.ContextNativeRuntime
 	transfer    evidence.DownloadResponseTransfer
@@ -63,7 +62,7 @@ type DownloadContentHandler struct {
 	active      map[identity.Principal]int
 }
 
-func NewDownloadContentHandler(c DownloadContentConfig, sessions SessionHandler, bearer identities.Resolver, pauses identities.BrowserRefreshPauseReader, audit *presentation.AuditedOperations, runtime *evidence.ContextNativeRuntime, transfer evidence.DownloadResponseTransfer) (*DownloadContentHandler, error) {
+func NewDownloadContentHandler(c DownloadContentConfig, sessions SessionHandler, bearer identities.Resolver, audit *presentation.AuditedOperations, runtime *evidence.ContextNativeRuntime, transfer evidence.DownloadResponseTransfer) (*DownloadContentHandler, error) {
 	issuer, e := url.Parse(c.Issuer)
 	credential, ok := bearer.(identities.CredentialObserver)
 	switch {
@@ -71,7 +70,7 @@ func NewDownloadContentHandler(c DownloadContentConfig, sessions SessionHandler,
 		return nil, contentConfigurationStep("config")
 	case !sessions.validOrigin() || sessions.Origin != c.PublicOrigin || sessions.Issuer != c.Issuer || sessions.Sessions == nil:
 		return nil, contentConfigurationStep("sessions")
-	case bearer == nil || !ok || pauses == nil:
+	case bearer == nil || !ok:
 		return nil, contentConfigurationStep("identity")
 	case audit == nil || audit.PublicOrigin() != c.PublicOrigin:
 		return nil, contentConfigurationStep("audit")
@@ -87,7 +86,7 @@ func NewDownloadContentHandler(c DownloadContentConfig, sessions SessionHandler,
 	if _, e = presentation.NewNativeContentAuditor(audit, presentation.NativeContentInput{DownloadID: "00000000-0000-4000-8000-000000000001"}, c.Now().Add(time.Second)); e != nil {
 		return nil, contentConfigurationStep("auditor")
 	}
-	return &DownloadContentHandler{config: c, sessions: sessions, bearer: bearer, credentials: credential, pauses: pauses, audit: audit, runtime: runtime, transfer: transfer, slots: make(chan struct{}, c.MaxConcurrent), active: make(map[identity.Principal]int)}, nil
+	return &DownloadContentHandler{config: c, sessions: sessions, bearer: bearer, credentials: credential, audit: audit, runtime: runtime, transfer: transfer, slots: make(chan struct{}, c.MaxConcurrent), active: make(map[identity.Principal]int)}, nil
 }
 func (h *DownloadContentHandler) acquire(p identity.Principal) bool {
 	h.mu.Lock()
@@ -235,7 +234,10 @@ func (h *DownloadContentHandler) ServeHTTP(w http.ResponseWriter, r *http.Reques
 	defer release()
 	var reader identities.ReaderIdentity
 	if cookie != "" {
-		reader, err = identities.NewBrowserRefreshReader(owner, h.sessions.Sessions, h.pauses, cookie, i.Principal, hardUntil, h.config.Now)
+		// A plain current-session read, like other reads. When the session
+		// needs a refresh mid-transfer the GET fails closed; the console resumes
+		// with Range after its own explicit POST refresh.
+		reader, err = identities.NewBrowserLiveReader(owner, h.sessions.Sessions, cookie, i.Principal, hardUntil, h.config.Now)
 	} else {
 		reader, err = identities.NewBearerLiveReader(owner, contentPinnedResolver{h}, token, i.Principal, hardUntil, h.config.Now)
 	}

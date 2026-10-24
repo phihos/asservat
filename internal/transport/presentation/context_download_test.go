@@ -87,44 +87,26 @@ func TestDownloadInvalidRawOrAmbiguousInputNeverDispatches(t *testing.T) {
 		}
 	}
 }
-func TestDownloadPreparationAttachmentAndContinuationArePOSTOnly(t *testing.T) {
+func TestDownloadContinuationIsPrepareOnly(t *testing.T) {
 	s, f, c := downloadProjection(t)
 	f.view.Session.State = artifact.DownloadPreparing
 	f.view.Metadata = nil
 	f.view.ContinuePreparation = true
-	calls := 0
-	attachmentUntil := c.i.VerifiedAt.Add(500 * time.Millisecond)
-	call := OperationCall{requestID: caseID, downloadAttachment: func(ctx context.Context, id string) (time.Time, error) {
-		calls++
-		if id != downloadID || ctx.Err() != nil {
-			t.Fatal("wrong binding")
-		}
-		return attachmentUntil, nil
-	}}
-	out, e := s.CallWithContext(t.Context(), c, call, "prepare_artifact_download", []byte(`{"artifact_id":"`+artifactID+`","idempotency_key":"key"}`))
-	if e != nil || calls != 1 || !out.ValidUntil.Equal(attachmentUntil) || !strings.Contains(string(out.Body), `"continue_preparation":true`) {
-		t.Fatal(string(out.Body), e, calls)
+	out, e := s.Call(t.Context(), c, "prepare_artifact_download", []byte(`{"artifact_id":"`+artifactID+`","idempotency_key":"key"}`))
+	if e != nil || !strings.Contains(string(out.Body), `"continue_preparation":true`) {
+		t.Fatal(string(out.Body), e)
 	}
 	f.view.ContinuePreparation = false
-	out, e = s.CallWithContext(t.Context(), c, call, "get_artifact_download", []byte(`{"download_id":"`+downloadID+`"}`))
-	if e != nil || calls != 1 || strings.Contains(string(out.Body), "continue_preparation") {
-		t.Fatal("status acquired an owner or continued work", e)
-	}
-	f.view.Session.State = artifact.DownloadCompleted
-	if _, e = s.CallWithContext(t.Context(), c, call, "prepare_artifact_download", []byte(`{"artifact_id":"`+artifactID+`","idempotency_key":"key"}`)); e != nil || calls != 1 {
-		t.Fatal("terminal replay acquired owner", e)
+	out, e = s.Call(t.Context(), c, "get_artifact_download", []byte(`{"download_id":"`+downloadID+`"}`))
+	if e != nil || strings.Contains(string(out.Body), "continue_preparation") {
+		t.Fatal("status continued work", e)
 	}
 }
-func TestDownloadResponseDeniesChangedIdentityAndExpiredAttachment(t *testing.T) {
+func TestDownloadResponseDeniesChangedIdentity(t *testing.T) {
 	s, f, c := downloadProjection(t)
 	f.after = func() { c.i.Scopes = []string{"evidence:read"} }
 	if _, e := s.Call(t.Context(), c, "get_artifact_download", []byte(`{"download_id":"`+downloadID+`"}`)); e == nil {
 		t.Fatal("lost download scope disclosed metadata")
-	}
-	s, _, c = downloadProjection(t)
-	call := OperationCall{requestID: caseID, downloadAttachment: func(context.Context, string) (time.Time, error) { return c.i.VerifiedAt, nil }}
-	if out, e := s.CallWithContext(t.Context(), c, call, "prepare_artifact_download", []byte(`{"artifact_id":"`+artifactID+`","idempotency_key":"key"}`)); e == nil || len(out.Body) > 0 {
-		t.Fatal("expired attachment disclosed metadata")
 	}
 }
 func TestDownloadErrorsDoNotDiscloseNativeOrExistenceDetails(t *testing.T) {

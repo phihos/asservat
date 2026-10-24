@@ -102,7 +102,7 @@ func qualifyContextNativeResume(t *testing.T, ctx context.Context, f nativeExcha
 		t.Fatal(err)
 	}
 	sessions := &nativeResumeSessions{nativeContentSessions: nativeContentSessions{workerBrowserSession{initial, original.Deadline, 5 * time.Second}}}
-	handler, err := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, nativeContentNoRefresh{}, shared, runtime, transfer)
+	handler, err := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, shared, runtime, transfer)
 	if err != nil {
 		t.Fatal("native resume HTTP handler", err)
 	}

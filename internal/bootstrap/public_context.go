@@ -31,8 +31,6 @@ type PublicContextConfig struct {
 // particular, the two bearer resolvers have separately pinned resource audiences.
 type PublicContextServices struct {
 	Sessions                      *identities.BrowserSessions
-	RefreshOwners                 *identities.BrowserRefreshOwners
-	RefreshPauses                 identities.BrowserRefreshPauseReader
 	MCPIdentity, DownloadIdentity identities.Resolver
 	Operations                    *presentation.InvestigationOperations
 	NormalAudit, ResolutionAudit  presentation.HealthyAuditGate
@@ -51,7 +49,7 @@ type PublicContextServices struct {
 // The same healthy operation auditor is used across browser, MCP and content.
 func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, files fs.FS) (http.Handler, error) {
 	host, ok := publicContextHost(c.PublicOrigin)
-	if !ok || s.Sessions == nil || s.Sessions.Issuer != c.Issuer || s.RefreshOwners == nil || s.RefreshPauses == nil || s.MCPIdentity == nil || s.DownloadIdentity == nil || s.Operations == nil || s.Operations.PublicOrigin() != c.PublicOrigin {
+	if !ok || s.Sessions == nil || s.Sessions.Issuer != c.Issuer || s.MCPIdentity == nil || s.DownloadIdentity == nil || s.Operations == nil || s.Operations.PublicOrigin() != c.PublicOrigin {
 		return nil, &fixedStepError{"services", presentation.ErrOperationsConfiguration}
 	}
 	// No missing case or download service may be hidden behind an app-shell
@@ -71,7 +69,7 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 		return nil, &fixedStepError{"audited", e}
 	}
 	sessions := browser.SessionHandler{Origin: c.PublicOrigin, Issuer: c.Issuer, Sessions: s.Sessions}
-	investigations, e := browser.NewAuditedDownloadInvestigationHandler(sessions, audited, s.RefreshOwners, c.OperationConcurrency)
+	investigations, e := browser.NewAuditedDownloadInvestigationHandler(sessions, audited, c.OperationConcurrency)
 	if e != nil {
 		return nil, &fixedStepError{"investigations", e}
 	}
@@ -90,7 +88,7 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 			PublicOrigin: c.PublicOrigin, Issuer: c.Issuer,
 			MaxConcurrent: c.DownloadConcurrency, MaxPerIdentity: c.DownloadsPerIdentity,
 			MaxDuration: c.DownloadMaxDuration, Now: c.Audit.Now, NewID: c.Audit.NewID,
-		}, sessions, s.DownloadIdentity, s.RefreshPauses, audited, s.Native, s.Transfer)
+		}, sessions, s.DownloadIdentity, audited, s.Native, s.Transfer)
 		if e != nil {
 			return nil, &fixedStepError{"downloads", e}
 		}

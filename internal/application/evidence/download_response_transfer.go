@@ -41,9 +41,6 @@ type responseCurrent struct {
 	scope        artifact.DownloadScope
 	value        artifact.DownloadAuthority
 	now          func() time.Time
-	response     identityvalue.RefreshResponseBinding
-	pauseUsed    bool
-	lastPause    identityvalue.RefreshPause
 	endAuthority func()
 }
 
@@ -68,7 +65,7 @@ func (c *responseCurrent) get(ctx context.Context) (artifact.DownloadAuthority, 
 		return c.value, nil
 	}
 	c.closeBatch()
-	b, e := c.begin(ctx)
+	b, e := c.reader.BeginBatch(ctx)
 	if e != nil {
 		return artifact.DownloadAuthority{}, e
 	}
@@ -311,7 +308,6 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	if !r.Valid() || r.Plan != plan || r.ID != request.ResponseID || r.SessionID != session.ID || r.OwnerID != request.OwnerID || r.Until.After(until) {
 		return artifact.ErrIntegrity
 	}
-	current.response = identityvalue.RefreshResponseBinding{DownloadID: session.ID, ResponseID: r.ID, ResponseOwnerID: r.OwnerID, ResponseGeneration: r.Generation}
 	// Always join writes before closing the durable response. Cleanup only closes
 	// this exact owner; an unknown close reply never releases accounting credit.
 	defer func() {

@@ -248,12 +248,10 @@ func (s BrowserSessions) Resolve(ctx context.Context, cookie string, allowRefres
 	if err != nil {
 		return out, err
 	}
-	return s.resolveKey(ctx, key, allowRefresh, nil)
+	return s.resolveKey(ctx, key, allowRefresh)
 }
 
-// resolveKey is private to C02. An explicit POST-admitted refresh owner keeps
-// only the original hashed session locator; it does not fabricate a cookie.
-func (s BrowserSessions) resolveKey(ctx context.Context, key [32]byte, allowRefresh bool, schedule *refreshSessionSchedule) (SessionView, error) {
+func (s BrowserSessions) resolveKey(ctx context.Context, key [32]byte, allowRefresh bool) (SessionView, error) {
 	var out SessionView
 	if !s.configured() || ctx == nil || ctx.Err() != nil {
 		return out, value.ErrUnavailable
@@ -285,12 +283,7 @@ func (s BrowserSessions) resolveKey(ctx context.Context, key [32]byte, allowRefr
 	if refresh && allowRefresh {
 		claimSecret := randomSessionSecret()
 		claim, _ := sessionKey(claimSecret)
-		if owned, ok := s.Store.(currentRefreshClaimStore); ok {
-			err = owned.ClaimCurrentRefresh(ctx, key, r.Version, claim, i)
-		} else {
-			err = s.Store.ClaimRefresh(ctx, key, r.Version, claim)
-		}
-		if err != nil {
+		if err = s.Store.ClaimRefresh(ctx, key, r.Version, claim); err != nil {
 			return out, err
 		}
 		// A failed or ambiguous provider call leaves the durable claim consumed.
@@ -345,12 +338,6 @@ func (s BrowserSessions) resolveKey(ctx context.Context, key [32]byte, allowRefr
 	i.ValidUntil = value.Earlier(i.ValidUntil, current.Observation.FreshUntil)
 	if !i.Valid(s.Now()) {
 		return out, value.ErrDenied
-	}
-	if schedule != nil {
-		*schedule = refreshSessionSchedule{Pin: value.RefreshSessionPin{ID: current.ID, Principal: current.Principal, ProviderSession: current.ProviderSession, CreatedAt: current.CreatedAt, AuthenticatedAt: current.AuthenticatedAt, ExpiresAt: current.ExpiresAt}, Version: current.Version, RefreshAt: current.RefreshAt, Window: window}
-		if window.Valid(s.Now()) {
-			schedule.RefreshAt = value.Earlier(schedule.RefreshAt, window.RefreshAt(current.ExpiresAt))
-		}
 	}
 	return SessionView{i, secrets.CSRF, current.ExpiresAt}, nil
 }

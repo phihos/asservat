@@ -614,12 +614,6 @@ func (nativeContentDeniedBearer) ObserveCredential(context.Context, string) (ide
 	return identities.CredentialObservation{}, identity.ErrDenied
 }
 
-type nativeContentNoRefresh struct{}
-
-func (nativeContentNoRefresh) BrowserRefreshPause(context.Context, [32]byte, identity.Principal, identity.RefreshResponseBinding) (identity.RefreshPause, error) {
-	return identity.RefreshPause{}, identity.ErrDenied
-}
-
 func serveContextNativeGET(t *testing.T, ctx context.Context, f nativeExchangeFixture, runtime *evidence.ContextNativeRuntime, transfer evidence.DownloadResponseTransfer, coordinator evidence.ContextDownloadCoordinator, session artifact.DownloadSession, m artifact.NativeDownloadMetadata) {
 	t.Helper()
 	server := httptest.NewUnstartedServer(nil)
@@ -639,7 +633,7 @@ func serveContextNativeGET(t *testing.T, ctx context.Context, f nativeExchangeFi
 		t.Fatal(e)
 	}
 	sessions := nativeContentSessions{workerBrowserSession{initial, session.Deadline, 5 * time.Second}}
-	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, nativeContentNoRefresh{}, shared, runtime, transfer)
+	handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{PublicOrigin: origin, Issuer: initial.Principal.Issuer, MaxConcurrent: 2, MaxPerIdentity: 2, MaxDuration: time.Minute, Now: time.Now, NewID: custodyID}, browser.SessionHandler{Origin: origin, Issuer: initial.Principal.Issuer, Sessions: sessions}, nativeContentDeniedBearer{}, shared, runtime, transfer)
 	if e != nil {
 		t.Fatal("public content constructor", e)
 	}

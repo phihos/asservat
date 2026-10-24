@@ -1,5 +1,15 @@
 # Sustained implementation progress
 
+## Browser download refresh owners removed (2026-10-24)
+
+[ADR-224](decisions/224-remove-download-refresh-owners.md) removes ADR-114's refresh owners:
+browser prepare is the ordinary audited call (as MCP), the content GET reads the current session
+and fails closed when it needs refreshing, and the console resumes with Range. Migration 00078
+drops the owner/consumer tables, guard functions and busy function; the three refresh SQL logins
+are gone and the shared schema is 78. Known limitation: a long download with a closed or frozen
+console tab stops at the next needed refresh. Unit/race, vet, sqlc, architecture and spec gates
+pass; the real-SQL custody, browser-session (Keycloak) and installed journey runs are pending.
+
 ## S-02 exit checks in the installed journey (2026-10-24)
 
 Installed runs native93–99 added the remaining S-02 exit checks to the installed journey and
@@ -9363,7 +9373,7 @@ The reviewed SQL43 package is integrated after all 25 base/payload hash checks;
 Migration 43 now precedes 44; the schema head remains 44 and the exact initial
 installation inventory includes 70 tables. The [handoff](../test/results/browser-refresh-owner-stage-HANDOFF.md)
 records focused staged race/vet checks and the limits of its compile-only native hooks.
-The [owner contract](architecture/browser-refresh-owner.md) binds explicit browser
+The owner contract (removed by ADR-224) bound explicit browser
 POST consent to the original session, current accepted download, finite demand,
 one-use provider refresh and positive joined cleanup. Logout removes authority
 without refunding unjoined work. Public operation attachment, native browser

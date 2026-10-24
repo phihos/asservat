@@ -119,10 +119,7 @@ production identity authority. Complete response/accounting/HTTP relay
 qualification remains separate; no public-runtime or large-file claim follows
 from this factory alone.
 
-A complete browser download must not depend on keeping the console tab open or
-on its JavaScript refresh timer. A bounded server-side refresh owner, explicitly
-started by an authenticated CSRF-protected POST and retaining existing one-use
-refresh claims and fixed session expiry, needs a separate accepted design and
-qualification under [ADR-114](../decisions/114-download-owned-browser-refresh.md).
-It is not implemented by this factory. Until that composition is
-qualified, this component does not establish tab-independent long-download UX.
+The browser reader never refreshes the session. Under
+[ADR-224](../decisions/224-remove-download-refresh-owners.md) a long download whose
+console tab is closed or frozen stops when the session next needs refreshing;
+the console resumes it with Range after its own explicit refresh.

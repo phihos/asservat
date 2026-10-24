@@ -394,40 +394,13 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("browser_session", "SELECT", "root_id", "id", "epoch", "created_at", "expires_at", "refresh_at")
 		add("browser_session", "UPDATE", "expires_at", "refresh_at")
 	case "browser-session":
-		read("browser_session_root", "browser_login", "browser_session", "browser_logout", "browser_refresh_owner", "browser_refresh_consumer")
+		read("browser_session_root", "browser_login", "browser_session", "browser_logout")
 		add("browser_session_root", "UPDATE", "id")
-		add("browser_refresh_owner", "UPDATE", "session_id")
 		for _, table := range []string{"browser_login", "browser_session", "browser_logout"} {
 			add(table, "DELETE")
 			add(table, "INSERT")
 			add(table, "UPDATE")
 		}
-		out = append(out, publicRuntimeGrant{"function", "browser_owned_refresh_busy(uuid,bytea)", "", "EXECUTE"})
-	case "refresh-admit", "refresh-owner", "refresh-read":
-		read("browser_session_root", "browser_session", "browser_refresh_owner", "browser_refresh_consumer", "fleet_current_trust", "artifact_download", "download_response", "context_catalog", "context_capture", "context_verification", "custody_attempt")
-		add("fleet_current_trust", "UPDATE", "installation_id")
-		add("browser_session_root", "UPDATE", "id")
-		if purpose == "refresh-read" {
-			break
-		}
-		read("permission_stream", "authority_audit", "retention_source", "retention_checkpoint", "retention_source_epoch", "retention_catchup", "retention_catchup_effect", "retention_decision", "processing_root", "context_processing", "processing_rule")
-		add("browser_session", "UPDATE", "id")
-		add("artifact_download", "UPDATE", "id")
-		add("permission_stream", "UPDATE", "id")
-		add("retention_source", "UPDATE", "root_id")
-		add("browser_refresh_owner", "UPDATE", "session_id")
-		add("browser_refresh_consumer", "UPDATE", "download_id", "owner_id", "owner_generation")
-		fields := []string{"lease_until", "joined_at", "claim", "claim_version", "claim_until", "claim_joined_at", "claim_download_id", "claim_response_id", "claim_response_owner", "claim_response_generation"}
-		if purpose == "refresh-admit" {
-			add("browser_refresh_owner", "INSERT")
-			add("browser_refresh_consumer", "INSERT")
-			fields = append(fields, "owner_id", "generation", "installation_id", "cluster_id", "pod_uid", "process_epoch", "started_at", "session_expires_at")
-		} else {
-			read("browser_logout")
-			add("browser_refresh_owner", "DELETE")
-			add("browser_session", "UPDATE", "refresh_claim", "claim_until")
-		}
-		add("browser_refresh_owner", "UPDATE", fields...)
 	}
 	out = append(out, publicRuntimeProjectionGrants(purpose)...)
 	slices.SortFunc(out, func(a, b publicRuntimeGrant) int { return strings.Compare(a.key(), b.key()) })

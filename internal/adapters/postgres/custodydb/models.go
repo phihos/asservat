@@ -75,45 +75,6 @@ type BrowserLogout struct {
 	ExpiresAt       pgtype.Timestamptz
 }
 
-type BrowserRefreshConsumer struct {
-	DownloadID      pgtype.UUID
-	DownloadRootID  pgtype.UUID
-	FirstAdmittedAt pgtype.Timestamptz
-	GraceUntil      pgtype.Timestamptz
-	HardUntil       pgtype.Timestamptz
-	ActorKey        []byte
-	OwnerID         pgtype.UUID
-	OwnerGeneration pgtype.Int8
-}
-
-type BrowserRefreshOwner struct {
-	RootID                  pgtype.UUID
-	SessionID               []byte
-	Epoch                   pgtype.UUID
-	OwnerID                 pgtype.UUID
-	Generation              int64
-	InstallationID          pgtype.UUID
-	ClusterID               pgtype.UUID
-	PodUid                  pgtype.UUID
-	ProcessEpoch            pgtype.UUID
-	ActorKey                []byte
-	ProviderSessionKey      []byte
-	SessionCreatedAt        pgtype.Timestamptz
-	AuthenticatedAt         pgtype.Timestamptz
-	SessionExpiresAt        pgtype.Timestamptz
-	StartedAt               pgtype.Timestamptz
-	LeaseUntil              pgtype.Timestamptz
-	JoinedAt                pgtype.Timestamptz
-	Claim                   []byte
-	ClaimVersion            pgtype.Int8
-	ClaimUntil              pgtype.Timestamptz
-	ClaimJoinedAt           pgtype.Timestamptz
-	ClaimDownloadID         pgtype.UUID
-	ClaimResponseID         pgtype.UUID
-	ClaimResponseOwner      pgtype.UUID
-	ClaimResponseGeneration pgtype.Int8
-}
-
 type BrowserSession struct {
 	RootID          pgtype.UUID
 	Epoch           pgtype.UUID

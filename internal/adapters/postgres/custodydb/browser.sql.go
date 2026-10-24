@@ -11,22 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const browserOwnedRefreshBusy = `-- name: BrowserOwnedRefreshBusy :one
-SELECT browser_owned_refresh_busy($1::uuid,$2::bytea)::boolean AS busy
-`
-
-type BrowserOwnedRefreshBusyParams struct {
-	RootID    pgtype.UUID
-	SessionID []byte
-}
-
-func (q *Queries) BrowserOwnedRefreshBusy(ctx context.Context, arg BrowserOwnedRefreshBusyParams) (bool, error) {
-	row := q.db.QueryRow(ctx, browserOwnedRefreshBusy, arg.RootID, arg.SessionID)
-	var busy bool
-	err := row.Scan(&busy)
-	return busy, err
-}
-
 const browserSessionLoggedOut = `-- name: BrowserSessionLoggedOut :one
 SELECT EXISTS(SELECT 1 FROM browser_logout WHERE root_id=$1 AND epoch=$2 AND issuer=$3 AND client_id=$4 AND expires_at>clock_timestamp() AND ((provider_session<>'' AND provider_session=$5 AND (subject='' OR subject=$6)) OR (provider_session='' AND subject=$6 AND issued_at>=$7))) AS blocked
 `
@@ -133,7 +117,7 @@ func (q *Queries) CountBrowserLogout(ctx context.Context, rootID pgtype.UUID) (i
 }
 
 const countBrowserSessions = `-- name: CountBrowserSessions :one
-SELECT count(*) FROM (SELECT s.id FROM browser_session s WHERE s.root_id=$1 UNION SELECT o.session_id FROM browser_refresh_owner o WHERE o.root_id=$1) occupied
+SELECT count(*) FROM browser_session WHERE root_id=$1
 `
 
 func (q *Queries) CountBrowserSessions(ctx context.Context, rootID pgtype.UUID) (int64, error) {
@@ -144,7 +128,7 @@ func (q *Queries) CountBrowserSessions(ctx context.Context, rootID pgtype.UUID) 
 }
 
 const countBrowserSubject = `-- name: CountBrowserSubject :one
-SELECT count(*) FROM (SELECT s.id FROM browser_session s WHERE s.root_id=$1 AND s.issuer=$2 AND s.client_id=$3 AND s.subject=$4 UNION SELECT o.session_id FROM browser_refresh_owner o WHERE o.root_id=$1 AND o.actor_key=$5) occupied
+SELECT count(*) FROM browser_session WHERE root_id=$1 AND issuer=$2 AND client_id=$3 AND subject=$4
 `
 
 type CountBrowserSubjectParams struct {
@@ -152,7 +136,6 @@ type CountBrowserSubjectParams struct {
 	Issuer   string
 	ClientID string
 	Subject  string
-	ActorKey []byte
 }
 
 func (q *Queries) CountBrowserSubject(ctx context.Context, arg CountBrowserSubjectParams) (int64, error) {
@@ -161,7 +144,6 @@ func (q *Queries) CountBrowserSubject(ctx context.Context, arg CountBrowserSubje
 		arg.Issuer,
 		arg.ClientID,
 		arg.Subject,
-		arg.ActorKey,
 	)
 	var count int64
 	err := row.Scan(&count)
@@ -403,19 +385,6 @@ func (q *Queries) PruneBrowserSessions(ctx context.Context, arg PruneBrowserSess
 	return err
 }
 
-const pruneJoinedBrowserRefreshOwners = `-- name: PruneJoinedBrowserRefreshOwners :exec
-DELETE FROM browser_refresh_owner o WHERE o.root_id=$1 AND o.session_id IN
- (SELECT c.session_id FROM browser_refresh_owner c WHERE c.root_id=$1 AND c.joined_at IS NOT NULL
- AND NOT EXISTS(SELECT 1 FROM browser_session s WHERE s.root_id=c.root_id AND s.id=c.session_id)
- AND NOT EXISTS(SELECT 1 FROM browser_refresh_consumer d WHERE d.owner_id=c.owner_id AND d.owner_generation=c.generation)
- ORDER BY c.joined_at,c.session_id LIMIT 256 FOR UPDATE SKIP LOCKED)
-`
-
-func (q *Queries) PruneJoinedBrowserRefreshOwners(ctx context.Context, rootID pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, pruneJoinedBrowserRefreshOwners, rootID)
-	return err
-}
-
 const readBrowserLogout = `-- name: ReadBrowserLogout :one
 SELECT root_id, epoch, id, issuer, client_id, subject, provider_session, issued_at, expires_at FROM browser_logout WHERE root_id=$1 AND epoch=$2 AND id=$3
 `
@@ -528,28 +497,4 @@ func (q *Queries) ShareBrowserRoot(ctx context.Context, id pgtype.UUID) (Browser
 		&i.MaxLifetimeSeconds,
 	)
 	return i, err
-}
-
-const wakeBrowserOwnedRefresh = `-- name: WakeBrowserOwnedRefresh :execrows
-UPDATE browser_session SET refresh_at=least(refresh_at,clock_timestamp()) WHERE root_id=$1 AND epoch=$2 AND id=$3 AND version=$4 AND refresh_claim IS NULL AND created_at<clock_timestamp() AND clock_timestamp()<expires_at
-`
-
-type WakeBrowserOwnedRefreshParams struct {
-	RootID  pgtype.UUID
-	Epoch   pgtype.UUID
-	ID      []byte
-	Version int64
-}
-
-func (q *Queries) WakeBrowserOwnedRefresh(ctx context.Context, arg WakeBrowserOwnedRefreshParams) (int64, error) {
-	result, err := q.db.Exec(ctx, wakeBrowserOwnedRefresh,
-		arg.RootID,
-		arg.Epoch,
-		arg.ID,
-		arg.Version,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
 }

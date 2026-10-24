@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"sort"
-	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/contracts"
@@ -128,9 +127,8 @@ func (s *InvestigationOperations) Call(ctx context.Context, current identities.C
 // OperationCall contains a server-created correlation ID. Its private field is
 // deliberately not a public wire input or a human-supplied context value.
 type OperationCall struct {
-	requestID          string
-	downloadAttachment func(context.Context, string) (time.Time, error)
-	queryInvocation    *contextQueryInvocation
+	requestID       string
+	queryInvocation *contextQueryInvocation
 }
 
 func (s *InvestigationOperations) CallWithContext(ctx context.Context, current identities.CurrentIdentity, call OperationCall, name string, raw json.RawMessage) (OperationReply, error) {

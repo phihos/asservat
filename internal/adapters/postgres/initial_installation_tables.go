@@ -9,8 +9,6 @@ var initialInstallationTables = []string{
 	"authority_audit",
 	"browser_login",
 	"browser_logout",
-	"browser_refresh_consumer",
-	"browser_refresh_owner",
 	"browser_session",
 	"browser_session_epoch",
 	"browser_session_root",

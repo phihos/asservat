@@ -21,18 +21,17 @@ import (
 // InvestigationHandler is inert until protected bootstrap mounts it. It shares
 // the exact application operations with MCP; it contains no permission evaluator.
 type InvestigationHandler struct {
-	sessions      SessionHandler
-	operations    presentation.Operations
-	audited       *presentation.AuditedOperations
-	refreshOwners *identities.BrowserRefreshOwners
-	security      presentation.IngressCounters
-	ingress       chan struct{}
-	contracts     *contracts.InvestigationContracts
-	slots         chan struct{}
-	stopSlots     chan struct{}
-	mu            sync.Mutex
-	active        map[identity.Principal]int
-	stopActive    map[identity.Principal]int
+	sessions   SessionHandler
+	operations presentation.Operations
+	audited    *presentation.AuditedOperations
+	security   presentation.IngressCounters
+	ingress    chan struct{}
+	contracts  *contracts.InvestigationContracts
+	slots      chan struct{}
+	stopSlots  chan struct{}
+	mu         sync.Mutex
+	active     map[identity.Principal]int
+	stopActive map[identity.Principal]int
 	// Report receives a fixed stage label for every 503 (diagnostics only).
 	Report func(string)
 }
@@ -65,10 +64,10 @@ func NewAuditedInvestigationHandler(sessions SessionHandler, operations *present
 	return h, err
 }
 
-// Native browser preparation always attaches the concrete POST-admitted
-// refresh owner. It is never inferred from GET/status or carried through MCP.
-func NewAuditedDownloadInvestigationHandler(sessions SessionHandler, operations *presentation.AuditedOperations, owners *identities.BrowserRefreshOwners, maxConcurrent int) (*InvestigationHandler, error) {
-	if operations == nil || owners == nil {
+// NewAuditedDownloadInvestigationHandler also serves the native download
+// operations. Browser preparation is the same audited call as MCP's.
+func NewAuditedDownloadInvestigationHandler(sessions SessionHandler, operations *presentation.AuditedOperations, maxConcurrent int) (*InvestigationHandler, error) {
+	if operations == nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	if _, ok := operations.Tool("prepare_artifact_download"); !ok {
@@ -80,7 +79,6 @@ func NewAuditedDownloadInvestigationHandler(sessions SessionHandler, operations 
 	h, e := NewInvestigationHandler(sessions, operations, maxConcurrent)
 	if e == nil {
 		h.audited = operations
-		h.refreshOwners = owners
 	}
 	return h, e
 }
@@ -260,29 +258,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		}
 	}()
 	var out presentation.OperationReply
-	if name == "prepare_artifact_download" && h.audited != nil {
-		if h.refreshOwners == nil {
-			h.unavailable(w, "download-owners")
-			return
-		}
-		cookie, e := cookieValue(r, SessionCookie)
-		if e != nil {
-			h.failure(w, "download-cookie", e)
-			return
-		}
-		origin, csrf := r.Header.Get("Origin"), r.Header.Get("X-CSRF-Token")
-		// Synchronous callback is discarded when this original POST ends. The owner
-		// keeps its own already admitted session binding, never this request/cookie.
-		out, err = h.audited.CallBrowserDownload(ctx, current, name, body, func(call context.Context, id string) (time.Time, error) {
-			observation, e := h.refreshOwners.Admit(call, origin, cookie, csrf, id)
-			if e != nil {
-				return time.Time{}, e
-			}
-			return observation.ValidUntil, nil
-		})
-	} else {
-		out, err = h.operations.Call(ctx, current, name, body)
-	}
+	out, err = h.operations.Call(ctx, current, name, body)
 	defer func() { _ = out.Close(ctx); clear(out.Body) }()
 	if err != nil {
 		if h.audited != nil {
