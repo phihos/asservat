@@ -66,9 +66,11 @@ func qualifyFleetObservationContention(t *testing.T, ctx context.Context, admin 
 	if json.Unmarshal(recordRaw, &record) != nil || json.Unmarshal(receiptRaw, &receipt) != nil || !record.Valid() || !receipt.ValidInitialInstallation(record.Scope.InstallationID, record.Claim.ID) {
 		t.Fatal("original activation invalid")
 	}
+	var storedFrom time.Time
 	if mode == "observation-contention-final-expired" {
-		// Choose this finite original stored interval before either competing call.
+		// Choose this original stored observation before either competing call.
 		a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
+		storedFrom = a.ObservedAt
 		a.FreshUntil = a.ObservedAt.Add(2 * time.Second)
 		if e := observer.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, observer), a); e != nil {
 			t.Fatal("short original stored interval", e)
@@ -79,6 +81,21 @@ func qualifyFleetObservationContention(t *testing.T, ctx context.Context, admin 
 	var until time.Time
 	if err = admin.QueryRow(ctx, `SELECT to_jsonb(t)::text,t.fresh_until FROM public.fleet_current_trust t WHERE installation_id=$1`, input.InstallationID).Scan(&before, &until); err != nil {
 		t.Fatal(err)
+	}
+	if mode == "observation-contention-final-expired" {
+		// Migration 00074 stores the positive row for 30 seconds, longer than any
+		// caller interval (at most five). Start the competing observation late
+		// enough that the stored row expires inside its original interval.
+		if !until.Equal(storedFrom.Add(30 * time.Second)) {
+			t.Fatal("stored 30-second observation interval", until)
+		}
+		timer := time.NewTimer(time.Until(until.Add(-2500 * time.Millisecond)))
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			t.Fatal("fixture cancelled before the competing observation")
+		case <-timer.C:
+		}
 	}
 	a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 	a.FreshUntil = a.ObservedAt.Add(5 * time.Second)

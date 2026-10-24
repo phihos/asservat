@@ -34,13 +34,19 @@ func qualifyOwnerIdentityConstructorCurrent(t *testing.T, ctx context.Context, a
 	switch mode {
 	case "constructor-expired-source":
 		// Deliberately short independent source observation; no SQL timestamp edit
-		// or refreshed authority after it expires.
+		// or refreshed authority after it expires. Migration 00074 stores the
+		// positive row for 30 seconds from its own observation, so the source
+		// expires at that stored end, not at the caller's shorter interval.
 		a.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
 		a.FreshUntil = a.ObservedAt.Add(250 * time.Millisecond)
 		if err = observer.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, observer), a); err != nil {
 			t.Fatal("short original source", err)
 		}
-		timer := time.NewTimer(time.Until(a.FreshUntil))
+		stored, e := readOwnerSQLPrerequisites(ctx, admin, input)
+		if e != nil || !stored.ObservedAt.Time.Equal(a.ObservedAt) || !stored.FreshUntil.Time.Equal(a.ObservedAt.Add(30*time.Second)) {
+			t.Fatal("stored 30-second source interval", e, stored.ObservedAt.Time, stored.FreshUntil.Time)
+		}
+		timer := time.NewTimer(time.Until(stored.FreshUntil.Time))
 		defer timer.Stop()
 		select {
 		case <-ctx.Done():
