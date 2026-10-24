@@ -2,9 +2,11 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
+	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
@@ -91,6 +93,27 @@ func TestCapacityRemoteObservationSameNamesKeepsEachClusterSeparate(t *testing.T
 		v := regions[cluster]
 		if _, _, err := readers[cluster].ReadCapacityGuardedWorkload(ctx, v.namespace, v.workload, []string{"team"}); err == nil {
 			t.Fatal("another region's answer accepted for", cluster)
+		}
+	}
+}
+
+// The holder's no-standby outcome reaches the capacity reconciler as
+// ErrCapacityNoStandby (its retry signal); every other failure does not.
+func TestCapacityRemoteObservationMapsOnlyNoStandby(t *testing.T) {
+	for _, c := range []struct {
+		err       error
+		noStandby bool
+	}{{&fixedStepError{"locate", errHolderNoStandby}, true}, {&fixedStepError{"locate", fleet.ErrUnavailable}, false}, {&fixedStepError{"claim", fleet.ErrUnavailable}, false}} {
+		exchange := capacityRegionExchange(func(context.Context, fleet.ClusterObservationRequest) (fleet.ClusterObservationResult, error) {
+			return fleet.ClusterObservationResult{}, c.err
+		})
+		read, err := newCapacityRemoteObservation(exchange, observationForwardID(800), observationForwardID(801), time.Now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, _, err = read.ReadCapacityGuardedWorkload(context.Background(), cfg.NamespaceRef{Name: "regional-apps", UID: "namespace-a"}, cfg.WorkloadRef{Kind: "Deployment", Name: "regional-app", UID: "workload-a"}, []string{"team"})
+		if err == nil || errors.Is(err, app.ErrCapacityNoStandby) != c.noStandby {
+			t.Fatal("no-standby mapping", c.err, err)
 		}
 	}
 }

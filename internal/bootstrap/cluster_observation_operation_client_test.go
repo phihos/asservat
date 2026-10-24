@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"context"
+	"errors"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -296,10 +297,25 @@ func TestDirectHolderAllUnavailableNeverAdvancesAsAbsence(t *testing.T) {
 		dials.Add(1)
 		return nil, value.ErrUnavailable
 	}
-	if _, err := c.ObserveCluster(f.base.root, f.base.request()); err == nil {
-		t.Fatal("all unavailable became a successful empty result")
+	if _, err := c.ObserveCluster(f.base.root, f.base.request()); err == nil || errors.Is(err, errHolderNoStandby) {
+		t.Fatal("all unavailable became a successful empty result or an absence", err)
 	}
 	if dials.Load() != 2 || inputs.tokens.Load() != 0 || f.get.Load() != 0 || f.post.Load() != 0 || len(c.sockets) != 0 {
 		t.Fatal("unknown candidate advanced or disclosed token", dials.Load(), inputs.tokens.Load())
+	}
+}
+
+// Only an authenticated owner's explicit "no standby for this cluster" reply
+// is classified as no free standby; it discloses nothing and claims nothing.
+func TestDirectHolderAuthenticatedAbsenceIsNoStandby(t *testing.T) {
+	c, f, _, _, _ := directHolderFixture(t, "joined")
+	r := f.base.request()
+	r.ClusterID = observationForwardID(990)
+	_, err := c.ObserveCluster(f.base.root, r)
+	if !errors.Is(err, errHolderNoStandby) {
+		t.Fatal("authenticated absence not reported as no standby", err)
+	}
+	if f.get.Load() != 1 || f.post.Load() != 0 || len(c.sockets) != 0 {
+		t.Fatal("absence claimed or leaked transports", f.get.Load(), f.post.Load())
 	}
 }

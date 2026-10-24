@@ -113,6 +113,9 @@ func (s *capacityRemoteObservation) observe(ctx context.Context, r fleet.Cluster
 		}
 		s.mu.Unlock()
 	}
+	if errors.Is(err, errHolderNoStandby) {
+		return zero, errors.Join(mounts.ErrUnavailable, app.ErrCapacityNoStandby)
+	}
 	if err != nil {
 		return zero, mounts.ErrUnavailable
 	}

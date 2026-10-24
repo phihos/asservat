@@ -58,6 +58,15 @@ type ownerLocalDialReader interface {
 
 var _ app.ClusterObservationExchange = (*DirectHolderObservationClient)(nil)
 
+// directHolderMaximum admits one call per regional discovery loop (at most
+// eight) plus the demand lane.
+const directHolderMaximum = contracts.OwnerClusterCatalogSlots + 1
+
+// errHolderNoStandby is locate's positive outcome that every candidate owner
+// authenticated and replied that it holds no free standby for the cluster.
+// Unknown or failed replies are never absence.
+var errHolderNoStandby = errors.Join(value.ErrUnavailable, errors.New("no free regional standby"))
+
 func NewDirectHolderObservationClient(ctx context.Context, pin value.OwnerObservationPin, podUID string, roots *x509.CertPool, registry *postgres.OwnerEnrollments, endpoints *kube.OwnerEndpoints, native *kube.OwnerObservationOperationReader, tokens app.ClusterObservationTokenReader, maximum int, now func() time.Time) (*DirectHolderObservationClient, error) {
 	if registry == nil || endpoints == nil || native == nil {
 		return nil, value.ErrInvalid
@@ -69,7 +78,7 @@ func NewDirectHolderObservationClient(ctx context.Context, pin value.OwnerObserv
 // supplies the same existing role70 SQL pool and native clients, with no grants,
 // rate limiters or purpose-selected URL callback added here.
 func newDirectHolderObservationClient(ctx context.Context, pin value.OwnerObservationPin, podUID string, roots *x509.CertPool, candidates app.OwnerObservationCandidateSource, registry app.OwnerCertificateRegistry, ready ownerLocalDialReader, native app.OwnerNativeObservationOperations, tokens app.ClusterObservationTokenReader, maximum int, now func() time.Time) (*DirectHolderObservationClient, error) {
-	if ctx == nil || ctx.Err() != nil || !pin.Valid() || pin.Pool.NativeCandidateLimit == 0 || !authorization.UUID(podUID) || roots == nil || len(roots.Subjects()) == 0 || registry == nil || ready == nil || native == nil || tokens == nil || maximum < 1 || maximum > 2 || now == nil {
+	if ctx == nil || ctx.Err() != nil || !pin.Valid() || pin.Pool.NativeCandidateLimit == 0 || !authorization.UUID(podUID) || roots == nil || len(roots.Subjects()) == 0 || registry == nil || ready == nil || native == nil || tokens == nil || maximum < 1 || maximum > directHolderMaximum || now == nil {
 		return nil, value.ErrInvalid
 	}
 	selected, err := app.NewOwnerObservationCandidateSelection(pin.Pool, candidates)
@@ -82,7 +91,7 @@ func newDirectHolderObservationClient(ctx context.Context, pin value.OwnerObserv
 	}
 	root, cancel := context.WithCancel(ctx)
 	dialer := &net.Dialer{Timeout: 5 * time.Second, KeepAlive: -1}
-	return &DirectHolderObservationClient{root: root, cancel: cancel, pin: pin, podUID: podUID, roots: roots.Clone(), verifier: verifier, candidates: selected, registry: registry, ready: ready, native: native, tokens: tokens, maximum: maximum, now: now, dial: dialer.DialContext, sockets: make(chan struct{}, 2)}, nil
+	return &DirectHolderObservationClient{root: root, cancel: cancel, pin: pin, podUID: podUID, roots: roots.Clone(), verifier: verifier, candidates: selected, registry: registry, ready: ready, native: native, tokens: tokens, maximum: maximum, now: now, dial: dialer.DialContext, sockets: make(chan struct{}, max(2, maximum))}, nil
 }
 func (c *DirectHolderObservationClient) enter() bool {
 	c.mu.Lock()
@@ -174,6 +183,9 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	selected, err := c.locate(bounded, request.LocatorQuery(), routes)
 	auditapp.MarkStep(ctx, "o-locate", mark)
 	if err != nil || selected == nil {
+		if err == errHolderNoStandby {
+			return zero, &fixedStepError{"locate", errHolderNoStandby}
+		}
 		return zero, &fixedStepError{"locate", value.ErrUnavailable}
 	}
 	defer selected.Close()
@@ -258,10 +270,12 @@ func (c *DirectHolderObservationClient) locate(ctx context.Context, q value.Clus
 	done := make(chan struct{})
 	go func() { joined.Wait(); close(done) }()
 	var result ownerLocalLookupResult
+	received := false
 	// An unavailable candidate is not an absence and that worker never advances
 	// because of it. It also cannot cancel an independent candidate already
 	// admitted under this same original bound. Only a positive ends discovery.
 	accept := func(v ownerLocalLookupResult) bool {
+		received = true
 		if v.err == nil && v.selected != nil {
 			result = v
 			return true
@@ -288,7 +302,12 @@ searching:
 						break searching
 					}
 				default:
+					// Every worker ran out of candidates and only an
+					// authenticated absence lets a worker advance.
 					result.err = value.ErrUnavailable
+					if !received && ctx.Err() == nil {
+						result.err = errHolderNoStandby
+					}
 					break searching
 				}
 			}
@@ -309,6 +328,9 @@ searching:
 			if result.err != nil || result.selected == nil || ctx.Err() != nil {
 				if result.selected != nil {
 					result.selected.Close()
+				}
+				if result.err == errHolderNoStandby && ctx.Err() == nil {
+					return nil, errHolderNoStandby
 				}
 				return nil, value.ErrUnavailable
 			}

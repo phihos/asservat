@@ -35,6 +35,14 @@ type OwnerOperationConfig struct {
 // before its hello names a cluster.
 const ownerRegionalStandbys = 3
 
+// capacityRegionalCalls is the concurrent hub-worker capacity observations
+// of n regional clusters: one per regional discovery loop plus the demand
+// lane, never fewer than the original two. The hub-worker's holder client,
+// the owner's local receiver and its proof connections use the same bound.
+func capacityRegionalCalls(n int) int {
+	return max(2, min(n, contracts.OwnerClusterCatalogSlots)+1)
+}
+
 // ownerOperationServing is composed once the server identity is active: the
 // claim receiver binds the current serving leaf.
 type ownerOperationServing struct {
@@ -44,6 +52,7 @@ type ownerOperationServing struct {
 	handler  *wire.HubObservationOperationHandler
 	holder   *wire.HubObservationOperationHolder
 	standbys int
+	calls    int
 }
 
 func newOwnerOperationServing(root context.Context, c OwnerOperationConfig, server *mtls.OwnerCredentials) (*ownerOperationServing, error) {
@@ -53,7 +62,7 @@ func newOwnerOperationServing(root context.Context, c OwnerOperationConfig, serv
 	if out.holder, err = wire.NewHubObservationOperationHolder(root, standbys, time.Now); err != nil {
 		return nil, err
 	}
-	if out.receiver, err = NewOwnerLocalObservationReceiver(root, c.Pin, server, c.Owners, c.Proof, out.holder, 2, time.Now); err != nil {
+	if out.receiver, err = NewOwnerLocalObservationReceiver(root, c.Pin, server, c.Owners, c.Proof, out.holder, capacityRegionalCalls(len(c.Regional)), time.Now); err != nil {
 		out.close()
 		return nil, err
 	}
@@ -93,11 +102,12 @@ func newOwnerOperationServing(root context.Context, c OwnerOperationConfig, serv
 		}
 	}
 	out.standbys = standbys
+	out.calls = capacityRegionalCalls(len(c.Regional))
 	return out, nil
 }
 
 func (o *ownerOperationServing) serve(root context.Context, listener net.Listener) error {
-	return native.ServeOwnerObservationOperation(root, listener, o.roots, o.serving, o.receiver, o.handler, 2, o.standbys)
+	return native.ServeOwnerObservationOperation(root, listener, o.roots, o.serving, o.receiver, o.handler, o.calls, o.standbys)
 }
 
 func (o *ownerOperationServing) close() {

@@ -546,3 +546,25 @@ Historical checkpoints recorded before the 2026-10-20 status refresh above:
     only when its three-second poll lands in the window after enrollment.
     This is a design gap, not a race: [ADR-200](200-on-demand-capacity-refresh.md)
     refreshes a workload's binding when admission needs it.
+- Two regional clusters (native105, 2026-10-24): the second joined
+  cluster's workload missed `ready_at` within five minutes. Routing was
+  checked and is per cluster at every hop (holder lookup/claim, hello
+  profile, authenticated binding, request digest; distinct guard digests
+  would fail `guard-pin`). The cause was discovery throughput: one serial
+  loop shared by every cluster made a regional pass about 43 steps of about
+  4.6 s, and a guarded read that found no free standby lost the candidate
+  until the next pass. Changes:
+  - Each cluster now has its own discovery loop with its own cursor, pace
+    and stall watchdog (at most eight regional loops), all joined on
+    shutdown. Pass time no longer grows with the cluster count, apart
+    from the shared Kubernetes client QPS limits, which are unchanged.
+  - A guarded read whose every candidate owner authenticated and replied
+    that it holds no free standby (`ErrCapacityNoStandby`) is retried once
+    after one second, only when the step's original deadline still leaves
+    the wait plus a two-second read. Unknown or failed replies are not
+    retried.
+  - The hub-worker holder client, the owner's local receiver and its proof
+    connections admit one concurrent capacity observation per regional
+    cluster plus the demand lane (never fewer than the original two).
+  - Regional capacity log lines carry the cluster ID
+    (`capacity regional <cluster ID> ...`).

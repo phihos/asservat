@@ -136,7 +136,7 @@ func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, 
 		if err != nil {
 			return nil, nil, err
 		}
-		direct, err := NewDirectHolderObservationClient(d.root, pin, podUID, roots, registry, v2Endpoints, proof, mountedCapacityObservationToken{in}, 2, time.Now)
+		direct, err := NewDirectHolderObservationClient(d.root, pin, podUID, roots, registry, v2Endpoints, proof, mountedCapacityObservationToken{in}, capacityRegionalCalls(len(regional)), time.Now)
 		if err != nil {
 			return nil, nil, err
 		}
