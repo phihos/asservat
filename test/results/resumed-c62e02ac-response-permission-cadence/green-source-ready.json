@@ -1,0 +1,18 @@
+{
+  "base": "RED snapshots in red-source",
+  "qualification": "NOT RUN; implementation prepared outside source tree pending genuine RED",
+  "patch_sha256": "d317f11f517eb559d5feac384a0f92e2d55e9b58e577d599b4cbfc522d861834",
+  "files": {
+    "internal/application/authorization/download.go": "4d4b9a2782917150c381bc09b65090b345a72541c3462e46c294236c80ba865b",
+    "internal/application/authorization/download_response.go": "3cb5ff442fd6172a23e178d4efcbfaba58de3d409aecab7cdadac40bdcaca00f",
+    "internal/application/authorization/download_response_test.go": "7ae83b7791cfbff69e6194e18401a80f9c215883be76b20c09c3db1cb82202a7",
+    "internal/application/evidence/download_response_transfer.go": "94e09124b65abe6ee9101ac16d44c7f837326fb93bdcbd1a382698dd416d1091",
+    "internal/application/evidence/download_response_owner_test.go": "4339c9044b22316b9984a41b44c9144f2da890546b2876581fa1a3ec8a342092",
+    "internal/application/evidence/context_native_response.go": "b3931189aafa59450c746d5f7ced4b174d7ee0a601372ea9d1335e6ba6dbb2de",
+    "internal/application/evidence/context_native_response_authority_test.go": "3c0f404a1db36a2c8243faf8f7ff0ef794b98312f406443f09c3184c867b1339",
+    "internal/application/evidence/context_native_runtime.go": "f4d9d2883c0be0c52b349fb08bc83984b949561e2d77f779df519b6945f25792",
+    "internal/application/evidence/worker_current.go": "c9d0107ec5c138cdd46f7dc80b1b3c15459a24ae83603d4c15815dd222e798c9",
+    "internal/bootstrap/public_downloads.go": "4c2c4437772ec71c39c1d590d02ffdd5a6b62573eacd43cbbb721cc73213e1de",
+    "test/integration/download_response_test.go": "3e060fa9c9a3cb03bd1705b0982934d94221c56ffdb90afb2da8202b9bd345b8"
+  }
+}

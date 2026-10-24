@@ -1,0 +1,17 @@
+{
+  "command": [
+    "docker",
+    "exec",
+    "-i",
+    "asservat-context-cqjvthn6-postgres",
+    "psql",
+    "-U",
+    "postgres",
+    "-d",
+    "custody_test",
+    "-v",
+    "ON_ERROR_STOP=1"
+  ],
+  "exit": 0,
+  "elapsedSeconds": 0.08194050303427503
+}

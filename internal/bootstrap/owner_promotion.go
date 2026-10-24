@@ -45,6 +45,9 @@ type promotedOwnerParts struct {
 	// Downloads are the configured hub-local download workers (ADR-204),
 	// or nil: the worker API, its profile source and the path template.
 	Downloads *promotedDownloads
+	// Processing is the capacity processing source and guard (ADR-210), or
+	// nil without a capacity profile.
+	Processing *contracts.OwnerPublicEnvironment
 }
 
 // derivePromotedOwner adds Native and Public to the selected installed owner
@@ -92,7 +95,7 @@ func derivePromotedOwner(in contracts.OwnerDeployment, x promotedOwnerParts, now
 		Port:                contracts.OwnerInstalledPublicPort, Version: p.Version,
 		OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4, DownloadsPerIdentity: 2, DownloadMaxSeconds: 3600,
 		OperationAudit:    contracts.OwnerPublicOperationAudit{RetentionSeconds: int(retention), NormalConcurrency: 8, ResolutionConcurrency: 2, PerPrincipalConcurrency: 2, NormalPerSecond: 50, ResolutionPerSecond: 10},
-		RuntimeProjection: x.Projection}
+		RuntimeProjection: x.Projection, Processing: x.Processing}
 	if d := x.Downloads; d != nil {
 		// ADR-204 decisions 2 and 4: the one pinned worker API owns the
 		// profile source's namespace, and one path template per installation.

@@ -219,6 +219,11 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 		return OperationFailure{"Conflict", "This submission conflicts with existing request or admission state. Keep the original preview and request key; do not assume an earlier attempt failed.", false}
 	case errors.Is(err, value.ErrPreviewExpired):
 		return OperationFailure{"PreviewExpired", "This preview is no longer valid for a new capture. An earlier attempt may still have been accepted. Keep the original preview and request key while resolving its outcome.", false}
+	case errors.Is(err, value.ErrChanged) && !request:
+		// A preview has no earlier review to resolve: an observation that
+		// changed or lapsed while it was assembled is a retryable unavailability
+		// (installed native 63/69), not ReviewChanged.
+		return OperationFailure{"NotAvailable", "The operation is unavailable. Check your access or retry when the service is available.", true}
 	case errors.Is(err, value.ErrChanged):
 		return OperationFailure{"ReviewChanged", "The reviewed scope or current conditions changed. An earlier attempt may still have been accepted. Resolve the original request before reviewing a replacement.", false}
 	case errors.Is(err, value.ErrProcessingCoverage):

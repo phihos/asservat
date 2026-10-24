@@ -1,0 +1,39 @@
+{
+  "scope": "fixture policy representation and strict read-back; focused regression plus full in-process integration race checks; external fixtures not run here",
+  "baseCommit": "62bfc0bbab4d7a5be1c79495039ecbe894cb8d4d",
+  "worktreeCandidate": true,
+  "native49FailureEvidence": "../resumed-c62e02ac-native49/postmortem-bucket-policy.json",
+  "native49PolicySHA256": "9a91a5b41c24ca217569cdba3b837761740e9798c4053312adc8deb8ecf647a9",
+  "focusedRedExit": 1,
+  "focusedRedPackageSeconds": 0.015,
+  "focusedRedTool": {
+    "session": 64451,
+    "terminalChunk": "f79e27",
+    "exit": 1
+  },
+  "focusedGreenRaceExit": 0,
+  "focusedGreenRacePackageSeconds": 1.068,
+  "integrationRaceExit": 0,
+  "integrationRacePackageSeconds": 6.262,
+  "greenTool": {
+    "session": 79121,
+    "terminalChunk": "279055",
+    "exit": 0
+  },
+  "sourceFileCount": 2582,
+  "sourcesUnchangedDuringEachRun": true,
+  "inheritedExternalFixtureSwitches": [],
+  "finalOwnedSourceSHA256": {
+    "test/integration/installer_deletion_storage_test.go": "8ef41a59464cd2a92d1e0ec04207349b904694dc0307ee6126d246c702d2212d",
+    "test/integration/installer_deletion_storage_unit_test.go": "2bf5005d7309791e33be710c0de6978c440ac2046d94b4b71ae0c8ddc134292c"
+  },
+  "diffCheckExit": 0,
+  "independentReview": {
+    "reviewer": "recover_decisions",
+    "result": "no blockers",
+    "scope": "read-only source, exact provider snapshot, archived RED/GREEN/full race evidence and final source hashes; no new tests or external operations",
+    "limits": "actual provider read-back/permissions and installed deletion lifecycle remain pending"
+  },
+  "externalProviderQualification": "pending parent-coordinated exact small S3 suite",
+  "installedDeletionLifecycleQualification": "pending; native49 stopped before fault arming and download"
+}

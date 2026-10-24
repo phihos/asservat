@@ -31,7 +31,30 @@ JSON encoding disables HTML escaping before canonicalization. Actual maximum-str
 
 Work and independently current peer/trust observations may overlap without having identical ends. Verification takes their minimum; it does not reject a valid shorter proof or renew it. Every blocking read/sign/write retains that minimum. The stream owns a single bounded EOF reader, one queued frame and one decoder frame. Socket/pipe callbacks cancel and join before release. Stream termination cancels the hub runner and the regional operation contexts, including a blocked operation. A late positive backend result cannot authorize a reply after cancellation.
 
-Standby and capture reservations count closing owners until joined completion. Each discovered owner has an independent thirty-second conversation with at least one second before a fresh empty standby. A retry never carries a capture or signed work from a prior connection. SQL52/ADR134 determine whether an explicit current continuation can proceed; transport failure is not proof of non-admission or no effect.
+Standby and capture reservations count closing owners until joined completion. Each discovered owner has an independent thirty-second conversation with at least one second before a fresh empty standby; after a TLS refusal (a registered owner process the hub no longer serves) the next attempt to that owner waits thirty seconds, so its setup proofs do not contend with the live owner's opening. A hub target query that finds no idle standby waits for the next registration only within its own original deadline, keeping 2.5 seconds for the query and the caller. A retry never carries a capture or signed work from a prior connection. SQL52/ADR134 determine whether an explicit current continuation can proceed; transport failure is not proof of non-admission or no effect.
+
+Router selection and attachment checks also observe the stream's own
+cancellation, even before the surrounding HTTP request notices it. A joined
+callback cancels the standby and active conversation; its reservation remains
+charged until the handler closes the stream and calls `Finish`.
+[ADR-211](../decisions/211-completed-query-standby-transition.md) separates a
+fully validated pre-work query from subsequent passive waiting: after its
+frame callbacks join, both hub socket deadlines return to the same original
+standby cutoff. Its target and receiver proofs retain their original bounds.
+Queries exclusively reserve their standby through completion, excluding
+other queries and attachment source pulls. Failure withdraws the standby
+before exposing the result. An attempted work lease, cancellation or expiry
+permanently prevents this passive transition. Withdrawal permits
+later operations to select another current standby; it never replays an
+uncertain query, capture or signed work.
+
+The installed regional supervisor reports failed candidate observation, an empty
+candidate set, failed connection setup and failed exchange service using fixed
+private labels and the existing exponentially suppressed logger. Optional nested
+steps are explicitly allowlisted; error text, target identity and credentials are
+excluded. Omitting the reporter preserves the same operation, retry and deadline
+behavior. A capacity standby is a separate protocol and does not establish that
+a context-start standby is available for preview target resolution.
 
 ## Work transport observation
 
@@ -51,6 +74,18 @@ The bare-Pod native fixture's original identity-frame graph required seventeen f
 
 One concrete protection instance coalesces a single positively completed process proof. Reuse retains the original observation start and earliest end, including the original TokenReview and independent admission-denial intervals. It performs current process credential/source/registration, SSR account/Pod identity, namespace/account, exact guard policy/binding, immutable settings, full workload digest and approved input metadata checks before returning. These later reads can shorten the interval; they cannot create a new denial proof or renew it. An error or known change invalidates the snapshot and any in-flight publication generation. A cancelled waiter cannot detach the original producer; cancellation, expiry or invalidation prevents a late positive producer from entering the cache. There is no background refresh or general Kubernetes client cache.
 
+The concrete executor also implements `mtls.ContextStartProcessReader`. Its
+combined read returns the connector observation already checked inside that
+complete native proof, only for the identical process-owned credentials
+instance. The transport need not make a second outer connector observation
+before the same proof. Both results retain their original starts and earliest
+expiry; returned CSR/profile buffers are copies. The transport validates both
+identities and the exact expected channel after the read. Other process readers
+keep the separate connector/process checks. This removes one duplicate per
+local read; it neither caches a whole connection setup nor removes its later
+owner, source or executor checks. Whole installed opening timing remains
+unqualified.
+
 After expiry, a new independent invocation may perform the full proof again under its own original caller bound. Existing preparation, binding and request deadlines remain fixed. [ADR-163](../decisions/163-original-work-transport-observation-lease.md) separately selects an exchange-owned transport observation lease, described below. Source-reader reuse remains unimplemented; neither mechanism qualifies the installed HTTP/2 path or removes current effect checks inside the production credential source.
 
 The accepted template is the API-returned defaulted Deployment template. Comparison retains every PodSpec/security/mount/token field and template label/annotation. It normalizes only the deprecated service-account alias and Pod-only zero priority/default preemption/default service-links scalars. It removes exactly the qualified ReplicaSet controller hash and actual node assignment for comparison. Both 300-second not-ready/unreachable tolerations are explicit. Automount is false; the projected service-account token is explicit and dynamic, with its entire specification pinned. Init/ephemeral/sidecar injection, different mounts, privilege, image or arguments fail closed.
@@ -60,6 +95,17 @@ ConfigMap/Secret metadata reads bind exact UID and resourceVersion. Settings can
 PartialObjectMetadata limits returned data, not Kubernetes privileges. `dedicatedToAPI` is an immutable installer-owned whole-object approval required for Secret references and forbidden for ConfigMap references. The installer must construct role-owned dedicated objects and independently accept those exact names/UIDs. Mounting one file does not establish ownership of other keys. Native grants permit GET on only these whole approved objects; unrelated GET and namespace LIST must fail. No payload hash is used, and the reader does not fetch Secret payloads. A metadata reader with broader credentials would be an unqualified composition.
 
 The optional owner policy branch admits exact capacity-account CREATE on the main CapacityReservation and exact capacity/execution-account UPDATE on its status subresource. It grants no RBAC and no main UPDATE, deletion, Secret/token/input mutation or arbitrary CRD privilege. Independently pinned StartAdmission enforces the original immutable binding, Ready and one StartCommitted transition. Legacy bare-Pod and omitted owner-capability bytes are unchanged.
+
+The regional operator installs the matching chart CRDs before enrollment.
+For an executor offer, `installer-cluster` checks served API discovery before
+creating its namespace or installation objects: the namespaced
+`CapacityReservation` resource must advertise create/get and its status
+subresource must advertise update. The check preserves caller cancellation
+and the earlier original deadline within five seconds, with bounded response
+bytes and resource count. Missing or conflicting discovery fails at the closed
+`start-api` step. This proves API availability only, not schema compatibility,
+RBAC, admission protection or activation. The installer gains no CRD mutation
+rights or ownership; ordinary connector-only offers keep their existing path.
 
 ## SQL and components
 

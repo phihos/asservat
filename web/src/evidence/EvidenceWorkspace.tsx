@@ -1,8 +1,10 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
 import { Evidence } from './evidence';
 import type { Artifact, Download } from './http';
+import { ContextProjectionView } from '../projection/ContextProjectionView';
+import { ContextProjection } from '../projection/projection';
 
 export const evidenceController = new Evidence();
 const date = (value: string) => new Date(value).toLocaleString();
@@ -10,6 +12,12 @@ const bytes = (value: number) => new Intl.NumberFormat().format(value) + ' bytes
 const states: Record<Download['state'], string> = { Preparing: 'Preparing the native file', Ready: 'Ready to download', Streaming: 'Sending the file', Completed: 'Transfer recorded', Interrupted: 'Download interrupted', Cancelled: 'Download cancelled', Expired: 'Download expired', Denied: 'Download access unavailable', Failed: 'Download failed' };
 const contentNames: Record<string, string> = { userContent: 'user content', credentials: 'credentials', personalIdentifiers: 'personal identifiers', networkAddresses: 'network addresses', paths: 'paths', profileLabels: 'profile labels', unknownApplicationData: 'other application data' };
 const terminal = new Set(['Completed', 'Cancelled', 'Expired', 'Denied', 'Failed']);
+function SavedPodStatus({ session, scope, caseID, artifactID }: { session: Session; scope: AbortSignal; caseID: string; artifactID: string }) {
+  // Each visible artifact owns its view. Mounting reads nothing; the existing
+  // view aborts its request and clears its result on unmount or session loss.
+  const [controller] = useState(() => new ContextProjection());
+  return <ContextProjectionView controller={controller} session={session} scope={scope} caseID={caseID} artifactID={artifactID}/>;
+}
 function Handling({ artifact }: { artifact: Artifact }) {
   const notice = artifact.handling_notice;
   return <>
@@ -39,7 +47,10 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
         <h2 id={`artifact-${index}`}>{['context', 'pod-status'].includes(artifact.kind) ? 'Pod status' : artifact.kind}</h2>
         <p className="field-help">{artifact.data_class === 'raw' ? 'Raw evidence' : artifact.data_class === 'extract' ? 'Approved extract' : 'Approved metadata'} · {artifact.completeness}</p>
         <Handling artifact={artifact}/>
-        {Date.parse(artifact.expires_at) <= Date.now() ? <p>Evidence access has expired.</p> : <Button className="button" isDisabled={state.busy || pending} onPress={() => void controller.prepare(artifact)}>Download</Button>}
+        {Date.parse(artifact.expires_at) <= Date.now() ? <p>Evidence access has expired.</p> : <>
+          {artifact.data_class === 'metadata' && ['context', 'pod-status'].includes(artifact.kind) && <SavedPodStatus session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id}/>}
+          <Button className="button" isDisabled={state.busy || pending} onPress={() => void controller.prepare(artifact)}>Download</Button>
+        </>}
         {pending && state.preparingArtifact !== artifact.artifact_id && <p className="field-help">Finish the current download request before preparing another file.</p>}
       </section>)}
       <p className="notice">Downloaded copies are outside Asservat's automatic deletion. Follow your organization's handling and deletion policy.</p>

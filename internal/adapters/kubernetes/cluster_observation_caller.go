@@ -228,11 +228,8 @@ func (s *ClusterObservationCallerAdmission) ObserveClusterObservationCaller(ctx 
 	if e != nil || after != before {
 		return zero, cfg.ErrChanged
 	}
-	final, end, e := s.protection.Current(call)
-	if e != nil || final != guard {
-		return zero, value.ErrUnavailable
-	}
-	narrow(end)
+	// The guard proof above is the reused self-protection observation; the
+	// caller-specific token and Pod reads are the current per-request checks.
 	out := value.ClusterObservationCaller{Pin: s.pin, Pod: name, PodUID: podUID, ReplicaSet: before.ReplicaSet, ReplicaSetUID: before.ReplicaSetUID, WorkloadDigest: before.Digest, ObservedAt: start, FreshUntil: until}
 	if call.Err() != nil || !out.Matches(request, s.client.now()) {
 		return zero, value.ErrUnavailable

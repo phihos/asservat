@@ -1,0 +1,23 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-run",
+    "^$",
+    "./test/integration"
+  ],
+  "cwd": "/home/phil/Projekte/asservat-projection-c62e02ac",
+  "env": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exit_code": 0,
+  "elapsed_seconds": 21.774800777435303,
+  "sources": 2651,
+  "source_unchanged": true,
+  "scope": "compile only; no tests selected"
+}

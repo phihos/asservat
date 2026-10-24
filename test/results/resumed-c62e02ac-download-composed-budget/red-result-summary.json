@@ -1,0 +1,41 @@
+{
+  "actual_terminal": {
+    "session": 83265,
+    "chunk": "48eae0",
+    "exit": 1,
+    "go_package_seconds": 5.008
+  },
+  "policy_only": {
+    "result": "PASS",
+    "operation_seconds": 0.006884404,
+    "authority_checks": 10,
+    "raw_policy_reads": 1,
+    "observer_requests": 14,
+    "probe_requests": 3
+  },
+  "identity_composed": {
+    "result": "FAIL",
+    "operation_seconds": 4.958395285,
+    "original_interval_seconds": 5,
+    "authority_checks": 10,
+    "raw_policy_reads": 1,
+    "policy_observer_requests": 14,
+    "identity_observer_requests": 119,
+    "identity_configmap_reads": 40,
+    "synthetic_token_verifications": 40,
+    "synthetic_permission_reads": 20,
+    "synthetic_catalog_reads": 10,
+    "synthetic_retention_reads": 10,
+    "job_created": true,
+    "job_recorded": true,
+    "job_pending_observed": true,
+    "continue_preparation": false,
+    "error": "download unavailable"
+  },
+  "scope": "Actual coordinator/runtime/dispatcher, ContextDownloadAuthority, identity.Service/CurrentIdentity, native protected DownloadPolicy and IdentityPolicyClient over loopback TLS. Independent standard20/20 policy and identity clients match installed topology. Synthetic claims/token crypto, permissions/catalog/retention SQL, audit and Jobs. No browser session/KMS, real IdP, external Kubernetes/SQL/S3 or native bytes qualified. No timers/QPS raised. Original archived whole-phase RED remains untouched.",
+  "sources_unchanged": true,
+  "owned_source_sha256": {
+    "internal/adapters/kubernetes/download_preparation_phase_budget_test.go": "32bf3bce83978f8bc2206854e4c8a8315a4e82bcad87b45d8d404b726b674345",
+    "internal/adapters/kubernetes/download_preparation_identity_budget_test.go": "8f4558bf55360abc04ff6c149f05028b6adc974c054502ac1c87b260f341442f"
+  }
+}

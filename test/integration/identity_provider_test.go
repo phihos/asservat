@@ -99,6 +99,20 @@ func randomPKCE() string {
 }
 func (f *kcFixture) login(client string, mode ...string) kcTokens {
 	f.t.Helper()
+	return f.loginScope(client, "", mode...)
+}
+
+// loginScope logs in like login and also requests the optional client scope
+// extra when it is not empty.
+func (f *kcFixture) loginScope(client, extra string, mode ...string) kcTokens {
+	f.t.Helper()
+	return f.loginScopes(client, strings.TrimSpace("openid evidence:read evidence:download evidence:capture "+extra), mode...)
+}
+
+// loginScopes allows a real least-scope PKCE session; token claims are still
+// issued and validated by Keycloak and the product, never synthesized here.
+func (f *kcFixture) loginScopes(client, scopes string, mode ...string) kcTokens {
+	f.t.Helper()
 	// Real authorization code + S256 PKCE. The loopback callback is never fetched;
 	// the fixture observes Keycloak's redirect and exchanges the one-use code.
 	jar, _ := cookiejar.New(nil)
@@ -107,7 +121,7 @@ func (f *kcFixture) login(client string, mode ...string) kcTokens {
 	defer func() { f.http.Jar = previous }()
 	verifier, state, nonce := randomPKCE(), randomPKCE(), randomPKCE()
 	sum := sha256.Sum256([]byte(verifier))
-	query := url.Values{"client_id": {client}, "redirect_uri": {"http://127.0.0.1:1/callback"}, "response_type": {"code"}, "scope": {"openid evidence:read evidence:download evidence:capture"}, "state": {state}, "nonce": {nonce}, "code_challenge_method": {"S256"}, "code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}}
+	query := url.Values{"client_id": {client}, "redirect_uri": {"http://127.0.0.1:1/callback"}, "response_type": {"code"}, "scope": {scopes}, "state": {state}, "nonce": {nonce}, "code_challenge_method": {"S256"}, "code_challenge": {base64.RawURLEncoding.EncodeToString(sum[:])}}
 	status, page, _ := f.request("GET", f.Issuer+"/protocol/openid-connect/auth?"+query.Encode(), "", "", nil)
 	if status != 200 {
 		f.t.Fatalf("PKCE login page status %d", status)

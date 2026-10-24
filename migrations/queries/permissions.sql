@@ -21,7 +21,9 @@ UPDATE permission_stream SET lease_until=clock_timestamp()+interval '30 seconds'
 UPDATE permission_stream SET suspended=true,lease_until=clock_timestamp(),fresh_until=NULL,observed_at=NULL WHERE id=$1;
 
 -- name: UpdatePermissionStream :exec
-UPDATE permission_stream SET sequence=$2,projection_digest=$3,observed_at=$4,fresh_until=$5,suspended=false WHERE id=$1;
+-- ADR-200 revision (2026-10-23): the live lease holder's accepted observation
+-- also keeps the lease at least until that observation's 30-second lifetime.
+UPDATE permission_stream SET sequence=$2,projection_digest=$3,observed_at=$4,fresh_until=$5,lease_until=GREATEST(lease_until,$5),suspended=false WHERE id=$1;
 
 -- name: ReadPermissionAcceptance :one
 SELECT * FROM permission_acceptance WHERE request_id=$1;

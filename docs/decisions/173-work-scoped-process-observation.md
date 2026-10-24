@@ -3,6 +3,10 @@
 Date: 2026-10-14. Status: accepted; implemented; the connector executor's local start passes natively.
 Requirements: REQ-EXE-002, S-02 regional context start; TASK-03 / TASK-11.
 
+[ADR-216](216-request-owned-context-start-observation.md) subsequently removes
+repeated complete hub observations within one start. The regional process and
+current capacity/CAS checks described here retain their original bounds.
+
 ## Context
 
 Under [ADR-171](171-hub-run-context-execution.md), one API context execution
@@ -95,3 +99,13 @@ and was denied 47 ms before the bound. Run 5 had a test-side binding with
 non-canonical times. The accepted connector source, CA/registry and
 preparation grant are explicit fixture inputs; no SQL preparation, hub runner
 or product binary ran.
+
+## Revision (2026-10-23)
+
+The hub-side counterpart now follows the same reuse pattern without a work
+scope: the hub's own guard proof and installed identity proof are reused for
+at most 30 seconds (`kube.OwnerProtectionReuse`) by every caller in the process,
+including provider login and renewal, which previously ran two full native
+proofs per OpenBao call. Failures are never reused. See the
+[ADR-208 revision](208-context-opening-client-burst.md#revision-2026-10-23).
+The regional process observation described here is unchanged.

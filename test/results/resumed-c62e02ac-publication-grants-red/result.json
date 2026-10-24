@@ -1,0 +1,19 @@
+{
+  "sourceCommit": "67638285b745f83bc681f70329933241cbe327cd",
+  "sourceHashesVerified": 2713,
+  "sourceHashMismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "testExit": 1,
+  "cleanupFailures": [],
+  "command": "python3 scripts/test-custody.py --run '^TestContextAdmissionWithRealServices$/^api-execution-one-preparation-exact-result-historical-publication$'",
+  "runnerExit": 1,
+  "testSeconds": 6.109,
+  "harnessTestElapsedSeconds": 50.19511270901421,
+  "ownedContainersAbsent": true,
+  "files": {
+    "custody-environment.json": "9c9860230ab9c67c9e30d1b4bc4ca569e744e8807c1063d9abde9a30352a0aed",
+    "custody-postgres.log": "939271d2101e34367e2a5f584f49144022bb7c1012000a1627e4a777d236b191",
+    "custody.log": "1e4c798ea96f2e2850f833868a3da7183e396ea0fde732cde6a62402af5ebf75"
+  },
+  "scope": "Expected failing regression before the grant fix. Both independent fresh compiled-verifier and compiled-publisher cases reached their first publication path and failed; PostgreSQL recorded permission denied for table retention_source at each transactional accepted-source read. Existing role-isolation negatives also intentionally produced unrelated permission errors. Real SQL/S3 composition with explicit synthetic authority fixtures; no installed workflow qualification."
+}

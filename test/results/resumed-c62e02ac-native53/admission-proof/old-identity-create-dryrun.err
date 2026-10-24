@@ -1,0 +1,1 @@
+The configmaps "asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability" is invalid: : ValidatingAdmissionPolicy 'asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability-guard' with binding 'asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability-guard' denied request: Asservat context capability administrator is required.

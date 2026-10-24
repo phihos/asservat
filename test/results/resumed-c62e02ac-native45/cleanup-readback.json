@@ -1,0 +1,86 @@
+[
+  {
+    "kind": "container",
+    "name": "asservat-context-boqlf6my-0-control-plane",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-boqlf6my-0-control-plane"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-boqlf6my-1-control-plane",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-boqlf6my-1-control-plane"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-boqlf6my-s3",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-boqlf6my-s3"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-boqlf6my-kms",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-boqlf6my-kms"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-boqlf6my-postgres",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-boqlf6my-postgres"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-boqlf6my-tls",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-boqlf6my-tls"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-boqlf6my-keycloak",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-boqlf6my-keycloak"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-boqlf6my-0-seed",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-boqlf6my-0-seed"
+  },
+  {
+    "kind": "volume",
+    "name": "asservat-context-boqlf6my-0-var",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: get asservat-context-boqlf6my-0-var: no such volume"
+  },
+  {
+    "kind": "image",
+    "name": "asservat-context-worker:context-boqlf6my",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such image: asservat-context-worker:context-boqlf6my"
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-boqlf6my",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: network asservat-context-boqlf6my not found"
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-boqlf6my-kind",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: network asservat-context-boqlf6my-kind not found"
+  }
+]

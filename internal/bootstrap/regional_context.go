@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -108,13 +109,36 @@ func storageCredentials(in *providerInputs, name string) aws.CredentialsProvider
 }
 
 // newRegionalContext builds every input that does not need an enrolled
-// process. observer/probe are the regional account's own clients.
-func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in *providerInputs, podUID string, observer, probe *kube.PermissionClient, source *kube.ConnectorIdentitySource, guard *kube.OwnerWorkloadProtection, owners *RegionalLifecycle, credentials *mtls.ConnectorProcessCredentials) (*regionalContext, []func(), error) {
+// process. Like regional capacity, its observer/probe are its own instances of
+// the regional account's identities, each with its own 20 QPS limiter:
+// sharing the lifecycle/source client let other regional reads starve the
+// opening setup's original five seconds (installed native 53). They use the
+// kube.WithOpeningBurst limiter (ADR-208, installed native 55/57).
+func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in *providerInputs, podUID string, workload cfg.OwnerWorkloadAdministration, sourcePlan cfg.ConfigMapAdministration, binding value.PeerBinding, owners *RegionalLifecycle, credentials *mtls.ConnectorProcessCredentials) (*regionalContext, []func(), error) {
 	var closers []func()
 	a := *c.APIContext
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+	observer, err := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-observer.token")), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	probe, err := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-probe.token")), c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	guard, err := kube.NewOwnerWorkloadProtection(observer, probe, workload, regionalPin(c.WorkloadGuard))
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	protection, err := kube.NewConnectorIdentityProtection(observer, probe, sourcePlan, regionalPin(c.SourceGuard))
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	source, err := kube.NewConnectorIdentitySource(observer, protection, c.Source.Name, c.Source.UID, c.PermissionRootID, binding)
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
 	out := &regionalContext{c: a, rootID: c.PermissionRootID, owners: owners, source: source}
-	var err error
 	if out.pool, err = regionalOwnerPool(c, a.Owners.Configuration); err != nil {
 		return nil, closers, err
 	}
@@ -215,9 +239,9 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	if err != nil {
 		return &fixedStepError{"start-client", err}
 	}
-	local := contextstart.RegionalLocal{Process: process, Targets: r.targets, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer")}, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
 	fmt.Fprintln(os.Stderr, "regional context start active")
-	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Verifier: r.verifier, Local: local}.Run(ctx)
+	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Verifier: reportedWorkVerifier{r.verifier, eventLog(os.Stderr, "regional work refused")}, Local: local, Report: eventLog(os.Stderr, "regional context standby refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
 }
 
 // regionalArtifactOutput prepares each attempt's output with a key sealer
@@ -240,4 +264,31 @@ func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.C
 		return nil, err
 	}
 	return producer.PrepareContext(ctx, e)
+}
+
+// reportedTargets logs the region's target-answer step durations.
+type reportedTargets struct {
+	*kube.PodTargets
+	report func(string, string)
+}
+
+func (t reportedTargets) ReportAnswer(steps string) { t.report("answer", steps) }
+
+// reportedWorkVerifier logs a refused work verification's fixed step.
+type reportedWorkVerifier struct {
+	verifier *jose.APIContextWorkSignatures
+	report   func(string)
+}
+
+func (v reportedWorkVerifier) VerifyAPIContextWork(ctx context.Context, encoded []byte, receiver value.APIContextReceiver) (value.AuthenticatedAPIContextWork, error) {
+	out, err := v.verifier.VerifyAPIContextWork(ctx, encoded, receiver)
+	if err != nil {
+		step := "other"
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			step = fixed.FixedStep()
+		}
+		v.report(step)
+	}
+	return out, err
 }

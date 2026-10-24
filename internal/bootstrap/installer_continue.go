@@ -95,7 +95,7 @@ func (k *InstallerContinuation) Close() {
 // OpenInstallerContinuation reopens the activated installation: the original
 // preparer and passive history under native protection, the acknowledged
 // activation record, and the operator superuser for the runtime SQL bridge.
-// preparer is the produce step's fresh projection; files holds the
+// preparer is the retirement step's refreshed public/history projection; files holds the
 // continuation input, the superuser and the kubelet-rotated runner token.
 func OpenInstallerContinuation(ctx context.Context, files, preparer *os.Root, step *string) (*InstallerContinuation, error) {
 	if ctx == nil || ctx.Err() != nil || files == nil || preparer == nil || disableWorkerCoreDumps() != nil {
@@ -1128,7 +1128,8 @@ func (k *InstallerContinuation) promote(ctx context.Context, inventory kube.Init
 		return input, err
 	}
 	promoted, err := derivePromotedOwner(input, promotedOwnerParts{Settings: *k.input.Public, Sources: *k.sources, Qualification: k.capacity.qualification, ConnectorRoots: connectorRoots,
-		IssuerEpoch: k.record.Scope.IssuerEpoch, Signing: readback.Signing, WorkerRoots: readback.WorkerRoots, Projection: k.publicProjection, Downloads: downloads}, time.Now())
+		IssuerEpoch: k.record.Scope.IssuerEpoch, Signing: readback.Signing, WorkerRoots: readback.WorkerRoots, Projection: k.publicProjection, Downloads: downloads,
+		Processing: k.capacity.processingEnvironment()}, time.Now())
 	if err != nil {
 		return input, err
 	}
@@ -1308,7 +1309,7 @@ func (k *InstallerContinuation) Permission(ctx context.Context, resources *kube.
 			if projection == nil {
 				deployment := contracts.PermissionDeployment{Format: contracts.PermissionDeploymentFormat, InstallationID: k.record.Scope.InstallationID, RootID: owner.PermissionRootID,
 					RoleRootUID: verified.UID, RoleSetupID: verified.State.OperationID, Postgres: owner.Postgres, Control: control,
-					Retention: &contracts.RetentionDeployment{Guard: retention}, WorkerConfiguration: workers, ContextDeletion: k.contextDeletionEnabled()}
+					Retention: &contracts.RetentionDeployment{Guard: retention}, WorkerConfiguration: workers, ContextDeletion: k.contextDeletionEnabled(), Browser: k.browserSection()}
 				if projection, e = kube.NewPermissionRuntimeProjection(bridge, resources, k.publicRoot, deployment); e != nil {
 					return e
 				}
@@ -1319,11 +1320,29 @@ func (k *InstallerContinuation) Permission(ctx context.Context, resources *kube.
 	})
 }
 
+// browserSection is the installed browser settings the hub-worker projects
+// into SQL (ADR-210), or nil without public sources.
+func (k *InstallerContinuation) browserSection() *contracts.PermissionBrowserSettings {
+	if k.sources == nil || k.sources.BrowserSettings.Name == "" {
+		return nil
+	}
+	return &contracts.PermissionBrowserSettings{RootID: k.sources.BrowserRootID, Settings: k.sources.BrowserSettings}
+}
+
 // installedCapacity is what the capacity projection needs after the launch.
 type installedCapacity struct {
 	sources       kube.CapacitySources
 	qualification capacityapp.CapacityQualification
 	setup         contracts.CapacityRootSetup
+}
+
+// processingEnvironment is the processing source the hub-api reads for
+// processing decisions (ADR-210), or nil without a capacity profile.
+func (c *installedCapacity) processingEnvironment() *contracts.OwnerPublicEnvironment {
+	if c == nil || c.sources.ProcessingSource.Name == "" {
+		return nil
+	}
+	return &contracts.OwnerPublicEnvironment{Source: c.sources.ProcessingSource, Guard: c.sources.ProcessingGuard, Paths: []contracts.DownloadEnvironmentPath{}}
 }
 
 // Capacity is the ADR-190 initialization before the owner launch: the
@@ -1374,7 +1393,7 @@ func (k *InstallerContinuation) Capacity(ctx context.Context, inventory kube.Ini
 	}
 	// ADR-192: identities and the setup time derive from the role setup, so a
 	// replay rebuilds the input its committed claim bound.
-	q, err := buildCapacityQualification(*p, capacityDerived{Root: owner.PermissionRootID, Installation: installation, AccountVersion: roles.State.MAC.AccountVersion,
+	q, err := buildCapacityQualification(*p, capacityDerived{SharedQueries: k.downloadsEnabled(), Root: owner.PermissionRootID, Installation: installation, AccountVersion: roles.State.MAC.AccountVersion,
 		SystemPoolUID: pool, ProcessingSourceUID: sources.ProcessingSource.UID, ProcessingProtection: proofs.Processing,
 		NamespaceGuards: []capacityapp.CapacityNamespaceQualification{{ClusterID: cluster, Digest: proofs.NamespaceDigest, Keys: keys}}, Now: roles.State.CreatedAt}, capacityIDs(roles.State.OperationID))
 	if err != nil {
@@ -1558,7 +1577,7 @@ func (k *InstallerContinuation) FederationWorkload(ctx context.Context, inventor
 		return err
 	}
 	k.at("federation/workload")
-	w, err := kube.BuildFederationWorkload(namespace, k.plan.Plan.Workload.Image, inventory.OwnerDeployment.Name, *f, settings.ServiceType, settings.NodePort)
+	w, err := kube.BuildFederationWorkload(namespace, k.plan.Plan.Workload.Image, inventory.OwnerDeployment.Name, inventory.OwnerAccount.Name, *f, settings.ServiceType, settings.NodePort)
 	if err != nil {
 		return err
 	}

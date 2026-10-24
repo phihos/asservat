@@ -104,7 +104,7 @@ func TestProviderOwnerNativeObjectReadersPreserveOriginalSelectedLayout(t *testi
 			case "extra-legacy-secret-key":
 				x.providers.Data["audit-wrap.token"] = []byte("synthetic-legacy-token")
 			case "missing-sql-key":
-				delete(x.providers.Data, "sql-activation.json")
+				delete(x.providers.Data, "sql-owner-runtime.json")
 			case "changed-jwt-audience", "changed-jwt-lifetime":
 				found := false
 				for _, source := range x.deployment.Spec.Template.Spec.Volumes[0].Projected.Sources {

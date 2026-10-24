@@ -131,3 +131,43 @@ func TestConnectorBackingDerivation(t *testing.T) {
 		}
 	}
 }
+
+// The installed journey's profile (test/integration nativeCapacityProfile):
+// one-day admission, room for about 150 root renewals and enough normal-lane
+// records for repeated hold previews must still compile.
+func TestCapacityQualificationJourneySizing(t *testing.T) {
+	p := capacityProfileFixture()
+	p.AdmissionSeconds = 86400
+	p.Lanes.Normal.Records = 64
+	p.Processing.MaxRootTransitions = 512
+	p.Metadata.ConfigurationTransitions = 4096
+	if _, err := buildCapacityQualification(p, capacityDerivedFixture(), sequentialIDs()); err != nil {
+		t.Fatal("journey capacity profile does not compile", err)
+	}
+}
+
+func TestInstalledSharedQueryCapacityUsesOriginalEnvelopeAndExactWorkloadBudgets(t *testing.T) {
+	d := capacityDerivedFixture()
+	d.SharedQueries = true
+	q, err := buildCapacityQualification(capacityProfileFixture(), d, sequentialIDs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	x := q.ContextQuery
+	if x == nil || !x.Profile.SharedBudgetValid() || x.Profile.Lifetime != time.Minute || x.RootQueries != q.RootBacking.Accounts*q.RootBacking.RecordsPerAccount || x.WorkloadAccounts != q.RootBacking.Accounts || x.WorkloadQueries != q.RootBacking.RecordsPerAccount {
+		t.Fatal("shared installed query budget missing or root selected target")
+	}
+	if x.Profile.Worker.CPUMilli != downloadWorkerCPUMillis || x.Profile.Worker.MemoryBytes != downloadWorkerMemoryBytes || x.Profile.Worker.EphemeralStorageBytes != 4<<20 || x.Profile.Cost.AuditObjects != 14 {
+		t.Fatal("worker or independent audit budget mismatch")
+	}
+	need, err := x.Required()
+	if err != nil || need != x.Envelope {
+		t.Fatal("logical charge not exactly derived", err)
+	}
+	body, _ := json.Marshal(x)
+	for _, field := range []string{"Native", "SourceTransitionLimit", "ReportDigest"} {
+		if bytes.Contains(body, []byte(field)) {
+			t.Fatal("invented deployment/source engine", field)
+		}
+	}
+}

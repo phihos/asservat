@@ -1,0 +1,86 @@
+[
+  {
+    "kind": "container",
+    "name": "asservat-context-5ngvkl2b-0-control-plane",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-5ngvkl2b-0-control-plane"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-5ngvkl2b-1-control-plane",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-5ngvkl2b-1-control-plane"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-5ngvkl2b-s3",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-5ngvkl2b-s3"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-5ngvkl2b-kms",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-5ngvkl2b-kms"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-5ngvkl2b-postgres",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-5ngvkl2b-postgres"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-5ngvkl2b-tls",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-5ngvkl2b-tls"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-5ngvkl2b-keycloak",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-5ngvkl2b-keycloak"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-5ngvkl2b-0-seed",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-5ngvkl2b-0-seed"
+  },
+  {
+    "kind": "volume",
+    "name": "asservat-context-5ngvkl2b-0-var",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: get asservat-context-5ngvkl2b-0-var: no such volume"
+  },
+  {
+    "kind": "image",
+    "name": "asservat-context-worker:context-5ngvkl2b",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such image: asservat-context-worker:context-5ngvkl2b"
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-5ngvkl2b",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: network asservat-context-5ngvkl2b not found"
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-5ngvkl2b-kind",
+    "inspectExit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: network asservat-context-5ngvkl2b-kind not found"
+  }
+]

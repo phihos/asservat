@@ -162,7 +162,7 @@ func (s *APIContextWorkSignatures) VerifyAPIContextWork(ctx context.Context, enc
 	}
 	var h map[string]string
 	if json.Unmarshal(header, &h) != nil || len(h) != 3 || h["alg"] != "Ed25519" || h["typ"] != APIContextWorkType || !identity.Text(h["kid"], 128) {
-		return out, value.ErrDenied
+		return out, workStep{"header", value.ErrDenied}
 	}
 	payload, ok := rawURL(parts[1], wire.APIContextWorkBytes)
 	if !ok {
@@ -178,8 +178,11 @@ func (s *APIContextWorkSignatures) VerifyAPIContextWork(ctx context.Context, enc
 		return out, value.ErrInvalid
 	}
 	w, e := apiContextValue(d)
-	if e != nil || !w.Matches(receiver, s.now()) {
-		return out, value.ErrDenied
+	if e != nil {
+		return out, workStep{"value", value.ErrDenied}
+	}
+	if !w.Matches(receiver, s.now()) {
+		return out, workStep{"receiver-" + w.MismatchStep(receiver, s.now()), value.ErrDenied}
 	}
 	canonical, e := wire.EncodeAPIContextWork(apiContextWire(w))
 	defer clear(canonical)
@@ -192,7 +195,7 @@ func (s *APIContextWorkSignatures) VerifyAPIContextWork(ctx context.Context, enc
 	defer stop()
 	first, key, e := s.current(call, w, h["kid"])
 	if e != nil {
-		return out, e
+		return out, workStep{"trust", e}
 	}
 	until := apiContextUntil(call, w, first)
 	bounded, cancel := context.WithDeadline(call, until)
@@ -200,7 +203,7 @@ func (s *APIContextWorkSignatures) VerifyAPIContextWork(ctx context.Context, enc
 	actual, e := jws.Verify(encoded, jws.WithKey(jwa.EdDSAEd25519(), ed25519.PublicKey(key.PublicKey)))
 	defer clear(actual)
 	if e != nil || !bytes.Equal(actual, payload) {
-		return out, value.ErrDenied
+		return out, workStep{"signature", value.ErrDenied}
 	}
 	last, current, e := s.current(bounded, w, h["kid"])
 	until = identity.Earlier(until, last.Trust.FreshUntil)
@@ -213,3 +216,14 @@ func (s *APIContextWorkSignatures) VerifyAPIContextWork(ctx context.Context, enc
 	}
 	return out, nil
 }
+
+// workStep names where a work verification stopped, for operator
+// diagnostics; its class is the wrapped error.
+type workStep struct {
+	step string
+	err  error
+}
+
+func (e workStep) Error() string     { return "api context work " + e.step }
+func (e workStep) Unwrap() error     { return e.err }
+func (e workStep) FixedStep() string { return e.step }

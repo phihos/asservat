@@ -239,7 +239,8 @@ func TestEnrollmentFleetFreshnessWithRealPostgres(t *testing.T) {
 			t.Fatal("positive renewal blocked behind retained SHARE", e)
 		}
 		var at, until time.Time
-		if e := db.QueryRow(ctx, "SELECT observed_at,fresh_until FROM fleet_current_trust WHERE installation_id=$1", a.InstallationID).Scan(&at, &until); e != nil || !at.Equal(a.ObservedAt) || !until.Equal(a.FreshUntil) {
+		if e := db.QueryRow(ctx, "SELECT observed_at,fresh_until FROM fleet_current_trust WHERE installation_id=$1", a.InstallationID).Scan(&at, &until); e != nil || !at.Equal(a.ObservedAt) || !until.Equal(a.ObservedAt.Add(30*time.Second)) {
+			// Migration 00074 stores the positive row for 30 seconds.
 			t.Fatal("original positive interval changed", e)
 		}
 		// The consumer transaction remains open through the successful commit.

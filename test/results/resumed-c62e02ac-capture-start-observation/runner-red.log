@@ -1,0 +1,6 @@
+=== RUN   TestAPIContextRunnerOneRequestObservation
+    api_observation_test.go:64: one request repeated authority observations: target=3 eligibility=3 capability=3 retention=3 process=4 (includes final completion proof)
+--- FAIL: TestAPIContextRunnerOneRequestObservation (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/execution	0.003s
+FAIL

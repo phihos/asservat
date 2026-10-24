@@ -1,0 +1,33 @@
+{
+  "cwd": "/home/phil/Projekte/asservat-resume-0450e73c",
+  "command": [
+    "go",
+    "test",
+    "./internal/application/evidence",
+    "-run",
+    "^TestContextRuntimeInitialAuthority",
+    "-count=1",
+    "-v"
+  ],
+  "env": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "started_utc": "2026-10-20T19:34:55.984212+00:00",
+  "source_sha256_before": {
+    "internal/application/evidence/worker_current.go": "79954a1a1c6c56bfec4a5757efb0479c4836e142407f48285fe509f0ebf2a2b2",
+    "internal/application/evidence/context_native_runtime.go": "e125fe1cf96a1265b1babc8c6f92f8db5b0c6b2fac544d6c832269c89250783a",
+    "internal/application/evidence/context_native_response.go": "6f006efd5401256b43c311f16c584aefc7f2ac0c12fd0278e3ec6a7bd8d53f85",
+    "internal/application/evidence/context_native_initial_authority_test.go": "f376828a05f0957ea73472d6c5016989113f1405c4a55869e6b4a55db1c3b46b"
+  },
+  "exit_code": 1,
+  "elapsed_seconds": 1.593723,
+  "source_sha256_after": {
+    "internal/application/evidence/worker_current.go": "79954a1a1c6c56bfec4a5757efb0479c4836e142407f48285fe509f0ebf2a2b2",
+    "internal/application/evidence/context_native_runtime.go": "e125fe1cf96a1265b1babc8c6f92f8db5b0c6b2fac544d6c832269c89250783a",
+    "internal/application/evidence/context_native_response.go": "6f006efd5401256b43c311f16c584aefc7f2ac0c12fd0278e3ec6a7bd8d53f85",
+    "internal/application/evidence/context_native_initial_authority_test.go": "f376828a05f0957ea73472d6c5016989113f1405c4a55869e6b4a55db1c3b46b"
+  }
+}

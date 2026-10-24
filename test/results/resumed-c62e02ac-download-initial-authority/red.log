@@ -1,0 +1,49 @@
+=== RUN   TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation
+=== RUN   TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation/0s
+    context_native_initial_authority_test.go:71: full authority checks before first SQL=2 total=3 SQL reads=1; want one before SQL and one after it
+=== RUN   TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation/1.7s
+    context_native_initial_authority_test.go:68: first reservation not reached: calls=0 authority=3 err=download authority or session expired
+--- FAIL: TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation (0.00s)
+    --- FAIL: TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation/0s (0.00s)
+    --- FAIL: TestContextRuntimeInitialAuthorityIsConsumedBeforeNextEvaluation/1.7s (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/caller
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/identity
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/authority
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/session
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/source
+--- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/caller (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/identity (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/session (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/source (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/source-expired-during-authority
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/invalid-source
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/wrong-profile
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/authority-denied
+--- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/source-expired-during-authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/invalid-source (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/wrong-profile (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/authority-denied (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityRechecksAfterAttachment
+=== RUN   TestContextRuntimeInitialAuthorityRechecksAfterAttachment/revoked
+=== RUN   TestContextRuntimeInitialAuthorityRechecksAfterAttachment/identity-changed
+=== RUN   TestContextRuntimeInitialAuthorityRechecksAfterAttachment/expired
+=== RUN   TestContextRuntimeInitialAuthorityRechecksAfterAttachment/cancelled
+--- PASS: TestContextRuntimeInitialAuthorityRechecksAfterAttachment (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRechecksAfterAttachment/revoked (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRechecksAfterAttachment/identity-changed (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRechecksAfterAttachment/expired (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRechecksAfterAttachment/cancelled (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/authority
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/attachment
+--- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/attachment (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.006s
+FAIL

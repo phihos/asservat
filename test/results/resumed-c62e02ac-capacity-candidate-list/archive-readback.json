@@ -1,0 +1,22 @@
+{
+  "currentMain": "17e0ff6387e5e472037bb3a0bfdd7239ddbec95b",
+  "integratedCommit": "1906c826",
+  "componentCommit": "cb552c4dc6f2b0b226012e5ff00b64a835324a45",
+  "originalCacheManifestSha256": "2694622d89366e3b63726ea84905f8849d4efeb7bcc39140848d7410a9dd723d",
+  "originalManifestEntries": 23,
+  "byteExactCopiedFiles": 24,
+  "currentSourceHashes": {
+    "internal/adapters/kubernetes/cluster_observation_metadata.go": "c843a02eb798909f41ac0fd19a088c9755f32447fb92fa5fb27a7a876e516afa",
+    "internal/adapters/kubernetes/cluster_observation_metadata_test.go": "2d400ded2f7f708033fa08cdcc1bd0fb1308e9111145cd60ce383f71f591dedb",
+    "docs/architecture/capacity-production.md": "16a42ec502ab8979c9fc0419b25411801ae8bb646d17d615dfb574ad2eed73ac"
+  },
+  "allThreeSourceHashesMatchCurrentMain": true,
+  "checks": {
+    "redActualExit": 1,
+    "greenFocusedActualExit": 0,
+    "greenRaceActualExit": 0,
+    "sourceCountPerRun": 2610,
+    "sourceUnchangedEachRun": true
+  },
+  "scope": "Read-back/copy only; synthetic local TLS qualification preserved. No tests, builds, external fixtures, installed result, source edits or documentation edits in this archival task."
+}

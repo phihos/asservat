@@ -1,0 +1,42 @@
+--- FAIL: TestContextSubmissionConsumesMetadataBeforeIndependentStart (0.00s)
+    --- FAIL: TestContextSubmissionConsumesMetadataBeforeIndependentStart/request/intent (0.00s)
+        context_submission_phase_test.go:113: consumed response metadata blocked independent start: err=context admission no longer authorized starts=0 intent=1
+    --- FAIL: TestContextSubmissionConsumesMetadataBeforeIndependentStart/request/start (0.00s)
+        context_submission_phase_test.go:101: response metadata shortened start context: got 2026-10-23 00:03:03.786223 +0000 UTC, caller 2026-10-23 00:03:08.686223 +0000 UTC
+        context_submission_phase_test.go:113: consumed response metadata blocked independent start: err=context admission no longer authorized starts=1 intent=1
+    --- FAIL: TestContextSubmissionConsumesMetadataBeforeIndependentStart/continue/intent (0.00s)
+        context_submission_phase_test.go:113: consumed response metadata blocked independent start: err=context admission no longer authorized starts=0 intent=1
+    --- FAIL: TestContextSubmissionConsumesMetadataBeforeIndependentStart/continue/start (0.00s)
+        context_submission_phase_test.go:101: response metadata shortened start context: got 2026-10-23 00:03:03.787046 +0000 UTC, caller 2026-10-23 00:03:08.687046 +0000 UTC
+        context_submission_phase_test.go:113: consumed response metadata blocked independent start: err=context admission no longer authorized starts=1 intent=1
+--- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation (0.01s)
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/missing (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/read-error (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/capture (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/scope (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/submission (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/pin (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/registration (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/created (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/deadline (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/expired-metadata (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/identity-after-read (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/recovery-after-read (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+    --- FAIL: TestContextSubmissionMetadataRefreshCannotReplaceAcceptedOperation/cancel-after-read (0.00s)
+        context_submission_phase_test.go:174: failed final observation changed known admission or repeated effects: err=context admission no longer authorized starts=1 intent=1 reads=0
+FAIL
+FAIL	asservat.local/asservat/internal/application/capture	0.012s
+ok  	asservat.local/asservat/internal/application/audit	0.002s
+FAIL

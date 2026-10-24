@@ -1,0 +1,20 @@
+=== RUN   TestDownloadPolicyObservationRetainsOriginalInterval
+    download_policy_observation_test.go:57: observation was reread or its original interval changed: reads=2 first=2026-10-20 20:55:09.107902 +0000 UTC/2026-10-20 20:55:14.107902 +0000 UTC last=2026-10-20 20:56:08.107902 +0000 UTC/2026-10-20 20:56:13.107902 +0000 UTC err=<nil>
+--- FAIL: TestDownloadPolicyObservationRetainsOriginalInterval (0.00s)
+=== RUN   TestDownloadPolicyObservationSharesConcurrentRead
+    download_policy_observation_test.go:95: concurrent callers performed 8 live policy reads, want1
+--- FAIL: TestDownloadPolicyObservationSharesConcurrentRead (0.00s)
+=== RUN   TestDownloadPolicyObservationWaiterCancellation
+    download_policy_observation_test.go:128: waiter started additional read: 2
+--- FAIL: TestDownloadPolicyObservationWaiterCancellation (0.00s)
+=== RUN   TestDownloadPolicyObservationOwnsReturnedSlices
+    download_policy_observation_test.go:147: returned data aliases retained/source policy <nil>
+--- FAIL: TestDownloadPolicyObservationOwnsReturnedSlices (0.00s)
+=== RUN   TestDownloadPolicyObservationRejectsClockRollback
+    download_policy_observation_test.go:171: clock rollback accepted
+--- FAIL: TestDownloadPolicyObservationRejectsClockRollback (0.00s)
+=== RUN   TestDownloadPolicyObservationFailureHasNoFallback
+--- PASS: TestDownloadPolicyObservationFailureHasNoFallback (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/authorization	0.002s
+FAIL

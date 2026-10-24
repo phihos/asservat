@@ -183,6 +183,8 @@ GRANT UPDATE(id) ON permission_stream,artifact_download TO download_worker_runti
 GRANT UPDATE(root_id) ON retention_source TO download_worker_runtime;
 GRANT INSERT(id,session_id,root_id,installation_id,allocation_id,principal_key,generation,intent_json,run_until) ON download_worker TO download_worker_runtime;
 GRANT UPDATE(claimed_at,job_json,binding_json,termination_json,retired_proof_json) ON download_worker TO download_worker_runtime;
+-- The shared acquisition capacity count matches workload identity through either purpose parent.
+GRANT SELECT ON download_allocation,context_query_allocation TO download_worker_runtime;
 GRANT UPDATE(audit_receipt_json) ON download_worker TO download_worker_audit_runtime;
 
 CREATE ROLE worker_configuration_runtime LOGIN PASSWORD 'synthetic-worker-configuration';
@@ -626,7 +628,7 @@ GRANT UPDATE(root_id) ON retention_source,context_query_backing TO context_query
 GRANT UPDATE(operation_id) ON operation_audit_lifecycle TO context_query_runtime;
 GRANT INSERT ON context_query_principal,context_query,context_query_call,context_query_batch TO context_query_runtime;
 GRANT UPDATE(claim_id,closed) ON context_query_batch TO context_query_runtime;
-GRANT EXECUTE ON FUNCTION lock_context_query_capacity(uuid,uuid),context_query_capacity_allocation_current(uuid,uuid) TO context_query_runtime;
+GRANT EXECUTE ON FUNCTION lock_context_query_capacity(uuid,uuid),context_query_capacity_allocation_current(uuid,uuid),context_query_shared_profile_current(uuid,jsonb) TO context_query_runtime;
 CREATE ROLE context_query_key_fixture LOGIN NOINHERIT PASSWORD 'synthetic-context-query-key';
 GRANT CONNECT ON DATABASE custody_test TO context_query_key_fixture;
 GRANT USAGE ON SCHEMA public TO context_query_key_fixture;

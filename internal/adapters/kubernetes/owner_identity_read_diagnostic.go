@@ -1,6 +1,9 @@
 package kubernetes
 
-import "errors"
+import (
+	"context"
+	"errors"
+)
 
 // OwnerIdentityReadCheck is a closed diagnostic vocabulary, not an authority.
 type OwnerIdentityReadCheck uint8
@@ -16,11 +19,6 @@ const (
 	ownerReadProjections
 	ownerReadInitialDeployment
 	ownerReadInitialPod
-	ownerReadFinalTokenReview
-	ownerReadFinalPod
-	ownerReadFinalDeployment
-	ownerReadFinalJournal
-	ownerReadFinalGuard
 	ownerReadFinalDeadline
 	ownerReadJournalRead
 	ownerReadJournalMetadata
@@ -49,6 +47,17 @@ const (
 	ownerReadDeploymentTemplate
 	ownerReadAccountRead
 	ownerReadAccountContent
+	ownerReadLiveDigest
+	ownerReadLiveNamespaceRead
+	ownerReadLiveNamespaceContent
+	ownerReadLiveAccountRead
+	ownerReadLiveAccountContent
+	ownerReadLiveDeploymentRead
+	ownerReadLiveDeploymentContent
+	ownerReadLivePodRead
+	ownerReadLivePodContent
+	ownerReadLiveReplicaRead
+	ownerReadLiveReplicaContent
 )
 
 func (v OwnerIdentityReadCheck) String() string {
@@ -73,16 +82,6 @@ func (v OwnerIdentityReadCheck) String() string {
 		return "initial-deployment"
 	case ownerReadInitialPod:
 		return "initial-pod"
-	case ownerReadFinalTokenReview:
-		return "final-token-review"
-	case ownerReadFinalPod:
-		return "final-pod"
-	case ownerReadFinalDeployment:
-		return "final-deployment"
-	case ownerReadFinalJournal:
-		return "final-journal"
-	case ownerReadFinalGuard:
-		return "final-guard"
 	case ownerReadFinalDeadline:
 		return "final-deadline"
 	case ownerReadJournalRead:
@@ -139,6 +138,28 @@ func (v OwnerIdentityReadCheck) String() string {
 		return "account-read"
 	case ownerReadAccountContent:
 		return "account-content"
+	case ownerReadLiveDigest:
+		return "live-digest"
+	case ownerReadLiveNamespaceRead:
+		return "live-namespace-read"
+	case ownerReadLiveNamespaceContent:
+		return "live-namespace-content"
+	case ownerReadLiveAccountRead:
+		return "live-account-read"
+	case ownerReadLiveAccountContent:
+		return "live-account-content"
+	case ownerReadLiveDeploymentRead:
+		return "live-deployment-read"
+	case ownerReadLiveDeploymentContent:
+		return "live-deployment-content"
+	case ownerReadLivePodRead:
+		return "live-pod-read"
+	case ownerReadLivePodContent:
+		return "live-pod-content"
+	case ownerReadLiveReplicaRead:
+		return "live-replica-read"
+	case ownerReadLiveReplicaContent:
+		return "live-replica-content"
 	default:
 		return "unspecified"
 	}
@@ -178,6 +199,12 @@ func (e *OwnerIdentityReadFailure) FixedStep() string {
 	var nested interface{ FixedStep() string }
 	if errors.As(e.cause, &nested) {
 		return e.Check().String() + "/" + nested.FixedStep()
+	}
+	if errors.Is(e.cause, context.DeadlineExceeded) {
+		return e.Check().String() + "/deadline"
+	}
+	if errors.Is(e.cause, context.Canceled) {
+		return e.Check().String() + "/cancelled"
 	}
 	return e.Check().String()
 }

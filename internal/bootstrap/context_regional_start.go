@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"context"
 	"errors"
 
@@ -30,6 +31,9 @@ type RegionalAPIContextStart struct {
 	Signer fleetapp.APIContextWorkSigner
 	Router *contextstart.Router
 	Now    func() time.Time
+	// Report receives a failed run's fixed step and error class; diagnostics
+	// only, nil leaves it silent.
+	Report func(string)
 }
 
 var _ captureapp.ContextAcceptedStart = RegionalAPIContextStart{}
@@ -48,23 +52,33 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 			cancels[i]()
 		}
 	}()
-	narrow := func(d time.Time) {
+	// The initial context may already be shorter than this start's five seconds.
+	// Later names identify only an input that actually shortens that bound.
+	bound := regionalStartInitialBound(ctx, started)
+	narrow := func(name string, d time.Time) {
+		if d.Before(until) {
+			bound = name
+		}
 		until = identity.Earlier(until, d)
 		var stop context.CancelFunc
 		call, stop = context.WithDeadline(call, until)
 		cancels = append(cancels, stop)
 	}
+	// Fixed step durations for the operation's timing line; diagnostics only.
+	var mark time.Time
 	caller, e := current.ResolveIdentity(call)
 	if e != nil || !caller.Valid(s.Now()) {
 		return execution.ErrDenied
 	}
-	narrow(caller.ValidUntil)
+	narrow("identity", caller.ValidUntil)
 	recovery, e := s.Runner.Recovery.RecoveryState(call)
 	if e != nil || !recovery.Valid(s.Now()) {
 		return execution.ErrUnavailable
 	}
-	narrow(recovery.FreshUntil)
+	narrow("recovery", recovery.FreshUntil)
+	mark = time.Now()
 	accepted, e := s.Runner.Read.ReadAPIContextWork(call, id, caller, recovery)
+	auditapp.MarkStep(ctx, "st-read", mark)
 	if e != nil {
 		return e
 	}
@@ -72,26 +86,32 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if accepted.Actor != caller.Principal || a.CaptureID != id || a.State != capturevalue.IntentAudited || accepted.Target.ClusterID != a.Expectation.Registration.Location.ClusterID {
 		return execution.ErrDenied
 	}
-	narrow(a.Deadline)
-	narrow(a.Expectation.Registration.WriteUntil)
+	narrow("deadline", a.Deadline)
+	narrow("write-until", a.Expectation.Registration.WriteUntil)
 	target := authorization.Target{ClusterID: accepted.Target.ClusterID, NamespaceUID: accepted.Target.Namespace.UID, WorkloadUID: accepted.Target.Workload.UID, PodUID: accepted.Target.PodUID}
+	mark = time.Now()
 	capability, e := s.Runner.Capabilities.ContextCapability(call, target)
+	auditapp.MarkStep(ctx, "st-capability", mark)
 	if e != nil || !capability.Valid(s.Now()) {
 		return execution.ErrUnavailable
 	}
-	narrow(capability.FreshUntil)
+	narrow("capability", capability.FreshUntil)
 	// Reservation happens before signing/attachment. A closing old exchange stays
 	// charged until its original socket and human owner have actually joined.
+	mark = time.Now()
 	attachment, e := s.Router.Attach(call, target.ClusterID, id)
+	auditapp.MarkStep(ctx, "st-attach", mark)
 	if e != nil {
 		return execution.ErrUnavailable
 	}
 	defer attachment.Close()
+	mark = time.Now()
 	receiver, e := attachment.Receiver(call)
+	auditapp.MarkStep(ctx, "st-receiver", mark)
 	if e != nil {
 		return execution.ErrUnavailable
 	}
-	narrow(receiver.ValidUntil)
+	narrow("receiver", receiver.ValidUntil)
 	if receiver.Channel.Connector.Binding.InstallationID != recovery.InstallationID || receiver.Channel.Connector.Binding.IssuerEpoch != recovery.IssuerEpoch {
 		return execution.ErrDenied
 	}
@@ -99,7 +119,9 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if e != nil {
 		return e
 	}
+	mark = time.Now()
 	signed, e := s.Signer.SignAPIContextWork(call, work)
+	auditapp.MarkStep(ctx, "st-sign", mark)
 	if e != nil {
 		return e
 	}
@@ -109,10 +131,19 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if call.Err() != nil || !s.Now().Before(until) {
 		return execution.ErrUnavailable
 	}
+	mark = time.Now()
 	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
 		r := s.Runner
 		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
-		result, err := r.Execute(ctx, current, id)
+		result, err := r.ExecuteObserved(ctx, current, caller, accepted, capability, recovery)
+		if err != nil && s.Report != nil {
+			step := "execute"
+			var fixed interface{ FixedStep() string }
+			if errors.As(err, &fixed) {
+				step += "/" + fixed.FixedStep()
+			}
+			s.Report(step + " (" + regionalOutcome(err) + ") left" + fleetapp.RemainingBucket(ctx, s.Now()) + " start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
+		}
 		switch {
 		case err == nil && (result.State == "StoredPendingVerification" || result.State == "AlreadyStarted"):
 			return result.State, nil
@@ -121,7 +152,11 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		}
 		return "Unavailable", err
 	})
+	auditapp.MarkStep(ctx, "st-run", mark)
 	if e != nil && state == "" {
+		if s.Report != nil {
+			s.Report("dispatch (" + regionalOutcome(e) + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
+		}
 		return execution.ErrUnavailable
 	}
 	switch state {
@@ -132,6 +167,14 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	default:
 		return execution.ErrUnavailable
 	}
+}
+
+// Diagnostic only: a retained caller deadline is not a fresh start interval.
+func regionalStartInitialBound(ctx context.Context, started time.Time) string {
+	if deadline, ok := ctx.Deadline(); ok && deadline.Before(started.Add(5*time.Second)) {
+		return "parent"
+	}
+	return "start"
 }
 
 // ServeRegionalAPIContextExchange owns one outbound exchange until all regional
@@ -152,8 +195,23 @@ func ServeRegionalAPIContextExchange(exchange *mtls.ContextStartExchange, verifi
 		return e
 	}
 	defer stream.Close()
-	return contextstart.ServeRegionalOperations(exchange.Context(), stream, receiver, verifier, local, local.Now)
+	ctx, diagnostics := contextstart.NewStreamDiagnosticContext(exchange.Context())
+	if e = contextstart.ServeRegionalOperations(ctx, stream, receiver, verifier, local, local.Now); e != nil {
+		if v := diagnostics.Interruption(); v.Present() {
+			return exchangeStepError{e, v.Stage() + "/" + v.Reason()}
+		}
+	}
+	return e
 }
+
+// exchangeStepError carries only the stream's fixed stage/reason codes.
+type exchangeStepError struct {
+	error
+	step string
+}
+
+func (e exchangeStepError) Unwrap() error        { return e.error }
+func (e exchangeStepError) ExchangeStep() string { return e.step }
 
 // RegionalContextStartConnections supervises only outbound standby exchanges.
 // Each new conversation starts empty under fresh route/peer checks. It cannot
@@ -164,6 +222,11 @@ type RegionalContextStartConnections struct {
 	Client     *mtls.ContextStartClient
 	Verifier   fleetapp.APIContextWorkVerifier
 	Local      contextstart.RegionalLocal
+	// Report receives closed diagnostic labels only and must not block.
+	Report func(string)
+	// ReportOpening keeps numeric timing outside the finite event-count key.
+	// It observes a joined refusal, never changes the opening's authority.
+	ReportOpening func(string, time.Duration, time.Duration, string)
 }
 
 func (s RegionalContextStartConnections) Run(ctx context.Context) error {
@@ -174,13 +237,17 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 	type connection struct{ cancel context.CancelFunc }
 	active := make(map[fleetvalue.OwnerBinding]connection)
 	next := make(map[fleetvalue.OwnerBinding]time.Time)
-	ended := make(chan fleetvalue.OwnerBinding, 16)
+	type end struct {
+		owner fleetvalue.OwnerBinding
+		retry time.Duration
+	}
+	ended := make(chan end, 16)
 	defer func() {
 		for _, c := range active {
 			c.cancel()
 		}
 		for len(active) > 0 {
-			delete(active, <-ended)
+			delete(active, (<-ended).owner)
 		}
 	}()
 	ticker := time.NewTicker(time.Second)
@@ -188,7 +255,11 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 	poll := func() {
 		observed, e := s.Candidates.ReadContextStartOwners(ctx)
 		if e != nil || !observed.Valid(s.Local.Now()) || ctx.Err() != nil {
+			s.reportFailure("candidates", e)
 			return
+		}
+		if len(observed.Owners) == 0 {
+			s.reportFailure("candidates-empty", nil)
 		}
 		contains := func(b fleetvalue.OwnerBinding) bool {
 			for _, candidate := range observed.Owners {
@@ -217,10 +288,16 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 			owner := owner
 			go func() {
 				defer cancel()
-				defer func() { ended <- owner }()
+				retry := time.Second
+				defer func() { ended <- end{owner, retry} }()
 				exchange, e := s.Client.OpenDiscovered(call, owner, observed)
+				retry = openingRetry(e)
 				if e == nil {
-					_ = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local)
+					if e = ServeRegionalAPIContextExchange(exchange, s.Verifier, s.Local); e != nil {
+						s.reportFailure("exchange", e)
+					}
+				} else {
+					s.reportFailure("open", e)
 				}
 			}()
 		}
@@ -230,12 +307,25 @@ func (s RegionalContextStartConnections) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case owner := <-ended:
-			delete(active, owner)
-			next[owner] = s.Local.Now().Add(time.Second)
+		case e := <-ended:
+			delete(active, e.owner)
+			next[e.owner] = s.Local.Now().Add(e.retry)
 		case <-ticker.C:
 			poll()
 		}
 	}
 	return ctx.Err()
+}
+
+// openingRetry is one second, or thirty after a TLS refusal: a registered
+// owner process the hub no longer serves (for example before a restart) is
+// refused at TLS each time, and its full setup proof shares the connector's
+// coalesced proof with the live owner's opening (installed native 66). The
+// owner set, every check and the next opening's bounds are unchanged.
+func openingRetry(err error) time.Duration {
+	var fixed interface{ FixedStep() string }
+	if err != nil && errors.As(err, &fixed) && fixed.FixedStep() == "tls" {
+		return 30 * time.Second
+	}
+	return time.Second
 }

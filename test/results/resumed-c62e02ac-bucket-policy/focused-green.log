@@ -1,0 +1,12 @@
+=== RUN   TestInstalledDeletionFaultPolicyKeepsOriginalScope
+--- PASS: TestInstalledDeletionFaultPolicyKeepsOriginalScope (0.00s)
+=== RUN   TestInstalledDeletionFaultRestoresUnknownMutation
+--- PASS: TestInstalledDeletionFaultRestoresUnknownMutation (0.00s)
+=== RUN   TestInstallerEvidenceBucketPolicyMatchesProviderReadback
+=== RUN   TestInstallerEvidenceBucketPolicyMatchesProviderReadback/captured-provider-policy
+=== RUN   TestInstallerEvidenceBucketPolicyMatchesProviderReadback/strict-scalar-array-distinction
+--- PASS: TestInstallerEvidenceBucketPolicyMatchesProviderReadback (0.00s)
+    --- PASS: TestInstallerEvidenceBucketPolicyMatchesProviderReadback/captured-provider-policy (0.00s)
+    --- PASS: TestInstallerEvidenceBucketPolicyMatchesProviderReadback/strict-scalar-array-distinction (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.068s

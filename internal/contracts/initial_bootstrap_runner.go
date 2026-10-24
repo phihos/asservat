@@ -12,6 +12,9 @@ type InitialBootstrapRunnerInput struct {
 	SchemaSecret     string `json:"schemaSecret"`
 	RetirementSecret string `json:"retirementSecret"`
 	RegistrySecret   string `json:"registrySecret,omitempty"`
+	// The full public continuation digest selects its immutable ConfigMap.
+	// Omission keeps the original bootstrap-only runner bytes and layout.
+	ContinuationDigest string `json:"continuationDigest,omitempty"`
 }
 
 func DecodeInitialBootstrapRunnerInput(r io.Reader) (InitialBootstrapRunnerInput, error) {

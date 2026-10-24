@@ -1,0 +1,11 @@
+{
+  "command": [
+    "make",
+    "-j1",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "architecture-check"
+  ],
+  "exit_code": 0,
+  "wall_seconds": 1.275,
+  "output": "architecture-check.log"
+}

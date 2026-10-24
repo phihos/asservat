@@ -1,0 +1,16 @@
+installed journey: the processing operator initialized processing through the console
+installed request_capture ok request c249bf89-0bf1-404a-8321-2598f01a4193
+installed journey: MCP preview, request and resolution of a regional pod-status capture as the Keycloak user
+installed journey: the regional capture was collected, verified and published
+installed approved query: one exact shared worker, 2 paid poll(s), 1 joined batch(es), three consumed key roles per batch; no native session
+installed journey: real read-only OAuth scope received approved pod-status content through shared acquisition; native-download scope was absent and preparation refused
+installed journey: the Keycloak user downloaded the native pod-status file (354 bytes) through the hub-local worker
+installed list_diagnostics attempt 1 after 4.553s request 30495a1d-3683-4f75-98f6-14b30c190ba5: acknowledged operation unavailable (retryable=true)
+installed query worker: original lifetime ended, exact Job/Pod terminated, product demand cleanup retained positive retirement before Stop
+installed Stop call 1: download 811e9d91-bd07-4aaf-b55f-4e4af17a9597 request b2cfc7bd-9220-4845-bf98-e98a47f8de66 state Cancelled audit recorded
+installed Stop call 2: download 811e9d91-bd07-4aaf-b55f-4e4af17a9597 request b2cfc7bd-9220-4845-bf98-e98a47f8de66 state Cancelled audit recorded
+installed journey: Stop after accepted Deny remained Cancelled on exact-key replay and restored access; original content route returned only a bounded problem response (no active-stream interruption tested)
+installed journey: accepted Deny accompanied refusal; removing it restored the original artifact
+installed journey: an installed cleanup lease expired under the exact inventory denial; original evidence, receipts, deadlines and storage/control charges remain, with no purge checkpoint
+installed journey: all evidence objects, versions, markers and multipart uploads are absent; acknowledged audit receipt matches its immutable ciphertext version; evidence storage refunded while control charges remain
+installed journey: after original expiry, case and new preparation refused while current workload diagnostics succeeded; independent deletion verified

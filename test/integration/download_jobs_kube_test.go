@@ -330,18 +330,6 @@ func qualifyDownloadWorkerPod(t *testing.T, nativeMode bool) {
 	if _, e = jobs.ObserveDownloadWorkerTermination(ctx, worker); e == nil {
 		t.Fatal("running worker released")
 	}
-	priority.GlobalDefault = true
-	priority, e = admin.SchedulingV1().PriorityClasses().Update(ctx, priority, meta.UpdateOptions{})
-	if e != nil {
-		t.Fatal(e)
-	}
-	if _, e = jobs.ObserveDownloadWorker(ctx, i, receipt); e == nil {
-		t.Fatal("changed priority source accepted")
-	}
-	priority.GlobalDefault = false
-	if _, e = admin.SchedulingV1().PriorityClasses().Update(ctx, priority, meta.UpdateOptions{}); e != nil {
-		t.Fatal(e)
-	}
 	restricted, e := kubernetes.NewForConfig(limited)
 	if e != nil {
 		t.Fatal(e)
@@ -371,6 +359,30 @@ func qualifyDownloadWorkerPod(t *testing.T, nativeMode bool) {
 	proof, e := source.ReadDownloadPeerProof(ctx, i.SessionID, peer)
 	if e != nil || proof.Binding != worker.Binding || proof.FreshUntil.After(i.RunUntil) {
 		t.Fatal("dispatched projected-token proof", e)
+	}
+	// A changed source does not rewrite the exact running Pod. Observing it
+	// is not credential/evidence authority; both actual proof paths still deny.
+	priority.GlobalDefault = true
+	priority, e = admin.SchedulingV1().PriorityClasses().Update(ctx, priority, meta.UpdateOptions{})
+	if e != nil {
+		t.Fatal(e)
+	}
+	if observed, err := jobs.ObserveDownloadWorker(ctx, i, receipt); err != nil || observed != worker {
+		t.Fatal("exact existing worker observation", err)
+	}
+	if _, err := source.ReadDownloadPeerProof(ctx, i.SessionID, peer); err == nil {
+		t.Fatal("changed priority source granted key proof")
+	}
+	enrollmentProofs, err := kube.NewWorkerEnrollmentAttester(proofClient, fixtureWorkerIdentity{worker, configuration}, tokens)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = enrollmentProofs.ReadWorkerEnrollmentProof(ctx, i.SessionID, i.ID, artifact.Digest{1}); err == nil {
+		t.Fatal("changed priority source granted enrollment proof")
+	}
+	priority.GlobalDefault = false
+	if _, e = admin.SchedulingV1().PriorityClasses().Update(ctx, priority, meta.UpdateOptions{}); e != nil {
+		t.Fatal(e)
 	}
 	if e = exec.CommandContext(ctx, "kubectl", "--kubeconfig", f.Clusters[0].Config, "--request-timeout=5s", "exec", "-n", ns.Name, worker.Binding.Pod, "--", "/fixture", "fixture-stop").Run(); e != nil {
 		t.Fatal("synthetic worker stop", e)

@@ -26,7 +26,7 @@ import (
 // original receipts and token identity remain explicitly synthetic; no SQL or
 // external storage authority is inferred from this component regression.
 func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
-	for _, mode := range []string{"valid", "rotated-current", "stale-mount", "replaced-secret", "wrong-secret-kind", "wrong-secret-version", "extra-key", "placeholder", "missing-receipt", "guard-lost", "allowing-probe", "wrong-token-pod", "token-revoked", "late-secret", "cancelled"} {
+	for _, mode := range []string{"valid", "rotated-current", "stale-mount", "replaced-secret", "wrong-secret-kind", "wrong-secret-version", "extra-key", "placeholder", "missing-receipt", "allowing-probe", "wrong-token-pod", "late-secret", "cancelled", "sdk-budget"} {
 		t.Run(mode, func(t *testing.T) {
 			x := providerOwnerObjectFixture(t)
 			in := x.reader.input
@@ -118,17 +118,13 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 					}
 					storageReads.Add(1)
 					if mode == "late-secret" {
-						offset.Store(int64(6 * time.Second))
+						offset.Store(int64(OwnerProtectionReuse + time.Second))
 					}
 					permissionReply(w, currentSecret.Load())
 				case "/api/v1/namespaces/" + in.Namespace.Name:
 					permissionReply(w, ns)
 				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/" + g.Name:
-					if mode == "guard-lost" && storageReads.Load() > 0 {
-						http.NotFound(w, r)
-					} else {
-						permissionReply(w, policy)
-					}
+					permissionReply(w, policy)
 				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicybindings/" + g.Name:
 					permissionReply(w, binding)
 				case "/apis/authentication.k8s.io/v1/selfsubjectreviews":
@@ -142,7 +138,7 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 					if r.URL.Query().Get("dryRun") != "All" {
 						t.Error("persistent guard probe attempted")
 					}
-					if mode == "allowing-probe" && storageReads.Load() > 0 {
+					if mode == "allowing-probe" {
 						permissionReply(w, x.deployment)
 						break
 					}
@@ -150,7 +146,7 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 					w.WriteHeader(403)
 					permissionReply(w, meta.Status{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "Status"}, Status: meta.StatusFailure, Reason: meta.StatusReasonForbidden, Code: 403, Details: &meta.StatusDetails{Group: "apps", Kind: "deployments", Causes: []meta.StatusCause{{Message: "ValidatingAdmissionPolicy '" + g.Name + "' with binding '" + g.Name + "' denied request: " + ownerWorkloadDenial}}}})
 				case "/apis/authentication.k8s.io/v1/tokenreviews":
-					n := reviews.Add(1)
+					reviews.Add(1)
 					var request auth.TokenReview
 					if json.NewDecoder(r.Body).Decode(&request) != nil || request.Spec.Token != string(token) || len(request.Spec.Audiences) != 1 || request.Spec.Audiences[0] != OwnerEnrollmentAudience(in.InstallationID) {
 						t.Error("wrong original token or audience")
@@ -158,9 +154,6 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 					reply := auth.TokenReview{TypeMeta: meta.TypeMeta{APIVersion: "authentication.k8s.io/v1", Kind: "TokenReview"}, Status: auth.TokenReviewStatus{Authenticated: true, Audiences: request.Spec.Audiences, User: auth.UserInfo{Username: "system:serviceaccount:" + in.Namespace.Name + ":" + a.Input.ServiceAccount.Name, UID: a.Input.ServiceAccount.UID, Extra: map[string]auth.ExtraValue{"authentication.kubernetes.io/pod-name": {pod.Name}, "authentication.kubernetes.io/pod-uid": {string(pod.UID)}}}}}
 					if mode == "wrong-token-pod" {
 						reply.Status.User.Extra["authentication.kubernetes.io/pod-uid"] = auth.ExtraValue{ownerID(3501)}
-					}
-					if mode == "token-revoked" && n == 2 {
-						reply.Status.Authenticated = false
 					}
 					permissionReply(w, reply)
 				case "/api/v1/namespaces/" + in.Namespace.Name + "/pods/" + pod.Name:
@@ -172,8 +165,11 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 				}
 				return true
 			}
-			probe := *x.reader.client
-			guard, e := NewOwnerWorkloadProtection(x.reader.client, &probe, x.plan, GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
+			probe, e := NewPermissionClient(x.apiConfig, in.ClusterID, x.reader.client.control, x.reader.client.now)
+			if e != nil {
+				t.Fatal(e)
+			}
+			guard, e := NewOwnerWorkloadProtection(x.reader.client, probe, x.plan, GuardPin{PolicyUID: g.PolicyUID, PolicyGeneration: g.PolicyGeneration, BindingUID: g.BindingUID, BindingResourceVersion: g.BindingResourceVersion})
 			if e != nil {
 				t.Fatal("fixture guard construction", e)
 			}
@@ -199,6 +195,10 @@ func TestProviderOwnerAuditReadRequiresCurrentOriginalMaterial(t *testing.T) {
 			reader, e := NewInstalledOwnerIdentityReader(x.reader.client, guard, in, a, ownerTokenFunc(func(context.Context) ([]byte, error) { return append([]byte(nil), token...), nil }), x.reader.podUID)
 			if e != nil {
 				t.Fatal(e)
+			}
+			if mode == "sdk-budget" {
+				exerciseProviderCredentialAuditBudget(t, reader, x, mounted)
+				return
 			}
 			verifyStart := time.Now()
 			ctx, end := context.WithDeadline(context.Background(), verifyStart.Add(5*time.Second))

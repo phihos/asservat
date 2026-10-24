@@ -60,7 +60,7 @@ func (s *Store) readControlAudit(ctx context.Context, key string, maximum int64)
 	// One bounded GET returns a consistent immutable version, including the body.
 	v, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: &s.bucket, Key: &key})
 	if err != nil {
-		return out, nil, ErrStorage
+		return out, nil, storageRefusal(err)
 	}
 	defer v.Body.Close()
 	size := aws.ToInt64(v.ContentLength)

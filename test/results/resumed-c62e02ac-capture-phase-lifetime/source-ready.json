@@ -1,0 +1,12 @@
+{
+  "base": "8fef8e40b49dce4147b7b8405416018425074027",
+  "worktree": "/home/phil/Projekte/asservat-capture-phase-c62e02ac",
+  "files": {
+    "internal/application/capture/context_submission.go": "d0e3fbb638d57ca9113b8fea8162f2b77324025462976b1ba47f3a09408ecb59",
+    "internal/application/capture/context_submission_phase_test.go": "0c611551553013ebb3ad621799b648e69f5f87f69da685006dc5a40b04eb5f2d",
+    "internal/application/audit/capture_operation_phase_test.go": "f7b22f9ce7a9d65a6720a24565c49b536d6a40f54924a43800cce0b66a921ac0",
+    "docs/decisions/216-request-owned-context-start-observation.md": "a6dd7738281fffd52e455e266bad00a26b1f78ed9f16a44057160bc708b66167",
+    "docs/architecture/context-capability.md": "08568023609f28295ee4635ee126409b81eee81b386a7d3b009c5e646d875ebd",
+    "specs/execution.md": "2df9c9f11e0b7b4ea391e01cc7cc1f698f348069427b2028c13229a19649230f"
+  }
+}

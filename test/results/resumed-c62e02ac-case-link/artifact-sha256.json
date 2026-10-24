@@ -1,0 +1,15 @@
+{
+  "01-red-regression.patch": "417ecce995c878193463a778d1f2eb94ecb3a18178998306beaa5fba283278fb",
+  "02-green-correction.patch": "18bcc6a0deda19ec71c5b77ee60c3756a70a9c23c10e0356d4e806b4796d8363",
+  "README.md": "d516571df368bbbf57378157a585b79ad953b253819e4b4ac8948ab72ddf3f10",
+  "final.patch": "70c747bdd43f53dd11b1adcf3ad81730938a7636b32b51a7a03f939e510c50bb",
+  "green-race-command-result.json": "96bf5abee138a27ea7cc4157750a6243f05b2b8d0e0fc1ffa4e6d50107e1aa44",
+  "green-race.log": "5c0dfca008d87552aee6cf062c21dacf6c7229891598dc9ee9c7fb91ac4d8eb1",
+  "green-source-sha256.json": "2616cbe0fc1d1727b4971febd7a68226375499ca6f8468778668d0a00b27b3e4",
+  "independent-review.md": "8c2f2585fed53b69bad849db11b228f9ad95dbcab1d80fd2dd4001c622229b0d",
+  "installed_journey_native_test.go.red.txt": "3820f8840febe050fba61ab73a583c593b50803ebc9267cb995ada8bb9682d76",
+  "installed_journey_unit_test.go.red.txt": "7ef0a7e44d4bb7ae3281d029983ad17702f1d6047d432736da263e35353a7543",
+  "red-command-result.json": "aa994e754c7984382247504594aade768b43a0aee73f5a18d4a22b26053c104f",
+  "red-source-sha256.json": "b9c1bbcc8639547553b4241e09bc01e99463ae1531d3e6ece97ad4c80afb861a",
+  "red.log": "e33c091b56029d7ac7557eff40a80dad1c723762e059298031672e02d252bf0d"
+}

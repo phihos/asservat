@@ -37,7 +37,7 @@ func TestCapacityRolePlansKeepClosedRPCsAndPurposeFixedPeerReads(t *testing.T) {
 				t.Fatal("unrecognized privilege", g.key())
 			}
 		}
-		want := 17 // ADR-200 added read_capacity_refresh_demands
+		want := 19 // ADR-219 shares root/allocation publication with query backing.
 		if purpose == "capacity-capture" {
 			want = 5
 		}

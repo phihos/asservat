@@ -39,6 +39,13 @@ func NewWorkerCertificateIssuer(endpoint, token, mount, role, installation, epoc
 	return &WorkerCertificateIssuer{c, mount + "/sign/" + role, installation, epoch, v, now}, nil
 }
 func (s *WorkerCertificateIssuer) SignWorkerCertificate(ctx context.Context, a value.WorkerCertificateAttempt, csr []byte) (value.WorkerCertificate, error) {
+	if s == nil || s.now == nil || !a.Valid(s.now()) {
+		return value.WorkerCertificate{}, artifact.ErrInvalid
+	}
+	return s.SignAcquisitionCertificate(ctx, a.Acquisition(), csr)
+}
+
+func (s *WorkerCertificateIssuer) SignAcquisitionCertificate(ctx context.Context, a value.AcquisitionCertificateAttempt, csr []byte) (value.WorkerCertificate, error) {
 	var out value.WorkerCertificate
 	if s == nil || ctx == nil || s.client == nil || s.now == nil || !a.Valid(s.now()) || a.Enrollment.Worker.Binding.InstallationID != s.installation || a.RecoveryEpoch != s.epoch {
 		return out, artifact.ErrInvalid
@@ -47,7 +54,7 @@ func (s *WorkerCertificateIssuer) SignWorkerCertificate(ctx context.Context, a v
 	if e != nil || key != a.Enrollment.PublicKeyDigest {
 		return out, artifact.ErrInvalid
 	}
-	uri, e := mtls.WorkerCertificateURI(a)
+	uri, e := mtls.AcquisitionCertificateURI(a)
 	if e != nil {
 		return out, e
 	}
@@ -101,5 +108,5 @@ func (s *WorkerCertificateIssuer) SignWorkerCertificate(ctx context.Context, a v
 	if ctx.Err() != nil || !a.Valid(s.now()) {
 		return out, artifact.ErrDownloadExpired
 	}
-	return s.verify.CheckWorkerCertificate(a, csr, der, chain)
+	return s.verify.CheckAcquisitionCertificate(a, csr, der, chain)
 }

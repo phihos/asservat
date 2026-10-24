@@ -1,0 +1,7 @@
+BEGIN
+SET
+ capture_id | attempt_id | object_uid | phase | created_at | not_before | not_after | preparation_remaining_seconds 
+------------+------------+------------+-------+------------+------------+-----------+-------------------------------
+(0 rows)
+
+COMMIT

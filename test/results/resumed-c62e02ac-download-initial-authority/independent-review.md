@@ -1,0 +1,13 @@
+# Independent review of the initial download authority handoff
+
+No blocking findings in the frozen four-file patch. All four live source files exactly match the final `.green.txt` snapshots in `test/results/resumed-c62e02ac-download-initial-authority`.
+
+The compatibility constructor remains eager. The new observation helper returns the exact initial `Check` result rather than caching it. The immediate first attachment consumes a copied authority value, narrows it against the original request/source bound, checks cancellation/current validity/owner clock rollback/exact scope/path/profile, and retains the existing SQL read and post-read freshness checks.
+
+All three callers were traced: continuation has only synchronous source validation/narrowing after construction; prepared metadata only constructs local cleanup closures; response chunk reading only constructs its end closure. None crosses blocking I/O or an effect before this first handoff. The dispatcher still checks current identity and authority after attachment SQL. Prepared metadata still repeats attachment/current authority after cache or remote observation. Response native work retains its independent current callbacks. No new I/O, retries, authority freshness, provider error text, deadline or capacity is introduced.
+
+The RED raw log demonstrates two evaluations before first attachment and three before first reservation; the deterministic 1.7-second-per-check case expires before reservation. Final focused race passed (1.047 s), as did full evidence package race (3.896 s). The archived intermediate failed clock-rollback fixture setup is clearly distinguished. The reported 2,582 source hashes stayed unchanged during the full race command. I reused those actual checks; no duplicate tests or external fixtures were run for this review.
+
+The negative regressions cover all original caller/identity/authority/session/source cutoffs, unchanged producer values, invalid source/scope/path/profile, source expiry during initial authority, local cancellation/clock rollback, and revocation/identity change/expiry/cancellation during attachment SQL before reservation, including joined blocked reads.
+
+This validates the narrow adjacent-duplicate correction only. The complete first-dispatch phase still performs many full authority evaluations after worker reservation. Neither this review nor the separate TLS request-count measurement proves native50 causality or sufficient capacity to finish the original installed five-second phase. Further design must preserve all post-I/O identity/permission/recovery and current-policy semantics; native51 is not justified by this patch alone.

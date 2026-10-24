@@ -26,9 +26,27 @@ Use an action-specific watchdog and safe detach/stop procedure for live diagnost
 
 The [assessment panel](capture-assessment.md) explains expected effects, limits and uncertainty before admission. Forecasts do not reserve capacity or weaken a ceiling. Aggregate only compatible scoped quantities, distinguish declared buffers from total memory and show shared pressure without revealing other teams' plans. Current local admission and circuit breakers remain authoritative when a preview becomes stale.
 
+For the bounded context profile, a readiness hint cannot replace the final
+authoritative storage check. One owned readiness operation may wait for an
+independently refreshed binding with the same selected storage and at least
+one second remaining, using at most one refresh demand and 250 ms polling.
+All original caller, identity/recovery, preview, target, eligibility,
+capability, retention/proof and reason deadlines remain binding. Do not
+refresh those facts, change selection, extend observation timestamps or
+retry admission. Invalid observations, read errors, cancellation and expired
+retained facts refuse the operation before any new admission effect.
+
 ### SC-CAP-002
 
 Given no available storage/scratch reservation, when a live dump is requested, then no ptrace stop, application heap request or custom dump command begins. A natural core without a ready local permit is rejected promptly. A lost acknowledgment cannot authorize a second start or release an uncertain reservation.
+
+Given a context readiness hint for binding A whose remaining margin is
+consumed by the ordered target/facts reads, when independently refreshed B
+for the same selection becomes available within all original authority
+deadlines, then the one owned wait may consume B with its unchanged timestamps
+and admit once. If a retained fact expires or B changes the selected storage,
+then no admission occurs; retained non-storage facts are not refreshed and
+target resolution, the demand attempt and effects are not retried.
 
 ## REQ-CAP-003 — Fair scheduling and workload health
 

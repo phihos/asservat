@@ -1,0 +1,43 @@
+{
+  "scope": "Known accepted capture recovery uses fresh same-capture progress instead of repeating admission resolution. Finalizing hands off to unchanged terminal, publication, native-byte, revocation and deletion gates.",
+  "baselineCommit": "d6dabdabbe72a04606de7bd301a307c119aef615",
+  "redEvidence": "The original loop was unchanged. A DTO and ignored optional callback parameter allowed the new current-progress regression to compile; it failed by requesting resolution 3 after 2 continuations without any progress read. Exact RED source bytes and hashes are preserved. Archived source files carry a .txt suffix to keep historical fixtures out of Go package discovery; their bytes are unchanged.",
+  "results": {
+    "red": {
+      "exit": 1,
+      "command": "TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 GOFLAGS=\"-buildvcs=false -p=1\" go test ./test/integration -run ^TestInstalledJourneyKnownCaptureUsesCurrentProgressWithinResolutionBudget$ -count=1 -timeout=60s",
+      "output": "--- FAIL: TestInstalledJourneyKnownCaptureUsesCurrentProgressWithinResolutionBudget (0.00s)\n    installed_journey_unit_test.go:218: known accepted capture spent resolution budget instead of observing current progress false resolution audit budget exhausted 3 2 0 [resolve pause continue resolve pause continue resolve]\nFAIL\nFAIL\tasservat.local/asservat/test/integration\t0.018s\nFAIL\n"
+    },
+    "green": {
+      "exit": 0,
+      "command": "TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 GOFLAGS=\"-buildvcs=false -p=1\" go test -race ./test/integration -run ^TestInstalledJourney(Resolves|Bounds|CaptureConfirmation|ClosedReview|SuccessfulContinuation|KnownCapture|AcceptedReceipt) -count=1 -timeout=60s",
+      "output": "ok  \tasservat.local/asservat/test/integration\t1.068s\n"
+    },
+    "full-race": {
+      "exit": 0,
+      "command": "TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 GOFLAGS=\"-buildvcs=false -p=1\" go test -race ./test/integration -count=1 -timeout=120s",
+      "output": "ok  \tasservat.local/asservat/test/integration\t6.250s\n"
+    }
+  },
+  "finalSources": {
+    "test/integration/installed_journey_native_test.go": "6e1d25d128bb1aa88e23b341a4137364f462ec982009b6259ce9802308b9aac1",
+    "test/integration/installed_journey_unit_test.go": "db8e460e9076da49ec4c87bad2dc632cf30c0667f1c0759c03fee477a3930713"
+  },
+  "diffCheckExit": 0,
+  "limitations": [
+    "No external fixture ran. Native49 qualification remains pending.",
+    "The existing four-continuation ceiling, two-second pauses, original capture/request deadlines and capacity budgets are unchanged.",
+    "Pending is not proof of an unused execution attempt; the existing server preparation fence still governs explicit continuation.",
+    "Stored or Finalizing is not publication success."
+  ],
+  "redSourceArchive": {
+    "red-sources/installed_journey_native_test.go.txt": {
+      "originalPath": "test/integration/installed_journey_native_test.go",
+      "sha256": "734fc4342a75ff8329ee0d00b32fa5480a4fe1b769522d031fdd691f7941947e"
+    },
+    "red-sources/installed_journey_unit_test.go.txt": {
+      "originalPath": "test/integration/installed_journey_unit_test.go",
+      "sha256": "7b5cc63feddfdff3bab0f565747b2c2190906bec23b17a978189346dd9528a63"
+    }
+  }
+}

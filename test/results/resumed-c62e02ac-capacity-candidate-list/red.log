@@ -1,0 +1,40 @@
+--- FAIL: TestClusterObservationMetadataPurposesPreserveOriginalBounds (0.18s)
+    --- FAIL: TestClusterObservationMetadataPurposesPreserveOriginalBounds/capacity-workload-candidates/request-bound (0.02s)
+        cluster_observation_metadata_test.go:219: candidate page requires only its original LIST: calls=3 namespace GETs=2 lists=1
+    --- FAIL: TestClusterObservationMetadataPurposesPreserveOriginalBounds/capacity-workload-candidates/caller-bound (0.02s)
+        cluster_observation_metadata_test.go:219: candidate page requires only its original LIST: calls=3 namespace GETs=2 lists=1
+--- FAIL: TestClusterObservationMetadataRejectsChangedOrUnavailablePage (0.08s)
+    --- FAIL: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/expired-list (0.02s)
+        cluster_observation_metadata_test.go:291: candidate result caused additional reads: calls=2 namespace GETs=1 lists=1
+    --- FAIL: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/unavailable (0.02s)
+        cluster_observation_metadata_test.go:291: candidate result caused additional reads: calls=2 namespace GETs=1 lists=1
+    --- FAIL: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/duplicate (0.02s)
+        cluster_observation_metadata_test.go:291: candidate result caused additional reads: calls=2 namespace GETs=1 lists=1
+    --- FAIL: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/overflow (0.02s)
+        cluster_observation_metadata_test.go:291: candidate result caused additional reads: calls=2 namespace GETs=1 lists=1
+    --- FAIL: TestClusterObservationMetadataRejectsChangedOrUnavailablePage/empty (0.02s)
+        cluster_observation_metadata_test.go:285: acknowledged empty page became unavailable or missing
+--- FAIL: TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks (0.16s)
+    --- FAIL: TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks/capacity-workload/namespace-unavailable (0.02s)
+        cluster_observation_metadata_test.go:311: non-authorizing candidate LIST depended on namespace GET: permission configuration unavailable
+    --- FAIL: TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks/capacity-workload/replaced-before (0.02s)
+        cluster_observation_metadata_test.go:311: non-authorizing candidate LIST depended on namespace GET: permission source identity changed
+    --- FAIL: TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks/capacity-workload/replaced-after (0.02s)
+        cluster_observation_metadata_test.go:311: non-authorizing candidate LIST depended on namespace GET: permission source identity changed
+    --- FAIL: TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks/capacity-workload/deleted-after (0.02s)
+        cluster_observation_metadata_test.go:311: non-authorizing candidate LIST depended on namespace GET: permission source identity changed
+    --- FAIL: TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks/capacity-workload/expired-first (0.02s)
+        cluster_observation_metadata_test.go:311: non-authorizing candidate LIST depended on namespace GET: permission configuration unavailable
+    --- FAIL: TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks/capacity-guarded-workload/namespace-unavailable (0.01s)
+        cluster_observation_metadata_test.go:311: non-authorizing candidate LIST depended on namespace GET: permission configuration unavailable
+    --- FAIL: TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks/capacity-guarded-workload/replaced-before (0.02s)
+        cluster_observation_metadata_test.go:311: non-authorizing candidate LIST depended on namespace GET: permission source identity changed
+    --- FAIL: TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks/capacity-guarded-workload/replaced-after (0.02s)
+        cluster_observation_metadata_test.go:311: non-authorizing candidate LIST depended on namespace GET: permission source identity changed
+    --- FAIL: TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks/capacity-guarded-workload/deleted-after (0.02s)
+        cluster_observation_metadata_test.go:311: non-authorizing candidate LIST depended on namespace GET: permission source identity changed
+    --- FAIL: TestClusterObservationMetadataCandidatesDoNotReplaceExactNamespaceChecks/capacity-guarded-workload/expired-first (0.02s)
+        cluster_observation_metadata_test.go:311: non-authorizing candidate LIST depended on namespace GET: permission configuration unavailable
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	0.712s
+FAIL

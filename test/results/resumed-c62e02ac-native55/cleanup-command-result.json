@@ -1,0 +1,13 @@
+{
+  "cwd": "/home/phil/Projekte/asservat-simplify-c62e02ac",
+  "argv": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--cleanup-kept",
+    "/home/phil/.cache/asservat-build/kept/context-jb2tvobx.json"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 16.205455,
+  "reviewerInspectionComplete": true,
+  "cleanupFailures": []
+}

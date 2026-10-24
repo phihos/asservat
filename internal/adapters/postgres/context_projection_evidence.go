@@ -62,11 +62,13 @@ func (s *ContextPublications) ContextProjectionEvidence(ctx context.Context, art
 		if err != nil {
 			return err
 		}
-		until := identity.Earlier(started.Time.Add(5*time.Second), retained.Effective.ExpiresAt)
-		if d, ok := call.Deadline(); ok {
+		// The evidence-read observation interval; the five-second call bound
+		// above limits only this read, not how long its result stays current.
+		until := identity.Earlier(started.Time.Add(identity.EvidenceReadRequestWindow), retained.Effective.ExpiresAt)
+		if d, ok := ctx.Deadline(); ok {
 			until = identity.Earlier(until, d)
 		}
-		if !identity.Fresh(started.Time, until, now.Time, 5*time.Second) {
+		if !identity.Fresh(started.Time, until, now.Time, identity.EvidenceReadRequestWindow) {
 			return privacy.ErrExpired
 		}
 		// The current context verifier accepts exactly this native format and

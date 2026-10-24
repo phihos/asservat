@@ -453,6 +453,17 @@ SELECT $1,root_id,decode(repeat('ef',32),'hex'),submission_digest,scope_digest,s
 // This uses a separately owned, temporary fixture database. It applies the
 // actual historical migrations, imports finite synthetic accepted records, and
 // applies37. No live/harness database is downgraded and no trigger is disabled.
+// historicalRowJSON selects a current row for insertion into a scratch schema
+// stopped before migration 00074. Before that migration a permission_stream
+// observation was current for at most five seconds, so the copied fixture
+// observation is narrowed to that historical bound (shortening only).
+func historicalRowJSON(table string) string {
+	if table == "permission_stream" {
+		return "to_jsonb(t)||jsonb_build_object('fresh_until',LEAST(t.fresh_until,t.observed_at+interval '5 seconds'))"
+	}
+	return "to_jsonb(t)"
+}
+
 func qualifyContextControlMigration(t *testing.T, ctx context.Context, admin *pgxpool.Pool, create func(*testing.T, int64, int64, int64) captureAdmissionScenario) {
 	t.Helper()
 	t.Run("control-migration-adopts-all-history-without-free-capacity", func(t *testing.T) {
@@ -530,7 +541,7 @@ func qualifyContextControlMigration(t *testing.T, ctx context.Context, admin *pg
 			{"context_capture", "id", s.a.Plan.Input.CaptureID},
 		} {
 			var body []byte
-			statement := "SELECT to_jsonb(t) FROM " + pgx.Identifier{row.table}.Sanitize() + " t WHERE " + pgx.Identifier{row.column}.Sanitize() + "=$1"
+			statement := "SELECT " + historicalRowJSON(row.table) + " FROM " + pgx.Identifier{row.table}.Sanitize() + " t WHERE " + pgx.Identifier{row.column}.Sanitize() + "=$1"
 			if err = admin.QueryRow(ctx, statement, row.key).Scan(&body); err != nil {
 				t.Fatal(err)
 			}

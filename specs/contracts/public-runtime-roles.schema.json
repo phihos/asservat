@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/public-runtime-roles.schema.json",
   "title": "Protected post-activation public SQL role input",
-  "description": "Generated protected installation input for the closed 33-purpose credential inventory. Separate hub and A-HWORK projections retain original setup/provenance; worker purposes require the original resource and positive configuration launch binding. No runtime DDL, source acceptance, recovery authority or installed enablement is conferred by this input.",
+  "description": "Generated protected installation input for the closed 81-purpose credential inventory. Separate hub and A-HWORK projections retain original setup/provenance; worker purposes require the original resource and positive configuration launch binding. No runtime DDL, source acceptance, recovery authority or installed enablement is conferred by this input.",
   "type": "object",
   "additionalProperties": false,
   "required": [

@@ -2,10 +2,12 @@ package analysis
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"sync"
 	"time"
 
+	auditapp "asservat.local/asservat/internal/application/audit"
 	identities "asservat.local/asservat/internal/application/identity"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -22,6 +24,8 @@ type ContextProjectionResults struct {
 	Reader                                  ContextProjectionReader
 	Now                                     func() time.Time
 	NewID                                   func() string
+	// Refused, when set, reports a refused query once with its closed stage.
+	Refused func(context.Context, string, error)
 }
 
 type ContextProjectionService struct {
@@ -197,18 +201,23 @@ func (d *ContextProjectionDelivery) Close(ctx context.Context) error {
 }
 
 type projectionRequest struct {
-	service    ContextProjectionResults
-	ctx        context.Context
-	cancel     context.CancelFunc
-	current    identities.CurrentIdentity
-	initial    identity.Identity
-	invocation ContextQueryInvocation
-	request    value.ContextQueryRequest
-	query      value.ContextQuery
-	mu         sync.Mutex
-	until      time.Time
-	closed     bool
-	timer      *time.Timer
+	service            ContextProjectionResults
+	ctx                context.Context
+	cancel             context.CancelFunc
+	current            identities.CurrentIdentity
+	initial            identity.Identity
+	invocation         ContextQueryInvocation
+	request            value.ContextQueryRequest
+	query              value.ContextQuery
+	mu                 sync.Mutex
+	until              time.Time
+	bound              string
+	closed             bool
+	timer              *time.Timer
+	authorityMu        sync.Mutex
+	authority          *value.ContextProjectionAuthority
+	authorityError     error
+	authorityAttempted bool
 }
 
 // Every port sees the same monotonically shortened deadline. The underlying
@@ -243,10 +252,10 @@ func sameProjectionIdentity(a, b identity.Identity, now time.Time) bool {
 
 func (s ContextProjectionResults) request(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, tool string) (*projectionRequest, error) {
 	if !s.valid() || ctx == nil || ctx.Err() != nil || current == nil || invocation == nil {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("configuration", value.ErrUnavailable)
 	}
 	started := s.Now()
-	until := started.Add(5 * time.Second)
+	until := started.Add(identity.EvidenceReadRequestWindow)
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -258,8 +267,11 @@ func (s ContextProjectionResults) request(ctx context.Context, current identitie
 		}
 	}()
 	i, err := current.ResolveIdentity(initialCtx)
-	if err != nil || initialCtx.Err() != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") {
-		return nil, value.ErrUnavailable
+	if err != nil || initialCtx.Err() != nil || !i.Valid(s.Now()) {
+		return nil, queryCollapsed("identity", value.ErrUnavailable, errors.Join(err, initialCtx.Err()))
+	}
+	if !slices.Contains(i.Scopes, "evidence:read") {
+		return nil, queryStepped("read-scope", value.ErrUnavailable)
 	}
 	i.Scopes, i.Groups = slices.Clone(i.Scopes), slices.Clone(i.Groups)
 	until = identity.Earlier(until, i.ValidUntil)
@@ -271,12 +283,12 @@ func (s ContextProjectionResults) request(ctx context.Context, current identitie
 	}()
 	call, err := invocation.Invocation(callCtx)
 	if err != nil || callCtx.Err() != nil || !call.Valid(s.Now()) || call.Tool != tool || call.RootID != s.RootID || call.Principal != i.Principal {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("invocation", value.ErrUnavailable, errors.Join(err, callCtx.Err()))
 	}
 	until = identity.Earlier(until, call.Until)
 	request := value.ContextQueryRequest{Call: call, OwnerID: s.NewID(), HubProcessEpoch: s.HubProcessEpoch}
 	if !request.Valid(s.Now()) || !s.Now().Before(until) {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("request-window", value.ErrUnavailable)
 	}
 	owned, cancel := context.WithCancel(callCtx)
 	o := &projectionRequest{service: s, current: current, initial: i, invocation: invocation, request: request, until: until}
@@ -292,13 +304,13 @@ func (s ContextProjectionResults) request(ctx context.Context, current identitie
 		o.mu.Unlock()
 	}
 	transferred = true
-	if !o.shorten(until) || invocation.CheckIntent(o.ctx, call) != nil {
+	if !o.shorten("request", until) || invocation.CheckIntent(o.ctx, call) != nil {
 		o.cancel()
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("intent", value.ErrUnavailable)
 	}
 	if _, err = o.checkIdentity(o.ctx); err != nil {
 		o.cancel()
-		return nil, err
+		return nil, queryStepped("identity-recheck", err)
 	}
 	return o, nil
 }
@@ -337,17 +349,20 @@ func (o *projectionRequest) checkIdentity(ctx context.Context) (identity.Identit
 	if err != nil || checked.Err() != nil || o.ctx.Err() != nil || !sameProjectionIdentity(o.initial, i, o.service.Now()) {
 		return identity.Identity{}, value.ErrUnavailable
 	}
-	if !o.shorten(i.ValidUntil) {
+	if !o.shorten("identity", i.ValidUntil) {
 		return identity.Identity{}, value.ErrExpired
 	}
 	return i, nil
 }
 
-func (o *projectionRequest) shorten(until time.Time) bool {
+func (o *projectionRequest) shorten(bound string, until time.Time) bool {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	earliest := identity.Earlier(o.until, until)
 	if o.timer == nil || earliest.Before(o.until) {
+		if o.timer == nil || until.Before(o.until) {
+			o.bound = bound
+		}
 		o.until = earliest
 		if o.timer != nil {
 			o.timer.Stop()
@@ -357,35 +372,74 @@ func (o *projectionRequest) shorten(until time.Time) bool {
 	return !o.closed && o.ctx.Err() == nil && o.service.Now().Before(o.until)
 }
 
+// cut labels a refusal caused by this request reaching its own shortened
+// deadline with the observation that set it, for the operator report only.
+func (o *projectionRequest) cut(err error) error {
+	o.mu.Lock()
+	bound, until := o.bound, o.until
+	o.mu.Unlock()
+	if err == nil || o.ctx.Err() == nil || bound == "" || o.service.Now().Before(until) {
+		return err
+	}
+	return queryStepped("until-"+bound, err)
+}
+
+// One completed authorization belongs to this exact request. Later helpers
+// validate its original cutoff and scope locally; transactional effects still
+// enforce current SQL permission, recovery, retention and processing state.
+// A new poll creates a new owner and performs its own complete authorization.
 func (o *projectionRequest) CheckCurrent(ctx context.Context) (value.ContextProjectionAuthority, error) {
 	checked, cancel, err := o.context(ctx)
 	if err != nil {
 		return value.ContextProjectionAuthority{}, err
 	}
 	defer cancel()
-	if _, err := o.checkIdentity(checked); err != nil {
-		return value.ContextProjectionAuthority{}, err
+	o.authorityMu.Lock()
+	defer o.authorityMu.Unlock()
+	if !o.authorityAttempted {
+		o.authorityAttempted = true
+		a, e := o.service.Authority.CheckProjectionCurrent(checked, o.current, o.query.Scope)
+		if e != nil || !o.query.Current(a, o.service.Now()) || a.Environment.InstallationID != o.service.InstallationID || a.IdentityRevision != o.initial.Policy || checked.Err() != nil {
+			o.authorityError = queryCollapsed("authority", value.ErrUnavailable, errors.Join(e, checked.Err()))
+		} else {
+			o.authority = &a
+		}
 	}
-	a, err := o.service.Authority.CheckProjectionCurrent(checked, o.current, o.query.Scope)
-	if err != nil || !o.query.Current(a, o.service.Now()) || a.Environment.InstallationID != o.service.InstallationID ||
-		a.IdentityRevision != o.initial.Policy || !o.shorten(identity.Earlier(o.query.Deadline, a.ValidUntil)) {
-		return value.ContextProjectionAuthority{}, value.ErrUnavailable
+	if o.authorityError != nil {
+		return value.ContextProjectionAuthority{}, o.authorityError
 	}
-	if _, err = o.checkIdentity(checked); err != nil {
-		return value.ContextProjectionAuthority{}, err
+	if o.authority == nil || checked.Err() != nil || o.ctx.Err() != nil {
+		return value.ContextProjectionAuthority{}, queryCollapsed("cancelled", value.ErrUnavailable, errors.Join(checked.Err(), o.ctx.Err()))
+	}
+	a := *o.authority
+	label := "authority"
+	if a.Bound != "" {
+		label += "/" + a.Bound
+	}
+	if o.query.Deadline.Before(a.ValidUntil) {
+		label = "query-deadline"
+	}
+	if !o.query.Current(a, o.service.Now()) || !o.initial.Valid(o.service.Now()) || !o.shorten(label, identity.Earlier(o.query.Deadline, a.ValidUntil)) {
+		return value.ContextProjectionAuthority{}, queryStepped("authority-lapsed", value.ErrUnavailable)
 	}
 	o.mu.Lock()
 	a.ValidUntil = identity.Earlier(a.ValidUntil, o.until)
 	o.mu.Unlock()
-	if !a.Valid(o.service.Now()) {
-		return value.ContextProjectionAuthority{}, value.ErrUnavailable
+	if !a.Valid(o.service.Now()) || checked.Err() != nil || o.ctx.Err() != nil {
+		return value.ContextProjectionAuthority{}, queryStepped("authority-lapsed", value.ErrUnavailable)
 	}
 	return a, nil
 }
 
 func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, selection value.ContextExcerptSelection) (*ContextProjectionDelivery, error) {
+	d, err := s.beginExcerpt(ctx, current, invocation, selection)
+	s.Results.refused(ctx, "excerpt", err)
+	return d, err
+}
+
+func (s ContextProjectionService) beginExcerpt(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, selection value.ContextExcerptSelection) (*ContextProjectionDelivery, error) {
 	if !selection.Valid() || s.Recovery == nil || s.Routes == nil || s.Plans == nil || s.Workers == nil {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("configuration", value.ErrUnavailable)
 	}
 	o, err := s.Results.request(ctx, current, invocation, "get_file_excerpt")
 	if err != nil {
@@ -398,48 +452,51 @@ func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current iden
 		}
 	}()
 	if err = invocation.CheckInput(o.ctx, ContextQueryInput{Selection: selection}); err != nil {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("input", value.ErrUnavailable)
 	}
 	recovery, err := s.Recovery.RecoveryState(o.ctx)
-	if err != nil || !recovery.Valid(s.Results.Now()) || recovery.InstallationID != s.Results.InstallationID || !o.shorten(recovery.FreshUntil) {
-		return nil, value.ErrUnavailable
+	if err != nil || !recovery.Valid(s.Results.Now()) || recovery.InstallationID != s.Results.InstallationID || !o.shorten("recovery", recovery.FreshUntil) {
+		return nil, queryCollapsed("recovery", value.ErrUnavailable, err)
 	}
 	candidate, err := s.Routes.ResolveContextProjection(o.ctx, selection, o.initial, recovery)
 	if err != nil || !candidate.Valid() || candidate.RootID != s.Results.RootID || candidate.CaseID != selection.CaseID ||
 		candidate.ArtifactID != selection.ArtifactID || candidate.Selection != selection.Selection || candidate.Principal != o.initial.Principal {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("route", value.ErrUnavailable, err)
 	}
 	a, err := s.Results.Authority.ResolveProjectionCurrent(o.ctx, current, candidate)
 	if err != nil || !a.Valid(s.Results.Now()) || a.Scope.Candidate() != candidate || a.Environment.InstallationID != s.Results.InstallationID ||
-		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten(a.ValidUntil) {
-		return nil, value.ErrUnavailable
+		a.Environment.Recovery.IssuerEpoch != recovery.IssuerEpoch || a.Environment.Recovery.Revision != recovery.Revision || a.IdentityRevision != o.initial.Policy || !o.shorten("resolved-authority/"+a.Bound, a.ValidUntil) {
+		return nil, queryCollapsed("authority", value.ErrUnavailable, err)
 	}
 	p, err := s.Plans.ContextQueryPlan(o.ctx, a)
-	if err != nil || !p.Valid(a.Scope, s.Results.Now()) || !o.shorten(p.ValidUntil) {
-		return nil, value.ErrUnavailable
+	if err != nil || !p.Valid(a.Scope, s.Results.Now()) || !o.shorten("plan", p.ValidUntil) {
+		return nil, queryCollapsed("plan", value.ErrUnavailable, err)
 	}
 	q, err := value.NewContextQuery(s.Results.NewID(), o.request.Call.ID, s.Results.NewID(), a, p, s.Results.Now())
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("query", err)
 	}
 	o.query = q
+	// ResolveProjectionCurrent already completed this request's exact scope.
+	retained := a
+	o.authority, o.authorityAttempted = &retained, true
 	a, err = o.CheckCurrent(o.ctx)
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("pre-admit", err)
 	}
 	admitted, err := s.Results.Ledger.AdmitQuery(o.ctx, q, o.request, a)
 	if err != nil || !admitted.Fresh || !admitted.Query.Equal(q) {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("admit", value.ErrUnavailable, err)
 	}
 	if _, err = o.CheckCurrent(o.ctx); err != nil {
-		return nil, err
+		return nil, queryStepped("post-admit", err)
 	}
 	if err = s.Workers.AdmitProjectionWorker(o.ctx, q, o); err != nil {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("worker-admission", value.ErrUnavailable, err)
 	}
 	d, err := s.Results.prepare(o, ContextQueryAdmitted)
 	if err != nil {
-		return nil, err
+		return nil, o.cut(queryStepped("prepare", err))
 	}
 	owned = true
 	return d, nil
@@ -448,13 +505,21 @@ func (s ContextProjectionService) BeginExcerpt(ctx context.Context, current iden
 // GetQueryResult has no reference to ContextProjectionWorkerAdmission.
 // A paid poll and fresh authorization precede status as well as evidence output.
 func (s ContextProjectionResults) GetQueryResult(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, queryID string) (*ContextProjectionDelivery, error) {
+	d, err := s.getQueryResult(ctx, current, invocation, queryID)
+	s.refused(ctx, "result", err)
+	return d, err
+}
+
+func (s ContextProjectionResults) getQueryResult(ctx context.Context, current identities.CurrentIdentity, invocation ContextQueryInvocation, queryID string) (*ContextProjectionDelivery, error) {
 	if !authorization.UUID(queryID) {
-		return nil, value.ErrInvalid
+		return nil, queryStepped("handle", value.ErrInvalid)
 	}
+	mark := time.Now()
 	o, err := s.request(ctx, current, invocation, "get_query_result")
 	if err != nil {
 		return nil, err
 	}
+	auditapp.MarkStep(o.ctx, "q-request", mark)
 	owned := false
 	defer func() {
 		if !owned {
@@ -462,23 +527,29 @@ func (s ContextProjectionResults) GetQueryResult(ctx context.Context, current id
 		}
 	}()
 	if err = invocation.CheckInput(o.ctx, ContextQueryInput{QueryID: queryID}); err != nil {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("input", value.ErrUnavailable)
 	}
+	mark = time.Now()
 	q, err := s.Ledger.LookupQuery(o.ctx, o.initial.Principal, queryID)
 	if err != nil || !q.Valid() || q.ID != queryID || q.Scope.RootID != s.RootID || q.Scope.Principal != o.initial.Principal {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("lookup", value.ErrUnavailable, err)
 	}
+	auditapp.MarkStep(o.ctx, "q-lookup", mark)
 	o.query = q
+	mark = time.Now()
 	a, err := o.CheckCurrent(o.ctx)
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("current", err)
 	}
+	auditapp.MarkStep(o.ctx, "q-authority", mark)
+	mark = time.Now()
 	if err = s.Ledger.AdmitQueryPoll(o.ctx, q, o.request, a); err != nil {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("poll", value.ErrUnavailable, err)
 	}
+	auditapp.MarkStep(o.ctx, "q-poll", mark)
 	d, err := s.prepare(o, ContextQueryPollCharged)
 	if err != nil {
-		return nil, err
+		return nil, o.cut(queryStepped("prepare", err))
 	}
 	owned = true
 	return d, nil
@@ -486,82 +557,97 @@ func (s ContextProjectionResults) GetQueryResult(ctx context.Context, current id
 
 func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQueryEffect) (*ContextProjectionDelivery, error) {
 	if _, err := o.CheckCurrent(o.ctx); err != nil {
-		return nil, err
+		return nil, queryStepped("current-start", err)
 	}
+	mark := time.Now()
 	worker, err := s.Reader.ObserveProjectionWorker(o.ctx, o.query, o)
-	if err != nil || !identity.Fresh(worker.ObservedAt, worker.ValidUntil, s.Now(), 5*time.Second) || !o.shorten(worker.ValidUntil) {
-		return nil, value.ErrUnavailable
+	if err != nil || !identity.Fresh(worker.ObservedAt, worker.ValidUntil, s.Now(), identity.EvidenceReadRequestWindow) || !o.shorten("worker", worker.ValidUntil) {
+		return nil, queryCollapsed("worker-observe", value.ErrUnavailable, err)
 	}
+	auditapp.MarkStep(o.ctx, "q-worker", mark)
 	a, err := o.CheckCurrent(o.ctx)
 	if err != nil {
-		return nil, err
-	}
-	if err = s.Ledger.PermitQuery(o.ctx, o.query, o.request, a); err != nil {
-		return nil, value.ErrUnavailable
-	}
-	a, err = o.CheckCurrent(o.ctx)
-	if err != nil {
-		return nil, err
+		return nil, queryStepped("current-observed", err)
 	}
 	d := &ContextProjectionDelivery{owner: o, pending: !worker.Ready, effect: effect,
 		observedAt: s.Now(), queryDeadline: identity.Earlier(o.query.Deadline, a.AccessUntil),
 		cleanupUntil: identity.Earlier(o.query.CleanupUntil, o.request.Call.WriteUntil),
 		association:  ContextProjectionAssociation{ID: s.NewID(), QueryID: o.query.ID, OperationID: o.request.Call.ID, Selection: o.query.Scope.Selection}}
 	if !authorization.UUID(d.association.ID) {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("association", value.ErrUnavailable)
 	}
 	if !worker.Ready {
 		if worker.Worker != (value.ContextQueryWorker{}) {
-			return nil, value.ErrUnavailable
+			return nil, queryStepped("worker-pending", value.ErrUnavailable)
 		}
 		if _, err = o.CheckCurrent(o.ctx); err != nil {
-			return nil, err
+			return nil, queryStepped("current-pending", err)
 		}
 		return d, nil
 	}
 	if !worker.Worker.Matches(o.query) {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("worker-match", value.ErrUnavailable)
+	}
+	// The full SQL fence runs once before a read. A pending reply discloses only
+	// the handle, and admission just ran the same fence (native69: repeating it
+	// on the first call exhausted the request before the worker could start).
+	mark = time.Now()
+	if err = s.Ledger.PermitQuery(o.ctx, o.query, o.request, a); err != nil {
+		return nil, queryCollapsed("permit", value.ErrUnavailable, err)
+	}
+	auditapp.MarkStep(o.ctx, "q-permit", mark)
+	a, err = o.CheckCurrent(o.ctx)
+	if err != nil {
+		return nil, queryStepped("current-permitted", err)
 	}
 	batchID := s.NewID()
 	if !authorization.UUID(batchID) {
-		return nil, value.ErrUnavailable
+		return nil, queryStepped("association", value.ErrUnavailable)
 	}
+	mark = time.Now()
 	admitted, err := s.Ledger.BeginReadBatch(o.ctx, o.query, o.request, worker.Worker, batchID, a)
 	b := admitted.Batch
 	if err != nil || !admitted.Fresh || !b.Current(o.query, a, s.Now()) || b.Until.After(a.ValidUntil) || b.ID != batchID || b.Worker != worker.Worker || b.Request != o.request {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("batch-begin", value.ErrUnavailable, err)
 	}
 	a, err = o.CheckCurrent(o.ctx)
 	if err != nil {
-		return nil, err
+		return nil, queryStepped("current-batch", err)
 	}
-	if !o.shorten(b.Until) {
-		return nil, value.ErrExpired
+	if !o.shorten("batch", b.Until) {
+		return nil, queryStepped("batch-expired", value.ErrExpired)
 	}
+	auditapp.MarkStep(o.ctx, "q-batch", mark)
+	mark = time.Now()
 	start, err := s.Ledger.ClaimReadBatch(o.ctx, b, a)
 	if err != nil || !start.Fresh || !start.Batch.Equal(b) || !authorization.UUID(start.ClaimID) {
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("batch-claim", value.ErrUnavailable, err)
 	}
+	auditapp.MarkStep(o.ctx, "q-claim", mark)
 	if _, err = o.CheckCurrent(o.ctx); err != nil {
-		return nil, err
+		return nil, queryStepped("current-claimed", err)
 	}
 	d.batch = &b
 	d.effect = ContextQueryReadCharged
 	d.association.BatchID, d.association.Generation = b.ID, b.Generation
 	// No retry is possible after this one-use claim. A missing handle on an
 	// uncertain reply remains charged for independently protected cleanup.
+	mark = time.Now()
 	d.read, err = s.Reader.ReadProjection(o.ctx, start, o)
+	auditapp.MarkStep(o.ctx, "q-read", mark)
 	if err != nil || d.read == nil {
 		if d.read != nil {
 			_ = d.Close(context.WithoutCancel(o.ctx))
 		}
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("read", value.ErrUnavailable, err)
 	}
 	if _, err = o.CheckCurrent(o.ctx); err != nil {
 		_ = d.Close(context.WithoutCancel(o.ctx))
-		return nil, err
+		return nil, queryStepped("current-read", err)
 	}
+	mark = time.Now()
 	projection, err := d.read.Projection(o.ctx)
+	auditapp.MarkStep(o.ctx, "q-projection", mark)
 	if err == nil && projection.NamespaceUID == o.query.Scope.NamespaceUID && projection.PodUID == o.query.Scope.PodUID {
 		d.excerpt, err = FormatContextExcerpt(projection, o.query.Scope.Selection)
 	} else {
@@ -579,7 +665,7 @@ func (s ContextProjectionResults) prepare(o *projectionRequest, effect ContextQu
 	}
 	if err != nil {
 		_ = d.Close(context.WithoutCancel(o.ctx))
-		return nil, value.ErrUnavailable
+		return nil, queryCollapsed("projection", value.ErrUnavailable, err)
 	}
 	return d, nil
 }

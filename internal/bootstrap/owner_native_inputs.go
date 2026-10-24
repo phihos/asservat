@@ -196,7 +196,7 @@ func (d *OwnerDeployment) nativeConfiguration(ctx context.Context, pool *pgxpool
 	if err != nil {
 		return nil, err
 	}
-	origins := evidence.NativeOrigins{Locators: readers, Operations: readers, Now: time.Now, Proofs: func(token evidence.DownloadPeerToken) (evidence.DownloadPeerProofReader, error) {
+	origins := evidence.NativeOrigins{Locators: readers, Operations: readers, Now: time.Now, Recent: evidence.NewNativeRecentObservations(), Proofs: func(token evidence.DownloadPeerToken) (evidence.DownloadPeerProofReader, error) {
 		if token == nil {
 			return nil, artifact.ErrInvalid
 		}

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"reflect"
 	"slices"
+	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/application/evidence"
@@ -24,8 +25,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// APIContextExecutions is instantiated separately for read, prepare and execute
-// credentials. Its facets never acquire key-unwrapping or publication rights.
+// APIContextExecutions supplies three typed facets from one installed credential
+// and pool. It has no key-unwrapping, capture-admission or publication rights.
 type APIContextExecutions struct {
 	ledger *Ledger
 	root   string
@@ -119,41 +120,50 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 	if !authorization.UUID(captureID) || !i.Valid(i.VerifiedAt) || !recovery.Valid(recovery.ObservedAt) {
 		return out, value.ErrInvalid
 	}
+	// The ledger normalizes errors returned through it; keep the step beside it.
+	failed := ""
+	fail := func(step string, e error) error { failed = step; return e }
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		trust, err := s.guards.Recovery.lock(ctx, q, s.root, recovery)
 		if err != nil {
-			return err
+			return fail("recovery-lock", err)
 		}
 		stream, err := q.LockPermissionStream(ctx, id(s.root))
 		if err != nil {
-			return err
+			return fail("permission-lock", err)
 		}
 		row, err := q.ReadPublicationCapture(ctx, custodydb.ReadPublicationCaptureParams{ID: id(captureID), RootID: id(s.root)})
 		if err != nil {
-			return value.ErrDenied
+			return fail("capture", value.ErrDenied)
 		}
 		out, err = apiWork(row)
 		if err != nil {
-			return err
+			return fail("work", err)
 		}
 		projection, err := permissionProjection(ctx, q, stream, authorization.Target{ClusterID: out.Target.ClusterID, NamespaceUID: out.Target.Namespace.UID, WorkloadUID: out.Target.Workload.UID, PodUID: out.Target.PodUID})
 		if err != nil {
-			return value.ErrDenied
+			return fail("permission", value.ErrDenied)
 		}
 		if err = s.guards.Recovery.check(ctx, q, trust, s.root, recovery); err != nil {
-			return err
+			return fail("recovery-check", err)
 		}
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
-			return err
+			return fail("time", err)
 		}
 		eligible := authorization.ContextEligibility(i, projection, projection.Target, now.Time)
-		if !eligible.Eligible || i.Principal != out.Actor || !now.Time.Before(out.Accepted.Deadline) {
-			return value.ErrDenied
+		if !eligible.Eligible {
+			return fail("eligibility", value.ErrDenied)
+		}
+		if i.Principal != out.Actor || !now.Time.Before(out.Accepted.Deadline) {
+			return fail("actor-deadline", value.ErrDenied)
 		}
 		return ctx.Err()
 	})
 	if err != nil {
+		if failed != "" {
+			return app.APIContextWork{}, sqlStep{failed, err}
+		}
 		return app.APIContextWork{}, err
 	}
 	return out, nil
@@ -164,72 +174,72 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries, c app.APIExecutionCheck, topology privacyvalue.PolicyTopology, fn func(custodydb.ContextCapture) error) error {
 	trust, err := s.guards.Recovery.lock(ctx, q, s.root, c.Recovery)
 	if err != nil {
-		return err
+		return sqlStep{"recovery-lock", err}
 	}
 	stream, err := q.LockPermissionStream(ctx, id(s.root))
 	if err != nil {
-		return err
+		return sqlStep{"permission-lock", err}
 	}
 	e := c.Work.Accepted.Expectation
 	pool, allocation, err := lockAllocation(ctx, q, e.Registration.AllocationID)
 	if err != nil {
-		return err
+		return sqlStep{"allocation", err}
 	}
 	attempt, err := q.LockAttempt(ctx, id(e.Registration.Location.AttemptID))
 	if err != nil {
-		return err
+		return sqlStep{"attempt", err}
 	}
 	accepted, err := q.LockContextCapture(ctx, custodydb.LockContextCaptureParams{ID: id(e.CaptureUID), RootID: id(s.root)})
 	if err != nil {
-		return err
+		return sqlStep{"capture", err}
 	}
 	w, err := apiWork(accepted)
 	if err != nil {
-		return err
+		return sqlStep{"work", err}
 	}
 	if w.Actor != c.Work.Actor || w.Target != c.Work.Target || w.IntentDigest != c.Work.IntentDigest || w.Accepted.Pin != c.Work.Accepted.Pin || !bytes.Equal(digest(w.Accepted.Expectation), digest(e)) {
-		return value.ErrConflict
+		return sqlStep{"conflict", value.ErrConflict}
 	}
 
 	if !bytes.Equal(attempt.RequestDigest, digest(normalized(e.Registration))) || attempt.State != artifact.Reserved {
-		return value.ErrDenied
+		return sqlStep{"attempt-state", value.ErrDenied}
 	}
 	check := func() error {
 		if err := s.guards.Recovery.check(ctx, q, trust, s.root, c.Recovery); err != nil {
-			return err
+			return sqlStep{"recovery-check", err}
 		}
 		if err := s.guards.Retention.check(ctx, q, topology, c.Plan.Input.Retention.Proof, c.Plan.Input.Target.Target()); err != nil {
-			return err
+			return sqlStep{"retention-check", err}
 		}
 		projection, err := permissionProjection(ctx, q, stream, c.Eligibility.Target)
 		if err != nil {
-			return err
+			return sqlStep{"permission", err}
 		}
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
-			return err
+			return sqlStep{"time", err}
 		}
 		eligible := authorization.ContextEligibility(c.Eligibility.VerifiedIdentity, projection, c.Eligibility.Target, now.Time)
 		if !c.Valid(now.Time) || !eligible.Eligible || eligible.Principal != w.Actor || eligible.PermissionRevision != c.Eligibility.PermissionRevision || eligible.IdentityRevision != c.Eligibility.IdentityRevision || !slices.Equal(eligible.DefaultAudience, e.Audience) {
-			return value.ErrDenied
+			return sqlStep{"eligibility", value.ErrDenied}
 		}
 		if err = current(ctx, q, pool, allocation, e.Registration, attempt.EffectiveExpiresAt.Time); err != nil {
-			return err
+			return sqlStep{"storage-current", err}
 		}
 		now, err = q.CurrentTime(ctx)
 		if err != nil {
-			return err
+			return sqlStep{"time", err}
 		}
 		if !c.Valid(now.Time) || !now.Time.Before(eligible.ValidUntil) {
-			return value.ErrExpired
+			return sqlStep{"expired", value.ErrExpired}
 		}
 		return ctx.Err()
 	}
 	if err = check(); err != nil {
-		return err
+		return sqlStep{"expired", err}
 	}
 	if err = fn(accepted); err != nil {
-		return err
+		return sqlStep{"effect", err}
 	}
 	return check()
 }
@@ -243,10 +253,14 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 	if err != nil {
 		return out, false, err
 	}
+	// The ledger normalizes errors returned through it; keep the step beside it.
+	failed := ""
+	headroomRefused := false
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		out = value.APIExecution{}
 		first = false
-		return s.checked(ctx, q, c, topology, func(accepted custodydb.ContextCapture) error {
+		headroomRefused = false
+		err := s.checked(ctx, q, c, topology, func(accepted custodydb.ContextCapture) error {
 			row, err := q.LockAPIExecution(ctx, custodydb.LockAPIExecutionParams{RootID: id(s.root), CaptureID: accepted.ID})
 			if errors.Is(err, pgx.ErrNoRows) {
 				e := c.Work.Accepted.Expectation
@@ -261,34 +275,77 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 				bj, _ := json.Marshal(b)
 				pj, _ := json.Marshal(p)
 				ed := evidence.ContextExpectationDigest(e)
+				// ADR-212: spend the first preparation only with at least one
+				// second left after the blocking authority/storage locks. The
+				// caller may be shorter than the original checked interval;
+				// neither interval nor the stored binding is renewed here.
+				now, timeErr := q.CurrentTime(ctx)
+				if timeErr != nil {
+					return sqlStep{"time", timeErr}
+				}
+				until := c.ValidUntil
+				if deadline, ok := ctx.Deadline(); ok {
+					until = identity.Earlier(until, deadline)
+				}
+				if err := ctx.Err(); err != nil {
+					return err
+				}
+				if until.Sub(now.Time) < time.Second {
+					headroomRefused = true
+					return sqlStep{"headroom", privacyapp.ErrUnavailable}
+				}
 				row, err = q.InsertAPIExecution(ctx, custodydb.InsertAPIExecutionParams{RootID: id(s.root), CaptureID: accepted.ID, AttemptID: accepted.AttemptID, BindingJson: bj, ProcessJson: pj, ExpectationDigest: ed[:], NotBefore: ts(b.NotBefore), NotAfter: ts(b.NotAfter), WriterProtocol: pgtype.Text{String: artifact.ContextWriterProtocol, Valid: true}})
 				first = err == nil
 			}
 			if err != nil {
-				return err
+				return sqlStep{map[bool]string{true: "insert", false: "lock"}[first || errors.Is(err, pgx.ErrNoRows)], err}
 			}
 			out, err = apiExecution(row)
 			if err != nil {
-				return err
+				return sqlStep{"read", err}
 			}
 			if out.Process != c.Process.Binding || out.ExpectationDigest != evidence.ContextExpectationDigest(c.Work.Accepted.Expectation) || out.Binding.ScopeDigest != c.Plan.ScopeDigest {
-				return value.ErrConflict
+				return sqlStep{"conflict", value.ErrConflict}
 			}
 			now, err := q.CurrentTime(ctx)
 			if err != nil {
 				return err
 			}
-			if !now.Time.Before(out.Binding.NotAfter) {
-				return value.ErrExpired
+			// Exact existing preparation is passive even after its original
+			// interval: the runner must classify it uncertain without keys or
+			// another start. checked still requires current authority before
+			// and after this result, and every active effect keeps its cutoff.
+			if (first || out.Phase != "prepared") && !now.Time.Before(out.Binding.NotAfter) {
+				return sqlStep{"expired", value.ErrExpired}
 			}
 			return nil
 		})
+		var st sqlStep
+		if errors.As(err, &st) {
+			failed = st.FixedStep()
+		}
+		return err
 	})
 	if err != nil {
+		err = apiPreparationRefusalError(err, headroomRefused)
+		if failed != "" {
+			return value.APIExecution{}, false, sqlStep{failed, err}
+		}
 		return value.APIExecution{}, false, err
 	}
 	return out, first, nil
 }
+
+func apiPreparationRefusalError(err error, headroomRefused bool) error {
+	// Ordinary custody normalization of this known refusal is "client".
+	// Expiry during rollback instead reports "deadline" and must survive.
+	var cause ledgerCause
+	if headroomRefused && errors.As(err, &cause) && cause.cause == "client" {
+		return value.ErrUnavailable
+	}
+	return err
+}
+
 func (s *APIContextExecutions) BindAPIStart(ctx context.Context, c app.APIExecutionCheck, r value.APIExecution, p value.PreparedStart) (value.APIExecution, error) {
 	return s.changeAPIStart(ctx, c, r, func(q *custodydb.Queries, old value.APIExecution) (custodydb.ContextExecution, error) {
 		if !authorization.UUID(p.ObjectUID) || !identity.Text(p.ResourceVersion, 128) {
@@ -509,3 +566,20 @@ func (s *APIContextExecutions) recordAPIOutcome(ctx context.Context, r value.API
 var _ app.APIExecutionReader = (*APIContextExecutions)(nil)
 var _ app.APIExecutionPreparer = (*APIContextExecutions)(nil)
 var _ app.APIExecutionRecorder = (*APIContextExecutions)(nil)
+
+// sqlStep names where an execution transaction stopped, for operator
+// diagnostics; its class is the wrapped error.
+type sqlStep struct {
+	step string
+	err  error
+}
+
+func (e sqlStep) Error() string { return "api execution " + e.step }
+func (e sqlStep) Unwrap() error { return e.err }
+func (e sqlStep) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if errors.As(e.err, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
+}

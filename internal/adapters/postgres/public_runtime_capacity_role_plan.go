@@ -29,6 +29,9 @@ func publicRuntimeCapacityGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			"read_capacity_cluster_qualifications(uuid)",
 			// ADR-200: active refresh demands.
 			"read_capacity_refresh_demands(uuid)",
+			// ADR-219: shared query backing follows these existing publications.
+			"ensure_shared_context_query_capacity(uuid)",
+			"ensure_shared_context_query_allocation(uuid,uuid,text,text)",
 		}
 	case "capacity-capture":
 		signatures = []string{

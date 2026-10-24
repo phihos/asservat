@@ -1124,12 +1124,12 @@ def main() -> None:
     ):
         rejects(owner_roles, "owner-identity-roles", mutation)
     owner_entries = []
-    for index, purpose in enumerate(("enrollment", "audit", "activation", "registry")):
+    for index, purpose in enumerate(("owner-runtime",)):
         owner_entries.append({"purpose": purpose, "password": "a" * 42 + str(index),
             "claim": {"operationID": owner_id(10 + index),
                 "claimedAt": "2026-10-12T12:00:01Z", "until": "2026-10-12T12:00:05Z",
                 "databaseOID": 16384, "postmasterAt": "2026-10-12T11:00:00Z"},
-            "receipt": {"roleName": "as_" + owner_id(1).replace("-", "") + f"_own_{index:02d}",
+            "receipt": {"roleName": "as_" + owner_id(1).replace("-", "") + "_own_06",
                 "roleOID": 17000 + index, "layoutDigest": "b" * 64}})
     owner_state = {"format": "asservat-owner-identity-role-state/v1", "input": owner_roles,
         "operationID": owner_id(14), "createdAt": "2026-10-12T12:00:00Z",
@@ -1138,6 +1138,7 @@ def main() -> None:
     for mutation in (
         lambda d: d["roles"].pop(),
         lambda d: d["roles"][0].update(purpose="configuration-fleet"),
+        lambda d: d["roles"][0].update(purpose="enrollment"),
         lambda d: d["roles"][0]["receipt"].update(roleName="as_" + "a" * 32 + "_pub_00"),
         lambda d: d["roles"][0].update(password="short"),
     ):

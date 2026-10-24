@@ -4,7 +4,47 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	app "asservat.local/asservat/internal/application/fleet"
+	value "asservat.local/asservat/internal/domain/fleet"
 )
+
+type connectorObservationScopedRegistry struct {
+	app.ConnectorLeafRegistry
+	wanted value.ConnectorIdentitySource
+	used   int
+}
+
+func (s *connectorObservationScopedRegistry) ConnectorLeafRegistrationAt(ctx context.Context, certificate value.ConnectorCredentialCertificate, source value.ConnectorIdentitySource) (app.ConnectorLeafRegistration, error) {
+	s.used++
+	if !source.Observation.SameSource(s.wanted.Observation) || source.Roles != s.wanted.Roles || source.Observation.ObservedAt != s.wanted.Observation.ObservedAt || source.Observation.FreshUntil != s.wanted.Observation.FreshUntil {
+		return app.ConnectorLeafRegistration{}, value.ErrDenied
+	}
+	return s.ConnectorLeafRegistry.ConnectorLeafRegistration(ctx, certificate)
+}
+
+func TestConnectorOwnedObservationAtCarriesOriginalSourceIntoRegistration(t *testing.T) {
+	f := newConnectorPairFixture(t)
+	c := f.owner()
+	if err := c.Reconcile(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	source, _ := f.ReadConnectorIdentitySource(context.Background())
+	scoped := &connectorObservationScopedRegistry{ConnectorLeafRegistry: f, wanted: source}
+	c.registry = scoped
+	if _, err := c.ObserveConnectorProcessAt(context.Background(), source); err != nil || scoped.used != 1 {
+		t.Fatal("nested registration did not use the executor's original source bracket", err, scoped.used)
+	}
+	// Ordinary observations still own their independent source reads. This
+	// optimization must not silently become an ambient registration cache.
+	if _, err := c.ObserveConnectorProcess(context.Background()); err != nil || scoped.used != 1 {
+		t.Fatal("ordinary observation borrowed an unrelated source bracket", err, scoped.used)
+	}
+	f.revoked.Store(true)
+	if _, err := c.ObserveConnectorProcessAt(context.Background(), source); err == nil || scoped.used != 2 {
+		t.Fatal("scoped registration bypassed current revocation", err, scoped.used)
+	}
+}
 
 func TestConnectorOwnedObservationRequiresActivatedCurrentOriginalProcess(t *testing.T) {
 	f := newConnectorPairFixture(t)
@@ -100,5 +140,72 @@ func TestConnectorOwnedObservationConfirmIsLocalAndBounded(t *testing.T) {
 	c.Close()
 	if _, e = c.ConfirmConnectorProcessAt(context.Background(), opened, source); e == nil {
 		t.Fatal("closed process confirmed")
+	}
+}
+
+func TestConnectorOwnedObservationConfirmRechecksAfterLocalVerification(t *testing.T) {
+	for _, mode := range []string{"unchanged", "closed", "root-cancelled", "retired", "replaced", "new-leaf", "expired", "caller-cancelled", "shorter-caller", "caller-deadline"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newConnectorPairFixture(t)
+			c := f.owner()
+			if err := c.Reconcile(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			source, _ := f.ReadConnectorIdentitySource(context.Background())
+			opened, err := c.ObserveConnectorProcessAt(context.Background(), source)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithDeadline(context.Background(), f.now.Add(2*time.Second))
+			defer cancel()
+			changed := false
+			// X.509 verification consults its clock after Confirm has copied the
+			// active process/leaf and released c.mu. Exercise exact intervening
+			// state transitions without sleeps, races or a production test hook.
+			c.verifier.now = func() time.Time {
+				if !changed {
+					changed = true
+					switch mode {
+					case "closed":
+						c.Close()
+					case "root-cancelled":
+						c.stop()
+					case "retired", "replaced", "new-leaf":
+						c.mu.Lock()
+						switch mode {
+						case "retired":
+							c.active.retired = true
+						case "replaced":
+							replacement := *c.active
+							c.active = &replacement
+						case "new-leaf":
+							c.active.installed[0].Digest[0] ^= 1
+						}
+						c.mu.Unlock()
+					case "expired":
+						f.advance.Store(int64(opened.ValidUntil.Sub(f.now)))
+					case "caller-cancelled":
+						cancel()
+					case "caller-deadline":
+						f.advance.Store(int64(2 * time.Second))
+					}
+				}
+				return f.clock()
+			}
+			confirmed, err := c.ConfirmConnectorProcessAt(ctx, opened, source)
+			if !changed {
+				t.Fatal("test did not reach verification after the active snapshot")
+			}
+			if mode == "unchanged" || mode == "shorter-caller" {
+				if err != nil || confirmed.Registration != opened.Registration || confirmed.ValidUntil.After(opened.ValidUntil) {
+					t.Fatal("unchanged local confirmation", err)
+				}
+				if mode == "shorter-caller" && !confirmed.ValidUntil.Equal(f.now.Add(2*time.Second)) {
+					t.Fatal("confirmation exceeded original caller deadline")
+				}
+			} else if err == nil {
+				t.Fatal("local confirmation accepted a change after its active snapshot", mode)
+			}
+		})
 	}
 }

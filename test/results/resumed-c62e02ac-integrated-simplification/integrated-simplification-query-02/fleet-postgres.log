@@ -1,0 +1,129 @@
+The files belonging to this database system will be owned by user "postgres".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "en_US.utf8".
+The default database encoding has accordingly been set to "UTF8".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+fixing permissions on existing directory /var/lib/postgresql/18/docker ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Etc/UTC
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/lib/postgresql/18/docker -l logfile start
+
+waiting for server to start....2026-10-23 01:01:21.149 UTC [37] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-23 01:01:21.149 UTC [37] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-23 01:01:21.160 UTC [43] LOG:  database system was shut down at 2026-10-23 01:01:20 UTC
+2026-10-23 01:01:21.170 UTC [37] LOG:  database system is ready to accept connections
+ done
+server started
+CREATE DATABASE
+
+
+/usr/local/bin/docker-entrypoint.sh: ignoring /docker-entrypoint-initdb.d/*
+
+waiting for server to shut down...2026-10-23 01:01:21.329 UTC [37] LOG:  received fast shutdown request
+.2026-10-23 01:01:21.331 UTC [37] LOG:  aborting any active transactions
+2026-10-23 01:01:21.332 UTC [37] LOG:  background worker "logical replication launcher" (PID 46) exited with exit code 1
+2026-10-23 01:01:21.333 UTC [41] LOG:  shutting down
+2026-10-23 01:01:21.337 UTC [41] LOG:  checkpoint starting: shutdown immediate
+.2026-10-23 01:01:22.359 UTC [41] LOG:  checkpoint complete: wrote 941 buffers (5.7%), wrote 3 SLRU buffers; 0 WAL file(s) added, 0 removed, 0 recycled; write=0.037 s, sync=0.964 s, total=1.027 s; sync files=303, longest=0.009 s, average=0.004 s; distance=4335 kB, estimate=4335 kB; lsn=0/1B94FA8, redo lsn=0/1B94FA8
+2026-10-23 01:01:22.375 UTC [37] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+chmod: changing permissions of '/var/run/postgresql': Operation not permitted
+initdb: warning: enabling "trust" authentication for local connections
+initdb: hint: You can change this by editing pg_hba.conf or using the option -A, or --auth-local and --auth-host, the next time you run initdb.
+2026-10-23 01:01:22.452 UTC [1] LOG:  starting PostgreSQL 18.6 (Debian 18.6-1.pgdg12+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-10-23 01:01:22.452 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-10-23 01:01:22.452 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-10-23 01:01:22.455 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-10-23 01:01:22.462 UTC [89] LOG:  database system was shut down at 2026-10-23 01:01:22 UTC
+2026-10-23 01:01:22.468 UTC [1] LOG:  database system is ready to accept connections
+2026-10-23 01:01:22.649 UTC [100] ERROR:  relation "goose_db_version" does not exist at character 36
+2026-10-23 01:01:22.649 UTC [100] STATEMENT:  SELECT version_id, is_applied from goose_db_version ORDER BY id DESC
+2026-10-23 01:01:31.018 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_95" by role "postgres"
+2026-10-23 01:01:31.078 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_16" by role "postgres"
+2026-10-23 01:01:31.128 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_20" by role "postgres"
+2026-10-23 01:01:31.179 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_34" by role "postgres"
+2026-10-23 01:01:31.233 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_40" by role "postgres"
+2026-10-23 01:01:31.308 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_41" by role "postgres"
+2026-10-23 01:01:31.358 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_42" by role "postgres"
+2026-10-23 01:01:31.408 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_01" by role "postgres"
+2026-10-23 01:01:31.460 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_43" by role "postgres"
+2026-10-23 01:01:31.513 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_44" by role "postgres"
+2026-10-23 01:01:31.564 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_45" by role "postgres"
+2026-10-23 01:01:31.615 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_48" by role "postgres"
+2026-10-23 01:01:31.668 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_49" by role "postgres"
+2026-10-23 01:01:31.721 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_50" by role "postgres"
+2026-10-23 01:01:31.773 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_51" by role "postgres"
+2026-10-23 01:01:31.827 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_52" by role "postgres"
+2026-10-23 01:01:31.878 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_56" by role "postgres"
+2026-10-23 01:01:31.930 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_24" by role "postgres"
+2026-10-23 01:01:31.985 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_25" by role "postgres"
+2026-10-23 01:01:32.060 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_26" by role "postgres"
+2026-10-23 01:01:32.112 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_27" by role "postgres"
+2026-10-23 01:01:32.162 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_65" by role "postgres"
+2026-10-23 01:01:32.215 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_66" by role "postgres"
+2026-10-23 01:01:32.269 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_53" by role "postgres"
+2026-10-23 01:01:32.325 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_54" by role "postgres"
+2026-10-23 01:01:32.384 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_55" by role "postgres"
+2026-10-23 01:01:32.443 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_70" by role "postgres"
+2026-10-23 01:01:32.496 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_71" by role "postgres"
+2026-10-23 01:01:32.553 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_72" by role "postgres"
+2026-10-23 01:01:32.608 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_73" by role "postgres"
+2026-10-23 01:01:32.662 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_78" by role "postgres"
+2026-10-23 01:01:32.714 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_79" by role "postgres"
+2026-10-23 01:01:32.787 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_80" by role "postgres"
+2026-10-23 01:01:32.840 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_81" by role "postgres"
+2026-10-23 01:01:32.896 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_86" by role "postgres"
+2026-10-23 01:01:32.949 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_87" by role "postgres"
+2026-10-23 01:01:33.006 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_89" by role "postgres"
+2026-10-23 01:01:33.061 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_90" by role "postgres"
+2026-10-23 01:01:33.119 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_91" by role "postgres"
+2026-10-23 01:01:33.176 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_82" by role "postgres"
+2026-10-23 01:01:33.234 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_83" by role "postgres"
+2026-10-23 01:01:33.290 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_84" by role "postgres"
+2026-10-23 01:01:33.352 UTC [121] WARNING:  role "postgres" has not been granted membership in role "as_10000000000040008000000000000001_pub_88" by role "postgres"
+2026-10-23 01:01:37.251 UTC [184] ERROR:  operator is not unique: unknown - unknown at character 1144
+2026-10-23 01:01:37.251 UTC [184] HINT:  Could not choose a best candidate operator. You might need to add explicit type casts.
+2026-10-23 01:01:37.251 UTC [184] QUERY:  NOT public.context_query_intent_current(NEW.root_id,NEW.operation_id,NEW.actor,NEW.issuer_epoch,NEW.initial_request->'Call') OR
+	  NOT public.context_query_complete_object(NEW.query,ARRAY['ID','OperationID','WorkerID','Scope','Plan','RecoveryIssuerEpoch','RecoveryRevision','CreatedAt','Deadline','WorkerUntil','CredentialUntil','ProviderUntil','CleanupUntil']) OR
+	  NOT public.context_query_complete_object(NEW.query->'Plan',ARRAY['AcceptanceID','AccountID','AllocationID','RootID','InstallationID','ClusterID','NamespaceUID','WorkloadUID','AllocationRevision','PoolSource','PolicySource','Principal','Profile','ObservedAt','ValidUntil','HardUntil','EffectsUntil','CleanupUntil','RetireBy']) OR
+	  NOT public.context_query_complete_object(NEW.query->'Scope',ARRAY['RootID','CaseID','ArtifactID','CaptureID','ClusterID','NamespaceUID','WorkloadUID','PodUID','Version','SourceProjectionDigest','SourceFormat','DisplayVersion','Selection','Principal']) OR
+	  b.suspended OR p.principal_key<>NEW.principal_key OR NEW.generation<>0 OR NEW.active_batch IS NOT NULL OR NEW.polls<>0 OR NEW.controls<>0 OR NEW.uncertain OR
+	  (NEW.query->'Plan'->'Profile'-'Path') IS DISTINCT FROM (b.profile-'Path') OR NEW.query->'Plan'->'Profile'->'Path'->>'TargetClusterID' IS DISTINCT FROM a.cluster_id::text OR NOT public.context_query_shared_profile_current(NEW.root_id,NEW.query->'Plan'->'Profile') OR NOT public.context_query_capacity_allocation_current(NEW.root_id,a.id) OR NEW.query->'Plan'->>'AcceptanceID'<>b.acceptance_id::text OR NEW.query->'Plan'->>'AllocationID'<>a.id::text OR
+	  NEW.query->'Plan'->>'AccountID'<>p.id::text OR NEW.query->'Plan'->>'ClusterID'<>a.cluster_id::text OR NEW.query->'Plan'->>'NamespaceUID'<>a.namespace_uid OR NEW.query->'Plan'->>'WorkloadUID'<>a.workload_uid OR
+	  NEW.query->'Plan'->'Principal' IS DISTINCT FROM NEW.actor OR NEW.query->'Scope'->>'RootID' IS DISTINCT FROM NEW.root_id::text OR NEW.query->'Scope'->>'ClusterID' IS DISTINCT FROM a.cluster_id::text OR NEW.query->'Scope'->>'NamespaceUID' IS DISTINCT FROM a.namespace_uid OR NEW.query->'Scope'->>'WorkloadUID' IS DISTINCT FROM a.workload_uid OR
+	  NEW.query->'Plan'->'PoolSource' IS DISTINCT FROM a.pool_source OR NEW.query->'Plan'->'PolicySource' IS DISTINCT FROM a.policy_source OR
+	  (NEW.query->'Plan'->>'AllocationRevision')::bigint<>a.revision OR NEW.query->'Scope'->'Principal' IS DISTINCT FROM NEW.actor OR
+	  NEW.query->>'ID'<>NEW.id::text OR NEW.query->>'WorkerID'<>NEW.worker_id::text OR NEW.query->>'OperationID'<>NEW.operation_id::text OR
+	  (NEW.query->>'CreatedAt')::timestamptz<>NEW.created_at OR (NEW.query->>'Deadline')::timestamptz<>NEW.deadline OR (NEW.query->>'CleanupUntil')::timestamptz<>NEW.cleanup_until OR
+	  NEW.deadline>NEW.created_at+make_interval(secs=>(b.profile->>'Lifetime')::double precision/1000000000) OR
+	  (NEW.query->'Plan'->>'RootID')::uuid<>NEW.root_id OR (NEW.query->'Plan'->>'InstallationID')::uuid<>b.installation_id OR
+	  (NEW.query->'Plan'->>'RetireBy')::timestamptz<>NEW.retire_by OR NEW.retire_by<>b.retire_by OR
+	  (NEW.query->'Plan'->>'HardUntil')::timestamptz<>b.hard_until OR (NEW.query->'Plan'->>'EffectsUntil')::timestamptz<>b.effects_until OR (NEW.query->'Plan'->>'CleanupUntil')::timestamptz<>b.cleanup_until OR
+	  NEW.deadline>b.hard_until OR NEW.cleanup_until>b.cleanup_until OR n>=(NEW.query->'Plan'->>'ValidUntil')::timestamptz OR n<(NEW.query->'Plan'->>'ObservedAt')::timestamptz OR
+	  (NEW.query->>'WorkerUntil')::timestamptz>b.effects_until OR (NEW.query->>'CredentialUntil')::timestamptz>b.effects_until OR (NEW.query->>'ProviderUntil')::timestamptz>b.effects_until OR
+	  NEW.query->>'RecoveryIssuerEpoch' IS DISTINCT FROM NEW.issuer_epoch::text OR NEW.created_at>n OR NEW.created_at<(NEW.initial_request->'Call'->>'StartedAt')::timestamptz OR
+	  NEW.postmaster_at<>pg_postmaster_start_time() OR NEW.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR n>=NEW.deadline
+2026-10-23 01:01:37.251 UTC [184] CONTEXT:  PL/pgSQL function public.guard_context_query() line 15 at IF
+2026-10-23 01:01:37.251 UTC [184] STATEMENT:  -- name: InsertContextQuery :one
+	INSERT INTO context_query(id,root_id,allocation_id,account_id,principal_key,actor,query,initial_request,operation_id,worker_id,created_at,deadline,cleanup_until,retire_by,issuer_epoch,postmaster_at,database_oid)
+	VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain
+	

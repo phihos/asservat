@@ -1,0 +1,133 @@
+{
+  "scope": "ADR219/221 component checks before integration with ADR222; external SQL/S3/installed runtime pending",
+  "checks": {
+    "affected-native-race": {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "./internal/application/evidence",
+        "./internal/transport/native",
+        "./internal/transport/worker"
+      ],
+      "exit": 0,
+      "elapsed": 43.20383840001887,
+      "sourceUnchanged": true
+    },
+    "compile-first": {
+      "command": [
+        "go",
+        "test",
+        "-run",
+        "^$",
+        "./..."
+      ],
+      "exit": 1,
+      "elapsed": 28.232646465301514
+    },
+    "compile-second": {
+      "command": [
+        "go",
+        "test",
+        "-run",
+        "^$",
+        "./..."
+      ],
+      "exit": 1,
+      "elapsed": 35.873129239014816
+    },
+    "compile-third": {
+      "command": [
+        "go",
+        "test",
+        "-run",
+        "^$",
+        "./..."
+      ],
+      "exit": 1,
+      "elapsed": 5.287148171046283
+    },
+    "focused-race-final": {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-v",
+        "-run",
+        "^Test(Query|ContextProjection|InvestigationProjection)",
+        "./internal/application/analysis",
+        "./internal/transport/presentation"
+      ],
+      "exit": 0,
+      "elapsed": 8.97082855500048,
+      "sourceUnchanged": true
+    },
+    "focused-race-first": {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-v",
+        "-run",
+        "Projection|Acquisition|AdmittedWorker|Query|ContextRuntime|ActiveContextEnrollment|OwnerRuntimeServesAcquisition|ServeAcquisitionWorkers",
+        "./internal/domain/authorization",
+        "./internal/domain/analysis",
+        "./internal/application/authorization",
+        "./internal/application/analysis",
+        "./internal/application/capacity",
+        "./internal/application/evidence",
+        "./internal/adapters/postgres",
+        "./internal/adapters/kubernetes",
+        "./internal/transport/native",
+        "./internal/transport/worker",
+        "./internal/transport/presentation",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 1,
+      "elapsed": 295.0233951250557,
+      "sourceUnchanged": true,
+      "classification": "Incomplete: intentionally interrupted accidental broad unchanged Kubernetes selection after recorded C18 failures."
+    },
+    "focused-race-second": {
+      "command": [
+        "go",
+        "test",
+        "-race",
+        "-count=1",
+        "-v",
+        "-run",
+        "^Test(Acquisition|Projection|Admitted|Query|ContextProjection|CurrentProjection|NativeApprovedProjection|InvestigationProjection|PublicContextProjection|ContextRuntime|ActiveContextEnrollment|OwnerRuntimeServesAcquisition|ServeAcquisitionWorkers|InstalledApproved|InstalledProjection|SharedAcquisition)",
+        "./internal/domain/authorization",
+        "./internal/domain/analysis",
+        "./internal/application/authorization",
+        "./internal/application/analysis",
+        "./internal/application/capacity",
+        "./internal/application/evidence",
+        "./internal/adapters/postgres",
+        "./internal/adapters/kubernetes",
+        "./internal/transport/native",
+        "./internal/transport/worker",
+        "./internal/transport/presentation",
+        "./internal/bootstrap",
+        "./test/integration"
+      ],
+      "exit": 1,
+      "elapsed": 80.03608547500335,
+      "sourceUnchanged": true,
+      "classification": "Completed failure: unused test import and obsolete repeated-read presentation assertions; corrected without runtime behavior change."
+    },
+    "sqlc-first": {
+      "command": [
+        "/home/phil/.cache/asservat-build/bin/sqlc",
+        "generate"
+      ],
+      "exit": 0,
+      "elapsed": 0.305783748626709
+    }
+  },
+  "external_qualification": "not run"
+}

@@ -2,6 +2,7 @@ package authorization
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -457,4 +458,34 @@ func TestContextProjectionAuthorityCancellationAndDependencies(t *testing.T) {
 			t.Fatal("continued after cancelled environment")
 		}
 	})
+}
+
+// Installed native86: the decision ended 1.27 s after its check at the
+// retention proof's end, which the report did not name. The decision now
+// carries the component whose interval ended it, for the report only.
+func TestContextProjectionAuthorityNamesItsEarliestBound(t *testing.T) {
+	for _, c := range []struct {
+		bound string
+		set   func(*projectionFixture)
+	}{
+		{"retention", func(f *projectionFixture) { f.retention.ValidUntil = f.now.Add(2 * time.Second) }},
+		{"environment/recovery", func(f *projectionFixture) {
+			f.environment.Recovery.FreshUntil = f.now.Add(time.Second)
+			f.environment.ValidUntil = f.environment.Recovery.FreshUntil
+		}},
+		{"catalog", func(f *projectionFixture) { f.record.ValidUntil = f.now.Add(time.Second) }},
+	} {
+		t.Run(c.bound, func(t *testing.T) {
+			f, s, scope := newProjectionFixture()
+			c.set(f)
+			out, err := s.CheckProjectionCurrent(context.Background(), f, scope)
+			if err != nil || out.Bound != c.bound {
+				t.Fatalf("bound %q, want %q (%v)", out.Bound, c.bound, err)
+			}
+			encoded, _ := json.Marshal(out)
+			if strings.Contains(string(encoded), c.bound) {
+				t.Fatal("report-only bound was serialized")
+			}
+		})
+	}
 }

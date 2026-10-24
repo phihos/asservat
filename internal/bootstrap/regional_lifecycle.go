@@ -101,6 +101,10 @@ func (r *RegionalLifecycle) IssueProcess(ctx context.Context, id, usage string, 
 // leaf this adapter received, presented by the process that requested it. An
 // unknown leaf is never looked up: it has no process to present.
 func (r *RegionalLifecycle) ConnectorLeafRegistration(ctx context.Context, c value.ConnectorCredentialCertificate) (fleetapp.ConnectorLeafRegistration, error) {
+	return r.connectorLeafRegistration(ctx, c, r.Local)
+}
+
+func (r *RegionalLifecycle) connectorLeafRegistration(ctx context.Context, c value.ConnectorCredentialCertificate, local connectorlifecycle.Local) (fleetapp.ConnectorLeafRegistration, error) {
 	var request *value.ConnectorProcessRequest
 	r.mu.Lock()
 	for i := range r.issued {
@@ -112,7 +116,7 @@ func (r *RegionalLifecycle) ConnectorLeafRegistration(ctx context.Context, c val
 	if request == nil {
 		return fleetapp.ConnectorLeafRegistration{}, value.ErrUnavailable
 	}
-	frame, err := r.run(ctx, connectorlifecycle.PurposeRegistration, value.ClusterRenewal, uuid.NewString(), *request, &c)
+	frame, err := r.runLocal(ctx, connectorlifecycle.PurposeRegistration, value.ClusterRenewal, uuid.NewString(), *request, &c, local)
 	if err != nil || frame.Registration == nil || frame.Registration.Certificate != c || frame.Registration.Process != request.Process {
 		return fleetapp.ConnectorLeafRegistration{}, unavailable(err)
 	}
@@ -120,8 +124,12 @@ func (r *RegionalLifecycle) ConnectorLeafRegistration(ctx context.Context, c val
 }
 
 func (r *RegionalLifecycle) run(ctx context.Context, purpose value.ConnectorLifecyclePurpose, operation, id string, request value.ConnectorProcessRequest, leaf *value.ConnectorCredentialCertificate, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
+	return r.runLocal(ctx, purpose, operation, id, request, leaf, r.Local, owner...)
+}
+
+func (r *RegionalLifecycle) runLocal(ctx context.Context, purpose value.ConnectorLifecyclePurpose, operation, id string, request value.ConnectorProcessRequest, leaf *value.ConnectorCredentialCertificate, local connectorlifecycle.Local, owner ...value.OwnerCertificate) (connectorlifecycle.HubFrame, error) {
 	var zero connectorlifecycle.HubFrame
-	if r.Client == nil || r.Local == nil || r.Now == nil || ctx == nil || !request.Valid() {
+	if r.Client == nil || local == nil || r.Now == nil || ctx == nil || !request.Valid() {
 		return zero, value.ErrInvalid
 	}
 	client, err := mtls.EnrollmentKey(request.ClientCSRDER)
@@ -154,7 +162,7 @@ func (r *RegionalLifecycle) run(ctx context.Context, purpose value.ConnectorLife
 			o.Owner = &owner[0]
 		}
 		return o, nil
-	}, r.Local)
+	}, local)
 	if err != nil {
 		return zero, errRegionalChannel
 	}

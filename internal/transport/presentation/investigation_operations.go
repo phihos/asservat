@@ -22,10 +22,34 @@ type Operations interface {
 
 // InvestigationOperations snapshots the configured public operation set. Only composed services are advertised; contracts alone never enable operations.
 type InvestigationOperations struct {
-	origin   string
-	names    []string
-	routes   map[string]Operations
-	captures *ContextOperations
+	origin     string
+	names      []string
+	routes     map[string]Operations
+	captures   *ContextOperations
+	projection *ContextProjectionOperations
+}
+
+// NewInvestigationProjectionOperations adds only the two audited approved-read
+// operations to an already composed installation. The returned routing snapshot
+// has no unaudited projection Call path.
+func NewInvestigationProjectionOperations(base *InvestigationOperations, projection *ContextProjectionOperations) (*InvestigationOperations, error) {
+	if base == nil || projection == nil || projection.excerpts == nil || projection.results == nil || projection.contracts == nil || base.projection != nil {
+		return nil, ErrOperationsConfiguration
+	}
+	out := *base
+	out.names = append([]string(nil), base.names...)
+	for _, name := range []string{"get_file_excerpt", "get_query_result"} {
+		if _, exists := base.Tool(name); exists {
+			return nil, ErrOperationsConfiguration
+		}
+		if _, exists := projection.contracts.Tool(name); !exists {
+			return nil, ErrOperationsConfiguration
+		}
+		out.names = append(out.names, name)
+	}
+	out.projection = projection
+	sort.Strings(out.names)
+	return &out, nil
 }
 
 func NewInvestigationOperations(captures *ContextOperations, cases *ContextCaseOperations, downloads ...*ContextDownloadOperations) (*InvestigationOperations, error) {
@@ -76,6 +100,9 @@ func (s *InvestigationOperations) Tool(name string) (contracts.InvestigationTool
 	if s == nil {
 		return contracts.InvestigationTool{}, false
 	}
+	if s.projection != nil && queryOperation(name) {
+		return s.projection.contracts.Tool(name)
+	}
 	part, ok := s.routes[name]
 	if !ok {
 		return contracts.InvestigationTool{}, false
@@ -109,6 +136,9 @@ type OperationCall struct {
 func (s *InvestigationOperations) CallWithContext(ctx context.Context, current identities.CurrentIdentity, call OperationCall, name string, raw json.RawMessage) (OperationReply, error) {
 	if s == nil {
 		return OperationReply{}, ErrOperationsConfiguration
+	}
+	if s.projection != nil && queryOperation(name) {
+		return s.projection.CallWithContext(ctx, current, call, name, raw)
 	}
 	part := s.routes[name]
 	if name == "request_capture" && s.captures != nil {

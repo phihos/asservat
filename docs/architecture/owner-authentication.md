@@ -33,3 +33,16 @@ The owned Kubernetes fixture creates a real controller-owned Pod with an unsatis
 The source administrator suspends the actual ConfigMap after client signing/audit but before activation. The coordinator must retain the signed public result, deny activation, and reuse the exact leaf after an explicitly observed resume. Actual loopback mTLS uses those leaves. The peer authenticator rejects use before Pod readiness; normal kubelet/controller status must later make the same Pod routable. The test reuses the same verified TLS snapshots when replacing the actual accepted root, retiring one purpose and deleting the Pod. A separate injected protection outage tests the composite service; native guard removal is already exercised independently by the outer workload-protection fixture.
 
 The initial fleet recovery/issuer bootstrap and recovery-observation refresh are fixture inputs. The administrator requests the short Pod-bound token; CSR/private keys and TLS listener are owned by the test process, outside the pause Pod. This does not prove protected runtime startup, a deployed owner process, private enrollment transport, process-key custody inside that Pod or real forwarded download bytes. Unit fixtures isolate orchestration with synthetic ports; actual-TLS tests additionally check snapshot ownership, SNI/binding mismatch, incomplete/unverified handshakes, current-root/suspension/freshness rejection and expiry on reuse. See [implementation progress](../implementation-progress.md) for actual exits and source/cleanup reports.
+
+## Rendered federation account read
+
+The installed delegated path runs this same authenticator through
+`federationOwnerReads`, including `OwnerEndpoints`' live owner ServiceAccount
+UID check. `BuildFederationWorkload` accepts that account's independently pinned
+name from `InitialRuntimeResourceInventory.OwnerAccount`, separately from the
+Deployment name, and renders only an exact-name `get` rule for it. The original
+namespace, account UID, Pod/ReplicaSet/Deployment, route, workload guard and SQL
+checks remain mandatory. This adds no account listing, token creation or writes.
+The focused [RBAC investigation](../research/federation-owner-read-rbac.md)
+separates the source defect and native component qualification from the installed
+journey's still-unresolved first refusal.

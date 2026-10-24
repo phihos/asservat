@@ -1,0 +1,13 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier
+    api_execution_test.go:317: context-verify first publication with compiled grants custody unavailable; retain the original attempt and charge
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher
+    api_execution_test.go:317: context-publish first publication with compiled grants custody unavailable; retain the original attempt and charge
+--- FAIL: TestContextAdmissionWithRealServices (6.04s)
+    --- FAIL: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication (5.61s)
+        --- FAIL: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier (2.94s)
+        --- FAIL: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher (2.67s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	6.109s
+FAIL

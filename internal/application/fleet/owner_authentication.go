@@ -4,6 +4,8 @@ import (
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 	"context"
+	"errors"
+	"strings"
 	"time"
 )
 
@@ -68,9 +70,120 @@ func (s *OwnerAuthenticator) checkLocal(ctx context.Context, usage string, get f
 	return out.ValidUntil, nil
 }
 
+type refusalStepKey struct{}
+
+// WithRefusalSteps carries a diagnostic sink for fixed authentication step
+// names. It carries no request data and changes no result.
+func WithRefusalSteps(ctx context.Context, report func(string)) context.Context {
+	return context.WithValue(ctx, refusalStepKey{}, report)
+}
+
+// ChainRefusalSteps adds report to any sink ctx already carries.
+func ChainRefusalSteps(ctx context.Context, report func(string)) context.Context {
+	outer, _ := ctx.Value(refusalStepKey{}).(func(string))
+	return WithRefusalSteps(ctx, func(step string) {
+		report(step)
+		if outer != nil {
+			outer(step)
+		}
+	})
+}
+
+func refusalStep(ctx context.Context, step string) {
+	if ctx == nil {
+		return
+	}
+	if report, ok := ctx.Value(refusalStepKey{}).(func(string)); ok && report != nil {
+		report(step + RemainingBucket(ctx, time.Now()))
+	}
+}
+
+// Only exact native protection check codes may cross this diagnostic boundary.
+// Do not render dependency Error text or accept a compound/private FixedStep.
+// With no reporter, the dependency is not inspected at all.
+func protectionReadRefusal(ctx context.Context, stage string, err error) {
+	if ctx == nil {
+		return
+	}
+	report, ok := ctx.Value(refusalStepKey{}).(func(string))
+	if !ok || report == nil {
+		return
+	}
+	reason := "other"
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		reason = "deadline"
+	case errors.Is(err, context.Canceled):
+		reason = "canceled"
+	default:
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			reason = protectionReadCode(fixed.FixedStep())
+		}
+	}
+	report(stage + "/read/" + reason + RemainingBucket(ctx, time.Now()))
+}
+
+func protectionReadCode(step string) string {
+	phase, detail, nested := strings.Cut(step, "/")
+	switch phase {
+	case "protection.entry", "protection.binding", "protection.namespace-first", "protection.namespace-first-deleting",
+		"protection.guard-first", "protection.probe", "protection.guard-last", "protection.guard-changed",
+		"protection.original-interval", "protection.namespace-last", "protection.namespace-last-deleting",
+		"protection.final-interval", "protection.result", "protection.result-context":
+		if !nested || detail == "deadline" || detail == "canceled" {
+			return step
+		}
+		// Native leaf codes occur only at the three guard/probe boundaries.
+		if phase == "protection.guard-first" || phase == "protection.guard-last" || phase == "protection.probe" {
+			if protectionNativeCode(detail) {
+				return step
+			}
+		}
+	default:
+		if !nested && protectionNativeCode(step) {
+			return step
+		}
+	}
+	return "other"
+}
+
+func protectionNativeCode(step string) bool {
+	switch step {
+	case "source.guard-policy-read", "source.guard-policy-decode", "source.guard-policy-identity", "source.guard-policy-spec",
+		"source.guard-binding-read", "source.guard-binding-decode", "source.guard-binding-identity",
+		"source.probe-identity-read", "source.probe-identity-shape", "source.probe-administrator",
+		"source.probe-access-read", "source.probe-access-verdict", "source.probe-object-read", "source.probe-object-shape",
+		"source.probe-denial-body", "source.probe-denial-status", "source.probe-denial-details", "source.probe-denial-cause",
+		"source.probe-control-identity", "source.probe-controller-identity", "source.probe-original-interval",
+		"source.probe-status-decode", "source.probe-conflicts-exhausted":
+		return true
+	}
+	return false
+}
+
+// RemainingBucket coarsely names the time left on ctx for diagnostics.
+func RemainingBucket(ctx context.Context, now time.Time) string {
+	d, ok := ctx.Deadline()
+	switch left := d.Sub(now); {
+	case !ok:
+		return "@none"
+	case left <= 0:
+		return "@0"
+	case left < 500*time.Millisecond:
+		return "@<0.5s"
+	case left < time.Second:
+		return "@<1s"
+	case left < 2*time.Second:
+		return "@<2s"
+	}
+	return "@>=2s"
+}
+
 func (s *OwnerAuthenticator) authenticate(ctx context.Context, certificateFrom func() (value.OwnerCertificate, error), verify func(value.OwnerConfigurationObservation) (value.OwnerCertificate, error)) (value.AuthenticatedOwner, error) {
 	var zero value.AuthenticatedOwner
 	if s == nil || ctx == nil || s.Registry == nil || s.Routes == nil || s.Protection == nil || s.Now == nil {
+		refusalStep(ctx, "invalid")
 		return zero, value.ErrInvalid
 	}
 	start := s.Now()
@@ -78,49 +191,66 @@ func (s *OwnerAuthenticator) authenticate(ctx context.Context, certificateFrom f
 	defer end()
 	certificate, err := certificateFrom()
 	if err != nil || !certificate.Valid(s.Now()) || ctx.Err() != nil {
+		refusalStep(ctx, "certificate")
 		return zero, value.ErrDenied
 	}
 	first, err := s.Registry.ReadOwnerRegistration(ctx, certificate)
 	if err != nil || !first.Valid(s.Now()) || first.Certificate != certificate {
+		refusalStep(ctx, "registration-first")
 		return zero, value.ErrUnavailable
 	}
 	first.Configuration.Configuration = first.Configuration.Configuration.Clone()
 	current, err := verify(first.Configuration)
 	if err != nil || current != certificate {
+		refusalStep(ctx, "verify-first")
 		return zero, value.ErrDenied
 	}
 	pool := first.Enrollment.Pool
 	before, err := s.Protection.ReadOwnerProtection(ctx, pool)
-	if err != nil || !before.Valid(s.Now()) || before.Pool != pool {
+	if err != nil {
+		protectionReadRefusal(ctx, "protection-before", err)
+		return zero, value.ErrUnavailable
+	}
+	if !before.Valid(s.Now()) {
+		refusalStep(ctx, "protection-before/invalid")
+		return zero, value.ErrUnavailable
+	}
+	if before.Pool != pool {
+		refusalStep(ctx, "protection-before/pool")
 		return zero, value.ErrUnavailable
 	}
 	route, err := s.Routes.CurrentOwnerRoute(ctx, certificate.Binding)
 	if err != nil || !route.Valid(s.Now()) || route.Endpoint.Binding != certificate.Binding || route.Endpoint.Pool != pool || route.Endpoint.Pod != first.Enrollment.Pod || route.Endpoint.ReplicaSetUID != first.Enrollment.ReplicaSetUID || !route.Configuration.Configuration.Equal(first.Configuration.Configuration) {
+		if err != nil {
+			refusalStep(ctx, "route-read")
+		} else {
+			refusalStep(ctx, "route")
+		}
 		return zero, value.ErrUnavailable
 	}
 	route.Configuration.Configuration = route.Configuration.Configuration.Clone()
-	after, err := s.Protection.ReadOwnerProtection(ctx, pool)
-	if err != nil || !after.Valid(s.Now()) || after.Pool != pool || after.Digest != before.Digest {
-		return zero, value.ErrUnavailable
-	}
 	last, err := s.Registry.ReadOwnerRegistration(ctx, certificate)
 	if err != nil || !last.Valid(s.Now()) || last.Certificate != certificate || last.Enrollment != first.Enrollment || !last.Configuration.Configuration.Equal(first.Configuration.Configuration) {
+		refusalStep(ctx, "registration-last")
 		return zero, value.ErrUnavailable
 	}
 	current, err = verify(last.Configuration)
 	if err != nil || current != certificate {
+		refusalStep(ctx, "verify-last")
 		return zero, value.ErrDenied
 	}
 	now := s.Now()
-	if ctx.Err() != nil || !first.Valid(now) || !last.Valid(now) || !before.Valid(now) || !after.Valid(now) || !route.Valid(now) || !certificate.Valid(now) {
+	if ctx.Err() != nil || !first.Valid(now) || !last.Valid(now) || !before.Valid(now) || !route.Valid(now) || !certificate.Valid(now) {
+		refusalStep(ctx, "expired")
 		return zero, value.ErrUnavailable
 	}
 	until := start.Add(5 * time.Second)
-	for _, deadline := range []time.Time{first.FreshUntil, last.FreshUntil, route.FreshUntil, before.FreshUntil, after.FreshUntil, certificate.NotAfter} {
+	for _, deadline := range []time.Time{first.FreshUntil, last.FreshUntil, route.FreshUntil, before.FreshUntil, certificate.NotAfter} {
 		until = identity.Earlier(until, deadline)
 	}
 	out := value.AuthenticatedOwner{Certificate: certificate, EnrollmentID: first.Enrollment.ID, Pool: pool, Pod: route.Endpoint.Pod, ReplicaSetUID: route.Endpoint.ReplicaSetUID, ConfigurationRevision: first.Configuration.Configuration.Revision, ProtectionDigest: before.Digest, VerifiedAt: start, ValidUntil: until}
 	if !out.Valid(s.Now()) {
+		refusalStep(ctx, "result")
 		return zero, value.ErrUnavailable
 	}
 	return out, nil
@@ -141,8 +271,8 @@ func (s *OwnerAuthenticator) ObserveOwnerServing(ctx context.Context, server Own
 }
 
 // ObserveOwnerClient returns the same full current observation as local client
-// admission. It retains the actual private client identity and both independent
-// registry/guard reads; it does not fabricate a remote TLS connection.
+// admission. It retains the actual private client identity and its registry
+// reads and current guard proof; it does not fabricate a remote TLS connection.
 func (s *OwnerAuthenticator) ObserveOwnerClient(ctx context.Context, client OwnerClientIdentity) (value.AuthenticatedOwner, error) {
 	if client == nil {
 		return value.AuthenticatedOwner{}, value.ErrInvalid

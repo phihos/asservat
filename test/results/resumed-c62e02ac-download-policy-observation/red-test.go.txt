@@ -1,0 +1,199 @@
+package authorization
+
+import (
+	"context"
+	"errors"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/domain/privacy"
+)
+
+type observationPolicyReader func(context.Context) (privacy.DownloadPolicy, error)
+
+func (f observationPolicyReader) DownloadPolicy(ctx context.Context) (privacy.DownloadPolicy, error) {
+	return f(ctx)
+}
+
+// The RED checkpoint passes the existing live reader directly, before the
+// download-only observation owner is composed. Its reads remain real calls.
+func policyObservationForTest(t *testing.T, raw DownloadPolicyReader, now func() time.Time) DownloadPolicyReader {
+	t.Helper()
+	return raw
+}
+
+type policyObservationClock struct {
+	mu  sync.Mutex
+	now time.Time
+}
+
+func (c *policyObservationClock) Now() time.Time  { c.mu.Lock(); defer c.mu.Unlock(); return c.now }
+func (c *policyObservationClock) Set(n time.Time) { c.mu.Lock(); defer c.mu.Unlock(); c.now = n }
+
+func TestDownloadPolicyObservationRetainsOriginalInterval(t *testing.T) {
+	f, _, _, _ := newEnvironmentFixture()
+	clock := &policyObservationClock{now: f.now}
+	original := f.now
+	var reads atomic.Int32
+	raw := observationPolicyReader(func(context.Context) (privacy.DownloadPolicy, error) {
+		reads.Add(1)
+		p := f.policy
+		p.ObservedAt = clock.Now()
+		p.FreshUntil = p.ObservedAt.Add(5 * time.Second)
+		return p, nil
+	})
+	reader := policyObservationForTest(t, raw, clock.Now)
+	call, end := context.WithTimeout(t.Context(), time.Second)
+	defer end()
+	first, err := reader.DownloadPolicy(call)
+	if err != nil {
+		t.Fatal(err)
+	}
+	clock.Set(original.Add(59 * time.Second))
+	last, err := reader.DownloadPolicy(call)
+	if err != nil || reads.Load() != 1 || !first.ObservedAt.Equal(original) || !last.ObservedAt.Equal(original) || !first.FreshUntil.Equal(original.Add(time.Minute)) || !last.FreshUntil.Equal(first.FreshUntil) {
+		t.Fatalf("observation was reread or its original interval changed: reads=%d first=%s/%s last=%s/%s err=%v", reads.Load(), first.ObservedAt, first.FreshUntil, last.ObservedAt, last.FreshUntil, err)
+	}
+	clock.Set(original.Add(time.Minute))
+	next, err := reader.DownloadPolicy(call)
+	if err != nil || reads.Load() != 2 || !next.ObservedAt.Equal(clock.Now()) || !next.FreshUntil.Equal(original.Add(2*time.Minute)) {
+		t.Fatal("expired observation did not require one new live read", reads.Load(), err)
+	}
+}
+
+func TestDownloadPolicyObservationSharesConcurrentRead(t *testing.T) {
+	f, _, _, _ := newEnvironmentFixture()
+	var reads atomic.Int32
+	entered, release := make(chan struct{}), make(chan struct{})
+	raw := observationPolicyReader(func(ctx context.Context) (privacy.DownloadPolicy, error) {
+		if reads.Add(1) == 1 {
+			close(entered)
+		}
+		select {
+		case <-release:
+			return f.policy, nil
+		case <-ctx.Done():
+			return privacy.DownloadPolicy{}, ctx.Err()
+		}
+	})
+	reader := policyObservationForTest(t, raw, func() time.Time { return f.now })
+	const callers = 8
+	results := make(chan error, callers)
+	for range callers {
+		go func() { _, err := reader.DownloadPolicy(t.Context()); results <- err }()
+	}
+	<-entered
+	close(release)
+	for range callers {
+		if err := <-results; err != nil {
+			t.Fatal(err)
+		}
+	}
+	if reads.Load() != 1 {
+		t.Fatalf("concurrent callers performed %d live policy reads, want1", reads.Load())
+	}
+}
+
+func TestDownloadPolicyObservationWaiterCancellation(t *testing.T) {
+	f, _, _, _ := newEnvironmentFixture()
+	var reads atomic.Int32
+	entered, release := make(chan struct{}), make(chan struct{})
+	raw := observationPolicyReader(func(ctx context.Context) (privacy.DownloadPolicy, error) {
+		if reads.Add(1) == 1 {
+			close(entered)
+		}
+		select {
+		case <-release:
+			return f.policy, nil
+		case <-ctx.Done():
+			return privacy.DownloadPolicy{}, ctx.Err()
+		}
+	})
+	reader := policyObservationForTest(t, raw, func() time.Time { return f.now })
+	ownerDone := make(chan error, 1)
+	go func() { _, err := reader.DownloadPolicy(t.Context()); ownerDone <- err }()
+	<-entered
+	waiter, cancel := context.WithCancel(t.Context())
+	cancel()
+	if _, err := reader.DownloadPolicy(waiter); err == nil {
+		t.Error("cancelled waiter returned authority")
+	}
+	close(release)
+	if err := <-ownerDone; err != nil {
+		t.Fatal("waiter cancelled original reader", err)
+	}
+	if reads.Load() != 1 {
+		t.Fatalf("waiter started additional read: %d", reads.Load())
+	}
+}
+
+func TestDownloadPolicyObservationOwnsReturnedSlices(t *testing.T) {
+	f, _, _, _ := newEnvironmentFixture()
+	original := f.policy.Clients[0].Purposes[0]
+	reader := policyObservationForTest(t, observationPolicyReader(func(context.Context) (privacy.DownloadPolicy, error) { return f.policy, nil }), func() time.Time { return f.now })
+	p, err := reader.DownloadPolicy(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Clients[0].Purposes[0] = "changed"
+	p.Clients[0].PathIDs[0] = "changed"
+	p.PermittedRegions[0] = "changed"
+	p.Paths[0].StorageRegion = "changed"
+	p.Operators[0].ID = "changed"
+	again, err := reader.DownloadPolicy(t.Context())
+	if err != nil || again.Clients[0].Purposes[0] != original || again.Clients[0].PathIDs[0] == "changed" || again.PermittedRegions[0] == "changed" || again.Paths[0].StorageRegion == "changed" || again.Operators[0].ID == "changed" || f.policy.Clients[0].Purposes[0] != original {
+		t.Fatal("returned data aliases retained/source policy", err)
+	}
+}
+
+func TestDownloadPolicyObservationRejectsClockRollback(t *testing.T) {
+	f, _, _, _ := newEnvironmentFixture()
+	clock := &policyObservationClock{now: f.now}
+	var reads atomic.Int32
+	reader := policyObservationForTest(t, observationPolicyReader(func(context.Context) (privacy.DownloadPolicy, error) {
+		reads.Add(1)
+		p := f.policy
+		p.ObservedAt = clock.Now()
+		p.FreshUntil = p.ObservedAt.Add(5 * time.Second)
+		return p, nil
+	}), clock.Now)
+	if _, err := reader.DownloadPolicy(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	clock.Set(f.now.Add(20 * time.Second))
+	if _, err := reader.DownloadPolicy(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	clock.Set(f.now.Add(10 * time.Second))
+	if _, err := reader.DownloadPolicy(t.Context()); err == nil {
+		t.Fatal("clock rollback accepted")
+	}
+	if reads.Load() != 1 {
+		t.Fatal("clock rollback refreshed the original policy", reads.Load())
+	}
+}
+
+func TestDownloadPolicyObservationFailureHasNoFallback(t *testing.T) {
+	f, _, _, _ := newEnvironmentFixture()
+	clock := &policyObservationClock{now: f.now}
+	var reads atomic.Int32
+	failure := errors.New("source unavailable")
+	reader := policyObservationForTest(t, observationPolicyReader(func(context.Context) (privacy.DownloadPolicy, error) {
+		if reads.Add(1) > 1 {
+			return privacy.DownloadPolicy{}, failure
+		}
+		return f.policy, nil
+	}), clock.Now)
+	if _, err := reader.DownloadPolicy(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	clock.Set(f.now.Add(time.Minute))
+	if p, err := reader.DownloadPolicy(t.Context()); !errors.Is(err, failure) || p.RootID != "" {
+		t.Fatal("expired policy reused after failed read", err)
+	}
+	if reads.Load() != 2 {
+		t.Fatal("failed refresh retried", reads.Load())
+	}
+}

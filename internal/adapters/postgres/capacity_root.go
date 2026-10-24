@@ -194,6 +194,11 @@ func (s *capacityRootScope) run(ctx context.Context, o app.RootBackingObservatio
 		if err != nil {
 			return err
 		}
+		if phase == "publish" {
+			if err = q.EnsureSharedContextQueryCapacity(live, id(s.root)); err != nil {
+				return err
+			}
+		}
 		out, err = decodeCapacityRootResult(raw)
 		if err != nil || out.FreshUntil.After(until) || out.Configuration == nil && phase != "read" || out.Configuration != nil && (out.Configuration.RootID != s.root || out.Configuration.PlanDigest != o.PlanDigest) || expected != nil && (out.Configuration == nil || phase == "renew" && !expected.CompatibleRenewal(*out.Configuration, o) || phase != "renew" && !expected.CompatibleContinuation(*out.Configuration)) {
 			return cfg.ErrUnavailable

@@ -158,3 +158,16 @@ func TestLargeDownloadPlanBoundariesAndPartialRange(t *testing.T) {
 		t.Fatal("partial range became full session completion", e)
 	}
 }
+
+// Installed native91: SQL pins a window's WriteUntil to its control's
+// AuditWriteUntil, which a protected-capacity control sets about 24 h ahead.
+// The window must accept it; a deadline beyond the capacity bound still fails.
+func TestDownloadWindowAcceptsCapacityControlAuditDeadline(t *testing.T) {
+	s, a, r, n := responseFixture(t, DeliveryBytes)
+	if _, _, _, e := r.BeginWindow(s, a, s.ID, s.ID, n.Add(24*time.Hour+30*time.Second), n); e != nil {
+		t.Fatal("capacity control audit deadline refused the window", e)
+	}
+	if _, _, _, e := r.BeginWindow(s, a, s.ID, s.ID, n.Add(MaxDownloadWindowWrite+time.Second), n); e == nil {
+		t.Fatal("unbounded window audit deadline accepted")
+	}
+}

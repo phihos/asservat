@@ -1,0 +1,10 @@
+{
+  "command": [
+    "python3",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/verify-native-sources.py",
+    "/home/phil/Projekte/asservat-simplify-c62e02ac",
+    "17e0ff6387e5e472037bb3a0bfdd7239ddbec95b",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/native57-full/context-storage-environment.json"
+  ],
+  "exitCode": 0
+}

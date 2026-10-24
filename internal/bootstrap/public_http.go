@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mounts"
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
@@ -69,11 +68,11 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			if err != nil {
 				return nil, mounts.ErrUnavailable
 			}
-			closed, err := objectstore.NewClosedOperationAuditObjects(a.store, policy.StoreID, a.seal, a.open)
+			objects, closed, err := a.operationObjects(policy.StoreID)
 			if err != nil {
 				return nil, mounts.ErrUnavailable
 			}
-			return auditapp.NewHealthyOperationAuditor(policy, journal, acks, &objectstore.OperationAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}, closed, lifecycle, time.Now)
+			return auditapp.NewHealthyOperationAuditor(policy, journal, acks, objects, closed, lifecycle, time.Now)
 		})
 	}
 	normal, err := auditor("normal")
@@ -109,7 +108,7 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	*closers = append(*closers, func() { _ = refresh.Close() })
 
 	operations, err := NewPublicContextOperations(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
-		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native})
+		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection})
 	if err != nil {
 		return nil, &fixedStepError{"operations", mounts.ErrUnavailable}
 	}
@@ -117,6 +116,18 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	services := PublicContextServices{Sessions: id.sessions, RefreshOwners: refresh, RefreshPauses: journal, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
 	if pc.fleet != nil {
 		services.Fleet = pc.fleet
+	}
+	// ADR-210: the privacy operator's processing changes on the normal lane.
+	if pc.processingPolicy != nil {
+		pool, err := d.public.open(ctx, "processing-decision")
+		if err != nil {
+			return nil, &fixedStepError{"processing-sql", err}
+		}
+		decisions, err := postgres.NewProcessingDecisions(ctx, pool, root, d.shared.guards.Recovery)
+		if err != nil {
+			return nil, &fixedStepError{"processing-sql", mounts.ErrUnavailable}
+		}
+		services.Processing = publicProcessingChanges{root: root, installation: installation, profiles: profiles, policies: pc.processingPolicy, recovery: pc.recovery, decisions: decisions, audit: normal, mac: pc.mac, refused: eventLog(os.Stderr, "processing change refused")}
 	}
 	h, err := NewPublicContextHandler(PublicContextConfig{PublicOrigin: p.Origin, Issuer: settings.Issuer, Version: p.Version,
 		OperationConcurrency: p.OperationConcurrency, MCPPerIdentity: p.MCPPerIdentity, DownloadConcurrency: p.DownloadConcurrency, DownloadsPerIdentity: p.DownloadsPerIdentity, DownloadMaxDuration: time.Duration(p.DownloadMaxSeconds) * time.Second,

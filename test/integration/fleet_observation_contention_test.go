@@ -50,7 +50,7 @@ func (p *countedContentionProjection) FenceAdministration(ctx context.Context, b
 	if p.lost != nil && p.lost.lost.Load() {
 		// Read the committed actual row before applying the existing failure fence.
 		// This is test evidence, never accepted authority or a retry of COMMIT.
-		_ = p.admin.QueryRow(ctx, `SELECT NOT suspended AND observed_at=$2 AND fresh_until=$3 FROM public.fleet_current_trust WHERE installation_id=$1`, p.expected.InstallationID, p.expected.ObservedAt, p.expected.FreshUntil).Scan(&p.committedBeforeFence)
+		_ = p.admin.QueryRow(ctx, `SELECT NOT suspended AND observed_at=$2 AND fresh_until=$3 FROM public.fleet_current_trust WHERE installation_id=$1`, p.expected.InstallationID, p.expected.ObservedAt, p.expected.ObservedAt.Add(30*time.Second)).Scan(&p.committedBeforeFence)
 	}
 	return p.actual.FenceAdministration(ctx, basis, started)
 }

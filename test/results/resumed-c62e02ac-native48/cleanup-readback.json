@@ -1,0 +1,74 @@
+[
+  {
+    "kind": "container",
+    "name": "asservat-context-siix2l2z-0-control-plane",
+    "exit": 1,
+    "absent": true
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-siix2l2z-1-control-plane",
+    "exit": 1,
+    "absent": true
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-siix2l2z-s3",
+    "exit": 1,
+    "absent": true
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-siix2l2z-kms",
+    "exit": 1,
+    "absent": true
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-siix2l2z-postgres",
+    "exit": 1,
+    "absent": true
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-siix2l2z-tls",
+    "exit": 1,
+    "absent": true
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-siix2l2z-keycloak",
+    "exit": 1,
+    "absent": true
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-siix2l2z-0-seed",
+    "exit": 1,
+    "absent": true
+  },
+  {
+    "kind": "volume",
+    "name": "asservat-context-siix2l2z-0-var",
+    "exit": 1,
+    "absent": true
+  },
+  {
+    "kind": "image",
+    "name": "asservat-context-worker:context-siix2l2z",
+    "exit": 1,
+    "absent": true
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-siix2l2z",
+    "exit": 1,
+    "absent": true
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-siix2l2z-kind",
+    "exit": 1,
+    "absent": true
+  }
+]

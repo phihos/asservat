@@ -1,0 +1,18 @@
+{
+  "at": "2026-10-22T20:16:34.853316+00:00",
+  "checks": [
+    {
+      "argv": [
+        "docker",
+        "network",
+        "inspect",
+        "asservat-custody-0z7t5p3f"
+      ],
+      "exitCode": 1,
+      "stdout": "[]\n",
+      "stderr": "Error response from daemon: network asservat-custody-0z7t5p3f not found\n",
+      "absent": true
+    }
+  ],
+  "allAbsent": true
+}

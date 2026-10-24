@@ -71,7 +71,7 @@ func TestInstallerContinuationBudgetStopNamesSafeCounts(t *testing.T) {
 	plan, _ := contracts.InstalledSQLConnectionPlan(1)
 	_, err := plan.Validate(0, contracts.SQLServerCapacity{MaxConnections: 48, SuperuserReserved: 3})
 	stop := &InstallerContinuationStop{Step: "open/sql-budget", Err: errors.Join(err, errors.New("secret SQL detail"))}
-	if !strings.Contains(stop.Error(), "requires 112 connections, 45 configured") || strings.Contains(stop.Error(), "secret") || !errors.Is(stop, contracts.ErrSQLConnectionBudget) {
+	if !strings.Contains(stop.Error(), "requires 114 connections, 45 configured") || strings.Contains(stop.Error(), "secret") || !errors.Is(stop, contracts.ErrSQLConnectionBudget) {
 		t.Fatal(stop.Error())
 	}
 }

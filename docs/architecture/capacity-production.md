@@ -16,6 +16,17 @@ namespace/workload UID, approved selector labels and ownership are reread before
 enrollment. Accepted maintainer assignments identify eligible scopes without
 turning a group, candidate or capacity account into collection authority.
 
+Workload candidate pages use one bounded, typed LIST in the selected namespace,
+without separate namespace GETs before and after it. The page can contain a
+candidate from a replacement namespace with the same name; it cannot establish
+namespace identity or authorize enrollment. The later exact workload observation
+still checks the original namespace UID and protected labels around its reads,
+and the workload UID, ownership and generation independently. This removes two
+API calls per candidate page (three calls become one), including empty pages;
+it changes no cursor, retry policy, API rate, request deadline, guard or SQL
+authority check. The call reduction is an operation count, not a measured
+installed latency improvement.
+
 Admission needs a binding refreshed within the last five seconds, and a
 discovery pass revisits a workload only once per pass, which takes minutes on a
 regional cluster. Under [ADR-200](../decisions/200-on-demand-capacity-refresh.md)
@@ -25,6 +36,15 @@ waits within its original deadline. The worker's demand lane
 (`read_capacity_refresh_demands`, capacity writer) reconciles demanded workloads
 back to back through the same guarded path as discovery. A demand names a
 workload and confers no authority.
+
+[ADR-213](../decisions/213-storage-readiness-at-consumption.md) carries the
+same owned readiness operation from its early hint into final storage
+selection. If a valid binding has lost the required one-second margin,
+the consumer may wait at the existing 250 ms interval for an independently
+refreshed binding with the same selection. One demand attempt and all
+original non-storage authority deadlines bound both phases. Changed storage,
+invalid observations, errors or expired retained facts stop consumption;
+neither the demand nor the wait supplies authority or retries admission.
 
 `capacity-root-setup.json` is a private generated administrator input. It binds
 original installation/activation, permission root, public role-root UID/setup,
@@ -109,7 +129,10 @@ new leader or configuration receipt.
 3. Role70 verifies all original storage, context, control, normal/resolution,
    capture, download, native and Stop backing before publishing Ready.
 
-`capacity_managed_admission_until` is the common managed admission fence.
+`capacity_managed_admission_until` is the common managed admission fence for
+collection (custody attempts, context captures and capture-lane audit). Since
+migration 00076, download sessions, approved queries and other audit lanes do
+not consult it or `capacity_managed_root_until`.
 Early context bindings and paused physical allocations cannot authorize a
 legacy consumer before phase3. A failed or uncertain phase keeps all original
 charges. Exact committed SQL configuration can continue under a new current
@@ -200,10 +223,11 @@ in implementation progress.
 
 ## Original-installation query extension
 
-[Protected query capacity](context-query-capacity.md) adds an optional closed
-original setup extension and a separate immutable residual reservation. Existing
-base totals stay exact. Accepted query resource/history measurements and four
-independent current deployment proofs are mandatory; absent qualification does
-not inherit download capacity. The first implementation is finite and does not
-replenish on root renewal, query expiry or restart. It supplies no installed
-query roles, native qualification or public availability.
+[Shared query capacity](context-query-capacity.md), under ADR-219, adds a closed
+original setup extension and one immutable logical residual reservation. Existing
+root and workload publication transactions accept it; the separate query source
+observer and four-deployment requirement are removed. Queries and downloads use
+the actual installed acquisition/hub/key/provider limits with distinct authority
+and charged query history. Base totals stay exact, each plan binds the exact
+workload and current accepted worker profile, and renewal/expiry/restart never
+replenish the original query budget. Installed qualification is recorded separately.

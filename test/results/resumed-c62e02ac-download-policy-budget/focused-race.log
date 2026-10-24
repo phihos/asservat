@@ -1,0 +1,14 @@
+=== RUN   TestDownloadPolicyRequestBudgetOriginalParent
+    download_policy_request_budget_test.go:132: policy_read=1 elapsed=30.170302ms total_elapsed=30.194022ms observer=14 probe=3 denied=1
+    download_policy_request_budget_test.go:132: policy_read=2 elapsed=373.792445ms total_elapsed=404.056968ms observer=28 probe=6 denied=2
+--- PASS: TestDownloadPolicyRequestBudgetOriginalParent (0.48s)
+=== RUN   TestDownloadPolicyRequestBudgetOriginalSourceInterval
+--- PASS: TestDownloadPolicyRequestBudgetOriginalSourceInterval (0.11s)
+=== RUN   TestDownloadPolicyRequestBudgetStopsAtOriginalBoundary
+=== RUN   TestDownloadPolicyRequestBudgetStopsAtOriginalBoundary/deadline
+=== RUN   TestDownloadPolicyRequestBudgetStopsAtOriginalBoundary/cancellation
+--- PASS: TestDownloadPolicyRequestBudgetStopsAtOriginalBoundary (1.20s)
+    --- PASS: TestDownloadPolicyRequestBudgetStopsAtOriginalBoundary/deadline (1.08s)
+    --- PASS: TestDownloadPolicyRequestBudgetStopsAtOriginalBoundary/cancellation (0.11s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	2.858s

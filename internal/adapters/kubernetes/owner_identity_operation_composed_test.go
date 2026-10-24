@@ -90,7 +90,7 @@ func (s *ownerIdentityOperationSQLFixture) advance(ctx context.Context, operatio
 		if s.effects[purpose] != claim.OperationID {
 			return zero, cfg.ErrUnavailable
 		}
-		receipt := contracts.PublicRuntimeRoleReceipt{RoleName: "as_" + strings.ReplaceAll(s.root.input.InstallationID, "-", "") + "_own_0" + strconv.Itoa(index), RoleOID: uint32(6000 + index), LayoutDigest: s.root.input.LayoutDigest}
+		receipt := contracts.PublicRuntimeRoleReceipt{RoleName: "as_" + strings.ReplaceAll(s.root.input.InstallationID, "-", "") + "_own_0" + strconv.Itoa(6), RoleOID: uint32(6000 + index), LayoutDigest: s.root.input.LayoutDigest}
 		if !inspect {
 			if _, err = operation.AcknowledgeOwnerIdentityRole(ctx, s.root, receipt); err != nil {
 				return zero, err

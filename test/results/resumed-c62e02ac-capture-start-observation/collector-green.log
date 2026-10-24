@@ -1,0 +1,33 @@
+=== RUN   TestBoundedContextProtocol
+=== RUN   TestBoundedContextProtocol/safe-projection
+=== RUN   TestBoundedContextProtocol/unowned-projection
+=== RUN   TestBoundedContextProtocol/unexpected-owner
+=== RUN   TestBoundedContextProtocol/redirect
+=== RUN   TestBoundedContextProtocol/namespace-replaced
+=== RUN   TestBoundedContextProtocol/controller-replaced
+=== RUN   TestBoundedContextProtocol/oversized
+E1022 23:32:33.067486 4027483 request.go:1198] "Unexpected error when reading response body" err="bounded pod status unavailable"
+=== RUN   TestBoundedContextProtocol/denied
+--- PASS: TestBoundedContextProtocol (0.11s)
+    --- PASS: TestBoundedContextProtocol/safe-projection (0.01s)
+    --- PASS: TestBoundedContextProtocol/unowned-projection (0.01s)
+    --- PASS: TestBoundedContextProtocol/unexpected-owner (0.01s)
+    --- PASS: TestBoundedContextProtocol/redirect (0.01s)
+    --- PASS: TestBoundedContextProtocol/namespace-replaced (0.01s)
+    --- PASS: TestBoundedContextProtocol/controller-replaced (0.01s)
+    --- PASS: TestBoundedContextProtocol/oversized (0.05s)
+    --- PASS: TestBoundedContextProtocol/denied (0.01s)
+=== RUN   TestAPIContextCollectorDoesNotRequireNodeAssignment
+=== RUN   TestAPIContextCollectorDoesNotRequireNodeAssignment/unscheduled
+=== RUN   TestAPIContextCollectorDoesNotRequireNodeAssignment/scheduled
+=== RUN   TestAPIContextCollectorDoesNotRequireNodeAssignment/replacement
+=== RUN   TestAPIContextCollectorDoesNotRequireNodeAssignment/controller-changed
+=== RUN   TestAPIContextCollectorDoesNotRequireNodeAssignment/node-pin
+--- PASS: TestAPIContextCollectorDoesNotRequireNodeAssignment (0.03s)
+    --- PASS: TestAPIContextCollectorDoesNotRequireNodeAssignment/unscheduled (0.01s)
+    --- PASS: TestAPIContextCollectorDoesNotRequireNodeAssignment/scheduled (0.01s)
+    --- PASS: TestAPIContextCollectorDoesNotRequireNodeAssignment/replacement (0.01s)
+    --- PASS: TestAPIContextCollectorDoesNotRequireNodeAssignment/controller-changed (0.01s)
+    --- PASS: TestAPIContextCollectorDoesNotRequireNodeAssignment/node-pin (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	1.192s

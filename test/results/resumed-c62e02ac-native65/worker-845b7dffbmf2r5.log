@@ -1,0 +1,271 @@
+2026-10-23T08:36:05.896769167Z I1023 08:36:05.896693       1 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+2026-10-23T08:36:21.931581421Z I1023 08:36:21.931519       1 leaderelection.go:272] "Successfully acquired lease" lock="asservat configuration reconciliation"
+2026-10-23T08:36:22.709124881Z capacity started with 0 regional clusters
+2026-10-23T08:36:22.722892620Z capacity local observation capacity-namespace-candidates: candidates (unavailable) after 10ms
+2026-10-23T08:36:22.722896490Z capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T08:36:23.916300444Z capacity source: accept (unavailable)
+2026-10-23T08:36:25.245393151Z capacity local observation capacity-namespace-candidates: ok after 1.26s
+2026-10-23T08:36:26.121413072Z authority audit publish: unavailable
+2026-10-23T08:36:27.144990546Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T08:36:32.336077887Z authority audit publish: ok
+2026-10-23T08:36:33.293360115Z capacity source: ok
+2026-10-23T08:36:33.733615014Z capacity root: unavailable
+2026-10-23T08:36:39.495634222Z capacity local observation capacity-workload-candidates: post (unavailable) after 700ms
+2026-10-23T08:36:39.751045488Z capacity local observation capacity-workload-candidates: dial (unavailable) after 10ms
+2026-10-23T08:36:43.851780013Z capacity local observation capacity-workload-candidates: verify (denied) after 3.09s
+2026-10-23T08:36:45.121923248Z capacity local observation capacity-workload-candidates: ok after 1.02s
+2026-10-23T08:36:46.948711730Z capacity local observation capacity-namespace-guard: ok after 1.57s
+2026-10-23T08:36:47.698343223Z capacity local observation capacity-workload: selected (unavailable) after 750ms
+2026-10-23T08:36:47.698349093Z capacity local workload: workload (unavailable) after 2.33s
+2026-10-23T08:36:49.948836289Z capacity local observation capacity-namespace-guard: ok after 1.99s
+2026-10-23T08:36:51.252194095Z capacity local observation capacity-workload: refused (unavailable) after 1.3s
+2026-10-23T08:36:52.711202147Z capacity local observation capacity-namespace-guard: post (unavailable) after 1.2s
+2026-10-23T08:36:52.711207316Z capacity local workload: guard-read (unavailable) after 1.21s
+2026-10-23T08:36:52.712557292Z capacity clusters changed; capacity restarts with the new set
+2026-10-23T08:36:53.165779154Z capacity started with 1 regional clusters
+2026-10-23T08:36:54.440865628Z capacity local observation capacity-namespace-candidates: ok after 1.27s
+2026-10-23T08:36:54.440871908Z capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T08:36:56.418338220Z capacity regional observation capacity-namespace-candidates: ok after 1.73s
+2026-10-23T08:36:56.418343439Z capacity regional discovery: steps=1 candidates=0 namespace-index=0 namespace-count=9 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T08:36:57.585929041Z capacity local observation capacity-workload-candidates: ok after 920ms
+2026-10-23T08:37:01.459876813Z capacity regional observation capacity-workload-candidates: ok after 1.72s
+2026-10-23T08:37:06.521449654Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:37:06.532625172Z capacity regional workload: compose/permission-scope (not-allocated) after 1.73s
+2026-10-23T08:37:11.578010037Z capacity regional observation capacity-workload-candidates: ok after 1.73s
+2026-10-23T08:37:20.548227001Z capacity local observation capacity-namespace-guard: ok after 1.39s
+2026-10-23T08:37:22.448063916Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:37:22.448077046Z capacity local workload: compose/permission-scope (not-allocated) after 3.3s
+2026-10-23T08:37:24.368119086Z capacity local observation capacity-workload-candidates: ok after 920ms
+2026-10-23T08:37:24.871852060Z capacity local discovery: steps=16 candidates=2 namespace-index=3 namespace-count=10 kind-index=0 workload-index=1 workload-count=5
+2026-10-23T08:37:26.267733577Z capacity local observation capacity-namespace-guard: ok after 1.38s
+2026-10-23T08:37:28.167239707Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:37:30.133967334Z capacity regional discovery: steps=7 candidates=1 namespace-index=1 namespace-count=9 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T08:37:31.324762933Z capacity local observation capacity-namespace-guard: ok after 920ms
+2026-10-23T08:37:33.223656098Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:37:36.379674513Z capacity local observation capacity-namespace-guard: ok after 920ms
+2026-10-23T08:37:38.279853840Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:37:41.641829920Z capacity local observation capacity-namespace-guard: ok after 1.13s
+2026-10-23T08:37:43.316836323Z capacity local observation capacity-workload: unavailable after 1.67s
+2026-10-23T08:37:43.316841953Z capacity local workload: workload (unavailable) after 2.81s
+2026-10-23T08:37:45.089580013Z capacity local observation capacity-namespace-guard: ok after 1.26s
+2026-10-23T08:37:46.988958343Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:37:46.988968403Z capacity local workload: compose/permission-scope (not-allocated) after 3.17s
+2026-10-23T08:37:50.138157436Z capacity local observation capacity-workload-candidates: ok after 920ms
+2026-10-23T08:37:55.682345487Z capacity local discovery: steps=24 candidates=6 namespace-index=4 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T08:38:02.897381657Z capacity regional discovery: steps=14 candidates=1 namespace-index=3 namespace-count=9 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T08:38:21.053106869Z capacity local observation capacity-namespace-guard: ok after 1.39s
+2026-10-23T08:38:22.952732322Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:38:24.852820446Z capacity local observation capacity-workload-candidates: ok after 1.4s
+2026-10-23T08:38:27.096745163Z capacity local discovery: steps=39 candidates=7 namespace-index=7 namespace-count=10 kind-index=2 workload-index=0 workload-count=0
+2026-10-23T08:38:31.327318668Z capacity local observation capacity-namespace-guard: selected (unavailable) after 80ms
+2026-10-23T08:38:31.327324238Z capacity local workload: guard-read (unavailable) after 100ms
+2026-10-23T08:38:33.296814613Z capacity regional discovery: steps=20 candidates=1 namespace-index=4 namespace-count=9 kind-index=1 workload-index=0 workload-count=0
+2026-10-23T08:38:34.813496020Z capacity local observation capacity-workload-candidates: ok after 1.27s
+2026-10-23T08:38:42.275700029Z capacity local observation capacity-namespace-guard: ok after 1.39s
+2026-10-23T08:38:44.175966264Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:38:44.175976494Z capacity local workload: compose/permission-scope (not-allocated) after 3.3s
+2026-10-23T08:38:46.075860567Z capacity local observation capacity-workload-candidates: ok after 1.4s
+2026-10-23T08:38:51.605572517Z capacity local observation capacity-namespace-candidates: ok after 920ms
+2026-10-23T08:38:53.505539287Z capacity local observation capacity-workload-candidates: ok after 1.4s
+2026-10-23T08:38:55.478733847Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:38:58.572567291Z capacity local discovery: steps=54 candidates=9 namespace-index=0 namespace-count=10 kind-index=2 workload-index=0 workload-count=0
+2026-10-23T08:39:00.541588441Z capacity regional observation capacity-workload-candidates: ok after 1.72s
+2026-10-23T08:39:04.767700813Z capacity regional observation capacity-workload-candidates: claim/post (unavailable) after 630ms
+2026-10-23T08:39:04.767706433Z capacity regional discovery: steps=26 candidates=2 namespace-index=5 namespace-count=9 kind-index=2 workload-index=0 workload-count=0
+2026-10-23T08:39:09.890891251Z capacity regional observation capacity-workload-candidates: ok after 1.81s
+2026-10-23T08:39:17.262050231Z capacity local observation capacity-namespace-guard: ok after 1.39s
+2026-10-23T08:39:18.762540464Z capacity local observation capacity-workload: refused (unavailable) after 1.5s
+2026-10-23T08:39:18.762546273Z capacity local workload: workload (unavailable) after 2.9s
+2026-10-23T08:39:22.398105780Z capacity local observation capacity-workload-candidates: ok after 920ms
+2026-10-23T08:39:24.298458378Z capacity local observation capacity-namespace-guard: ok after 1.39s
+2026-10-23T08:39:25.301412955Z capacity local observation capacity-workload: refused (unavailable) after 1s
+2026-10-23T08:39:27.272414522Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:39:28.806456993Z capacity local observation capacity-namespace-guard: ok after 1.26s
+2026-10-23T08:39:30.706210685Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:39:30.706249065Z capacity local workload: compose/permission-scope (not-allocated) after 3.17s
+2026-10-23T08:39:32.674439108Z capacity regional observation capacity-workload-candidates: ok after 1.72s
+2026-10-23T08:39:32.924492239Z capacity local discovery: steps=68 candidates=13 namespace-index=3 namespace-count=10 kind-index=0 workload-index=3 workload-count=5
+2026-10-23T08:39:33.861885086Z capacity local observation capacity-namespace-guard: ok after 930ms
+2026-10-23T08:39:35.762573600Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:39:37.734429196Z capacity regional discovery: steps=32 candidates=3 namespace-index=6 namespace-count=9 kind-index=2 workload-index=0 workload-count=0
+2026-10-23T08:39:38.913752729Z capacity local observation capacity-namespace-guard: ok after 920ms
+2026-10-23T08:39:40.812754584Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:39:42.713121004Z capacity local observation capacity-namespace-guard: ok after 1.39s
+2026-10-23T08:39:44.612970571Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:39:47.749791832Z capacity local observation capacity-workload-candidates: ok after 920ms
+2026-10-23T08:39:51.615081530Z capacity regional observation capacity-guarded-workload: ok after 1.71s
+2026-10-23T08:39:51.945719431Z capacity regional workload: ok after 2.05s
+2026-10-23T08:39:54.332562159Z capacity regional observation capacity-workload-candidates: locate (unavailable) after 120ms
+2026-10-23T08:39:54.609281502Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:39:54.724956842Z capacity demand refresh: ok after 1.83s, read left 2.3s [guarded-read=1.72s guarded-reconcile=120ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:39:57.254528903Z capacity demand refresh: ok after 2.28s, read left 2.21s [guarded-read=2.19s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:39:57.541529529Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:39:57.541539859Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:39:57.827405201Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:39:58.115570952Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:39:58.402473578Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:39:58.695021818Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:39:58.984650885Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:39:59.276783853Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:39:59.563153636Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:39:59.731458050Z capacity regional observation capacity-workload-candidates: ok after 1.72s
+2026-10-23T08:39:59.850732315Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:39:59.850736895Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:02.278499632Z capacity regional observation capacity-guarded-workload: ok after 2.18s
+2026-10-23T08:40:02.371608096Z capacity demand refresh: ok after 2.27s, read left 2.16s [guarded-read=2.18s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:02.671955269Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 50ms
+2026-10-23T08:40:02.671962619Z capacity demand refresh: guarded-read (unavailable) after 50ms, read left 0s [guarded-read=50ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:02.961038964Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:03.299812179Z capacity local discovery: steps=79 candidates=15 namespace-index=5 namespace-count=10 kind-index=1 workload-index=0 workload-count=0
+2026-10-23T08:40:03.585745101Z capacity regional observation capacity-workload-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:04.927802726Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:40:05.020588459Z capacity demand refresh: ok after 1.81s, read left 2.55s [guarded-read=1.72s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:05.987121724Z capacity regional observation capacity-workload-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:07.481276313Z capacity regional observation capacity-guarded-workload: ok after 2.21s
+2026-10-23T08:40:07.575124721Z capacity demand refresh: ok after 2.3s, read left 2.02s [guarded-read=2.21s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:07.863491522Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:40:07.863496602Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:08.150374787Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:09.306126533Z capacity regional discovery: steps=40 candidates=4 namespace-index=8 namespace-count=9 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T08:40:10.127381801Z capacity regional observation capacity-guarded-workload: ok after 1.73s
+2026-10-23T08:40:10.220063114Z capacity demand refresh: ok after 1.82s, read left 2.41s [guarded-read=1.73s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:11.745005522Z capacity regional observation capacity-workload-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:12.670030039Z capacity regional observation capacity-guarded-workload: ok after 2.2s
+2026-10-23T08:40:12.762326000Z capacity demand refresh: ok after 2.29s, read left 1.9s [guarded-read=2.2s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:13.057194049Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:40:13.057200859Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:13.346997936Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:15.091171402Z capacity local observation capacity-namespace-guard: ok after 1.31s
+2026-10-23T08:40:15.314394677Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:40:15.407667751Z capacity demand refresh: ok after 1.81s, read left 2.3s [guarded-read=1.72s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:16.292505628Z capacity local observation capacity-workload: refused (unavailable) after 1.2s
+2026-10-23T08:40:16.292511888Z capacity local workload: workload (unavailable) after 2.53s
+2026-10-23T08:40:16.578798940Z capacity regional observation capacity-workload-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:17.873650053Z capacity regional observation capacity-guarded-workload: ok after 2.22s
+2026-10-23T08:40:17.971397516Z capacity demand refresh: ok after 2.31s, read left 1.76s [guarded-read=2.22s guarded-reconcile=100ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:18.260573861Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:40:18.260579981Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:18.291737573Z capacity local observation capacity-workload-candidates: ok after 1.46s
+2026-10-23T08:40:18.550599488Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:20.482943329Z capacity regional observation capacity-workload-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:20.522059985Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:40:20.614274895Z capacity demand refresh: ok after 1.81s, read left 2.75s [guarded-read=1.72s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:23.188276621Z capacity demand refresh: ok after 2.32s, read left 2.21s [guarded-read=2.22s guarded-reconcile=100ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:23.474785313Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:40:23.474790743Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:23.763307874Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:24.862141765Z capacity local observation capacity-namespace-guard: ok after 2.2s
+2026-10-23T08:40:25.284827944Z capacity local observation capacity-workload: selected (unavailable) after 420ms
+2026-10-23T08:40:25.571979059Z capacity regional observation capacity-workload-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:25.739772729Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:40:25.831864689Z capacity demand refresh: ok after 1.82s, read left 2.6s [guarded-read=1.72s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:27.186553032Z capacity local observation capacity-workload-candidates: ok after 1.36s
+2026-10-23T08:40:28.398774012Z capacity demand refresh: ok after 2.32s, read left 2.07s [guarded-read=2.22s guarded-reconcile=100ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:28.686476549Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:40:28.686482569Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:28.973314423Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:29.379985394Z capacity regional observation capacity-workload-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:30.944295973Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:40:31.035584519Z capacity demand refresh: ok after 1.81s, read left 2.47s [guarded-read=1.72s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:32.951872637Z capacity local observation capacity-namespace-guard: ok after 1.39s
+2026-10-23T08:40:33.592790588Z capacity demand refresh: ok after 2.31s, read left 2.05s [guarded-read=2.21s guarded-reconcile=100ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:33.880831277Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:40:33.880836577Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:34.168385514Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:34.850846311Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:40:34.850856901Z capacity local workload: compose/permission-scope (not-allocated) after 3.3s
+2026-10-23T08:40:35.141881812Z capacity regional observation capacity-workload-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:36.149047152Z capacity regional observation capacity-guarded-workload: ok after 1.73s
+2026-10-23T08:40:36.242507988Z capacity demand refresh: ok after 1.82s, read left 2.97s [guarded-read=1.73s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:36.750745238Z capacity local observation capacity-workload-candidates: ok after 1.36s
+2026-10-23T08:40:36.750751267Z capacity local discovery: steps=98 candidates=18 namespace-index=9 namespace-count=10 kind-index=1 workload-index=0 workload-count=0
+2026-10-23T08:40:38.800545588Z capacity demand refresh: ok after 2.3s, read left 2.57s [guarded-read=2.2s guarded-reconcile=100ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:39.088270145Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:40:39.088276855Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:39.374743556Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:40.574131819Z capacity local observation capacity-namespace-candidates: ok after 920ms
+2026-10-23T08:40:41.349349457Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:40:41.441346367Z capacity demand refresh: ok after 1.82s, read left 2.28s [guarded-read=1.72s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:42.474452866Z capacity local observation capacity-workload-candidates: ok after 1.4s
+2026-10-23T08:40:42.765082604Z capacity regional observation capacity-namespace-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:42.765089064Z capacity regional discovery: steps=48 candidates=4 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T08:40:44.035857958Z capacity regional observation capacity-guarded-workload: ok after 2.34s
+2026-10-23T08:40:44.131108021Z capacity demand refresh: ok after 2.44s, read left 1.75s [guarded-read=2.34s guarded-reconcile=100ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:44.418610387Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:40:44.418616637Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:45.019088136Z capacity regional observation capacity-namespace-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:46.446353990Z capacity regional observation capacity-guarded-workload: ok after 1.78s
+2026-10-23T08:40:46.537975058Z capacity demand refresh: ok after 1.87s, read left 2.35s [guarded-read=1.78s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:47.416121061Z capacity regional observation capacity-namespace-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:48.992840287Z capacity regional observation capacity-guarded-workload: ok after 2.2s
+2026-10-23T08:40:49.082977258Z capacity demand refresh: ok after 2.29s, read left 1.96s [guarded-read=2.2s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:49.370687674Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:40:49.370693354Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:49.656880014Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:50.769616248Z capacity regional observation capacity-namespace-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:51.626934032Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:40:51.718752080Z capacity demand refresh: ok after 1.81s, read left 2.43s [guarded-read=1.72s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:53.170944399Z capacity regional observation capacity-namespace-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:54.175509685Z capacity regional observation capacity-guarded-workload: ok after 2.21s
+2026-10-23T08:40:54.265309074Z capacity demand refresh: ok after 2.3s, read left 1.91s [guarded-read=2.21s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:54.550573050Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 30ms
+2026-10-23T08:40:54.550577840Z capacity demand refresh: guarded-read (unavailable) after 30ms, read left 0s [guarded-read=30ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:54.838421176Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:40:56.527909147Z capacity regional observation capacity-namespace-candidates: locate (unavailable) after 40ms
+2026-10-23T08:40:56.815210731Z capacity regional observation capacity-guarded-workload: ok after 1.73s
+2026-10-23T08:40:56.910635574Z capacity demand refresh: ok after 1.82s, read left 2.31s [guarded-read=1.73s guarded-reconcile=100ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:59.454420574Z capacity demand refresh: ok after 2.29s, read left 2s [guarded-read=2.2s guarded-reconcile=100ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:40:59.741724088Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:40:59.741729978Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:00.037262687Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:00.126858665Z capacity local observation capacity-namespace-guard: ok after 1.47s
+2026-10-23T08:41:01.952301108Z capacity local observation capacity-workload: ok after 1.83s
+2026-10-23T08:41:02.010964406Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:41:02.102549253Z capacity demand refresh: ok after 1.81s, read left 2.42s [guarded-read=1.72s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:41:02.389876567Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:41:02.389883157Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:02.677281011Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:02.965777130Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:03.252757953Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:03.541961095Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:03.838645568Z capacity demand refresh: guarded-read (unavailable) after 50ms, read left 0s [guarded-read=50ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:04.127945530Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:04.417791625Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:04.558409719Z capacity regional observation capacity-namespace-candidates: ok after 2.36s
+2026-10-23T08:41:04.703988664Z capacity regional observation capacity-guarded-workload: locate (unavailable) after 40ms
+2026-10-23T08:41:04.703993444Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:04.991151697Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:05.278671492Z capacity demand refresh: guarded-read (unavailable) after 40ms, read left 0s [guarded-read=40ms o-candidates@<100ms o-routes@<100ms o-locate@<100ms]
+2026-10-23T08:41:06.226932018Z capacity local observation capacity-workload-candidates: ok after 920ms
+2026-10-23T08:41:07.247540789Z capacity regional observation capacity-guarded-workload: ok after 1.72s
+2026-10-23T08:41:07.345455863Z capacity demand refresh: ok after 1.82s, read left 2.47s [guarded-read=1.72s guarded-reconcile=100ms o-candidates@<100ms o-routes@<100ms o-locate@<250ms c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:41:08.476252779Z capacity local observation capacity-namespace-guard: ok after 1.74s
+2026-10-23T08:41:09.680147034Z capacity local observation capacity-workload: refused (unavailable) after 1.2s
+2026-10-23T08:41:09.680154084Z capacity local workload: workload (unavailable) after 2.95s
+2026-10-23T08:41:09.896891560Z capacity demand refresh: ok after 2.3s, read left 2.05s [guarded-read=2.21s guarded-reconcile=90ms o-candidates@<100ms o-routes@<100ms o-locate@<1s c-open@<100ms c-before@<100ms c-post@<2s c-after@<100ms c-final@<100ms c-current@<100ms o-claim@<2s]
+2026-10-23T08:41:09.966939236Z capacity regional observation capacity-workload-candidates: locate (unavailable) after 40ms
+2026-10-23T08:41:10.217109182Z capacity local discovery: steps=117 candidates=21 namespace-index=3 namespace-count=10 kind-index=0 workload-index=2 workload-count=5
+2026-10-23T08:41:11.918143177Z capacity local observation capacity-namespace-guard: ok after 1.69s
+2026-10-23T08:41:12.300561721Z capacity local observation capacity-workload: selected (unavailable) after 380ms
+2026-10-23T08:41:14.273589264Z capacity regional observation capacity-workload-candidates: ok after 1.72s
+2026-10-23T08:41:14.273596814Z capacity regional discovery: steps=56 candidates=4 namespace-index=0 namespace-count=9 kind-index=0 workload-index=0 workload-count=1
+2026-10-23T08:41:15.518821442Z capacity local observation capacity-namespace-guard: ok after 920ms
+2026-10-23T08:41:17.418563574Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:41:17.418577134Z capacity local workload: compose/permission-scope (not-allocated) after 2.89s
+2026-10-23T08:41:19.397969301Z capacity regional observation capacity-guarded-workload: ok after 1.73s
+2026-10-23T08:41:19.407531022Z capacity regional workload: compose/permission-scope (not-allocated) after 1.74s
+2026-10-23T08:41:20.593358238Z capacity local observation capacity-namespace-guard: ok after 920ms
+2026-10-23T08:41:22.492049753Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:41:24.459967580Z capacity regional observation capacity-workload-candidates: ok after 1.72s
+2026-10-23T08:41:25.803004739Z capacity local observation capacity-namespace-guard: ok after 1.08s
+2026-10-23T08:41:27.900643353Z capacity local observation capacity-workload: ok after 2.1s
+2026-10-23T08:41:31.051831211Z capacity local observation capacity-workload-candidates: ok after 930ms
+2026-10-23T08:41:40.254880500Z capacity local discovery: steps=126 candidates=24 namespace-index=4 namespace-count=10 kind-index=2 workload-index=0 workload-count=0
+2026-10-23T08:41:47.774032313Z capacity regional discovery: steps=63 candidates=5 namespace-index=1 namespace-count=9 kind-index=2 workload-index=0 workload-count=0
+2026-10-23T08:42:00.543445488Z capacity local observation capacity-namespace-guard: ok after 1.74s
+2026-10-23T08:42:02.443046994Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:42:05.592111595Z capacity local observation capacity-workload-candidates: ok after 920ms
+2026-10-23T08:42:11.130136820Z capacity local discovery: steps=141 candidates=25 namespace-index=8 namespace-count=10 kind-index=0 workload-index=0 workload-count=1
+2026-10-23T08:42:13.029133021Z capacity local observation capacity-namespace-guard: ok after 1.39s
+2026-10-23T08:42:14.929579716Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T08:42:16.830034272Z capacity local observation capacity-workload-candidates: ok after 1.4s

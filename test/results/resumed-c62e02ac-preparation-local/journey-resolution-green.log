@@ -1,0 +1,46 @@
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/first-request-succeeds
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/unaccepted-unknown
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/changed-review-needs-close
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/unavailable-needs-close
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/lost-resolution
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/missing-disposition
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-continues
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/successful-continuation-cannot-change
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/successful-continuation-needs-capture
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-changed-review
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/spent-preparation
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-cannot-close
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-cannot-change
+=== RUN   TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/malformed-closure
+--- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/first-request-succeeds (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/unaccepted-unknown (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/changed-review-needs-close (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/unavailable-needs-close (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/lost-resolution (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/missing-disposition (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-continues (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/successful-continuation-cannot-change (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/successful-continuation-needs-capture (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-changed-review (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/spent-preparation (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-cannot-close (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/accepted-cannot-change (0.00s)
+    --- PASS: TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement/malformed-closure (0.00s)
+=== RUN   TestInstalledJourneyBoundsAcceptedContinuationAndCancellation
+--- PASS: TestInstalledJourneyBoundsAcceptedContinuationAndCancellation (0.00s)
+=== RUN   TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots
+=== RUN   TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/immediate-success
+=== RUN   TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/first-continuation-success
+=== RUN   TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/second-continuation-success
+--- PASS: TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots (0.00s)
+    --- PASS: TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/immediate-success (0.00s)
+    --- PASS: TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/first-continuation-success (0.00s)
+    --- PASS: TestInstalledJourneyCaptureConfirmationWithinTwoResolutionSlots/second-continuation-success (0.00s)
+=== RUN   TestInstalledJourneyClosedReviewDoesNotConfirmReplacement
+--- PASS: TestInstalledJourneyClosedReviewDoesNotConfirmReplacement (0.00s)
+=== RUN   TestInstalledJourneySuccessfulContinuationStillChecksCancellation
+--- PASS: TestInstalledJourneySuccessfulContinuationStillChecksCancellation (0.00s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.065s

@@ -31,6 +31,21 @@ The original five-second identity and observation intervals bound all reads and
 the final response, including time spent writing the draft. A request cannot
 detach from the originating browser/MCP request by supplying another context.
 
+Installed preview refusals emit a bounded private stage diagnostic for initial
+identity/recovery/target resolution, each facts dependency, processing coverage,
+compilation, passive draft persistence and final checks. Dependency errors remain
+wrapped for `errors.Is` classification; their text and arbitrary nested stage
+strings are never logged. Only fixed stage labels reach the existing exponentially
+suppressed process logger. This adds no public result field, authority, retry or
+freshness interval. An acknowledged `NotAvailable` envelope remains distinct from
+an audit or transport failure that prevented any valid response.
+
+Regional target-query diagnostics report success only after decoded target,
+exact requested identity and original freshness validation. Fixed private
+labels distinguish the hub receiver cutoff from the regional resolution cutoff;
+successful transport alone is not a usable target observation. These diagnostics
+never refresh either interval or substitute another Pod.
+
 The passive `ContextPreview` holds server-generated preview, capture, case,
 occurrence, artifact, attempt and assessment IDs; original actor/client; exact
 authored intent; target pin; selected storage revisions; relative retention;
@@ -74,6 +89,33 @@ and compares canonical scope, complete audience, storage revisions, relative
 retention policy provenance and current assessment rules. Material changes
 require a new review. Updated observation times do not change reviewed scope or
 extend a prior observation's deadline.
+
+Each call owns at most one non-authoritative capacity readiness wait.
+Request starts it beside exact-Pod resolution using the preview's pinned
+target; Preview and CheckDiagnostic start it after target resolution. The
+same wait overlaps eligibility, capability and retention reads in their
+existing order, then joins before the authoritative storage read. Early
+failure cancels and joins it before returning. Under
+[ADR-213](../decisions/213-storage-readiness-at-consumption.md), this same
+owned operation retains its original upper bound and single demand-attempt
+state through consumption. A valid same-selection result below the existing
+one-second freshness margin may poll every 250 ms for an independently
+refreshed binding, while every retained non-storage fact remains current.
+It may use the sole demand attempt only if the hint has not already spent it.
+An early successful hint cannot satisfy the final margin check.
+
+Request pins the preview's exact storage selection; Preview and
+CheckDiagnostic pin their first valid authoritative selection. Read errors,
+invalid/expired bindings, changed selections and cancellation refuse
+consumption. Missing refresh or a failed demand prevents polling for a thin
+result; a valid final read with sufficient margin can still succeed.
+The wait uses the earliest original
+caller, initial identity/recovery, preview, target, eligibility/identity,
+capability, retention/proof/expiry and optional reason cutoff. It never
+refreshes those facts or extends a binding's timestamps. Target resolution,
+ordered initial fact reads and admission remain single operations, with the
+existing final eligibility recheck retained. The bounded early hint behavior
+for a missing/stale binding remains unchanged.
 
 Evidence retention starts at actual submission preparation, not at preview
 creation. A developer can review for two minutes and still request sixty seconds

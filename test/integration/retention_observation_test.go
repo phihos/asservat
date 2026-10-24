@@ -43,7 +43,9 @@ func qualifyRetentionObservation(t *testing.T, ctx context.Context, admin *pgxpo
 		}
 		publisher := app.RetentionAcceptancePublisher{Journal: auditor, Writer: &objectstore.RetentionAcceptanceObjects{Store: store, Seal: keys, Open: keys}}
 		observe := func(rv string, lifetime time.Duration) app.RetentionObservation {
-			now := time.Now().UTC().Truncate(time.Microsecond)
+			// Real LIST/guard observations carry nanoseconds; native75-77 refused
+			// every one when only part of the bound was truncated.
+			now := time.Now().UTC().Truncate(time.Microsecond).Add(789 * time.Nanosecond)
 			list := cp.Transition.List
 			list.ResourceVersion = rv
 			list.Snapshot.ObservedAt, list.Snapshot.FreshUntil = now, now.Add(lifetime)
@@ -76,6 +78,11 @@ func qualifyRetentionObservation(t *testing.T, ctx context.Context, admin *pgxpo
 			t.Fatal("empty scan", page, err)
 		}
 		before := ready()
+		// ADR-200 revision (2026-10-23, migration 00075): the accepted
+		// observation lives 30 seconds after its original LIST/guard start.
+		if before.FreshUntil.Sub(before.ObservedAt) != privacy.RetentionSourceInterval {
+			t.Fatal("accepted retention observation lifetime", before.FreshUntil.Sub(before.ObservedAt))
+		}
 		if err = s.AdvanceRetentionCursor(ctx, f, "101"); err != nil {
 			t.Fatal(err)
 		}
@@ -204,7 +211,11 @@ func qualifyRetentionObservation(t *testing.T, ctx context.Context, admin *pgxpo
 			t.Fatal(err)
 		}
 		time.Sleep(150 * time.Millisecond)
-		unavailable()
+		// Migration 00075: the stored observation outlives its short input LIST
+		// and guard proof by the relaxed 30-second rule.
+		if late := ready(); late.FreshUntil.Sub(late.ObservedAt) != privacy.RetentionSourceInterval {
+			t.Fatal("accepted retention observation lifetime", late.FreshUntil.Sub(late.ObservedAt))
+		}
 		if err = s.ObserveRetention(ctx, observe(large, 5*time.Second)); err != nil {
 			t.Fatal(err)
 		}

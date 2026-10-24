@@ -12,6 +12,16 @@ SQL locks permission root, storage pool/allocation, attempt and capture before v
 
 Separate SQL verification, audit, publication and read credentials implement narrow consumer facets, composed by `ContextPublicationFacets`. The verifier cannot create catalog rows or acknowledge audit; the publisher cannot create verification facts or alter custody deadlines; audit cannot change verification scope; the reader has SELECT only. No table holds evidence text, a native plaintext hash, raw token, encryption key or complete artifact manifest. Accepted control metadata remains under the existing content-minimized capture contract.
 
+Both verification and publication transactions read `retention_source`,
+`retention_checkpoint`, `retention_catchup`, `retention_catchup_effect` and
+`retention_decision` through their own credentials to check the accepted
+retention fence. A separate retention-reader pool cannot supply permissions
+inside those transactions. The compiled installer grants include these five
+reads for `context-verify` and `context-publish`; audit acknowledgement remains
+separate. Integration scenarios use each exact compiled role independently on
+a fresh unpublished execution, so broader fixture grants cannot mask a missing
+transaction permission.
+
 `RetainedAudience` reads only joined catalog/verification/accepted/custody records. It refuses missing audit, unmatched copy digests, deletion state and read expiry. The ordinary authorization evaluator checks current principal/scope/denies before this lookup and intersects the original full audience afterward. This adapter is not a disclosure permission. The legacy copy-ledger label `stored_unpublished` still means custody alone cannot establish visibility; an independently valid catalog record now establishes publication. Revocation of ownership never rewrites the original audience.
 
 Unit/race checks cover effect ordering, failures and authority changes after verification/audit. Real SQL/S3 tests cover concurrent idempotence, exact native verification, audit failure/retry, role boundaries, immutable receipts, deletion-state hiding and expiry while blocked on locks. `make custody-integration` passed the initial transaction/composition tests (`test/results/context-publication-integration-check.log`, `custody-environment.json`: exit 0, unchanged source, empty cleanup failures). The fixture uses real SQL/S3/Tink but synthetic collector/result/retention authority, not a qualified production `ContextPublicationGate`. The strengthened regression also passed after actually recording generic ciphertext custody, proving that it cannot create a catalog entry without semantic verification. The repository Go/import/SQL/spec/architecture/design gates passed in `test/results/context-publication-gates.log` after moving serialization/digest helpers to their application owner. Production gate composition, native-download sessions, full deletion/writer barriers, finite metadata/audit retirement and the public UI/MCP path remain required.

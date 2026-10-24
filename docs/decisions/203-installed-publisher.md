@@ -1,12 +1,40 @@
 # ADR-203 — Installed publisher
 
-Date: 2026-10-18. Status: accepted; implementation in progress.
+Date: 2026-10-18. Status: accepted; implemented; installed verification, audit acknowledgement and catalog publication observed.
 Requirements: S-02 (encrypted publication in the installed journey); REQ-DEP-003,
 REQ-FED-002; TASK-03.
 Completes [ADR-181](181-asynchronous-publication-verifier.md) (the `asservat
 publisher` process); follows [ADR-198](198-installed-key-service.md) (installed
 key service) and [ADR-196](196-regional-cluster-join.md) decision 7 (catalog
 topology pins).
+
+Current qualification (2026-10-20): the installer deploys the publisher with
+its provider setup, credentials and protected inputs.
+[Independent fresh lifecycles](../../test/results/resumed-c62e02ac-publication-grants-green/result.json)
+using the compiled verifier and publisher roles pass publication, historical
+replay and purpose-isolation checks, with synthetic current authority.
+[Resumed native48](../../test/results/resumed-c62e02ac-native48/result.json)
+completed acquisition and storage, followed by installed verification, encrypted
+verification-audit acknowledgement and catalog publication. The
+[SQL postmortem](../../test/results/resumed-c62e02ac-native48/postmortem-publication.log)
+records publication at `2026-10-20T18:09:06.234647Z`. The generic custody row
+remains `stored_unpublished`; the separate verification, audit and catalog
+records establish publication.
+
+Native48's overall installed test exited 1. Its public capture response remained
+`OutcomeUnknown`, and an exhausted admission-resolution reservation stopped the
+fixture before fresh capture/case reads or download.
+
+[Resumed native49](../../test/results/resumed-c62e02ac-native49/result.json)
+again reached installed verification, audit acknowledgement and catalog
+publication, then recovered the accepted capture and completed fresh authorized
+`get_capture` and `get_case` reads with one published artifact. Its outward
+capture replies remained `OutcomeUnknown`; the fresh reads independently
+established the result. The overall test still exited 1 at the deletion fixture's
+strict bucket-policy comparison: the provider returned a singleton `Action` as a
+scalar rather than an array. No deletion fault was applied and no download
+session was created. Native download, revocation, expiry, deletion and the
+complete S-02 workflow remain unqualified.
 
 ## Context
 
@@ -116,6 +144,8 @@ that the installed layout cannot supply:
   hub-api.
 
 ## Progress
+
+Historical checkpoints recorded before the 2026-10-20 status refresh above:
 
 - **Implementation** (unit tests pass): the publisher's projection claim and
   Secret, account and credential Secrets, Service-less workload and RBAC,

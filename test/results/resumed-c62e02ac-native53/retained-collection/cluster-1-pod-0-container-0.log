@@ -1,0 +1,21 @@
+2026-10-22T20:39:24.369686728Z connector lifecycle enroll took 580ms, observer 82 calls
+2026-10-22T20:39:25.238719469Z connector lifecycle client-sign took 840ms, observer 68 calls
+2026-10-22T20:39:26.878225847Z connector lifecycle server-sign took 1.36s, observer 68 calls
+2026-10-22T20:39:27.715153617Z connector lifecycle registration took 560ms, observer 28 calls
+2026-10-22T20:39:28.555867415Z connector process credentials active
+2026-10-22T20:39:28.596059585Z regional capacity standby active
+2026-10-22T20:39:28.684641604Z connector lifecycle owner-observation-candidates took 90ms, observer 0 calls
+2026-10-22T20:39:28.684657204Z regional capacity standby: open (unavailable)
+2026-10-22T20:39:28.699141171Z regional capacity standby: open (unavailable)
+2026-10-22T20:39:28.738825094Z regional context start active
+2026-10-22T20:39:28.804097030Z connector lifecycle owner-candidates took 60ms, observer 0 calls
+2026-10-22T20:39:30.155086425Z connector lifecycle owner-authentication took 350ms, observer 0 calls
+2026-10-22T20:39:30.156999289Z regional context standby refused: open/headers (denied) (1), elapsed=1.35s remaining=2.51s
+2026-10-22T20:39:32.104143360Z regional context standby refused: open/headers (denied) (2), elapsed=340ms remaining=560ms
+2026-10-22T20:39:36.088506991Z regional context standby refused: open/headers (denied) (4), elapsed=330ms remaining=1.75s
+2026-10-22T20:39:37.842818542Z regional context standby refused: open/setup-begin (unavailable) (1), elapsed=80ms remaining=4.13s
+2026-10-22T20:39:44.074207007Z regional context standby refused: open/owner-first (denied) (1), elapsed=310ms remaining=0s
+2026-10-22T20:39:48.087623787Z regional context standby refused: open/headers (denied) (8), elapsed=320ms remaining=2.09s
+2026-10-22T20:39:55.847570652Z regional context standby refused: open/setup-begin (unavailable) (2), elapsed=90ms remaining=4.6s
+2026-10-22T20:40:06.081551191Z regional context standby refused: open/headers (denied) (16), elapsed=320ms remaining=1.66s
+2026-10-22T20:40:11.835077480Z connector local source failed: source-protection (changed) after 10ms of 10ms

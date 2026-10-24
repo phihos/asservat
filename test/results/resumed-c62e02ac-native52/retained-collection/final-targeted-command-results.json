@@ -1,0 +1,39 @@
+[
+  {
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native52-private/cluster-1-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-84bi0pmu-1",
+      "--request-timeout=10s",
+      "get",
+      "namespaces",
+      "-o",
+      "jsonpath={range .items[*]}{.metadata.name}{\" \"}{.metadata.uid}{\"\\n\"}{end}"
+    ],
+    "exit": 0
+  },
+  {
+    "argv": [
+      "docker",
+      "exec",
+      "-i",
+      "asservat-context-84bi0pmu-postgres",
+      "psql",
+      "-X",
+      "-w",
+      "-U",
+      "postgres",
+      "-d",
+      "custody_test",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-P",
+      "pager=off",
+      "-f",
+      "-"
+    ],
+    "exit": 0
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-run",
+    "^$",
+    "./test/integration"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 34.44,
+  "scope": "Compile only; deliberately no integration tests run"
+}

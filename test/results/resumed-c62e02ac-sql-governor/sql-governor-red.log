@@ -1,0 +1,24 @@
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/cancel
+    connection_governor_cancellation_test.go:306: next BeginTx missed its original one-second deadline after canceled query: context deadline exceeded
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/deadline
+    connection_governor_cancellation_test.go:306: next BeginTx missed its original one-second deadline after canceled query: context deadline exceeded
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/cancel
+    connection_governor_cancellation_test.go:306: next BeginTx missed its original one-second deadline after canceled query: context deadline exceeded
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/deadline
+    connection_governor_cancellation_test.go:306: next BeginTx missed its original one-second deadline after canceled query: context deadline exceeded
+--- FAIL: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction (4.33s)
+    --- FAIL: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/cancel (1.00s)
+    --- FAIL: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/deadline (1.15s)
+    --- FAIL: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/cancel (1.01s)
+    --- FAIL: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/deadline (1.16s)
+=== RUN   TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully
+=== RUN   TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully/tcp
+    connection_governor_cancellation_test.go:369: cold cleanup changed: hooks=1 closedBeforeHook=0 terminate=0 cancel=0 active=0 peak=1
+=== RUN   TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully/tls
+--- FAIL: TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully (0.01s)
+    --- FAIL: TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully/tcp (0.00s)
+    --- PASS: TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully/tls (0.01s)
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	4.382s
+FAIL

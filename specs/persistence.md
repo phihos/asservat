@@ -72,6 +72,20 @@ Claim bounded work batches using FOR UPDATE SKIP LOCKED, then release locks befo
 
 Initial tuning budgets: <=100 work items per claim, <=30-second claim lease with bounded renewal, <=5-second SQL statement timeout and <=1-second lock wait for online requests, <=32 pooled connections per hub replica with an installation-wide allocation leaving maintenance headroom. Different lifecycle batches require explicit bounded profiles. Exhaustion returns actionable pressure and does not grow queues without limits. Ordinary completed work rows expire after the replay window; authoritative denial/accounting rows have dependency-aware retention.
 
+Ordinary public hub duties MUST share the fixed `hub-runtime` credential under
+[ADR-222](../docs/decisions/222-hub-process-sql-credentials.md), superseding the
+smaller metadata and execution groupings. Grant the exact compiled duty union.
+Use one 18-connection ordinary pool and the existing one-connection resolution
+journal and acknowledgement reservations. The owner identity/routing duties share
+one separate six-connection credential and pool. Keep the four role-pinned capture
+duties, pinned capacity reader and nested worker-configuration reader separate;
+keep publisher, federation, collector, key and deletion process credentials
+separate. These fixed pools retain the 32-connection governor and unchanged current
+SQL effect checks. Role-wide limits include the aggregate pools across retained
+processes plus the serialized verifier. Broader same-process privileges are the
+explicit accepted injection/composition tradeoff recorded in the ADR. Refuse
+unsupported retained development layouts without adoption or implicit migration.
+
 Before provisioning the promoted installed graph, the continuation MUST compare
 its compiled process/purpose allowance, including retained workers, simultaneous
 installer pools, verifier and maintenance reserve, with the actual server's
@@ -88,6 +102,13 @@ read-only under the original activation/incarnation and deadline checks.
 ### SC-DB-004
 
 Given a worker dies after object audit upload or remote dispatch, when another claims the expired lease, then it resumes the same operation, verifies audit by digest and never blindly reruns an ambiguous dump. Missing notifications do not lose work; audit failure prevents action start and evidence delivery.
+
+With the compiled shared hub login, concurrent preparation still creates one
+immutable execution. Current revocation committed while preparation waits for a
+lock prevents its effect. Ordinary pool saturation cannot consume the two
+reserved resolution connections or the owner's six slots, and waiting obeys
+original cancellation/deadlines. Publication, key-service unwrap, configuration
+acceptance and deletion statements remain outside the hub credential union.
 
 ## REQ-DB-005 — Durability, outage and disaster recovery
 

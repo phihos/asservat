@@ -8,6 +8,7 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/postgres"
+	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -315,7 +316,7 @@ func ownerStartupAnnotate(phase *ownerStartupPhase, role *string, result *error)
 }
 func ownerStartupRole(s string) string {
 	switch s {
-	case "enrollment", "audit", "activation", "registry", "server", "client":
+	case "enrollment", "audit", "activation", "registry", "owner-runtime", "server", "client":
 		return s
 	default:
 		return "none"
@@ -333,6 +334,8 @@ func ownerStartupReason(e error) string {
 		return "unauthorized"
 	case apierrors.IsNotFound(e):
 		return "not-found"
+	case errors.Is(e, contracts.ErrPublicRuntimeLayout):
+		return "unsupported-development-layout"
 	case errors.Is(e, cfg.ErrChanged):
 		return "changed"
 	case errors.Is(e, cfg.ErrDenied), errors.Is(e, value.ErrDenied):
@@ -405,7 +408,7 @@ func OwnerStartupDiagnosticLine(line string) (string, bool) {
 			valid = ownerStartupRole(v) == v
 		case 2:
 			switch v {
-			case "deadline", "cancelled", "forbidden", "unauthorized", "not-found", "changed", "denied", "invalid", "unavailable", "other":
+			case "deadline", "cancelled", "forbidden", "unauthorized", "not-found", "changed", "denied", "invalid", "unavailable", "other", "unsupported-development-layout":
 				valid = true
 			}
 		case 3, 4:

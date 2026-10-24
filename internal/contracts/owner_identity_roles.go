@@ -8,14 +8,15 @@ import (
 // Private owner identity credentials are separate from public investigation,
 // configuration observation and regional observation backend credentials.
 const OwnerIdentityRoleManifestFile = "owner-roles.json"
-const OwnerIdentityRoleConnections = PublicRuntimeRetainedHubProcesses + 1
+const OwnerIdentityPoolConnections = 6
+const OwnerIdentityRoleConnections = PublicRuntimeRetainedHubProcesses*OwnerIdentityPoolConnections + 1
 const OwnerIdentityRolesFormat = "asservat-owner-identity-roles/v1"
 const OwnerIdentityRoleStateFormat = "asservat-owner-identity-role-state/v1"
 const OwnerIdentityCredentialManifestFormat = "asservat-owner-identity-credentials/v1"
 const OwnerIdentityRoleMaxBytes = 32 << 10
 
 func OwnerIdentityRolePurposes() []string {
-	return []string{"enrollment", "audit", "activation", "registry", "routing", "native-read"}
+	return []string{"owner-runtime"}
 }
 
 // OwnerIdentityProjectionFiles are the identity projection's files: the
@@ -29,22 +30,10 @@ func OwnerIdentityProjectionFiles() []string {
 }
 
 func OwnerIdentityRoleOrdinal(purpose string) (int, bool) {
-	switch purpose {
-	case "enrollment":
-		return 0, true
-	case "audit":
-		return 1, true
-	case "activation":
-		return 2, true
-	case "registry":
-		return 3, true
-	case "routing":
-		return 4, true
-	case "native-read":
-		return 5, true
-	default:
-		return 0, false
+	if purpose == "owner-runtime" {
+		return 6, true // former individual duty ordinals 0-5 are not reused
 	}
+	return 0, false
 }
 
 // Original private producer input, generated from the completed installation

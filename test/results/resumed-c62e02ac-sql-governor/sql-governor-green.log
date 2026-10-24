@@ -1,0 +1,18 @@
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/cancel
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/deadline
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/cancel
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/deadline
+--- PASS: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction (0.35s)
+    --- PASS: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/cancel (0.00s)
+    --- PASS: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/deadline (0.15s)
+    --- PASS: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/cancel (0.02s)
+    --- PASS: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/deadline (0.17s)
+=== RUN   TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully
+=== RUN   TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully/tcp
+=== RUN   TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully/tls
+--- PASS: TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully (0.01s)
+    --- PASS: TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully/tcp (0.00s)
+    --- PASS: TestSQLConnectionGovernorHealthyColdConnectionClosesGracefully/tls (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.402s

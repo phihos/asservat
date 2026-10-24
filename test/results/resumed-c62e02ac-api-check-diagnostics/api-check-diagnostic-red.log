@@ -1,0 +1,48 @@
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ReadAPIContextWork
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod
+    api_check_diagnostic_test.go:161: failure not localized to its closed check stage: got api context execution ReadAPIContextWork, want Check/ResolvePod
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod#01
+    api_check_diagnostic_test.go:161: failure not localized to its closed check stage: got api context execution ReadAPIContextWork, want Check/ResolvePod
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod#02
+    api_check_diagnostic_test.go:161: failure not localized to its closed check stage: got api context execution ReadAPIContextWork, want Check/ResolvePod
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Eligibility
+    api_check_diagnostic_test.go:161: failure not localized to its closed check stage: got api context execution ReadAPIContextWork, want Check/Eligibility
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Capability
+    api_check_diagnostic_test.go:161: failure not localized to its closed check stage: got api context execution ReadAPIContextWork, want Check/Capability
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Retention
+    api_check_diagnostic_test.go:161: failure not localized to its closed check stage: got api context execution ReadAPIContextWork, want Check/Retention
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Compile
+    api_check_diagnostic_test.go:161: failure not localized to its closed check stage: got api context execution ReadAPIContextWork, want Check/Compile
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Recovery
+    api_check_diagnostic_test.go:161: failure not localized to its closed check stage: got api context execution ReadAPIContextWork, want Check/Recovery
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Process
+    api_check_diagnostic_test.go:161: failure not localized to its closed check stage: got api context execution ReadAPIContextWork, want Check/Process
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Current
+    api_check_diagnostic_test.go:161: failure not localized to its closed check stage: got api context execution ReadAPIContextWork, want Check/Current
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Context
+    api_check_diagnostic_test.go:161: failure not localized to its closed check stage: got api context execution ReadAPIContextWork, want Check/Context
+--- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ReadAPIContextWork (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod#01 (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod#02 (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Eligibility (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Capability (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Retention (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Compile (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Recovery (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Process (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Current (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Context (0.00s)
+=== RUN   TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary
+=== RUN   TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary/PrepareContext/ResolvePod
+    api_check_diagnostic_test.go:183: later check lost its original effect boundary api context execution PrepareContext
+=== RUN   TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary/ReadyStart/ResolvePod
+    api_check_diagnostic_test.go:183: later check lost its original effect boundary api context execution ReadyStart
+--- FAIL: TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary/PrepareContext/ResolvePod (0.00s)
+    --- FAIL: TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary/ReadyStart/ResolvePod (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/execution	0.004s
+FAIL

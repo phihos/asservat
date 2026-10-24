@@ -109,8 +109,10 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		}
 		other := s.a.Eligibility.Target
 		other.WorkloadUID = custodyID()
-		if _, err := reader.ContextStorage(ctx, other); err == nil {
-			t.Fatal("unbound workload adopted another placement")
+		_, err = reader.ContextStorage(ctx, other)
+		var refusal interface{ ContextStorageRead() string }
+		if !errors.Is(err, capture.ErrUnavailable) || !errors.As(err, &refusal) || refusal.ContextStorageRead() != "query/no-row" {
+			t.Fatal("unbound workload changed its refusal or lost its private no-row phase", err)
 		}
 		for _, check := range []struct {
 			statement string
@@ -354,16 +356,17 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			t.Fatal(err)
 		}
 		in := query(t, s, p)
-		batch := s.batch
-		batch.Initial = nil
-		batch.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
-		batch.FreshUntil = batch.ObservedAt.Add(150 * time.Millisecond)
-		if err := s.p.RefreshPermissions(ctx, batch); err != nil {
+		// ADR-200 revision (migration 00074): an accepted stream observation is
+		// complete for 30 seconds after its own observation, not for the batch's
+		// shorter interval. Age the stored observation so that its complete-deny
+		// interval ends 150 ms from now; replay must still keep exactly that end.
+		var streamUntil time.Time
+		if err := admin.QueryRow(ctx, "UPDATE permission_stream SET observed_at=statement_timestamp()-interval '29850 milliseconds',fresh_until=statement_timestamp()+interval '150 milliseconds' WHERE id=$1 RETURNING fresh_until", s.a.RootID).Scan(&streamUntil); err != nil {
 			t.Fatal(err)
 		}
 		got, found, err := s.s.LookupContextAdmission(ctx, in)
-		if err != nil || !found || !got.MetadataValidUntil.Equal(batch.FreshUntil) {
-			t.Fatal("replay did not preserve shorter permission deadline", found, got.MetadataValidUntil, batch.FreshUntil, err)
+		if err != nil || !found || !got.MetadataValidUntil.Equal(streamUntil) {
+			t.Fatal("replay did not preserve shorter permission deadline", found, got.MetadataValidUntil, streamUntil, err)
 		}
 		tx, err := admin.Begin(ctx)
 		if err != nil {

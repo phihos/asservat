@@ -118,3 +118,7 @@ real, fresh, audited stream.
 7. Native qualification: a fresh stream with acknowledged initial and epoch
    audits, and a restart that resumes under a new epoch.
 8. The retention ADR and its cleanup.
+
+Revision (2026-10-23): an accepted stream observation is now current for
+30 seconds after its own observation, not five (migration 00074, see the
+[ADR-200 revision](200-on-demand-capacity-refresh.md#revision-2026-10-23)).

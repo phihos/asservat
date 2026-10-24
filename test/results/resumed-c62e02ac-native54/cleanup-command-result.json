@@ -1,0 +1,12 @@
+{
+  "cwd": "/home/phil/Projekte/asservat-simplify-c62e02ac",
+  "argv": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--cleanup-kept",
+    "/home/phil/.cache/asservat-build/kept/context-lcscbtz7.json"
+  ],
+  "exitCode": 0,
+  "terminalEvidence": "write_stdin session31948 chunk6bb0c3 exit0",
+  "cleanupFailures": []
+}

@@ -27,6 +27,16 @@ allocation. An existing request keeps its original session, allocation, limits,
 deadline and spend even when today's plan differs or its proposed allocation is
 absent; different scope/request under the same key conflicts.
 
+[ADR-218](../decisions/218-consumed-download-preflight.md) consumes passive runtime
+readiness at its check and plan freshness through acknowledged session reservation.
+An expired check or a reservation that crosses the plan's original cutoff refuses
+continuation. After reservation, that consumed freshness bound does not shorten
+worker startup. The original request/identity/authority bounds and the session's
+accepted limits, allocation/access expiry and hard backing deadline remain.
+Worker effects independently check current SQL configuration and authorization;
+Job creation also retains its current configuration check. This adds no renewed
+observation or automatic retry after an uncertain effect.
+
 Normal startup can outlast a five-second request-owned identity observation.
 An acknowledged Preparing result permits bounded automatic **same-key prepare
 POST continuation** while the initiating view and session remain active. This is

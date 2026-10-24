@@ -6,6 +6,8 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
+	"sync/atomic"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
@@ -50,6 +52,36 @@ type ContextStartIngress struct {
 	owners   *app.OwnerAuthenticator
 	clusters map[string]contextStartConnectorAdmission
 	now      func() time.Time
+	// Refused, when set, receives a fixed stage name for each refusal. It carries
+	// no request data and changes no result.
+	Refused func(string)
+}
+
+func (s *ContextStartIngress) refuse(stage string) {
+	if s != nil && s.Refused != nil {
+		s.Refused(stage)
+	}
+}
+
+func (s *ContextStartIngress) refuseStep(prefix string) func(string) {
+	return func(step string) { s.refuse(prefix + step) }
+}
+
+// refusalClass names a refusal without request data.
+func refusalClass(e error, valid, matches bool) string {
+	switch {
+	case errors.Is(e, value.ErrDenied):
+		return "denied"
+	case errors.Is(e, value.ErrUnavailable):
+		return "unavailable"
+	case e != nil:
+		return "error"
+	case !valid:
+		return "expired"
+	case !matches:
+		return "binding"
+	}
+	return "other"
 }
 
 func NewContextStartIngress(rootID string, local *OwnerCredentials, owners *app.OwnerAuthenticator, inputs []ContextStartConnectorAdmission, now func() time.Time) (*ContextStartIngress, error) {
@@ -142,15 +174,18 @@ func contextStartChannelWire(c value.APIContextChannel) contracts.APIContextChan
 func (s *ContextStartIngress) AuthenticateContextStart(ctx context.Context, state *tls.ConnectionState, hello contracts.APIContextHello, sources app.ConnectorIdentitySourceReader) (value.APIContextReceiver, app.APIContextReceiverCheck, error) {
 	var zero value.APIContextReceiver
 	if s == nil || ctx == nil || ctx.Err() != nil || hello.Format != contracts.APIContextExchangeFormat || sources == nil {
+		s.refuse("request")
 		return zero, nil, value.ErrDenied
 	}
 	channel := contextStartChannel(hello.Channel)
 	admission, exists := s.clusters[channel.Connector.Binding.ClusterID]
 	if !exists || !channel.Valid() || channel.RootID != s.rootID || channel.Connector.Binding != admission.Profile.Binding || !admission.Executor.matches(channel.Executor) {
+		s.refuse("admission")
 		return zero, nil, value.ErrDenied
 	}
 	chain, e := contextStartPeerChain(state)
 	if e != nil {
+		s.refuse("chain")
 		return zero, nil, e
 	}
 	check := func(call context.Context) (value.APIContextReceiver, error) {
@@ -165,6 +200,7 @@ func (s *ContextStartIngress) AuthenticateContextStart(ctx context.Context, stat
 func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnectorAdmission, sources app.ConnectorIdentitySourceReader, channel value.APIContextChannel, chain []*x509.Certificate) (value.APIContextReceiver, error) {
 	var zero value.APIContextReceiver
 	if ctx == nil || ctx.Err() != nil {
+		s.refuse("cancelled")
 		return zero, value.ErrUnavailable
 	}
 	started := s.now()
@@ -184,42 +220,91 @@ func (s *ContextStartIngress) current(ctx context.Context, a contextStartConnect
 		call, cancel = context.WithDeadline(call, until)
 		cancels = append(cancels, cancel)
 	}
-	local, e := s.owners.ObserveOwnerServing(call, s.local)
-	if e != nil || !local.Valid(s.now()) || local.Certificate.Binding != channel.Hub {
-		return zero, value.ErrDenied
+	// The hub's own serving identity is independent of the connector reads, so
+	// both run together within the same original bound. Each result is still
+	// checked and narrows the bound, so no interval is extended.
+	opening, cancelOpening := context.WithCancel(call)
+	var abandoned atomic.Bool
+	var local value.AuthenticatedOwner
+	var localErr error
+	localDone := make(chan struct{})
+	go func() {
+		defer close(localDone)
+		// After a deliberate cancellation its step reports would blame the hub.
+		report := s.refuseStep("local/")
+		local, localErr = s.owners.ObserveOwnerServing(app.WithRefusalSteps(opening, func(step string) {
+			if !abandoned.Load() {
+				report(step)
+			}
+		}), s.local)
+	}()
+	joined := false
+	joinLocal := func() bool {
+		if !joined {
+			<-localDone
+			joined = true
+		}
+		if localErr != nil || !local.Valid(s.now()) || local.Certificate.Binding != channel.Hub {
+			s.refuse("local/" + refusalClass(localErr, local.Valid(s.now()), local.Certificate.Binding == channel.Hub) + app.RemainingBucket(opening, s.now()))
+			return false
+		}
+		return true
 	}
-	narrow(local.ValidUntil)
+	defer func() {
+		if !joined {
+			abandoned.Store(true)
+			cancelOpening() // An earlier refusal needs no opening result.
+			<-localDone
+		}
+		cancelOpening()
+	}()
 	source, e := sources.ReadConnectorIdentitySource(call)
 	if e != nil || !source.Valid(s.now()) || !source.Observation.Profile.Equal(a.Profile) {
+		s.refuse("source")
 		return zero, value.ErrDenied
 	}
 	narrow(source.Observation.FreshUntil)
 	roots, _, e := OwnerTrustRoots(source.Observation.Profile.ClientIssuerRoots, s.now())
 	if e != nil {
+		s.refuse("roots")
 		return zero, value.ErrDenied
 	}
 	cert, e := a.verifier.verify(chain, "client", roots)
 	if e != nil || cert.Binding != channel.Connector.Binding || cert.Digest != channel.ConnectorLeaf {
+		s.refuse("certificate")
 		return zero, value.ErrDenied
 	}
 	narrow(cert.NotAfter)
 	registered, e := a.Registry.ReadConnectorObservationRegistration(call, a.Profile, sources, cert)
 	if e != nil || !registered.Valid(s.now()) || registered.Certificate != cert || registered.Process != channel.Connector || registered.Revision != source.Observation.Profile.Revision {
+		switch {
+		case e != nil || !registered.Valid(s.now()):
+			s.refuse("registration/" + refusalClass(e, registered.Valid(s.now()), true))
+		case registered.Certificate != cert:
+			s.refuse("registration/certificate")
+		case registered.Process != channel.Connector:
+			s.refuse("registration/process")
+		default:
+			s.refuse("registration/revision")
+		}
 		return zero, value.ErrDenied
 	}
 	narrow(registered.FreshUntil)
+	if !joinLocal() {
+		return zero, value.ErrDenied
+	}
+	narrow(local.ValidUntil)
+	// The hub's own serving observation above already rests on the reused
+	// self-protection proof; only the connector source is read again.
 	finalSource, e := sources.ReadConnectorIdentitySource(call)
 	if e != nil || !finalSource.Valid(s.now()) || !finalSource.Observation.SameSource(source.Observation) || finalSource.Roles != source.Roles {
+		s.refuse("final-source")
 		return zero, value.ErrDenied
 	}
 	narrow(finalSource.Observation.FreshUntil)
-	finalLocal, e := s.owners.ObserveOwnerServing(call, s.local)
-	if e != nil || !finalLocal.Valid(s.now()) || !sameForwardPeer(finalLocal, local) {
-		return zero, value.ErrDenied
-	}
-	narrow(finalLocal.ValidUntil)
 	out := value.APIContextReceiver{Channel: channel, ObservedAt: started, ValidUntil: until}
 	if call.Err() != nil || !out.Valid(s.now()) || !source.Valid(s.now()) || !registered.Valid(s.now()) || !local.Valid(s.now()) {
+		s.refuse("expired")
 		return zero, value.ErrUnavailable
 	}
 	return out, nil

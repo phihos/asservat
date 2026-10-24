@@ -110,15 +110,17 @@ func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, 
 		return nil, nil, err
 	}
 	if len(regional) > 0 {
-		// The v2 client's own client instances of the same identities, each
-		// at the fixed 20 QPS, so regional observation never spends the local
-		// cluster's or the source observer's budget.
+		// The v2 client's own client instances of the same identities, so
+		// regional observation never spends the local cluster's or the source
+		// observer's budget. Discovery and the ADR-200 demand lane share them;
+		// at 20/20 a guarded demand read took 2.6-3.7 s against a five-second
+		// binding (local journey hold), so they use the ADR-208 opening limiter.
 		control := capacityWorkerRef(c.Control.Namespace)
-		v2Observer, err := kube.NewPermissionClient(in.kubernetes(observerToken), c.Control.ClusterID, control, time.Now)
+		v2Observer, err := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes(observerToken)), c.Control.ClusterID, control, time.Now)
 		if err != nil {
 			return nil, nil, mounts.ErrUnavailable
 		}
-		v2Probe, err := kube.NewPermissionClient(in.kubernetes(probeToken), c.Control.ClusterID, control, time.Now)
+		v2Probe, err := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes(probeToken)), c.Control.ClusterID, control, time.Now)
 		if err != nil {
 			return nil, nil, mounts.ErrUnavailable
 		}

@@ -1,0 +1,17 @@
+{
+  "red": {
+    "session": 97058,
+    "terminalChunk": "ac939d",
+    "actualExitCode": 1
+  },
+  "green-focused": {
+    "session": 86524,
+    "terminalChunk": "a12eda",
+    "actualExitCode": 0
+  },
+  "green-race": {
+    "session": 94393,
+    "terminalChunk": "7a67e2",
+    "actualExitCode": 0
+  }
+}

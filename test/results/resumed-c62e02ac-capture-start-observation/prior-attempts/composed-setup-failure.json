@@ -1,0 +1,30 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-timeout=60s",
+    "./internal/bootstrap",
+    "-run",
+    "^TestRegionalStartReusesPreludeBeforeFirstPreparation$",
+    "-v"
+  ],
+  "env": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exit": 1,
+  "seconds": 21.58727500902023,
+  "before": {
+    "internal/application/execution/api_context.go": "8ad319f3b4272acbfc899d12fa4e1c8c23d903f504342e8d2db4c2de22d87282",
+    "internal/bootstrap/context_regional_start.go": "3ccb8a0ad64e31186e33fe811dfe26b3d1e946b08ac7ff4a9803e37b0ea9e90f",
+    "internal/bootstrap/context_regional_observation_test.go": "d307b0feb7047065a0b3ede6e349766604934444a99cde1e14c2620d5bd460e0"
+  },
+  "after": {
+    "internal/application/execution/api_context.go": "8ad319f3b4272acbfc899d12fa4e1c8c23d903f504342e8d2db4c2de22d87282",
+    "internal/bootstrap/context_regional_start.go": "3ccb8a0ad64e31186e33fe811dfe26b3d1e946b08ac7ff4a9803e37b0ea9e90f",
+    "internal/bootstrap/context_regional_observation_test.go": "d307b0feb7047065a0b3ede6e349766604934444a99cde1e14c2620d5bd460e0"
+  }
+}

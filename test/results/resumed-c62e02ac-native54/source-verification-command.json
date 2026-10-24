@@ -1,0 +1,11 @@
+{
+  "argv": [
+    "python3",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/verify-native-sources.py",
+    "/home/phil/Projekte/asservat-simplify-c62e02ac",
+    "840f27fc338f0c170a4f6069bc95db4c109bbfaf",
+    "/home/phil/.cache/asservat-build/recovered-c62e02ac/native54-full/context-storage-environment.json"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 0.37343287467956543
+}

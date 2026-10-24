@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -53,8 +54,10 @@ func TestWorkerNativeOnlyReentersAfterPositiveDisposition(t *testing.T) {
 			loop := workerNativeLoop{target: target, token: tokens, now: func() time.Time { return now }, nonce: workerNativeNonce,
 				wait: func(ctx context.Context, d time.Duration) error {
 					waits++
-					if d != contracts.NativeIdleRetry {
-						t.Fatal("idle retry was unbounded")
+					// The idle lookup rate stays at most one per NativeIdleRetry,
+					// counting the time the reply took (a parked hub request).
+					if d <= 0 || d > contracts.NativeIdleRetry || mode == "idle-after-setup" && d != contracts.NativeIdleRetry-100*time.Millisecond {
+						t.Fatal("idle retry was unbounded", d)
 					}
 					return nil
 				},
@@ -227,5 +230,19 @@ func TestWorkerNativeIdleKeepsOriginalWorkerDeadline(t *testing.T) {
 	}
 	if err := loop.Run(t.Context()); !errors.Is(err, artifact.ErrDownloadExpired) || opens != 1 {
 		t.Fatalf("idle extended worker: opens=%d err=%v", opens, err)
+	}
+}
+
+func TestNativeReadReportCarriesOnlyStepsAndClosedOutcome(t *testing.T) {
+	var out strings.Builder
+	reportNativeRead(&out, "", nil)
+	if out.Len() != 0 {
+		t.Fatal("a conversation without read steps was reported")
+	}
+	reportNativeRead(&out, "unwrap-1@<100ms unwrap-2@<250ms", nil)
+	reportNativeRead(&out, "unwrap-1@>=3s", &fixedStepError{"read", errors.New("secret dependency text")})
+	want := "native read: unwrap-1@<100ms unwrap-2@<250ms, joined\nnative read: unwrap-1@>=3s, stopped at read\n"
+	if out.String() != want {
+		t.Fatalf("got %q", out.String())
 	}
 }

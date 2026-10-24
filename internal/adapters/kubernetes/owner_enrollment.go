@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"errors"
 	"fmt"
 	"time"
 
@@ -56,37 +57,63 @@ func ownerEnrollmentSelector(s *meta.LabelSelector, values map[string]string) bo
 	return err == nil && selector.Matches(labels.Set(values))
 }
 
-func (s *OwnerEnrollmentAttester) live(ctx context.Context, p value.OwnerPool, b value.OwnerBinding, name string) (ownerEnrollmentWorkload, error) {
-	var out ownerEnrollmentWorkload
+func (s *OwnerEnrollmentAttester) live(ctx context.Context, p value.OwnerPool, b value.OwnerBinding, name string) (out ownerEnrollmentWorkload, result error) {
+	check := ownerReadLiveNamespaceRead
+	defer ownerReadAnnotate(&check, &result)
 	ns, err := s.client.namespace(ctx, s.client.control)
-	if err != nil || ns.Deleting {
+	if err != nil {
+		return out, errors.Join(value.ErrUnavailable, err)
+	}
+	check = ownerReadLiveNamespaceContent
+	if ns.Deleting {
 		return out, value.ErrUnavailable
 	}
 	reader := &OwnerEndpoints{client: s.client, pool: p} // Resource reader only; never Ready endpoint discovery.
+	check = ownerReadLiveAccountRead
 	account, err := ownerResource[core.ServiceAccount](reader, ctx, "/api/v1/namespaces/"+p.Namespace+"/serviceaccounts/"+p.ServiceAccount, "v1", "ServiceAccount")
-	if err != nil || !ownerMetadata(account.ObjectMeta, p.Namespace, p.ServiceAccount, p.AccountUID) {
+	if err != nil {
+		return out, errors.Join(value.ErrUnavailable, err)
+	}
+	check = ownerReadLiveAccountContent
+	if !ownerMetadata(account.ObjectMeta, p.Namespace, p.ServiceAccount, p.AccountUID) {
 		return out, value.ErrUnavailable
 	}
+	check = ownerReadLiveDeploymentRead
 	deployment, err := ownerResource[apps.Deployment](reader, ctx, "/apis/apps/v1/namespaces/"+p.Namespace+"/deployments/"+p.Deployment, "apps/v1", "Deployment")
-	if err != nil || !ownerMetadata(deployment.ObjectMeta, p.Namespace, p.Deployment, p.DeploymentUID) || deployment.Spec.Template.Spec.ServiceAccountName != p.ServiceAccount || deployment.Spec.Replicas == nil || *deployment.Spec.Replicas < 1 {
+	if err != nil {
+		return out, errors.Join(value.ErrUnavailable, err)
+	}
+	check = ownerReadLiveDeploymentContent
+	if !ownerMetadata(deployment.ObjectMeta, p.Namespace, p.Deployment, p.DeploymentUID) || deployment.Spec.Template.Spec.ServiceAccountName != p.ServiceAccount || deployment.Spec.Replicas == nil || *deployment.Spec.Replicas < 1 {
 		return out, value.ErrUnavailable
 	}
+	check = ownerReadLivePodRead
 	pod, err := ownerResource[core.Pod](reader, ctx, "/api/v1/namespaces/"+p.Namespace+"/pods/"+name, "v1", "Pod")
-	if err != nil || !ownerMetadata(pod.ObjectMeta, p.Namespace, name, b.PodUID) || pod.Spec.ServiceAccountName != p.ServiceAccount || pod.Spec.NodeName == "" || pod.Spec.HostNetwork || pod.Spec.HostPID || pod.Spec.HostIPC || len(pod.Spec.EphemeralContainers) != 0 || (pod.Status.Phase != core.PodPending && pod.Status.Phase != core.PodRunning) || !ownerEnrollmentSelector(deployment.Spec.Selector, pod.Labels) {
+	if err != nil {
+		return out, errors.Join(value.ErrUnavailable, err)
+	}
+	check = ownerReadLivePodContent
+	if !ownerMetadata(pod.ObjectMeta, p.Namespace, name, b.PodUID) || pod.Spec.ServiceAccountName != p.ServiceAccount || pod.Spec.NodeName == "" || pod.Spec.HostNetwork || pod.Spec.HostPID || pod.Spec.HostIPC || len(pod.Spec.EphemeralContainers) != 0 || (pod.Status.Phase != core.PodPending && pod.Status.Phase != core.PodRunning) || !ownerEnrollmentSelector(deployment.Spec.Selector, pod.Labels) {
 		return out, value.ErrUnavailable
 	}
 	ref, ok := ownerController(pod.OwnerReferences, "ReplicaSet", "apps/v1")
 	if !ok {
 		return out, value.ErrUnavailable
 	}
+	check = ownerReadLiveReplicaRead
 	replica, err := ownerResource[apps.ReplicaSet](reader, ctx, "/apis/apps/v1/namespaces/"+p.Namespace+"/replicasets/"+ref.Name, "apps/v1", "ReplicaSet")
-	if err != nil || !ownerMetadata(replica.ObjectMeta, p.Namespace, ref.Name, string(ref.UID)) || replica.Spec.Template.Spec.ServiceAccountName != p.ServiceAccount || replica.Spec.Replicas == nil || *replica.Spec.Replicas < 1 || !ownerEnrollmentSelector(replica.Spec.Selector, pod.Labels) {
+	if err != nil {
+		return out, errors.Join(value.ErrUnavailable, err)
+	}
+	check = ownerReadLiveReplicaContent
+	if !ownerMetadata(replica.ObjectMeta, p.Namespace, ref.Name, string(ref.UID)) || replica.Spec.Template.Spec.ServiceAccountName != p.ServiceAccount || replica.Spec.Replicas == nil || *replica.Spec.Replicas < 1 || !ownerEnrollmentSelector(replica.Spec.Selector, pod.Labels) {
 		return out, value.ErrUnavailable
 	}
 	owner, ok := ownerController(replica.OwnerReferences, "Deployment", "apps/v1")
 	if !ok || owner.Name != p.Deployment || string(owner.UID) != p.DeploymentUID {
 		return out, value.ErrUnavailable
 	}
+	check = ownerReadLiveDigest
 	// Status/RV-only changes during normal startup are allowed. Security-relevant
 	// specs, selectors, labels and controller identities must remain identical.
 	raw, err := json.Marshal(struct {
@@ -169,16 +196,12 @@ func (s *OwnerEnrollmentAttester) ReadOwnerEnrollmentProof(ctx context.Context, 
 	if err != nil || before != after {
 		return zero, fmt.Errorf("owner proof repeated workload: %w", value.ErrUnavailable)
 	}
-	lastGuard, lastGuardUntil, err := s.protection.Current(ctx)
-	if err != nil || lastGuard != guard {
-		return zero, fmt.Errorf("owner proof final protection: %w", value.ErrUnavailable)
-	}
 	last, err := s.configuration.ReadOwnerConfiguration(ctx)
 	if err != nil || !last.Valid(s.client.now()) || !last.Configuration.Equal(first.Configuration) || ctx.Err() != nil {
 		return zero, fmt.Errorf("owner proof final configuration: %w", value.ErrUnavailable)
 	}
 	until := start.Add(5 * time.Second)
-	for _, deadline := range []time.Time{first.FreshUntil, last.FreshUntil, guardUntil, lastGuardUntil, expires} {
+	for _, deadline := range []time.Time{first.FreshUntil, last.FreshUntil, guardUntil, expires} {
 		until = identity.Earlier(until, deadline)
 	}
 	out := value.OwnerEnrollmentProof{Binding: b, Usage: r.Usage, Configuration: first, Pod: name, ReplicaSet: before.ReplicaSet, ReplicaSetUID: before.ReplicaSetUID, PublicKeyDigest: key, TokenDigest: artifact.Digest(sha256.Sum256(token)), WorkloadDigest: before.Digest, ProtectionDigest: guard, ObservedAt: start, FreshUntil: until}

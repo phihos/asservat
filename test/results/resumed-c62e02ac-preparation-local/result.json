@@ -1,0 +1,40 @@
+{
+  "scope": "local race and design gates; no installed lifecycle qualification",
+  "apiPreparationRace": {
+    "exit": 0,
+    "postgresSeconds": 2.454,
+    "executionSeconds": 1.146,
+    "toolSession": 5023,
+    "terminalChunk": "563885"
+  },
+  "journeyResolution": {
+    "redExit": 1,
+    "redSeconds": 0.065,
+    "greenExit": 0,
+    "greenSeconds": 1.065
+  },
+  "contractGates": {
+    "exit": 0,
+    "toolSession": 88976,
+    "terminalChunk": "acd632"
+  },
+  "sha256": {
+    "api-preparation-local-race-verification-transcript.txt": "d57c37ef6a1d2d40a21ec9c1ad72ed58e338f1576574269fd52a764fee8dc76e",
+    "journey-resolution-red-command.txt": "1c6f9e956bc3512278d78bfd165ca1f9679c1bef576bcfa18d5b1eede38852cf",
+    "journey-resolution-red.log": "67b0f0cea951a084dfe185e714d17e192c4dd71486f9fb4a001c97c746f239a7",
+    "journey-resolution-red.exit": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "journey-resolution-green-command.txt": "1c6f9e956bc3512278d78bfd165ca1f9679c1bef576bcfa18d5b1eede38852cf",
+    "journey-resolution-green.log": "05dd0e48e59790115d5fafa90729a982186c70bc3bae72f52847088558350e48",
+    "journey-resolution-green.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "journey-resolution-verification-transcript.txt": "096846aa395990e738e39347fc4ef8b65b84e51ef41484d67350338d71a06ef8",
+    "preparation-fix-contract-gates.log": "911829be05c99ed17d7ed1c891071c03f7f908b7aca0b517fd3a53e5a8f90b51",
+    "preparation-inprocess-integration.log": "653a5bfbc87e30162cf46c6911fe041d099088b7b7ecf79a693a1d1db30032f8"
+  },
+  "inProcessIntegration": {
+    "exit": 0,
+    "seconds": 6.488,
+    "toolSession": 34102,
+    "terminalChunk": "7dc7fe",
+    "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 GOFLAGS='-buildvcs=false -p=1' go test -race -count=1 -timeout=5m ./test/integration"
+  }
+}

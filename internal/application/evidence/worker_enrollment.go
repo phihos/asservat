@@ -7,7 +7,6 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
-	"crypto/sha256"
 	"time"
 )
 
@@ -17,16 +16,25 @@ type WorkerEnrollmentBindings interface {
 type WorkerEnrollmentProofReader interface {
 	ReadWorkerEnrollmentProof(context.Context, string, string, artifact.Digest) (value.WorkerEnrollmentProof, error)
 }
+
+// These identity-only ports share attestation without converting a query into
+// download authority. The producing ledger validates its own parent and scope.
+type AcquisitionEnrollmentBindings interface {
+	ReadAcquisitionEnrollment(context.Context, value.AcquisitionParent, string) (value.AcquisitionWorkerIdentity, error)
+}
+type AcquisitionEnrollmentProofReader interface {
+	ReadAcquisitionEnrollmentProof(context.Context, value.AcquisitionParent, string, artifact.Digest) (value.AcquisitionWorkerProof, error)
+}
 type WorkerCSRVerifier interface {
 	EnrollmentKey([]byte) (artifact.Digest, error)
 }
 type WorkerEnrollmentLedger interface {
-	ClaimWorkerEnrollment(context.Context, value.WorkerEnrollmentProof, artifact.DownloadAuthority) (value.WorkerEnrollment, audit.Receipt, bool, error)
-	PrepareWorkerCertificate(context.Context, value.WorkerEnrollmentProof, artifact.DownloadAuthority) (value.WorkerCertificateProgress, error)
-	StoreWorkerCertificate(context.Context, value.WorkerCertificateAttempt, value.WorkerCertificate, artifact.DownloadAuthority) error
+	ClaimWorkerEnrollment(context.Context, value.WorkerEnrollmentProof) (value.WorkerEnrollment, audit.Receipt, bool, error)
+	PrepareWorkerCertificate(context.Context, value.WorkerEnrollmentProof) (value.WorkerCertificateProgress, error)
+	StoreWorkerCertificate(context.Context, value.WorkerCertificateAttempt, value.WorkerCertificate) error
 }
 type WorkerCertificateActivator interface {
-	ActivateWorkerCertificate(context.Context, value.WorkerEnrollmentProof, value.WorkerCertificateAttempt, artifact.DownloadAuthority) (value.WorkerCertificate, error)
+	ActivateWorkerCertificate(context.Context, value.WorkerEnrollmentProof, value.WorkerCertificateAttempt) (value.WorkerCertificate, error)
 }
 type WorkerCertificateIssuer interface {
 	SignWorkerCertificate(context.Context, value.WorkerCertificateAttempt, []byte) (value.WorkerCertificate, error)
@@ -98,123 +106,34 @@ func (s *WorkerEnrollmentCoordinator) enrollChecked(ctx context.Context, session
 		shorten()
 		return p, final, nil
 	}
-	p, a, err := current()
-	if err != nil {
-		return zero, err
+	return enrollAcquisition(ctx, &downloadEnrollmentFlow{service: s, check: func() (value.WorkerEnrollmentProof, error) { p, _, err := current(); return p, err }}, csr, key, s.Now)
+}
+
+// EnrollAdmitted issues identity for an already admitted worker. The caller is
+// the worker's own finite HTTP request; SQL effects independently check current
+// parent/configuration/recovery. The certificate confers no evidence rights.
+func (s *WorkerEnrollmentCoordinator) EnrollAdmitted(ctx context.Context, session, worker string, csr []byte) (value.WorkerCertificate, error) {
+	var zero value.WorkerCertificate
+	if s == nil || ctx == nil || ctx.Err() != nil || s.CSR == nil || s.Proofs == nil || s.Ledger == nil || s.Activation == nil || s.Audit == nil || s.Acknowledgements == nil || s.Issuer == nil || s.Now == nil || !value.UUID(session) || !value.UUID(worker) || len(csr) < 1 || len(csr) > 8192 {
+		return zero, artifact.ErrInvalid
 	}
-	e, receipt, acknowledged, err := s.Ledger.ClaimWorkerEnrollment(ctx, p, a)
-	if err != nil {
-		return zero, err
+	call, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	key, err := s.CSR.EnrollmentKey(csr)
+	if err != nil || key == (artifact.Digest{}) {
+		return zero, collapsed("csr", artifact.ErrInvalid, err)
 	}
-	if !e.Valid() || e.Worker != p.Worker || e.PublicKeyDigest != key {
-		return zero, artifact.ErrIntegrity
+	p, err := s.Proofs.ReadWorkerEnrollmentProof(call, session, worker, key)
+	if err != nil || !p.Valid(s.Now()) || p.Worker.Intent.SessionID != session || p.Worker.Intent.ID != worker || p.PublicKeyDigest != key || call.Err() != nil {
+		return zero, collapsed("proof", artifact.ErrDownloadUnavailable, err)
 	}
-	if !acknowledged {
-		p, a, err = current()
-		if err != nil {
-			return zero, err
+	proofCall, stop := context.WithDeadline(call, p.FreshUntil)
+	defer stop()
+	flow := &downloadEnrollmentFlow{service: s, check: func() (value.WorkerEnrollmentProof, error) {
+		if proofCall.Err() != nil || !p.Valid(s.Now()) {
+			return value.WorkerEnrollmentProof{}, artifact.ErrDownloadExpired
 		}
-		receipt, err = s.Audit.WriteWorkerEnrollment(ctx, e)
-		if err != nil {
-			return zero, err
-		}
-		if !receipt.ValidWorkerEnrollment(e) {
-			return zero, artifact.ErrIntegrity
-		}
-		p, a, err = current()
-		if err != nil {
-			return zero, err
-		}
-		if err = s.Acknowledgements.AcknowledgeWorkerEnrollment(ctx, e, receipt); err != nil {
-			return zero, err
-		}
-	} else if !receipt.ValidWorkerEnrollment(e) {
-		return zero, artifact.ErrIntegrity
-	}
-	p, a, err = current()
-	if err != nil {
-		return zero, err
-	}
-	progress, err := s.Ledger.PrepareWorkerCertificate(ctx, p, a)
-	if err != nil {
-		return zero, err
-	}
-	attempt := progress.Attempt
-	if attempt.Enrollment != e || !attempt.Valid(attempt.CheckedAt) {
-		return zero, artifact.ErrIntegrity
-	}
-	p, a, err = current()
-	if err != nil {
-		return zero, err
-	}
-	if progress.MaySign {
-		if progress.Signed != nil || !attempt.Valid(s.Now()) {
-			return zero, artifact.ErrDownloadExpired
-		}
-		signing, cancel := context.WithDeadline(ctx, attempt.SignBefore)
-		c, err := s.Issuer.SignWorkerCertificate(signing, attempt, csr)
-		cancel()
-		if err != nil {
-			return zero, err
-		}
-		if !attempt.Valid(s.Now()) || !attempt.Matches(c) || artifact.Digest(sha256.Sum256(c.DER)) != c.Peer.Certificate {
-			return zero, artifact.ErrIntegrity
-		}
-		p, a, err = current()
-		if err != nil {
-			return zero, err
-		}
-		if err = s.Ledger.StoreWorkerCertificate(ctx, attempt, c, a); err != nil {
-			return zero, err
-		}
-		progress.Signed = &c
-	}
-	if progress.Signed == nil {
-		return zero, artifact.ErrDownloadUnavailable
-	}
-	if !attempt.Matches(*progress.Signed) || artifact.Digest(sha256.Sum256(progress.Signed.DER)) != progress.Signed.Peer.Certificate {
-		return zero, artifact.ErrIntegrity
-	}
-	record := audit.WorkerCertificate{Attempt: attempt, Peer: progress.Signed.Peer}
-	r, ok, err := s.Acknowledgements.ReadWorkerCertificateReceipt(ctx, record)
-	if err != nil {
-		return zero, err
-	}
-	if !ok {
-		p, a, err = current()
-		if err != nil {
-			return zero, err
-		}
-		r, err = s.Audit.WriteWorkerCertificate(ctx, record)
-		if err != nil {
-			return zero, err
-		}
-		if !r.ValidWorkerCertificate(record) {
-			return zero, artifact.ErrIntegrity
-		}
-		p, a, err = current()
-		if err != nil {
-			return zero, err
-		}
-		if err = s.Acknowledgements.AcknowledgeWorkerCertificate(ctx, record, r); err != nil {
-			return zero, err
-		}
-	} else if !r.ValidWorkerCertificate(record) {
-		return zero, artifact.ErrIntegrity
-	}
-	p, a, err = current()
-	if err != nil {
-		return zero, err
-	}
-	c, err := s.Activation.ActivateWorkerCertificate(ctx, p, attempt, a)
-	if err != nil {
-		return zero, err
-	}
-	if !attempt.Matches(c) || c.Peer != progress.Signed.Peer || artifact.Digest(sha256.Sum256(c.DER)) != c.Peer.Certificate || !p.Valid(s.Now()) || !a.Valid(s.Now()) || !c.Peer.Valid(s.Now()) || ctx.Err() != nil {
-		return zero, artifact.ErrIntegrity
-	}
-	if _, _, err = current(); err != nil {
-		return zero, err
-	}
-	return c, nil
+		return p, nil
+	}}
+	return enrollAcquisition(proofCall, flow, csr, key, s.Now)
 }

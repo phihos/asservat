@@ -321,7 +321,7 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 	users := map[string]bool{}
 	// ADR-184: a promoted hub-api also opens its backend pools here, under the
 	// same name, SCRAM, governor and manifest checks as the identity pools.
-	roles := append([]string{"enrollment", "audit", "activation", "registry"}, backend...)
+	roles := contracts.OwnerIdentityRolePurposes()
 	for _, role := range roles {
 		*purpose = role
 		*phase = startupSqlCredential
@@ -334,7 +334,7 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		if !known || c.ConnConfig.User != expected {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
-		c.MaxConns, c.MinConns = 1, 0
+		c.MaxConns, c.MinConns = contracts.OwnerIdentityPoolConnections, 0
 		c.ConnConfig.RequireAuth = "scram-sha-256"
 		users[c.ConnConfig.User] = true
 		// A promoted installed owner governs its identity pools too (ADR-177).
@@ -352,6 +352,11 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 		if err = postgres.VerifyOwnerIdentityCredential(verified, pool, manifest, role); err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
+	}
+	// Typed identity and backend adapters share this process credential. The
+	// pool is opened, verified and closed once, with six physical slots.
+	for _, duty := range []string{"enrollment", "audit", "activation", "registry", "routing", "native-read"} {
+		pools[duty] = pools["owner-runtime"]
 	}
 	*purpose = "none"
 	*phase = startupConfigurationReader
@@ -408,18 +413,17 @@ func composeOwnerIdentity(root, startup context.Context, files *os.Root, podUID 
 	issuers := map[string]*kms.OwnerCertificateIssuer{}
 	if c.ProviderAuthentication != nil {
 		*phase = startupProviderEffects
-		// ADR-173: every provider login and renewal runs two full native proofs
-		// (before and after the OpenBao call) within the first proof's window. On
-		// the shared observer they overran it, and every refresh failed at
-		// final-proof. They get their own clients, guard and reader; the proof is
-		// unchanged.
+		// ADR-173: provider login and renewal use their own clients, guard copy
+		// and reader. The native self-proof is reused for
+		// kube.OwnerProtectionReuse (2026-10-23 revision), so a login rarely
+		// repeats it.
 		providerReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.providerStats)
 		if err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)
 		}
-		// Each audit object write reads its storage credential under a full
-		// native proof too. Behind a refresh's proofs on one client it ran out
-		// of its five seconds (credentials-verify/identity), so it gets its own.
+		// Each audit object write reads its storage credential under the same
+		// reused native proof, on its own clients so it never queues behind a
+		// provider refresh. Within the reuse window a read is one Secret GET.
 		credentialReader, err := ownerProviderProofReader(in, c, control, guard, activation, podUID, &d.credentialStats)
 		if err != nil {
 			return parts, errors.Join(mounts.ErrUnavailable, err)

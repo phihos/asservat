@@ -1,6 +1,8 @@
 package capture
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -71,8 +73,9 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 			stops[j]()
 		}
 	}()
-	// Every known shorter source bound constrains subsequent blocking work. A
-	// later observation cannot widen this invocation or the accepted operation.
+	// Every known shorter authority bound constrains subsequent blocking work.
+	// Response-only metadata is consumed separately; it is not start authority.
+	// A later observation cannot widen this invocation or the accepted operation.
 	narrow := func(bound time.Time) error {
 		if bound.IsZero() {
 			return value.ErrUnavailable
@@ -125,16 +128,19 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 			return a, err
 		}
 	}
-	if err = narrow(a.MetadataValidUntil); err != nil {
-		return a, err
-	}
 	if err = check(); err != nil {
 		return a, err
+	}
+	// Consume the exact accepted identity while its admission/replay observation
+	// is current. Start obtains its own authority; the metadata read's cutoff
+	// must not become that later phase's deadline.
+	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, until)
+	if !s.Now().Before(a.MetadataValidUntil) {
+		return a, value.ErrDenied
 	}
 	// Ordinary accepted replay remains passive regardless of a lost earlier
 	// response. Only the explicit Continue action can reach this effect path.
 	if a.Replay && !continuation {
-		a.MetadataValidUntil = until
 		return a, nil
 	}
 	if !s.Now().Before(a.Deadline) || !s.Now().Before(a.Expectation.Registration.WriteUntil) {
@@ -143,20 +149,62 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 	if err = narrow(identity.Earlier(a.Deadline, a.Expectation.Registration.WriteUntil)); err != nil {
 		return a, err
 	}
+	intentStarted := time.Now()
 	r, err := s.Intents.AcknowledgedCaptureIntent(call, a.CaptureID)
+	auditapp.MarkStep(call, "s-intent", intentStarted)
 	b, encodeErr := json.Marshal(a.Expectation)
-	if err != nil || encodeErr != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != a.CaptureID || r.Actor != i.Principal || r.ScopeDigest != a.ScopeDigest || r.SubmissionDigest != a.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(b)) || !r.Deadline.Equal(a.Deadline) {
+	if err != nil {
+		if s.ReportPreviewFailure != nil {
+			s.ReportPreviewFailure("request/intent/" + auditapp.CaptureOperationFailureStage(err))
+		}
+		return a, value.ErrUnavailable
+	}
+	if encodeErr != nil || !r.Valid() || r.RootID != s.RootID || r.CaptureID != a.CaptureID || r.Actor != i.Principal || r.ScopeDigest != a.ScopeDigest || r.SubmissionDigest != a.SubmissionDigest || r.ExpectationDigest != artifact.Digest(sha256.Sum256(b)) || !r.Deadline.Equal(a.Deadline) {
+		if s.ReportPreviewFailure != nil {
+			s.ReportPreviewFailure("request/intent/record")
+		}
 		return a, value.ErrUnavailable
 	}
 	if err = check(); err != nil {
 		return a, err
 	}
-	if err = s.Start.StartContext(call, current, a.CaptureID); err != nil {
+	startStarted := time.Now()
+	err = s.Start.StartContext(call, current, a.CaptureID)
+	auditapp.MarkStep(call, "s-start", startStarted)
+	if err != nil {
 		return a, err
 	}
 	if err = check(); err != nil {
 		return a, err
 	}
-	a.MetadataValidUntil = until
-	return a, nil
+	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, until)
+	if s.Now().Before(a.MetadataValidUntil) {
+		return a, nil
+	}
+	// The start may have completed after its admission metadata expired. Obtain
+	// one current read-only response for that same accepted operation, never a
+	// new admission, audit write or execution attempt. No stale receipt is renewed.
+	recovery, err := s.currentRecovery(call)
+	if err != nil {
+		return a, err
+	}
+	observed, endRead := context.WithDeadline(call, recovery.FreshUntil)
+	defer endRead()
+	fresh, found, err := s.Replay.LookupContextAdmission(observed, value.ReplayQuery{RootID: s.RootID, PreviewID: preview, IdempotencyKey: key, SubmissionDigest: a.SubmissionDigest, Identity: i, Recovery: recovery})
+	if err != nil {
+		return a, err
+	}
+	encoded, encodeErr := json.Marshal(fresh.Expectation)
+	if !found || !acceptedContext(fresh, a.SubmissionDigest) || fresh.CaptureID != a.CaptureID || fresh.ScopeDigest != a.ScopeDigest || fresh.Pin != a.Pin || !fresh.CreatedAt.Equal(a.CreatedAt) || !fresh.Deadline.Equal(a.Deadline) || encodeErr != nil || !bytes.Equal(encoded, b) {
+		return a, value.ErrUnavailable
+	}
+	if err = check(); err != nil {
+		return a, err
+	}
+	fresh.MetadataValidUntil = identity.Earlier(fresh.MetadataValidUntil, identity.Earlier(until, recovery.FreshUntil))
+	if observed.Err() != nil || !recovery.Valid(s.Now()) || !s.Now().Before(fresh.MetadataValidUntil) {
+		return a, value.ErrDenied
+	}
+	fresh.Replay = a.Replay
+	return fresh, nil
 }

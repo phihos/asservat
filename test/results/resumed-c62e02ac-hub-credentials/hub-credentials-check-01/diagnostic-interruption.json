@@ -1,0 +1,7 @@
+{
+  "pid": 334058,
+  "signal": "SIGQUIT",
+  "reason": "Selected Kubernetes unit process remained blocked for over five minutes; capture goroutine stacks and retain failed result before correcting fixtures.",
+  "unix": 1792713664.9208062,
+  "stackReadback": "The selected test was TestPublicRoleOperationBoundsAPIRequests, waiting in the ordinary client-go rate limiter. This does not establish a deadlock; the run was interrupted and cannot qualify the whole Kubernetes subset. Existing fixture failures are retained; rerun affected/full required checks after corrections."
+}

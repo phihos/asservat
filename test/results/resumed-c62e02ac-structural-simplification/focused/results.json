@@ -1,0 +1,35 @@
+[
+  {
+    "name": "red-worker-observation",
+    "argv": [
+      "go",
+      "test",
+      "-overlay=/home/phil/.cache/asservat-build/recovered-c62e02ac/simplification-focused/baseline-overlay.json",
+      "-race",
+      "-count=1",
+      "-timeout=5m",
+      "-run",
+      "^TestWorkerCurrent(DispatchReusesObservationOnlyWithinOriginalInterval|EnrollmentReusesItsOriginalIdentityObservation|OriginalShorterObservationBoundsEveryEffect)$",
+      "-v",
+      "./internal/application/evidence"
+    ],
+    "expectedExit": 1,
+    "exitCode": 1,
+    "elapsedSeconds": 8.882
+  },
+  {
+    "name": "green-worker-observation",
+    "argv": [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "-timeout=10m",
+      "-v",
+      "./internal/application/evidence"
+    ],
+    "expectedExit": 0,
+    "exitCode": 1,
+    "elapsedSeconds": 6.649
+  }
+]

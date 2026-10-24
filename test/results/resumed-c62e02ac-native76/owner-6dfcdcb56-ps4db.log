@@ -1,0 +1,23 @@
+2026-10-23T13:21:24.492360700Z owner port router: started (1)
+2026-10-23T13:21:24.492370500Z owner router: started (1)
+2026-10-23T13:21:40.784884067Z owner router: handoff observation (1)
+2026-10-23T13:21:51.401877290Z owner observer 143 calls 110ms, operation 0 calls 0s, readiness 548 calls 390ms, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:22:16.222906749Z owner router: handoff observation (2)
+2026-10-23T13:22:19.640065604Z owner router: handoff observation (4)
+2026-10-23T13:22:21.401643824Z owner observer 253 calls 190ms, operation 0 calls 0s, readiness 870 calls 620ms, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:22:27.239194321Z owner router: handoff observation (8)
+2026-10-23T13:22:42.625600717Z owner router: handoff observation (16)
+2026-10-23T13:22:51.402137743Z owner observer 731 calls 530ms, operation 0 calls 0s, readiness 1456 calls 1.01s, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:23:13.621010981Z owner router: handoff observation (32)
+2026-10-23T13:23:21.401771122Z owner observer 1165 calls 830ms, operation 0 calls 0s, readiness 2042 calls 1.43s, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:23:51.402149163Z owner observer 1633 calls 1.17s, operation 0 calls 0s, readiness 2651 calls 1.84s, identity 3 calls 0s, provider 22 calls 20ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:24:15.079974362Z owner router: handoff observation (64)
+2026-10-23T13:24:21.402496643Z owner observer 2073 calls 1.48s, operation 0 calls 0s, readiness 3238 calls 2.26s, identity 3 calls 0s, provider 22 calls 20ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:24:51.402294660Z owner observer 2559 calls 1.83s, operation 0 calls 0s, readiness 3824 calls 2.67s, identity 3 calls 0s, provider 22 calls 20ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:25:21.402118473Z owner observer 3002 calls 2.16s, operation 0 calls 0s, readiness 4420 calls 3.09s, identity 3 calls 0s, provider 22 calls 20ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:25:51.401874093Z owner observer 3467 calls 2.5s, operation 0 calls 0s, readiness 5006 calls 3.49s, identity 3 calls 0s, provider 33 calls 30ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:26:16.149909166Z owner router: handoff observation (128)
+2026-10-23T13:26:21.402170690Z owner observer 3938 calls 2.83s, operation 0 calls 0s, readiness 5616 calls 3.91s, identity 3 calls 0s, provider 33 calls 30ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:26:51.402123010Z owner observer 4403 calls 3.16s, operation 0 calls 0s, readiness 6202 calls 4.31s, identity 3 calls 0s, provider 33 calls 30ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:27:21.401605711Z owner observer 4835 calls 3.48s, operation 0 calls 0s, readiness 6788 calls 4.71s, identity 3 calls 0s, provider 33 calls 30ms, credentials 15 calls 10ms, context-start 0 calls 0s total
+2026-10-23T13:27:51.402399341Z owner observer 5321 calls 3.83s, operation 0 calls 0s, readiness 7396 calls 5.14s, identity 3 calls 0s, provider 44 calls 40ms, credentials 15 calls 10ms, context-start 0 calls 0s total

@@ -1,0 +1,89 @@
+{
+  "at": "2026-10-23T01:02:31.246423+00:00",
+  "ownedNames": [
+    "asservat-custody-09vk9c6p-postgres",
+    "asservat-custody-09vk9c6p-s3",
+    "asservat-custody-09vk9c6p-kms"
+  ],
+  "network": "asservat-custody-09vk9c6p",
+  "checks": [
+    {
+      "command": [
+        "docker",
+        "ps",
+        "-aq",
+        "--filter",
+        "label=asservat.test=custody-09vk9c6p"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "docker",
+        "network",
+        "ls",
+        "-q",
+        "--filter",
+        "label=asservat.test=custody-09vk9c6p"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Id}}",
+        "asservat-custody-09vk9c6p-postgres"
+      ],
+      "exit": 1,
+      "stdout": "\n",
+      "stderr": "Error response from daemon: No such container: asservat-custody-09vk9c6p-postgres\n"
+    },
+    {
+      "command": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Id}}",
+        "asservat-custody-09vk9c6p-s3"
+      ],
+      "exit": 1,
+      "stdout": "\n",
+      "stderr": "Error response from daemon: No such container: asservat-custody-09vk9c6p-s3\n"
+    },
+    {
+      "command": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Id}}",
+        "asservat-custody-09vk9c6p-kms"
+      ],
+      "exit": 1,
+      "stdout": "\n",
+      "stderr": "Error response from daemon: No such container: asservat-custody-09vk9c6p-kms\n"
+    },
+    {
+      "command": [
+        "docker",
+        "network",
+        "inspect",
+        "--format",
+        "{{.Id}}",
+        "asservat-custody-09vk9c6p"
+      ],
+      "exit": 1,
+      "stdout": "\n",
+      "stderr": "Error response from daemon: network asservat-custody-09vk9c6p not found\n"
+    }
+  ],
+  "absent": true
+}

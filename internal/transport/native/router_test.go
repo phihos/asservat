@@ -17,16 +17,23 @@ import (
 
 func routerFixture(t *testing.T) (evidence.NativeOrigin, contracts.NativeHello, native.NativeOperationFactory) {
 	t.Helper()
+	return routerFixtureFor(t, 4*time.Second, nil)
+}
+
+// routerFixtureFor bounds the operation to lifetime. A non-nil recheck is the
+// operation gate's current check, as the hub's runtimes use Origins.Recheck.
+func routerFixtureFor(t *testing.T, lifetime time.Duration, recheck func(context.Context, evidence.NativeOrigin) (value.NativeLease, error)) (evidence.NativeOrigin, contracts.NativeHello, native.NativeOperationFactory) {
+	t.Helper()
 	source := flowSourceValue(t)
 	n := time.Now()
-	o := value.NativeOperation{Reference: value.NativeReference{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, OperationID: nativeID, Fence: 1}, Kind: value.NativePrepare, HubPodUID: nativeID, HubProcessEpoch: nativeID, WorkerPodUID: nativeID, WorkerPublicKey: artifact.Digest{1}, SourceVersion: evidence.ContextCopiesDigest(source.Copies), ParentID: nativeID, Generation: 1, StartedAt: n, Until: n.Add(4 * time.Second)}
+	o := value.NativeOperation{Reference: value.NativeReference{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, OperationID: nativeID, Fence: 1}, Kind: value.NativePrepare, HubPodUID: nativeID, HubProcessEpoch: nativeID, WorkerPodUID: nativeID, WorkerPublicKey: artifact.Digest{1}, SourceVersion: evidence.ContextCopiesDigest(source.Copies), ParentID: nativeID, Generation: 1, StartedAt: n, Until: n.Add(lifetime)}
 	o = syntheticProcessingPath(o)
 	o.Processing.Location = source.Expectation.Registration.Location
 	o.Path.TargetClusterID = o.Processing.Location.ClusterID
 	o.Path.StoreID = source.Expectation.Registration.StoreID
 	peer := value.KeyPeer{InstallationID: nativeID, PeerID: nativeID, Role: "acquisition", Certificate: artifact.Digest{3}, NotBefore: n.Add(-time.Minute), NotAfter: n.Add(time.Minute)}
 	binding := value.KeyWorkerBinding{InstallationID: nativeID, DownloadID: nativeID, ClusterID: nativeID, Namespace: "private-workers", NamespaceUID: nativeID, ServiceAccount: "acquisition", ServiceAccountUID: nativeID, Job: "download", JobUID: nativeID, Pod: "download-pod", PodUID: nativeID, JobSpec: artifact.Digest{1}, PodSpec: artifact.Digest{2}}
-	origin := evidence.NativeOrigin{Lease: value.NativeLease{Operation: o, Certificate: peer.Certificate, Sequence: 1, ObservedAt: n, Until: o.Until}, Proof: value.KeyWorkerProof{Binding: binding, Peer: peer, TokenDigest: artifact.Digest{4}, ObservedAt: n, FreshUntil: o.Until}}
+	origin := evidence.NativeOrigin{Lease: value.NativeLease{Operation: o, Certificate: peer.Certificate, Sequence: 1, ObservedAt: n, Until: o.Until}, Proof: (value.KeyWorkerProof{Binding: binding, Peer: peer, TokenDigest: artifact.Digest{4}, ObservedAt: n, FreshUntil: o.Until}).Acquisition()}
 	h := workerHello()
 	h.Reference.OperationID = nativeID
 	h.Reference.Fence = 1
@@ -34,7 +41,12 @@ func routerFixture(t *testing.T) (evidence.NativeOrigin, contracts.NativeHello, 
 		if !got.Lease.Operation.Equal(o) {
 			return nil, artifact.ErrDownloadUnavailable
 		}
-		gate, e := evidence.NewNativeFrameGate(owner, func(context.Context) (value.NativeLease, error) { return origin.Lease, nil }, time.Now)
+		gate, e := evidence.NewNativeFrameGate(owner, func(c context.Context) (value.NativeLease, error) {
+			if recheck != nil {
+				return recheck(c, got)
+			}
+			return origin.Lease, nil
+		}, time.Now)
 		if e != nil {
 			return nil, e
 		}

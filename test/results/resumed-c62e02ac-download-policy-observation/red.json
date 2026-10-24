@@ -1,0 +1,15 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "./internal/application/authorization",
+    "-run",
+    "^TestDownloadPolicyObservation",
+    "-timeout=45s",
+    "-v"
+  ],
+  "exit": 1,
+  "seconds": 0.5528922080993652,
+  "scope": "Existing raw policy port composed directly; no cache/extended validity exists. The same regression suite will compose the new observation owner after implementation."
+}

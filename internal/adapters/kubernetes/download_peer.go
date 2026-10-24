@@ -19,9 +19,13 @@ import (
 
 // This reader runs at trusted control mediation, not in a collector with a
 // token-review credential. Expected dispatch identities are independently pinned.
-type DownloadPeerAttester struct {
+type DownloadPeerAttester struct{ *AcquisitionPeerAttester }
+
+// The shared attester establishes only exact admitted workload identity. Parent
+// authority is independently enforced by the download or approved-query ledger.
+type AcquisitionPeerAttester struct {
 	client   *PermissionClient
-	expected value.KeyWorkerBinding
+	expected value.AcquisitionWorkerBinding
 	tokens   app.DownloadPeerToken
 }
 
@@ -85,10 +89,20 @@ func (s *DispatchedDownloadPeerAttester) ReadDownloadPeerProof(ctx context.Conte
 var _ app.DownloadPeerProofReader = (*DownloadPeerAttester)(nil)
 
 func NewDownloadPeerAttester(c *PermissionClient, b value.KeyWorkerBinding, tokens app.DownloadPeerToken) (*DownloadPeerAttester, error) {
+	if !b.Valid() {
+		return nil, artifact.ErrInvalid
+	}
+	a, err := NewAcquisitionPeerAttester(c, b.Acquisition(), tokens)
+	if err != nil {
+		return nil, err
+	}
+	return &DownloadPeerAttester{a}, nil
+}
+func NewAcquisitionPeerAttester(c *PermissionClient, b value.AcquisitionWorkerBinding, tokens app.DownloadPeerToken) (*AcquisitionPeerAttester, error) {
 	if c == nil || tokens == nil || !b.Valid() || c.clusterID != b.ClusterID || c.control.Name != b.Namespace || c.control.UID != b.NamespaceUID || len(validation.IsDNS1123Label(b.Namespace)) != 0 || len(validation.IsDNS1123Label(b.Job)) != 0 || len(validation.IsDNS1123Subdomain(b.Pod)) != 0 || len(validation.IsDNS1123Subdomain(b.ServiceAccount)) != 0 {
 		return nil, artifact.ErrInvalid
 	}
-	return &DownloadPeerAttester{c, b, tokens}, nil
+	return &AcquisitionPeerAttester{c, b, tokens}, nil
 }
 func DownloadPeerAudience(installation string) string {
 	return "https://asservat." + installation + "/key-worker-enrollment"
@@ -136,7 +150,7 @@ func reviewedTokenExpiry(token []byte, now time.Time) (time.Time, error) {
 	}
 	return time.Unix(exp, 0).UTC(), nil
 }
-func (s *DownloadPeerAttester) review(ctx context.Context, token []byte) error {
+func (s *AcquisitionPeerAttester) review(ctx context.Context, token []byte) error {
 	b := s.expected
 	pod, err := reviewBoundPodToken(ctx, s.client, token, DownloadPeerAudience(b.InstallationID), b.Namespace, b.ServiceAccount, b.ServiceAccountUID, b.PodUID)
 	if err != nil || pod != b.Pod {
@@ -186,7 +200,7 @@ func reviewBoundPodToken(ctx context.Context, client *PermissionClient, token []
 	}
 	return pod, nil
 }
-func (s *DownloadPeerAttester) object(ctx context.Context, kind, name, uid string) (map[string]json.RawMessage, error) {
+func (s *AcquisitionPeerAttester) object(ctx context.Context, kind, name, uid string) (map[string]json.RawMessage, error) {
 	b := s.expected
 	resource, version := "serviceaccounts", "v1"
 	prefix := "/api/v1/namespaces/" + b.Namespace + "/"
@@ -213,7 +227,7 @@ func (s *DownloadPeerAttester) object(ctx context.Context, kind, name, uid strin
 	}
 	return fields, nil
 }
-func (s *DownloadPeerAttester) live(ctx context.Context) error {
+func (s *AcquisitionPeerAttester) live(ctx context.Context) error {
 	b := s.expected
 	ns, e := s.client.namespace(ctx, s.client.control)
 	if e != nil || ns.Deleting {
@@ -298,15 +312,29 @@ func (s *DownloadPeerAttester) live(ctx context.Context) error {
 	return nil
 }
 func (s *DownloadPeerAttester) ReadDownloadPeerProof(ctx context.Context, session string, peer value.KeyPeer) (value.KeyWorkerProof, error) {
-	var zero value.KeyWorkerProof
-	if s == nil || ctx == nil || ctx.Err() != nil || session != s.expected.DownloadID || peer.InstallationID != s.expected.InstallationID || peer.PeerID != s.expected.PodUID || peer.Role != "acquisition" || !peer.Valid(s.client.now()) {
+	if s == nil || s.AcquisitionPeerAttester == nil {
+		return value.KeyWorkerProof{}, artifact.ErrInvalid
+	}
+	p, err := s.ReadAcquisitionPeerProof(ctx, value.AcquisitionParent{Purpose: value.AcquisitionDownload, ID: session}, peer)
+	if err != nil {
+		return value.KeyWorkerProof{}, err
+	}
+	binding, ok := p.Binding.DownloadBinding()
+	if !ok {
+		return value.KeyWorkerProof{}, artifact.ErrInvalid
+	}
+	return value.KeyWorkerProof{Binding: binding, Peer: p.Peer, TokenDigest: p.TokenDigest, ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil}, nil
+}
+func (s *AcquisitionPeerAttester) ReadAcquisitionPeerProof(ctx context.Context, parent value.AcquisitionParent, peer value.KeyPeer) (value.AcquisitionPeerProof, error) {
+	var zero value.AcquisitionPeerProof
+	if s == nil || ctx == nil || ctx.Err() != nil || !parent.Valid() || parent != s.expected.Parent || peer.InstallationID != s.expected.InstallationID || peer.PeerID != s.expected.PodUID || peer.Role != "acquisition" || !peer.Valid(s.client.now()) {
 		return zero, artifact.ErrInvalid
 	}
-	digest, started, until, e := s.observeToken(ctx)
-	if e != nil {
-		return zero, e
+	digest, started, until, err := s.observeToken(ctx)
+	if err != nil {
+		return zero, err
 	}
-	p := value.KeyWorkerProof{Binding: s.expected, Peer: peer, TokenDigest: digest, ObservedAt: started, FreshUntil: identity.Earlier(until, peer.NotAfter)}
+	p := value.AcquisitionPeerProof{Binding: s.expected, Peer: peer, TokenDigest: digest, ObservedAt: started, FreshUntil: identity.Earlier(until, peer.NotAfter)}
 	if !p.Valid(s.client.now()) {
 		return zero, artifact.ErrInvalid
 	}
@@ -315,7 +343,7 @@ func (s *DownloadPeerAttester) ReadDownloadPeerProof(ctx context.Context, sessio
 
 // Shared by initial enrollment and certificate-bound key observations. Neither
 // path fabricates a certificate to get through the bootstrap check.
-func (s *DownloadPeerAttester) observeToken(ctx context.Context) (artifact.Digest, time.Time, time.Time, error) {
+func (s *AcquisitionPeerAttester) observeToken(ctx context.Context) (artifact.Digest, time.Time, time.Time, error) {
 	var zero artifact.Digest
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

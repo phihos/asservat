@@ -43,12 +43,14 @@ type contextStartTLSFixture struct {
 	router          *contextstart.Router
 	owner           value.OwnerBinding
 	requests, dials atomic.Int32
+	intercept       func(http.ResponseWriter, *http.Request) bool
 	rootID          string
 	api             contextStartAPIProcess
 	// Retained for the fixed-endpoint regional client (ADR-172).
 	pool       value.OwnerPool
 	roots      *x509.CertPool
 	owners     *app.OwnerAuthenticator
+	ingress    *ContextStartIngress
 	credential *ConnectorProcessCredentials
 	listener   string
 	// targets answers ADR-179 queries on regional streams opened by open.
@@ -72,6 +74,9 @@ func newContextStartTLSFixture(t *testing.T) *contextStartTLSFixture {
 	var handler *contextstart.Handler
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		fixture.requests.Add(1)
+		if fixture.intercept != nil && fixture.intercept(w, r) {
+			return
+		}
 		if r.ProtoMajor != 2 {
 			t.Error("not actual H2")
 		}
@@ -124,6 +129,7 @@ func newContextStartTLSFixture(t *testing.T) *contextStartTLSFixture {
 	if e != nil {
 		t.Fatal(e)
 	}
+	fixture.ingress = ingress
 	fixture.router, e = contextstart.NewRouter(contextstart.RouterLimits{Standby: 1, Captures: 1, Clusters: []contextstart.ClusterLimit{{ClusterID: api.ClusterID, Standby: 1, Captures: 1}}})
 	if e != nil {
 		t.Fatal(e)

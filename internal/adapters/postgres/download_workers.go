@@ -142,7 +142,7 @@ func (s *DownloadWorkers) ReserveDownloadWorker(ctx context.Context, session, at
 		if generation > parent.RequestLimit {
 			return artifact.ErrDownloadCapacity
 		}
-		counts, e := q.DownloadWorkerCapacity(ctx, custodydb.DownloadWorkerCapacityParams{InstallationID: id(p.InstallationID), AllocationID: id(parent.AllocationID), PrincipalKey: principalKey(a.Scope.Principal)})
+		counts, e := q.AcquisitionWorkerCapacity(ctx, custodydb.AcquisitionWorkerCapacityParams{InstallationID: id(p.InstallationID), ClusterID: id(a.Scope.ClusterID), NamespaceUid: a.Scope.NamespaceUID, WorkloadUid: a.Scope.WorkloadUID, PrincipalKey: principalKey(a.Scope.Principal)})
 		if e != nil {
 			return e
 		}
@@ -480,6 +480,38 @@ func (s *DownloadWorkers) ConfirmDownloadWorkerTermination(ctx context.Context, 
 	})
 	if e != nil {
 		return value.DownloadWorkerTermination{}, e
+	}
+	return out, nil
+}
+
+// UnretiredDownloadWorkers lists bound native download workers still charged
+// against acquisition capacity. Rows from another profile stay charged.
+func (s *DownloadWorkers) UnretiredDownloadWorkers(ctx context.Context) ([]evidence.DownloadCleanupCandidate, error) {
+	if s == nil || ctx == nil || ctx.Err() != nil {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	call, stop := context.WithTimeout(ctx, 5*time.Second)
+	defer stop()
+	rows, e := custodydb.New(s.downloads.ledger.pool).UnretiredBoundDownloadWorkers(call, custodydb.UnretiredBoundDownloadWorkersParams{RootID: id(s.downloads.root), InstallationID: id(s.profile.InstallationID)})
+	if e != nil || len(rows) > 16 {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	out := make([]evidence.DownloadCleanupCandidate, 0, len(rows))
+	for _, r := range rows {
+		w, e := decodeWorker(r)
+		if e != nil || w.Intent.Profile != s.profile {
+			continue
+		}
+		c := evidence.DownloadCleanupCandidate{Worker: w}
+		if r.TerminationJson != nil {
+			if json.Unmarshal(r.TerminationJson, &c.Termination) != nil || !c.Termination.Valid(c.Termination.ObservedAt) || c.Termination.Worker != w {
+				return nil, artifact.ErrIntegrity
+			}
+		}
+		out = append(out, c)
+	}
+	if call.Err() != nil {
+		return nil, artifact.ErrDownloadUnavailable
 	}
 	return out, nil
 }

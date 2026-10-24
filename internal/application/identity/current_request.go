@@ -42,9 +42,9 @@ func sameIdentitySet(a, b []string) bool {
 	return slices.Equal(a, b)
 }
 
-func bindCurrentRequest(ctx context.Context, started time.Time, initial value.Identity, resolve func(context.Context) (value.Identity, error), now func() time.Time) (CurrentIdentity, value.Identity, error) {
+func bindCurrentRequest(ctx context.Context, started time.Time, lifetime time.Duration, initial value.Identity, resolve func(context.Context) (value.Identity, error), now func() time.Time) (CurrentIdentity, value.Identity, error) {
 	n := now()
-	initial.ValidUntil = value.Earlier(initial.ValidUntil, started.Add(5*time.Second))
+	initial.ValidUntil = value.Earlier(initial.ValidUntil, started.Add(lifetime))
 	if ctx.Err() != nil || n.Before(started) || !initial.Valid(n) {
 		return nil, value.Identity{}, value.ErrDenied
 	}
@@ -57,7 +57,15 @@ func bindCurrentRequest(ctx context.Context, started time.Time, initial value.Id
 // snapshot is for presentation, principal accounting and the original deadline;
 // consumers must use CurrentIdentity for subsequent authorization checks.
 func NewBearerRequest(ctx context.Context, resolver Resolver, token string, now func() time.Time) (CurrentIdentity, value.Identity, error) {
-	if ctx == nil || resolver == nil || now == nil || ctx.Err() != nil {
+	return NewBearerRequestWithin(ctx, resolver, token, now, 5*time.Second)
+}
+
+// NewBearerRequestWithin is NewBearerRequest for a transport whose request may
+// be an evidence read: lifetime is at most value.EvidenceReadRequestWindow and
+// only caps the request, never the resolver's own identity interval. The
+// transport must shorten every other request to its own operation window.
+func NewBearerRequestWithin(ctx context.Context, resolver Resolver, token string, now func() time.Time, lifetime time.Duration) (CurrentIdentity, value.Identity, error) {
+	if ctx == nil || resolver == nil || now == nil || ctx.Err() != nil || lifetime <= 0 || lifetime > value.EvidenceReadRequestWindow {
 		return nil, value.Identity{}, value.ErrUnavailable
 	}
 	started := now()
@@ -71,7 +79,7 @@ func NewBearerRequest(ctx context.Context, resolver Resolver, token string, now 
 	if initialCtx.Err() != nil {
 		return nil, value.Identity{}, value.ErrDenied
 	}
-	return bindCurrentRequest(ctx, started, i, resolve, now)
+	return bindCurrentRequest(ctx, started, lifetime, i, resolve, now)
 }
 
 // NewBrowserRequest accepts only the private session cookie after the transport
@@ -105,7 +113,7 @@ func NewBrowserRequest(ctx context.Context, sessions BrowserSessionResolver, coo
 		current.Identity.ValidUntil = value.Earlier(current.Identity.ValidUntil, current.ExpiresAt)
 		return current.Identity, nil
 	}
-	h, i, err := bindCurrentRequest(ctx, started, v.Identity, resolve, now)
+	h, i, err := bindCurrentRequest(ctx, started, 5*time.Second, v.Identity, resolve, now)
 	if err != nil {
 		return nil, SessionView{}, err
 	}
@@ -154,4 +162,34 @@ func (r *currentRequest) ResolveIdentity(ctx context.Context) (value.Identity, e
 	}
 	r.until = i.ValidUntil
 	return cloneIdentity(i), nil
+}
+
+// ShortenRequest caps a request identity at until, for a transport that
+// learns after authentication that the request is not an evidence read. It
+// can only shorten: every result keeps the inner identity's own ValidUntil.
+func ShortenRequest(current CurrentIdentity, until time.Time, now func() time.Time) CurrentIdentity {
+	return shortenedRequest{inner: current, until: until, now: now}
+}
+
+type shortenedRequest struct {
+	inner CurrentIdentity
+	until time.Time
+	now   func() time.Time
+}
+
+func (r shortenedRequest) ResolveIdentity(ctx context.Context) (value.Identity, error) {
+	if r.inner == nil || r.now == nil || ctx == nil || !r.now().Before(r.until) {
+		return value.Identity{}, value.ErrDenied
+	}
+	bounded, cancel := context.WithDeadline(ctx, r.until)
+	defer cancel()
+	i, err := r.inner.ResolveIdentity(bounded)
+	if err != nil {
+		return value.Identity{}, err
+	}
+	i.ValidUntil = value.Earlier(i.ValidUntil, r.until)
+	if bounded.Err() != nil || !i.Valid(r.now()) {
+		return value.Identity{}, value.ErrDenied
+	}
+	return i, nil
 }

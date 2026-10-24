@@ -1,0 +1,1 @@
+TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 GOFLAGS="-buildvcs=false -p=1" go test -race ./internal/application/capture -run ^TestContext(Storage|Facts|RequestStorage|PreviewStorage) -count=1 -timeout=60s

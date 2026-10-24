@@ -118,7 +118,7 @@ func newWorkerEnrollmentServices(t *testing.T, ctx context.Context, poolFor func
 				t.Fatal(err)
 			}
 		}
-		l, e := postgres.NewWorkerEnrollments(ctx, pool, root, profile, g, custodyID)
+		l, e := postgres.NewWorkerEnrollments(ctx, pool, root, profile, custodyID)
 		if e != nil {
 			t.Fatal(e)
 		}
@@ -140,5 +140,5 @@ func newWorkerEnrollmentServices(t *testing.T, ctx context.Context, poolFor func
 	return workerEnrollmentFixture{bindings, svc, l, a, active, issuer, csr}
 }
 func (f workerEnrollmentFixture) enroll(ctx context.Context, w value.DownloadWorker) (value.WorkerCertificate, error) {
-	return f.service.Enroll(ctx, "synthetic-reference", w.Intent.SessionID, w.Intent.ID, w.Intent.Authority.Scope, f.csr)
+	return f.service.EnrollAdmitted(ctx, w.Intent.SessionID, w.Intent.ID, f.csr)
 }

@@ -1,0 +1,16 @@
+{
+  "sourceSHA": "b705387f600982903aec500e1cc9becc35eaf147",
+  "reportSHA256": "8c586f723dc9c4777f0f6280c45af8c1d822506e0f03ee8e5dc9df3e6083b89d",
+  "sourceFiles": 2695,
+  "allMatchCommitArchive": true,
+  "mismatches": [],
+  "testPattern": "^TestConnectorAPIProcessWithRealKubernetes$",
+  "passedTests": [
+    "TestConnectorAPIProcessWithRealKubernetes/named-whole-secret-and-foreign-denial",
+    "TestConnectorAPIProcessWithRealKubernetes/setup-original-native-bracket",
+    "TestConnectorAPIProcessWithRealKubernetes/capacity-token-admission"
+  ],
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": []
+}

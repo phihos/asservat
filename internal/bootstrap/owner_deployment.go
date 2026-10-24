@@ -22,12 +22,10 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
-	"asservat.local/asservat/internal/application/evidence"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	configuration "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -42,19 +40,21 @@ type OwnerDeployment struct {
 	// providerStats and credentialStats count the provider proofs' and the
 	// audit credential reads' own clients (ADR-173).
 	providerStats, credentialStats regionalAPIStats
-	Runtime                        *OwnerRuntime
-	Router                         *evidence.WorkerEnrollmentRouter
-	inputs                         *ownerInputs
-	trust                          *mtls.WorkerTrustCatalog
-	root                           context.Context
-	cancel                         context.CancelFunc
-	closers                        []func()
-	mu                             sync.Mutex
-	closed                         bool
-	running                        bool
-	owners                         sync.WaitGroup
-	once                           sync.Once
-	catalogDigest                  [32]byte
+	// contextStartStats counts the context-start ingress clients (ADR-208).
+	contextStartStats regionalAPIStats
+	Runtime           *OwnerRuntime
+	workerIdentities  *postgres.WorkerRouting
+	inputs            *ownerInputs
+	trust             *mtls.WorkerTrustCatalog
+	root              context.Context
+	cancel            context.CancelFunc
+	closers           []func()
+	mu                sync.Mutex
+	closed            bool
+	running           bool
+	owners            sync.WaitGroup
+	once              sync.Once
+	catalogDigest     [32]byte
 	// public holds the ADR-180 public purpose pools, identity and context
 	// services; all nil without Public. shared is the native composition's
 	// retention topology and effect guards, reused by the public layer.
@@ -134,10 +134,10 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 	if installed {
 		// ADR-184: every installed owner pool is an identity purpose with one
 		// connection per process.
-		hot = 4 + len(backendRoles)
+		hot = contracts.OwnerIdentityPoolConnections
 	}
 	if in.config.Public != nil {
-		hot += len(hubAPIHotPurposes)
+		hot += hubAPIHotConnections
 	}
 	governor, err := postgres.NewSQLConnectionGovernor(contracts.SQLConnectionsPerHubReplica, hot)
 	if err != nil {
@@ -201,10 +201,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 	if _, err = d.refreshWorkerTrust(startup); err != nil {
 		return nil, err
 	}
-	d.Router, err = evidence.NewWorkerEnrollmentRouter(root, c.InstallationID, reader, time.Now, c.Concurrency)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
+	d.workerIdentities = reader
 	var nativeConfig *OwnerNativeRuntimeConfig
 	if (c.Native == nil) != (pool.NativePort == 0) {
 		return nil, mounts.ErrUnavailable
@@ -244,12 +241,27 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 		}
 		closers = nil
 		phase = startupPublicContext
-		d.publicContext, err = newPublicContext(startup, in, d.publicFiles, d.providers, d.public, observer, probe, d.shared, catalog, parts.audit, &closers)
+		// ADR-208: preview capability and catalog reads get their own clients
+		// with the opening limiter; on the owner's shared clients the capability
+		// read alone took 1-2 s of a preview's five seconds (local run 3).
+		control := configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+		publicObserver, e := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-observer.token")), c.ClusterID, control, time.Now)
+		if e != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		publicProbe, e := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-probe.token")), c.ClusterID, control, time.Now)
+		if e != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		d.publicContext, err = newPublicContext(startup, in, d.publicFiles, d.providers, d.public, publicObserver, publicProbe, d.shared, catalog, parts.audit, &closers)
 		d.closers = append(d.closers, closers...)
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
 		nativeConfig.ContextStarts = d.publicContext.starts
+		if nativeConfig.ContextStarts.Authenticator, err = contextStartOwnerAuthenticator(in, c, guard, pool, configs, ledgers["registry"], &d.contextStartStats); err != nil {
+			return nil, mounts.ErrUnavailable
+		}
 	}
 	// ADR-190 decision 4: an installed promoted owner keeps serving the
 	// observation handler set, now beside the native handler on its port.
@@ -280,9 +292,7 @@ func NewOwnerDeployment(ctx context.Context, files *os.Root, podUID string) (res
 	if parts.readinessProofs != nil {
 		readinessProofs = parts.readinessProofs
 	}
-	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, ReadinessProofs: readinessProofs, Routes: routes, Protection: guard, Requests: func(b value.OwnerBinding) (evidence.WorkerOwnerEnrollment, error) {
-		return &evidence.WorkerRequestOwners{Router: d.Router, PodUID: b.PodUID, ProcessEpoch: b.ProcessEpoch}, nil
-	}, WorkerTrust: d.trust, Workers: reader, Locators: reader, Connections: c.Connections, Concurrency: c.Concurrency, Native: nativeConfig, Observation: observation, Operation: operation})
+	d.Runtime, err = NewOwnerRuntime(root, OwnerRuntimeConfig{Pool: pool, PodUID: podUID, SourceUID: c.ConfigurationUID, Configuration: configs, ServerEnrollment: services["server"], ClientEnrollment: services["client"], Registry: ledgers["registry"], Proofs: proofs, ReadinessProofs: readinessProofs, Routes: routes, Protection: guard, Connections: c.Connections, Concurrency: c.Concurrency, Native: nativeConfig, Observation: observation, Operation: operation})
 	if err != nil || startup.Err() != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -345,16 +355,10 @@ func (d *OwnerDeployment) Close() {
 		// Disable both owners before joining either. Runtime.Run owns its
 		// readiness/native children; the router also admits independent control
 		// registrations and retains busy deliveries through their final close.
-		if d.Router != nil {
-			d.Router.Close()
-		}
 		if d.Runtime != nil {
 			d.Runtime.Close()
 		}
 		d.owners.Wait()
-		if d.Router != nil {
-			d.Router.CloseAndJoin()
-		}
 		// Provider lifetimes join before the files and pools they borrow close.
 		if d.providers != nil {
 			_ = d.providers.CloseAndJoin(context.Background())
@@ -437,8 +441,9 @@ func (d *OwnerDeployment) Run(listener net.Listener, additional ...net.Listener)
 					identity, identitySpent := d.identityStats.load()
 					provider, providerSpent := d.providerStats.load()
 					credential, credentialSpent := d.credentialStats.load()
-					fmt.Fprintf(os.Stderr, "owner observer %d calls %s, operation %d calls %s, readiness %d calls %s, identity %d calls %s, provider %d calls %s, credentials %d calls %s total\n", calls, spent.Round(10*time.Millisecond), operation, operationSpent.Round(10*time.Millisecond),
-						readiness, readinessSpent.Round(10*time.Millisecond), identity, identitySpent.Round(10*time.Millisecond), provider, providerSpent.Round(10*time.Millisecond), credential, credentialSpent.Round(10*time.Millisecond))
+					starts, startsSpent := d.contextStartStats.load()
+					fmt.Fprintf(os.Stderr, "owner observer %d calls %s, operation %d calls %s, readiness %d calls %s, identity %d calls %s, provider %d calls %s, credentials %d calls %s, context-start %d calls %s total\n", calls, spent.Round(10*time.Millisecond), operation, operationSpent.Round(10*time.Millisecond),
+						readiness, readinessSpent.Round(10*time.Millisecond), identity, identitySpent.Round(10*time.Millisecond), provider, providerSpent.Round(10*time.Millisecond), credential, credentialSpent.Round(10*time.Millisecond), starts, startsSpent.Round(10*time.Millisecond))
 				}
 			}
 			if _, err := d.refreshWorkerTrust(d.root); err != nil {
@@ -618,34 +623,19 @@ func (d *OwnerDeployment) projectionInputs(path string) (*providerInputs, error)
 	return in, nil
 }
 
-// providerAuditCredentials reads the installed audit store credential from
-// the provider effects on each use; nothing is cached across reads.
-type providerAuditCredentials struct {
-	providers *kms.InstalledOwnerProviderEffects
-}
-
-func (s providerAuditCredentials) Retrieve(ctx context.Context) (aws.Credentials, error) {
-	c, until, err := s.providers.ReadAuditCredentials(ctx)
-	if err != nil {
-		// The provider's own closed step (credentials-<step>) reaches the
-		// object store's diagnostics through the SDK's error chain.
-		var named interface{ FixedStep() string }
-		if errors.As(err, &named) {
-			return aws.Credentials{}, &fixedStepError{named.FixedStep(), mounts.ErrUnavailable}
-		}
-		return aws.Credentials{}, &fixedStepError{"credentials", mounts.ErrUnavailable}
+func auditCredentialFailure(err error) error {
+	var named interface{ FixedStep() string }
+	if errors.As(err, &named) {
+		return &fixedStepError{named.FixedStep(), mounts.ErrUnavailable}
 	}
-	if !time.Now().Before(until) {
-		return aws.Credentials{}, &fixedStepError{"credentials-expired", mounts.ErrUnavailable}
-	}
-	return aws.Credentials{AccessKeyID: c.AccessKeyID, SecretAccessKey: c.SecretAccessKey, SessionToken: c.SessionToken, Source: "installed-owner-provider"}, nil
+	return &fixedStepError{"credentials", mounts.ErrUnavailable}
 }
 
 // installedAuditStore is the public layer's audit store in the installed
 // layout: provider-held credentials and the provider audit Transit keys.
 func (d *OwnerDeployment) installedAuditStore(providers *kms.InstalledOwnerProviderEffects) (publicAuditStore, error) {
 	c := d.inputs.config
-	if providers == nil || providers.Sealer() == nil || providers.Opener() == nil {
+	if providers == nil || providers.Sealer() == nil || providers.Opener() == nil || c.Concurrency < 1 || c.Concurrency > 16 {
 		return publicAuditStore{}, mounts.ErrUnavailable
 	}
 	h, err := ownerHTTP(c.AuditStore.Endpoint, c.AuditStore.Roots)
@@ -658,12 +648,7 @@ func (d *OwnerDeployment) installedAuditStore(providers *kms.InstalledOwnerProvi
 		return publicAuditStore{}, err
 	}
 	d.closers = append(d.closers, keys.CloseIdleConnections)
-	store, err := objectstore.NewVersionedAudit(c.AuditStore.Endpoint, c.AuditStore.Region, c.AuditStore.Bucket, providerAuditCredentials{providers}, h)
-	if err != nil {
-		return publicAuditStore{}, mounts.ErrUnavailable
-	}
-	d.closers = append(d.closers, store.Close)
-	return publicAuditStore{store: store, seal: providers.Sealer(), open: providers.Opener(), keys: keys}, nil
+	return publicAuditStore{seal: providers.Sealer(), open: providers.Opener(), keys: keys, operation: &installedOperationAudit{input: c, providers: providers, http: h, seal: providers.Sealer(), open: providers.Opener(), slots: make(chan struct{}, c.Concurrency)}}, nil
 }
 
 // backendInputs is the backend root: the installed observation projection
@@ -690,4 +675,33 @@ func (d *OwnerDeployment) clusterCatalogChanged(ctx context.Context) bool {
 	}
 	digest, err := clusterCatalogDigest(catalog)
 	return err == nil && digest != pc.clustersDigest
+}
+
+// contextStartOwnerAuthenticator gives the context-start ingress self-checks
+// their own observer/probe clients with the same guard plan and pins: on the
+// owner's shared clients they queued behind other request paths and overran
+// the original five seconds (installed native 54). The guard proof is reused
+// for kube.OwnerProtectionReuse, so they keep the default client limiter.
+func contextStartOwnerAuthenticator(in *ownerInputs, c contracts.OwnerDeployment, guard *kube.OwnerWorkloadProtection, pool value.OwnerPool, configs *postgres.OwnerConfigurations, registry *postgres.OwnerEnrollments, stats *regionalAPIStats) (*app.OwnerAuthenticator, error) {
+	control := configuration.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
+	observerConfig, probeConfig := in.kubernetes("kube-observer.token"), in.kubernetes("kube-probe.token")
+	observerConfig.Wrap(stats.wrap)
+	probeConfig.Wrap(stats.wrap)
+	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, err
+	}
+	probe, err := kube.NewPermissionClient(probeConfig, c.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, err
+	}
+	own, err := guard.WithClients(observer, probe)
+	if err != nil {
+		return nil, err
+	}
+	endpoints, err := kube.NewOwnerEndpoints(observer, pool)
+	if err != nil {
+		return nil, err
+	}
+	return &app.OwnerAuthenticator{Registry: registry, Routes: &app.OwnerRoutes{Configurations: configs, Endpoints: endpoints, Now: time.Now}, Protection: own, Now: time.Now}, nil
 }

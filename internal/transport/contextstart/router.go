@@ -35,25 +35,36 @@ type Router struct {
 	standby  map[string]*Standby
 	captures map[string]*Attachment
 	serial   uint64
+	// registered is closed and replaced when a standby registers or a query
+	// releases it, so a waiting query can retry within its original reserve.
+	registered chan struct{}
 }
+
+// queryReserve is the part of a query's original deadline kept for the query
+// itself and the caller's later checks when waiting for a standby to register.
+const queryReserve = 2500 * time.Millisecond
 
 // ReceiverCheck rechecks the same actual TLS peer and accepted local process.
 // A successful fresh check may authorize attachment, never restore a lost human
 // owner. The channel identity must remain exactly the original registered one.
 type ReceiverCheck = app.APIContextReceiverCheck
 type Standby struct {
-	router   *Router
-	channel  fleet.APIContextChannel
-	check    ReceiverCheck
-	order    uint64
-	ctx      context.Context
-	cancel   context.CancelFunc
-	job      chan *captureJob
-	query    chan *queryJob
-	done     chan struct{}
-	attached bool
-	queries  int
-	once     sync.Once
+	router    *Router
+	channel   fleet.APIContextChannel
+	check     ReceiverCheck
+	order     uint64
+	ctx       context.Context
+	cancel    context.CancelFunc
+	job       chan *captureJob
+	query     chan *queryJob
+	done      chan struct{}
+	attached  bool
+	queryBusy bool
+	queries   int
+	once      sync.Once
+	// Protected by router.mu. Selection observes stream cancellation directly,
+	// including the interval before its cancellation callback runs.
+	streamDone <-chan struct{}
 }
 type queryJob struct {
 	ctx     context.Context
@@ -107,7 +118,7 @@ func NewRouter(l RouterLimits) (*Router, error) {
 		return nil, fleet.ErrInvalid
 	}
 	l.Clusters = append([]ClusterLimit(nil), l.Clusters...)
-	return &Router{limits: l, clusters: clusters, standby: make(map[string]*Standby), captures: make(map[string]*Attachment)}, nil
+	return &Router{limits: l, clusters: clusters, standby: make(map[string]*Standby), captures: make(map[string]*Attachment), registered: make(chan struct{})}, nil
 }
 
 // RegisterStandby runs only after actual TLS authentication, before any human
@@ -129,9 +140,22 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 	s := &Standby{router: r, channel: receiver.Channel, check: check, order: r.serial, ctx: call, cancel: cancel, job: make(chan *captureJob, 1), query: make(chan *queryJob), done: make(chan struct{})}
 	r.standby[s.channel.ExchangeID] = s
 	cluster.standby++
+	close(r.registered)
+	r.registered = make(chan struct{})
 	return s, nil
 }
 func (s *Standby) Context() context.Context { return s.ctx }
+func (s *Standby) liveLocked() bool {
+	if s.ctx.Err() != nil {
+		return false
+	}
+	select {
+	case <-s.streamDone:
+		return false
+	default:
+		return true
+	}
+}
 func (s *Standby) Finish() {
 	if s == nil {
 		return
@@ -159,6 +183,23 @@ func (s *Standby) Serve(stream Stream, now func() time.Time) error {
 	if s == nil || stream == nil || now == nil {
 		return fleet.ErrInvalid
 	}
+	streamCtx := stream.Context()
+	if streamCtx == nil {
+		return fleet.ErrInvalid
+	}
+	s.router.mu.Lock()
+	s.streamDone = streamCtx.Done()
+	s.router.mu.Unlock()
+	// A stream can die before the surrounding HTTP request is cancelled.
+	// Withdraw it immediately, but keep both reservations until the handler
+	// joins stream.Close and calls Finish. Active work also sees this cancellation.
+	ended := make(chan struct{})
+	stopStream := context.AfterFunc(streamCtx, func() { s.cancel(); close(ended) })
+	defer func() {
+		if !stopStream() {
+			<-ended
+		}
+	}()
 	for {
 		select {
 		case job := <-s.job:
@@ -178,6 +219,7 @@ func (s *Standby) Serve(stream Stream, now func() time.Time) error {
 			// unless it broke the stream.
 			fs, ok := stream.(*frameStream)
 			if !ok {
+				s.cancel()
 				q.result <- queryResult{err: fleet.ErrUnavailable}
 				return fleet.ErrUnavailable
 			}
@@ -186,8 +228,14 @@ func (s *Standby) Serve(stream Stream, now func() time.Time) error {
 			until, e := fs.query(call, q.method, q.in, q.out)
 			stop()
 			cancel()
-			q.result <- queryResult{until, e}
 			var answer errQueryAnswer
+			if e != nil && !errors.As(e, &answer) {
+				recordStreamDiagnostic(q.ctx, fs, e, streamHubQuery)
+				// Withdraw before result publication releases query ownership.
+				// The handler still owns joined socket cleanup and Finish.
+				s.cancel()
+			}
+			q.result <- queryResult{until, e}
 			if e != nil && !errors.As(e, &answer) {
 				return e
 			}
@@ -208,19 +256,53 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	if !ok || !time.Now().Before(deadline) || deadline.After(time.Now().Add(5*time.Second)) {
 		return time.Time{}, fleet.ErrInvalid
 	}
-	r.mu.Lock()
+	// Between a standby's bounded residency and the region's next opening no
+	// standby may be idle. Wait for a registration within this query's original
+	// deadline, keeping queryReserve for the query and the caller (native 66).
 	var selected *Standby
-	for _, s := range r.standby {
-		if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && s.queries < contracts.APIContextMaximumQueries && s.ctx.Err() == nil && (selected == nil || s.order < selected.order) {
-			selected = s
+	for {
+		r.mu.Lock()
+		for _, s := range r.standby {
+			if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && !s.queryBusy && s.queries < contracts.APIContextMaximumQueries && s.liveLocked() && (selected == nil || s.order < selected.order) {
+				selected = s
+			}
+		}
+		if r.closed {
+			r.mu.Unlock()
+			return time.Time{}, fleet.ErrUnavailable
+		}
+		if selected != nil {
+			selected.queries++
+			selected.queryBusy = true
+			r.mu.Unlock()
+			break
+		}
+		registered := r.registered
+		r.mu.Unlock()
+		wait := time.Until(deadline.Add(-queryReserve))
+		if wait <= 0 {
+			return time.Time{}, fleet.ErrUnavailable
+		}
+		timer := time.NewTimer(wait)
+		select {
+		case <-registered:
+			timer.Stop()
+		case <-ctx.Done():
+			timer.Stop()
+			return time.Time{}, fleet.ErrUnavailable
+		case <-timer.C:
+			return time.Time{}, fleet.ErrUnavailable
 		}
 	}
-	if r.closed || selected == nil {
+	defer func() {
+		r.mu.Lock()
+		selected.queryBusy = false
+		if !r.closed && selected.liveLocked() {
+			close(r.registered)
+			r.registered = make(chan struct{})
+		}
 		r.mu.Unlock()
-		return time.Time{}, fleet.ErrUnavailable
-	}
-	selected.queries++
-	r.mu.Unlock()
+	}()
 	job := &queryJob{ctx: ctx, method: method, in: in, out: out, result: make(chan queryResult, 1)}
 	select {
 	case selected.query <- job:
@@ -229,6 +311,8 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	case <-selected.ctx.Done():
 		return time.Time{}, fleet.ErrUnavailable
 	}
+	// After handoff, cancellation cannot release ownership before the actual
+	// query and its finite I/O callbacks have joined.
 	result := <-job.result
 	return result.until, result.err
 }
@@ -249,7 +333,7 @@ func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachme
 	}
 	var selected *Standby
 	for _, s := range r.standby {
-		if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && s.ctx.Err() == nil && (selected == nil || s.order < selected.order) {
+		if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && !s.queryBusy && s.liveLocked() && (selected == nil || s.order < selected.order) {
 			selected = s
 		}
 	}
@@ -278,15 +362,19 @@ func (a *Attachment) Receiver(ctx context.Context) (fleet.APIContextReceiver, er
 	}
 	a.router.mu.Lock()
 	check := a.standby.check
+	live := a.standby.liveLocked()
 	a.router.mu.Unlock()
-	if closed || check == nil || a.ctx.Err() != nil || a.standby.ctx.Err() != nil {
+	if closed || check == nil || a.ctx.Err() != nil || !live {
 		return fleet.APIContextReceiver{}, fleet.ErrUnavailable
 	}
 	call, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(a.ctx, cancel)
 	defer func() { stop(); cancel() }()
 	receiver, e := check(call)
-	if e != nil || call.Err() != nil || a.ctx.Err() != nil || a.standby.ctx.Err() != nil || !receiver.Valid(time.Now()) || receiver.Channel != a.standby.channel {
+	a.router.mu.Lock()
+	live = a.standby.liveLocked()
+	a.router.mu.Unlock()
+	if e != nil || call.Err() != nil || a.ctx.Err() != nil || !live || !receiver.Valid(time.Now()) || receiver.Channel != a.standby.channel {
 		return fleet.APIContextReceiver{}, fleet.ErrUnavailable
 	}
 	if d, ok := a.ctx.Deadline(); ok && d.Before(receiver.ValidUntil) {
@@ -317,7 +405,7 @@ func (a *Attachment) dispatch(w fleet.APIContextWork, signed []byte, run func(co
 		return "", fleet.ErrUnavailable
 	}
 	a.router.mu.Lock()
-	if a.router.standby[a.standby.channel.ExchangeID] != a.standby || a.standby.ctx.Err() != nil {
+	if a.router.standby[a.standby.channel.ExchangeID] != a.standby || !a.standby.liveLocked() {
 		a.router.mu.Unlock()
 		a.mu.Unlock()
 		return "", fleet.ErrUnavailable

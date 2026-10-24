@@ -1,0 +1,23 @@
+[
+  {
+    "kind": "container",
+    "name": "asservat-custody-hmd_p6d3-postgres",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-custody-hmd_p6d3-postgres"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-custody-hmd_p6d3-s3",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-custody-hmd_p6d3-s3"
+  },
+  {
+    "kind": "network",
+    "name": "asservat-custody-hmd_p6d3",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: network asservat-custody-hmd_p6d3 not found"
+  }
+]

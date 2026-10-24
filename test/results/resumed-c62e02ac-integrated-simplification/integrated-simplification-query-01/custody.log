@@ -1,0 +1,6 @@
+=== RUN   TestSharedProjectionLifecycleWithRealServices
+    capacity_producer_test.go:95: fixture request failed
+--- FAIL: TestSharedProjectionLifecycleWithRealServices (0.04s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	0.103s
+FAIL

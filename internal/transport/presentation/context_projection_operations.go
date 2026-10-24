@@ -21,9 +21,9 @@ type ContextQueryResults interface {
 	GetQueryResult(context.Context, identities.CurrentIdentity, analysisapp.ContextQueryInvocation, string) (*analysisapp.ContextProjectionDelivery, error)
 }
 
-// This inert adapter deliberately has no ToolNames, Tool or unaudited Call.
-// Existing public composition does not register it. A future explicit runtime
-// composition must supply accepted services and the existing audit wrapper.
+// This adapter deliberately has no ToolNames, Tool or unaudited Call. Explicit
+// installation composition adds its two operations to InvestigationOperations;
+// the existing audit wrapper alone supplies each live invocation owner.
 type ContextProjectionOperations struct {
 	excerpts  ContextExcerptService
 	results   ContextQueryResults
@@ -45,12 +45,12 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 	noDispatch := OperationReply{auditNoDispatch: true, auditEffect: operationEffectNone}
 	if s == nil || ctx == nil || ctx.Err() != nil || current == nil || call.queryInvocation == nil ||
 		!queryOperation(name) || s.contracts.ValidateInput(name, raw) != nil {
-		return noDispatch, ErrOperationDelivery
+		return noDispatch, stopped("query-call", ErrOperationDelivery)
 	}
 	i := call.queryInvocation
 	record, err := i.Invocation(ctx)
 	if err != nil || record.ID != call.requestID || record.Tool != name {
-		return noDispatch, ErrOperationDelivery
+		return noDispatch, stopped("query-invocation", ErrOperationDelivery)
 	}
 	var input analysisapp.ContextQueryInput
 	if name == "get_file_excerpt" {
@@ -78,7 +78,7 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		input.QueryID = in.QueryHandle
 	}
 	if i.CheckInput(ctx, input) != nil {
-		return noDispatch, ErrOperationDelivery
+		return noDispatch, stopped("query-input", ErrOperationDelivery)
 	}
 	var d *analysisapp.ContextProjectionDelivery
 	if name == "get_file_excerpt" {
@@ -101,27 +101,28 @@ func (s *ContextProjectionOperations) CallWithContext(ctx context.Context, curre
 		}
 	}()
 	if err != nil || d == nil {
-		return OperationReply{}, ErrOperationDelivery
+		// The service's own closed stage names this refusal in the report.
+		return OperationReply{}, stoppedAt("query", err, ErrOperationDelivery)
 	}
 	select {
 	case <-d.Done():
-		return OperationReply{}, ErrOperationDelivery
+		return OperationReply{}, stopped("query-done", ErrOperationDelivery)
 	default:
 	}
 	body, err := s.serialize(call.requestID, name, d)
 	if err != nil {
-		return OperationReply{}, ErrOperationDelivery
+		return OperationReply{}, stopped("query-output", ErrOperationDelivery)
 	}
 	if i.bind(ctx, d, int64(len(body))) != nil {
 		clear(body)
-		return OperationReply{}, ErrOperationDelivery
+		return OperationReply{}, stopped("query-bind", ErrOperationDelivery)
 	}
 	reply := OperationReply{Body: body, ValidUntil: d.ValidUntil(), auditEffect: operationEffectAccepted}
 	reply, err = ownOperationReply(ctx, reply, &contextProjectionGuard{delivery: d, invocation: i, preparedUntil: reply.ValidUntil},
 		identity.Earlier(record.WriteUntil, d.CleanupUntil()), i.acknowledge)
 	if err != nil {
 		clear(body)
-		return OperationReply{}, err
+		return OperationReply{}, stoppedAt("query-reply", err, err)
 	}
 	transferred = true
 	return reply, nil

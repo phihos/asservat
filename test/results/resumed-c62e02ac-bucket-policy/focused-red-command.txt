@@ -1,0 +1,1 @@
+GOMAXPROCS=2 TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp 'GOFLAGS=-buildvcs=false -p=1' go test -count=1 -timeout=60s ./test/integration -run '^Test(InstallerEvidenceBucketPolicyMatchesProviderReadback|InstalledDeletionFaultPolicyKeepsOriginalScope|InstalledDeletionFaultRestoresUnknownMutation)$' -v

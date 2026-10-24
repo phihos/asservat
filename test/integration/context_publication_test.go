@@ -7,6 +7,7 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"encoding/json"
 	"errors"
@@ -200,7 +201,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 					if err != nil || projection.CaseID != f.e.CaseID || projection.CaptureID != f.e.CaptureUID || projection.Version != evidence.ContextCopiesDigest(f.copies) ||
 						projection.SourceFormat != artifact.ContextFormat || projection.SourceProjectionDigest != analysis.ContextSourceProjectionDigest() || projection.DataClass != "metadata" ||
 						projection.Retained.Registration.Location != f.e.Registration.Location || !projection.Retained.Effective.ExpiresAt.Equal(f.e.Registration.ExpiresAt) ||
-						!projection.ValidUntil.After(projection.ObservedAt) || projection.ValidUntil.After(projection.ObservedAt.Add(5*time.Second)) {
+						!projection.ValidUntil.After(projection.ObservedAt) || projection.ValidUntil.After(projection.ObservedAt.Add(identity.EvidenceReadRequestWindow)) {
 						t.Fatal("approved projection lost protected source identity or original bounds", err)
 					}
 					replay, err := f.publish.PublishContext(ctx, f.e, f.copies, authority)

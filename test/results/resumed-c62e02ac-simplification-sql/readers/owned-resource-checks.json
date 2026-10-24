@@ -1,0 +1,60 @@
+[
+  {
+    "kind": "container",
+    "name": "asservat-custody-0z7t5p3f-postgres",
+    "id": "6c55cde0139f6b5b6323e7bfa7a4725576e7257c1235696368121d372beac58d",
+    "exitCode": 1,
+    "absent": true,
+    "stdout": "[]\n",
+    "stderr": "error: no such object: 6c55cde0139f6b5b6323e7bfa7a4725576e7257c1235696368121d372beac58d\n"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-custody-0z7t5p3f-s3",
+    "id": "24d3db3c4fd9500509ee0b6dad70bac3ffbb5a54b9e9abf72d0984c76e80cc1d",
+    "exitCode": 1,
+    "absent": true,
+    "stdout": "[]\n",
+    "stderr": "error: no such object: 24d3db3c4fd9500509ee0b6dad70bac3ffbb5a54b9e9abf72d0984c76e80cc1d\n"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-custody-0z7t5p3f-kms",
+    "id": "82d43769852078c6463cd4eb9dd82c615d205adb98c032370a63dd9815e40fac",
+    "exitCode": 1,
+    "absent": true,
+    "stdout": "[]\n",
+    "stderr": "error: no such object: 82d43769852078c6463cd4eb9dd82c615d205adb98c032370a63dd9815e40fac\n"
+  },
+  {
+    "kind": "containers",
+    "label": "custody-0z7t5p3f",
+    "argv": [
+      "docker",
+      "ps",
+      "-aq",
+      "--filter",
+      "label=asservat.test=custody-0z7t5p3f"
+    ],
+    "exitCode": 0,
+    "absent": true,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "kind": "networks",
+    "label": "custody-0z7t5p3f",
+    "argv": [
+      "docker",
+      "network",
+      "ls",
+      "-q",
+      "--filter",
+      "label=asservat.test=custody-0z7t5p3f"
+    ],
+    "exitCode": 0,
+    "absent": true,
+    "stdout": "",
+    "stderr": ""
+  }
+]

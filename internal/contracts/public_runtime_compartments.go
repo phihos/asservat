@@ -43,9 +43,10 @@ func PublicRuntimeConnectorMaintenancePurposes() []string {
 // also support that purpose before any credential effect or runtime mount.
 func PublicRuntimeRoleConnectionLimit(purpose string) (int, bool) {
 	if slices.Contains(PublicRuntimeHubRolePurposes(), purpose) {
-		return PublicRuntimeRoleConnections, true
+		limit, _ := PublicRuntimeRolePoolLimit(purpose)
+		return PublicRuntimeRetainedHubProcesses*limit + 1, true
 	}
-	if slices.Contains(PublicRuntimeCaptureCleanupPurposes(), purpose) || slices.Contains(PublicRuntimeConnectorMaintenancePurposes(), purpose) || purpose == "capacity" || purpose == "capacity-capture" || slices.Contains(PublicRuntimePermissionPurposes(), purpose) || slices.Contains(PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(PublicRuntimeContextDeletionPurposes(), purpose) {
+	if purpose == "browser-settings" || slices.Contains(PublicRuntimeCaptureCleanupPurposes(), purpose) || slices.Contains(PublicRuntimeConnectorMaintenancePurposes(), purpose) || purpose == "capacity" || purpose == "capacity-capture" || slices.Contains(PublicRuntimePermissionPurposes(), purpose) || slices.Contains(PublicRuntimeRetentionPurposes(), purpose) || slices.Contains(PublicRuntimeWorkerConfigurationPurposes(), purpose) || slices.Contains(PublicRuntimeContextDeletionPurposes(), purpose) {
 		return PublicRuntimeWorkerRoleConnections, true
 	}
 	if slices.Contains(PublicRuntimeFederationPurposes(), purpose) {
@@ -58,4 +59,17 @@ func PublicRuntimeRoleConnectionLimit(purpose string) (int, bool) {
 		return PublicRuntimeKeyServiceRoleConnections, true
 	}
 	return 0, false
+}
+
+// PublicRuntimeRolePoolLimit is the aggregate pool maximum for a credential
+// in one process. The shared hub login owns an 18-slot ordinary pool and two
+// one-slot resolution pools; other public credentials keep one connection.
+func PublicRuntimeRolePoolLimit(purpose string) (int, bool) {
+	if !slices.Contains(PublicRuntimeRolePurposes(), purpose) {
+		return 0, false
+	}
+	if purpose == "hub-runtime" {
+		return PublicRuntimeHubConnections, true
+	}
+	return 1, true
 }

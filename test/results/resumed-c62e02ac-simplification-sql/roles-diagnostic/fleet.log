@@ -1,0 +1,12 @@
+=== RUN   TestInitialInstallationWithRealServices
+=== RUN   TestInitialInstallationWithRealServices/public-runtime-roles-matrix
+    initial_installation_test.go:558: failed_role_provision_elapsed_ms=5376 original_fleet_fresh_until=2026-10-22T20:08:11.548786Z claims=81 receipts=81 expected=81
+    initial_installation_test.go:558: failed_role_provision_current_fleet observed_at=2026-10-22T22:08:06.548786+02:00 fresh_until=2026-10-22T22:08:11.548786+02:00 database_now=2026-10-22T22:08:11.931891+02:00 expired=true suspended=false recovery_blocked=false
+    initial_installation_test.go:558: provision/reconcile fixed roles provisioning stopped at verify
+=== NAME  TestInitialInstallationWithRealServices
+    initial_installation_test.go:631: real scoped PostgreSQL, S3 and OpenBao initial activation; protected source/witness inputs synthetic outside native cases; full installer provisioning and restore remain unqualified
+--- FAIL: TestInitialInstallationWithRealServices (6.36s)
+    --- FAIL: TestInitialInstallationWithRealServices/public-runtime-roles-matrix (6.26s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	6.426s
+FAIL

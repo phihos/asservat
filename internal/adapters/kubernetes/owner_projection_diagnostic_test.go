@@ -46,7 +46,7 @@ func TestOwnerProjectionDiagnosticPreservesFirstExecuteAndOnlyFinalization(t *te
 	}
 	defer driver.Close()
 	out, err := driver.Run(context.Background())
-	if err == nil || !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, cfg.ErrChanged) || out.Complete || out.Stop != OwnerInstallationUnverified || out.Phase != "projection" || out.Calls != 20 || out.Inspections != 1 || out.Finalizations != 3 || calls != 3 {
+	if err == nil || !errors.Is(err, cfg.ErrUnavailable) || errors.Is(err, cfg.ErrChanged) || out.Complete || out.Stop != OwnerInstallationUnverified || out.Phase != "projection" || out.Calls != 10 || out.Inspections != 1 || out.Finalizations != 3 || calls != 3 {
 		t.Fatal("diagnostic changed bounded sequence", out, err, calls)
 	}
 	message := err.Error()

@@ -1,0 +1,50 @@
+{
+  "sourceCommit": "e19738c87346e735532a99daf68acf662504f0af",
+  "harnessExit": 1,
+  "goTestSeconds": 12.368,
+  "scope": "real PostgreSQL/S3: zero-effect headroom refusal and expired passive uncertainty passed; 3 errors.Is unavailable assertions failed generic Ledger normalization; post-lock fresh-winner/replay assertions were not reached; existing exact execution/publication cases passed",
+  "sourceHashesVerified": 2726,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "cleanupReadback": [
+    {
+      "resource": "asservat-custody-0vw2s_ig-postgres",
+      "kind": "container",
+      "exit": 1,
+      "stderr": "Error response from daemon: No such container: asservat-custody-0vw2s_ig-postgres",
+      "absent": true
+    },
+    {
+      "resource": "asservat-custody-0vw2s_ig-s3",
+      "kind": "container",
+      "exit": 1,
+      "stderr": "Error response from daemon: No such container: asservat-custody-0vw2s_ig-s3",
+      "absent": true
+    },
+    {
+      "resource": "asservat-custody-0vw2s_ig",
+      "kind": "network",
+      "exit": 1,
+      "stderr": "Error response from daemon: network asservat-custody-0vw2s_ig not found",
+      "absent": true
+    }
+  ],
+  "sha256": {
+    "custody.log": "23b9dadc8ade65374ea1135150330895434f93984b6931d80f3c0cbea2633d64",
+    "custody-environment.json": "639151b84af43dd4105fb1f0e5f952c444b48de81bd00ee93c8be65cea4aa6bd",
+    "custody-postgres.log": "d486c3355217e2edd5e6afa80552d5a65f615f967850214fb989914ef1c54d13",
+    "runner.log": "101a69dc57362988434067fdc5eb76ab12807d21922f9f6dc683d2360437661c",
+    "api-preparation-rollback-deadline-red.log": "8b4af063d05b05f6058ffade040cc1be94f295d9bb8d6c6c145970b5f2ea03d8",
+    "api-preparation-rollback-deadline-green.log": "e0611fef5c34a07a8cdc76d704616b5bdbb0513c7e371eee6437ec7613676b83",
+    "api-preparation-rollback-deadline-green.json": "2e103fd059e2ec3b08fa6e469b7ef631df9ee6151920952ec8826d57ce4df8ad",
+    "api-preparation-rollback-deadline-red-evidence.txt": "ebf19dc9214e86b0a28618c29239298a985fe7d444a83174bf367cd326dac886",
+    "preparation-classification-contract-gates.log": "69e5d204bc160ba244aeace5a8beca5ec6bd6f485ac7957076163852cd9548dd"
+  },
+  "localCorrection": {
+    "scope": "local error boundary only; genuine real SQL green remains pending",
+    "regressionRedExit": 1,
+    "postgresRaceExit": 0,
+    "postgresRaceSeconds": 2.466,
+    "specArchitectureExit": 0
+  }
+}

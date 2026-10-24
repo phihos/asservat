@@ -1,0 +1,19 @@
+{
+  "command": [
+    "make",
+    "console-build"
+  ],
+  "cwd": "/home/phil/Projekte/asservat-projection-c62e02ac",
+  "environment": {
+    "VITEST_MAX_WORKERS": "2",
+    "NODE_OPTIONS": "--max-old-space-size=2048"
+  },
+  "startedAt": "2026-10-23T00:23:17.006248+00:00",
+  "durationSeconds": 8.680747575999703,
+  "exitCode": 0,
+  "sourceCount": 366,
+  "sourcesUnchanged": true,
+  "changedSources": [],
+  "log": "console-build-1.log",
+  "qualification": "Console component checks only; no installed approved-native read qualification."
+}

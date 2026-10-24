@@ -7,7 +7,6 @@ import (
 	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
@@ -23,7 +22,7 @@ func newPublicFleet(ctx context.Context, c contracts.OwnerDeployment, providers 
 		return nil, nil
 	}
 	f := c.Public.Fleet
-	if providers == nil || providers.BootstrapChannel() == nil || pools == nil || observer == nil || probe == nil || a.store == nil || a.seal == nil || a.open == nil {
+	if providers == nil || providers.BootstrapChannel() == nil || pools == nil || observer == nil || probe == nil || !a.storageConfigured() || a.seal == nil || a.open == nil {
 		return nil, mounts.ErrUnavailable
 	}
 	admins, pin := capacityWorkerGuard(f.SettingsGuard)
@@ -54,5 +53,5 @@ func newPublicFleet(ctx context.Context, c contracts.OwnerDeployment, providers 
 		}
 	}
 	return &fleetapp.FleetBootstrapIssuance{Settings: settings, Reservations: reserve, Credentials: providers.BootstrapChannel(), Records: issues[0], Audits: issues[1],
-		Objects: &objectstore.BootstrapIssueObjects{Store: a.store, Seal: a.seal, Open: a.open}, Activation: issues[2], Now: time.Now}, nil
+		Objects: a.bootstrapObjects(), Activation: issues[2], Now: time.Now}, nil
 }

@@ -79,7 +79,13 @@ func TestEnrollmentFleetObservationWithRealPostgres(t *testing.T) {
 		if suspended != wantSuspended || blocked != wantRecovery {
 			t.Fatal("unexpected authority flags", suspended, blocked)
 		}
-		if !observed.Equal(a.ObservedAt) || !until.Equal(a.FreshUntil) || generation != a.Revision.Generation {
+		want := a.FreshUntil
+		if !wantRecovery {
+			// Migration 00074: the positive observation row lives 30 seconds
+			// from its own observation; the caller's interval bounds the call.
+			want = a.ObservedAt.Add(30 * time.Second)
+		}
+		if !observed.Equal(a.ObservedAt) || !until.Equal(want) || generation != a.Revision.Generation {
 			t.Fatal("observation deadline or revision changed")
 		}
 	}

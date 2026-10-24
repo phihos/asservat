@@ -1,0 +1,134 @@
+package evidence
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+type preflightServing func(context.Context) (time.Time, error)
+
+func (f preflightServing) ContextNativeReady(ctx context.Context) (time.Time, error) {
+	return f(ctx)
+}
+
+type preflightConfiguration func(context.Context, value.DownloadWorkerProfile) (time.Time, error)
+
+func (f preflightConfiguration) CurrentWorkerConfiguration(ctx context.Context, p value.DownloadWorkerProfile) (time.Time, error) {
+	return f(ctx, p)
+}
+
+// Match the production source reader's intersection with its caller and
+// authority. This port returns immutable file facts, without reading bytes.
+type preflightSource struct{ *downloadControlFixture }
+
+func (f preflightSource) ReadContextDownloadSource(ctx context.Context, a artifact.DownloadAuthority) (ContextDownloadSource, error) {
+	s, err := f.downloadControlFixture.ReadContextDownloadSource(ctx, a)
+	s.ValidUntil = identity.Earlier(s.ValidUntil, a.ValidUntil)
+	if d, ok := ctx.Deadline(); ok {
+		s.ValidUntil = identity.Earlier(s.ValidUntil, d)
+	}
+	return s, err
+}
+
+// The coordinator, native runtime, request-owned authority and dispatcher are
+// real. SQL, current configuration, Job and audit ports are synthetic. Advancing
+// the component clock inside the acknowledged audit models its elapsed work;
+// no provider timing or native55 cause is claimed by this regression.
+func newPreflightPreparation(t *testing.T, which string) (boundWorkerFixture, *downloadControlFixture, ContextDownloadCoordinator, time.Time) {
+	t.Helper()
+	f := newBoundWorkerFixture(t)
+	c, coordinator := newDownloadControlFixture(t)
+	c.now, c.a, c.i, c.source = f.f.now, f.f.a, f.f.identity, f.source
+	c.plan.ObservedAt, c.plan.ValidUntil = c.now, c.a.ValidUntil
+	c.plan.Allocation.ID = f.f.s.AllocationID
+	c.plan.HardUntil = c.now.Add(2 * time.Second)
+	coordinator.Now = func() time.Time { return c.now }
+	coordinator.NewID = func() string { return f.f.s.ID }
+	coordinator.Runtime, coordinator.Sources = f.r, preflightSource{c}
+	short := c.now.Add(200 * time.Millisecond)
+	f.r.config.Serving = preflightServing(func(context.Context) (time.Time, error) {
+		if which == "readiness" {
+			return short, nil
+		}
+		return c.a.ValidUntil, nil
+	})
+	f.r.config.Configuration = preflightConfiguration(func(context.Context, value.DownloadWorkerProfile) (time.Time, error) {
+		if which == "configuration-readiness" {
+			return short, nil
+		}
+		return c.a.ValidUntil, nil
+	})
+	if which == "plan" {
+		// A previously observed configuration may cap the finite plan read,
+		// independently of the current runtime readiness observation.
+		c.plan.ValidUntil = short
+	}
+	f.lookup.value = ContextDownloadAttachment{SessionID: f.f.s.ID, Scope: c.a.Scope, State: artifact.DownloadPreparing, ObservedAt: c.now, ValidUntil: c.a.ValidUntil}
+	f.launch.created, f.launch.acknowledged = false, false
+	f.jobs.err = &DownloadWorkerPending{Intent: f.launch.w.Intent, Job: f.launch.w.Job, ObservedAt: c.now, ValidUntil: c.a.ValidUntil}
+	f.launch.hooks["ack-worker-audit"] = func() {
+		f.advance(400 * time.Millisecond)
+		c.now = f.f.now
+	}
+	return f, c, coordinator, short
+}
+
+func TestContextDownloadConsumedPreflightDoesNotExpirePreparation(t *testing.T) {
+	for _, which := range []string{"readiness", "configuration-readiness", "plan"} {
+		t.Run(which, func(t *testing.T) {
+			f, c, coordinator, short := newPreflightPreparation(t, which)
+			original := c.a
+			call, cancel := context.WithDeadline(t.Context(), c.now.Add(5*time.Second))
+			defer cancel()
+			out, err := coordinator.PrepareContextDownload(call, c, c.a.Scope.ArtifactID, "preflight-key")
+			if !f.launch.acknowledged || !c.now.After(short) || !original.Valid(c.now) {
+				t.Fatal("probe did not cross only the consumed preflight interval", f.launch.calls, err)
+			}
+			if err != nil || !out.ContinuePreparation || out.Session.State != artifact.DownloadPreparing || out.Metadata != nil {
+				t.Fatalf("live preparation expired with consumed %s observation: acknowledged=%v claims=%d jobs=%d error=%v", which, f.launch.acknowledged, f.launch.count("claim-worker"), f.launch.count("create-job"), err)
+			}
+			if f.launch.count("claim-worker") != 1 || f.launch.count("create-job") != 1 || f.launch.count("write-worker-audit") != 1 || countDownloadCalls(c, "reserve") != 1 || out.Session.ID != f.f.s.ID || !out.Session.Deadline.Equal(c.plan.HardUntil) || c.a != original {
+				t.Fatal("preflight consumption changed identity, spend or hard lifetime", f.launch.calls, c.calls)
+			}
+			for phase, deadline := range f.launch.deadlines {
+				if deadline.After(original.ValidUntil) || deadline.After(c.plan.HardUntil) {
+					t.Fatalf("%s escaped original authority or accepted session lifetime", phase)
+				}
+			}
+		})
+	}
+}
+
+func TestContextDownloadConsumedPreflightKeepsHardBounds(t *testing.T) {
+	for _, which := range []string{"caller", "identity", "authority", "session", "canceled"} {
+		t.Run(which, func(t *testing.T) {
+			f, c, coordinator, short := newPreflightPreparation(t, "normal")
+			call, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			switch which {
+			case "caller":
+				var stop context.CancelFunc
+				call, stop = context.WithDeadline(call, short)
+				defer stop()
+			case "identity":
+				c.i.ValidUntil, f.f.identity.ValidUntil = short, short
+			case "authority":
+				c.a.ValidUntil, f.f.a.ValidUntil = short, short
+			case "session":
+				c.plan.HardUntil = short
+			case "canceled":
+				advance := f.launch.hooks["ack-worker-audit"]
+				f.launch.hooks["ack-worker-audit"] = func() { advance(); cancel() }
+			}
+			_, err := coordinator.PrepareContextDownload(call, c, c.a.Scope.ArtifactID, "hard-bound-key")
+			if err == nil || f.launch.count("ack-worker-audit") != 1 || f.launch.count("claim-worker") != 0 || f.launch.count("create-job") != 0 {
+				t.Fatal("expired or canceled authority reached worker launch", which, f.launch.calls, err)
+			}
+		})
+	}
+}

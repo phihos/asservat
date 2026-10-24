@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "name": "asservat-c71fa5be1d3b459da57b1234889affda-owner-inputs",
+    "namespace": "bootstrap-chain-10000000-target",
+    "uid": "463418ac-7c89-4c0b-a12c-cca5f4907d92",
+    "resourceVersion": "2682"
+  },
+  "installationID": "c71fa5be-1d3b-459d-a57b-1234889affda",
+  "permissionRootID": "7591d375-5ea8-4641-ad84-f0cb3e30790b",
+  "namespace": {
+    "name": "bootstrap-chain-10000000-target",
+    "uid": "29ed6b47-2a29-4a04-9224-5b0e076b1719"
+  },
+  "public": {
+    "clusterCatalog": {
+      "source": {
+        "name": "asservat-c71fa5be1d3b459da57b1234889affda-cluster-catalog",
+        "uid": "7698b56d-86fb-4145-b31a-b62b9aab143c"
+      },
+      "guard": {
+        "name": "asservat-c71fa5be1d3b459da57b1234889affda-cluster-catalog-guard",
+        "policyUID": "d353bf46-c602-4411-a1c2-ad2e32e3b059",
+        "policyGeneration": 1,
+        "bindingUID": "a8df8d04-72fd-4e73-beb5-cc834e4a6c5a",
+        "bindingResourceVersion": "1663",
+        "administrators": [
+          {
+            "kind": "User",
+            "name": "system:serviceaccount:bootstrap-chain-10000000:install-bootstrap-runner"
+          }
+        ]
+      }
+    }
+  }
+}

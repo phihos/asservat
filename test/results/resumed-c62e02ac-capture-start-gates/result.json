@@ -1,0 +1,21 @@
+{
+  "sourceCommit": "9543cff77c78bd7a3262e575820c47bd413dc430",
+  "designExit": 0,
+  "sqlWrapperExit": 0,
+  "sqlGoExit": 0,
+  "designSeconds": 13.203,
+  "sqlWrapperSeconds": 50.458,
+  "sqlGoPackageSeconds": 14.395,
+  "retainedCheckLockWaitRevocationSeconds": 0.68,
+  "originalTrackedNonResultHashes": 3777,
+  "originalChangedSources": [],
+  "harnessSourceHashesVerified": 2753,
+  "sourceHashMismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "independentCleanup": {
+    "containersAbsent": 2,
+    "networksAbsent": 1
+  },
+  "archiveScope": "Previously completed design and selected real SQL/S3 gates only; no tests rerun and no installed journey qualification claimed."
+}

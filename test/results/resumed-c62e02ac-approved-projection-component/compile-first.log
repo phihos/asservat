@@ -1,0 +1,84 @@
+?   	asservat.local/asservat/api/v1alpha1	[no test files]
+# asservat.local/asservat/internal/application/capacity
+internal/application/capacity/query_qualification.go:99:15: undefined: capacitySum
+internal/application/capacity/query_qualification.go:103:15: undefined: capacitySum
+internal/application/capacity/query_qualification.go:115:14: undefined: capacitySum
+internal/application/capacity/query_qualification.go:123:15: undefined: capacitySum
+internal/application/capacity/query_qualification.go:132:14: undefined: capacitySum
+internal/application/capacity/query_qualification.go:140:18: undefined: capacitySum
+internal/application/capacity/query_qualification.go:168:15: undefined: capacitySum
+internal/application/capacity/query_qualification.go:179:21: undefined: capacitySum
+internal/application/capacity/query_qualification.go:222:14: undefined: capacitySum
+internal/application/capacity/query_qualification.go:230:12: undefined: capacitySum
+internal/application/capacity/query_qualification.go:230:12: too many errors
+FAIL	asservat.local/asservat/cmd/asservat [build failed]
+ok  	asservat.local/asservat/internal/adapters/diagnostics	0.003s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/jose	0.005s [no tests to run]
+FAIL	asservat.local/asservat/internal/adapters/kms [build failed]
+FAIL	asservat.local/asservat/internal/adapters/kubernetes [build failed]
+ok  	asservat.local/asservat/internal/adapters/mounts	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/mtls	0.006s [no tests to run]
+FAIL	asservat.local/asservat/internal/adapters/objectstore [build failed]
+ok  	asservat.local/asservat/internal/adapters/objectstore/framed	0.006s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/objectstore/manifest	0.004s [no tests to run]
+ok  	asservat.local/asservat/internal/adapters/oidc	0.002s [no tests to run]
+FAIL	asservat.local/asservat/internal/adapters/postgres [build failed]
+?   	asservat.local/asservat/internal/adapters/postgres/custodydb	[no test files]
+ok  	asservat.local/asservat/internal/adapters/providerconfig	0.005s [no tests to run]
+ok  	asservat.local/asservat/internal/application/analysis	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/application/audit	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/application/authorization	0.001s [no tests to run]
+FAIL	asservat.local/asservat/internal/application/capacity [build failed]
+ok  	asservat.local/asservat/internal/application/capture	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/application/catalog	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/application/configuration	0.001s [no tests to run]
+# asservat.local/asservat/internal/application/evidence [asservat.local/asservat/internal/application/evidence.test]
+internal/application/evidence/context_native_active_enrollment_test.go:66:13: f.r.config.Requests undefined (type ContextNativeRuntimeConfig has no field or method Requests)
+internal/application/evidence/context_native_bound_worker_test.go:74:17: runtime.config.Enrollments undefined (type ContextNativeRuntimeConfig has no field or method Enrollments)
+internal/application/evidence/context_native_bound_worker_test.go:75:17: runtime.config.Proofs undefined (type ContextNativeRuntimeConfig has no field or method Proofs)
+internal/application/evidence/context_native_bound_worker_test.go:86:17: runtime.config.Requests undefined (type ContextNativeRuntimeConfig has no field or method Requests)
+internal/application/evidence/context_native_bound_worker_test.go:285:23: f.r.config.Requests undefined (type ContextNativeRuntimeConfig has no field or method Requests)
+internal/application/evidence/context_native_bound_worker_test.go:321:23: f.r.config.Requests undefined (type ContextNativeRuntimeConfig has no field or method Requests)
+internal/application/evidence/worker_current_test.go:255:68: cannot use f (variable of type *workerLifecycleFixture) as WorkerEnrollmentLedger value in struct literal: *workerLifecycleFixture does not implement WorkerEnrollmentLedger (wrong type for method ClaimWorkerEnrollment)
+		have ClaimWorkerEnrollment(context.Context, authorization.WorkerEnrollmentProof, artifact.DownloadAuthority) (authorization.WorkerEnrollment, "asservat.local/asservat/internal/domain/audit".Receipt, bool, error)
+		want ClaimWorkerEnrollment(context.Context, authorization.WorkerEnrollmentProof) (authorization.WorkerEnrollment, "asservat.local/asservat/internal/domain/audit".Receipt, bool, error)
+internal/application/evidence/worker_current_test.go:255:83: cannot use f (variable of type *workerLifecycleFixture) as WorkerCertificateActivator value in struct literal: *workerLifecycleFixture does not implement WorkerCertificateActivator (wrong type for method ActivateWorkerCertificate)
+		have ActivateWorkerCertificate(context.Context, authorization.WorkerEnrollmentProof, authorization.WorkerCertificateAttempt, artifact.DownloadAuthority) (authorization.WorkerCertificate, error)
+		want ActivateWorkerCertificate(context.Context, authorization.WorkerEnrollmentProof, authorization.WorkerCertificateAttempt) (authorization.WorkerCertificate, error)
+FAIL	asservat.local/asservat/internal/application/evidence [build failed]
+ok  	asservat.local/asservat/internal/application/execution	0.002s [no tests to run]
+ok  	asservat.local/asservat/internal/application/fleet	0.002s [no tests to run]
+ok  	asservat.local/asservat/internal/application/identity	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/application/planning	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/application/privacy	0.001s [no tests to run]
+?   	asservat.local/asservat/internal/application/targets	[no test files]
+FAIL	asservat.local/asservat/internal/bootstrap [build failed]
+ok  	asservat.local/asservat/internal/console	0.002s [no tests to run]
+ok  	asservat.local/asservat/internal/contracts	0.004s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/analysis	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/artifact	0.002s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/audit	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/authorization	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/capture	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/catalog	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/configuration	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/execution	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/fleet	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/identity	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/planning	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/privacy	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/domain/targets	0.001s [no tests to run]
+ok  	asservat.local/asservat/internal/transport/browser	0.008s [no tests to run]
+?   	asservat.local/asservat/internal/transport/clustercredential	[no test files]
+ok  	asservat.local/asservat/internal/transport/clusterobservation	0.005s [no tests to run]
+ok  	asservat.local/asservat/internal/transport/connectorlifecycle	0.005s [no tests to run]
+ok  	asservat.local/asservat/internal/transport/contextstart	0.005s [no tests to run]
+?   	asservat.local/asservat/internal/transport/keyservice	[no test files]
+ok  	asservat.local/asservat/internal/transport/mcp	0.005s [no tests to run]
+ok  	asservat.local/asservat/internal/transport/native	0.006s [no tests to run]
+ok  	asservat.local/asservat/internal/transport/ownerrelay	0.005s [no tests to run]
+ok  	asservat.local/asservat/internal/transport/presentation	0.005s [no tests to run]
+ok  	asservat.local/asservat/internal/transport/worker	0.005s [no tests to run]
+?   	asservat.local/asservat/migrations	[no test files]
+FAIL	asservat.local/asservat/test/integration [build failed]
+FAIL

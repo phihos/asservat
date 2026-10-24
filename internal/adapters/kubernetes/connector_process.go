@@ -198,10 +198,6 @@ func (s *ConnectorProcessAttester) readConnectorProcessSourceAttestationWith(ctx
 	if e != nil || before != after {
 		return zero, noSource, connectorAPIStage("attest-live-after", value.ErrUnavailable)
 	}
-	finalGuard, finalUntil, e := s.protection.Current(ctx)
-	if e != nil || finalGuard != guard {
-		return zero, noSource, connectorAPIStage("attest-workload-guard-after", value.ErrUnavailable)
-	}
 	last, e := read(ctx)
 	if e != nil || !last.Valid(s.client.now()) || last.Roles != first.Roles || !last.Observation.SameSource(first.Observation) || ctx.Err() != nil {
 		return zero, noSource, connectorAPIStage("attest-source-after", value.ErrUnavailable)
@@ -210,7 +206,7 @@ func (s *ConnectorProcessAttester) readConnectorProcessSourceAttestationWith(ctx
 	if deadline, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, deadline)
 	}
-	for _, bound := range []time.Time{first.Observation.FreshUntil, last.Observation.FreshUntil, guardUntil, finalUntil, expires} {
+	for _, bound := range []time.Time{first.Observation.FreshUntil, last.Observation.FreshUntil, guardUntil, expires} {
 		until = identity.Earlier(until, bound)
 	}
 	out := value.ConnectorProcessProof{Process: b, Configuration: first.Observation, Pod: name, ReplicaSet: before.ReplicaSet, ReplicaSetUID: before.ReplicaSetUID, ClientKeyDigest: clientKey, ServerKeyDigest: serverKey, TokenDigest: artifact.Digest(sha256.Sum256(token)), WorkloadDigest: before.Digest, ProtectionDigest: guard, ObservedAt: start, FreshUntil: until}

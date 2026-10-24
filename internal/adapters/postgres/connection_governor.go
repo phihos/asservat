@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"net"
 	"sync"
@@ -20,8 +21,8 @@ var ErrConnectionGovernor = errors.New("SQL connection governor configuration re
 // TLS/authentication handshake cannot leak it. Hot purposes own MaxConns
 // dedicated slots and keep their connections; cold purposes share the
 // remaining slots and close their connection when it is released. Waiting
-// for a slot is bounded by the caller's own context; there is no background
-// reconnect.
+// for a slot obeys the context supplied to the dial. pgxpool may continue a
+// bounded connection attempt after the acquiring caller cancels.
 type SQLConnectionGovernor struct {
 	mu         sync.Mutex
 	limit, hot int
@@ -75,6 +76,27 @@ func (g *SQLConnectionGovernor) Govern(c *pgxpool.Config, hot bool) error {
 			return nil, err
 		}
 		return &governedConn{Conn: conn, release: sync.OnceFunc(func() { <-slots })}, nil
+	}
+	beforeClose := c.BeforeClose
+	c.BeforeClose = func(conn *pgx.Conn) {
+		if beforeClose != nil {
+			beforeClose(conn)
+		}
+		if !conn.IsClosed() {
+			return
+		}
+		// pgx's asynchronous cancellation opens a second connection before
+		// closing the first. A discarded connection must return its physical
+		// slot before the pool joins that cleanup, or a one-slot pool waits
+		// on its own cancellation dial. Healthy connections still close
+		// gracefully through pgx; its context watcher remains unchanged.
+		raw := conn.PgConn().Conn()
+		if encrypted, ok := raw.(*tls.Conn); ok {
+			raw = encrypted.NetConn()
+		}
+		if physical, ok := raw.(*governedConn); ok {
+			_ = physical.Close()
+		}
 	}
 	if !hot {
 		// A cold purpose never keeps an idle connection between transactions.

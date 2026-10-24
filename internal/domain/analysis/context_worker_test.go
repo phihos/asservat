@@ -3,6 +3,7 @@ package analysis
 import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 	"testing"
 	"time"
 )
@@ -30,7 +31,9 @@ func TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval(t *testing.T
 		"no-token-proof":      func(p *ContextProjectionWorkerProof) { p.TokenDigest = artifact.Digest{} },
 		"changed-config":      func(p *ContextProjectionWorkerProof) { p.Binding.Configuration.Generation++ },
 		"renewed-certificate": func(p *ContextProjectionWorkerProof) { p.Peer.NotAfter = q.CredentialUntil.Add(time.Second) },
-		"renewed-proof":       func(p *ContextProjectionWorkerProof) { p.ValidUntil = p.ObservedAt.Add(5*time.Second + 1) },
+		"renewed-proof": func(p *ContextProjectionWorkerProof) {
+			p.ValidUntil = p.ObservedAt.Add(identity.EvidenceReadRequestWindow + 1)
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			v := p

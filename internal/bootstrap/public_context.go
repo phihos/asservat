@@ -41,6 +41,8 @@ type PublicContextServices struct {
 	Transfer                      evidence.DownloadResponseTransfer
 	// Fleet is the ADR-193 issuance route's service; nil leaves it absent.
 	Fleet browser.FleetBootstrapService
+	// Processing is the ADR-210 operator change service; nil leaves it absent.
+	Processing browser.ProcessingChangeService
 }
 
 // NewPublicContextHandler composes the original HTTP handlers directly. It
@@ -78,17 +80,21 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 		return nil, &fixedStepError{"mcp", e}
 	}
 	mcpHandler.Report = eventLog(os.Stderr, "mcp unavailable")
+	audited.Timing = timedEventLog(os.Stderr, "mcp timing")
 	// ADR-194 D1: a nil Native (no configured worker) serves no content; its
 	// paths answer 503 rather than falling through to the console.
 	var content http.Handler
 	if s.Native != nil {
-		if content, e = browser.NewDownloadContentHandler(browser.DownloadContentConfig{
+		handler, e := browser.NewDownloadContentHandler(browser.DownloadContentConfig{
 			PublicOrigin: c.PublicOrigin, Issuer: c.Issuer,
 			MaxConcurrent: c.DownloadConcurrency, MaxPerIdentity: c.DownloadsPerIdentity,
 			MaxDuration: c.DownloadMaxDuration, Now: c.Audit.Now, NewID: c.Audit.NewID,
-		}, sessions, s.DownloadIdentity, s.RefreshPauses, audited, s.Native, s.Transfer); e != nil {
+		}, sessions, s.DownloadIdentity, s.RefreshPauses, audited, s.Native, s.Transfer)
+		if e != nil {
 			return nil, &fixedStepError{"downloads", e}
 		}
+		handler.Refused = downloadRefusalReport(timedEventLog(os.Stderr, "download content refused"), time.Now)
+		content = handler
 	}
 	var fleet http.Handler
 	if s.Fleet != nil {
@@ -96,8 +102,14 @@ func NewPublicContextHandler(c PublicContextConfig, s PublicContextServices, fil
 			return nil, &fixedStepError{"fleet", e}
 		}
 	}
+	var processing http.Handler
+	if s.Processing != nil {
+		if processing, e = browser.NewProcessingHandler(sessions, s.Processing); e != nil {
+			return nil, &fixedStepError{"processing", e}
+		}
+	}
 	return &publicContextRoutes{
-		host: host, sessions: sessions, investigations: investigations, fleet: fleet,
+		host: host, sessions: sessions, investigations: investigations, fleet: fleet, processing: processing,
 		mcp: mcpHandler, content: content, console: static,
 		mcpPath: mcp.Path, mcpMetadata: mcp.MetadataPath,
 		contentPrefix:   browser.DownloadContentPrefix,

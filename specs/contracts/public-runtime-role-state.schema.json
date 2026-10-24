@@ -34,8 +34,8 @@
     },
     "roles": {
       "type": "array",
-      "minItems": 33,
-      "maxItems": 33,
+      "minItems": 43,
+      "maxItems": 43,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -46,39 +46,49 @@
         "properties": {
           "purpose": {
             "enum": [
-              "identity-read",
+              "hub-runtime",
               "browser-settings",
-              "browser-session",
-              "browser-cleanup",
-              "refresh-admit",
-              "refresh-owner",
-              "refresh-read",
-              "permission-read",
-              "retention-read",
-              "storage-read",
-              "progress-read",
-              "case-read",
-              "processing-read",
               "capture-intent-read",
-              "download-source",
-              "catalog-read",
-              "download-plan",
               "worker-config-read",
-              "audit-normal-journal",
-              "audit-normal-ack",
-              "audit-resolution-journal",
-              "audit-resolution-ack",
               "capacity-profile-read",
               "capture-admit",
               "capture-journal",
               "capture-ack",
-              "capture-preview",
-              "capture-resolution",
               "capture-cleanup",
               "capture-verifier",
               "capture-finalizer",
+              "connector-source",
+              "connector-journal",
+              "connector-ack",
+              "connector-read",
+              "cluster-credential",
+              "connector-owner-read",
+              "publication-gate",
+              "context-verify",
+              "context-verification-audit",
+              "context-publish",
+              "publisher-identity-read",
+              "publisher-retention-read",
+              "connector-cleanup",
+              "connector-verifier",
+              "connector-finalizer",
               "capacity",
-              "capacity-capture"
+              "capacity-capture",
+              "permission-accept",
+              "permission-audit",
+              "retention-source",
+              "retention-source-audit",
+              "retention-catchup",
+              "retention-lifecycle-audit",
+              "worker-config-observe",
+              "worker-config-audit",
+              "context-cleanup",
+              "context-cleanup-audit",
+              "context-cleanup-finalize",
+              "key-configuration",
+              "key-wrap",
+              "key-verify",
+              "key-acquisition"
             ]
           },
           "password": {
@@ -180,6 +190,15 @@
     },
     "capacitySetup": {
       "$ref": "https://asservat.io/spec/v1/capacity-root-setup-claim.schema.json"
+    },
+    "federationProjection": {
+      "$ref": "https://asservat.io/spec/v1/public-runtime-role-state.schema.json#/properties/projection"
+    },
+    "keyServiceProjection": {
+      "$ref": "https://asservat.io/spec/v1/public-runtime-role-state.schema.json#/properties/projection"
+    },
+    "publisherProjection": {
+      "$ref": "https://asservat.io/spec/v1/public-runtime-role-state.schema.json#/properties/projection"
     }
   }
 }

@@ -1,0 +1,24 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/expired-prepared-is-passive-and-runner-uncertain
+    api_execution_preparation_test.go:158: expired preparation did not return the exact passive record false api execution effect/expired
+    api_execution_preparation_test.go:164: first-insert floor blocked an existing passive preparation false api execution effect/expired
+    api_execution_preparation_test.go:170: expired SQL preparation lost runner uncertainty classification  api context execution PrepareAPIExecution
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-observation-headroom
+    api_execution_preparation_test.go:261: execution/key-wrap effects = 1/0, want 0/0
+    api_execution_preparation_test.go:263: first preparation spent a sub-second interval after the lock true <nil>
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-caller-headroom
+    api_execution_preparation_test.go:261: execution/key-wrap effects = 1/0, want 0/0
+    api_execution_preparation_test.go:263: first preparation spent a sub-second interval after the lock true <nil>
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/short-caller-reaches-no-runner-effects
+    api_execution_preparation_test.go:295: short caller reached key/start/acquisition effects 1
+    api_execution_preparation_test.go:297: execution/key-wrap effects = 1/0, want 0/0
+--- FAIL: TestContextAdmissionWithRealServices (5.91s)
+    --- FAIL: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries (5.56s)
+        --- FAIL: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/expired-prepared-is-passive-and-runner-uncertain (2.46s)
+        --- FAIL: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-observation-headroom (1.27s)
+        --- FAIL: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-caller-headroom (1.27s)
+        --- FAIL: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/short-caller-reaches-no-runner-effects (0.56s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	5.971s
+FAIL

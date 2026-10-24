@@ -1,0 +1,13 @@
+{
+  "scope": "recovered installed continuation failure, not S-02 acceptance",
+  "claudeSession": "c62e02ac-2970-4821-8f4d-d584e5ea4d8c",
+  "commit": "007f1fb5bd3a88316369eb217e323245ea2dd863",
+  "testExit": 1,
+  "wrapperExit": 0,
+  "sourceCount": 2716,
+  "sourceHashMismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "resourcesKeptAtReturn": true,
+  "cleanupFailures": [],
+  "observation": "One preview; request and four accepted-only continuations returned OutcomeUnknown. Retained SQL read found zero context_capture and context_execution rows. No acquisition, publication, download or deletion qualified."
+}

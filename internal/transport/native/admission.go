@@ -87,7 +87,7 @@ func (a *ConnectorAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 		if e != nil || !other.Operation.Equal(local.Operation) || other.Certificate != local.Certificate || other.Sequence != local.Sequence {
 			return value.NativeLease{}, artifact.ErrDownloadUnavailable
 		}
-		local.Until = identity.Earlier(local.Until, identity.Earlier(serving, identity.Earlier(until, other.Until)))
+		local.Until = identity.Earlier(local.Until, identity.Earlier(admissionServing(local, serving), identity.Earlier(until, other.Until)))
 		return local, nil
 	}, a.now)
 	if e != nil {
@@ -169,7 +169,7 @@ func (a *HubAdmission) OpenNative(ctx context.Context, state *tls.ConnectionStat
 		if e != nil || !local.Operation.Equal(peer.Operation) || local.Certificate != peer.Certificate || local.Sequence != peer.Sequence {
 			return value.NativeLease{}, artifact.ErrDownloadUnavailable
 		}
-		local.Until = identity.Earlier(local.Until, identity.Earlier(serving, identity.Earlier(until, peer.Until)))
+		local.Until = identity.Earlier(local.Until, identity.Earlier(admissionServing(local, serving), identity.Earlier(until, peer.Until)))
 		return local, nil
 	}, a.now)
 	if e != nil {
@@ -184,11 +184,45 @@ type peerConversation struct {
 	gate  *evidence.NativeFrameGate
 }
 
-func (c *peerConversation) Gate() *evidence.NativeFrameGate           { return c.gate }
-func (c *peerConversation) Serve(ctx context.Context, s Stream) error { return c.inner.Serve(ctx, s) }
+func (c *peerConversation) Gate() *evidence.NativeFrameGate { return c.gate }
+func (c *peerConversation) Serve(ctx context.Context, s Stream) error {
+	return c.inner.Serve(ctx, &peerStream{Stream: s, inner: c.inner.Gate(), outer: c.gate})
+}
+
+// peerStream carries the operation's exact completion proof across this
+// conversation's own frame gate. The operation proves its SQL close against
+// its inner gate; the stream sends under the outer peer gate, which is bounded
+// by the inner one. Without it every hub-local or relayed conversation was
+// refused at its final close (installed native88: serve/close).
+type peerStream struct {
+	Stream
+	inner, outer *evidence.NativeFrameGate
+}
+
+func (s *peerStream) sendCompleted(ctx context.Context, f contracts.NativeFrame, proof nativeCompletionProof) error {
+	terminal, ok := s.Stream.(interface {
+		sendCompleted(context.Context, contracts.NativeFrame, nativeCompletionProof) error
+	})
+	if !ok || proof.gate == nil || proof.gate != s.inner {
+		return step("completion-proof", contracts.ErrNativeProtocol)
+	}
+	proof.gate = s.outer
+	return terminal.sendCompleted(ctx, f, proof)
+}
 func (c *peerConversation) Close() error {
 	c.gate.Close()
 	e := c.inner.Close()
 	_ = c.gate.Wait(context.Background())
 	return e
+}
+
+// admissionServing is the admission's serving observation as a per-frame
+// bound. Each frame's own serving check is current; an approved projection
+// conversation (up to the evidence-read window) is not ended by the stale
+// admission observation. Other kinds keep it.
+func admissionServing(l value.NativeLease, serving time.Time) time.Time {
+	if l.Operation.Kind == value.NativeProjection {
+		return l.Operation.Until
+	}
+	return serving
 }

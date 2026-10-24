@@ -232,7 +232,7 @@ func (q *Queries) LockRetentionSource(ctx context.Context, arg LockRetentionSour
 }
 
 const observeRetentionSource = `-- name: ObserveRetentionSource :exec
-UPDATE retention_source SET observed_sequence=sequence,observed_at=$4,fresh_until=$5 WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3
+UPDATE retention_source SET observed_sequence=sequence,observed_at=$4,fresh_until=$5,lease_until=GREATEST(lease_until,$5) WHERE root_id=$1 AND cluster_id=$2 AND namespace_uid=$3
 `
 
 type ObserveRetentionSourceParams struct {
@@ -243,6 +243,8 @@ type ObserveRetentionSourceParams struct {
 	FreshUntil   pgtype.Timestamptz
 }
 
+// ADR-200 revision (2026-10-23): the live lease holder's accepted observation
+// also keeps the lease at least until that observation's 30-second lifetime.
 func (q *Queries) ObserveRetentionSource(ctx context.Context, arg ObserveRetentionSourceParams) error {
 	_, err := q.db.Exec(ctx, observeRetentionSource,
 		arg.RootID,

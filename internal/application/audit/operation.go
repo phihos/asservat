@@ -40,7 +40,9 @@ func (s OperationAuditor) Begin(ctx context.Context, in value.OperationIntent) e
 	if !s.configured() || ctx == nil || ctx.Err() != nil || !in.Valid() || !s.Now().Before(in.RequestUntil) {
 		return operationStep("start")
 	}
+	started := time.Now()
 	snap, err := s.Journal.ReserveOperation(ctx, in)
+	MarkStep(ctx, "begin-reserve", started)
 	if err != nil {
 		return operationStep("reserve")
 	}
@@ -53,20 +55,27 @@ func (s OperationAuditor) Begin(ctx context.Context, in value.OperationIntent) e
 		}
 		return s.current(ctx, in.RequestUntil)
 	}
+	started = time.Now()
 	fresh, err := s.Journal.ClaimOperationWrite(ctx, in, "intent")
+	MarkStep(ctx, "begin-claim", started)
 	if err != nil {
 		return operationStep("claim")
 	}
 	var receipt value.Receipt
+	started = time.Now()
 	if fresh {
 		receipt, err = s.Objects.CreateOperationIntent(ctx, in)
 	} else {
 		receipt, err = s.Objects.FindOperationIntent(ctx, in)
 	}
+	MarkStep(ctx, "begin-object", started)
 	if err != nil || !receipt.ValidOperation(in.RootID, in.ID, "intent") {
 		return operationStep("object", err)
 	}
-	if err = s.Acknowledgements.AcknowledgeOperation(ctx, in, "intent", receipt); err != nil {
+	started = time.Now()
+	err = s.Acknowledgements.AcknowledgeOperation(ctx, in, "intent", receipt)
+	MarkStep(ctx, "begin-ack", started)
+	if err != nil {
 		return operationStep("acknowledge")
 	}
 	return s.current(ctx, in.RequestUntil)
@@ -75,7 +84,9 @@ func (s OperationAuditor) Finish(ctx context.Context, out value.OperationOutcome
 	if !s.configured() || ctx == nil || ctx.Err() != nil || !out.Valid() || !s.Now().Before(out.Intent.WriteUntil) {
 		return operationStep("start")
 	}
+	started := time.Now()
 	snap, err := s.Journal.FreezeOperationOutcome(ctx, out)
+	MarkStep(ctx, "finish-freeze", started)
 	if err != nil || snap.Outcome == nil || snap.IntentReceipt == nil || !sameOperationRecord(snap.Intent, out.Intent) || !sameOperationRecord(*snap.Outcome, out) {
 		return operationStep("freeze")
 	}
@@ -85,20 +96,27 @@ func (s OperationAuditor) Finish(ctx context.Context, out value.OperationOutcome
 		}
 		return s.current(ctx, out.Intent.WriteUntil)
 	}
+	started = time.Now()
 	fresh, err := s.Journal.ClaimOperationWrite(ctx, out.Intent, "outcome")
+	MarkStep(ctx, "finish-claim", started)
 	if err != nil {
 		return operationStep("claim")
 	}
 	var receipt value.Receipt
+	started = time.Now()
 	if fresh {
 		receipt, err = s.Objects.CreateOperationOutcome(ctx, *snap.Outcome)
 	} else {
 		receipt, err = s.Objects.FindOperationOutcome(ctx, *snap.Outcome)
 	}
+	MarkStep(ctx, "finish-object", started)
 	if err != nil || !receipt.ValidOperation(out.Intent.RootID, out.Intent.ID, "outcome") {
 		return operationStep("object", err)
 	}
-	if err = s.Acknowledgements.AcknowledgeOperation(ctx, out.Intent, "outcome", receipt); err != nil {
+	started = time.Now()
+	err = s.Acknowledgements.AcknowledgeOperation(ctx, out.Intent, "outcome", receipt)
+	MarkStep(ctx, "finish-ack", started)
+	if err != nil {
 		return operationStep("acknowledge")
 	}
 	return s.current(ctx, out.Intent.WriteUntil)

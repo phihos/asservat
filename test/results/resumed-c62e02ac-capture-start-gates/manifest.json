@@ -1,0 +1,89 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "README.md": {
+      "sha256": "be2513e77e344ab1e46a8481cfc00557afb63d98cbad9281970064fc64209df8",
+      "bytes": 2404
+    },
+    "copied-files.json": {
+      "sha256": "03063e70c1e5858af65689a026c09e44d6c963aeadb7ae1377d6fb3773a7a751",
+      "bytes": 2700
+    },
+    "design/gate.log": {
+      "sha256": "82cd3bd40de31c519a23efd9f80255ab70b66e78f3280216ae167b01896457e3",
+      "bytes": 1094
+    },
+    "design/invocation.json": {
+      "sha256": "8683c859352cd8c9de19e589085b05d5220e699ec5497448ef9f17483f3714b2",
+      "bytes": 285
+    },
+    "design/result.json": {
+      "sha256": "cee82f09ab43e863396256967dd8836591bde446fd2cbccb710e2e4d42b3f8ef",
+      "bytes": 377
+    },
+    "design/source-before.json": {
+      "sha256": "3624df61e52c8b780dd7e0c02d24309895de4dbc66f35eb9bfc530be9d473225",
+      "bytes": 461998
+    },
+    "original-gate-wrapper.py.txt": {
+      "sha256": "8d71b5dec9c9e2b20a928affbe38c0ba3296b2b5ee344752cbedf0a73809e565",
+      "bytes": 2373
+    },
+    "result.json": {
+      "sha256": "7f6e9d9f1802fb52cbb1397a96187970be75dd35bd7be44dbbe148f1edd8a201",
+      "bytes": 702
+    },
+    "source-verification-command.json": {
+      "sha256": "0a151c16bc43a47e6d8fdc93afc83e39ee4511c0a085c8963e4772f63339738a",
+      "bytes": 515
+    },
+    "source-verification.err": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "source-verification.exit": {
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    "source-verification.json": {
+      "sha256": "34ed6d72d50d163290202eb7cdeae597b55395952771088786da827a189555c4",
+      "bytes": 237
+    },
+    "sql/cleanup-readback.json": {
+      "sha256": "1134fcee359f58c1941d21bc0f4c682456b8e15ebe3a943fa8ccd55131e8d67a",
+      "bytes": 475
+    },
+    "sql/custody-environment.json": {
+      "sha256": "8fd9f3e0a524e61900ac3e9dfe56d4bb2d8a4c75ae21697b426e1f014e852c19",
+      "bytes": 354727
+    },
+    "sql/custody.log": {
+      "sha256": "901d615384d855897470e6acee554f322b71c7e2d47afdf72745d3f384d02f59",
+      "bytes": 3220
+    },
+    "sql/gate.log": {
+      "sha256": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373",
+      "bytes": 28
+    },
+    "sql/invocation.json": {
+      "sha256": "1d83c192d4e2af1a51dd8bff31915312e4151239d4c5067d4f26585b472c19e6",
+      "bytes": 356
+    },
+    "sql/result.json": {
+      "sha256": "f3504c80c337426e1912115ba28197742caf5c8c52ec0c8e51d288692328ae19",
+      "bytes": 448
+    },
+    "sql/source-before.json": {
+      "sha256": "3624df61e52c8b780dd7e0c02d24309895de4dbc66f35eb9bfc530be9d473225",
+      "bytes": 461998
+    },
+    "terminal-receipts.json": {
+      "sha256": "7de0100cddbd642b39f7fd81f656d33c43bedd406cddeb9bde74f442ae88130b",
+      "bytes": 999
+    },
+    "verify-native-sources.py.txt": {
+      "sha256": "b423a2e6d47d102ad03c2fc6e117ebb127f0f05175e6c22ce806eb1bab7aaa3a",
+      "bytes": 1636
+    }
+  }
+}

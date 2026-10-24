@@ -22,6 +22,18 @@ Only an acknowledged first durable claim allows one PUT. Intent starts before th
 
 The closed object producer returns completion only after its actual successful PUT, exact verification and joined synchronous owner. A lost claim/PUT response permits bounded lookup, not another PUT. Lookup may recover a receipt but cannot create writer completion. Independent receipt acknowledgement and positive completion are distinct SQL columns/roles. Two exact acknowledged receipts permit `intent_audited`; unknown writer completion still prevents refund/healthy retirement.
 
+Private refusal diagnostics identify the fixed persistence stage: retained
+read, journal, write/reconciliation claim, object operation, completion,
+acknowledgement or pair validation. Only allowlisted dependency labels and
+bounded HTTP status labels may accompany that stage; provider text, keys,
+credentials and record values are excluded. Failed object operations also
+distinguish the original call's cancellation or expiry without renewing it.
+The submission reports these
+through the existing bounded private logger and retains the accepted
+`OutcomeUnknown` result. Diagnostics add no reads, writes, retries or authority
+intervals. A spent write whose object is absent remains unavailable; an exact
+lookup cannot recreate it or justify another capture.
+
 ## Cleanup and boundaries
 
 The private filtered lifecycle views reuse the existing deletion protocol, including separate purger, verifier and finalizer credentials, two prepaid certificate-verifier attempts, original dates, the explicit overdue no-certificate branch and H-backed cooling. The accepted capture does not disappear when its audit pair retires. Removing the transient binding requires the same qualified finalization transaction and independently acknowledged terminal purge; no cascade deletes accepted/execution/replay state.

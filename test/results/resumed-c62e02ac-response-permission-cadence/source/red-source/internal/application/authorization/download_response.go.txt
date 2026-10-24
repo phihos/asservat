@@ -1,0 +1,58 @@
+package authorization
+
+import (
+	"context"
+	"sync"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
+)
+
+// DownloadResponseAuthority belongs to one original content response. It is not
+// a transport value, credential, global cache or authority for another request.
+type DownloadResponseAuthority struct {
+	mu      sync.Mutex
+	owner   context.Context
+	cancel  context.CancelFunc
+	service ContextDownloadAuthority
+	scope   artifact.DownloadScope
+	closed  bool
+}
+
+func (s ContextDownloadAuthority) NewDownloadResponse(ctx context.Context, scope artifact.DownloadScope) (*DownloadResponseAuthority, error) {
+	if ctx == nil || ctx.Err() != nil || !scope.Valid() || scope.RootID != s.RootID || s.Now == nil {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	owner, cancel := context.WithCancel(ctx)
+	return &DownloadResponseAuthority{owner: owner, cancel: cancel, service: s, scope: scope}, nil
+}
+
+func (s *DownloadResponseAuthority) CheckDownloadCurrent(ctx context.Context, current identities.CurrentIdentity, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
+	if s == nil || ctx == nil || ctx.Err() != nil || !s.mu.TryLock() {
+		return artifact.DownloadAuthority{}, artifact.ErrDownloadUnavailable
+	}
+	defer s.mu.Unlock()
+	if s.closed || s.owner.Err() != nil || scope != s.scope {
+		return artifact.DownloadAuthority{}, artifact.ErrDownloadUnavailable
+	}
+	call, cancel := context.WithCancel(ctx)
+	joined := make(chan struct{})
+	stop := context.AfterFunc(s.owner, func() { defer close(joined); cancel() })
+	defer func() {
+		if !stop() {
+			<-joined
+		}
+		cancel()
+	}()
+	return s.service.CheckDownloadCurrent(call, current, scope)
+}
+
+func (s *DownloadResponseAuthority) Close() {
+	if s == nil {
+		return
+	}
+	s.cancel()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.closed = true
+}

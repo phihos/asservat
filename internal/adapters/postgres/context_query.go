@@ -24,7 +24,8 @@ import (
 // original disclosure/effect/cleanup/history horizons and purpose-specific path. A caller profile or qualification digest is not proof.
 // The callback performs SQL only, at most once. SQL still locks and compares the
 // accepted epochs/profile/accounts: a remote observation cannot make SQL atomic.
-// No production implementation or setup grant is supplied by this component.
+// SharedContextQueryPlans is the installed implementation; current source,
+// allocation and configuration checks remain inside the effect transaction.
 type ContextQueryBackingGuard interface {
 	WithCurrentQueryBacking(context.Context, value.ContextQueryPlan, value.ContextProjectionAuthority, func(context.Context) error) error
 }
@@ -92,14 +93,14 @@ func queryFromRow(r custodydb.ContextQuery) (value.ContextQuery, error) {
 // callback. Committed obligations are deliberately not undone in those cases.
 func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, request value.ContextQueryRequest, authority value.ContextProjectionAuthority, effect func(context.Context, *custodydb.Queries, custodydb.ContextQueryBacking, custodydb.ContextQueryAllocation) error) error {
 	if s == nil || s.ledger == nil || s.backing == nil || ctx == nil || ctx.Err() != nil || query.Scope.RootID != s.root || !query.Current(authority, time.Now()) || !request.Valid(time.Now()) || request.Call.RootID != s.root || request.Call.Principal != query.Scope.Principal {
-		return value.ErrUnavailable
+		return queryRefusal("input", nil)
 	}
 	until := identity.Earlier(query.Deadline, identity.Earlier(request.Call.Until, authority.ValidUntil))
 	ctx, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
 	topology, e := s.retention.observe(ctx, query.Scope.ClusterID)
 	if e != nil {
-		return value.ErrUnavailable
+		return queryRefusal("topology", nil)
 	}
 	e = queryGuarded(ctx, func(bound context.Context, callback func(context.Context) error) error {
 		return s.backing.WithCurrentQueryBacking(bound, query.Plan, authority, callback)
@@ -107,11 +108,11 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 		return s.ledger.transaction(callback, func(tx *custodydb.Queries) error {
 			recovery, e := s.recovery.lock(callback, tx, s.root, authority.Environment.Recovery)
 			if e != nil {
-				return e
+				return queryRefusal("recovery-lock", e)
 			}
 			permissions, e := tx.LockPermissionStream(callback, id(s.root))
 			if e != nil {
-				return e
+				return queryRefusal("permission-lock", e)
 			}
 			// The original installed root and immutable residual reservation are
 			// mandatory, including when a backing callback reports success.
@@ -119,15 +120,15 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 			// negative protected state never falls back to caller-supplied facts.
 			accepted, e := tx.LockContextQueryCapacity(callback, custodydb.LockContextQueryCapacityParams{RootID: id(s.root), AcceptanceID: id(query.Plan.AcceptanceID)})
 			if e != nil || !accepted {
-				return value.ErrUnavailable
+				return queryRefusal("capacity", nil)
 			}
 			backing, e := tx.LockContextQueryBacking(callback, id(s.root))
 			if e != nil {
-				return e
+				return queryRefusal("backing-lock", e)
 			}
 			allocation, e := tx.LockContextQueryAllocation(callback, custodydb.LockContextQueryAllocationParams{ID: id(query.Plan.AllocationID), RootID: id(s.root)})
 			if e != nil {
-				return e
+				return queryRefusal("allocation-lock", e)
 			}
 			fence := func() error {
 				return s.fence(callback, tx, query, request, authority, topology, recovery, permissions, backing, allocation)
@@ -136,13 +137,16 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 				return e
 			}
 			if e = effect(callback, tx, backing, allocation); e != nil {
-				return e
+				return queryRefusal("effect", e)
 			}
 			return fence()
 		})
 	})
-	if e != nil || ctx.Err() != nil || !query.Current(authority, time.Now()) || !request.Valid(time.Now()) {
-		return value.ErrUnavailable
+	if e != nil {
+		return queryRefusal("transaction", e)
+	}
+	if ctx.Err() != nil || !query.Current(authority, time.Now()) || !request.Valid(time.Now()) {
+		return queryRefusal("final", nil)
 	}
 	return nil
 }
@@ -150,64 +154,80 @@ func (s *ContextQueries) current(ctx context.Context, query value.ContextQuery, 
 func (s *ContextQueries) fence(ctx context.Context, tx *custodydb.Queries, q value.ContextQuery, r value.ContextQueryRequest, a value.ContextProjectionAuthority, topology privacy.PolicyTopology, recovery custodydb.FleetCurrentTrust, p custodydb.PermissionStream, b custodydb.ContextQueryBacking, allocation custodydb.ContextQueryAllocation) error {
 	now, e := tx.CurrentTime(ctx)
 	if e != nil {
-		return e
+		return queryRefusal("fence-time", e)
 	}
-	if ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time) || b.Suspended || uid(b.InstallationID) != q.Plan.InstallationID || uid(b.AcceptanceID) != q.Plan.AcceptanceID || !identity.Fresh(b.ObservedAt.Time, b.FreshUntil.Time, now.Time, 5*time.Second) ||
-		a.PermissionRevision.UID != uid(p.Epoch) || a.PermissionRevision.Generation != p.Sequence || !bytes.Equal(a.PermissionRevision.Digest[:], p.ProjectionDigest) || p.Suspended || !p.InitialAuditID.Valid || !now.Time.Before(p.LeaseUntil.Time) || !identity.Fresh(p.ObservedAt.Time, p.FreshUntil.Time, now.Time, 5*time.Second) {
-		return value.ErrUnavailable
+	switch {
+	case ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time):
+		return queryRefusal("fence-request", nil)
+	case b.Suspended || uid(b.InstallationID) != q.Plan.InstallationID || uid(b.AcceptanceID) != q.Plan.AcceptanceID:
+		return queryRefusal("fence-backing", nil)
+	case a.PermissionRevision.UID != uid(p.Epoch) || a.PermissionRevision.Generation != p.Sequence || !bytes.Equal(a.PermissionRevision.Digest[:], p.ProjectionDigest):
+		return queryRefusal("fence-permission-revision", nil)
+	case p.Suspended || !p.InitialAuditID.Valid:
+		return queryRefusal("fence-permission-suspended", nil)
+	case !now.Time.Before(p.LeaseUntil.Time) || !identity.Fresh(p.ObservedAt.Time, p.FreshUntil.Time, now.Time, authorization.PermissionObservationInterval):
+		return queryRefusal("fence-permission-fresh", nil)
 	}
 	var profile value.ContextQueryResourceProfile
 	var pool, policy, qualification identity.Revision
-	if queryDecode(b.Profile, 32768, &profile) != nil || profile != q.Plan.Profile || queryDecode(b.Qualification, 32768, &qualification) != nil || qualification != profile.Qualification ||
+	if queryDecode(b.Profile, 32768, &profile) != nil || profile != q.Plan.Profile.SharedBudget() || queryDecode(b.Qualification, 32768, &qualification) != nil || qualification != profile.Qualification ||
 		!b.HardUntil.Time.Equal(q.Plan.HardUntil) || !b.EffectsUntil.Time.Equal(q.Plan.EffectsUntil) || !b.CleanupUntil.Time.Equal(q.Plan.CleanupUntil) || !b.RetireBy.Time.Equal(q.Plan.RetireBy) || queryDecode(allocation.PoolSource, 4096, &pool) != nil || queryDecode(allocation.PolicySource, 4096, &policy) != nil || pool != q.Plan.PoolSource || policy != q.Plan.PolicySource || allocation.Revision != q.Plan.AllocationRevision || uid(allocation.ClusterID) != q.Scope.ClusterID || allocation.NamespaceUid != q.Scope.NamespaceUID || allocation.WorkloadUid != q.Scope.WorkloadUID {
-		return value.ErrUnavailable
+		return queryRefusal("fence-profile", nil)
 	}
 	for _, auditID := range []string{uid(p.Epoch), uid(p.InitialAuditID)} {
 		proof, e := tx.ReadAuthorityAudit(ctx, id(auditID))
 		if e != nil || !currentAuthorityAudit(proof, p.ID, id(auditID)) {
-			return value.ErrUnavailable
+			return queryRefusal("fence-audit", nil)
 		}
 	}
 	if e = s.retention.check(ctx, tx, topology, a.Retention, authorization.Target{ClusterID: q.Scope.ClusterID, NamespaceUID: q.Scope.NamespaceUID, WorkloadUID: q.Scope.WorkloadUID, PodUID: q.Scope.PodUID}); e != nil {
-		return e
+		return queryRefusal("fence-retention", e)
 	}
 	expected := a.Environment.Processing
 	snapshot, processing, e := readProcessingSnapshot(ctx, tx, s.root, q.Plan.InstallationID, q.RecoveryIssuerEpoch, q.Scope.ArtifactID, expected.ObservedAt, expected.ValidUntil)
 	if e != nil {
-		return e
+		return queryRefusal("fence-processing-read", e)
 	}
 	observed := processingProof(snapshot, processing)
 	if observed.RootID != expected.RootID || observed.Epoch != expected.Epoch || observed.Sequence != expected.Sequence || observed.CaptureID != expected.CaptureID || observed.Location != expected.Location || observed.StateDigest != expected.StateDigest {
-		return value.ErrUnavailable
+		return queryRefusal("fence-processing", nil)
 	}
 	published, e := tx.ReadPublishedContext(ctx, custodydb.ReadPublishedContextParams{ArtifactID: id(q.Scope.ArtifactID), RootID: id(s.root)})
 	if e != nil {
-		return e
+		return queryRefusal("fence-published-read", e)
 	}
 	original, e := currentPublishedContext(published)
 	if e != nil || original.CaseID != q.Scope.CaseID || original.CaptureUID != q.Scope.CaptureID || original.NamespaceUID != q.Scope.NamespaceUID || original.WorkloadUID != q.Scope.WorkloadUID || original.PodUID != q.Scope.PodUID || original.Registration.Location != a.Environment.Location || original.Registration.StoreID != a.Environment.StoreID || original.Registration.NativeLimit != artifact.MaxContextBytes || original.DataClass != "metadata" || !bytes.Equal(published.ContextVerification.CopiesDigest, q.Scope.Version[:]) || a.AccessUntil.After(published.EffectiveExpiresAt.Time) || a.DeleteBy.After(published.EffectiveDeleteBy.Time) {
-		return value.ErrUnavailable
+		return queryRefusal("fence-published", nil)
 	}
 	linked, e := tx.ContextQueryCaseExists(ctx, custodydb.ContextQueryCaseExistsParams{RootID: id(s.root), CaseID: id(q.Scope.CaseID), CaptureID: id(q.Scope.CaptureID), ArtifactID: id(q.Scope.ArtifactID)})
 	if e != nil || !linked {
-		return value.ErrUnavailable
+		return queryRefusal("fence-case", nil)
 	}
 	if e = queryIntentFence(ctx, tx, r.Call, recovery); e != nil {
-		return e
+		return queryRefusal("fence-intent", e)
 	}
 	if e = s.recovery.check(ctx, tx, recovery, s.root, a.Environment.Recovery); e != nil {
-		return e
+		return queryRefusal("fence-recovery", e)
+	}
+	profileBody, e := queryJSON(q.Plan.Profile)
+	if e != nil {
+		return queryRefusal("fence-profile-json", nil)
+	}
+	configured, e := tx.ContextQuerySharedProfileCurrent(ctx, custodydb.ContextQuerySharedProfileCurrentParams{RootID: id(s.root), Profile: profileBody})
+	if e != nil || !configured {
+		return queryRefusal("fence-shared-profile", nil)
 	}
 	// The same root can acquire a restrictive workload/source change. Compare
 	// the exact original allocation to current protected base capacity at the
 	// end of both the pre-effect and post-effect fence, after blocking reads.
 	current, e := tx.ContextQueryCapacityAllocationCurrent(ctx, custodydb.ContextQueryCapacityAllocationCurrentParams{RootID: id(s.root), AllocationID: id(q.Plan.AllocationID)})
 	if e != nil || !current {
-		return value.ErrUnavailable
+		return queryRefusal("fence-allocation", nil)
 	}
 	now, e = tx.CurrentTime(ctx)
-	if e != nil || ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time) || !now.Time.Before(published.EffectiveExpiresAt.Time) || !now.Time.Before(topology.FreshUntil) || !now.Time.Before(b.FreshUntil.Time) || !now.Time.Before(p.FreshUntil.Time) || !now.Time.Before(p.LeaseUntil.Time) {
-		return value.ErrUnavailable
+	if e != nil || ctx.Err() != nil || !q.Current(a, now.Time) || !r.Valid(now.Time) || !now.Time.Before(published.EffectiveExpiresAt.Time) || !now.Time.Before(topology.FreshUntil) || !now.Time.Before(p.FreshUntil.Time) || !now.Time.Before(p.LeaseUntil.Time) {
+		return queryRefusal("fence-final", nil)
 	}
 	return nil
 }
@@ -266,7 +286,7 @@ func (s *ContextQueries) AdmitQuery(ctx context.Context, q value.ContextQuery, r
 		return s.call(ctx, tx, q, r, false)
 	})
 	if e != nil {
-		return app.ContextQueryAdmission{}, value.ErrUnavailable
+		return app.ContextQueryAdmission{}, queryRefusal("admission", e)
 	}
 	return out, nil
 }
@@ -340,4 +360,26 @@ func (s *ContextQueries) PermitQuery(ctx context.Context, q value.ContextQuery, 
 		}
 		return nil
 	})
+}
+
+// queryStepError names the refusing admission/poll check for the operator
+// report. It always unwraps to value.ErrUnavailable, so no caller decision
+// changes; the dependency error is kept only for its own step name.
+type queryStepError struct {
+	step  string
+	cause error
+}
+
+func (e *queryStepError) Error() string { return value.ErrUnavailable.Error() }
+func (e *queryStepError) Unwrap() error { return value.ErrUnavailable }
+func (e *queryStepError) FixedStep() string {
+	var inner interface{ FixedStep() string }
+	if e.cause != nil && errors.As(e.cause, &inner) {
+		return e.step + "/" + inner.FixedStep()
+	}
+	return e.step
+}
+
+func queryRefusal(step string, cause error) error {
+	return &queryStepError{step: step, cause: cause}
 }

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"sync"
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
@@ -98,16 +99,94 @@ func (p *OwnerRequestPeers) CheckOwnerServing(ctx context.Context) (time.Time, e
 	if p == nil || p.Authenticator == nil || p.Server == nil {
 		return time.Time{}, value.ErrInvalid
 	}
-	return p.Authenticator.CheckOwnerServing(ctx, p.Server)
+	observed, err := p.observeServing(ctx)
+	if err != nil {
+		return time.Time{}, err
+	}
+	// Each caller keeps the usual five-second serving window; the reused
+	// observation only spares re-reading the hub's own route.
+	return identity.Earlier(observed.ValidUntil, p.Authenticator.Now().Add(5*time.Second)), nil
+}
+
+// ownerServingRefresh is the remaining reuse below which the local serving
+// observation is renewed on demand, so a request never inherits one ending
+// within its evidence-read window.
+const ownerServingRefresh = identity.EvidenceReadRequestWindow
+
+// servingReuse is the process-wide last successful observation of this
+// hub's own serving identity (route, registration, protection). A one-slot
+// channel serializes renewals while honoring each caller's cancellation.
+// Failures are never stored; a failed early renewal keeps the still-current
+// observation and its original end.
+type servingReuse struct {
+	slot     chan struct{}
+	observed value.AuthenticatedOwner
+}
+
+type servingReuseKey struct {
+	authenticator *app.OwnerAuthenticator
+	server        *OwnerCredentials
+}
+
+var servingReuses sync.Map // servingReuseKey -> *servingReuse
+
+func (p *OwnerRequestPeers) observeServing(ctx context.Context) (value.AuthenticatedOwner, error) {
+	var zero value.AuthenticatedOwner
+	if ctx == nil || ctx.Err() != nil {
+		return zero, value.ErrUnavailable
+	}
+	v, _ := servingReuses.LoadOrStore(servingReuseKey{p.Authenticator, p.Server}, &servingReuse{slot: make(chan struct{}, 1)})
+	r := v.(*servingReuse)
+	select {
+	case r.slot <- struct{}{}:
+		defer func() { <-r.slot }()
+	case <-ctx.Done():
+		return zero, value.ErrUnavailable
+	}
+	current, err := p.Server.Certificate()
+	now := p.Authenticator.Now()
+	cached := err == nil && r.observed.Certificate == current && r.observed.Valid(now)
+	if cached && r.observed.ValidUntil.Sub(now) >= ownerServingRefresh {
+		return r.observed, nil
+	}
+	fresh, err := p.Authenticator.ObserveOwnerServing(ctx, p.Server)
+	if err == nil {
+		fresh.ValidUntil = identity.Earlier(fresh.VerifiedAt.Add(value.OwnerServingReuse), fresh.Certificate.NotAfter)
+		if fresh.Valid(p.Authenticator.Now()) {
+			r.observed = fresh
+			return fresh, nil
+		}
+		err = value.ErrUnavailable
+	}
+	if cached && r.observed.Valid(p.Authenticator.Now()) && ctx.Err() == nil {
+		return r.observed, nil
+	}
+	return zero, err
 }
 
 func (p *OwnerRequestPeers) CheckNativeHub(ctx context.Context, operation permissions.NativeOperation) (time.Time, error) {
 	if p == nil || p.Authenticator == nil || p.Server == nil {
 		return time.Time{}, value.ErrInvalid
 	}
-	observed, e := p.Authenticator.ObserveOwnerServing(ctx, p.Server)
-	if e != nil || !operation.CurrentValid(p.Authenticator.Now()) || observed.Pool.InstallationID != operation.Reference.InstallationID || observed.Pool.ClusterID != operation.Path.HubClusterID || observed.ConfigurationRevision != operation.Path.HubConfiguration || observed.Certificate.Binding.PodUID != operation.HubPodUID || observed.Certificate.Binding.ProcessEpoch != operation.HubProcessEpoch {
-		return time.Time{}, value.ErrDenied
+	// The refusal keeps its decision (ErrDenied) and names the closed stage:
+	// the serving authentication step with its remaining-deadline bucket, the
+	// operation's own validity, or the hub placement (installed native84).
+	var refused string
+	observed, e := p.observeServing(app.ChainRefusalSteps(ctx, func(step string) {
+		if refused == "" {
+			refused = step
+		}
+	}))
+	switch {
+	case e != nil:
+		if refused == "" {
+			refused = "unknown"
+		}
+		return time.Time{}, answerStep("serving/"+refused, value.ErrDenied, nil)
+	case !operation.CurrentValid(p.Authenticator.Now()):
+		return time.Time{}, answerStep("operation"+app.RemainingBucket(ctx, p.Authenticator.Now()), value.ErrDenied, nil)
+	case observed.Pool.InstallationID != operation.Reference.InstallationID || observed.Pool.ClusterID != operation.Path.HubClusterID || observed.ConfigurationRevision != operation.Path.HubConfiguration || observed.Certificate.Binding.PodUID != operation.HubPodUID || observed.Certificate.Binding.ProcessEpoch != operation.HubProcessEpoch:
+		return time.Time{}, answerStep("placement", value.ErrDenied, nil)
 	}
-	return identity.Earlier(observed.ValidUntil, operation.Until), nil
+	return identity.Earlier(identity.Earlier(observed.ValidUntil, p.Authenticator.Now().Add(5*time.Second)), operation.Until), nil
 }

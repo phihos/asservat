@@ -38,35 +38,27 @@ import (
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/api/resource"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 )
 
-// qualifyInstallerContinuationNative runs ADR-183 from a completed bootstrap:
-// the actual `installer-continue` Pod under the runner account with exactly the
-// chart's continuation rules, and the actual `installer-provider-apply` command
-// for each provider wait. The test acts only as the operator: it creates the
-// provider prerequisites and the scoped storage principals.
-func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *rest.Config, kubeconfig string, api kubernetes.Interface, admin *pgxpool.Pool, f fixture, desired contracts.InitialBootstrap, original contracts.InitialPreparer) {
-	t.Helper()
-	installation, namespace := original.Plan.InstallationID, desired.BootstrapNamespace
-	providers := initialRuntimeProviderSelections(t, ctx, api, kc, f, desired, original, false)
-	prefix := "asservat-" + strings.ReplaceAll(installation, "-", "")
-	t.Cleanup(func() { initialRuntimeNativeCleanup(t, api, desired.TargetNamespace, installation, prefix) })
-	installerContinuationRBAC(t, ctx, api, namespace)
-	installShippedPermissionCRDs(t, ctx, api)
-	installNativeCapacityObjects(t, ctx, api, desired.TargetNamespace, original.Plan.ClusterID)
+// Static upstream choices are prepared before the unified runner. No generated
+// installation ID, source receipt or runtime authority is fabricated here.
+type installerContinuationFixture struct {
+	providers                                                     *initialRuntimeNativeProviders
+	document                                                      []byte
+	identity                                                      *installedIdentity
+	issuer, origin, consoleSecret, evidenceBucket, keyServiceHost string
+}
 
-	// Operator inputs: the public continuation document and the superuser.
-	sql := admin.Config().ConnConfig
-	superuser, _ := json.Marshal(contracts.OwnerSQLCredential{Username: sql.User, Password: sql.Password})
-	defer clear(superuser)
-	if _, err := api.CoreV1().Secrets(namespace).Create(ctx, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: "operator-continuation-sql"}, Immutable: ptr.To(true), Type: core.SecretTypeOpaque, Data: map[string][]byte{"postgres-administrator.json": superuser}}, meta.CreateOptions{}); err != nil {
-		t.Fatal(err)
-	}
+func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api kubernetes.Interface, f fixture, desired contracts.InitialBootstrap) *installerContinuationFixture {
+	t.Helper()
+	namespace := desired.BootstrapNamespace
+	providers := initialRuntimeProviderPrerequisites(t, ctx, api, f, desired, desired.Kubernetes, namespace)
+	installerContinuationRBAC(t, ctx, api, namespace, desired.Name+"-bootstrap-runner")
+	installShippedPermissionCRDs(t, ctx, api)
 	var roots bytes.Buffer
 	for _, der := range providers.issuerRoots {
 		_ = pem.Encode(&roots, &pem.Block{Type: "CERTIFICATE", Bytes: der})
@@ -84,7 +76,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		_ = pem.Encode(&storeRoots, &pem.Block{Type: "CERTIFICATE", Bytes: der})
 	}
 	// ADR-193 operator prerequisite: the connector PKI mount and its root.
-	connectorPKI := "connector-pki-" + strings.ReplaceAll(installation, "-", "")[:8]
+	connectorPKI := "connector-pki-" + namespace
 	providers.admin(t, ctx, http.MethodPost, "sys/mounts/"+connectorPKI, map[string]any{"type": "pki", "config": map[string]any{"max_lease_ttl": "2h"}}, http.StatusNoContent)
 	var generated struct {
 		Data struct {
@@ -97,21 +89,34 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	connectorRoots := generated.Data.Certificate
 	// ADR-194 operator prerequisites: the public Transit mount and the worker
 	// PKI mount with its root; the artifact creates the keys and the role.
-	publicTransit, workerPKI := "public-transit-"+strings.ReplaceAll(installation, "-", "")[:8], "worker-pki-"+strings.ReplaceAll(installation, "-", "")[:8]
+	publicTransit, workerPKI := "public-transit-"+namespace, "worker-pki-"+namespace
 	providers.admin(t, ctx, http.MethodPost, "sys/mounts/"+publicTransit, map[string]any{"type": "transit"}, http.StatusNoContent)
 	providers.admin(t, ctx, http.MethodPost, "sys/mounts/"+workerPKI, map[string]any{"type": "pki", "config": map[string]any{"max_lease_ttl": "2h"}}, http.StatusNoContent)
 	providers.admin(t, ctx, http.MethodPost, workerPKI+"/root/generate/internal", map[string]any{"common_name": "synthetic-worker-root", "ttl": "2h", "key_type": "ec", "key_bits": 256}, http.StatusOK)
+	// The installed journey's owned Keycloak replaces the synthetic issuer,
+	// which is never contacted, and adds the MCP client.
+	origin, consoleSecret := "https://asservat.synthetic.invalid", "synthetic-client-secret"
+	issuer, providerRoots := "https://id.synthetic.invalid/realms/org", string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.NativeProviders.Root}))
+	clients := []contracts.IdentityClient{{ID: "console", Kind: "human", ClassQualified: true}}
+	var identity *installedIdentity
+	if f.Identity != nil {
+		identity = newInstalledIdentity(t, f, origin, consoleSecret)
+		issuer, providerRoots = identity.Issuer, identity.RootPEM
+		clients = append(clients, contracts.IdentityClient{ID: "mcp", Kind: "human", ClassQualified: true})
+	}
 	document, _ := json.Marshal(contracts.InstallerContinuation{Format: contracts.InstallerContinuationFormat, Namespace: namespace,
 		WorkerProvider:      contracts.InstallerProviderSelection{AuthMount: providers.worker.AuthMount, AuthMountAccessor: providers.worker.AuthMountAccessor},
 		OwnerProvider:       contracts.InstallerProviderSelection{AuthMount: providers.owner.AuthMount, AuthMountAccessor: providers.owner.AuthMountAccessor},
 		OwnerIssuerRootsPEM: roots.String(), OwnerPKIMount: "owner-pki", OwnerConnections: 4, OwnerConcurrency: 2,
 		// ADR-185: synthetic browser identity settings exercise the public sources step.
-		Public: &contracts.InstallerPublicSettings{Origin: "https://asservat.synthetic.invalid", Issuer: "https://id.synthetic.invalid/realms/org", ClientID: "console",
-			MaxLifetimeSeconds: 3600, MaxLogins: 8, MaxSessions: 8, MaxLogoutEvents: 8, Clients: []contracts.IdentityClient{{ID: "console", Kind: "human", ClassQualified: true}},
+		Public: &contracts.InstallerPublicSettings{Origin: origin, Issuer: issuer, ClientID: "console",
+			MaxLifetimeSeconds: 3600, MaxLogins: 8, MaxSessions: 8, MaxLogoutEvents: 8, Clients: clients,
 			EligibleGroups: []string{"synthetic-group"}, GroupMaxAgeSeconds: 300,
 			// ADR-190: the operator's synthetic capacity profile and release operator.
-			Capacity:            nativeCapacityProfile(),
-			ProcessingOperators: []contracts.ProcessingOperator{{ClientID: "console", Issuer: "https://id.synthetic.invalid/realms/org", Kind: "User", ID: "synthetic-operator"}},
+			Capacity: nativeCapacityProfile(),
+			// ADR-210: the synthetic group's console users are the processing
+			// operators, so the journey's one user initializes processing.
+			ProcessingOperators: []contracts.ProcessingOperator{{ClientID: "console", Issuer: issuer, Kind: "Group", ID: installedIdentityGroup}},
 			// ADR-193: the federation's operator choices.
 			Federation: &contracts.InstallerFederationSettings{ConnectorPKIMount: connectorPKI, ConnectorIssuerRootsPEM: connectorRoots,
 				Endpoint: federationEndpoint, ServerName: "federation.synthetic.invalid", ServiceType: "NodePort", NodePort: 31446,
@@ -129,20 +134,39 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 				Defaults:              contracts.InstallerRetentionDurations{EvidenceSeconds: 86400, CaseMetadataSeconds: 86400, AuditMetadataSeconds: 86400},
 				Maxima:                contracts.InstallerRetentionDurations{EvidenceSeconds: 604800, CaseMetadataSeconds: 604800, AuditMetadataSeconds: 604800},
 				DeletionBudgetSeconds: 3600},
-			// ADR-194: the promoted launch; the synthetic issuer is never contacted at startup.
-			Promotion: &contracts.InstallerOwnerPromotion{BrowserAudience: "asservat-api", ProviderRootsPEM: string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: f.NativeProviders.Root})),
+			// ADR-194: the promoted launch.
+			Promotion: &contracts.InstallerOwnerPromotion{BrowserAudience: "asservat-api", ProviderRootsPEM: providerRoots,
+				// ADR-202: the public API's NodePort for the installed journey.
+				Exposure:     &contracts.InstallerPublicExposure{ServiceType: "NodePort", NodePort: 31450},
 				TransitMount: publicTransit, WorkerPKIMount: workerPKI, Version: "native-qualification"}}})
-	if _, err := api.CoreV1().ConfigMaps(namespace).Create(ctx, &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: "operator-continuation"}, Immutable: ptr.To(true), Data: map[string]string{contracts.InstallerContinuationFile: string(document)}}, meta.CreateOptions{}); err != nil {
+	return &installerContinuationFixture{providers: providers, document: document, identity: identity, issuer: issuer, origin: origin, consoleSecret: consoleSecret, evidenceBucket: evidenceBucket, keyServiceHost: keyServiceHost}
+}
+
+// Complete the actual five-command runner through both operator provider waits,
+// then keep all installed process, SQL, regional and public journey assertions.
+func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *rest.Config, kubeconfig string, api kubernetes.Interface, admin *pgxpool.Pool, f fixture, desired contracts.InitialBootstrap, original contracts.InitialPreparer, unified *installedUnifiedRunner) {
+	t.Helper()
+	installation, namespace := original.Plan.InstallationID, desired.BootstrapNamespace
+	setup := unified.continuation
+	providers, identity := setup.providers, setup.identity
+	issuer, origin, consoleSecret := setup.issuer, setup.origin, setup.consoleSecret
+	evidenceBucket := setup.evidenceBucket
+	providers.installation, providers.cluster = installation, original.Plan.ClusterID
+	prefix := "asservat-" + strings.ReplaceAll(installation, "-", "")
+	t.Cleanup(func() { initialRuntimeNativeCleanup(t, api, desired.TargetNamespace, installation, prefix) })
+	// Use the original compiled runner actor for guarded operator prerequisites;
+	// fixture administration is not added to the product administrator list.
+	runnerConfig := installedUnifiedRunnerConfig(kc, desired)
+	runnerAPI, err := kubernetes.NewForConfig(runnerConfig)
+	if err != nil {
 		t.Fatal(err)
 	}
-	defer installerContinuationLaunchedCleanup(t, api, desired.TargetNamespace, prefix)
-	// ADR-193 operator prerequisite: the federation's serving TLS Secret.
-	servingCA := installerFederationServingSecret(t, ctx, api, desired.TargetNamespace, installation, "federation.synthetic.invalid")
-	keyServingCA := installerServingSecret(t, ctx, api, desired.TargetNamespace, contracts.KeyServiceServingSecretName(installation), keyServiceHost)
-	pod, err := api.CoreV1().Pods(namespace).Create(ctx, installerContinuationPod(desired), meta.CreateOptions{})
-	if err != nil {
-		t.Fatal("actual Restricted continuation admission", err)
-	}
+	defer installerContinuationLaunchedCleanup(t, api, runnerAPI, desired, prefix)
+	installNativeCapacityObjects(t, ctx, runnerAPI, desired.TargetNamespace, original.Plan.ClusterID)
+	servingCA := installerFederationServingSecret(t, ctx, runnerAPI, desired.TargetNamespace, installation, "federation.synthetic.invalid")
+	keyServingCA := installerServingSecret(t, ctx, runnerAPI, desired.TargetNamespace, contracts.KeyServiceServingSecretName(installation), setup.keyServiceHost)
+	var publicRoot []byte // DER of the public listener's synthetic CA
+	pod := unified.interruptAndResume(t, ctx, api, kc, kubeconfig, desired, original)
 	defer installerContinuationLogs(t, api, pod)
 
 	// The operator's side: own OpenBao administration and scoped storage only.
@@ -270,8 +294,9 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			}
 			if artifact.Public {
 				// ADR-194: the operator's OIDC client secret and public TLS pair.
-				_, certPEM, keyPEM := syntheticServingPair(t, "asservat.synthetic.invalid")
-				for name, b := range map[string][]byte{"oidc-client-secret": []byte("synthetic-client-secret"), "public-tls.crt": certPEM, "public-tls.key": keyPEM} {
+				var certPEM, keyPEM []byte
+				publicRoot, certPEM, keyPEM = syntheticServingPair(t, "asservat.synthetic.invalid")
+				for name, b := range map[string][]byte{"oidc-client-secret": []byte(consoleSecret), "public-tls.crt": certPEM, "public-tls.key": keyPEM} {
 					if e = os.WriteFile(filepath.Join(work, name), b, 0o600); e != nil {
 						t.Fatal(e)
 					}
@@ -438,7 +463,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	// ADR-195 step 7: an administrator's baseline edit is accepted, and a
 	// hub-worker restart returns the source to Ready under a new epoch.
 	runner := rest.CopyConfig(kc)
-	runner.Impersonate = rest.ImpersonationConfig{UserName: "system:serviceaccount:" + namespace + ":trusted-runner", Groups: []string{"system:serviceaccounts", "system:serviceaccounts:" + namespace, "system:authenticated"}}
+	runner.Impersonate = rest.ImpersonationConfig{UserName: "system:serviceaccount:" + namespace + ":" + desired.Name + "-bootstrap-runner", Groups: []string{"system:serviceaccounts", "system:serviceaccounts:" + namespace, "system:authenticated"}}
 	edit, err := kubernetes.NewForConfig(runner)
 	if err != nil {
 		t.Fatal(err)
@@ -463,48 +488,41 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	t.Log("baseline edit accepted and hub-worker restart Ready under a new epoch")
 	t.Log("promoted owner Ready with download sources, operator public Secret and observation on 9444")
 	// ADR-193 step 5: a regional cluster installed by installer-cluster.
-	qualifyRegionalInstall(t, ctx, f, admin, api, desired.TargetNamespace, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	// ADR-187: after the guard bridge the bootstrap hook replays (as on helm
-	// upgrade) and a second continuation finds the installation complete; the
-	// guard generation and the journal stay unchanged.
+	// The first installed S-02 slice runs once the regional workload holds a
+	// fresh binding; it reads the public root generated during provider apply.
+	publicAddress := net.JoinHostPort(nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID), "31450")
+	journey := func(cluster, namespace, workload string, deny func(bool)) {
+		diagnose := func() {
+			installedSQLActivityDiagnostics(ctx, admin.Query, installation, t.Logf)
+			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-owner", prefix+"-worker", contracts.PublisherName(installation))
+			c, end := context.WithTimeout(ctx, 20*time.Second)
+			defer end()
+			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
+		}
+		installedJourney(t, ctx, identity, publicRoot, publicAddress, origin, diagnose,
+			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))(cluster, namespace, workload, deny)
+	}
+	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
+	qualifyRegionalInstall(t, ctx, f, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
+	// After the guard bridge, the same five-command profile replays (as on
+	// upgrade), finds the installation complete and preserves guard/journal state.
 	guard, err := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, original.Plan.Workload.WorkloadGuard, meta.GetOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	initialBootstrapChainRun(t, ctx, api, desired, "bootstrap-replay-after-bridge", true)
-	rerun := installerContinuationPod(desired)
-	rerun.Name = "installer-continuation-replay"
-	if _, err = api.CoreV1().Pods(namespace).Create(ctx, rerun, meta.CreateOptions{}); err != nil {
-		t.Fatal(err)
-	}
-	defer installerContinuationLogs(t, api, rerun)
-	wait, end := context.WithTimeout(ctx, 3*time.Minute)
-	defer end()
-	for {
-		current, e := api.CoreV1().Pods(namespace).Get(wait, rerun.Name, meta.GetOptions{})
-		if e == nil && current.Status.Phase == core.PodFailed {
-			t.Fatal("continuation rerun failed after the bridge")
-		}
-		if e == nil && current.Status.Phase == core.PodSucceeded {
-			break
-		}
-		select {
-		case <-wait.Done():
-			t.Fatal("continuation rerun did not finish", wait.Err())
-		case <-time.After(time.Second):
-		}
-	}
+	unified.replay(t, ctx, api, kubeconfig, desired)
+
 	after, err := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, guard.Name, meta.GetOptions{})
 	again, e := api.CoreV1().Secrets(desired.TargetNamespace).Get(ctx, journal.Name, meta.GetOptions{})
 	if err != nil || e != nil || after.UID != guard.UID || after.Generation != guard.Generation || again.ResourceVersion != journal.ResourceVersion {
 		t.Fatal("replay after the bridge changed the guard or the journal", err, e)
 	}
-	t.Log("actual installer-continue Pod under the runner account and chart continuation rules, two actual applier waits; worker inputs/launch and owner identity/launch acknowledged with running worker and owner processes; bootstrap hook and continuation replay after the guard bridge without changes; no public workflow claim")
+	t.Log("actual fresh five-command runner, positive-terminal interruption/resume of the same original journals, two actual provider waits and completed five-command replay; installed journey results are reported separately")
 }
 
 // installerContinuationRBAC mirrors the chart's continuation ClusterRole
 // (templates/bootstrap-continuation.yaml); check-helm pins the chart side.
-func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace string) {
+func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, account string) {
 	t.Helper()
 	role, err := api.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{ObjectMeta: meta.ObjectMeta{Name: namespace + "-continuation"}, Rules: []rbac.PolicyRule{
 		{APIGroups: []string{"apps"}, Resources: []string{"deployments"}, Verbs: []string{"get", "create", "update"}},
@@ -513,7 +531,9 @@ func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes
 		{APIGroups: []string{"coordination.k8s.io"}, Resources: []string{"leases"}, Verbs: []string{"get", "create", "update"}},
 		{APIGroups: []string{"discovery.k8s.io"}, Resources: []string{"endpointslices"}, Verbs: []string{"list"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidencestoragepools", "evidencebudgetpolicies"}, Verbs: []string{"get", "list", "create"}},
+		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidencestoragepools"}, Verbs: []string{"update"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"accessbindings", "permissionsources"}, Verbs: []string{"get", "list", "watch", "create"}},
+		{APIGroups: []string{"asservat.io"}, Resources: []string{"accessbindings"}, Verbs: []string{"delete"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidenceretentionpolicies"}, Verbs: []string{"get", "list", "watch", "create", "update"}},
 		{APIGroups: []string{""}, Resources: []string{"namespaces", "pods"}, Verbs: []string{"get", "list"}},
 		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets"}, Verbs: []string{"get", "list"}},
@@ -525,7 +545,7 @@ func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes
 	if err != nil {
 		t.Fatal(err)
 	}
-	binding, err := api.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: role.Name}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: role.Name}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Namespace: namespace, Name: "trusted-runner"}}}, meta.CreateOptions{})
+	binding, err := api.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{ObjectMeta: meta.ObjectMeta{Name: role.Name}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: role.Name}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Namespace: namespace, Name: account}}}, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -542,29 +562,6 @@ func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes
 			t.Error("continuation role cleanup", e)
 		}
 	})
-}
-
-// installerContinuationPod mirrors the chart's continuation hook Pod.
-func installerContinuationPod(d contracts.InitialBootstrap) *core.Pod {
-	mode := int32(0440)
-	memory := resource.MustParse("8Mi")
-	token := core.VolumeProjection{ServiceAccountToken: &core.ServiceAccountTokenProjection{Path: "administrator-token", Audience: d.ProbeAudience, ExpirationSeconds: ptr.To(int64(600))}}
-	public := core.VolumeProjection{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: "operator-bootstrap"}, Items: []core.KeyToPath{{Key: "bootstrap.json", Path: "bootstrap.json"}}}}
-	volumes := []core.Volume{
-		{Name: "scratch", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{Medium: core.StorageMediumMemory, SizeLimit: &memory}}},
-		{Name: "producer-input", VolumeSource: core.VolumeSource{Projected: &core.ProjectedVolumeSource{DefaultMode: &mode, Sources: []core.VolumeProjection{public, token}}}},
-		{Name: "continuation-input", VolumeSource: core.VolumeSource{Projected: &core.ProjectedVolumeSource{DefaultMode: &mode, Sources: []core.VolumeProjection{
-			{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: "operator-continuation"}, Items: []core.KeyToPath{{Key: contracts.InstallerContinuationFile, Path: contracts.InstallerContinuationFile}}}},
-			token,
-			{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: "operator-continuation-sql"}, Items: []core.KeyToPath{{Key: "postgres-administrator.json", Path: "postgres-administrator.json"}}}},
-		}}}},
-	}
-	container := func(name, command string, mounts ...core.VolumeMount) core.Container {
-		return core.Container{Name: name, Image: d.Image, ImagePullPolicy: core.PullNever, Command: []string{"/asservat", command}, VolumeMounts: mounts, SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}, Resources: core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("20m"), core.ResourceMemory: resource.MustParse("32Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("1"), core.ResourceMemory: resource.MustParse("256Mi")}}}
-	}
-	produce := container("produce", "initial-bootstrap", core.VolumeMount{Name: "scratch", MountPath: bootstrap.InitialBootstrapScratchRoot}, core.VolumeMount{Name: "producer-input", MountPath: bootstrap.InitialBootstrapRoot, ReadOnly: true})
-	continuation := container("continue", "installer-continue", core.VolumeMount{Name: "scratch", MountPath: contracts.InstallerContinuationPreparerRoot, SubPath: "projection/preparer", ReadOnly: true}, core.VolumeMount{Name: "continuation-input", MountPath: contracts.InstallerContinuationRoot, ReadOnly: true})
-	return &core.Pod{ObjectMeta: meta.ObjectMeta{Name: "installer-continuation", Namespace: d.BootstrapNamespace}, Spec: core.PodSpec{ServiceAccountName: "trusted-runner", AutomountServiceAccountToken: ptr.To(false), EnableServiceLinks: ptr.To(false), RestartPolicy: core.RestartPolicyNever, ActiveDeadlineSeconds: ptr.To(int64(1800)), TerminationGracePeriodSeconds: ptr.To(int64(15)), SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), RunAsGroup: ptr.To(int64(65532)), FSGroup: ptr.To(int64(65532)), FSGroupChangePolicy: ptr.To(core.FSGroupChangeOnRootMismatch), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}}, Volumes: volumes, InitContainers: []core.Container{produce}, Containers: []core.Container{continuation}}}
 }
 
 // installerOperatorStorage is the operator's own S3 IAM step for one wait: a
@@ -687,15 +684,60 @@ func installerContinuationRunning(t *testing.T, ctx context.Context, api kuberne
 	}
 }
 
-// installerContinuationLaunchedCleanup scales nothing and removes only the two
-// exact launched Deployments with normal foreground GC under the guard.
-func installerContinuationLaunchedCleanup(t *testing.T, api kubernetes.Interface, namespace, prefix string) {
-	c, end := context.WithTimeout(context.Background(), 5*time.Second)
+// Cleanup uses the original accepted installer actor for guarded deletion.
+// Only after the journey ends does the owned fixture grant that actor DELETE
+// for these two exact Deployment names. This is not installer/runtime RBAC.
+// Reads use the fixture administrator; the guard and normal foreground GC stay
+// active. A retained failed fixture must remain intact for diagnosis.
+func installerContinuationLaunchedCleanup(t *testing.T, admin, actor kubernetes.Interface, desired contracts.InitialBootstrap, prefix string) {
+	t.Helper()
+	if keepFailedFixture(t) {
+		return
+	}
+	ctx, end := context.WithTimeout(context.Background(), 90*time.Second)
 	defer end()
-	for _, name := range []string{prefix + "-owner", prefix + "-worker"} {
-		if d, e := api.AppsV1().Deployments(namespace).Get(c, name, meta.GetOptions{}); e == nil {
-			providerWorkerNativeCleanup(t, api, d)
+	names := []string{prefix + "-owner", prefix + "-worker"}
+	role, err := admin.RbacV1().ClusterRoles().Create(ctx, &rbac.ClusterRole{
+		ObjectMeta: meta.ObjectMeta{Name: prefix + "-fixture-cleanup"},
+		Rules:      []rbac.PolicyRule{{APIGroups: []string{"apps"}, Resources: []string{"deployments"}, ResourceNames: names, Verbs: []string{"delete"}}},
+	}, meta.CreateOptions{})
+	if err != nil {
+		t.Error("owned cleanup role", err)
+		return
+	}
+	defer func() {
+		clean, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
+		if err := admin.RbacV1().ClusterRoles().Delete(clean, role.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &role.UID}}); err != nil {
+			t.Error("owned cleanup role retirement", err)
 		}
+	}()
+	binding, err := admin.RbacV1().ClusterRoleBindings().Create(ctx, &rbac.ClusterRoleBinding{
+		ObjectMeta: meta.ObjectMeta{Name: role.Name},
+		RoleRef:    rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: role.Name},
+		Subjects:   []rbac.Subject{{Kind: "ServiceAccount", Namespace: desired.BootstrapNamespace, Name: desired.Name + "-bootstrap-runner"}},
+	}, meta.CreateOptions{})
+	if err != nil {
+		t.Error("owned cleanup binding", err)
+		return
+	}
+	defer func() {
+		clean, stop := context.WithTimeout(context.Background(), 5*time.Second)
+		defer stop()
+		if err := admin.RbacV1().ClusterRoleBindings().Delete(clean, binding.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &binding.UID}}); err != nil {
+			t.Error("owned cleanup binding retirement", err)
+		}
+	}()
+	for _, name := range names {
+		d, err := admin.AppsV1().Deployments(desired.TargetNamespace).Get(ctx, name, meta.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			continue
+		}
+		if err != nil {
+			t.Error("owned cleanup deployment read", err)
+			return
+		}
+		providerWorkerNativeCleanupAs(t, admin, actor, d)
 	}
 }
 
@@ -705,11 +747,15 @@ func installerContinuationLogs(t *testing.T, api kubernetes.Interface, pod *core
 	}
 	c, end := context.WithTimeout(context.Background(), 5*time.Second)
 	defer end()
-	for _, name := range []string{"produce", "continue"} {
+	current, err := api.CoreV1().Pods(pod.Namespace).Get(c, pod.Name, meta.GetOptions{})
+	if err != nil || current.UID != pod.UID {
+		return
+	}
+	for _, name := range []string{"produce", "schema", "prepare", "retire", "continue"} {
 		// Only fixed product errors are emitted; never projected file contents.
 		logs, e := api.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &core.PodLogOptions{Container: name, LimitBytes: ptr.To(int64(65536))}).DoRaw(c)
 		if e == nil {
-			t.Log("continuation", name, string(logs))
+			t.Log("continuation", pod.UID, name, string(logs))
 		}
 	}
 }
@@ -769,7 +815,13 @@ func installShippedPermissionCRDs(t *testing.T, ctx context.Context, api kuberne
 }
 
 // nativeCapacityProfile is the operator's synthetic capacity profile; its
-// footprints and sizes mirror the capacity SQL fixture (ADR-190).
+// footprints and sizes mirror the capacity SQL fixture (ADR-190). Processing
+// coverage (ADR-146) requires a capture's deletion date (retention plus the
+// deletion budget, about 4200 s here) before the processing root's current
+// end, which root renewal sets AdmissionSeconds ahead, so the profile uses the
+// one-day maximum (local hold 12). Each renewal also spends one lifetime
+// processing root transition and one configuration transition; 8 and 100 with
+// 60 s renewals expired the root nine minutes after install (local hold 10).
 func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	f := func(row, wal int64) contracts.InstallerCapacityFootprint {
 		return contracts.InstallerCapacityFootprint{RowBytes: row, TransitionWALBytes: wal}
@@ -777,14 +829,14 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	lane := func(accounts, records int64) contracts.InstallerCapacityLane {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
-	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 3, AdmissionSeconds: 60,
-		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 7), Resolution: lane(4, 2), Processing: lane(2, 16)},
+	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 3, AdmissionSeconds: 86400,
+		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 64), Resolution: lane(4, 8), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},
 		Footprints:          contracts.InstallerCapacityFootprints{Capture: f(128<<10, 256<<10), Operation: f(128<<10, 256<<10), Processing: f(128<<10, 256<<10), Native: f(64<<10, 128<<10), Stop: f(128<<10, 256<<10), ProcessingState: f(16<<10, 64<<10)},
 		PurgeLeases:         4,
-		Processing:          contracts.InstallerCapacityProcessing{MaxRules: 2, MaxRootTransitions: 8},
-		Metadata:            contracts.InstallerCapacityMetadata{FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, ConfigurationTransitions: 100},
+		Processing:          contracts.InstallerCapacityProcessing{MaxRules: 2, MaxRootTransitions: 512},
+		Metadata:            contracts.InstallerCapacityMetadata{FixedRowBytes: 1 << 20, AccountRowBytes: 256 << 10, RecordRowBytes: 128 << 10, RecordWALBytes: 8 << 20, RecordKeyAttempts: 16, TransitionWALBytes: 1 << 20, ConfigurationTransitions: 4096},
 		Envelope:            contracts.InstallerCapacityEnvelope{SystemObjects: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1 << 50}, SQLBytes: 1 << 50, BackupBytes: 1 << 50, WALBytes: 1 << 50, KeyAttempts: 1 << 50},
 		Backends:            []contracts.InstallerCapacityBackend{{StorageProfile: "dedicated", Usable: contracts.InstallerCapacityAmount{Bytes: 1 << 50, Objects: 1000000000}}}}
 }
@@ -830,23 +882,31 @@ func installedProcessDiagnostics(t *testing.T, ctx context.Context, api kubernet
 			t.Log("diagnostics: deployment", name, e)
 			continue
 		}
-		pods, e := api.CoreV1().Pods(namespace).List(c, meta.ListOptions{LabelSelector: meta.FormatLabelSelector(d.Spec.Selector)})
-		if e != nil {
-			t.Log("diagnostics: pods", name, e)
-			continue
-		}
-		for _, pod := range pods.Items {
-			for _, s := range pod.Status.ContainerStatuses {
-				reason, exit := "", int32(0)
-				if x := s.LastTerminationState.Terminated; x != nil {
-					reason, exit = x.Reason, x.ExitCode
-				}
-				t.Logf("diagnostics: %s pod %s container %s ready %v restarts %d last %q exit %d", name, pod.Name, s.Name, s.Ready, s.RestartCount, reason, exit)
-				for _, previous := range []bool{true, false} {
-					logs, e := api.CoreV1().Pods(namespace).GetLogs(pod.Name, &core.PodLogOptions{Container: s.Name, Previous: previous, TailLines: ptr.To(int64(100)), LimitBytes: ptr.To(int64(16384))}).DoRaw(c)
-					if e == nil && len(logs) > 0 {
-						t.Logf("diagnostics: %s previous=%v log:\n%s", pod.Name, previous, logs)
-					}
+		installedPodDiagnostics(t, c, api, namespace, name, meta.FormatLabelSelector(d.Spec.Selector))
+	}
+}
+
+// installedPodDiagnostics logs the status and recent logs of every Pod that
+// selector matches in namespace (an empty selector matches all of them).
+func installedPodDiagnostics(t *testing.T, c context.Context, api kubernetes.Interface, namespace, name, selector string) {
+	t.Helper()
+	pods, e := api.CoreV1().Pods(namespace).List(c, meta.ListOptions{LabelSelector: selector})
+	if e != nil {
+		t.Log("diagnostics: pods", name, e)
+		return
+	}
+	for _, pod := range pods.Items {
+		t.Logf("diagnostics: %s pod %s phase %s", name, pod.Name, pod.Status.Phase)
+		for _, s := range pod.Status.ContainerStatuses {
+			reason, exit := "", int32(0)
+			if x := s.LastTerminationState.Terminated; x != nil {
+				reason, exit = x.Reason, x.ExitCode
+			}
+			t.Logf("diagnostics: %s pod %s container %s ready %v restarts %d last %q exit %d", name, pod.Name, s.Name, s.Ready, s.RestartCount, reason, exit)
+			for _, previous := range []bool{true, false} {
+				logs, e := api.CoreV1().Pods(namespace).GetLogs(pod.Name, &core.PodLogOptions{Container: s.Name, Previous: previous, TailLines: ptr.To(int64(100)), LimitBytes: ptr.To(int64(16384))}).DoRaw(c)
+				if e == nil && len(logs) > 0 {
+					t.Logf("diagnostics: %s previous=%v log:\n%s", pod.Name, previous, logs)
 				}
 			}
 		}
@@ -949,7 +1009,7 @@ func installerHubRetentionReadyEpoch(t *testing.T, ctx context.Context, api kube
 		t.Fatal(err)
 	}
 	var login contracts.OwnerSQLCredential
-	if json.Unmarshal(projection.Data["sql-public-retention-read.json"], &login) != nil || login.Username == "" {
+	if json.Unmarshal(projection.Data["sql-public-hub-runtime.json"], &login) != nil || login.Username == "" {
 		t.Fatal("retention-read login missing")
 	}
 	// The product ledger requires verified TLS, as the step-5 issuance logins.

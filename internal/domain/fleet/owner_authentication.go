@@ -31,7 +31,13 @@ type AuthenticatedOwner struct {
 	VerifiedAt, ValidUntil time.Time
 }
 
+// OwnerServingReuse bounds how long the hub process may reuse its own local
+// serving observation (route, registration, protection), like its
+// self-protection proof (installed native89). A remote peer is still
+// authenticated per request with a five-second observation.
+const OwnerServingReuse = 30 * time.Second
+
 func (o AuthenticatedOwner) Valid(now time.Time) bool {
 	b := o.Certificate.Binding
-	return o.Certificate.Valid(now) && authorization.UUID(o.EnrollmentID) && o.Pool.Valid() && b.InstallationID == o.Pool.InstallationID && b.ClusterID == o.Pool.ClusterID && b.IssuerEpoch == o.Pool.IssuerEpoch && identity.Text(o.Pod, 253) && authorization.UUID(o.ReplicaSetUID) && o.ConfigurationRevision.Valid() && o.ProtectionDigest != (artifact.Digest{}) && identity.Fresh(o.VerifiedAt, o.ValidUntil, now, 5*time.Second) && !o.ValidUntil.After(o.Certificate.NotAfter)
+	return o.Certificate.Valid(now) && authorization.UUID(o.EnrollmentID) && o.Pool.Valid() && b.InstallationID == o.Pool.InstallationID && b.ClusterID == o.Pool.ClusterID && b.IssuerEpoch == o.Pool.IssuerEpoch && identity.Text(o.Pod, 253) && authorization.UUID(o.ReplicaSetUID) && o.ConfigurationRevision.Valid() && o.ProtectionDigest != (artifact.Digest{}) && identity.Fresh(o.VerifiedAt, o.ValidUntil, now, OwnerServingReuse) && !o.ValidUntil.After(o.Certificate.NotAfter)
 }

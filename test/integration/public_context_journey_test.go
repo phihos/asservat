@@ -269,7 +269,6 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	// A deliberate continuation of an acknowledged Pending response. This is not
 	// an automatic retry of an uncertain write, nor a replacement session/worker.
 	continuation, stopContinuation := context.WithCancel(ctx)
-	native.ownerClaims.Arm() // The first preparation's own claim is not this registration.
 	done := make(chan publicJourneyContinuationOutcome, 1)
 	continuationIdentity := current(continuation, false)
 	raw := publicJourneyInput(t, downloadInput)
@@ -295,8 +294,8 @@ func qualifyPublicContextJourney(t *testing.T, parent context.Context, fixture f
 	outcome.report(t, cleanupStarted)
 	ready := publicJourneyData[presentation.ContextDownloadData](t, "original preparation continuation", outcome.reply, outcome.err)
 	if ready.State == artifact.DownloadPreparing && ready.ContinuePreparation {
-		// An enrollment completed by that request ends it; the console repeats an
-		// acknowledged Preparing reply with the same key after two seconds. This
+		// Enrollment runs independently of the requesting socket; the console repeats
+		// an acknowledged Preparing reply with the same key after two seconds. This
 		// single next continuation is equally deliberate and has its own identity.
 		select {
 		case <-ctx.Done():

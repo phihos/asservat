@@ -113,7 +113,8 @@ func WriteNativeFrame(w io.Writer, f NativeFrame) error {
 // independently bind actual peer, live operation and stored current authority.
 type NativeReference struct {
 	InstallationID string `json:"installationID"`
-	SessionID      string `json:"sessionID"`
+	SessionID      string `json:"sessionID,omitempty"`
+	QueryID        string `json:"queryID,omitempty"`
 	WorkerID       string `json:"workerID"`
 	OperationID    string `json:"operationID"`
 	Fence          int64  `json:"fence"`
@@ -140,6 +141,7 @@ type NativeCommand struct {
 	Kind          string          `json:"kind"`
 	Source        json.RawMessage `json:"source"`
 	Operation     json.RawMessage `json:"operation"`
+	Projection    json.RawMessage `json:"projection,omitempty"`
 	ParentID      string          `json:"parentID"`
 	Generation    int64           `json:"generation"`
 	WindowID      string          `json:"windowID"`

@@ -1,0 +1,53 @@
+[
+  {
+    "name": "green-worker-observation",
+    "argv": [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "-timeout=10m",
+      "-v",
+      "./internal/application/evidence"
+    ],
+    "expectedExit": 0,
+    "exitCode": 0,
+    "elapsedSeconds": 7.356
+  },
+  {
+    "name": "green-kubernetes-composition",
+    "argv": [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "-timeout=10m",
+      "-run",
+      "^Test(DownloadPreparation(FirstJobFitsOriginalIdentityAndPolicyBudget|NearExpiredIdentityObservation)|InitialInstallerRunner.*|PublicMetadata.*|PublicRuntimeMetadata.*|PublicRuntimeOldLayoutCannotReplaceRetainedJournal)$",
+      "-v",
+      "./internal/adapters/kubernetes"
+    ],
+    "expectedExit": 0,
+    "exitCode": 0,
+    "elapsedSeconds": 26.94
+  },
+  {
+    "name": "green-metadata-contracts",
+    "argv": [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "-timeout=10m",
+      "-run",
+      "^Test(PublicMetadata.*|PublisherRetentionCredentialRemainsNarrow|PublicRuntime.*|PublicPool.*|PublicContext.*)$",
+      "-v",
+      "./internal/contracts",
+      "./internal/adapters/postgres",
+      "./internal/bootstrap"
+    ],
+    "expectedExit": 0,
+    "exitCode": 0,
+    "elapsedSeconds": 41.179
+  }
+]

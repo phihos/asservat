@@ -261,9 +261,9 @@ func TestEvidenceDeleteStorageRereadsAndRefusesSessionTokens(t *testing.T) {
 }
 
 func TestContextDeletionLoginsFollowTheWorkerConfigurationLogins(t *testing.T) {
-	got := contracts.PermissionProjectionPurposes(true, true, true)
+	got := contracts.PermissionProjectionPurposes(true, true, true, false)
 	want := append(append(append(contracts.PublicRuntimePermissionPurposes(), contracts.PublicRuntimeRetentionPurposes()...), contracts.PublicRuntimeWorkerConfigurationPurposes()...), contracts.PublicRuntimeContextDeletionPurposes()...)
-	if !slices.Equal(got, want) || slices.ContainsFunc(contracts.PermissionProjectionPurposes(true, true, false), func(p string) bool { return slices.Contains(contracts.PublicRuntimeContextDeletionPurposes(), p) }) {
+	if !slices.Equal(got, want) || slices.ContainsFunc(contracts.PermissionProjectionPurposes(true, true, false, false), func(p string) bool { return slices.Contains(contracts.PublicRuntimeContextDeletionPurposes(), p) }) {
 		t.Fatal("deletion logins out of order or present without deletion", got)
 	}
 	if w, err := openContextDeletion(context.Background(), contracts.PermissionDeployment{}, nil, nil, nil, nil, nil); w != nil || err != nil {

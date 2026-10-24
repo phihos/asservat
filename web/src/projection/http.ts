@@ -9,8 +9,8 @@ export interface Operations {
   call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>>;
 }
 
-// Generated routes do not advertise runtime availability. A protected runtime
-// composition must supply the optional view before these operations are offered.
+// Generated routes do not confer runtime availability. The server registers
+// these operations only when its protected approved-read service is composed.
 export const operations: Operations = {
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>> {
     if (!validators[`validInput_${name}`](input) || signal.aborted) throw new Error('Query unavailable');

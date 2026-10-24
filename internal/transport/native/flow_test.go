@@ -116,6 +116,9 @@ func (a *flowAdmission) OpenNative(ctx context.Context, peer *tls.ConnectionStat
 	return flowConversation{c, "connector", a.t}, nil
 }
 func flowServer(t *testing.T, path string, a native.Admission) *mtls.NativeClient {
+	return flowServerReporting(t, path, a, nil)
+}
+func flowServerReporting(t *testing.T, path string, a native.Admission, refused func(context.Context, string, error)) *mtls.NativeClient {
 	server, client, roots := testCertificates(t)
 	var handler http.Handler
 	var handlers sync.WaitGroup
@@ -144,10 +147,12 @@ func flowServer(t *testing.T, path string, a native.Admission) *mtls.NativeClien
 	})
 	u, _ := url.Parse(s.URL)
 	var e error
-	handler, e = native.NewHandler(path, u.Host, a, 1)
+	h, e := native.NewHandler(path, u.Host, a, 1)
 	if e != nil {
 		t.Fatal(e)
 	}
+	h.Refused = refused
+	handler = h
 	c, e := mtls.NewNativeClient(s.URL+path, &tls.Config{RootCAs: roots, Certificates: []tls.Certificate{client}})
 	if e != nil {
 		t.Fatal(e)
@@ -320,4 +325,49 @@ func TestNativeTwoHopPreparationObservationAndFinalHTTPSink(t *testing.T) {
 	if reader.reads.Load() != 2 {
 		t.Fatal("incorrect preparation/content reads")
 	}
+}
+
+// Installed native89: a download preparation conversation ran a complete
+// current check (owner serving route, worker, operation) around every frame
+// and failed one under load. Its frame checks now share one complete check for
+// NativeRecheckInterval like an approved projection's.
+func TestNativeDownloadPreparationSharesFrameChecksWithinInterval(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	source := flowSourceValue(t)
+	now := time.Now()
+	target := value.WorkerCredentialTarget{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, PodUID: nativeID, CreatedAt: now, RunUntil: now.Add(time.Minute)}
+	result, e := evidence.NewRegionalContextResult(ctx, target, &flowSource{}, time.Now)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer func() { result.Close(); result.Wait(context.Background()) }()
+	var checks atomic.Int32
+	prep, client, _ := flowOperationWithConnector(t, ctx, source, value.NativePrepare, 1, artifact.DownloadDeliveryLease{}, func(a *flowAdmission) native.Admission {
+		a.check = func(c context.Context) (value.NativeLease, error) {
+			checks.Add(1)
+			select {
+			case <-time.After(250 * time.Millisecond): // one installed complete check
+			case <-c.Done():
+				return value.NativeLease{}, c.Err()
+			}
+			return a.lease, nil
+		}
+		return a
+	})
+	started := time.Now()
+	done := flowRunWorker(t, ctx, client, target, result)
+	if _, e = prep.Prepared(ctx); e != nil {
+		t.Fatal(e)
+	}
+	if e = prep.Commit(ctx); e != nil {
+		t.Fatal(e)
+	}
+	if e = <-done; e != nil {
+		t.Fatal("preparation did not complete", e)
+	}
+	// With a complete check at every frame this preparation outlived its
+	// four-second operation; with shared frame checks it completes (13
+	// complete checks here, most in the connector relay's own path).
+	t.Logf("connector complete checks=%d elapsed=%s", checks.Load(), time.Since(started))
 }

@@ -30,6 +30,9 @@ type Handler struct {
 	peers     PeerVerifier
 	now       func() time.Time
 	semaphore chan struct{}
+	// Report, when set before serving, receives the closed stage of a refused
+	// request; never request content, keys or identities.
+	Report func(stage string)
 }
 
 func NewHandler(services []app.KeyService, peers PeerVerifier, now func() time.Time, concurrency int) (*Handler, error) {
@@ -59,20 +62,25 @@ func NewHandler(services []app.KeyService, peers PeerVerifier, now func() time.T
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store, private")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	deny := func(code int) { w.WriteHeader(code) }
+	deny := func(stage string, code int) {
+		if h != nil && h.Report != nil {
+			h.Report(stage)
+		}
+		w.WriteHeader(code)
+	}
 	if h == nil || h.peers == nil || h.now == nil || h.semaphore == nil {
-		deny(503)
+		deny("configuration", 503)
 		return
 	}
 	if r.Method != http.MethodPost || r.URL.Path != contracts.KeyServicePath || r.URL.RawPath != "" || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.IsAbs() || r.Header.Get("Content-Type") != "application/json" || r.Header.Get("Content-Encoding") != "" || r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" || r.ContentLength > contracts.KeyServiceMaxBody {
-		deny(400)
+		deny("request-shape", 400)
 		return
 	}
 	select {
 	case h.semaphore <- struct{}{}:
 		defer func() { <-h.semaphore }()
 	default:
-		deny(429)
+		deny("busy", 429)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
@@ -80,7 +88,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	control := http.NewResponseController(w)
 	deadline, _ := ctx.Deadline()
 	if control.SetReadDeadline(deadline) != nil || control.SetWriteDeadline(deadline) != nil {
-		deny(503)
+		deny("deadline", 503)
 		return
 	}
 	// Expired request deadlines must not poison a reusable keep-alive socket.
@@ -94,7 +102,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		peer, err = h.peers.Verify(r.TLS)
 	}
 	if err != nil || !peer.Valid(h.now()) {
-		deny(403)
+		deny("peer", 403)
 		return
 	}
 	wire, err := contracts.DecodeKeyRequest(http.MaxBytesReader(w, r.Body, contracts.KeyServiceMaxBody))
@@ -103,7 +111,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil || wire.Format != contracts.KeyServiceFormat {
 		r.Close = true
 		w.Header().Set("Connection", "close")
-		deny(400)
+		deny("decode", 400)
 		return
 	}
 	request := value.KeyRequest{Scope: value.KeyScope{InstallationID: wire.Scope.InstallationID, Purpose: wire.Scope.Purpose, KeyID: wire.Scope.KeyID}, AuthorityID: wire.AuthorityID, Operation: wire.Operation, Binding: wire.Binding, Input: wire.Input, Version: wire.Version}
@@ -111,22 +119,27 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		request.Sealed = artifact.SealedKey{Reference: wire.Sealed.Reference, Ciphertext: wire.Sealed.Ciphertext}
 	}
 	if !request.Valid() || (wire.Operation == "unwrap") != (wire.Sealed != nil) {
-		deny(400)
+		deny("request", 400)
 		return
 	}
 	service, ok := h.services[request.Scope]
 	if !ok {
-		deny(403)
+		deny("scope", 403)
 		return
 	}
 	result, err := service.Execute(ctx, peer, request)
 	defer clear(result.Output)
 	if err != nil {
+		stage := "unavailable"
+		code := 503
 		if errors.Is(err, app.ErrKeyDenied) {
-			deny(403)
-		} else {
-			deny(503)
+			stage, code = "denied", 403
 		}
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			stage += "/" + fixed.FixedStep()
+		}
+		deny(stage, code)
 		return
 	}
 	out := contracts.KeyServiceResponse{Format: contracts.KeyServiceFormat, Operation: request.Operation, RequestSHA256: hex.EncodeToString(result.RequestDigest[:]), ValidUntil: result.ValidUntil.UTC().Format(time.RFC3339Nano), Output: result.Output}
@@ -136,14 +149,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	b, err := json.Marshal(out)
 	defer clear(b)
 	if err != nil || len(b) > contracts.KeyServiceMaxBody || ctx.Err() != nil || !h.now().Before(result.ValidUntil) || !peer.Valid(h.now()) {
-		deny(503)
+		deny("response", 503)
 		return
 	}
 	if result.ValidUntil.Before(deadline) {
 		deadline = result.ValidUntil
 	}
 	if control.SetWriteDeadline(deadline) != nil {
-		deny(503)
+		deny("write", 503)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

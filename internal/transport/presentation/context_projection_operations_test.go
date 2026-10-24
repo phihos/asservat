@@ -177,9 +177,12 @@ func TestContextProjectionBridgePendingChargesAndNeverStartsOnPoll(t *testing.T)
 }
 
 func TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup(t *testing.T) {
-	for _, mode := range []string{"finish", "cancel", "retention", "shorter lease", "permission", "expired request", "uncertain close"} {
+	for _, mode := range []string{"finish", "cancel", "retention", "original lease expiry", "permission", "expired request", "uncertain close"} {
 		t.Run(mode, func(t *testing.T) {
 			s, f, g, _ := bridgeAuditFixture(t)
+			if mode == "original lease expiry" {
+				f.a.ValidUntil = f.a.ValidUntil.Add(-time.Second)
+			}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			g.onFinish = func() {
@@ -190,8 +193,11 @@ func TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup(t *test
 					cancel()
 				case "retention":
 					f.a.AccessUntil = f.q.Deadline.Add(-time.Second)
-				case "shorter lease":
-					f.a.ValidUntil = f.a.ValidUntil.Add(-time.Second)
+					// The current SQL retention fence is independent of the
+					// retained request observation.
+					f.permitErr = errors.New("current retention cutoff")
+				case "original lease expiry":
+					f.now = f.a.ValidUntil
 				case "permission":
 					f.permitErr = errors.New("denied")
 				case "expired request":
@@ -223,6 +229,9 @@ func TestContextProjectionBridgeRefusesAfterAuditAndJoinsOriginalCleanup(t *test
 
 func TestContextProjectionBridgeOwnerExpiryInterruptsBlockedWrite(t *testing.T) {
 	s, f, _, p := bridgeAuditFixture(t)
+	// The first authority already carries this short original cutoff; later
+	// local checks cannot renew it while the HTTP write blocks.
+	f.a.ValidUntil = time.Now().Add(500 * time.Millisecond)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	reply, err := s.Call(ctx, f, "get_file_excerpt", bridgeInput())
@@ -246,10 +255,8 @@ func TestContextProjectionBridgeOwnerExpiryInterruptsBlockedWrite(t *testing.T) 
 		<-done
 		t.Fatal("write did not begin")
 	}
-	// A separate check by the retained application owner discovers an earlier
-	// original authority lease while the public socket is already blocked.
-	// The transport request itself remains live throughout this cancellation.
-	f.a.ValidUntil = time.Now().Add(50 * time.Millisecond)
+	// The retained original authority expires while the public socket is
+	// blocked. The transport parent itself remains live throughout.
 	if err = d.CheckDisclosure(context.Background()); err != nil {
 		cancel()
 		<-done

@@ -1,0 +1,30 @@
+{
+  "design": {
+    "session": 22476,
+    "chunk": "a27df4",
+    "exitCode": 0,
+    "elapsedSeconds": 13.203,
+    "provenance": "Parent-supplied actual terminal identifier; corroborated by design/result.json and gate.log."
+  },
+  "sql": {
+    "session": 86601,
+    "chunk": "a30ac8",
+    "exitCode": 0,
+    "elapsedSeconds": 50.458,
+    "goPackageSeconds": 14.395,
+    "provenance": "Parent-supplied actual terminal identifier; corroborated by sql/result.json and custody.log."
+  },
+  "originalSQLSourceVerification": {
+    "chunk": "43edca",
+    "exitCode": 0,
+    "provenance": "Parent-supplied actual terminal identifier; original stdout was not saved. Read-only verification was repeated below."
+  },
+  "archivalSourceVerification": {
+    "chunk": "bb8232",
+    "exitCode": 0,
+    "commandRecord": "source-verification-command.json",
+    "stdout": "source-verification.json",
+    "stderr": "source-verification.err",
+    "provenance": "Observed terminal output during this archival task."
+  }
+}

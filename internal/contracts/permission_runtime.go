@@ -54,6 +54,17 @@ type PermissionDeployment struct {
 	// known only later and ride in the capacity projection; without both no
 	// deletion child runs.
 	ContextDeletion bool `json:"contextDeletion,omitempty"`
+	// Browser projects the protected browser settings into SQL (ADR-061,
+	// ADR-210): the hub-worker's browser-settings login follows the deletion
+	// logins. Without it no installed console login can begin.
+	Browser *PermissionBrowserSettings `json:"browser,omitempty"`
+}
+
+// PermissionBrowserSettings is the installed browser settings ConfigMap,
+// pinned by name and UID, and its session root.
+type PermissionBrowserSettings struct {
+	RootID   string                `json:"rootID"`
+	Settings WorkerObjectReference `json:"settings"`
 }
 
 // ContextDeletionDeployment names the evidence store the deletion child

@@ -1,0 +1,9 @@
+{
+  "command": [
+    "go",
+    "vet",
+    "./test/integration"
+  ],
+  "exit": 0,
+  "elapsedSeconds": 1.9010093720280565
+}

@@ -38,11 +38,11 @@ func NewHubWorkerAdmission(peers NativePeers, serving NativeHubServing, router *
 
 func (a *HubWorkerAdmission) OpenNative(ctx context.Context, state *tls.ConnectionState, h contracts.NativeHello) (Conversation, error) {
 	if a == nil || ctx == nil || state == nil || len(state.PeerCertificates) < 1 || h.Reference.OperationID != "" || h.Reference.Fence != 0 || len(h.WorkerLeaf) != 0 {
-		return nil, artifact.ErrInvalid
+		return nil, step("hello", artifact.ErrInvalid)
 	}
 	serving, e := a.serving.CheckOwnerServing(ctx)
 	if e != nil {
-		return nil, e
+		return nil, step("serving", e)
 	}
 	call, stop := context.WithDeadline(ctx, serving)
 	defer stop()
@@ -53,49 +53,77 @@ func (a *HubWorkerAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 		if idle.Valid(a.now()) && call.Err() == nil {
 			return nil, idle
 		}
-		return nil, artifact.ErrDownloadUnavailable
+		return nil, step("idle", artifact.ErrDownloadUnavailable)
 	}
 	if e != nil {
-		return nil, e
+		return nil, step("worker", e)
 	}
 	operation := origin.Lease.Operation
 	if operation.Path.ConnectorClusterID != operation.Path.HubClusterID {
-		return nil, artifact.ErrDownloadUnavailable
+		return nil, step("path", artifact.ErrDownloadUnavailable)
 	}
 	// The exact owning Pod/process and hub configuration, from the current
 	// serving identity; another replica's operation is never attached here.
 	pathUntil, e := a.serving.CheckNativeHub(call, operation)
 	if e != nil {
-		return nil, e
+		return nil, step("hub", e)
 	}
 	origin.Lease.Until = identity.Earlier(origin.Lease.Until, identity.Earlier(serving, pathUntil))
 	if !origin.Lease.Valid(a.now()) || call.Err() != nil {
-		return nil, artifact.ErrDownloadExpired
+		return nil, step("lease", artifact.ErrDownloadExpired)
 	}
 	h.Reference = nativeReference(operation)
 	inner, e := a.router.Attach(call, origin, h)
 	if e != nil {
-		return nil, e
+		return nil, step("attach", e)
 	}
 	gate, e := evidence.NewNativeFrameGate(inner.Gate().Context(), func(c context.Context) (value.NativeLease, error) {
 		until, e := a.serving.CheckNativeHub(c, operation)
 		if e != nil {
-			return value.NativeLease{}, e
+			return value.NativeLease{}, step("hub", e)
 		}
 		peer, e := a.peers.RecheckWorkerNative(c, state, origin)
 		if e != nil {
-			return peer, e
+			return peer, step("worker", e)
 		}
 		local, e := inner.Gate().Check(c)
-		if e != nil || !local.Operation.Equal(peer.Operation) || local.Certificate != peer.Certificate || local.Sequence != peer.Sequence {
-			return value.NativeLease{}, artifact.ErrDownloadUnavailable
+		if e != nil {
+			return value.NativeLease{}, step("operation", e)
 		}
-		local.Until = identity.Earlier(local.Until, identity.Earlier(serving, identity.Earlier(until, peer.Until)))
+		if !local.Operation.Equal(peer.Operation) || local.Certificate != peer.Certificate || local.Sequence != peer.Sequence {
+			return value.NativeLease{}, step("match", artifact.ErrDownloadUnavailable)
+		}
+		local.Until = identity.Earlier(local.Until, identity.Earlier(admissionServing(local, serving), identity.Earlier(until, peer.Until)))
 		return local, nil
 	}, a.now)
 	if e != nil {
 		inner.Close()
-		return nil, e
+		return nil, step("gate", e)
 	}
 	return &peerConversation{inner, gate}, nil
+}
+
+// nativeParkReserve is the part of the worker's single request budget kept for
+// the repeated complete admission and attachment after a parked wake-up, so
+// that a parked request which is not woken still answers with a valid idle.
+const nativeParkReserve = 2 * time.Second
+
+// ParkNative holds an idle worker's request, without a handler slot, until
+// this process publishes the worker's own operation (ADR-204 decision 9).
+// Admission of the operation and the worker's connection are otherwise two
+// independent schedules (the worker's idle retry and the human request that
+// claims the operation) that must coincide within one short request. Waking
+// grants nothing: the caller repeats the complete OpenNative admission. The
+// wait ends early enough that the original idle reply stays valid.
+func (a *HubWorkerAdmission) ParkNative(ctx context.Context, h contracts.NativeHello, idle *evidence.NativeIdle) bool {
+	if a == nil || ctx == nil || idle == nil || !idle.Valid(a.now()) || idle.Worker.Worker.Intent.ID != h.Reference.WorkerID {
+		return false
+	}
+	until := idle.Until
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	wait, stop := context.WithDeadline(ctx, until.Add(-nativeParkReserve))
+	defer stop()
+	return a.router.awaitPublished(wait, h.Reference.WorkerID)
 }

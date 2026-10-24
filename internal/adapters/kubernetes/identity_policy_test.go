@@ -66,6 +66,10 @@ func TestIdentityPolicyPinnedConfigAndCurrentRevocation(t *testing.T) {
 	settings["eligibleGroups"] = []string{"another-team"}
 	settings["revision"] = 2
 	set(settings, "identity-uid")
+	// Configuration changes are observed when the original thirty-second
+	// policy observation expires; token verification still runs on every use.
+	f.clock.Add(int64(30 * time.Second))
+	now = time.Unix(0, f.clock.Load()).UTC()
 	changed, err := reader.IdentityPolicy(context.Background(), claims.Issuer)
 	if err != nil {
 		t.Fatal(err)
@@ -81,6 +85,7 @@ func TestIdentityPolicyPinnedConfigAndCurrentRevocation(t *testing.T) {
 		t.Fatal("untrusted issuer selected installation lookup")
 	}
 	set(settings, "replacement")
+	f.clock.Add(int64(30 * time.Second))
 	if _, err = reader.IdentityPolicy(context.Background(), claims.Issuer); err == nil {
 		t.Fatal("replaced ConfigMap trusted")
 	}

@@ -1,0 +1,32 @@
+BEGIN
+SET
+ id | created_at | deadline | state | intent_acknowledged_at | request_until | write_until | initial_intent_seconds | intent_started | intent_acknowledged | outcome_set | outcome_acknowledged | intent_stored_at | intent_closed_at | intent_reads | intent_first_until | intent_second_until 
+----+------------+----------+-------+------------------------+---------------+-------------+------------------------+----------------+---------------------+-------------+----------------------+------------------+------------------+--------------+--------------------+---------------------
+(0 rows)
+
+                  id                  |    lane    |        operation_name        |         created_at          |         request_until         |          write_until          | intent_started | intent_acknowledged | outcome_set | outcome_acknowledged 
+--------------------------------------+------------+------------------------------+-----------------------------+-------------------------------+-------------------------------+----------------+---------------------+-------------+----------------------
+ 175012bb-a46e-420e-a8f3-14bc58ab3f7f | identity   | connector_process_enrollment | 2026-10-20T16:36:59.526815Z | 2026-10-20 16:37:04.022495+00 | 2026-10-20 16:37:29.526815+00 | t              | t                   | t           | t
+ ba621e6e-512a-44bc-9abb-4c1712ef8337 | identity   | connector_client_certificate | 2026-10-20T16:36:59.787223Z | 2026-10-20 16:37:04.022495+00 | 2026-10-20 16:37:29.787223+00 | t              | t                   | t           | t
+ f0597498-e8ca-4752-adf6-5597abdda036 | identity   | connector_server_certificate | 2026-10-20T16:37:01.432784Z | 2026-10-20 16:37:06.397277+00 | 2026-10-20 16:37:31.432784+00 | t              | t                   | t           | t
+ 76107e0f-277d-46d3-954b-89041dd44900 | normal     | initialize_processing        | 2026-10-20T16:41:42.475973Z | 2026-10-20 16:41:47.114476+00 | 2026-10-20 16:42:12.475973+00 | t              | t                   | t           | t
+ 1945858c-48db-4db8-81af-1862cb8d5422 | normal     | preview_capture              | 2026-10-20T16:41:43.100762Z | 2026-10-20 16:41:48.095575+00 | 2026-10-20 16:42:13.100762+00 | t              | t                   | t           | t
+ 8680fccc-6a22-4976-b848-db7d1c70399e | normal     | request_capture              | 2026-10-20T16:41:44.782233Z | 2026-10-20 16:41:49.488899+00 | 2026-10-20 16:42:14.782233+00 | t              | t                   | t           | t
+ 991cd29b-91a8-4483-a7e2-78b6f31967ae | resolution | resolve_capture_request      | 2026-10-20T16:41:47.671496Z | 2026-10-20 16:41:52.666442+00 | 2026-10-20 16:42:17.671496+00 | t              | t                   | t           | t
+ b2d63bdf-b4ba-496f-90c8-ff1ad51a526b | normal     | preview_capture              | 2026-10-20T16:41:50.333235Z | 2026-10-20 16:41:55.328216+00 | 2026-10-20 16:42:20.333235+00 | t              | t                   | t           | t
+ 6b3c0da4-f4fa-4070-86fa-d7b314be5f61 | normal     | request_capture              | 2026-10-20T16:41:54.278162Z | 2026-10-20 16:41:59.239029+00 | 2026-10-20 16:42:24.278162+00 | t              | t                   | t           | t
+ c40bd11c-fc52-45f7-8e5c-7571d3ee2b54 | resolution | resolve_capture_request      | 2026-10-20T16:41:55.808132Z | 2026-10-20 16:42:00.803305+00 | 2026-10-20 16:42:25.808132+00 | t              | t                   | t           | t
+ 9b0e6683-afc0-47ed-8ec0-92919c7c7ad2 | normal     | preview_capture              | 2026-10-20T16:41:58.835057Z | 2026-10-20 16:42:03.830242+00 | 2026-10-20 16:42:28.835057+00 | t              | t                   | t           | t
+ bd6c0878-aa97-48aa-a88e-f46de5a044dc | normal     | preview_capture              | 2026-10-20T16:42:03.681045Z | 2026-10-20 16:42:08.675263+00 | 2026-10-20 16:42:33.681045+00 | t              | t                   | t           | t
+ fd347f31-f5f9-4354-ba77-085c7174a5a4 | normal     | request_capture              | 2026-10-20T16:42:05.183623Z | 2026-10-20 16:42:09.977848+00 | 2026-10-20 16:42:35.183623+00 | t              | t                   | t           | t
+(13 rows)
+
+ capture_id | phase | created_at | not_before | not_after | started_at | acquired_at | completed_at 
+------------+-------+------------+------------+-----------+------------+-------------+--------------
+(0 rows)
+
+ state | count 
+-------+-------
+(0 rows)
+
+COMMIT

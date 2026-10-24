@@ -93,12 +93,28 @@ permission/accepted-capture state before disposition. SQL33/36 keep original
 blueprints immutable, closure one-way, fences finite and live deletion denied.
 No grant permits new capture, custody or audit effects.
 
-The inventory is now 33 installer purposes, 28 hub purposes. Each new hub role
-has five total connections and a one-connection runtime pool; no existing role
-or process envelope changes. Global installation capacity must account for the
-ten additional role connections. Cleanup/capacity credentials still stay out
-of the hub projection. Exact-count and layout-digest validation reject old
-incomplete states/manifests rather than upgrading them during runtime startup.
+Under [ADR-215](../decisions/215-hub-metadata-reader-role.md), the permission,
+retention, storage, capture-progress, case, processing and catalog readers share
+one `hub-metadata-read` credential and pool. Their typed methods and transaction
+checks remain separate. Its seven-connection maximum preserves their former
+aggregate concurrency; it remains cold under the unchanged 32-connection hub
+governor. It has the exact union of the former metadata grants, including their
+existing lock columns, without evidence-key, acquisition, publication, audit-write
+or deletion privileges. Those duties retain their credentials.
+
+Under [ADR-217](../decisions/217-api-execution-role.md), API execution read,
+preparation and recording share one `api-execution` credential and cold pool
+with `MaxConns=3`, the former aggregate limit. One adapter supplies the three
+typed runner ports; every SQL method retains its current effect checks. The
+credential is the exact old grant union, without capture admission, audit,
+publication, key or deletion privileges. The process governor remains 32.
+
+The fixed inventory contains 79 public-runtime credentials, including 44 hub
+entries. These are credential counts, not simultaneously open connections.
+Exact-count and layout-digest validation reject unsupported development
+states/manifests before effects; startup cannot adopt or migrate retained state.
+The qualification below records the earlier assembly. Current results are in
+[implementation progress](../implementation-progress.md).
 
 The [component gate](../../test/results/public-context-assembly-component-1/result.json)
 passes focused assembly, original-layout rejection, grant-plan and surrounding

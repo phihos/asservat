@@ -1,0 +1,67 @@
+[
+  {
+    "label": "postmortem-readiness",
+    "argv": [
+      "docker",
+      "exec",
+      "-i",
+      "asservat-context-84bi0pmu-postgres",
+      "psql",
+      "-X",
+      "-w",
+      "-U",
+      "postgres",
+      "-d",
+      "custody_test",
+      "-v",
+      "ON_ERROR_STOP=1",
+      "-P",
+      "pager=off",
+      "-f",
+      "-"
+    ],
+    "exit": 0,
+    "startedUnix": 1792698353.6156476,
+    "finishedUnix": 1792698353.688076
+  },
+  {
+    "label": "regional-target-namespace",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native52-private/cluster-1-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-84bi0pmu-1",
+      "--request-timeout=10s",
+      "get",
+      "namespace",
+      "regional-apps",
+      "-o",
+      "jsonpath={.metadata.name} {.metadata.uid} {.metadata.creationTimestamp} {.metadata.labels.team}"
+    ],
+    "exit": 0,
+    "startedUnix": 1792698353.688078,
+    "finishedUnix": 1792698353.7517989
+  },
+  {
+    "label": "regional-target-deployment",
+    "argv": [
+      "kubectl",
+      "--kubeconfig",
+      "/home/phil/.cache/asservat-build/recovered-c62e02ac/native52-private/cluster-1-kubeconfig.yaml",
+      "--context",
+      "kind-asservat-context-84bi0pmu-1",
+      "--request-timeout=10s",
+      "get",
+      "deployment",
+      "regional-app",
+      "-n",
+      "regional-apps",
+      "-o",
+      "jsonpath={.metadata.name} {.metadata.uid} {.metadata.creationTimestamp} {.status.readyReplicas}"
+    ],
+    "exit": 0,
+    "startedUnix": 1792698353.7518005,
+    "finishedUnix": 1792698353.8152888
+  }
+]

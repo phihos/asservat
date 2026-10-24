@@ -244,13 +244,13 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	in := &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes}
 	r.closers = append(r.closers, in.closeHTTP)
 	control := cfg.NamespaceRef{Name: c.Namespace.Name, UID: c.Namespace.UID}
-	observerConfig := in.kubernetes("kube-observer.token")
+	observerConfig := kube.WithOpeningBurst(in.kubernetes("kube-observer.token"))
 	observerConfig.Wrap(r.observerStats.wrap)
 	observer, err := kube.NewPermissionClient(observerConfig, c.ClusterID, control, time.Now)
 	if err != nil {
 		return r, mounts.ErrUnavailable
 	}
-	probeConfig := in.kubernetes("kube-probe.token")
+	probeConfig := kube.WithOpeningBurst(in.kubernetes("kube-probe.token"))
 	probeConfig.Wrap(r.probeStats.wrap)
 	probe, err := kube.NewPermissionClient(probeConfig, c.ClusterID, control, time.Now)
 	if err != nil {
@@ -318,7 +318,7 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 	r.closers = append(r.closers, r.credentials.Close)
 	if c.APIContext != nil {
 		var closers []func()
-		r.context, closers, err = newRegionalContext(startup, c, in, podUID, observer, probe, source, guard, lifecycle, r.credentials)
+		r.context, closers, err = newRegionalContext(startup, c, in, podUID, plan, sourcePlan, binding, lifecycle, r.credentials)
 		r.closers = append(r.closers, closers...)
 		if err != nil {
 			return r, mounts.ErrUnavailable

@@ -194,6 +194,21 @@ func keyServiceAcquisition(ctx context.Context, c contracts.KeyServiceDeployment
 	if err != nil {
 		return nil, none, mounts.ErrUnavailable
 	}
+	plans, err := postgres.NewSharedContextQueryPlans(ctx, pool, c.PermissionRootID, c.InstallationID, profile)
+	if err != nil {
+		return nil, none, mounts.ErrUnavailable
+	}
+	queries, err := postgres.NewContextQueries(ctx, pool, c.PermissionRootID, postgres.EffectTransactionGuards{Retention: retention, Recovery: recovery}, plans, nil)
+	if err != nil {
+		return nil, none, mounts.ErrUnavailable
+	}
+	if _, err = postgres.AttachProjectionWorkers(queries, profile); err != nil {
+		return nil, none, mounts.ErrUnavailable
+	}
+	projection, err := postgres.NewProjectionKeys(queries, scope)
+	if err != nil || native.WithProjectionKeys(projection) != nil {
+		return nil, none, mounts.ErrUnavailable
+	}
 	return native, catalog, nil
 }
 
@@ -293,6 +308,7 @@ func NewKeyService(ctx context.Context, files *os.Root) (k *KeyService, err erro
 	if k.handler, err = keyservice.NewHandler([]authapp.KeyService{{Scope: scope, Authority: authority, Backend: backend, Now: time.Now}}, mtls.KeyPeerUnion{KeyClients: keyClients, Connectors: connectors}, time.Now, c.Concurrency); err != nil {
 		return k, mounts.ErrUnavailable
 	}
+	k.handler.Report = eventLog(os.Stderr, "key service refused")
 	// The TLS layer accepts key-client and connector client chains; the
 	// handler's peer union then selects exactly one verifier per leaf.
 	clients := keyRoots.Clone()

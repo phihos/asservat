@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -25,6 +26,10 @@ type QueryTargets interface {
 	ResolveWorkload(context.Context, targets.WorkloadRequest) (targets.PodResolution, error)
 	ResolvePod(context.Context, targets.Request) (targets.PodResolution, error)
 }
+
+// answerReporter optionally receives the region's fixed answer step
+// durations; it never sees targets, peers or error text.
+type answerReporter interface{ ReportAnswer(string) }
 
 // Closed failure labels; raw errors never cross the exchange.
 var queryFailures = []struct {
@@ -97,18 +102,28 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 		return time.Time{}, e
 	}
 	defer clear(payload)
+	defer markQuery(ctx, "q-total", time.Now())
+	pulled := time.Now()
 	if e = s.pullSource(call); e != nil {
+		s.record(streamHubQuerySource, streamErrorReason(e))
 		return time.Time{}, fleet.ErrUnavailable
 	}
+	markQuery(ctx, "q-source", pulled)
+	checked := time.Now()
 	receiver, e := s.check(call)
+	markQuery(ctx, "q-check", checked)
 	if e != nil || !receiver.Valid(time.Now()) || receiver.Channel != s.channel {
+		s.record(streamHubQueryCheck, queryCheckReason(e))
 		s.interruptAt(streamSendPeer, streamPeerInvalid)
 		return time.Time{}, fleet.ErrUnavailable
 	}
-	if e = s.Send(call, contracts.APIContextFrame{Kind: contracts.APIContextQueryFrame, Payload: payload}); e != nil {
+	sentUntil, e := s.send(call, contracts.APIContextFrame{Kind: contracts.APIContextQueryFrame, Payload: payload})
+	if e != nil {
 		return time.Time{}, e
 	}
-	f, e := s.Receive(call)
+	answered := time.Now()
+	f, receivedUntil, e := s.receive(call)
+	markQuery(ctx, "q-answer", answered)
 	if e != nil {
 		return time.Time{}, e
 	}
@@ -118,14 +133,78 @@ func (s *frameStream) query(ctx context.Context, method string, in, out any) (ti
 		s.interruptAt(streamReceiveResult, streamProtocol)
 		return time.Time{}, contracts.ErrAPIContextProtocol
 	}
+	var answerError error
 	if reply.Failure != "" {
-		return time.Time{}, errQueryAnswer{queryFailureError(reply.Failure)}
+		for _, failure := range queryFailures {
+			if reply.Failure == failure.label {
+				answerError = errQueryAnswer{failure.err}
+				break
+			}
+		}
 	}
-	if decodeOperationBody(reply.Body, out) != nil {
+	if reply.Failure != "" && answerError == nil || reply.Failure == "" && decodeOperationBody(reply.Body, out) != nil {
 		s.interruptAt(streamReceiveResult, streamProtocol)
 		return time.Time{}, contracts.ErrAPIContextProtocol
 	}
-	return receiver.ValidUntil, nil
+	// Both finite frame calls have joined. A matched answer also acknowledges
+	// the outbound query; only now can either hub socket timer leave this phase.
+	until := identity.Earlier(receiver.ValidUntil, identity.Earlier(sentUntil, receivedUntil))
+	if e := s.completeQuery(call, until); e != nil {
+		return time.Time{}, e
+	}
+	if answerError != nil {
+		return time.Time{}, answerError
+	}
+	return until, nil
+}
+
+// completeQuery returns a semantically acknowledged hub query to the exact
+// original passive residence. It renews no answer, caller or work authority.
+// Holding mu excludes new logical frame/source I/O across both deadline hooks.
+// The sole bounded background reader remains active to detect EOF.
+func (s *frameStream) completeQuery(ctx context.Context, until time.Time) error {
+	s.mu.Lock()
+	passiveUntil, bounded := s.ctx.Deadline()
+	if d, ok := ctx.Deadline(); ok {
+		until = identity.Earlier(until, d)
+	}
+	live := func() bool {
+		now := time.Now()
+		return bounded && s.sources != nil && !s.closed && s.first.Load() == nil &&
+			!s.leaseStarted && s.reads == 0 && s.writes == 0 &&
+			ctx.Err() == nil && s.ctx.Err() == nil &&
+			now.Before(until) && now.Before(passiveUntil)
+	}
+	stage, reason := streamReceiveResult, streamUnavailable
+	ok := live()
+	if ok {
+		stage = streamReceiveDeadline
+		if e := s.readDeadline(passiveUntil); e != nil {
+			ok, reason = false, streamErrorReason(e)
+		} else {
+			ok = live()
+		}
+	}
+	if ok {
+		stage = streamSendDeadline
+		if e := s.writeDeadline(passiveUntil); e != nil {
+			ok, reason = false, streamErrorReason(e)
+		} else {
+			ok = live()
+		}
+	}
+	if !ok {
+		// Mark terminal while still owning admission, including when a deadline
+		// hook fails or cancellation races the transition. Never revive a stream.
+		s.closed = true
+		s.cancel()
+	}
+	s.mu.Unlock()
+	if !ok {
+		s.interruptAt(stage, reason)
+		return fleet.ErrUnavailable
+	}
+	return nil
 }
 
 // answerQuery is the region's reply to one hub query while awaiting work. The
@@ -144,14 +223,33 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	if r, ok := s.targets.(answerReporter); ok {
+		var times *auditapp.StepTimes
+		call, times = auditapp.WithStepTimes(call)
+		defer func() { r.ReportAnswer(times.String()) }()
+	}
+	checked := time.Now()
 	owner, e := s.check(call)
+	auditapp.MarkStep(call, "r-check", checked)
 	if e != nil || !owner.Valid(time.Now()) || owner.Channel != s.channel {
+		stage := streamRegionalQueryOwner
+		var step interface{ ReceiverCheckStep() string }
+		if errors.As(e, &step) {
+			switch step.ReceiverCheckStep() {
+			case "local":
+				stage = streamRegionalQueryLocal
+			case "owner":
+				stage = streamRegionalQueryOwnerAuth
+			}
+		}
+		s.record(stage, queryCheckReason(e))
 		return fleet.ErrUnavailable
 	}
 	until, _ := call.Deadline()
 	bounded, stop := context.WithDeadline(call, identity.Earlier(until, owner.ValidUntil))
 	defer stop()
 	var out targets.PodResolution
+	resolved := time.Now()
 	switch q.Method {
 	case queryResolveWorkload:
 		var r targets.WorkloadRequest
@@ -168,6 +266,7 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	default:
 		return contracts.ErrAPIContextProtocol
 	}
+	auditapp.MarkStep(call, "r-resolve", resolved)
 	reply := contracts.APIContextOperationReply{Format: contracts.APIContextExchangeFormat, Sequence: seq, Method: q.Method}
 	if e != nil {
 		reply.Failure = queryFailureLabel(e)
@@ -179,5 +278,20 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		return e
 	}
 	defer clear(encoded)
-	return s.writeSourceFrame(bounded, contracts.APIContextFrame{Kind: contracts.APIContextAnswerFrame, Payload: encoded})
+	written := time.Now()
+	e = s.writeSourceFrame(bounded, contracts.APIContextFrame{Kind: contracts.APIContextAnswerFrame, Payload: encoded})
+	auditapp.MarkStep(call, "r-write", written)
+	if e != nil {
+		s.record(streamRegionalQueryWrite, streamErrorReason(e))
+	}
+	return e
+}
+
+// queryCheckReason classifies a failed current check; a nil error means the
+// returned receiver itself was expired or for another channel.
+func queryCheckReason(e error) streamReason {
+	if e == nil {
+		return streamPeerInvalid
+	}
+	return streamErrorReason(e)
 }

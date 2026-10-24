@@ -1,0 +1,31 @@
+{
+  "sourceCommit": "d47f9a3caf08b390793357d0dea9a31409d6d529",
+  "ownedSourceHashes": {
+    "test/integration/download_sessions_test.go": "8e40aea089eac624bf45fa611bc744cce17995f46321887c197d0ce631c80a98",
+    "test/integration/installed_download_preparation_test.go": "8439026d75059df991638a9eb41c6c7ca8bff3ebd818c84e37e4e44eb1eea43a"
+  },
+  "compile": {
+    "session": 12325,
+    "terminalChunk": "719783",
+    "exitCode": 0,
+    "packageSeconds": 0.015,
+    "scope": "compile only, no tests"
+  },
+  "sql": {
+    "session": 23258,
+    "terminalChunk": "8b7d6c",
+    "exitCode": 0,
+    "wrapperSeconds": 43.882,
+    "packageSeconds": 3.771,
+    "selectedSubtestSeconds": 2.29,
+    "firstJobBoundaryMilliseconds": 184.795744,
+    "sourceHashesVerified": 2754,
+    "broaderFrozenSources": 3778
+  },
+  "native55Reproduced": false,
+  "installedDownloadQualified": false,
+  "provenance": {
+    "compile": "download-preparation-claim cache, captured by review_pr41",
+    "sql": "download-preparation-claim-sql cache, run and cleanup read-back by root"
+  }
+}

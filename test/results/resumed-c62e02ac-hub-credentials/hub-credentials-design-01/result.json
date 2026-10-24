@@ -1,0 +1,14 @@
+{
+  "argv": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "spec-check",
+    "architecture-check",
+    "design-check",
+    "go-architecture-check"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 11.141939163208008,
+  "sourceCount": 3791,
+  "changedSources": []
+}

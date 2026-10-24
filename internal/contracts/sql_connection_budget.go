@@ -18,16 +18,18 @@ const SQLMaintenanceReserve = 4
 var ErrSQLConnectionBudget = errors.New("PostgreSQL connection budget insufficient")
 
 // SQLConnectionCompartment is one fixed process kind. Every listed purpose
-// owns one MaxConns=1 pool per process; serial installer phases can share one
+// owns one connection per process unless PoolCapacity records shared pool maxima;
+// serial installer phases can share one
 // listed allowance only when the preceding pool has closed. RetainedProcesses
 // is the selected worst case including rollout surge and closing processes. MaxOpen, when set,
-// is the process's connection governor cap (ADR-177): its purposes keep their
-// own logins, but at most MaxOpen of them hold a physical connection at once.
+// is the process's connection governor cap (ADR-177): at most MaxOpen physical
+// connections exist at once, independently of the number of credentials.
 type SQLConnectionCompartment struct {
 	Name              string
 	Purposes          []string
 	RetainedProcesses int
 	MaxOpen           int
+	PoolCapacity      int // compiled aggregate pool maxima; zero means one per purpose
 	Hub               bool
 }
 
@@ -35,6 +37,9 @@ type SQLConnectionCompartment struct {
 func (c SQLConnectionCompartment) open() int {
 	if c.MaxOpen > 0 {
 		return c.MaxOpen
+	}
+	if c.PoolCapacity > 0 {
+		return c.PoolCapacity
 	}
 	return len(c.Purposes)
 }
@@ -82,23 +87,21 @@ func (e *SQLConnectionBudgetError) Unwrap() error { return ErrSQLConnectionBudge
 // the public hub and owner identity per hub process, and configuration,
 // capacity and capture-cleanup purposes per hub-worker process. The worst case
 // includes the downloads logins of ADR-204 (worker configuration acceptance
-// and acquisition unwraps) and the context deletion logins of ADR-205, which
-// open only with their deployment sections. One continuation may overlap the
-// retained runtime graph: four administrator pools and an accepted-owner reader
-// remain separately budgeted, without spending verifier or maintenance headroom.
+// and acquisition unwraps), the context deletion logins of ADR-205 and the
+// browser settings observer of ADR-210, which open only with their deployment
+// sections. One continuation may overlap the retained runtime graph: four
+// administrator pools and an accepted-owner reader remain separately budgeted,
+// without spending verifier or maintenance headroom.
 func InstalledSQLConnectionPlan(hubProcesses int) (SQLConnectionPlan, error) {
 	if hubProcesses < 1 || hubProcesses > PublicRuntimeRetainedHubProcesses {
 		return SQLConnectionPlan{}, ErrSQLConnectionBudget
 	}
 	hub := append(PublicRuntimeHubRolePurposes(), OwnerIdentityRolePurposes()...)
 	worker := append(ConfigurationRuntimeRolePurposes(), "capacity", "capacity-capture")
-	worker = append(worker, PublicRuntimePermissionPurposes()...)
-	worker = append(worker, PublicRuntimeRetentionPurposes()...)
-	worker = append(worker, PublicRuntimeWorkerConfigurationPurposes()...)
-	worker = append(worker, PublicRuntimeContextDeletionPurposes()...)
+	worker = append(worker, PermissionProjectionPurposes(true, true, true, true)...)
 	worker = append(worker, PublicRuntimeCaptureCleanupPurposes()...)
 	return SQLConnectionPlan{Compartments: []SQLConnectionCompartment{
-		{Name: "hub", Purposes: hub, RetainedProcesses: hubProcesses, MaxOpen: SQLConnectionsPerHubReplica, Hub: true},
+		{Name: "hub", Purposes: hub, RetainedProcesses: hubProcesses, MaxOpen: SQLConnectionsPerHubReplica, PoolCapacity: SQLConnectionsPerHubReplica, Hub: true},
 		{Name: "hub-worker", Purposes: worker, RetainedProcesses: PublicRuntimeRetainedWorkerProcesses},
 		{Name: "hub-federation", Purposes: PublicRuntimeFederationPurposes(), RetainedProcesses: PublicRuntimeRetainedFederationProcesses},
 		{Name: "publisher", Purposes: PublicRuntimePublisherPurposes(), RetainedProcesses: PublicRuntimeRetainedPublisherProcesses},
@@ -121,7 +124,11 @@ func (p SQLConnectionPlan) Validate(allocation int, server SQLServerCapacity) (S
 		return out, ErrSQLConnectionBudget
 	}
 	for _, c := range p.Compartments {
-		if c.Name == "" || c.RetainedProcesses < 1 || len(c.Purposes) == 0 || c.MaxOpen < 0 || c.MaxOpen > len(c.Purposes) {
+		capacity := c.PoolCapacity
+		if capacity == 0 {
+			capacity = len(c.Purposes)
+		}
+		if c.Name == "" || c.RetainedProcesses < 1 || len(c.Purposes) == 0 || c.PoolCapacity < 0 || capacity < len(c.Purposes) || c.MaxOpen < 0 || c.MaxOpen > capacity {
 			return out, ErrSQLConnectionBudget
 		}
 		unique := slices.Clone(c.Purposes)

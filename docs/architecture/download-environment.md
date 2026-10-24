@@ -4,6 +4,15 @@
 
 `CurrentDownloadEnvironment` takes an already-authorized `ContextDownloadEvidence` and current principal. It resolves the protected policy, current recovery and SQL processing state, then independently rechecks all three after blocking work. The returned proof retains the earliest original identity/catalog/access/deletion/source/recovery/caller deadline and never exceeds five seconds. Empty permitted sets deny. A client identity allowlist alone does not provide disclosure permission.
 
+[ADR-214](../decisions/214-bounded-download-policy-observation.md) changes the
+installed download policy reader to share one completed protected observation for
+at most 60 seconds from its original read start. The two policy lookups normally
+reuse that same observation; every caller still selects its exact allowed path.
+Current recovery and processing reads, dynamic proof bounds and original caller
+deadlines remain unchanged. Refresh failures cannot reuse an expired observation.
+This download-only view does not authorize processing administration: the raw
+source and operator/capacity policy checks retain their five-second contract.
+
 The private `download-environment.json` document is bounded to 128 KiB and closed by [its schema](../../specs/contracts/download-environment.schema.json). The Kubernetes source uses the existing native ConfigMap admission protection, independently pinned object/namespace/policy/binding identities, denied non-administrator probe, exact two reads and final guard. Complete paths are separately supplied by accepted installation composition; the ConfigMap may permit/remove one, but cannot invent a worker profile, hub pool or processing location. The source does not accept a recovery transition or a backend qualification.
 
 `ProcessingConfiguration` records independently accepted finite business/history and release-audit backing; `ProcessingChanges` owns explicit current privacy-operator decisions. `ProcessingReads` only reads initialized durable decisions. Source/configuration, decision, audit writer and independent acknowledgement use separate credentials. A captured artifact's immutable projection is created inside verified catalog publication. There is no allowing lineage backfill. The bounded reader follows at most 64 nodes, 16 parents each and 1,024 rules; missing nodes, cycles, unsupported origins and incomplete state deny. Exact artifact and workload/original-acquisition-time rules cover current and future matching artifacts immediately at read time.

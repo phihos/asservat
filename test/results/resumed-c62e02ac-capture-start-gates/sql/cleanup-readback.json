@@ -1,0 +1,32 @@
+[
+  {
+    "argv": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-custody-_y24qia7-postgres"
+    ],
+    "exitCode": 1,
+    "absent": true
+  },
+  {
+    "argv": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-custody-_y24qia7-s3"
+    ],
+    "exitCode": 1,
+    "absent": true
+  },
+  {
+    "argv": [
+      "docker",
+      "network",
+      "inspect",
+      "asservat-custody-_y24qia7"
+    ],
+    "exitCode": 1,
+    "absent": true
+  }
+]

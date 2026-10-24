@@ -1,0 +1,23 @@
+{
+  "runId": "context-hsp75ign",
+  "clusters": [
+    "asservat-context-hsp75ign-0",
+    "asservat-context-hsp75ign-1"
+  ],
+  "containers": [
+    "asservat-context-hsp75ign-s3",
+    "asservat-context-hsp75ign-kms",
+    "asservat-context-hsp75ign-postgres",
+    "asservat-context-hsp75ign-tls",
+    "asservat-context-hsp75ign-keycloak",
+    "asservat-context-hsp75ign-0-seed"
+  ],
+  "volumes": [
+    "asservat-context-hsp75ign-0-var"
+  ],
+  "image": "asservat-context-worker:context-hsp75ign",
+  "networks": [
+    "asservat-context-hsp75ign",
+    "asservat-context-hsp75ign-kind"
+  ]
+}

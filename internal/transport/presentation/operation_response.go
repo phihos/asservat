@@ -4,6 +4,8 @@ import (
 	"context"
 	"net/http"
 	"time"
+
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // WriteOperationResponse retains the original delivery deadline through a
@@ -15,7 +17,7 @@ func WriteOperationResponse(ctx context.Context, w http.ResponseWriter, status i
 		return false, ErrOperationDelivery
 	}
 	deadline, ok := ctx.Deadline()
-	if !ok || until.After(deadline) || until.After(time.Now().Add(5*time.Second)) {
+	if !ok || until.After(deadline) || until.After(time.Now().Add(identity.EvidenceReadRequestWindow)) {
 		return false, ErrOperationDelivery
 	}
 	call, cancel := context.WithDeadline(ctx, until)

@@ -55,8 +55,8 @@ func (*journeyDownloadDelivery) Certificate() value.WorkerCertificate {
 	return value.WorkerCertificate{DER: []byte{42}}
 }
 func (d *journeyDownloadDelivery) Close() { d.closed++ }
-func (f *journeyDownloadProbe) BeginWorkerEnrollment(c context.Context, i, s, w string, token, csr []byte) (evidence.WorkerEnrollmentDelivery, error) {
-	f.accept("BeginWorkerEnrollment", c, i, s, w, token, csr)
+func (f *journeyDownloadProbe) BeginAcquisitionEnrollment(c context.Context, i string, p value.AcquisitionParent, w string, token, csr []byte) (evidence.WorkerEnrollmentDelivery, error) {
+	f.accept("BeginAcquisitionEnrollment", c, i, p, w, token, csr)
 	return f.delivery, f.err
 }
 func (f *journeyDownloadProbe) CheckDownloadCurrent(c context.Context, i identities.CurrentIdentity, s artifact.DownloadScope) (artifact.DownloadAuthority, error) {
@@ -67,16 +67,16 @@ func (f *journeyDownloadProbe) ReadWorkerEnrollmentProof(c context.Context, s, w
 	f.accept("ReadWorkerEnrollmentProof", c, s, w, k)
 	return value.WorkerEnrollmentProof{PublicKeyDigest: artifact.Digest{4}}, f.err
 }
-func (f *journeyDownloadProbe) ClaimWorkerEnrollment(c context.Context, p value.WorkerEnrollmentProof, a artifact.DownloadAuthority) (value.WorkerEnrollment, auditvalue.Receipt, bool, error) {
-	f.accept("ClaimWorkerEnrollment", c, p, a)
+func (f *journeyDownloadProbe) ClaimWorkerEnrollment(c context.Context, p value.WorkerEnrollmentProof) (value.WorkerEnrollment, auditvalue.Receipt, bool, error) {
+	f.accept("ClaimWorkerEnrollment", c, p)
 	return value.WorkerEnrollment{PublicKeyDigest: artifact.Digest{5}}, auditvalue.Receipt{}, true, f.err
 }
-func (f *journeyDownloadProbe) PrepareWorkerCertificate(c context.Context, p value.WorkerEnrollmentProof, a artifact.DownloadAuthority) (value.WorkerCertificateProgress, error) {
-	f.accept("PrepareWorkerCertificate", c, p, a)
+func (f *journeyDownloadProbe) PrepareWorkerCertificate(c context.Context, p value.WorkerEnrollmentProof) (value.WorkerCertificateProgress, error) {
+	f.accept("PrepareWorkerCertificate", c, p)
 	return value.WorkerCertificateProgress{MaySign: true}, f.err
 }
-func (f *journeyDownloadProbe) StoreWorkerCertificate(c context.Context, a value.WorkerCertificateAttempt, v value.WorkerCertificate, p artifact.DownloadAuthority) error {
-	f.accept("StoreWorkerCertificate", c, a, v, p)
+func (f *journeyDownloadProbe) StoreWorkerCertificate(c context.Context, a value.WorkerCertificateAttempt, v value.WorkerCertificate) error {
+	f.accept("StoreWorkerCertificate", c, a, v)
 	return f.err
 }
 func (f *journeyDownloadProbe) WriteWorkerEnrollment(c context.Context, v value.WorkerEnrollment) (auditvalue.Receipt, error) {
@@ -103,8 +103,8 @@ func (f *journeyDownloadProbe) SignWorkerCertificate(c context.Context, a value.
 	f.accept("SignWorkerCertificate", c, a, csr)
 	return value.WorkerCertificate{DER: []byte{11}}, f.err
 }
-func (f *journeyDownloadProbe) ActivateWorkerCertificate(c context.Context, p value.WorkerEnrollmentProof, a value.WorkerCertificateAttempt, v artifact.DownloadAuthority) (value.WorkerCertificate, error) {
-	f.accept("ActivateWorkerCertificate", c, p, a, v)
+func (f *journeyDownloadProbe) ActivateWorkerCertificate(c context.Context, p value.WorkerEnrollmentProof, a value.WorkerCertificateAttempt) (value.WorkerCertificate, error) {
+	f.accept("ActivateWorkerCertificate", c, p, a)
 	return value.WorkerCertificate{DER: []byte{12}}, f.err
 }
 func (f *journeyDownloadProbe) EnrollmentKey(csr []byte) (artifact.Digest, error) {
@@ -123,7 +123,6 @@ func TestPublicJourneyDownloadDiagnosticsOriginalFacets(t *testing.T) {
 	source := identities.CurrentIdentity(nil)
 	scope := artifact.DownloadScope{RootID: "original-scope"}
 	proof := value.WorkerEnrollmentProof{PublicKeyDigest: artifact.Digest{31}}
-	auth := artifact.DownloadAuthority{Scope: scope}
 	en := value.WorkerEnrollment{PublicKeyDigest: artifact.Digest{32}}
 	attempt := value.WorkerCertificateAttempt{}
 	cert := value.WorkerCertificate{DER: []byte("private-original-certificate")}
@@ -138,8 +137,8 @@ func TestPublicJourneyDownloadDiagnosticsOriginalFacets(t *testing.T) {
 		call  func(journeyEnrollmentPorts) ([]any, error)
 		want  []any
 	}{
-		{"BeginWorkerEnrollment", 0, []any{ctx, "installation", "session", "worker", token, csr}, func(p journeyEnrollmentPorts) ([]any, error) {
-			v, e := p.BeginWorkerEnrollment(ctx, "installation", "session", "worker", token, csr)
+		{"BeginAcquisitionEnrollment", 0, []any{ctx, "installation", value.AcquisitionParent{Purpose: value.AcquisitionDownload, ID: "session"}, "worker", token, csr}, func(p journeyEnrollmentPorts) ([]any, error) {
+			v, e := p.BeginAcquisitionEnrollment(ctx, "installation", value.AcquisitionParent{Purpose: value.AcquisitionDownload, ID: "session"}, "worker", token, csr)
 			return []any{v}, e
 		}, []any{delivery}},
 		{"CheckDownloadCurrent", 1, []any{ctx, source, scope}, func(p journeyEnrollmentPorts) ([]any, error) {
@@ -150,16 +149,16 @@ func TestPublicJourneyDownloadDiagnosticsOriginalFacets(t *testing.T) {
 			v, e := p.ReadWorkerEnrollmentProof(ctx, "session", "worker", artifact.Digest{3})
 			return []any{v}, e
 		}, []any{value.WorkerEnrollmentProof{PublicKeyDigest: artifact.Digest{4}}}},
-		{"ClaimWorkerEnrollment", 3, []any{ctx, proof, auth}, func(p journeyEnrollmentPorts) ([]any, error) {
-			v, r, b, e := p.ClaimWorkerEnrollment(ctx, proof, auth)
+		{"ClaimWorkerEnrollment", 3, []any{ctx, proof}, func(p journeyEnrollmentPorts) ([]any, error) {
+			v, r, b, e := p.ClaimWorkerEnrollment(ctx, proof)
 			return []any{v, r, b}, e
 		}, []any{value.WorkerEnrollment{PublicKeyDigest: artifact.Digest{5}}, receipt, true}},
-		{"PrepareWorkerCertificate", 4, []any{ctx, proof, auth}, func(p journeyEnrollmentPorts) ([]any, error) {
-			v, e := p.PrepareWorkerCertificate(ctx, proof, auth)
+		{"PrepareWorkerCertificate", 4, []any{ctx, proof}, func(p journeyEnrollmentPorts) ([]any, error) {
+			v, e := p.PrepareWorkerCertificate(ctx, proof)
 			return []any{v}, e
 		}, []any{value.WorkerCertificateProgress{MaySign: true}}},
-		{"StoreWorkerCertificate", 5, []any{ctx, attempt, cert, auth}, func(p journeyEnrollmentPorts) ([]any, error) {
-			e := p.StoreWorkerCertificate(ctx, attempt, cert, auth)
+		{"StoreWorkerCertificate", 5, []any{ctx, attempt, cert}, func(p journeyEnrollmentPorts) ([]any, error) {
+			e := p.StoreWorkerCertificate(ctx, attempt, cert)
 			return nil, e
 		}, nil},
 		{"WriteWorkerEnrollment", 6, []any{ctx, en}, func(p journeyEnrollmentPorts) ([]any, error) {
@@ -186,8 +185,8 @@ func TestPublicJourneyDownloadDiagnosticsOriginalFacets(t *testing.T) {
 			v, e := p.SignWorkerCertificate(ctx, attempt, csr)
 			return []any{v}, e
 		}, []any{value.WorkerCertificate{DER: []byte{11}}}},
-		{"ActivateWorkerCertificate", 12, []any{ctx, proof, attempt, auth}, func(p journeyEnrollmentPorts) ([]any, error) {
-			out, e := p.ActivateWorkerCertificate(ctx, proof, attempt, auth)
+		{"ActivateWorkerCertificate", 12, []any{ctx, proof, attempt}, func(p journeyEnrollmentPorts) ([]any, error) {
+			out, e := p.ActivateWorkerCertificate(ctx, proof, attempt)
 			return []any{out}, e
 		}, []any{value.WorkerCertificate{DER: []byte{12}}}},
 		{"EnrollmentKey", 13, []any{csr}, func(p journeyEnrollmentPorts) ([]any, error) { v, e := p.EnrollmentKey(csr); return []any{v}, e }, []any{artifact.Digest{13}}},

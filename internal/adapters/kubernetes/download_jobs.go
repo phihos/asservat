@@ -122,6 +122,21 @@ func (s *DownloadWorkerJobs) sources(ctx context.Context) error {
 	return nil
 }
 func workerJob(i value.DownloadWorkerIntent) *batch.Job {
+	return acquisitionJob(i.Acquisition())
+}
+
+// Both closed purposes use the same Restricted process and mounts. The parent
+// flag is immutable launch identity, never a download permit or query input.
+func acquisitionJob(i value.AcquisitionWorkerIntent) *batch.Job {
+	parentFlag, label := "", acquisitionWorkerLabel(i.Parent.Purpose)
+	switch i.Parent.Purpose {
+	case value.AcquisitionDownload:
+		parentFlag = "--session"
+	case value.AcquisitionProjection:
+		parentFlag = "--query"
+	default:
+		return nil
+	}
 	p := i.Profile
 	no, yes := false, true
 	uid, grace, tokenLife, mode := int64(65532), int64(5), int64(600), int32(0440)
@@ -130,7 +145,7 @@ func workerJob(i value.DownloadWorkerIntent) *batch.Job {
 	completion, replacement, preempt := batch.NonIndexedCompletion, batch.Failed, core.PreemptNever
 	cpu, mem := *resource.NewMilliQuantity(p.CPUMillis, resource.DecimalSI), *resource.NewQuantity(p.MemoryBytes, resource.BinarySI)
 	resources := core.ResourceList{core.ResourceCPU: cpu, core.ResourceMemory: mem, core.ResourceEphemeralStorage: resource.MustParse("4Mi")}
-	labels := map[string]string{workerLabel: i.ID}
+	labels := map[string]string{label: i.ID}
 	pod := core.PodSpec{
 		PriorityClassName:  p.PriorityClass,
 		ServiceAccountName: p.ServiceAccount, DeprecatedServiceAccount: p.ServiceAccount, AutomountServiceAccountToken: &no,
@@ -141,7 +156,7 @@ func workerJob(i value.DownloadWorkerIntent) *batch.Job {
 			{Name: "control", VolumeSource: core.VolumeSource{ConfigMap: &core.ConfigMapVolumeSource{LocalObjectReference: core.LocalObjectReference{Name: p.ControlConfig}, DefaultMode: &mode}}},
 		},
 		Containers: []core.Container{{Name: "acquisition", Image: p.Image, ImagePullPolicy: core.PullIfNotPresent,
-			Command: []string{"/asservat"}, Args: []string{"download-worker", "--installation", p.InstallationID, "--cluster", p.ClusterID, "--dispatch", i.ID, "--session", i.SessionID, "--created-at", i.CreatedAt.UTC().Format(time.RFC3339Nano), "--until", i.RunUntil.UTC().Format(time.RFC3339Nano), "--control-sha256", fmt.Sprintf("%x", p.ControlDigest), "--control", contracts.WorkerControlPath, "--token", DownloadWorkerTokenPath},
+			Command: []string{"/asservat"}, Args: []string{"download-worker", "--installation", p.InstallationID, "--cluster", p.ClusterID, "--dispatch", i.ID, parentFlag, i.Parent.ID, "--created-at", i.CreatedAt.UTC().Format(time.RFC3339Nano), "--until", i.RunUntil.UTC().Format(time.RFC3339Nano), "--control-sha256", fmt.Sprintf("%x", p.ControlDigest), "--control", contracts.WorkerControlPath, "--token", DownloadWorkerTokenPath},
 			Env:                    []core.EnvVar{{Name: contracts.WorkerPodUIDEnvironment, ValueFrom: &core.EnvVarSource{FieldRef: &core.ObjectFieldSelector{APIVersion: "v1", FieldPath: "metadata.uid"}}}},
 			TerminationMessagePath: core.TerminationMessagePathDefault, TerminationMessagePolicy: core.TerminationMessageReadFile,
 			Resources:       core.ResourceRequirements{Requests: resources, Limits: resources},
@@ -160,6 +175,18 @@ func workerJob(i value.DownloadWorkerIntent) *batch.Job {
 	}
 	return &batch.Job{TypeMeta: meta.TypeMeta{APIVersion: "batch/v1", Kind: "Job"}, ObjectMeta: meta.ObjectMeta{Name: i.JobName(), Namespace: p.Namespace, Labels: labels}, Spec: batch.JobSpec{Parallelism: &one, Completions: &one, BackoffLimit: &zero, ActiveDeadlineSeconds: &duration, CompletionMode: &completion, PodReplacementPolicy: &replacement, Suspend: &no, ManualSelector: &yes, Selector: &meta.LabelSelector{MatchLabels: labels}, Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: pod}}}
 }
+
+func acquisitionWorkerLabel(p value.AcquisitionPurpose) string {
+	switch p {
+	case value.AcquisitionDownload:
+		return workerLabel
+	case value.AcquisitionProjection:
+		return "asservat.io/query-worker"
+	default:
+		return ""
+	}
+}
+
 func specBytes(raw []byte) []byte {
 	var o struct{ Spec json.RawMessage }
 	if json.Unmarshal(raw, &o) != nil {
@@ -168,12 +195,17 @@ func specBytes(raw []byte) []byte {
 	return o.Spec
 }
 func (s *DownloadWorkerJobs) checkedJob(i value.DownloadWorkerIntent, raw []byte) (*batch.Job, value.DownloadWorkerJob, error) {
+	return s.checkedAcquisitionJob(i.Acquisition(), raw)
+}
+
+func (s *DownloadWorkerJobs) checkedAcquisitionJob(i value.AcquisitionWorkerIntent, raw []byte) (*batch.Job, value.DownloadWorkerJob, error) {
 	var j batch.Job
 	var receipt value.DownloadWorkerJob
-	if permissionJSON(raw, 256<<10, 32768) != nil || json.Unmarshal(raw, &j) != nil || j.APIVersion != "batch/v1" || j.Kind != "Job" || j.Name != i.JobName() || j.Namespace != s.profile.Namespace || !identity.Text(string(j.UID), 64) || j.Labels[workerLabel] != i.ID {
+	label := acquisitionWorkerLabel(i.Parent.Purpose)
+	if label == "" || permissionJSON(raw, 256<<10, 32768) != nil || json.Unmarshal(raw, &j) != nil || j.APIVersion != "batch/v1" || j.Kind != "Job" || j.Name != i.JobName() || j.Namespace != s.profile.Namespace || !identity.Text(string(j.UID), 64) || j.Labels[label] != i.ID {
 		return nil, receipt, artifact.ErrIntegrity
 	}
-	expected := workerJob(i)
+	expected := acquisitionJob(i)
 	if !workerJSONEqual(j.Spec, expected.Spec) {
 		return nil, receipt, artifact.ErrIntegrity
 	}
@@ -189,6 +221,10 @@ func (s *DownloadWorkerJobs) checkedJob(i value.DownloadWorkerIntent, raw []byte
 	return &j, value.DownloadWorkerJob{IntentID: i.ID, UID: string(j.UID), Spec: d}, nil
 }
 func (s *DownloadWorkerJobs) getJob(ctx context.Context, i value.DownloadWorkerIntent) (*batch.Job, value.DownloadWorkerJob, error) {
+	return s.getAcquisitionJob(ctx, i.Acquisition())
+}
+
+func (s *DownloadWorkerJobs) getAcquisitionJob(ctx context.Context, i value.AcquisitionWorkerIntent) (*batch.Job, value.DownloadWorkerJob, error) {
 	b, e := s.client.api.Get().AbsPath("/apis/batch/v1/namespaces/" + s.profile.Namespace + "/jobs/" + i.JobName()).MaxRetries(0).DoRaw(ctx)
 	if e != nil {
 		if apierrors.IsNotFound(e) {
@@ -200,14 +236,23 @@ func (s *DownloadWorkerJobs) getJob(ctx context.Context, i value.DownloadWorkerI
 	if permissionJSON(b, 256<<10, 32768) != nil {
 		return nil, value.DownloadWorkerJob{}, artifact.ErrIntegrity
 	}
-	return s.checkedJob(i, b)
+	return s.checkedAcquisitionJob(i, b)
 }
 func (s *DownloadWorkerJobs) valid(i value.DownloadWorkerIntent) bool {
 	return s != nil && i.Valid() && i.Profile == s.profile && i.RunUntil.Sub(i.CreatedAt) >= time.Second
 }
 func (s *DownloadWorkerJobs) CreateDownloadWorker(ctx context.Context, l value.DownloadWorkerLaunch) (value.DownloadWorkerJob, error) {
+	if ctx == nil || !s.valid(l.Intent) || !l.Valid(s.client.now()) {
+		return value.DownloadWorkerJob{}, artifact.ErrInvalid
+	}
+	return s.CreateAcquisitionWorker(ctx, l.Acquisition())
+}
+
+// The launch is supplied by the purpose-specific checked SQL claim, never by
+// a public request or a polling path. Both purposes use this one create path.
+func (s *DownloadWorkerJobs) CreateAcquisitionWorker(ctx context.Context, l value.AcquisitionWorkerLaunch) (value.DownloadWorkerJob, error) {
 	var out value.DownloadWorkerJob
-	if ctx == nil || !s.valid(l.Intent) || !l.MayCreate || !l.Valid(s.client.now()) {
+	if ctx == nil || s == nil || s.client == nil || s.configuration == nil || l.Intent.Profile != s.profile || !l.MayCreate || !l.Valid(s.client.now()) {
 		return out, artifact.ErrInvalid
 	}
 	ctx, end := context.WithDeadline(ctx, l.Until)
@@ -221,7 +266,7 @@ func (s *DownloadWorkerJobs) CreateDownloadWorker(ctx context.Context, l value.D
 	if s.sources(ctx) != nil || !l.Valid(s.client.now()) || ctx.Err() != nil {
 		return out, artifact.ErrInvalid
 	}
-	b, e := json.Marshal(workerJob(l.Intent))
+	b, e := json.Marshal(acquisitionJob(l.Intent))
 	if e != nil {
 		return out, artifact.ErrInvalid
 	}
@@ -230,7 +275,7 @@ func (s *DownloadWorkerJobs) CreateDownloadWorker(ctx context.Context, l value.D
 		return out, artifact.ErrDownloadUnavailable
 	}
 	defer clear(raw)
-	_, out, e = s.checkedJob(l.Intent, raw)
+	_, out, e = s.checkedAcquisitionJob(l.Intent, raw)
 	if e != nil || ctx.Err() != nil || !l.Valid(s.client.now()) {
 		return value.DownloadWorkerJob{}, artifact.ErrDownloadUnavailable
 	}
@@ -240,13 +285,28 @@ func (s *DownloadWorkerJobs) FindDownloadWorkerJob(ctx context.Context, i value.
 	if ctx == nil || !s.valid(i) {
 		return value.DownloadWorkerJob{}, artifact.ErrInvalid
 	}
+	return s.FindAcquisitionWorkerJob(ctx, i.Acquisition())
+}
+
+func (s *DownloadWorkerJobs) FindAcquisitionWorkerJob(ctx context.Context, i value.AcquisitionWorkerIntent) (value.DownloadWorkerJob, error) {
+	if ctx == nil || s == nil || s.client == nil || !i.Valid() || i.Profile != s.profile {
+		return value.DownloadWorkerJob{}, artifact.ErrInvalid
+	}
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
-	_, r, e := s.getJob(ctx, i)
+	_, r, e := s.getAcquisitionJob(ctx, i)
 	return r, e
 }
 func (s *DownloadWorkerJobs) pods(ctx context.Context, i value.DownloadWorkerIntent) ([]json.RawMessage, error) {
-	b, e := s.client.raw(ctx, "/api/v1/namespaces/"+i.Profile.Namespace+"/pods", map[string]string{"labelSelector": workerLabel + "=" + i.ID, "limit": "3"})
+	return s.acquisitionPods(ctx, i.Acquisition())
+}
+
+func (s *DownloadWorkerJobs) acquisitionPods(ctx context.Context, i value.AcquisitionWorkerIntent) ([]json.RawMessage, error) {
+	label := acquisitionWorkerLabel(i.Parent.Purpose)
+	if label == "" {
+		return nil, artifact.ErrInvalid
+	}
+	b, e := s.client.raw(ctx, "/api/v1/namespaces/"+i.Profile.Namespace+"/pods", map[string]string{"labelSelector": label + "=" + i.ID, "limit": "3"})
 	if e != nil {
 		return nil, artifact.ErrInvalid
 	}
@@ -262,12 +322,17 @@ func (s *DownloadWorkerJobs) pods(ctx context.Context, i value.DownloadWorkerInt
 	return list.Items, nil
 }
 func checkedWorkerPod(i value.DownloadWorkerIntent, j value.DownloadWorkerJob, raw []byte) (*core.Pod, artifact.Digest, error) {
+	return checkedAcquisitionPod(i.Acquisition(), j, raw)
+}
+
+func checkedAcquisitionPod(i value.AcquisitionWorkerIntent, j value.DownloadWorkerJob, raw []byte) (*core.Pod, artifact.Digest, error) {
 	var p core.Pod
 	var zero artifact.Digest
 	// The caller obtained this item from a validated v1 PodList at the fixed
 	// namespace endpoint. Kubernetes may omit per-item TypeMeta there; if it
 	// supplies it, the explicit type must still match. Spec validation is exact.
-	if len(raw) > 256<<10 || json.Unmarshal(raw, &p) != nil || (p.APIVersion != "" && p.APIVersion != "v1") || (p.Kind != "" && p.Kind != "Pod") || p.Namespace != i.Profile.Namespace || !value.UUID(string(p.UID)) || p.Labels[workerLabel] != i.ID {
+	label := acquisitionWorkerLabel(i.Parent.Purpose)
+	if label == "" || len(raw) > 256<<10 || json.Unmarshal(raw, &p) != nil || (p.APIVersion != "" && p.APIVersion != "v1") || (p.Kind != "" && p.Kind != "Pod") || p.Namespace != i.Profile.Namespace || !value.UUID(string(p.UID)) || p.Labels[label] != i.ID {
 		return nil, zero, artifact.ErrIntegrity
 	}
 	controllers := 0
@@ -310,7 +375,7 @@ func checkedWorkerPod(i value.DownloadWorkerIntent, j value.DownloadWorkerJob, r
 		seen[v.Key] = true
 	}
 	copy.Tolerations = nil
-	if !workerJSONEqual(copy, &workerJob(i).Spec.Template.Spec) {
+	if !workerJSONEqual(copy, &acquisitionJob(i).Spec.Template.Spec) {
 		return nil, zero, artifact.ErrIntegrity
 	}
 	return &p, d, nil
@@ -324,8 +389,28 @@ func workerJobTerminal(j *batch.Job) bool {
 	return false
 }
 func (s *DownloadWorkerJobs) ObserveDownloadWorker(ctx context.Context, i value.DownloadWorkerIntent, receipt value.DownloadWorkerJob) (value.DownloadWorker, error) {
-	var out value.DownloadWorker
 	if ctx == nil || !s.valid(i) || !receipt.Valid(i) {
+		return value.DownloadWorker{}, artifact.ErrInvalid
+	}
+	worker, err := s.ObserveAcquisitionWorker(ctx, i.Acquisition(), receipt)
+	var pending *app.AcquisitionWorkerPending
+	if errors.As(err, &pending) {
+		return value.DownloadWorker{}, &app.DownloadWorkerPending{Intent: i, Job: receipt, ObservedAt: pending.ObservedAt, ValidUntil: pending.ValidUntil}
+	}
+	if err != nil {
+		return value.DownloadWorker{}, err
+	}
+	binding, ok := worker.Binding.DownloadBinding()
+	out := value.DownloadWorker{Intent: i, Job: worker.Job, Binding: binding}
+	if !ok || !out.Valid() {
+		return value.DownloadWorker{}, artifact.ErrIntegrity
+	}
+	return out, nil
+}
+
+func (s *DownloadWorkerJobs) ObserveAcquisitionWorker(ctx context.Context, i value.AcquisitionWorkerIntent, receipt value.DownloadWorkerJob) (value.AcquisitionWorker, error) {
+	var out value.AcquisitionWorker
+	if ctx == nil || s == nil || s.client == nil || s.configuration == nil || i.Profile != s.profile || !receipt.ValidAcquisition(i) {
 		return out, artifact.ErrInvalid
 	}
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
@@ -337,22 +422,25 @@ func (s *DownloadWorkerJobs) ObserveDownloadWorker(ctx context.Context, i value.
 	}
 	ctx, finish := context.WithDeadline(ctx, until)
 	defer finish()
-	if !start.Before(i.RunUntil) || s.sources(ctx) != nil {
+	// Observation pins only the already launched Job/Pod. Launch and both
+	// enrollment/key attesters independently verify complete protected sources;
+	// observing an intermediate binding grants neither credential nor evidence.
+	if !start.Before(i.RunUntil) {
 		return out, artifact.ErrInvalid
 	}
-	j, r, e := s.getJob(ctx, i)
+	j, r, e := s.getAcquisitionJob(ctx, i)
 	if e != nil || r != receipt || j.DeletionTimestamp != nil || workerJobTerminal(j) {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	items, e := s.pods(ctx, i)
+	items, e := s.acquisitionPods(ctx, i)
 	if e != nil || len(items) > 1 {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	pending := func() (value.DownloadWorker, error) {
+	pending := func() (value.AcquisitionWorker, error) {
 		if s.client.current(ctx, start, 5*time.Second) != nil {
 			return out, artifact.ErrDownloadExpired
 		}
-		observed := &app.DownloadWorkerPending{Intent: i, Job: receipt, ObservedAt: start, ValidUntil: identity.Earlier(start.Add(5*time.Second), identity.Earlier(until, i.RunUntil))}
+		observed := &app.AcquisitionWorkerPending{Intent: i, Job: receipt, ObservedAt: start, ValidUntil: identity.Earlier(start.Add(5*time.Second), identity.Earlier(until, i.RunUntil))}
 		if d, ok := ctx.Deadline(); ok {
 			observed.ValidUntil = identity.Earlier(observed.ValidUntil, d)
 		}
@@ -367,7 +455,7 @@ func (s *DownloadWorkerJobs) ObserveDownloadWorker(ctx context.Context, i value.
 		}
 		return pending()
 	}
-	p, d, e := checkedWorkerPod(i, receipt, items[0])
+	p, d, e := checkedAcquisitionPod(i, receipt, items[0])
 	if e != nil || p.DeletionTimestamp != nil {
 		return out, artifact.ErrDownloadUnavailable
 	}
@@ -380,33 +468,98 @@ func (s *DownloadWorkerJobs) ObserveDownloadWorker(ctx context.Context, i value.
 	if s.client.current(ctx, start, 5*time.Second) != nil || !s.client.now().Before(i.RunUntil) {
 		return out, artifact.ErrDownloadExpired
 	}
-	b := value.KeyWorkerBinding{InstallationID: i.Profile.InstallationID, DownloadID: i.SessionID, ClusterID: i.Profile.ClusterID, Namespace: i.Profile.Namespace, NamespaceUID: i.Profile.NamespaceUID, ServiceAccount: i.Profile.ServiceAccount, ServiceAccountUID: i.Profile.ServiceAccountUID, Job: i.JobName(), JobUID: receipt.UID, JobSpec: receipt.Spec, Pod: p.Name, PodUID: string(p.UID), PodSpec: d}
-	out = value.DownloadWorker{Intent: i, Job: receipt, Binding: b}
+	b := value.AcquisitionWorkerBinding{InstallationID: i.Profile.InstallationID, Parent: i.Parent, ClusterID: i.Profile.ClusterID, Namespace: i.Profile.Namespace, NamespaceUID: i.Profile.NamespaceUID, ServiceAccount: i.Profile.ServiceAccount, ServiceAccountUID: i.Profile.ServiceAccountUID, Job: i.JobName(), JobUID: receipt.UID, JobSpec: receipt.Spec, Pod: p.Name, PodUID: string(p.UID), PodSpec: d}
+	out = value.AcquisitionWorker{Intent: i, Job: receipt, Binding: b}
 	if !out.Valid() {
-		return value.DownloadWorker{}, artifact.ErrIntegrity
+		return value.AcquisitionWorker{}, artifact.ErrIntegrity
 	}
 	return out, nil
 }
 func (s *DownloadWorkerJobs) ObserveDownloadWorkerTermination(ctx context.Context, w value.DownloadWorker) (value.DownloadWorkerTermination, error) {
-	var out value.DownloadWorkerTermination
-	if ctx == nil || !w.Valid() || !s.valid(w.Intent) {
+	if !s.valid(w.Intent) || !w.Valid() {
+		return value.DownloadWorkerTermination{}, artifact.ErrInvalid
+	}
+	observed, err := s.ObserveAcquisitionWorkerTermination(ctx, w.Acquisition())
+	if err != nil {
+		return value.DownloadWorkerTermination{}, err
+	}
+	return value.DownloadWorkerTermination{Worker: w, TerminationDigest: observed.TerminationDigest, ObservedAt: observed.ObservedAt, FreshUntil: observed.FreshUntil}, nil
+}
+func (s *DownloadWorkerJobs) RetireDownloadWorker(ctx context.Context, t value.DownloadWorkerTermination) (value.DownloadWorkerRetirement, error) {
+	if !s.valid(t.Worker.Intent) || !t.Valid(t.ObservedAt) {
+		return value.DownloadWorkerRetirement{}, artifact.ErrInvalid
+	}
+	observed, err := s.RetireAcquisitionWorker(ctx, t.Acquisition())
+	if err != nil {
+		return value.DownloadWorkerRetirement{}, err
+	}
+	return value.DownloadWorkerRetirement{Termination: t, ObservedAt: observed.ObservedAt, FreshUntil: observed.FreshUntil}, nil
+}
+func (s *DownloadWorkerJobs) ObserveAcquisitionWorkerTermination(ctx context.Context, w value.AcquisitionWorker) (value.AcquisitionWorkerTermination, error) {
+	var out value.AcquisitionWorkerTermination
+	if ctx == nil || !w.Valid() || s == nil || w.Intent.Profile != s.profile {
 		return out, artifact.ErrInvalid
 	}
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	start := s.client.now()
-	j, e := s.historicalJob(ctx, w)
+	j, e := s.historicalAcquisitionJob(ctx, w)
 	if e != nil || !workerJobTerminal(j) {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	items, e := s.pods(ctx, w.Intent)
-	if e != nil || len(items) != 1 {
+	items, e := s.acquisitionPods(ctx, w.Intent)
+	if e != nil || len(items) > 1 {
 		return out, artifact.ErrDownloadUnavailable
 	}
+	return s.acquisitionTermination(ctx, w, start, j, items)
+}
+
+// WorkerJobReleasedPods reports the Job controller's own positive record that
+// the Job ended and every Pod it created has terminated and been counted. Job
+// Pods carry the job-tracking finalizer, so the API object of a Pod cannot
+// disappear before the controller has recorded its termination; terminal Job
+// conditions are set only after no Pod remains active, ready or terminating.
+// This is the evidence left when activeDeadlineSeconds kills and deletes the
+// Pod. Mere Pod absence, 404 or expiry of a still-active Job is not evidence.
+func WorkerJobReleasedPods(j *batch.Job) bool {
+	if j == nil || j.Status.Active != 0 || j.Status.Failed+j.Status.Succeeded < 1 || (j.Status.Ready != nil && *j.Status.Ready != 0) || (j.Status.Terminating != nil && *j.Status.Terminating != 0) {
+		return false
+	}
+	if u := j.Status.UncountedTerminatedPods; u != nil && len(u.Succeeded)+len(u.Failed) != 0 {
+		return false
+	}
+	for _, c := range j.Status.Conditions {
+		if c.Status != core.ConditionTrue {
+			continue
+		}
+		if c.Type == batch.JobComplete || c.Type == batch.JobFailed && (c.Reason == batch.JobReasonDeadlineExceeded || c.Reason == batch.JobReasonBackoffLimitExceeded) {
+			return true
+		}
+	}
+	return false
+}
+
+// The exact historical Job has already been checked. A remaining Pod must show
+// its own terminal container state; an absent Pod requires the Job controller's
+// accounted termination record instead.
+func (s *DownloadWorkerJobs) acquisitionTermination(ctx context.Context, w value.AcquisitionWorker, start time.Time, j *batch.Job, items []json.RawMessage) (value.AcquisitionWorkerTermination, error) {
+	var out value.AcquisitionWorkerTermination
 	selected := false
 	h := sha256.New()
+	if len(items) == 0 {
+		if j == nil || string(j.UID) != w.Binding.JobUID || !WorkerJobReleasedPods(j) {
+			return out, artifact.ErrDownloadUnavailable
+		}
+		selected = true
+		fmt.Fprintf(h, "job\x00%s\x00%d\x00%d", j.UID, j.Status.Succeeded, j.Status.Failed)
+		for _, c := range j.Status.Conditions {
+			if c.Status == core.ConditionTrue && (c.Type == batch.JobComplete || c.Type == batch.JobFailed) {
+				fmt.Fprintf(h, "\x00%s\x00%s\x00%s", c.Type, c.Reason, c.LastTransitionTime.UTC().Format(time.RFC3339))
+			}
+		}
+	}
 	for _, raw := range items {
-		p, e := checkedHistoricalPod(w, raw)
+		p, e := checkedHistoricalAcquisitionPod(w, raw)
 		if e != nil || (p.Status.Phase != core.PodSucceeded && p.Status.Phase != core.PodFailed) || len(p.Status.ContainerStatuses) != 1 {
 			return out, artifact.ErrDownloadUnavailable
 		}
@@ -422,20 +575,20 @@ func (s *DownloadWorkerJobs) ObserveDownloadWorkerTermination(ctx context.Contex
 	if !selected || s.client.current(ctx, start, 5*time.Second) != nil {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	out = value.DownloadWorkerTermination{Worker: w, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
+	out = value.AcquisitionWorkerTermination{Worker: w, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
 	copy(out.TerminationDigest[:], h.Sum(nil))
 	return out, nil
 }
-func (s *DownloadWorkerJobs) RetireDownloadWorker(ctx context.Context, t value.DownloadWorkerTermination) (value.DownloadWorkerRetirement, error) {
-	var out value.DownloadWorkerRetirement
-	if ctx == nil || !t.Valid(t.ObservedAt) || !s.valid(t.Worker.Intent) {
+func (s *DownloadWorkerJobs) RetireAcquisitionWorker(ctx context.Context, t value.AcquisitionWorkerTermination) (value.AcquisitionWorkerRetirement, error) {
+	var out value.AcquisitionWorkerRetirement
+	if ctx == nil || !t.Valid(t.ObservedAt) || s == nil || t.Worker.Intent.Profile != s.profile {
 		return out, artifact.ErrInvalid
 	}
 	i := t.Worker.Intent
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	start := s.client.now()
-	j, e := s.historicalJob(ctx, t.Worker)
+	j, e := s.historicalAcquisitionJob(ctx, t.Worker)
 	if e == nil {
 		if !workerJobTerminal(j) {
 			return out, artifact.ErrDownloadUnavailable
@@ -450,14 +603,14 @@ func (s *DownloadWorkerJobs) RetireDownloadWorker(ctx context.Context, t value.D
 	} else if e != errWorkerJobMissing {
 		return out, e
 	}
-	if _, e = s.historicalJob(ctx, t.Worker); e != errWorkerJobMissing {
+	if _, e = s.historicalAcquisitionJob(ctx, t.Worker); e != errWorkerJobMissing {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	items, e := s.pods(ctx, i)
+	items, e := s.acquisitionPods(ctx, i)
 	if e != nil || len(items) != 0 || s.client.current(ctx, start, 5*time.Second) != nil {
 		return out, artifact.ErrDownloadUnavailable
 	}
-	return value.DownloadWorkerRetirement{Termination: t, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, nil
+	return value.AcquisitionWorkerRetirement{Termination: t, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}, nil
 }
 
 // Called only after the exact immutable Job and complete bounded Pod list have

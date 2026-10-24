@@ -11,6 +11,7 @@ import (
 
 	identities "asservat.local/asservat/internal/application/identity"
 	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 const queryInput = `{"case_id":"00000000-0000-4000-8000-000000000001","artifact_id":"00000000-0000-4000-8000-000000000002"}`
@@ -54,10 +55,14 @@ type queryAuditTarget struct {
 	noGuard      bool
 	invalidBody  bool
 	effect       operationAuditEffect
+	during       func()
 }
 
 func (q *queryAuditTarget) CallWithContext(ctx context.Context, _ identities.CurrentIdentity, call OperationCall, name string, _ json.RawMessage) (OperationReply, error) {
 	q.ctx = ctx
+	if q.during != nil {
+		q.during()
+	}
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	until, _ := ctx.Deadline()
 	x := OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: call.requestID, DataClass: "metadata", Status: "pending", Data: map[string]any{"query_handle": "test-query", "retry_after_seconds": 1, "query_observed_at": now, "query_expires_at": now.Add(10 * time.Second)}, Warnings: []string{}, Provenance: []any{}}
@@ -198,5 +203,43 @@ func TestContextQuerySchemasDoNotRegisterTools(t *testing.T) {
 		if _, ok := q.Tool(name); ok || BrowserOperationSupported(q, name) {
 			t.Fatal("schema enabled route")
 		}
+	}
+}
+
+// Installed native78-80: an approved read needs more than five seconds between
+// audit admission and the worker's reply. A twelve-second read inside one
+// get_query_result succeeds; an ordinary tool still refuses after five seconds.
+func TestEvidenceReadRequestWindowOutlastsOrdinaryRequests(t *testing.T) {
+	for _, c := range []struct {
+		name, input string
+		window      time.Duration
+		ok          bool
+	}{
+		{"get_query_result", `{"query_handle":"00000000-0000-4000-8000-000000000003"}`, identity.EvidenceReadRequestWindow, true},
+		{"get_capture", `{"capture_id":"00000000-0000-4000-8000-000000000030"}`, 5 * time.Second, false},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			s, f, g, q := queryAuditFixture(t)
+			start := s.config.Now()
+			var elapsed atomic.Int64
+			s.config.Now = func() time.Time { return start.Add(time.Duration(elapsed.Load())) }
+			f.i.ValidUntil = start.Add(30 * time.Second)
+			f.metadataUntil = f.i.ValidUntil
+			q.during = func() { elapsed.Store(int64(12 * time.Second)) }
+			reply, err := s.Call(context.Background(), f, c.name, []byte(c.input))
+			if len(g.intents) != 1 || !g.intents[0].RequestUntil.Equal(start.Add(c.window)) || q.ctx == nil {
+				t.Fatalf("request window: intents=%d dispatched=%v", len(g.intents), q.ctx != nil)
+			}
+			if c.ok {
+				if err != nil || len(g.outcomes) != 1 || g.outcomes[0].Status != "success" {
+					t.Fatalf("twelve-second evidence read refused: %v", err)
+				}
+				_ = reply.Close(context.Background())
+				return
+			}
+			if !errors.Is(err, identity.ErrDenied) || len(reply.Body) != 0 {
+				t.Fatalf("ordinary request older than five seconds delivered: %v", err)
+			}
+		})
 	}
 }

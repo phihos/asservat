@@ -1,0 +1,10 @@
+{
+  "commit": "bc94a1885ddcfe16825dbf8571934d288a050f44",
+  "argv": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "sql-check",
+    "go-check"
+  ],
+  "startedUnix": 1792717015.2032278
+}

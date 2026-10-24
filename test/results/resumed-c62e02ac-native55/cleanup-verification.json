@@ -1,0 +1,202 @@
+{
+  "runId": "context-jb2tvobx",
+  "harnessCleanupExit": 0,
+  "harnessTerminalEvidence": "write_stdin session44359 chunk085b58 exit0",
+  "resources": [
+    {
+      "kind": "container",
+      "name": "asservat-context-jb2tvobx-0-control-plane",
+      "argv": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Name}}",
+        "asservat-context-jb2tvobx-0-control-plane"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-jb2tvobx-0-control-plane"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-jb2tvobx-1-control-plane",
+      "argv": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Name}}",
+        "asservat-context-jb2tvobx-1-control-plane"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-jb2tvobx-1-control-plane"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-jb2tvobx-s3",
+      "argv": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Name}}",
+        "asservat-context-jb2tvobx-s3"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-jb2tvobx-s3"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-jb2tvobx-kms",
+      "argv": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Name}}",
+        "asservat-context-jb2tvobx-kms"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-jb2tvobx-kms"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-jb2tvobx-postgres",
+      "argv": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Name}}",
+        "asservat-context-jb2tvobx-postgres"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-jb2tvobx-postgres"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-jb2tvobx-tls",
+      "argv": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Name}}",
+        "asservat-context-jb2tvobx-tls"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-jb2tvobx-tls"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-jb2tvobx-keycloak",
+      "argv": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Name}}",
+        "asservat-context-jb2tvobx-keycloak"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-jb2tvobx-keycloak"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-jb2tvobx-0-seed",
+      "argv": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Name}}",
+        "asservat-context-jb2tvobx-0-seed"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-jb2tvobx-0-seed"
+    },
+    {
+      "kind": "volume",
+      "name": "asservat-context-jb2tvobx-0-var",
+      "argv": [
+        "docker",
+        "volume",
+        "inspect",
+        "--format",
+        "{{.Name}}",
+        "asservat-context-jb2tvobx-0-var"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: get asservat-context-jb2tvobx-0-var: no such volume"
+    },
+    {
+      "kind": "image",
+      "name": "asservat-context-worker:context-jb2tvobx",
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "--format",
+        "{{.Id}}",
+        "asservat-context-worker:context-jb2tvobx"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such image: asservat-context-worker:context-jb2tvobx"
+    },
+    {
+      "kind": "network",
+      "name": "asservat-context-jb2tvobx",
+      "argv": [
+        "docker",
+        "network",
+        "inspect",
+        "--format",
+        "{{.Name}}",
+        "asservat-context-jb2tvobx"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: network asservat-context-jb2tvobx not found"
+    },
+    {
+      "kind": "network",
+      "name": "asservat-context-jb2tvobx-kind",
+      "argv": [
+        "docker",
+        "network",
+        "inspect",
+        "--format",
+        "{{.Name}}",
+        "asservat-context-jb2tvobx-kind"
+      ],
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: network asservat-context-jb2tvobx-kind not found"
+    }
+  ],
+  "resourceCount": 12,
+  "kindReadback": {
+    "argv": [
+      "kind",
+      "get",
+      "clusters"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "No kind clusters found."
+  },
+  "clustersAbsent": true,
+  "privateConfigsRemoved": true,
+  "privateDirectory": "/home/phil/.cache/asservat-build/recovered-c62e02ac/native55-private",
+  "success": true
+}

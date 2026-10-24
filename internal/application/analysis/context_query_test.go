@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"testing"
 	"time"
 
@@ -30,11 +29,18 @@ type projectionFixture struct {
 	active                                                                       bool
 	queryFresh, batchFresh, claimFresh, ready                                    bool
 	queryErr, claimErr, closeErr, permitErr, errorAfterRead                      error
+	authorityReads                                                               int
+	authorityErr                                                                 error
 	authorityHook                                                                func()
 	observeHook                                                                  func()
 	routeHook, planHook, claimHook                                               func(context.Context)
 	workerUntil                                                                  time.Time
 	lastRead                                                                     *projectionReadFake
+	// frames simulates the hub's per-frame native gate: each frame consults the
+	// request owner and an independent SQL operation/row fence (frameErr).
+	frames, frameChecks int
+	frameErr            error
+	frameHook           func(int)
 }
 
 func (f *projectionFixture) next() string {
@@ -107,13 +113,15 @@ func (f *projectionFixture) ResolveContextProjection(ctx context.Context, _ valu
 	return f.a.Scope.Candidate(), nil
 }
 func (f *projectionFixture) ResolveProjectionCurrent(context.Context, identities.CurrentIdentity, value.ContextProjectionCandidate) (value.ContextProjectionAuthority, error) {
-	return f.a, nil
+	f.authorityReads++
+	return f.a, f.authorityErr
 }
 func (f *projectionFixture) CheckProjectionCurrent(context.Context, identities.CurrentIdentity, value.ContextProjectionScope) (value.ContextProjectionAuthority, error) {
+	f.authorityReads++
 	if f.authorityHook != nil {
 		f.authorityHook()
 	}
-	return f.a, nil
+	return f.a, f.authorityErr
 }
 func (f *projectionFixture) ContextQueryPlan(ctx context.Context, _ value.ContextProjectionAuthority) (value.ContextQueryPlan, error) {
 	if f.planHook != nil {
@@ -140,6 +148,9 @@ func (f *projectionFixture) PermitQuery(context.Context, value.ContextQuery, val
 	return f.permitErr
 }
 func (f *projectionFixture) BeginReadBatch(_ context.Context, q value.ContextQuery, r value.ContextQueryRequest, w value.ContextQueryWorker, id string, a value.ContextProjectionAuthority) (ContextQueryBatchAdmission, error) {
+	if f.permitErr != nil {
+		return ContextQueryBatchAdmission{}, f.permitErr
+	}
 	if f.active || f.batches >= value.ContextMaxReadBatches {
 		return ContextQueryBatchAdmission{}, value.ErrUnavailable
 	}
@@ -181,8 +192,20 @@ func (f *projectionFixture) ObserveProjectionWorker(_ context.Context, q value.C
 	}
 	return o, nil
 }
-func (f *projectionFixture) ReadProjection(_ context.Context, start value.ContextReadStart, _ ContextProjectionRequestOwner) (ContextProjectionRead, error) {
+func (f *projectionFixture) ReadProjection(ctx context.Context, start value.ContextReadStart, owner ContextProjectionRequestOwner) (ContextProjectionRead, error) {
 	f.reads++
+	for n := 0; n < f.frames; n++ {
+		if f.frameHook != nil {
+			f.frameHook(n)
+		}
+		if _, err := owner.CheckCurrent(ctx); err != nil {
+			return nil, err
+		}
+		if f.frameErr != nil {
+			return nil, f.frameErr
+		}
+		f.frameChecks++
+	}
 	f.lastRead = &projectionReadFake{batch: start.Batch, projection: displayProjection(), closeErr: f.closeErr}
 	return f.lastRead, f.errorAfterRead
 }
@@ -454,29 +477,52 @@ func TestQueryPendingPollCannotDispatchAndRequiresOutcomeGuard(t *testing.T) {
 	_ = next.Close(context.Background())
 }
 
-func TestQueryFinalAuthorityAndOriginalRequestCancellation(t *testing.T) {
+func TestQueryRequestObservationAndCurrentSQLFence(t *testing.T) {
+	// ADR219 retains one exact observation inside this request. Changed external
+	// facts are evaluated by the next request; SQL effects still deny immediately.
 	for _, tc := range []struct {
 		name   string
 		mutate func(*projectionFixture)
 	}{
-		{"group-revocation", func(f *projectionFixture) { f.i.Groups = []string{"different"} }},
+		{"group-revocation", func(f *projectionFixture) { f.i.Groups = []string{"different"}; f.authorityErr = value.ErrUnavailable }},
 		{"source-replacement", func(f *projectionFixture) { f.a.Scope.Version[0]++ }},
 		{"retention-cutoff", func(f *projectionFixture) { f.a.AccessUntil = f.now }},
 		{"recovery-change", func(f *projectionFixture) { f.a.Environment.Recovery.Revision.Generation++ }},
 		{"path-change", func(f *projectionFixture) { f.a.Environment.Path.WorkerConfiguration.Generation++ }},
-		{"sql-fence", func(f *projectionFixture) { f.permitErr = value.ErrUnavailable }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newProjectionFixture(t)
 			d, i := f.begin(t)
 			i.outcome = d
-			tc.mutate(f)
-			if d.CheckDisclosure(context.Background()) == nil {
-				t.Fatal("final current fence bypassed")
+			original, err := d.owner.CheckCurrent(context.Background())
+			if err != nil {
+				t.Fatal(err)
 			}
-			_ = d.Close(context.Background())
+			tc.mutate(f)
+			retained, err := d.owner.CheckCurrent(context.Background())
+			if err != nil || retained != original || d.CheckDisclosure(context.Background()) != nil || f.authorityReads != 1 {
+				t.Fatal("request rebuilt or changed its original observation", err, f.authorityReads)
+			}
+			if err = d.Close(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			next := f.invocation("get_query_result")
+			if result, err := f.s.Results.GetQueryResult(context.Background(), f, next, f.q.ID); err == nil || result != nil || f.authorityReads != 2 {
+				t.Fatal("new poll reused prior request authority", err, f.authorityReads)
+			}
 		})
 	}
+	f := newProjectionFixture(t)
+	d, i := f.begin(t)
+	i.outcome = d
+	f.permitErr = value.ErrUnavailable
+	if d.CheckDisclosure(context.Background()) == nil {
+		t.Fatal("current SQL fence bypassed")
+	}
+	_ = d.Close(context.Background())
+}
+
+func TestQueryOriginalRequestCancellation(t *testing.T) {
 	f := newProjectionFixture(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	i := f.invocation("get_file_excerpt")
@@ -502,7 +548,7 @@ func TestQueryFinalAuthorityAndOriginalRequestCancellation(t *testing.T) {
 func TestQueryRechecksAfterBlockingObservation(t *testing.T) {
 	for _, mutate := range []func(*projectionFixture){
 		func(f *projectionFixture) { f.now = f.a.ValidUntil },
-		func(f *projectionFixture) { f.i.Scopes = slices.Delete(slices.Clone(f.i.Scopes), 0, 1) },
+		func(f *projectionFixture) { f.permitErr = value.ErrUnavailable },
 	} {
 		f := newProjectionFixture(t)
 		f.observeHook = func() { mutate(f) }
@@ -558,11 +604,24 @@ func TestQueryRetainsIdentitySnapshotAgainstPortSliceReuse(t *testing.T) {
 	f := newProjectionFixture(t)
 	f.observeHook = func() { f.i.Groups[0] = "changed-in-place" }
 	i := f.invocation("get_file_excerpt")
-	if _, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection); err == nil {
-		t.Fatal("mutable identity slice rewrote original observation")
+	d, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if f.batches+f.reads != 0 {
-		t.Fatal("read admitted after identity replacement")
+	if len(d.owner.initial.Groups) != 1 || d.owner.initial.Groups[0] != "team" || f.authorityReads != 1 {
+		t.Fatal("port slice rewrote the retained original identity")
+	}
+	if err = d.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	next := f.invocation("get_query_result")
+	d, err = f.s.Results.GetQueryResult(context.Background(), f, next, f.q.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close(context.Background())
+	if d.owner.initial.Groups[0] != "changed-in-place" || f.authorityReads != 2 {
+		t.Fatal("new request reused old identity instead of current observation")
 	}
 }
 
@@ -580,8 +639,8 @@ func TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun(t *testing.T) {
 		current := projectionIdentityFunc(func(ctx context.Context) (identity.Identity, error) {
 			called = true
 			until, ok := ctx.Deadline()
-			if !ok || !until.Equal(f.now.Add(5*time.Second)) {
-				t.Fatal("first identity read lacked original5s deadline", until)
+			if !ok || !until.Equal(f.now.Add(identity.EvidenceReadRequestWindow)) {
+				t.Fatal("first identity read lacked the original evidence-read request deadline", until)
 			}
 			return identity.Identity{}, value.ErrUnavailable
 		})
@@ -648,8 +707,11 @@ func TestQueryDeliveryTimingDoesNotRenewLatePollOrPreparedCutoff(t *testing.T) {
 	observed, deadline := d.ObservedAt(), d.QueryDeadline()
 	f.a.AccessUntil = f.now.Add(500 * time.Millisecond)
 	f.a.ValidUntil = f.a.AccessUntil
+	// A restrictive SQL retention change is current even though this request
+	// retains its original external observation.
+	f.permitErr = value.ErrExpired
 	if d.CheckDisclosure(context.Background()) == nil {
-		t.Fatal("prepared longer evidence cutoff survived shortening")
+		t.Fatal("current SQL retention fence did not stop prepared disclosure")
 	}
 	if !d.ObservedAt().Equal(observed) || !d.QueryDeadline().Equal(deadline) {
 		t.Fatal("audited prepared metadata mutated after observation")
@@ -679,4 +741,113 @@ func TestQueryDeliveryDoneTracksOriginalOwner(t *testing.T) {
 	default:
 		t.Fatal("missing owner appears live")
 	}
+}
+
+// native69: the first excerpt call returns pending while the worker starts;
+// the full SQL permit fence runs before a read, not on the pending reply.
+func TestQueryPendingReplySkipsPermitFence(t *testing.T) {
+	f := newProjectionFixture(t)
+	f.ready = false
+	f.permitErr = value.ErrUnavailable
+	i := f.invocation("get_file_excerpt")
+	d, err := f.s.BeginExcerpt(context.Background(), f, i, i.input.Selection)
+	if err != nil || !d.Pending() || f.batches != 0 {
+		t.Fatal("pending reply ran the read permit", err)
+	}
+	_ = d.Close(context.Background())
+}
+
+// One public request reconstructs the complete projection authority once and
+// reuses it through prepare, every native frame and disclosure (relaxed
+// bounded cadence, AGENTS.md 2026-10-20). Row-level SQL fences still refuse
+// the very next frame or disclosure without another reconstruction.
+func TestQueryOneAuthorityPerRequestAcrossPrepareAndFrames(t *testing.T) {
+	f := newProjectionFixture(t)
+	d, _ := f.begin(t)
+	if err := d.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.authorityReads, f.frames = 0, 8
+	i := f.invocation("get_query_result")
+	d2, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	i.outcome = d2
+	for range 3 {
+		if err = d2.CheckDisclosure(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if f.authorityReads != 1 || f.frameChecks != 8 {
+		t.Fatal("request reconstructed authority more than once", f.authorityReads, f.frameChecks)
+	}
+	// A SQL-level revocation (permission stream suspended, batch row no longer
+	// current) is enforced immediately by the row fence, not by re-observation.
+	f.permitErr = value.ErrUnavailable
+	if d2.CheckDisclosure(context.Background()) == nil || f.authorityReads != 1 {
+		t.Fatal("SQL revocation did not refuse the retained request immediately", f.authorityReads)
+	}
+	f.permitErr = nil
+	_ = d2.Close(context.Background())
+}
+
+func TestQuerySQLFenceRefusesNextFrameWithinOneRequest(t *testing.T) {
+	f := newProjectionFixture(t)
+	d, _ := f.begin(t)
+	if err := d.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.authorityReads, f.frames = 0, 8
+	f.frameHook = func(n int) {
+		if n == 3 {
+			f.frameErr = value.ErrUnavailable // e.g. native operation/batch row revoked
+		}
+	}
+	i := f.invocation("get_query_result")
+	if out, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID); err == nil || out != nil {
+		t.Fatal("frame after SQL revocation was accepted")
+	}
+	if f.frameChecks != 3 || f.authorityReads != 1 {
+		t.Fatal("revocation not enforced at the next frame", f.frameChecks, f.authorityReads)
+	}
+}
+
+// Installed native78-80: an approved read needs more than five seconds between
+// its authority check and the worker's result. Within the evidence-read window
+// a read taking twelve seconds succeeds on the one request authority.
+func TestQueryTwelveSecondReadWithinOneEvidenceRequest(t *testing.T) {
+	f := newProjectionFixture(t)
+	f.p.Profile.Lifetime = value.ContextMaxQueryTime // the installed profile
+	d, _ := f.begin(t)
+	if err := d.Close(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	start := f.now
+	window := start.Add(identity.EvidenceReadRequestWindow)
+	f.i.ValidUntil, f.a.ValidUntil, f.workerUntil = window, window, window
+	f.a.Environment.ValidUntil, f.a.Environment.Recovery.FreshUntil, f.a.Environment.Processing.ValidUntil = window, window, window
+	f.a.Retention.ValidUntil = window
+	if !f.a.Valid(start) {
+		t.Fatal("evidence-read authority interval rejected")
+	}
+	f.authorityReads, f.frames = 0, 8
+	f.frameHook = func(n int) {
+		if n == 1 {
+			f.now = start.Add(12 * time.Second) // key unwraps and object read
+		}
+	}
+	i := f.invocation("get_query_result")
+	i.call.Until = window
+	out, err := f.s.Results.GetQueryResult(context.Background(), f, i, f.q.ID)
+	if err != nil {
+		var s interface{ FixedStep() string }
+		_ = errors.As(err, &s)
+		t.Fatal("twelve-second read refused:", s.FixedStep())
+	}
+	i.outcome = out
+	if f.frameChecks != 8 || f.authorityReads != 1 || out.CheckDisclosure(context.Background()) != nil {
+		t.Fatal("read did not complete on one current authority", f.frameChecks, f.authorityReads)
+	}
+	_ = out.Close(context.Background())
 }

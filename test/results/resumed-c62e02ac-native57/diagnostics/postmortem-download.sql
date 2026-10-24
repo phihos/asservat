@@ -1,0 +1,11 @@
+BEGIN READ ONLY;
+SET LOCAL statement_timeout='5s';
+SELECT id,root_id,allocation_id,artifact_id,state,created_at,deadline,output_limit,read_limit,request_limit,charged_output,charged_read,requests,emitted_bytes,generation,active_batch FROM artifact_download;
+SELECT id,session_id,generation,lease_until,audit_acknowledged_at,outcome_acknowledged_at,outcome_json IS NOT NULL AS has_outcome FROM download_batch;
+SELECT id,session_id,root_id,allocation_id,generation,run_until,claimed_at,audit_receipt_json IS NOT NULL AS audited,job_json IS NOT NULL AS job,binding_json IS NOT NULL AS binding,termination_json IS NOT NULL AS termination,retired_proof_json IS NOT NULL AS retired FROM download_worker;
+SELECT id,root_id,reserved_output,reserved_read,reserved_sessions,valid_until FROM download_allocation;
+SELECT id,root_id,reserved_responses,reserved_windows,reserved_audit_bytes,valid_until,audit_write_until FROM download_control_allocation;
+SELECT id,session_id,generation,started_at,until_at,window_count,completed_windows,emitted_bytes,lease_until,closed FROM download_response;
+SELECT count(*) AS native_owners FROM download_native_owner;
+SELECT count(*) AS native_backings FROM download_native_backing;
+COMMIT;

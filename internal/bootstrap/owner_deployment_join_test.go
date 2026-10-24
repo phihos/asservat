@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/fleet"
 )
@@ -43,11 +43,11 @@ func ownerDeploymentJoinFixture(t *testing.T, closeResource func()) (*OwnerDeplo
 	}
 	inputs, directory, _ := ownerInputFixture(t)
 	writeOwnerJSON(t, directory, "worker-controls.json", contracts.OwnerWorkerTrust{Format: contracts.OwnerWorkerTrustFormat, Controls: [][]byte{}})
-	router, err := evidence.NewWorkerEnrollmentRouter(root, runtimeID, f, time.Now, 1)
+	trust, err := mtls.NewWorkerTrustCatalog(runtimeID, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	d := &OwnerDeployment{Runtime: runtime, Router: router, inputs: inputs, trust: config.WorkerTrust, root: root, cancel: cancel, closers: []func(){closeResource}}
+	d := &OwnerDeployment{Runtime: runtime, inputs: inputs, trust: trust, root: root, cancel: cancel, closers: []func(){closeResource}}
 	return d, proof, f, listener, directory
 }
 

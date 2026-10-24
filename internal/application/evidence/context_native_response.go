@@ -64,7 +64,20 @@ func (s *ContextNativeResponse) owned(ctx context.Context) (context.Context, con
 		cancel()
 	}
 }
+
+// These private entry points consume only the response coordinator's exact
+// short authority. The public Current methods remain independently checked.
+func (s *ContextNativeResponse) describeChecked(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, a artifact.DownloadAuthority) (artifact.NativeDownloadMetadata, int64, error) {
+	return s.describeCurrent(ctx, current, session, a, true)
+}
+func (s *ContextNativeResponse) readChunkChecked(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease, offset, length int64) (NativeResponseChunk, error) {
+	return s.readChunkCurrent(ctx, current, lease, offset, length, true)
+}
+
 func (s *ContextNativeResponse) DescribeCurrent(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, a artifact.DownloadAuthority) (artifact.NativeDownloadMetadata, int64, error) {
+	return s.describeCurrent(ctx, current, session, a, false)
+}
+func (s *ContextNativeResponse) describeCurrent(ctx context.Context, current identities.CurrentIdentity, session artifact.DownloadSession, a artifact.DownloadAuthority, checked bool) (artifact.NativeDownloadMetadata, int64, error) {
 	if s == nil || ctx == nil || !a.Valid(s.runtime.config.Now()) || session.Scope != a.Scope || !s.enter() {
 		return artifact.NativeDownloadMetadata{}, 0, artifact.ErrDownloadUnavailable
 	}
@@ -77,7 +90,11 @@ func (s *ContextNativeResponse) DescribeCurrent(ctx context.Context, current ide
 	}
 	call, end := s.owned(ctx)
 	defer end()
-	facts, key, release, e := s.runtime.prepared(call, current, session, true)
+	var observed *artifact.DownloadAuthority
+	if checked {
+		observed = &a
+	}
+	facts, key, release, e := s.runtime.preparedAuthority(call, current, session, true, observed)
 	if e != nil {
 		return artifact.NativeDownloadMetadata{}, 0, e
 	}
@@ -98,6 +115,9 @@ func (s *ContextNativeResponse) DescribeCurrent(ctx context.Context, current ide
 	return facts.Native, ContextDownloadReadWork, nil
 }
 func (s *ContextNativeResponse) ReadChunkCurrent(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease, offset, length int64) (NativeResponseChunk, error) {
+	return s.readChunkCurrent(ctx, current, lease, offset, length, false)
+}
+func (s *ContextNativeResponse) readChunkCurrent(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease, offset, length int64, checked bool) (NativeResponseChunk, error) {
 	var zero NativeResponseChunk
 	if s == nil || ctx == nil || !lease.Valid(s.runtime.config.Now()) || !s.enter() {
 		return zero, artifact.ErrDownloadUnavailable
@@ -110,13 +130,22 @@ func (s *ContextNativeResponse) ReadChunkCurrent(ctx context.Context, current id
 		return zero, artifact.ErrDownloadUnavailable
 	}
 	call, ownerEnd := s.owned(ctx)
-	bound, work, requestEnd, e := s.runtime.beginRequest(call, current, session)
+	var bound *ContextNativeRuntime
+	var work context.Context
+	var requestEnd context.CancelFunc
+	var initial artifact.DownloadAuthority
+	var e error
+	if checked {
+		bound, work, requestEnd, initial, e = s.runtime.beginResponseRequest(call, current, session, lease.Authority)
+	} else {
+		bound, work, requestEnd, initial, e = s.runtime.beginRequest(call, current, session)
+	}
 	if e != nil {
 		ownerEnd()
 		return zero, e
 	}
 	end := func() { requestEnd(); ownerEnd() }
-	observed, a, e := bound.attachment(work, current, session)
+	observed, a, e := bound.attachmentWithAuthority(work, session, initial)
 	if e != nil {
 		end()
 		return zero, e

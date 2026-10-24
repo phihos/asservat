@@ -2,6 +2,7 @@ package mtls
 
 import (
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"crypto/tls"
 	"io"
@@ -144,7 +145,7 @@ func (c *NativeClient) Open(ctx context.Context, hello contracts.NativeHello) (*
 		}
 		text := resp.Header.Get("Asservat-Native-Until")
 		until, parseErr := time.Parse(time.RFC3339Nano, text)
-		valid := parseErr == nil && text == until.UTC().Format(time.RFC3339Nano) && time.Now().Before(until) && !until.After(time.Now().Add(5*time.Second)) && single("Asservat-Native-Disposition", "no-command") && single("Asservat-Native-Nonce", hello.Nonce) && single("Asservat-Native-Installation", hello.Reference.InstallationID) && single("Asservat-Native-Session", hello.Reference.SessionID) && single("Asservat-Native-Worker", hello.Reference.WorkerID) && single("Retry-After", "1") && len(resp.Header.Values("Asservat-Native-Until")) == 1 && resp.ContentLength == 0 && hello.Reference.OperationID == "" && hello.Reference.Fence == 0
+		valid := parseErr == nil && text == until.UTC().Format(time.RFC3339Nano) && time.Now().Before(until) && !until.After(time.Now().Add(5*time.Second)) && single("Asservat-Native-Disposition", "no-command") && single("Asservat-Native-Nonce", hello.Nonce) && single("Asservat-Native-Installation", hello.Reference.InstallationID) && nativeIdleParent(resp.Header, hello.Reference) && single("Asservat-Native-Worker", hello.Reference.WorkerID) && single("Retry-After", "1") && len(resp.Header.Values("Asservat-Native-Until")) == 1 && resp.ContentLength == 0 && hello.Reference.OperationID == "" && hello.Reference.Fence == 0
 		// Finish the actual Hello write before classifying this as no-command; an
 		// uncertain POST body must never acquire a retryable disposition.
 		written := <-wrote
@@ -224,7 +225,9 @@ func (s *NativeClientStream) begin(ctx context.Context, read bool) (func(), erro
 		return nil, contracts.ErrNativeProtocol
 	}
 	d, ok := ctx.Deadline()
-	if !ok || !time.Now().Before(d) || d.After(time.Now().Add(5*time.Second)) {
+	// Frame calls carry the operation's current bound: at most the
+	// evidence-read window for an approved projection read.
+	if !ok || !time.Now().Before(d) || d.After(time.Now().Add(identity.EvidenceReadRequestWindow)) {
 		return nil, contracts.ErrNativeProtocol
 	}
 	s.mu.Lock()
@@ -281,4 +284,13 @@ func (s *NativeClientStream) Send(ctx context.Context, f contracts.NativeFrame) 
 		return contracts.ErrNativeProtocol
 	}
 	return nil
+}
+
+// Exactly one parent is echoed. A query idle acknowledgement cannot stand in
+// for a download session or vice versa, including an unsolicited empty header.
+func nativeIdleParent(h http.Header, r contracts.NativeReference) bool {
+	if r.QueryID != "" && r.SessionID == "" {
+		return len(h.Values("Asservat-Native-Session")) == 0 && len(h.Values("Asservat-Native-Query")) == 1 && h.Get("Asservat-Native-Query") == r.QueryID
+	}
+	return r.SessionID != "" && r.QueryID == "" && len(h.Values("Asservat-Native-Query")) == 0 && len(h.Values("Asservat-Native-Session")) == 1 && h.Get("Asservat-Native-Session") == r.SessionID
 }

@@ -1,0 +1,31 @@
+BEGIN
+SET
+                  id                  |          created_at           |           deadline            |           closed_at           
+--------------------------------------+-------------------------------+-------------------------------+-------------------------------
+ 8a59e601-96b1-488b-b380-761f38d0310f | 2026-10-20 17:27:10.498196+00 | 2026-10-20 17:29:10.498196+00 | 2026-10-20 17:27:15.038989+00
+ 485646ab-8757-4432-8d92-7b0dbea00f79 | 2026-10-20 17:27:17.771907+00 | 2026-10-20 17:29:17.771907+00 | 2026-10-20 17:27:21.589615+00
+ c1da45f8-2953-4c2c-8901-1e69c9e97687 | 2026-10-20 17:27:40.474718+00 | 2026-10-20 17:29:40.474718+00 | 
+(3 rows)
+
+                  id                  |        operation_name        |   status    |        reason         |  effect  |         recorded_at         |       metadata_until        
+--------------------------------------+------------------------------+-------------+-----------------------+----------+-----------------------------+-----------------------------
+ b2538950-b56e-490d-838a-cb9f40a279fe | connector_process_enrollment | success     | prepared              | accepted | 2026-10-20T17:22:32.526943Z | 2026-10-20T17:22:36.321303Z
+ 9e7800fa-ab12-4313-90a0-61fb859be88d | connector_client_certificate | success     | prepared              | accepted | 2026-10-20T17:22:33.304202Z | 2026-10-20T17:22:37.636785Z
+ 36d7811a-4f2e-4254-9350-09ecd7e76f68 | connector_server_certificate | success     | prepared              | accepted | 2026-10-20T17:22:34.942924Z | 2026-10-20T17:22:38.696962Z
+ c8677bcc-7e6f-4cd8-9792-054c561e9ed3 | initialize_processing        | success     | prepared              | unknown  | 2026-10-20T17:27:05.960307Z | 2026-10-20T17:27:10.280115Z
+ 396cecfa-2b92-4fb2-9cd8-67af1f267533 | preview_capture              | unavailable | authority_unavailable | none     | 2026-10-20T17:27:08.269132Z | 2026-10-20T17:27:11.510664Z
+ 99cb5793-46c3-4089-978d-e47348eb5068 | preview_capture              | success     | prepared              | none     | 2026-10-20T17:27:12.605972Z | 2026-10-20T17:27:15.224756Z
+ e9ebd810-334e-4626-8f42-559639643996 | request_capture              | unavailable | authority_unavailable | unknown  | 2026-10-20T17:27:14.438907Z | 2026-10-20T17:27:17.702098Z
+ 7fec6cc5-378d-4676-b3d9-62c8d079c383 | resolve_capture_request      | success     | prepared              | none     | 2026-10-20T17:27:15.322905Z | 2026-10-20T17:27:19.412229Z
+ d8cd3b08-7c84-4d1c-8208-5b9c9fc251ad | preview_capture              | success     | prepared              | none     | 2026-10-20T17:27:18.733118Z | 2026-10-20T17:27:20.293007Z
+ a6135283-061f-4827-9ed0-1f1a8017f3f9 | request_capture              | unavailable | authority_unavailable | unknown  | 2026-10-20T17:27:21.341476Z | 2026-10-20T17:27:23.837932Z
+ aea3a93c-2192-4f75-84fd-a1ad99bb88fc | resolve_capture_request      | success     | prepared              | none     | 2026-10-20T17:27:21.840905Z | 2026-10-20T17:27:25.51989Z
+ ea8c354a-b39d-4857-bb66-0f2682c81b69 | preview_capture              | unavailable | authority_unavailable | none     | 2026-10-20T17:27:26.644944Z | 2026-10-20T17:27:29.142197Z
+ a03b3b79-e411-4e58-ab36-4e6fbc8a9450 | preview_capture              | unavailable | authority_unavailable | none     | 2026-10-20T17:27:31.245945Z | 2026-10-20T17:27:33.742476Z
+ 6d9fab2c-5d2a-4a74-b491-b3f06279bba8 | preview_capture              | unavailable | authority_unavailable | none     | 2026-10-20T17:27:38.308514Z | 2026-10-20T17:27:38.336913Z
+ d332f7ad-91d8-4da2-9888-52e75f02ae38 | preview_capture              | success     | prepared              | none     | 2026-10-20T17:27:41.417182Z | 2026-10-20T17:27:42.902534Z
+ c7bc1413-f34c-4871-8928-541b19c410e6 | request_capture              | unavailable | authority_unavailable | unknown  | 2026-10-20T17:27:45.948338Z | 2026-10-20T17:27:46.514566Z
+ fcda9293-9d35-4138-a1e7-5dac4bf29a65 | persist_capture_intent       | success     | prepared              | accepted | 2026-10-20T17:27:44.749473Z | 2026-10-20T17:27:45.944036Z
+(17 rows)
+
+COMMIT

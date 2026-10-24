@@ -1,0 +1,17 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "^(TestPublic|TestHub|TestOwnerCredential|TestOwnerIdentity|TestOwnerPublic)",
+    "./internal/contracts",
+    "./internal/bootstrap",
+    "./internal/adapters/postgres",
+    "./internal/adapters/kubernetes"
+  ],
+  "exitCode": 1,
+  "elapsedSeconds": 411.7885111459764,
+  "sourceFiles": 2610,
+  "sourceUnchanged": true
+}

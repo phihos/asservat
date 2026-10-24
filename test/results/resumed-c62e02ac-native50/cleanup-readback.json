@@ -1,0 +1,134 @@
+[
+  {
+    "command": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-context-cqjvthn6-0-control-plane"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: No such container: asservat-context-cqjvthn6-0-control-plane\n"
+  },
+  {
+    "command": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-context-cqjvthn6-1-control-plane"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: No such container: asservat-context-cqjvthn6-1-control-plane\n"
+  },
+  {
+    "command": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-context-cqjvthn6-s3"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: No such container: asservat-context-cqjvthn6-s3\n"
+  },
+  {
+    "command": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-context-cqjvthn6-kms"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: No such container: asservat-context-cqjvthn6-kms\n"
+  },
+  {
+    "command": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-context-cqjvthn6-postgres"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: No such container: asservat-context-cqjvthn6-postgres\n"
+  },
+  {
+    "command": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-context-cqjvthn6-tls"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: No such container: asservat-context-cqjvthn6-tls\n"
+  },
+  {
+    "command": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-context-cqjvthn6-keycloak"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: No such container: asservat-context-cqjvthn6-keycloak\n"
+  },
+  {
+    "command": [
+      "docker",
+      "container",
+      "inspect",
+      "asservat-context-cqjvthn6-0-seed"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: No such container: asservat-context-cqjvthn6-0-seed\n"
+  },
+  {
+    "command": [
+      "docker",
+      "volume",
+      "inspect",
+      "asservat-context-cqjvthn6-0-var"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: get asservat-context-cqjvthn6-0-var: no such volume\n"
+  },
+  {
+    "command": [
+      "docker",
+      "image",
+      "inspect",
+      "asservat-context-worker:context-cqjvthn6"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: No such image: asservat-context-worker:context-cqjvthn6\n"
+  },
+  {
+    "command": [
+      "docker",
+      "network",
+      "inspect",
+      "asservat-context-cqjvthn6"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: network asservat-context-cqjvthn6 not found\n"
+  },
+  {
+    "command": [
+      "docker",
+      "network",
+      "inspect",
+      "asservat-context-cqjvthn6-kind"
+    ],
+    "exit": 1,
+    "stdout": "[]\n",
+    "stderr": "Error response from daemon: network asservat-context-cqjvthn6-kind not found\n"
+  }
+]

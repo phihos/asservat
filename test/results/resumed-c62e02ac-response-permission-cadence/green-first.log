@@ -1,0 +1,7 @@
+ok  	asservat.local/asservat/internal/application/authorization	0.004s
+--- FAIL: TestContextNativeResponseCheckedAuthorityPreservesOriginalCutoffs (0.00s)
+    --- FAIL: TestContextNativeResponseCheckedAuthorityPreservesOriginalCutoffs/session (0.00s)
+        context_native_response_authority_test.go:99: bounded handoff failed or reconstructed authority download unavailable 1 0
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.082s
+FAIL

@@ -1,9 +1,27 @@
 # ADR-200 — On-demand capacity refresh
 
-Date: 2026-10-17. Status: accepted; implementation in progress.
+Date: 2026-10-17. Status: accepted; implemented; SQL and installed demand-refresh checks pass.
 Requirements: REQ-CAP-001/002/003, REQ-FED-001, S-02; TASK-03.
 Follows [ADR-197](197-regional-capacity.md) (regional capacity) and
 [ADR-190](190-capacity-readiness-and-promoted-owner.md) (hub capacity).
+
+Current qualification (2026-10-20): the capture readiness wait overlaps
+independent facts work and joins before the authoritative storage read. Both
+retain the one-second selection margin and original deadlines. Download demand
+rearming is implemented and SQL-tested. In
+[resumed native47](../../test/results/resumed-c62e02ac-native47/result.json),
+the demand lane supplied six distinct observations and 37 usable samples over
+15 seconds, but a later request was refused at the final storage margin.
+Refresh sampling does not guarantee sufficient freshness at a later read.
+[ADR-213](213-storage-readiness-at-consumption.md) adds bounded readiness at
+consumption within the same owned wait. Its implementation and
+[complete capture race checks](../../test/results/resumed-c62e02ac-storage-consumption/verification.json)
+pass. [Resumed native48](../../test/results/resumed-c62e02ac-native48/result.json)
+included that change, passed demand readiness with six distinct observations
+and 25 usable samples over 15 seconds, and reached acquisition and publication.
+The evidence does not establish that consumption polling caused that success.
+The overall test failed before fresh public status/case retrieval and download;
+the complete installed lifecycle remains unqualified.
 
 ## Context
 
@@ -62,6 +80,24 @@ always be refused.
   the investigation records a demand and rereads every 250 ms until the
   binding is fresh or its original deadline passes. No deadline is extended
   and no check is skipped; a timeout reports the existing retryable outcome.
+  The investigation owns one joined readiness wait per call. It overlaps
+  exact-Pod resolution for a request and the unchanged ordered
+  eligibility/capability/retention checks, then joins before the authoritative
+  storage read. Under [ADR-213](213-storage-readiness-at-consumption.md), a valid
+  result for the same selected storage with less than the existing one-second
+  margin may continue into a consumption phase of that same owned wait.
+  With refresh configured, it polls every 250 ms and may use the call's single
+  demand attempt if it has not already been spent. Each candidate retains its
+  own original timestamps; only a separately observed result with sufficient
+  margin may be consumed. The original caller, initial identity/recovery,
+  preview, target, eligibility/identity, capability, retention/proof/expiry and
+  optional reason cutoffs bound this phase. Missing refresh or an earlier
+  failed demand refuses a thin result that would require polling; an already
+  valid result with sufficient margin may still pass. Read errors, invalid or
+  changed storage, cancellation and expired original facts refuse the
+  operation. No second owned wait, target selection, facts refresh or
+  side-effect retry is added. The margin remains a check at selection, not a
+  guarantee of time remaining after later SQL waits.
 - **Downloads** re-arm the demand (migration 00067): demand rows keep their
   names after they expire, and download preparation, which knows only its
   download allocation, calls `demand_capacity_refresh_for_download`
@@ -80,6 +116,8 @@ always be refused.
   regional binding fresh, rather than polling for a discovery window.
 
 ## Progress
+
+Historical checkpoints recorded before the 2026-10-20 status refresh above:
 
 - **Implementation** (unit tests pass): migration 00066 with the demand table
   and two functions, schema 66, the role grants (`capture-preview`: demand;
@@ -135,3 +173,81 @@ always be refused.
   adapter never returns, so it would not have retried at all. Unit tests pass;
   the extended SQL stage passed on CI (fleet run 39077437536).
 
+
+## Revision (2026-10-23)
+
+Option 3 is now taken for the binding alone, under the maintainer's
+authorization of relaxed, bounded recheck intervals. Migration 00072
+(schema 72) makes `refresh_capacity_enrollment` store
+`fresh_until = observed_at + 30 seconds` and lets
+`capacity_managed_admission_until` accept a binding observed at most
+30 seconds earlier (the table CHECK and Go `StorageBinding.Valid` already
+allowed 30 seconds). Installed runs native64 and native68 showed demand
+refreshes taking 2 s or more, or failing, so the five-second window lapsed and
+query, capture and download admission flapped between refused and admitted.
+The refresh receipt returned to the caller keeps its original interval; the
+root source, trust, permission, recovery and request bounds are unchanged, and
+a workload or namespace change still takes effect at the next refresh, within
+30 seconds. Demand refresh stays as described above.
+
+Migration 00073 (schema 73) applies the same 30-second lifetime to the root
+`capacity_source` observation that `capacity_managed_root_until` requires for
+every capture, query and download admission. `accept_capacity_source` stores
+`fresh_until = observed_at + 30 seconds` for an accepted observation and the
+table CHECK accepts at most 30 seconds; installed runs showed the separate
+hub-worker source refresh failing under load (`capacity demand refresh:
+guarded-read (unavailable)`), so the five-second source window lapsed even
+when the binding was current. The acceptance receipt keeps its original
+five-second interval (Go `CapacitySourceInterval` is unchanged), negative and
+invalidating observations keep their original intervals and take effect
+immediately, and trust, permission-stream, recovery and request bounds are
+unchanged. A capacity source change still takes effect at the next accepted
+or invalidating observation.
+
+Migration 00074 (schema 74) applies the 30-second lifetime to the two remaining
+observations that `capacity_managed_root_until` intersects: the accepted
+`permission_stream` observation and the positive fleet trust observation
+(`fleet_observation`, read through `fleet_current_trust`). Both were written for
+five seconds by hub-worker refresh loops that run late under load, so every
+capture, approved query and download admission still lapsed whenever either
+refresh missed its window. The Go permission store writes
+`fresh_until = observed_at + 30 seconds` and keeps the stream lease at least
+that long; `observe_fleet_administration` stores the positive row for
+30 seconds. The permission_stream CHECK, the SQL capacity readers/locks, the
+Go stream fences and the ordinary/automation deny-snapshot bound
+(`authorization.PermissionObservationInterval`) accept 30 seconds; fleet trust
+consumers already accepted 30 seconds. Batch and caller receipts keep their
+original five-second intervals. Suspension, newly accepted denies or retired
+assignments, recovery blocking, database incarnation checks and the fleet
+failure fence still take effect immediately; only a missing refresh is
+tolerated for up to 30 seconds. Down narrows stored rows back to five seconds.
+
+Migration 00075 (schema 75) applies the 30-second lifetime to the accepted
+`retention_source` observation. Retained-policy resolution
+(`AcceptedRetentionReader`, used by approved-query projection, downloads,
+catalog listing and the retention transaction guard) intersected it with a
+five-second bound, and the hub-worker retention follower runs late under
+load, so installed `get_query_result` was refused at
+`current/authority/retention` (native74) even with every other input
+current. `ObserveRetention` still requires the original LIST and guard proof
+to be inside their five seconds when it writes, then stores
+`fresh_until = observed_at + 30 seconds` and keeps the source lease at least
+that long; the table CHECK, the Go source/snapshot readers
+(`privacy.RetentionSourceInterval`) and the derived `RetentionProof`
+(`artifact.RetentionProofInterval`) accept 30 seconds. Raw Kubernetes LIST
+snapshots, guard proofs and protected selector facts keep five seconds. A data
+event, a LIST with changed policy state, suspension, takeover and recovery
+blocking still clear the observation at once, bookmarks still never renew it,
+and an unchanged LIST awaiting watch progress keeps only the original
+deadline. Down narrows stored rows back to five seconds.
+
+Revision 2026-10-23 (maintainer decision, migration 00076, schema 76):
+download preparation and approved queries no longer need a fresh workload
+binding, so the download demand path is removed: `demand_capacity_refresh_for_download`,
+its `download-session` grant, the coordinator's stale-binding retry and the
+`binding-stale` diagnostic. `artifact_download` no longer carries the
+`zzz_capacity_new_admission` trigger, and its session snapshot records the
+workload's immutable enrollment identity without checking the binding.
+Operation audit outside the `capture` lane is no longer gated by
+`capacity_managed_root_until`. Capture preview and admission keep the demand
+lane and the binding/root freshness described above.

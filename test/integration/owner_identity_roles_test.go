@@ -238,7 +238,7 @@ func qualifyOwnerIdentityRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		t.Fatal("post-activation constructor", e)
 	}
 	t.Cleanup(producer.Close)
-	firstName, _ := postgres.OwnerIdentityRoleName(scope.InstallationID, "enrollment")
+	firstName, _ := postgres.OwnerIdentityRoleName(scope.InstallationID, "owner-runtime")
 	switch mode {
 	case "unknown-claim":
 		root.lostClaim = true
@@ -382,7 +382,7 @@ func qualifyOwnerIdentityRoles(t *testing.T, ctx context.Context, admin *pgxpool
 			t.Fatal("verification did not read root")
 		}
 		root.mu.Lock()
-		root.value.State.Roles[0].Password = root.value.State.Roles[1].Password
+		root.value.State.Roles[0].Password = strings.Repeat("Q", 43)
 		root.mu.Unlock()
 		if e = blocker.Commit(ctx); e != nil {
 			t.Fatal(e)
@@ -438,7 +438,7 @@ func qualifyOwnerIdentityRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		if e != nil {
 			t.Fatal(e)
 		}
-		pc.ConnConfig, pc.MaxConns, pc.MinConns = current, 1, 0
+		pc.ConnConfig, pc.MaxConns, pc.MinConns = current, contracts.OwnerIdentityPoolConnections, 0
 		runtime, e := pgxpool.NewWithConfig(ctx, pc)
 		if e != nil {
 			t.Fatal(e)
@@ -521,7 +521,7 @@ func qualifyOwnerIdentityRoles(t *testing.T, ctx context.Context, admin *pgxpool
 	// A changed password in private storage cannot be adopted or repaired.
 	root.mu.Lock()
 	originalPassword := root.value.State.Roles[0].Password
-	root.value.State.Roles[0].Password = root.value.State.Roles[1].Password
+	root.value.State.Roles[0].Password = strings.Repeat("Q", 43)
 	root.mu.Unlock()
 	if _, e = producer.Provision(ctx); e == nil {
 		t.Fatal("wrong persisted password silently adopted")
@@ -553,7 +553,7 @@ func qualifyOwnerIdentityRoles(t *testing.T, ctx context.Context, admin *pgxpool
 	if _, e = producer.Provision(ctx); e == nil {
 		t.Fatal("current recovery fence ignored")
 	}
-	t.Log("actual four-purpose owner SQL role creation/SCRAM/privilege matrix passed; inert resource journal, Secret root CAS, accepted owner source and native guard remain explicitly synthetic inputs")
+	t.Log("actual shared owner SQL role creation/SCRAM/privilege matrix passed; inert resource journal, Secret root CAS, accepted owner source and native guard remain explicitly synthetic inputs")
 }
 
 func ownerIdentityFixtureClaimEqual(a, b contracts.PublicRuntimeRoleClaim) bool {

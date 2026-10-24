@@ -52,8 +52,13 @@ func (s PolicyScope) Valid() bool {
 	}
 	return true
 }
-func (s PolicySnapshot) Valid(now time.Time) bool {
-	if !authorization.UUID(s.SourceClusterID) || !identity.Text(s.ControlNamespaceUID, 64) || !s.Revision.Valid() || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second) || len(s.Policies) > 1024 {
+
+// Valid checks a raw LIST snapshot (five seconds).
+func (s PolicySnapshot) Valid(now time.Time) bool { return s.validWithin(now, 5*time.Second) }
+
+// validWithin also serves accepted source snapshots (RetentionSourceInterval).
+func (s PolicySnapshot) validWithin(now time.Time, interval time.Duration) bool {
+	if !authorization.UUID(s.SourceClusterID) || !identity.Text(s.ControlNamespaceUID, 64) || !s.Revision.Valid() || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, interval) || len(s.Policies) > 1024 {
 		return false
 	}
 	seenUID, seenName := map[string]bool{}, map[string]bool{}
@@ -76,8 +81,13 @@ type SelectorFacts struct {
 	NamespaceKeys, WorkloadKeys     []string
 }
 
-func (f SelectorFacts) Valid(now time.Time) bool {
-	if !f.Target.Valid() || !f.Revision.Valid() || !identity.Fresh(f.ObservedAt, f.FreshUntil, now, 5*time.Second) || !identity.Strings(f.NamespaceKeys, 64, 253) || !identity.Strings(f.WorkloadKeys, 64, 253) {
+// Valid checks protected selector observations (five seconds).
+func (f SelectorFacts) Valid(now time.Time) bool { return f.validWithin(now, 5*time.Second) }
+
+// validWithin also serves facts bounded only by accepted sources
+// (RetentionSourceInterval) when no selector affects the result.
+func (f SelectorFacts) validWithin(now time.Time, interval time.Duration) bool {
+	if !f.Target.Valid() || !f.Revision.Valid() || !identity.Fresh(f.ObservedAt, f.FreshUntil, now, interval) || !identity.Strings(f.NamespaceKeys, 64, 253) || !identity.Strings(f.WorkloadKeys, 64, 253) {
 		return false
 	}
 	for i, labels := range []map[string]string{f.NamespaceLabels, f.WorkloadLabels} {
@@ -128,7 +138,9 @@ func matchPolicies(snapshots []PolicySnapshot, f SelectorFacts, origins []artifa
 	for _, r := range origins {
 		original[r.UID] = r
 	}
-	if !f.Valid(now) || len(snapshots) < 1 || len(snapshots) > 2 {
+	// Snapshots come from accepted sources (RetentionSourceInterval); protected
+	// selector facts were already checked against their own five seconds.
+	if !f.validWithin(now, RetentionSourceInterval) || len(snapshots) < 1 || len(snapshots) > 2 {
 		return nil, time.Time{}, ErrUnavailable
 	}
 	until := f.FreshUntil
@@ -137,7 +149,7 @@ func matchPolicies(snapshots []PolicySnapshot, f SelectorFacts, origins []artifa
 	var out []Policy
 	for _, s := range snapshots {
 		source := s.SourceClusterID + "/" + s.ControlNamespaceUID
-		if !s.Valid(now) || seenSource[source] || (!s.Hub && s.SourceClusterID != f.Target.ClusterID) {
+		if !s.validWithin(now, RetentionSourceInterval) || seenSource[source] || (!s.Hub && s.SourceClusterID != f.Target.ClusterID) {
 			return nil, time.Time{}, ErrUnavailable
 		}
 		seenSource[source] = true

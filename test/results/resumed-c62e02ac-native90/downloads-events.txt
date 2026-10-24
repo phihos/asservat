@@ -1,0 +1,9 @@
+LAST SEEN   TYPE      REASON             OBJECT                                                          MESSAGE
+2m32s       Normal    Scheduled          pod/asservat-query-99b66ff8-fd46-4964-841c-640a3183bddc-s98qn   Successfully assigned asservat-66bdb9181aaa4b4dbfa8e8a23c5b5489-downloads/asservat-query-99b66ff8-fd46-4964-841c-640a3183bddc-s98qn to asservat-context-rafbe7ur-0-control-plane
+2m32s       Normal    SuccessfulCreate   job/asservat-query-99b66ff8-fd46-4964-841c-640a3183bddc         Created pod: asservat-query-99b66ff8-fd46-4964-841c-640a3183bddc-s98qn
+2m31s       Normal    Pulled             pod/asservat-query-99b66ff8-fd46-4964-841c-640a3183bddc-s98qn   Container image "docker.io/library/asservat-context-worker@sha256:c50e73b8c436876ab3c9057dcb352e21b81a6f117001873001582e15e14b9d60" already present on machine and can be accessed by the pod
+2m31s       Normal    Created            pod/asservat-query-99b66ff8-fd46-4964-841c-640a3183bddc-s98qn   Container created
+2m31s       Normal    Started            pod/asservat-query-99b66ff8-fd46-4964-841c-640a3183bddc-s98qn   Container started
+92s         Normal    Killing            pod/asservat-query-99b66ff8-fd46-4964-841c-640a3183bddc-s98qn   Stopping container acquisition
+92s         Normal    SuccessfulDelete   job/asservat-query-99b66ff8-fd46-4964-841c-640a3183bddc         Deleted pod: asservat-query-99b66ff8-fd46-4964-841c-640a3183bddc-s98qn
+91s         Warning   DeadlineExceeded   job/asservat-query-99b66ff8-fd46-4964-841c-640a3183bddc         Job was active longer than specified deadline

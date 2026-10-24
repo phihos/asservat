@@ -1,0 +1,38 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/expired-prepared-is-passive-and-runner-uncertain
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-observation-headroom
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-caller-headroom
+=== RUN   TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/short-caller-reaches-no-runner-effects
+=== RUN   TestContextAdmissionWithRealServices/api-execution-retained-check-revoked-during-permission-lock
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier/due-pages-pass-persistent-failures-and-wrap
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher/due-pages-pass-persistent-failures-and-wrap
+=== RUN   TestContextAdmissionWithRealServices/download-worker-installed-original-authority
+    installed_download_preparation_test.go:162: preparation stage=authority elapsed=38.195885ms call-left=4.961800535s authority-left=-2562047h47m16.854775808s error=<nil>/<nil>
+    installed_download_preparation_test.go:163: authority checked=2026-10-23T00:37:43.426485637+02:00 valid-until=2026-10-23T00:37:48.058301+02:00 retention-until=2026-10-23T00:37:48.058301+02:00 environment-until=2026-10-23T00:37:48.426431617+02:00
+    installed_download_preparation_test.go:170: preparation stage=reserve elapsed=88.518758ms call-left=4.543346925s authority-left=4.543346145s error=<nil>/<nil>
+    installed_download_preparation_test.go:176: preparation stage=read-audit elapsed=105.026304ms call-left=4.526839449s authority-left=4.526838579s error=<nil>/<nil>
+    installed_download_preparation_test.go:185: preparation stage=write-audit elapsed=114.071152ms call-left=4.517794561s authority-left=4.517793411s error=<nil>/<nil>
+    installed_download_preparation_test.go:191: preparation stage=ack-audit elapsed=135.387969ms call-left=4.496477794s authority-left=4.496476884s error=<nil>/<nil>
+    installed_download_preparation_test.go:198: preparation stage=claim elapsed=182.800643ms call-left=4.44906516s authority-left=4.44906443s error=<nil>/<nil>
+    installed_download_preparation_test.go:212: preparation stage=create-job-boundary elapsed=183.004305ms call-left=4.448861488s authority-left=4.448860828s error=<nil>/<nil>
+    download_sessions_test.go:197: preparation result elapsed=183.084695ms original-request-left=4.816911785s authority-left=4.448774228s stages=[authority reserve read-audit write-audit ack-audit claim create-job-boundary] error=*errors.errorString/test stopped before Kubernetes Job creation
+    native_exchange_test.go:469: native fixture observation longest-refresh=39.327762ms widest-completion-gap=1.039765265s
+--- PASS: TestContextAdmissionWithRealServices (16.13s)
+    --- PASS: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries (5.89s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/expired-prepared-is-passive-and-runner-uncertain (2.62s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-observation-headroom (1.37s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/first-preparation-lock-consumes-caller-headroom (1.39s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-preparation-boundaries/short-caller-reaches-no-runner-effects (0.51s)
+    --- PASS: TestContextAdmissionWithRealServices/api-execution-retained-check-revoked-during-permission-lock (0.53s)
+    --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication (7.51s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier (3.78s)
+            --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier/due-pages-pass-persistent-failures-and-wrap (0.04s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher (3.72s)
+            --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher/due-pages-pass-persistent-failures-and-wrap (0.04s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-installed-original-authority (1.80s)
+PASS
+ok  	asservat.local/asservat/test/integration	17.204s

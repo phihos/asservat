@@ -34,6 +34,18 @@ func (r *HubRouter) RegisterNativeExchange(ctx context.Context, input evidence.N
 		return nil, artifact.ErrInvalid
 	}
 	operation := input.Operation
+	var projection json.RawMessage
+	if operation.Kind == value.NativeProjection {
+		if input.Projection == nil || !input.Projection.Valid() || input.Projection.Version != operation.SourceVersion {
+			return nil, artifact.ErrInvalid
+		}
+		projection, e = json.Marshal(*input.Projection)
+		if e != nil {
+			return nil, e
+		}
+	} else if input.Projection != nil {
+		return nil, artifact.ErrInvalid
+	}
 	delivery := input.Delivery
 	registration, e := r.Register(ctx, operation, func(owner, admission context.Context, origin evidence.NativeOrigin, _ contracts.NativeHello) (*HubOperation, error) {
 		gate, e := evidence.NewNativeFrameGate(owner, func(call context.Context) (value.NativeLease, error) { return check(call, origin) }, time.Now)
@@ -61,7 +73,7 @@ func (r *HubRouter) RegisterNativeExchange(ctx context.Context, input evidence.N
 		if operation.Kind == value.NativeObserve {
 			payload = []byte("null")
 		}
-		command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: nativeReference(operation), Kind: string(operation.Kind), Source: payload, Operation: wire, ParentID: operation.ParentID, Generation: operation.Generation, LeaseSequence: lease.Sequence, Until: lease.Until.UTC().Format(time.RFC3339Nano)}
+		command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: nativeReference(operation), Kind: string(operation.Kind), Projection: projection, Source: payload, Operation: wire, ParentID: operation.ParentID, Generation: operation.Generation, LeaseSequence: lease.Sequence, Until: lease.Until.UTC().Format(time.RFC3339Nano)}
 		if operation.Kind == value.NativeResponse {
 			command.WindowID = delivery.WindowID
 			command.Offset = delivery.Offset

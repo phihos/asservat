@@ -22,13 +22,26 @@ import (
 )
 
 func initialBootstrapRunnerFixture(t *testing.T) (InitialBootstrapRunnerPlan, *core.ConfigMap, *core.Pod) {
+	p, cm, pod, _ := initialInstallerRunnerFixture(t, false)
+	return p, cm, pod
+}
+
+func initialInstallerRunnerFixture(t *testing.T, continuation bool) (InitialBootstrapRunnerPlan, *core.ConfigMap, *core.Pod, *core.ConfigMap) {
 	t.Helper()
 	input := contracts.InitialBootstrapInput{Format: contracts.InitialBootstrapInputFormat, Name: "install", BootstrapNamespace: "trusted-bootstrap", TargetNamespace: "asservat", RunnerAccount: "install-bootstrap-runner", Image: initialWorkloadPlan().Image}
 	refs := contracts.InitialBootstrapRunnerInput{Format: contracts.InitialBootstrapRunnerInputFormat, ProducerSecret: "operator-producer", SchemaSecret: "operator-schema", RetirementSecret: "operator-retirement"}
+	var next *core.ConfigMap
+	if continuation {
+		public := contracts.InstallerContinuation{Format: contracts.InstallerContinuationFormat, Namespace: input.BootstrapNamespace}
+		data, _ := json.Marshal(public)
+		digest := sha256.Sum256(data)
+		refs.ContinuationDigest = hex.EncodeToString(digest[:])
+		next = &core.ConfigMap{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: meta.ObjectMeta{Name: initialBootstrapContinuationInputName(input.Name, refs.ContinuationDigest), Namespace: input.BootstrapNamespace, UID: types.UID(ownerID(3)), ResourceVersion: "3"}, Immutable: ptr.To(true), Data: map[string]string{contracts.InstallerContinuationFile: string(data)}}
+	}
 	a, _ := json.Marshal(input)
 	b, _ := json.Marshal(refs)
 	sum := sha256.Sum256(append(append(append([]byte{}, a...), '\n'), b...))
-	p := InitialBootstrapRunnerPlan{Namespace: input.BootstrapNamespace, Name: input.Name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret}
+	p := InitialBootstrapRunnerPlan{Namespace: input.BootstrapNamespace, Name: input.Name, Image: input.Image, InputDigest: hex.EncodeToString(sum[:]), ProducerSecret: refs.ProducerSecret, SchemaSecret: refs.SchemaSecret, RetirementSecret: refs.RetirementSecret, ContinuationDigest: refs.ContinuationDigest}
 	cm := &core.ConfigMap{TypeMeta: meta.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"}, ObjectMeta: meta.ObjectMeta{Name: initialBootstrapRunnerInputName(p.Name, p.InputDigest), Namespace: p.Namespace, UID: types.UID(ownerID(1)), ResourceVersion: "1"}, Immutable: ptr.To(true), Data: map[string]string{"bootstrap.json": string(a), "runner.json": string(b)}}
 	pod, err := BuildInitialBootstrapRunner(p)
 	if err != nil {
@@ -43,11 +56,11 @@ func initialBootstrapRunnerFixture(t *testing.T) (InitialBootstrapRunnerPlan, *c
 		id := "containerd://" + name
 		return core.ContainerStatus{Name: name, Image: p.Image, ImageID: p.Image, ContainerID: id, State: core.ContainerState{Terminated: &core.ContainerStateTerminated{ContainerID: id, StartedAt: started, FinishedAt: finished, ExitCode: 0}}}
 	}
-	for _, name := range []string{"produce", "schema", "prepare"} {
-		pod.Status.InitContainerStatuses = append(pod.Status.InitContainerStatuses, status(name))
+	for _, c := range pod.Spec.InitContainers {
+		pod.Status.InitContainerStatuses = append(pod.Status.InitContainerStatuses, status(c.Name))
 	}
-	pod.Status.ContainerStatuses = []core.ContainerStatus{status("retire")}
-	return p, cm, pod
+	pod.Status.ContainerStatuses = []core.ContainerStatus{status(pod.Spec.Containers[0].Name)}
+	return p, cm, pod, next
 }
 
 func TestInitialBootstrapRunnerResumeRequiresEveryActualProcessToHaveEnded(t *testing.T) {

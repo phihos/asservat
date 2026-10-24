@@ -97,7 +97,7 @@ func (s *ContextPublications) publicationFence(ctx context.Context, q *custodydb
 	if err != nil {
 		return err
 	}
-	if !a.Valid(e, evidence.ContextExpectationDigest(e), n.Time) || stream.ID != id(a.RootID) || stream.Epoch != id(a.PermissionEpoch) || stream.Sequence != a.PermissionSequence || !bytes.Equal(stream.ProjectionDigest, a.ProjectionDigest[:]) || stream.Suspended || !stream.InitialAuditID.Valid || !n.Time.Before(stream.LeaseUntil.Time) || !identity.Fresh(stream.ObservedAt.Time, stream.FreshUntil.Time, n.Time, 5*time.Second) {
+	if !a.Valid(e, evidence.ContextExpectationDigest(e), n.Time) || stream.ID != id(a.RootID) || stream.Epoch != id(a.PermissionEpoch) || stream.Sequence != a.PermissionSequence || !bytes.Equal(stream.ProjectionDigest, a.ProjectionDigest[:]) || stream.Suspended || !stream.InitialAuditID.Valid || !n.Time.Before(stream.LeaseUntil.Time) || !identity.Fresh(stream.ObservedAt.Time, stream.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
 		return privacy.ErrFence
 	}
 	for _, auditID := range []pgtype.UUID{stream.Epoch, stream.InitialAuditID} {

@@ -12,7 +12,7 @@ const (
 	InstallerContinuationFormat = "asservat-installer-continuation/v1"
 	InstallerContinuationRoot   = "/run/asservat/installer-continue"
 	InstallerContinuationFile   = "continuation.json"
-	// The continuation Pod's produce step re-projects the preparer here.
+	// The installer runner's retirement step refreshes the preparer here.
 	InstallerContinuationPreparerRoot = "/run/asservat/initial-preparer"
 	InstallerContinuationMaxBytes     = 64 << 10
 	InstallerRecipeOutboxFormat       = "asservat-installer-recipe-outbox/v1"

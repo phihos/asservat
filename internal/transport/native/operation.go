@@ -3,6 +3,7 @@ package native
 import (
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
+	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
@@ -33,6 +34,8 @@ type HubOperation struct {
 	reserved, attached, closed, used bool
 	stream                           Stream
 	metadata                         chan artifact.NativeDownloadMetadata
+	projection                       chan query.PodStatusProjection
+	projectionScope                  query.ContextProjectionScope
 	body                             chan []byte
 	action                           chan nativeAction
 	done                             chan struct{}
@@ -92,6 +95,15 @@ func newHubOperationChecked(gate *evidence.NativeFrameGate, checked *checkedNati
 	// replace a source after reviewing/admitting the operation.
 	c.Operation = append(json.RawMessage(nil), c.Operation...)
 	c.Source = append(json.RawMessage(nil), c.Source...)
+	c.Projection = append(json.RawMessage(nil), c.Projection...)
+	var projectionScope query.ContextProjectionScope
+	if o.Kind == value.NativeProjection {
+		if nativeDecode(c.Projection, &projectionScope) != nil || !projectionScope.Valid() || projectionScope.Version != o.SourceVersion {
+			return nil, artifact.ErrInvalid
+		}
+	} else if len(c.Projection) != 0 {
+		return nil, artifact.ErrInvalid
+	}
 	encoded, e := json.Marshal(expected)
 	if e != nil {
 		return nil, e
@@ -111,7 +123,7 @@ func newHubOperationChecked(gate *evidence.NativeFrameGate, checked *checkedNati
 		return nil, artifact.ErrDownloadUnavailable
 	}
 	ctx, cancel := context.WithDeadline(gate.Context(), until)
-	result := &HubOperation{gate: gate, complete: complete, command: c, expected: cloned, delivery: delivery, ctx: ctx, cancel: cancel, metadata: make(chan artifact.NativeDownloadMetadata, 1), body: make(chan []byte), action: make(chan nativeAction), done: make(chan struct{})}
+	result := &HubOperation{gate: gate, complete: complete, command: c, expected: cloned, delivery: delivery, ctx: ctx, cancel: cancel, metadata: make(chan artifact.NativeDownloadMetadata, 1), projection: make(chan query.PodStatusProjection, 1), projectionScope: projectionScope, body: make(chan []byte), action: make(chan nativeAction), done: make(chan struct{})}
 	if o.Kind == value.NativeResponse && !result.matchChunk(delivery, c.Offset, c.Length) {
 		cancel()
 		return nil, artifact.ErrInvalid
@@ -285,31 +297,34 @@ type nativeCompletionProof struct {
 func (o *HubOperation) finish(ctx context.Context, s Stream, phase string) error {
 	lease, err := o.gate.Check(ctx)
 	if err != nil {
-		return err
+		return step("gate", err)
 	}
 	call, stop := context.WithDeadline(ctx, lease.Until)
 	defer stop()
 	if err = o.complete(call, lease); err != nil {
-		return err
+		return step("complete", err)
 	}
 	if call.Err() != nil || o.ctx.Err() != nil || !lease.Valid(time.Now()) {
-		return artifact.ErrDownloadExpired
+		return step("expired", artifact.ErrDownloadExpired)
 	}
 	terminal, ok := s.(interface {
 		sendCompleted(context.Context, contracts.NativeFrame, nativeCompletionProof) error
 	})
 	if !ok {
-		return contracts.ErrNativeProtocol
+		return step("terminal-stream", contracts.ErrNativeProtocol)
 	}
 	payload, err := json.Marshal(ack(o.command, phase, 0))
 	if err != nil {
 		return err
 	}
 	defer clear(payload)
-	return terminal.sendCompleted(call, contracts.NativeFrame{Kind: contracts.NativeDoneFrame, Payload: payload}, nativeCompletionProof{o.gate, lease, o.command.Nonce, phase})
+	return step("send-done", terminal.sendCompleted(call, contracts.NativeFrame{Kind: contracts.NativeDoneFrame, Payload: payload}, nativeCompletionProof{o.gate, lease, o.command.Nonce, phase}))
 }
 
 func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
+	// The closed stage of a failed conversation, for the operator report only.
+	stage := "attach"
+	defer func() { err = step(stage, err) }()
 	o.mu.Lock()
 	if !o.reserved || o.attached || o.closed || s == nil {
 		o.mu.Unlock()
@@ -323,9 +338,11 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 	defer cancel()
 	stop := context.AfterFunc(ctx, cancel)
 	defer stop()
+	stage = "command"
 	if e := sendControl(work, s, contracts.NativeCommandFrame, o.command); e != nil {
 		return e
 	}
+	stage = "result"
 	if o.command.Kind == "read-context-response" {
 		f, e := s.Receive(work)
 		if e != nil {
@@ -344,6 +361,16 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 			clear(f.Payload)
 			return work.Err()
 		}
+	} else if o.command.Kind == string(value.NativeProjection) {
+		p, e := o.readProjection(work, s)
+		if e != nil {
+			return e
+		}
+		select {
+		case o.projection <- p:
+		case <-work.Done():
+			return work.Err()
+		}
 	} else {
 		m, e := o.readMetadata(work, s)
 		if e != nil {
@@ -355,6 +382,7 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 			return work.Err()
 		}
 	}
+	stage = "consumer"
 	var action nativeAction
 	select {
 	case action = <-o.action:
@@ -362,6 +390,7 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 		return work.Err()
 	}
 	defer func() { action.done <- err }()
+	stage = "close"
 	// Do not close a successful observation before the original hub caller has
 	// consumed it under the still-current gate. No extra wire authority is
 	// introduced: this local acknowledgement only permits normal stream close.
@@ -386,6 +415,22 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 			return err
 		}
 		return o.finish(work, s, "closed")
+	}
+	if o.command.Kind == string(value.NativeProjection) {
+		if action.phase != "approved" || action.n != 0 {
+			return step("action", contracts.ErrNativeProtocol)
+		}
+		if err = sendControl(work, s, contracts.NativeAcknowledgeFrame, ack(o.command, "approved", 0)); err != nil {
+			return step("ack", err)
+		}
+		f, e := s.Receive(work)
+		if e != nil {
+			return step("worker-closed", e)
+		}
+		if err = exactAck(f, contracts.NativeDoneFrame, o.command, "closed", 0); err != nil {
+			return step("worker-closed-frame", err)
+		}
+		return step("finish", o.finish(work, s, "joined"))
 	}
 	if action.phase != "delivered" || action.n != o.command.Length {
 		return contracts.ErrNativeProtocol

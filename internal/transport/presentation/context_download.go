@@ -125,9 +125,12 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 		return s.cancel(ctx, current, call, input)
 	}
 	initial, err := current.ResolveIdentity(ctx)
-	if err != nil || ctx.Err() != nil || !initial.Valid(s.config.Now()) || !slices.Contains(initial.Scopes, "evidence:read") || !slices.Contains(initial.Scopes, "evidence:download") {
+	if err != nil || ctx.Err() != nil || !initial.Valid(s.config.Now()) {
 		return OperationReply{}, identity.ErrDenied
 	}
+	// A valid session without download scope gets the ordinary audited denial
+	// reply, not a transport failure (an approved-inspection-only login).
+	scoped := slices.Contains(initial.Scopes, "evidence:read") && slices.Contains(initial.Scopes, "evidence:download")
 	if !authorization.UUID(call.requestID) {
 		return OperationReply{}, artifact.ErrDownloadUnavailable
 	}
@@ -136,7 +139,9 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 	defer cancel()
 	var view evidence.ContextDownloadView
 	prepare := name == "prepare_artifact_download"
-	if prepare {
+	if !scoped {
+		err = identity.ErrDenied
+	} else if prepare {
 		view, err = s.downloads.PrepareContextDownload(ctx, current, input.ArtifactID, input.Key)
 	} else {
 		view, err = s.downloads.GetContextDownload(ctx, current, input.DownloadID)
@@ -151,11 +156,11 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 		}
 	} else {
 		if view.Session.Scope.Principal != initial.Principal || prepare && view.Session.Scope.ArtifactID != input.ArtifactID || !prepare && view.Session.ID != input.DownloadID {
-			return OperationReply{}, artifact.ErrDownloadUnavailable
+			return OperationReply{}, stopped("download-scope", artifact.ErrDownloadUnavailable)
 		}
 		data, e := contextDownloadData(view, prepare, s.config.Now())
 		if e != nil {
-			return OperationReply{}, e
+			return OperationReply{}, stopped("download-view", e)
 		}
 		until = identity.Earlier(until, view.ValidUntil)
 		// The callback exists only on this original authenticated browser POST.
@@ -163,7 +168,7 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 		if prepare && !view.Session.State.Terminal() && call.downloadAttachment != nil {
 			attachmentUntil, e := call.downloadAttachment(ctx, view.Session.ID)
 			if e != nil {
-				return OperationReply{}, artifact.ErrDownloadUnavailable
+				return OperationReply{}, stopped("download-attachment", artifact.ErrDownloadUnavailable)
 			}
 			until = identity.Earlier(until, attachmentUntil)
 		}
@@ -175,9 +180,13 @@ func (s *ContextDownloadOperations) CallWithContext(ctx context.Context, current
 	}
 	until = identity.Earlier(until, final.ValidUntil)
 	body, e := json.Marshal(out)
-	if e != nil || s.contracts.ValidateOutput(name, body) != nil || ctx.Err() != nil || !s.config.Now().Before(until) {
+	if e != nil || s.contracts.ValidateOutput(name, body) != nil {
 		clear(body)
-		return OperationReply{}, artifact.ErrDownloadUnavailable
+		return OperationReply{}, stopped("download-output", artifact.ErrDownloadUnavailable)
+	}
+	if ctx.Err() != nil || !s.config.Now().Before(until) {
+		clear(body)
+		return OperationReply{}, stopped("download-expired", artifact.ErrDownloadUnavailable)
 	}
 	return OperationReply{Body: body, ValidUntil: until, auditDecision: decision}, nil
 }

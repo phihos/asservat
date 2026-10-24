@@ -112,7 +112,7 @@ func (s *journeyEnrollmentTrace) Report(t *testing.T) {
 }
 
 type journeyEnrollmentPorts struct {
-	evidence.WorkerEnrollmentExchange
+	evidence.AcquisitionEnrollmentExchange
 	evidence.CurrentDownloadAuthority
 	evidence.DownloadAuthorityGate
 	evidence.WorkerEnrollmentProofReader
@@ -156,8 +156,8 @@ func (s *journeyEnrollmentTrace) Wrap(in evidence.WorkerEnrollmentCoordinator) e
 	}
 	return in
 }
-func (d journeyEnrollmentPorts) BeginWorkerEnrollment(c context.Context, i, s, w string, token, csr []byte) (evidence.WorkerEnrollmentDelivery, error) {
-	v, e := d.WorkerEnrollmentExchange.BeginWorkerEnrollment(c, i, s, w, token, csr)
+func (d journeyEnrollmentPorts) BeginAcquisitionEnrollment(c context.Context, i string, p value.AcquisitionParent, w string, token, csr []byte) (evidence.WorkerEnrollmentDelivery, error) {
+	v, e := d.AcquisitionEnrollmentExchange.BeginAcquisitionEnrollment(c, i, p, w, token, csr)
 	d.trace.record(0, e)
 	return v, e
 }
@@ -171,18 +171,18 @@ func (d journeyEnrollmentPorts) ReadWorkerEnrollmentProof(c context.Context, s, 
 	d.trace.record(2, e)
 	return v, e
 }
-func (d journeyEnrollmentPorts) ClaimWorkerEnrollment(c context.Context, p value.WorkerEnrollmentProof, a artifact.DownloadAuthority) (value.WorkerEnrollment, auditvalue.Receipt, bool, error) {
-	v, r, b, e := d.WorkerEnrollmentLedger.ClaimWorkerEnrollment(c, p, a)
+func (d journeyEnrollmentPorts) ClaimWorkerEnrollment(c context.Context, p value.WorkerEnrollmentProof) (value.WorkerEnrollment, auditvalue.Receipt, bool, error) {
+	v, r, b, e := d.WorkerEnrollmentLedger.ClaimWorkerEnrollment(c, p)
 	d.trace.record(3, e)
 	return v, r, b, e
 }
-func (d journeyEnrollmentPorts) PrepareWorkerCertificate(c context.Context, p value.WorkerEnrollmentProof, a artifact.DownloadAuthority) (value.WorkerCertificateProgress, error) {
-	v, e := d.WorkerEnrollmentLedger.PrepareWorkerCertificate(c, p, a)
+func (d journeyEnrollmentPorts) PrepareWorkerCertificate(c context.Context, p value.WorkerEnrollmentProof) (value.WorkerCertificateProgress, error) {
+	v, e := d.WorkerEnrollmentLedger.PrepareWorkerCertificate(c, p)
 	d.trace.record(4, e)
 	return v, e
 }
-func (d journeyEnrollmentPorts) StoreWorkerCertificate(c context.Context, a value.WorkerCertificateAttempt, v value.WorkerCertificate, p artifact.DownloadAuthority) error {
-	e := d.WorkerEnrollmentLedger.StoreWorkerCertificate(c, a, v, p)
+func (d journeyEnrollmentPorts) StoreWorkerCertificate(c context.Context, a value.WorkerCertificateAttempt, v value.WorkerCertificate) error {
+	e := d.WorkerEnrollmentLedger.StoreWorkerCertificate(c, a, v)
 	d.trace.record(5, e)
 	return e
 }
@@ -216,8 +216,8 @@ func (d journeyEnrollmentPorts) SignWorkerCertificate(c context.Context, a value
 	d.trace.record(11, e)
 	return v, e
 }
-func (d journeyEnrollmentPorts) ActivateWorkerCertificate(c context.Context, p value.WorkerEnrollmentProof, a value.WorkerCertificateAttempt, v artifact.DownloadAuthority) (value.WorkerCertificate, error) {
-	out, e := d.WorkerCertificateActivator.ActivateWorkerCertificate(c, p, a, v)
+func (d journeyEnrollmentPorts) ActivateWorkerCertificate(c context.Context, p value.WorkerEnrollmentProof, a value.WorkerCertificateAttempt) (value.WorkerCertificate, error) {
+	out, e := d.WorkerCertificateActivator.ActivateWorkerCertificate(c, p, a)
 	d.trace.record(12, e)
 	return out, e
 }

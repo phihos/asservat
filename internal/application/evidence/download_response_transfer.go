@@ -25,6 +25,9 @@ type DownloadResponseTransfer struct {
 	Audit     DownloadWindowAcknowledgements
 	Now       func() time.Time
 	NewID     func() string
+	// Bootstrap supplies an exact-response ordinary-entitlement owner. Other
+	// authority implementations retain their existing fresh-check behavior.
+	NewResponseAuthority func(context.Context, artifact.DownloadScope) (CurrentDownloadAuthority, func(), error)
 }
 
 func (t DownloadResponseTransfer) valid() bool {
@@ -32,18 +35,26 @@ func (t DownloadResponseTransfer) valid() bool {
 }
 
 type responseCurrent struct {
-	reader    identities.ReaderIdentity
-	authority CurrentDownloadAuthority
-	batch     identities.IdentityBatch
-	scope     artifact.DownloadScope
-	value     artifact.DownloadAuthority
-	now       func() time.Time
-	response  identityvalue.RefreshResponseBinding
-	pauseUsed bool
-	lastPause identityvalue.RefreshPause
+	reader       identities.ReaderIdentity
+	authority    CurrentDownloadAuthority
+	batch        identities.IdentityBatch
+	scope        artifact.DownloadScope
+	value        artifact.DownloadAuthority
+	now          func() time.Time
+	response     identityvalue.RefreshResponseBinding
+	pauseUsed    bool
+	lastPause    identityvalue.RefreshPause
+	endAuthority func()
 }
 
 func (c *responseCurrent) close() {
+	c.closeBatch()
+	if c.endAuthority != nil {
+		c.endAuthority()
+		c.endAuthority = nil
+	}
+}
+func (c *responseCurrent) closeBatch() {
 	if c.batch != nil {
 		c.batch.Close()
 		c.batch = nil
@@ -56,7 +67,7 @@ func (c *responseCurrent) get(ctx context.Context) (artifact.DownloadAuthority, 
 	if c.batch != nil && c.value.Valid(c.now()) {
 		return c.value, nil
 	}
-	c.close()
+	c.closeBatch()
 	b, e := c.begin(ctx)
 	if e != nil {
 		return artifact.DownloadAuthority{}, e
@@ -64,17 +75,17 @@ func (c *responseCurrent) get(ctx context.Context) (artifact.DownloadAuthority, 
 	c.batch = b
 	a, e := c.authority.CheckDownloadCurrent(ctx, b, c.scope)
 	if e != nil {
-		c.close()
+		c.closeBatch()
 		return artifact.DownloadAuthority{}, e
 	}
 	i, e := b.ResolveIdentity(ctx)
 	if e != nil || i.Principal != c.scope.Principal {
-		c.close()
+		c.closeBatch()
 		return artifact.DownloadAuthority{}, artifact.ErrDownloadUnavailable
 	}
 	a.ValidUntil = identityvalue.Earlier(a.ValidUntil, i.ValidUntil)
 	if !a.Valid(c.now()) || a.Scope != c.scope || ctx.Err() != nil {
-		c.close()
+		c.closeBatch()
 		return artifact.DownloadAuthority{}, artifact.ErrDownloadExpired
 	}
 	c.value = a
@@ -97,8 +108,12 @@ func (t DownloadResponseTransfer) TransferAudited(ctx context.Context, reader id
 }
 func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identities.ReaderIdentity, request DownloadResponseRequest, source NativeResponseSource, destination DownloadResponseSinkFactory, auditor DownloadContentAuditor) (err error) {
 	if !t.valid() || ctx == nil || reader == nil || source == nil || destination == nil || !authorization.UUID(request.SessionID) || !authorization.UUID(request.ResponseID) || !authorization.UUID(request.OwnerID) || !t.Now().Before(request.HardUntil) || request.HardUntil.After(t.Now().Add(8*time.Hour)) {
-		return artifact.ErrInvalid
+		return stepped("request", artifact.ErrInvalid)
 	}
+	// Every refusal names its closed stage for the operator report; the
+	// wrapper unwraps unchanged and runs after every other deferred close.
+	stage := "identity"
+	defer func() { err = stepped(stage, err) }()
 	defer reader.Close()
 	defer source.Close()
 	work, cancel := context.WithDeadline(ctx, request.HardUntil)
@@ -118,6 +133,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	finished := false
 	initial := i
 	if auditor != nil {
+		stage = "preflight-audit"
 		original := identityvalue.Earlier(i.ValidUntil, t.Now().Add(artifact.DownloadLease))
 		call, end := context.WithDeadline(work, original)
 		defer end()
@@ -152,7 +168,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		}
 		until = identityvalue.Earlier(until, fresh.ValidUntil)
 		if current.scope.Valid() {
-			checked, e := t.Authority.CheckDownloadCurrent(preflightWork, first, current.scope)
+			checked, e := current.authority.CheckDownloadCurrent(preflightWork, first, current.scope)
 			if e != nil || !checked.Valid(t.Now()) || checked.Scope != current.scope {
 				return artifact.ErrDownloadUnavailable
 			}
@@ -184,6 +200,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		}
 		i = fresh
 	}
+	stage = "session"
 	session, e := t.Sessions.LookupDownload(preflightWork, request.SessionID, i.Principal)
 	if e != nil {
 		return e
@@ -192,8 +209,19 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		return artifact.ErrDownloadUnavailable
 	}
 	current.scope = session.Scope
+	stage = "authority"
+	if t.NewResponseAuthority != nil {
+		owned, close, err := t.NewResponseAuthority(work, session.Scope)
+		if err != nil || owned == nil || close == nil {
+			if close != nil {
+				close()
+			}
+			return artifact.ErrDownloadUnavailable
+		}
+		current.authority, current.endAuthority = owned, close
+	}
 	// get must authorize even though the ingress batch already exists.
-	a, e := t.Authority.CheckDownloadCurrent(preflightWork, first, session.Scope)
+	a, e := current.authority.CheckDownloadCurrent(preflightWork, first, session.Scope)
 	if e != nil {
 		return e
 	}
@@ -209,10 +237,13 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	until := identityvalue.Earlier(request.HardUntil, identityvalue.Earlier(session.Deadline, a.AccessUntil))
 	work, cancelResponse := context.WithDeadline(work, until)
 	defer cancelResponse()
+	stage = "describe"
 	describe, stop := context.WithDeadline(preflightWork, a.ValidUntil)
 	var metadata artifact.NativeDownloadMetadata
 	var readLimit int64
-	if remote, ok := source.(CurrentNativeResponseSource); ok {
+	if native, ok := source.(*ContextNativeResponse); ok {
+		metadata, readLimit, e = native.describeChecked(describe, current.batch, session, a)
+	} else if remote, ok := source.(CurrentNativeResponseSource); ok {
 		metadata, readLimit, e = remote.DescribeCurrent(describe, current.batch, session, a)
 	} else {
 		metadata, readLimit, e = source.Describe(describe, session, a)
@@ -225,6 +256,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		return artifact.ErrDownloadUnavailable
 	}
 	until = identityvalue.Earlier(until, metadata.ReadUntil)
+	stage = "select"
 	selection, e := destination.SelectDownloadResponse(metadata)
 	if e != nil {
 		return e
@@ -236,6 +268,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	if !plan.Valid() {
 		return artifact.ErrInvalid
 	}
+	stage = "preflight-finish"
 	if e = finishPreflight(DownloadContentReady); e != nil {
 		return e
 	}
@@ -246,6 +279,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	if d, ok := work.Deadline(); ok {
 		until = identityvalue.Earlier(until, d)
 	}
+	stage = "body"
 	if receive, ok := destination.(DownloadContentBodyReceiver); ok {
 		if e = receive.BeginDownloadContentBody(work, until); e != nil {
 			return e
@@ -255,7 +289,8 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	// remain usable, but its initial identity lease may be nearly exhausted.
 	// Close it before admitting content and acquire a distinct current batch;
 	// neither the old observation nor Describe is renewed or replayed.
-	current.close()
+	current.closeBatch()
+	stage = "current"
 	a, e = current.get(work)
 	if e != nil {
 		return e
@@ -268,6 +303,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	}
 	work, stopContent := context.WithDeadline(work, until)
 	defer stopContent()
+	stage = "response"
 	r, e := t.Responses.BeginDownloadResponse(work, session.ID, a, artifact.DownloadResponse{ID: request.ResponseID, SessionID: session.ID, OwnerID: request.OwnerID, Plan: plan, Until: until})
 	if e != nil {
 		return e
@@ -288,6 +324,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 			err = closeErr
 		}
 	}()
+	stage = "open"
 	sink, e := destination.OpenDownloadResponse(work, metadata, r)
 	if e != nil {
 		return e
@@ -296,6 +333,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	fullHash := sha256.New()
 	offset := selection.Offset
 	for ordinal := int64(1); ordinal <= plan.Windows(); ordinal++ {
+		stage = "window-current"
 		a, e = current.get(work)
 		if e != nil {
 			return e
@@ -304,6 +342,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		if !authorization.UUID(windowID) {
 			return artifact.ErrInvalid
 		}
+		stage = "window"
 		intent, e := t.Responses.BeginDownloadWindow(work, session.ID, r.ID, r.OwnerID, windowID, a)
 		if e != nil {
 			return e
@@ -311,10 +350,12 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		if !intent.Valid() || intent.Response.ID != r.ID || intent.Window.Ordinal != ordinal || intent.Window.Offset != offset || intent.Window.Authority.Scope != session.Scope {
 			return artifact.ErrIntegrity
 		}
+		stage = "window-audit"
 		result, e := t.Objects.CreateDownloadWindowIntent(work, intent)
 		if e != nil {
 			return e
 		}
+		stage = "window-ack"
 		if e = t.Audit.AcknowledgeDownloadWindowIntent(work, intent, result); e != nil {
 			return e
 		}
@@ -323,11 +364,13 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 		verified := false
 		transferErr := func() error {
 			for emitted < intent.Window.Length || intent.Window.Length == 0 && lease.Sequence == 0 {
+				stage = "chunk-current"
 				a, e = current.get(work)
 				if e != nil {
 					return e
 				}
 				if !lease.Valid(t.Now()) {
+					stage = "lease"
 					lease, e = t.Responses.LeaseDownloadResponse(work, session.ID, r.ID, r.OwnerID, windowID, a)
 					if e != nil {
 						return e
@@ -337,10 +380,13 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 					}
 				}
 				length := min(artifact.DeliveryBytes, intent.Window.Length-emitted)
+				stage = "read"
 				piece, stop := context.WithDeadline(work, lease.Until)
 				var chunk NativeResponseChunk
 				var e error
-				if remote, ok := source.(CurrentNativeResponseSource); ok {
+				if native, ok := source.(*ContextNativeResponse); ok {
+					chunk, e = native.readChunkChecked(piece, current.batch, lease, offset, length)
+				} else if remote, ok := source.(CurrentNativeResponseSource); ok {
 					chunk, e = remote.ReadChunkCurrent(piece, current.batch, lease, offset, length)
 				} else {
 					chunk, e = source.ReadChunk(piece, lease, offset, length)
@@ -365,6 +411,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 					stop()
 					return artifact.ErrIntegrity
 				}
+				stage = "write"
 				n, writeErr := sink.WriteChunk(piece, lease, offset, chunk.Bytes)
 				clear(chunk.Bytes)
 				if n < 0 || n > length {
@@ -378,6 +425,7 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 				}
 				if writeErr == nil {
 					if remote, ok := source.(NativeResponseDeliveryAcknowledger); ok {
+						stage = "chunk-ack"
 						writeErr = remote.AcknowledgeNativeChunk(piece, lease, offset-n, n)
 						if writeErr == nil && (piece.Err() != nil || !lease.Valid(t.Now())) {
 							writeErr = artifact.ErrDownloadExpired
@@ -408,9 +456,11 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 			return transferErr
 		}
 		if recordErr != nil {
+			stage = "window-outcome"
 			return recordErr
 		}
 	}
+	stage = "finish"
 	if offset != selection.Offset+selection.Length {
 		return artifact.ErrIntegrity
 	}
@@ -418,5 +468,6 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 	if e = sink.Finish(work); e != nil {
 		return e
 	}
+	stage = "close"
 	return nil
 }

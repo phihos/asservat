@@ -1,0 +1,26 @@
+API context current-check diagnostic verification transcript
+Recorded from observed terminal tool outputs; no tests rerun to write this record. Raw logs were saved by the original subprocess invocation.
+
+api-check-diagnostic-red
+CWD: /home/phil/Projekte/asservat-resume-0450e73c
+HEAD: f7d3fe142b693eb7a1c29b4dd32b7492792982f0
+Command: env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 'GOFLAGS=-buildvcs=false -p=1' GOCACHE=/home/phil/.cache/asservat-build/recovered-c62e02ac/native41-full go test ./internal/application/execution -run '^TestAPIContextCheckDiagnostics' -count=1 -v
+Started UTC: 2026-10-20T17:34:49.335664+00:00
+Observed terminal: functions.exec_command chunk0fc85f exit1
+Elapsed seconds: 0.9365999829606153
+Exit code: 1
+Raw log: /home/phil/.cache/asservat-build/recovered-c62e02ac/api-check-diagnostic-red.log
+Metadata and before/after SHA256: /home/phil/.cache/asservat-build/recovered-c62e02ac/api-check-diagnostic-red.json
+SQL-read control passed; 11 first-check cases and two later-check cases failed only missing substep diagnostics. Earlier sentinel/read-order/deadline/effect assertions held.
+
+api-check-diagnostic-green-race
+CWD: /home/phil/Projekte/asservat-resume-0450e73c
+HEAD: f7d3fe142b693eb7a1c29b4dd32b7492792982f0
+Command: env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 'GOFLAGS=-buildvcs=false -p=1' GOCACHE=/home/phil/.cache/asservat-build/recovered-c62e02ac/native41-full go test -race ./internal/application/execution -count=1 -v
+Started UTC: 2026-10-20T17:35:39.820827+00:00
+Observed terminal: functions.write_stdin session23529 chunk1c1123 exit0
+Elapsed seconds: 2.6720003669615835
+Exit code: 0
+Raw log: /home/phil/.cache/asservat-build/recovered-c62e02ac/api-check-diagnostic-green-race.log
+Metadata and before/after SHA256: /home/phil/.cache/asservat-build/recovered-c62e02ac/api-check-diagnostic-green-race.json
+Full execution package, including both new diagnostic tests, passed under race detection in1.169s.

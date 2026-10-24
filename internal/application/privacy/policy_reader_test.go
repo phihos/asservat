@@ -154,3 +154,40 @@ func TestAcceptedRetainedReaderKeepsOriginalPoliciesAndAvoidsUnneededMetadata(t 
 		t.Fatal("new collection skipped required selector guard")
 	}
 }
+
+// ADR-200 revision (2026-10-23): accepted sources are current for 30 seconds
+// after their original observation, so a late hub-worker refresh does not
+// refuse retained-policy resolution; longer or expired intervals still refuse.
+func TestAcceptedRetentionSourcesAreCurrentForThirtySeconds(t *testing.T) {
+	for _, mode := range []string{"current", "overlong", "expired"} {
+		t.Run(mode, func(t *testing.T) {
+			f, r := acceptedRetentionTest()
+			start := f.now
+			f.topology.FreshUntil = start.Add(value.PolicyTopologyInterval)
+			for key, v := range f.sources {
+				v.FreshUntil = start.Add(value.RetentionSourceInterval)
+				if mode == "overlong" && key == "local" {
+					v.FreshUntil = v.FreshUntil.Add(time.Microsecond)
+				}
+				v.Snapshot.FreshUntil = v.FreshUntil
+				f.sources[key] = v
+			}
+			f.now = start.Add(20 * time.Second)
+			if mode == "expired" {
+				f.now = start.Add(value.RetentionSourceInterval)
+			}
+			// Protected selector facts keep their own five-second interval.
+			f.facts.ObservedAt, f.facts.FreshUntil = f.now, f.now.Add(5*time.Second)
+			got, err := r.RetainedRetentionPolicies(context.Background(), f.facts.Target, []artifact.RetentionRule{{UID: "rule-hub", Generation: 1, Digest: artifact.Digest{4}}})
+			if mode != "current" {
+				if err == nil {
+					t.Fatal("stale or overlong source accepted")
+				}
+				return
+			}
+			if err != nil || !got.Complete || !got.ObservedAt.Equal(start) || !got.FreshUntil.Equal(f.now.Add(5*time.Second)) || !got.Proof.Valid(f.now) {
+				t.Fatal(got, err)
+			}
+		})
+	}
+}

@@ -116,7 +116,7 @@ func qualifyWorkerHistoricalVersions(t *testing.T, ctx context.Context, f native
 		}
 		return a
 	}
-	progress, err := f.enrollment.ledger.PrepareWorkerCertificate(ctx, proof(t), authority(t))
+	progress, err := f.enrollment.ledger.PrepareWorkerCertificate(ctx, proof(t))
 	if err != nil || progress.Signed == nil {
 		t.Fatal("original signed attempt", err)
 	}
@@ -150,7 +150,7 @@ func qualifyWorkerHistoricalVersions(t *testing.T, ctx context.Context, f native
 		if err := refresh(); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.enrollment.activation.ActivateWorkerCertificate(ctx, proof(t), progress.Attempt, authority(t)); err != nil {
+		if _, err := f.enrollment.activation.ActivateWorkerCertificate(ctx, proof(t), progress.Attempt); err != nil {
 			t.Fatal("current activation baseline", err)
 		}
 		if _, err := f.enrollment.bindings.ReadDownloadWorkerIdentity(ctx, w.Intent.SessionID, cert.Peer); err != nil {
@@ -213,11 +213,11 @@ func qualifyWorkerHistoricalVersions(t *testing.T, ctx context.Context, f native
 						}
 					}
 					if kind != "certificate" {
-						if _, err := f.enrollment.ledger.PrepareWorkerCertificate(ctx, p, authority); err == nil {
+						if _, err := f.enrollment.ledger.PrepareWorkerCertificate(ctx, p); err == nil {
 							t.Fatal("historical audit authorized signing preparation")
 						}
 					}
-					if _, err := f.enrollment.activation.ActivateWorkerCertificate(ctx, p, progress.Attempt, authority); err == nil {
+					if _, err := f.enrollment.activation.ActivateWorkerCertificate(ctx, p, progress.Attempt); err == nil {
 						t.Fatal("historical audit authorized certificate activation")
 					}
 					if _, err := f.enrollment.bindings.ReadDownloadWorkerIdentity(ctx, w.Intent.SessionID, cert.Peer); err == nil {

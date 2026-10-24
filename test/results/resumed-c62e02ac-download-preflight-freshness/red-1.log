@@ -1,0 +1,31 @@
+=== RUN   TestContextDownloadConsumedPreflightDoesNotExpirePreparation
+=== RUN   TestContextDownloadConsumedPreflightDoesNotExpirePreparation/readiness
+    context_download_preflight_freshness_test.go:90: probe did not cross only the consumed preflight interval [] download unavailable
+=== RUN   TestContextDownloadConsumedPreflightDoesNotExpirePreparation/configuration-readiness
+    context_download_preflight_freshness_test.go:90: probe did not cross only the consumed preflight interval [] download unavailable
+=== RUN   TestContextDownloadConsumedPreflightDoesNotExpirePreparation/plan
+    context_download_preflight_freshness_test.go:90: probe did not cross only the consumed preflight interval [] download unavailable
+--- FAIL: TestContextDownloadConsumedPreflightDoesNotExpirePreparation (0.00s)
+    --- FAIL: TestContextDownloadConsumedPreflightDoesNotExpirePreparation/readiness (0.00s)
+    --- FAIL: TestContextDownloadConsumedPreflightDoesNotExpirePreparation/configuration-readiness (0.00s)
+    --- FAIL: TestContextDownloadConsumedPreflightDoesNotExpirePreparation/plan (0.00s)
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds/caller
+    context_download_preflight_freshness_test.go:130: expired or canceled authority reached worker launch caller [] download unavailable
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds/identity
+    context_download_preflight_freshness_test.go:130: expired or canceled authority reached worker launch identity [] download unavailable
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds/authority
+    context_download_preflight_freshness_test.go:130: expired or canceled authority reached worker launch authority [] download unavailable
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds/session
+    context_download_preflight_freshness_test.go:130: expired or canceled authority reached worker launch session [] download unavailable
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds/canceled
+    context_download_preflight_freshness_test.go:130: expired or canceled authority reached worker launch canceled [] download unavailable
+--- FAIL: TestContextDownloadConsumedPreflightKeepsHardBounds (0.00s)
+    --- FAIL: TestContextDownloadConsumedPreflightKeepsHardBounds/caller (0.00s)
+    --- FAIL: TestContextDownloadConsumedPreflightKeepsHardBounds/identity (0.00s)
+    --- FAIL: TestContextDownloadConsumedPreflightKeepsHardBounds/authority (0.00s)
+    --- FAIL: TestContextDownloadConsumedPreflightKeepsHardBounds/session (0.00s)
+    --- FAIL: TestContextDownloadConsumedPreflightKeepsHardBounds/canceled (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.004s
+FAIL

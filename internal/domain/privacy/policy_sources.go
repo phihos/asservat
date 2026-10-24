@@ -21,8 +21,13 @@ type PolicyTopology struct {
 	ObservedAt, FreshUntil  time.Time
 }
 
+// PolicyTopologyInterval bounds one topology observation. The topology is an
+// installer-pinned immutable ConfigMap whose content digest every read checks,
+// so the authorized 30 s recheck cadence applies (ADR-200 revision 2026-10-23).
+const PolicyTopologyInterval = 30 * time.Second
+
 func (t PolicyTopology) Valid(now time.Time) bool {
-	if !authorization.UUID(t.RootID) || !authorization.UUID(t.TargetClusterID) || !t.Revision.Valid() || !identity.Fresh(t.ObservedAt, t.FreshUntil, now, 5*time.Second) || len(t.Sources) < 1 || len(t.Sources) > 2 {
+	if !authorization.UUID(t.RootID) || !authorization.UUID(t.TargetClusterID) || !t.Revision.Valid() || !identity.Fresh(t.ObservedAt, t.FreshUntil, now, PolicyTopologyInterval) || len(t.Sources) < 1 || len(t.Sources) > 2 {
 		return false
 	}
 	hubs := 0
@@ -53,6 +58,13 @@ type AcceptedSource struct {
 	ObservedAt, FreshUntil time.Time
 }
 
+// RetentionSourceInterval bounds an accepted retention source observation:
+// 30 seconds after its original LIST/guard observation under the maintainer's
+// relaxed recheck cadence (ADR-200 revision 2026-10-23). A raw Kubernetes LIST
+// or guard proof keeps five seconds; invalidation, suspension and takeover
+// still clear the accepted observation at once, and bookmarks never renew it.
+const RetentionSourceInterval = artifact.RetentionProofInterval
+
 func (s AcceptedSource) Valid(now time.Time) bool {
-	return authorization.UUID(s.RootID) && authorization.UUID(s.Epoch) && s.Ready && s.Snapshot.Valid(now) && s.Acceptance.Valid() && s.ProtectionDigest != (artifact.Digest{}) && identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second)
+	return authorization.UUID(s.RootID) && authorization.UUID(s.Epoch) && s.Ready && s.Snapshot.validWithin(now, RetentionSourceInterval) && s.Acceptance.Valid() && s.ProtectionDigest != (artifact.Digest{}) && identity.Fresh(s.ObservedAt, s.FreshUntil, now, RetentionSourceInterval)
 }

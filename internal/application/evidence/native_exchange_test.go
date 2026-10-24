@@ -132,3 +132,40 @@ func TestNativeFrameGateRequiresProcessingAndExactPath(t *testing.T) {
 		})
 	}
 }
+
+// An approved projection conversation spans its operation (evidence-read
+// window): each frame's five-second observation must be current, but no longer
+// ends the conversation. A revoked check still refuses the next frame.
+func TestNativeFrameGateProjectionSpansOperationAndRefusesRevokedFrame(t *testing.T) {
+	base := nativeLeaseFixture()
+	start := base.Operation.StartedAt
+	base.Operation.Kind = value.NativeProjection
+	base.Operation.Reference.SessionID, base.Operation.Reference.QueryID = "", base.Operation.Reference.WorkerID
+	base.Operation.Until = start.Add(identity.EvidenceReadRequestWindow)
+	base.Operation.Processing.ValidUntil = base.Operation.Until
+	var clock atomic.Int64
+	now := func() time.Time { return start.Add(time.Duration(clock.Load())) }
+	var revoked atomic.Bool
+	observe := func(context.Context) (value.NativeLease, error) {
+		if revoked.Load() {
+			return value.NativeLease{}, artifact.ErrDownloadUnavailable
+		}
+		v := base
+		v.ObservedAt, v.Until = now(), now().Add(5*time.Second)
+		return v, nil
+	}
+	g, err := NewNativeFrameGate(context.Background(), observe, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer g.Close()
+	clock.Store(int64(12 * time.Second))
+	l, err := g.Check(context.Background())
+	if err != nil || !l.Until.Equal(base.Operation.Until) {
+		t.Fatal("projection frame after twelve seconds refused or shortened", err, l.Until)
+	}
+	revoked.Store(true)
+	if _, err = g.Check(context.Background()); err == nil {
+		t.Fatal("revoked projection frame accepted")
+	}
+}

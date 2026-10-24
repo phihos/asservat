@@ -1,5 +1,15 @@
 # Acquisition worker startup and supervision
 
+Current installed composition is revised by [ADR-219](../decisions/219-shared-approved-acquisition.md)
+and [ADR-221](../decisions/221-admitted-worker-identity-enrollment.md): one closed
+acquisition parent selects native download or approved pod-status. Certificate
+enrollment uses the exact admitted worker and its own bounded HTTP request,
+without a human certificate-owner registry/locator/relay. Native-operation
+ownership and each purpose's current key/evidence authority remain separate.
+The older certificate-routing components and their tests below are historical
+component evidence, not the installed certificate path. Shared composition
+qualification is still pending.
+
 [ADR-073](../decisions/073-worker-startup.md) composes the credential phase of A-ACQUIRE using the existing [worker credential channel](worker-credential-channel.md), [protected configuration](worker-configuration.md) and [dispatch](download-worker-dispatch.md). C-20 owns wire shapes, C-21 owns trust/token/crypto adapters, C-14 owns supervision and C-24 owns original identity/period values. `cmd/asservat` selects the role and `internal/bootstrap` chooses concrete adapters. The executable does not import Kubernetes or SQL clients just to read its fixed projected files.
 
 ## Inputs and trust

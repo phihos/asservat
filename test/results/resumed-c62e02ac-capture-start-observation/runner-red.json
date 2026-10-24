@@ -1,0 +1,28 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-timeout=60s",
+    "./internal/application/execution",
+    "-run",
+    "^TestAPIContextRunnerOneRequestObservation$",
+    "-v"
+  ],
+  "env": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exit": 1,
+  "seconds": 4.118866762961261,
+  "before": {
+    "internal/application/execution/api_context.go": "8ad319f3b4272acbfc899d12fa4e1c8c23d903f504342e8d2db4c2de22d87282",
+    "internal/application/execution/api_observation_test.go": "b8eb96c3a32d8c255565772219890f13dfcc128af739606afdfafe7a00fb3a67"
+  },
+  "after": {
+    "internal/application/execution/api_context.go": "8ad319f3b4272acbfc899d12fa4e1c8c23d903f504342e8d2db4c2de22d87282",
+    "internal/application/execution/api_observation_test.go": "b8eb96c3a32d8c255565772219890f13dfcc128af739606afdfafe7a00fb3a67"
+  }
+}

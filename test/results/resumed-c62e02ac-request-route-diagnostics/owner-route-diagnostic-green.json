@@ -1,0 +1,34 @@
+{
+  "cwd": "/home/phil/Projekte/asservat-resume-0450e73c",
+  "argv": [
+    "go",
+    "test",
+    "-race",
+    "./internal/application/fleet",
+    "-run",
+    "^TestOwnerRouteRefusal(DiagnosticsKeepBoundaries|ReachesAuthenticatorSink)$",
+    "-count=1",
+    "-v"
+  ],
+  "env": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1",
+    "GOCACHE": "/home/phil/.cache/asservat-build/recovered-c62e02ac/native41-full"
+  },
+  "head": "8b153eb25b47e8b075d97ef24327ba793cf8adb8",
+  "startUTC": "2026-10-20T16:58:19.132497+00:00",
+  "sourceBefore": {
+    "internal/application/fleet/owner.go": "3c80c91588d00eae223738ce36d5096e4de286dd5726f53dcafa3ac002c8f385",
+    "internal/application/fleet/owner_route_diagnostic.go": "8beb3131e4869fddc43d0f2e5e9ff4d87cb50975a8b2b2118d72f8f20d08c443",
+    "internal/application/fleet/owner_route_diagnostic_test.go": "20c3d7550b228d5b9774e202488138c92ff2b2fb5346fb6793c49f4ba9226766"
+  },
+  "exitCode": 0,
+  "elapsedSeconds": 2.8489958999562077,
+  "sourceAfter": {
+    "internal/application/fleet/owner.go": "3c80c91588d00eae223738ce36d5096e4de286dd5726f53dcafa3ac002c8f385",
+    "internal/application/fleet/owner_route_diagnostic.go": "8beb3131e4869fddc43d0f2e5e9ff4d87cb50975a8b2b2118d72f8f20d08c443",
+    "internal/application/fleet/owner_route_diagnostic_test.go": "20c3d7550b228d5b9774e202488138c92ff2b2fb5346fb6793c49f4ba9226766"
+  }
+}

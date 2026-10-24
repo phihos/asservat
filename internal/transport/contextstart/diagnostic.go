@@ -59,10 +59,17 @@ const (
 	streamRegionalResult
 	streamRegionalReceipt
 	streamWorkPeerLease
+	streamHubQuery
+	streamHubQuerySource
+	streamHubQueryCheck
+	streamRegionalQueryOwner
+	streamRegionalQueryWrite
+	streamRegionalQueryLocal
+	streamRegionalQueryOwnerAuth
 )
 
 func (v StreamInterruption) Stage() string {
-	names := [...]string{"none", "owner", "close", "send-admission", "receive-admission", "send-call", "receive-call", "send-peer", "receive-peer", "send-bound", "receive-bound", "send-deadline", "receive-deadline", "write", "flush", "read", "send-result", "receive-result", "passive-call", "passive-deadline", "passive-frame", "passive-peer", "hub-setup", "hub-send", "hub-receive", "hub-operations", "hub-result", "hub-receipt", "regional-setup", "regional-work", "regional-verify", "regional-operations", "regional-result", "regional-receipt", "work-peer-lease"}
+	names := [...]string{"none", "owner", "close", "send-admission", "receive-admission", "send-call", "receive-call", "send-peer", "receive-peer", "send-bound", "receive-bound", "send-deadline", "receive-deadline", "write", "flush", "read", "send-result", "receive-result", "passive-call", "passive-deadline", "passive-frame", "passive-peer", "hub-setup", "hub-send", "hub-receive", "hub-operations", "hub-result", "hub-receipt", "regional-setup", "regional-work", "regional-verify", "regional-operations", "regional-result", "regional-receipt", "work-peer-lease", "hub-query", "hub-query-source", "hub-query-check", "regional-query-owner", "regional-query-write", "regional-query-local", "regional-query-owner-auth"}
 	if int(v.stage) >= len(names) {
 		return "unknown"
 	}

@@ -51,6 +51,55 @@ type AuditedOperations struct {
 	mu        sync.Mutex
 	active    map[string]int
 	rate      map[string]auditRate
+	// Timing receives a fixed operation lane separately from stage durations.
+	// No input, identity or result enters either argument.
+	Timing func(event, timing string)
+}
+
+// callTiming marks stage ends of one audited call for Timing.
+type callTiming struct {
+	start, admitted, begin, call, finish time.Time
+}
+
+func (t callTiming) report(lane string, steps *auditapp.StepTimes, out func(string, string)) {
+	if out == nil {
+		return
+	}
+	line := "pre" + durationBucket(t.admitted, t.start) + " begin" + durationBucket(t.begin, t.admitted)
+	if !t.call.IsZero() {
+		line += " call" + durationBucket(t.call, t.begin)
+	}
+	if !t.finish.IsZero() {
+		line += " finish" + durationBucket(t.finish, t.call)
+	}
+	line += " total" + durationBucket(time.Now(), t.start)
+	if s := steps.String(); s != "" {
+		line += " [" + s + "]"
+	}
+	out(lane, line)
+}
+
+// durationBucket keeps timing lines in a finite vocabulary.
+func durationBucket(end, start time.Time) string {
+	if end.IsZero() {
+		return "@none"
+	}
+	switch d := end.Sub(start); {
+	case d < 100*time.Millisecond:
+		return "@<100ms"
+	case d < 250*time.Millisecond:
+		return "@<250ms"
+	case d < 500*time.Millisecond:
+		return "@<500ms"
+	case d < time.Second:
+		return "@<1s"
+	case d < 2*time.Second:
+		return "@<2s"
+	case d < 3*time.Second:
+		return "@<3s"
+	default:
+		return "@>=3s"
+	}
 }
 
 func NewAuditedOperations(c AuditedOperationsConfig, inner *InvestigationOperations, normal, resolution auditapp.OperationAuditor, mac *auditapp.OperationMAC) (*AuditedOperations, error) {
@@ -194,6 +243,18 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	if s == nil || ctx == nil || current == nil || ctx.Err() != nil || len(raw) > 32<<10 || len(name) > 8192 {
 		return OperationReply{}, auditapp.ErrUnavailable
 	}
+	timing := callTiming{start: time.Now()}
+	lane := ""
+	var steps *auditapp.StepTimes
+	if s.Timing != nil {
+		ctx, steps = auditapp.WithStepTimes(ctx)
+	}
+	event := ""
+	defer func() {
+		if lane != "" {
+			timing.report(event, steps, s.Timing)
+		}
+	}()
 	initial, err := current.ResolveIdentity(ctx)
 	checkedAt := s.config.Now()
 	now := checkedAt.UTC().Truncate(time.Microsecond)
@@ -227,13 +288,16 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		format = "context-query-input/v1"
 	}
 	var normalized []byte
+	downloadScopeDenied := false
 	if rejection == 0 {
 		if len(name) > 128 || !utf8.ValidString(name) {
 			rejection = IngressInvalid
 		} else if normalized, err = s.normalize(name, raw); err != nil {
 			rejection = IngressInvalid
-		} else if !slices.Contains(initial.Scopes, "evidence:read") || (name == "prepare_artifact_download" || name == "get_artifact_download") && !slices.Contains(initial.Scopes, "evidence:download") {
+		} else if !slices.Contains(initial.Scopes, "evidence:read") {
 			rejection = IngressDenied
+		} else if (name == "prepare_artifact_download" || name == "get_artifact_download") && !slices.Contains(initial.Scopes, "evidence:download") {
+			rejection, downloadScopeDenied = IngressDenied, true
 		}
 	}
 	op := name
@@ -268,7 +332,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	if err != nil {
 		return OperationReply{}, auditapp.ErrUnavailable
 	}
-	until := identity.Earlier(initial.ValidUntil, now.Add(5*time.Second))
+	until := identity.Earlier(initial.ValidUntil, now.Add(audit.OperationRequestWindow(op)))
 	if d, ok := ctx.Deadline(); ok {
 		until = identity.Earlier(until, d)
 	}
@@ -284,7 +348,16 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 			cancel()
 		}
 	}()
-	if e := s.audit[audit.OperationLane(op)].Begin(ctx, intent); e != nil {
+	lane, timing.admitted = audit.OperationLane(op), time.Now()
+	// Evidence reads get their own timing sequence, so a few reads among many
+	// other normal-lane calls still reach the doubling report.
+	event = lane
+	if audit.OperationRequestWindow(op) > 5*time.Second {
+		event = op
+	}
+	e := s.audit[lane].Begin(ctx, intent)
+	timing.begin = time.Now()
+	if e != nil {
 		return OperationReply{}, stoppedAt("audit-begin", e, auditapp.ErrUnavailable)
 	}
 	var reply OperationReply
@@ -317,6 +390,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 				call.queryInvocation = newContextQueryInvocation(ctx, intent, s.mac, s.config.Now)
 			}
 			reply, callErr = s.inner.CallWithContext(ctx, current, call, name, raw)
+			timing.call = time.Now()
 			reply.boundCleanup(intent.WriteUntil)
 			// Only a private, proven pre-dispatch rejection can rule out an
 			// effect from this invocation. A service error or response timeout
@@ -338,6 +412,7 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 	// request authority. This bounded synchronous completion never redispatches.
 	auditCtx, finishCancel := context.WithDeadline(context.WithoutCancel(ctx), intent.WriteUntil)
 	e = s.audit[audit.OperationLane(op)].Finish(auditCtx, out)
+	timing.finish = time.Now()
 	finishCancel()
 	if e != nil {
 		clearReply()
@@ -361,12 +436,22 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 		clearReply()
 		bound := OperationReply{ValidUntil: identity.Earlier(until, final.ValidUntil)}
 		if errors.Is(callErr, identity.ErrDenied) {
+			// A missing download scope is an ordinary audited refusal for the
+			// client, not a service outage (native61/62).
+			if downloadScopeDenied {
+				if body, ok := s.deniedReply(name, requestID); ok {
+					bound.Body = body
+					return bound, nil
+				}
+			}
 			return bound, identity.ErrDenied
 		}
 		if errors.Is(callErr, contracts.ErrInvestigationWire) {
 			return bound, contracts.ErrInvestigationWire
 		}
-		return bound, auditapp.ErrUnavailable
+		// The service's own closed stage, if any, names this refusal in the
+		// transport report; the returned class is unchanged.
+		return bound, stoppedAt("service", callErr, auditapp.ErrUnavailable)
 	}
 	if !s.config.Now().Before(reply.ValidUntil) {
 		clearReply()
@@ -563,4 +648,14 @@ func (e *callStop) FixedStep() string {
 func stopped(step string, err error) error { return &callStop{step: step, err: err} }
 func stoppedAt(step string, cause, err error) error {
 	return &callStop{step: step, err: err, cause: cause}
+}
+
+// deniedReply is the tool's ordinary NotAvailable envelope for a scope
+// rejection; false when the tool's output contract cannot carry it.
+func (s *AuditedOperations) deniedReply(name, requestID string) ([]byte, bool) {
+	body, err := json.Marshal(OperationEnvelope{SchemaVersion: "mcp-result/v1", RequestID: requestID, DataClass: "metadata", Status: "error", Warnings: []string{}, Provenance: []any{}, Data: OperationFailure{Code: "NotAvailable", Message: "This operation is not available with your current access.", Retryable: false}})
+	if err != nil || s.contracts.ValidateOutput(name, body) != nil {
+		return nil, false
+	}
+	return body, true
 }

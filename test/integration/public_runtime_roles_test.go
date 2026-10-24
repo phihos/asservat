@@ -238,7 +238,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		t.Fatal("post-activation constructor", e)
 	}
 	t.Cleanup(producer.Close)
-	firstName, _ := postgres.PublicRuntimeRoleName(scope.InstallationID, "identity-read")
+	firstName, _ := postgres.PublicRuntimeRoleName(scope.InstallationID, "hub-runtime")
 	switch mode {
 	case "unknown-claim":
 		root.lostClaim = true
@@ -320,9 +320,43 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 			t.Fatal("lost completion reported success")
 		}
 	}
+	// Match production's independently observed fleet source during positive
+	// complete-inventory calls. Each observation still lasts five seconds;
+	// stopping joins the observer before any later fault/recovery assertions.
+	provisionCurrent := func() (out contracts.PublicRuntimeRoleSnapshot, err error) {
+		stop := keepFixtureFleetCurrent(ctx, observer, a)
+		defer func() { err = errors.Join(err, stop()) }()
+		return producer.Provision(ctx)
+	}
 	refresh()
-	snapshot, e := producer.Provision(ctx)
+	provisionStarted := time.Now()
+	snapshot, e := provisionCurrent()
 	if e != nil {
+		// Failure-only fixture diagnostics distinguish an expired synthetic
+		// fleet observation from an incomplete role inventory. They do not
+		// refresh the source, retry provisioning or alter the failed interval.
+		root.mu.Lock()
+		claims, receipts := 0, 0
+		for _, role := range root.value.State.Roles {
+			if role.Claim != nil {
+				claims++
+			}
+			if role.Receipt != nil {
+				receipts++
+			}
+		}
+		root.mu.Unlock()
+		t.Logf("failed_role_provision_elapsed_ms=%d original_fleet_fresh_until=%s claims=%d receipts=%d expected=%d", time.Since(provisionStarted).Milliseconds(), a.FreshUntil.Format(time.RFC3339Nano), claims, receipts, len(contracts.PublicRuntimeRolePurposes()))
+		read, cancel := context.WithTimeout(ctx, time.Second)
+		var observed, fresh, current time.Time
+		var suspended, blocked bool
+		readErr := admin.QueryRow(read, `SELECT observed_at,fresh_until,clock_timestamp(),suspended,recovery_blocked FROM fleet_current_trust WHERE installation_id=$1`, scope.InstallationID).Scan(&observed, &fresh, &current, &suspended, &blocked)
+		cancel()
+		if readErr == nil {
+			t.Logf("failed_role_provision_current_fleet observed_at=%s fresh_until=%s database_now=%s expired=%t suspended=%t recovery_blocked=%t", observed.Format(time.RFC3339Nano), fresh.Format(time.RFC3339Nano), current.Format(time.RFC3339Nano), !current.Before(fresh), suspended, blocked)
+		} else {
+			t.Log("failed_role_provision_current_fleet unavailable")
+		}
 		t.Fatal("provision/reconcile fixed roles", e)
 	}
 	var originalVerifier string
@@ -330,7 +364,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		t.Fatal("missing SCRAM verifier")
 	}
 	refresh()
-	again, e := producer.Provision(ctx)
+	again, e := provisionCurrent()
 	if e != nil || root.claims != len(contracts.PublicRuntimeRolePurposes()) || again.State.OperationID != snapshot.State.OperationID {
 		t.Fatal("restart renewed creation claims", e)
 	}
@@ -371,7 +405,14 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		if e != nil {
 			t.Fatal(e)
 		}
-		pc.ConnConfig, pc.MaxConns, pc.MinConns = current, 1, 0
+		limit, known := contracts.PublicRuntimeRolePoolLimit(role.Purpose)
+		if !known {
+			t.Fatal("unknown runtime pool limit", role.Purpose)
+		}
+		if role.Purpose == "hub-runtime" {
+			limit = contracts.PublicRuntimeHubOrdinaryConnections
+		}
+		pc.ConnConfig, pc.MaxConns, pc.MinConns = current, int32(limit), 0
 		runtime, e := pgxpool.NewWithConfig(ctx, pc)
 		if e != nil {
 			t.Fatal(e)
@@ -382,11 +423,11 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 				runtime.Close()
 				t.Fatal("runtime's own catalog/provenance check", role.Purpose, e)
 			}
-			// A pre-ADR160 receipt is incomplete, even if its remaining roles and
-			// passwords are otherwise exact. No runtime schema/layout migration.
+			// An incomplete pinned-role receipt must not be accepted even when the
+			// shared credential is otherwise exact. No runtime layout adoption.
 			old := manifest
 			old.Roles = slices.DeleteFunc(slices.Clone(manifest.Roles), func(r contracts.PublicRuntimeCredentialProof) bool {
-				return r.Purpose == "capture-preview" || r.Purpose == "capture-resolution"
+				return r.Purpose == "capture-intent-read" || r.Purpose == "worker-config-read"
 			})
 			if e = postgres.VerifyPublicRuntimeCredential(ctx, runtime, old, role.Purpose); !errors.Is(e, cfg.ErrInvalid) {
 				runtime.Close()
@@ -417,50 +458,31 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 	if mode == "lost-completion" {
 		return
 	}
-	// Independent runtime processes can retain one connection each. The fixed
-	// role ceiling also includes one verification login, and does not silently
-	// become the per-process pool setting or an unbounded rollout allowance.
-	login := c.Copy()
-	login.User, login.Password, login.RequireAuth = snapshot.State.Roles[0].Receipt.RoleName, snapshot.State.Roles[0].Password, "scram-sha-256"
-	var active []*pgx.Conn
-	defer func() {
-		closeCtx, stop := context.WithTimeout(context.Background(), 5*time.Second)
-		defer stop()
-		for _, conn := range active {
-			_ = conn.Close(closeCtx)
-		}
-	}()
-	for range contracts.PublicRuntimeRoleConnections {
-		conn, e := pgx.ConnectConfig(ctx, login.Copy())
-		if e != nil {
-			t.Fatal("bounded independent login unavailable", e)
-		}
-		active = append(active, conn)
+	// The aggregate login ceiling covers all retained processes. Qualify its
+	// exact installed value without opening 81 connections against this fixture's
+	// 48-connection server. The shared pool fixture exercises actual per-process
+	// saturation, both reserved lanes, cancellation and connection reuse.
+	roleLimit, known := contracts.PublicRuntimeRoleConnectionLimit(snapshot.State.Roles[0].Purpose)
+	if !known || roleLimit != 81 {
+		t.Fatal("unexpected physical role ceiling", roleLimit)
 	}
-	excess, e := pgx.ConnectConfig(ctx, login.Copy())
-	if excess != nil {
-		_ = excess.Close(ctx)
+	var actualLimit int
+	if e = admin.QueryRow(ctx, "SELECT rolconnlimit FROM pg_roles WHERE rolname=$1", firstName).Scan(&actualLimit); e != nil || actualLimit != roleLimit {
+		t.Fatal("installed role-wide connection ceiling differs", actualLimit, e)
 	}
-	var full *pgconn.PgError
-	if !errors.As(e, &full) || full.Code != "53300" {
-		t.Fatal("role-wide connection ceiling not enforced", e)
-	}
-	if e = active[0].Close(ctx); e != nil {
-		t.Fatal(e)
-	}
-	replacement, e := pgx.ConnectConfig(ctx, login.Copy())
-	if e != nil {
-		t.Fatal("closed connection capacity not reusable", e)
-	}
-	active[0] = replacement
-	for _, conn := range active {
-		if e = conn.Close(ctx); e != nil {
-			t.Fatal(e)
+	assertOriginalPoolLock := func() {
+		t.Helper()
+		var columnUpdate, tableUpdate bool
+		if err := admin.QueryRow(ctx, "SELECT has_column_privilege($1, 'public.custody_pool', 'id', 'UPDATE'), has_table_privilege($1, 'public.custody_pool', 'UPDATE')", firstName).Scan(&columnUpdate, &tableUpdate); err != nil || !columnUpdate || tableUpdate {
+			t.Fatal("original exact custody pool lock privilege changed", columnUpdate, tableUpdate, err)
 		}
 	}
-	active = nil
+	assertOriginalPoolLock()
 	for _, mutation := range []struct{ name, grant, undo string }{
-		{"direct-extra", "GRANT UPDATE ON public.custody_pool TO " + pgx.Identifier{firstName}.Sanitize(), "REVOKE UPDATE ON public.custody_pool FROM " + pgx.Identifier{firstName}.Sanitize()},
+		{"connection-limit", "ALTER ROLE " + pgx.Identifier{firstName}.Sanitize() + " CONNECTION LIMIT 82", "ALTER ROLE " + pgx.Identifier{firstName}.Sanitize() + " CONNECTION LIMIT 81"},
+		// Table-level REVOKE also removes original column grants; restore only
+		// the installed API execution lock privilege after removing this fault.
+		{"direct-extra", "GRANT UPDATE ON public.custody_pool TO " + pgx.Identifier{firstName}.Sanitize(), "REVOKE UPDATE ON public.custody_pool FROM " + pgx.Identifier{firstName}.Sanitize() + "; GRANT UPDATE(id) ON public.custody_pool TO " + pgx.Identifier{firstName}.Sanitize()},
 		{"public-table", "GRANT SELECT ON public.custody_pool TO PUBLIC", "REVOKE SELECT ON public.custody_pool FROM PUBLIC"},
 		{"public-column", "GRANT UPDATE(recovery_blocked) ON public.fleet_trust TO PUBLIC", "REVOKE UPDATE(recovery_blocked) ON public.fleet_trust FROM PUBLIC"},
 		{"public-schema", "GRANT CREATE ON SCHEMA public TO PUBLIC", "REVOKE CREATE ON SCHEMA public FROM PUBLIC"},
@@ -481,6 +503,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		if denied == nil {
 			t.Fatal("accepted excess direct/ambient authority", mutation.name)
 		}
+		assertOriginalPoolLock()
 	}
 	refresh()
 	// A changed password in private storage cannot be adopted or repaired.
@@ -509,7 +532,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 		t.Fatal("same-name replacement role accepted")
 	}
 	refresh()
-	if _, e = producer.Provision(ctx); e != nil {
+	if _, e = provisionCurrent(); e != nil {
 		t.Fatal("original exact roles unavailable after fault removal", e)
 	}
 	if _, e = admin.Exec(ctx, "UPDATE fleet_trust SET recovery_blocked=true WHERE installation_id=$1", scope.InstallationID); e != nil {

@@ -1,0 +1,25 @@
+{
+  "argv": [
+    "docker",
+    "exec",
+    "-i",
+    "asservat-context---zb0ywd-postgres",
+    "psql",
+    "-X",
+    "-w",
+    "-U",
+    "postgres",
+    "-d",
+    "custody_test",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-P",
+    "pager=off",
+    "-f",
+    "-"
+  ],
+  "sqlSHA256": "6977e1eca5696b7ac91283337ade2b4b1901f6fe450403029d1fec6dc9bcd487",
+  "exitCode": 0,
+  "elapsedSeconds": 0.09170883003389463,
+  "scope": "Retained terminal native57 fixture; read-only metadata."
+}

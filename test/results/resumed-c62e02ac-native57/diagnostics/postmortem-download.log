@@ -1,0 +1,39 @@
+BEGIN
+SET
+ id | root_id | allocation_id | artifact_id | state | created_at | deadline | output_limit | read_limit | request_limit | charged_output | charged_read | requests | emitted_bytes | generation | active_batch 
+----+---------+---------------+-------------+-------+------------+----------+--------------+------------+---------------+----------------+--------------+----------+---------------+------------+--------------
+(0 rows)
+
+ id | session_id | generation | lease_until | audit_acknowledged_at | outcome_acknowledged_at | has_outcome 
+----+------------+------------+-------------+-----------------------+-------------------------+-------------
+(0 rows)
+
+ id | session_id | root_id | allocation_id | generation | run_until | claimed_at | audited | job | binding | termination | retired 
+----+------------+---------+---------------+------------+-----------+------------+---------+-----+---------+-------------+---------
+(0 rows)
+
+                  id                  |               root_id                | reserved_output | reserved_read | reserved_sessions |          valid_until          
+--------------------------------------+--------------------------------------+-----------------+---------------+-------------------+-------------------------------
+ d436e178-7955-4e51-872e-ec23d964c47e | ade5288e-4e48-4380-87b1-a124830040c8 |               0 |             0 |                 0 | 2026-10-23 23:43:11.238945+00
+(1 row)
+
+                  id                  |               root_id                | reserved_responses | reserved_windows | reserved_audit_bytes |          valid_until          |       audit_write_until       
+--------------------------------------+--------------------------------------+--------------------+------------------+----------------------+-------------------------------+-------------------------------
+ d436e178-7955-4e51-872e-ec23d964c47e | ade5288e-4e48-4380-87b1-a124830040c8 |                  0 |                0 |                    0 | 2026-10-23 23:43:11.238945+00 | 2026-10-23 23:43:41.238945+00
+(1 row)
+
+ id | session_id | generation | started_at | until_at | window_count | completed_windows | emitted_bytes | lease_until | closed 
+----+------------+------------+------------+----------+--------------+-------------------+---------------+-------------+--------
+(0 rows)
+
+ native_owners 
+---------------
+             0
+(1 row)
+
+ native_backings 
+-----------------
+               1
+(1 row)
+
+COMMIT

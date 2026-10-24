@@ -147,7 +147,7 @@ func (s nativeContextServing) ContextNativeReady(ctx context.Context) (time.Time
 
 func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExchangeFixture, owners *postgres.NativeOwners, firstOwners *postgres.FirstContextNativeOperations, origins evidence.NativeOrigins, router *native.HubRouter, prepKeys *postgres.DownloadKeys, windowKeys *postgres.NativeKeys, en value.WorkerEnrollment, target value.WorkerCredentialTarget, joined <-chan nativeSQLWorkerOutcome, stopWorker func()) {
 	t.Helper()
-	root := f.allocation.RootID
+	root := f.worker.Intent.Authority.Scope.RootID
 	first, e := postgres.NewFirstContextPreparations(f.runtime)
 	if e != nil {
 		t.Fatal(e)
@@ -156,24 +156,8 @@ func qualifyContextNativeContent(t *testing.T, ctx context.Context, f nativeExch
 	if e != nil {
 		t.Fatal(e)
 	}
-	ownerPool := f.poolFor("worker_owner_runtime", "synthetic-worker-owner")
-	defer ownerPool.Close()
-	ownerStore, e := postgres.NewWorkerOwners(ctx, ownerPool, root, f.worker.Intent.Profile, f.guards)
-	if e != nil {
-		t.Fatal(e)
-	}
-	enrollRouter, e := evidence.NewWorkerEnrollmentRouter(ctx, target.InstallationID, f.enrollment.bindings, time.Now, 1)
-	if e != nil {
-		t.Fatal(e)
-	}
-	defer enrollRouter.Close()
 	ownerPod, epoch := custodyID(), custodyID()
-	requests := &evidence.WorkerRequestOwners{Router: enrollRouter, Store: ownerStore, PodUID: ownerPod, ProcessEpoch: epoch, NewID: custodyID}
-	enrollment := *f.enrollment.service
-	enrollment.CurrentAuthority = f.gate
-	cfg := evidence.ContextNativeRuntimeConfig{Serving: nativeContextServing{target.RunUntil}, Profile: f.worker.Intent.Profile, Configuration: f.content.configuration, Workers: f.content.workers, Preparation: first, Dispatcher: f.content.dispatcher, Enrollments: enrollment, Proofs: func(token evidence.DownloadPeerToken) (evidence.WorkerEnrollmentProofReader, error) {
-		return channelSQLProof{token, f.worker}, nil
-	}, Requests: requests, Sources: f.runtime, Authority: f.gate, Audit: &objectstore.DownloadAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Acknowledgements: f.audit, Native: evidence.NativeAttachmentConfig{HubPodUID: ownerPod, HubProcessEpoch: epoch, KeyScope: f.keyScope, Owners: firstOwners, Fences: owners, Origins: origins, Registrar: router, PreparationKeys: prepKeys, WindowKeys: windowKeys}, Now: time.Now, NewID: custodyID}
+	cfg := evidence.ContextNativeRuntimeConfig{Serving: nativeContextServing{target.RunUntil}, Profile: f.worker.Intent.Profile, Configuration: f.content.configuration, Workers: f.content.workers, Preparation: first, Dispatcher: f.content.dispatcher, Sources: f.runtime, Authority: f.gate, Audit: &objectstore.DownloadAuditObjects{Store: f.store, Seal: f.keys, Open: f.keys}, Acknowledgements: f.audit, Native: evidence.NativeAttachmentConfig{HubPodUID: ownerPod, HubProcessEpoch: epoch, KeyScope: f.keyScope, Owners: firstOwners, Fences: owners, Origins: origins, Registrar: router, PreparationKeys: prepKeys, WindowKeys: windowKeys}, Now: time.Now, NewID: custodyID}
 	runtime, e := evidence.NewContextNativeRuntime(cfg)
 	if e != nil {
 		t.Fatal("actual native runtime", e)
@@ -358,7 +342,7 @@ func qualifyContextNativeControlRaces(t *testing.T, ctx context.Context, f nativ
 			t.Fatal(e)
 		}
 		now := time.Now().UTC().Truncate(time.Microsecond)
-		return value.NativeOperation{Path: a.Environment.Path, Processing: a.Environment.Processing, Reference: value.NativeReference{InstallationID: f.worker.Binding.InstallationID, SessionID: prep.SessionID, WorkerID: f.worker.Intent.ID, OperationID: custodyID(), Fence: fence}, Kind: value.NativeObserve, HubPodUID: pod, HubProcessEpoch: epoch, WorkerPodUID: f.worker.Binding.PodUID, WorkerPublicKey: en.PublicKeyDigest, SourceVersion: a.Scope.Version, ParentID: prep.BatchID, Generation: prep.Generation, StartedAt: now, Until: minPublicationTime(now.Add(5*time.Second), a.ValidUntil)}
+		return value.NativeOperation{Path: a.Environment.Path, Processing: a.Environment.Processing, Reference: value.NativeReference{InstallationID: f.worker.Binding.InstallationID, SessionID: prep.SessionID, WorkerID: f.worker.Intent.ID, OperationID: custodyID(), Fence: fence}, Kind: value.NativeObserve, HubPodUID: pod, HubProcessEpoch: epoch, WorkerPodUID: f.worker.Binding.PodUID, WorkerPublicKey: en.PublicKeyDigest, SourceVersion: a.Scope.Version, ParentID: prep.BatchID, Generation: prep.Generation, StartedAt: now, Until: minPublicationTime(now.Add(5*time.Second), a.ValidUntil).UTC().Truncate(time.Microsecond)}
 	}
 	newResponse := func() artifact.DownloadResponse {
 		return artifact.DownloadResponse{ID: custodyID(), SessionID: prep.SessionID, OwnerID: custodyID(), Plan: artifact.DownloadResponsePlan{Version: artifact.DownloadResponseVersion, Selection: artifact.DownloadSelection{Length: 1}, WindowReadLimit: evidence.ContextDownloadReadWork}, Until: f.worker.Intent.RunUntil}

@@ -203,6 +203,10 @@ func TestOwnerConfigurationReadDiagnosticPredicatesAndSingleClock(t *testing.T) 
 			if !errors.Is(err, value.ErrUnavailable) {
 				t.Fatal("predicate changed error identity", err)
 			}
+			var step interface{ FixedStep() string }
+			if !errors.As(d.failure(err), &step) || step.FixedStep() != tc.check+"/"+tc.reason {
+				t.Fatal("predicate detail is unavailable to fixed-step consumers")
+			}
 		})
 	}
 }
@@ -247,6 +251,10 @@ func TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset(t *testing.T)
 				}
 				if strings.Contains(fmt.Sprintf("%+v", wrapped), "private-") {
 					t.Fatal("driver values rendered")
+				}
+				var step interface{ FixedStep() string }
+				if !errors.As(wrapped, &step) || step.FixedStep() != want.String()+"/"+tc.reason {
+					t.Fatal("query class is unavailable to fixed-step consumers")
 				}
 				if tc.reason == "unspecified" {
 					// A retry that fails at Begin/SET never reenters the callback.

@@ -6,6 +6,32 @@ REQ-EVD-001–003 and the S-02 context workflow. It allows the fixed Pod status
 snapshot to inspect a Pod that has not been scheduled. It does not enable a
 public collector or complete regional execution/start authority.
 
+[ADR-216](../decisions/216-request-owned-context-start-observation.md) gives one
+start one complete hub authority observation within its earliest original cutoff,
+at most five seconds. The hub's pre-signing accepted-work/caller/recovery/capability
+reads feed the runner directly. Target, eligibility, retention and process are
+resolved once before preparation; later helper boundaries validate the retained
+observation and cancellation locally. SQL still checks current permission,
+retention, recovery and storage under its effect locks, and acquisition still
+checks the exact pinned Pod. No observation crosses a request or renews a deadline.
+Implementation and installed qualification are tracked in the progress record.
+
+The first durable execution preparation follows
+[ADR-212](../decisions/212-api-preparation-remaining-interval.md): after current
+authority and storage locks, database time must leave at least one second
+within the earlier checked/caller cutoff before insertion. This is a
+conservative availability rule, not a new deadline or performance guarantee.
+Refusal leaves no execution row or key permission. Exact existing prepared
+rows are passive no-create results even after expiry, allowing the runner's
+existing `PreparationUncertain` classification without repeating effects.
+
+[ADR-217](../decisions/217-api-execution-role.md) composes the hub's read,
+preparation and recording ports with one `APIContextExecutions` adapter, one
+`api-execution` SQL credential and one cold three-connection pool. The exact
+former grant union and existing SQL methods are retained. This does not join
+regional acquisition, audit, publication, key-service or deletion credentials.
+The hub physical connection governor remains 32.
+
 ## Exact class and target
 
 `artifact.ContextExecutionClass` has two supported values. The empty value is

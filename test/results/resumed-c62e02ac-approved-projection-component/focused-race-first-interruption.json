@@ -1,0 +1,9 @@
+{
+  "at": "2026-10-23T00:39:31.696112+00:00",
+  "reason": "Parent requested stopping accidentally broad unchanged Kubernetes selection; this run remains incomplete, no passing full selection claim.",
+  "goPID": 413274,
+  "childPIDs": [
+    419173
+  ],
+  "signal": "SIGINT"
+}

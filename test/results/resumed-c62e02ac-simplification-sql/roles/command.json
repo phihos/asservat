@@ -1,0 +1,22 @@
+{
+  "phase": "roles",
+  "argv": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-custody.py",
+    "--fleet",
+    "--run",
+    "^TestInitialInstallationWithRealServices$/^public-runtime-roles-(matrix|unknown-claim|lost-completion|held-lock|recovery-after-lock)$"
+  ],
+  "cwd": "/home/phil/Projekte/asservat-simplify-c62e02ac",
+  "commit": "c6be50caf35c904bccd2e44c5d773652dd9752a9",
+  "startedAt": "2026-10-22T20:02:12.921071+00:00",
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1",
+    "ASSERVAT_INITIAL_INSTALLATION": "1"
+  },
+  "sourceCount": 2750,
+  "sourceMatchesCommitBefore": true
+}

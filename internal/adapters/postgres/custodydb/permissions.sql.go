@@ -650,7 +650,7 @@ func (q *Queries) SuspendPermissionStream(ctx context.Context, id pgtype.UUID) e
 }
 
 const updatePermissionStream = `-- name: UpdatePermissionStream :exec
-UPDATE permission_stream SET sequence=$2,projection_digest=$3,observed_at=$4,fresh_until=$5,suspended=false WHERE id=$1
+UPDATE permission_stream SET sequence=$2,projection_digest=$3,observed_at=$4,fresh_until=$5,lease_until=GREATEST(lease_until,$5),suspended=false WHERE id=$1
 `
 
 type UpdatePermissionStreamParams struct {
@@ -661,6 +661,8 @@ type UpdatePermissionStreamParams struct {
 	FreshUntil       pgtype.Timestamptz
 }
 
+// ADR-200 revision (2026-10-23): the live lease holder's accepted observation
+// also keeps the lease at least until that observation's 30-second lifetime.
 func (q *Queries) UpdatePermissionStream(ctx context.Context, arg UpdatePermissionStreamParams) error {
 	_, err := q.db.Exec(ctx, updatePermissionStream,
 		arg.ID,

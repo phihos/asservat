@@ -1,0 +1,10 @@
+{
+  "sourceCommit": "c6be50caf35c904bccd2e44c5d773652dd9752a9",
+  "command": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "helm-integration"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 50.352
+}

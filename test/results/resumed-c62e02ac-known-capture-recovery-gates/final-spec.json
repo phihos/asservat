@@ -1,0 +1,9 @@
+{
+  "command": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "spec-check"
+  ],
+  "exit": 0,
+  "elapsedSeconds": 5.003037559974473
+}

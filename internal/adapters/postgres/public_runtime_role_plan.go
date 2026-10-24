@@ -69,6 +69,23 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	if !slices.Contains(contracts.PublicRuntimeRolePurposes(), purpose) {
 		return nil, false
 	}
+	if purpose == "hub-runtime" {
+		var out []publicRuntimeGrant
+		for _, duty := range contracts.PublicRuntimeHubSharedDuties() {
+			grants, ok := publicRuntimeDutyGrants(duty)
+			if !ok {
+				return nil, false
+			}
+			out = append(out, grants...)
+		}
+		return ownerIdentityGrantSet(out), true
+	}
+	return publicRuntimeDutyGrants(purpose)
+}
+
+// Duties retain their exact compiled grants; only installed role plans may
+// render them into credentials. A retired duty is not an accepted role name.
+func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	if out, ok := publicRuntimeCapacityGrants(purpose); ok {
 		return out, true
 	}
@@ -79,14 +96,13 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		return out, true
 	}
 	if table, ok := publicRuntimeHubExtensionGrantTable[purpose]; ok {
-		return slices.Clone(table), true
+		return ownerIdentityGrantSet(append(slices.Clone(table), publicRuntimeProjectionGrants(purpose)...)), true
 	}
-	// ADR-181: the publisher's own read logins carry exactly the hub reads.
+	// The publisher retains its own narrow identity and retention credentials.
+	// Consolidating hub metadata never expands this separate process's grants.
 	switch purpose {
 	case "publisher-identity-read":
 		purpose = "identity-read"
-	case "publisher-retention-read":
-		purpose = "retention-read"
 	}
 	out := []publicRuntimeGrant{{"schema", "public", "", "USAGE"}}
 	add := func(table, privilege string, columns ...string) {
@@ -105,6 +121,14 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	}
 	read("goose_db_version")
 	switch purpose {
+	case "hub-metadata-read":
+		// The hub's seven metadata facets share only their existing read and
+		// row-lock privileges. No evidence-object locators, credentials or effect writes.
+		read("authority_audit", "context_capture", "context_case_locator", "context_catalog", "context_control_account", "context_control_pool", "context_execution", "context_processing", "context_storage_binding", "context_verification", "custody_allocation", "custody_attempt", "custody_pool", "fleet_current_trust", "permission_assignment", "permission_basis", "permission_stream", "processing_root", "processing_rule", "retention_catchup", "retention_catchup_effect", "retention_checkpoint", "retention_decision", "retention_source")
+		add("fleet_current_trust", "UPDATE", "installation_id")
+		add("permission_stream", "UPDATE", "id")
+		add("retention_source", "UPDATE", "root_id")
+		out = append(out, publicRuntimeGrant{"function", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "", "EXECUTE"})
 	case "capacity-profile-read":
 		// SQL54 independently pins this actual session_user OID and original
 		// provenance. Root/qualification arguments are not a role boundary.
@@ -162,9 +186,6 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("context_preview_fence", "DELETE")
 	case "identity-read":
 		read("fleet_current_trust")
-	case "permission-read":
-		read("permission_stream", "permission_basis", "permission_assignment", "authority_audit")
-		add("permission_stream", "UPDATE", "id")
 	case "permission-accept":
 		// ADR-189: exactly the PermissionStore statements. Stream columns are
 		// those of reset/renew/suspend/update; assignments only retire.
@@ -314,29 +335,10 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			add("custody_copy", "UPDATE", "ciphertext_bytes", "ciphertext_sha256", "etag", "version_id")
 			add("custody_event", "INSERT")
 		}
-	case "retention-read":
+	case "publisher-retention-read":
 		read("permission_stream", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
 		add("permission_stream", "UPDATE", "id")
 		add("retention_source", "UPDATE", "root_id")
-	case "storage-read":
-		read("context_storage_binding", "custody_allocation", "custody_pool", "context_control_pool", "context_control_account")
-		// SQL54 reads only the current managed admission cutoff; exact source
-		// and readiness fencing remain inside this closed SECURITY DEFINER RPC.
-		out = append(out, publicRuntimeGrant{"function", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)", "", "EXECUTE"})
-	case "progress-read":
-		read("permission_stream", "context_capture", "context_catalog", "fleet_current_trust", "permission_basis", "permission_assignment", "authority_audit", "custody_attempt", "context_verification", "context_execution")
-		add("permission_stream", "UPDATE", "id")
-		add("fleet_current_trust", "UPDATE", "installation_id")
-	case "case-read":
-		read("context_case_locator", "fleet_current_trust", "processing_root", "context_processing", "processing_rule")
-		add("fleet_current_trust", "UPDATE", "installation_id")
-		add("context_catalog", "SELECT", "artifact_id", "capture_id", "root_id")
-		add("context_capture", "SELECT", "id", "root_id", "attempt_id")
-		add("context_verification", "SELECT", "capture_id", "root_id", "audit_acknowledged_at", "copies_digest")
-		add("custody_attempt", "SELECT", "id", "artifact_id", "state", "copies_digest", "effective_expires_at")
-	case "processing-read":
-		read("fleet_current_trust", "permission_stream", "processing_root", "context_processing", "processing_rule")
-		add("fleet_current_trust", "UPDATE", "installation_id")
 	case "capture-intent-read":
 		read("capture_operation_intents")
 		out = append(out, publicRuntimeGrant{"function", "capture_audit_role_ok(uuid,text)", "", "EXECUTE"})
@@ -347,9 +349,6 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 		add("retention_source", "UPDATE", "root_id")
-	case "catalog-read":
-		read("context_capture", "custody_attempt", "context_verification", "context_catalog", "retention_decision", "processing_root", "context_processing", "processing_rule", "fleet_current_trust")
-		add("fleet_current_trust", "UPDATE", "installation_id")
 	case "download-plan":
 		read("download_allocation", "download_control_allocation", "download_native_backing", "download_stop_backing", "download_stop_pool", "fleet_current_trust")
 		add("fleet_current_trust", "UPDATE", "installation_id")
@@ -389,24 +388,16 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("browser_login", "SELECT", "root_id")
 		add("browser_session", "SELECT", "root_id", "id", "epoch", "created_at", "expires_at", "refresh_at")
 		add("browser_session", "UPDATE", "expires_at", "refresh_at")
-	case "browser-session", "browser-cleanup":
+	case "browser-session":
 		read("browser_session_root", "browser_login", "browser_session", "browser_logout", "browser_refresh_owner", "browser_refresh_consumer")
 		add("browser_session_root", "UPDATE", "id")
 		add("browser_refresh_owner", "UPDATE", "session_id")
 		for _, table := range []string{"browser_login", "browser_session", "browser_logout"} {
 			add(table, "DELETE")
-			if purpose == "browser-session" {
-				add(table, "INSERT")
-				add(table, "UPDATE")
-			} else {
-				add(table, "UPDATE", "id")
-			}
+			add(table, "INSERT")
+			add(table, "UPDATE")
 		}
-		if purpose == "browser-cleanup" {
-			add("browser_refresh_owner", "DELETE")
-		} else {
-			out = append(out, publicRuntimeGrant{"function", "browser_owned_refresh_busy(uuid,bytea)", "", "EXECUTE"})
-		}
+		out = append(out, publicRuntimeGrant{"function", "browser_owned_refresh_busy(uuid,bytea)", "", "EXECUTE"})
 	case "refresh-admit", "refresh-owner", "refresh-read":
 		read("browser_session_root", "browser_session", "browser_refresh_owner", "browser_refresh_consumer", "fleet_current_trust", "artifact_download", "download_response", "context_catalog", "context_capture", "context_verification", "custody_attempt")
 		add("fleet_current_trust", "UPDATE", "installation_id")
@@ -433,6 +424,7 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		}
 		add("browser_refresh_owner", "UPDATE", fields...)
 	}
+	out = append(out, publicRuntimeProjectionGrants(purpose)...)
 	slices.SortFunc(out, func(a, b publicRuntimeGrant) int { return strings.Compare(a.key(), b.key()) })
 	return slices.CompactFunc(out, func(a, b publicRuntimeGrant) bool { return a == b }), true
 }

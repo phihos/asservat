@@ -1,0 +1,475 @@
+=== RUN   TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:268: original activation b7612d38-ef07-4790-91ab-25d2e7a669ee image docker.io/library/asservat-context-worker@sha256:a50976ae9ae8b623935d7ea0d683d888e7cb5c45b8afb8983572ea6cdd83e100 exit 0
+=== RUN   TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files
+=== RUN   TestInitialBootstrapChainWithRealServices/installer-continuation
+    initial_bootstrap_chain_test.go:347: applied phase 1 worker-provider:
+        Kubernetes context "kind-asservat-context-y739my12-0", namespace "bootstrap-chain-10000000", installation "d81154ff-dd9e-466d-b655-1b7ee27a4a61": applying phase 1 worker-provider recipe.
+        created: sys/policies/acl/asservat-configuration-92151041220a41f9f7013fabfc18ea58a2f93797b732db75da72c5e2ff692144-audit-wrap
+        created: auth/configuration-auth/role/asservat-configuration-92151041220a41f9f7013fabfc18ea58a2f93797b732db75da72c5e2ff692144-audit-wrap
+        created: sys/policies/acl/asservat-configuration-92151041220a41f9f7013fabfc18ea58a2f93797b732db75da72c5e2ff692144-audit-unwrap
+        created: auth/configuration-auth/role/asservat-configuration-92151041220a41f9f7013fabfc18ea58a2f93797b732db75da72c5e2ff692144-audit-unwrap
+        created: bootstrap-chain-transit/keys/asservat-d81154ffdd9e466db6551b7ee27a4a61-worker-configuration-audit
+        created: bootstrap-chain-transit/keys/asservat-d81154ffdd9e466db6551b7ee27a4a61-context-deletion
+        created: sys/policies/acl/asservat-d81154ffdd9e466db6551b7ee27a4a61-worker-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:347: applied phase 3 owner-provider:
+        Kubernetes context "kind-asservat-context-y739my12-0", namespace "bootstrap-chain-10000000", installation "d81154ff-dd9e-466d-b655-1b7ee27a4a61": applying phase 3 owner-provider recipe.
+        created: sys/policies/acl/asservat-owner-c73e1a2d060c51d07022d2edde31cbe0e9dd99c056b0b10901a45688d20b8150-audit-wrap
+        created: auth/owner-auth/role/asservat-owner-c73e1a2d060c51d07022d2edde31cbe0e9dd99c056b0b10901a45688d20b8150-audit-wrap
+        created: sys/policies/acl/asservat-owner-c73e1a2d060c51d07022d2edde31cbe0e9dd99c056b0b10901a45688d20b8150-audit-unwrap
+        created: auth/owner-auth/role/asservat-owner-c73e1a2d060c51d07022d2edde31cbe0e9dd99c056b0b10901a45688d20b8150-audit-unwrap
+        created: sys/policies/acl/asservat-owner-c73e1a2d060c51d07022d2edde31cbe0e9dd99c056b0b10901a45688d20b8150-server-sign
+        created: auth/owner-auth/role/asservat-owner-c73e1a2d060c51d07022d2edde31cbe0e9dd99c056b0b10901a45688d20b8150-server-sign
+        created: sys/policies/acl/asservat-owner-c73e1a2d060c51d07022d2edde31cbe0e9dd99c056b0b10901a45688d20b8150-client-sign
+        created: auth/owner-auth/role/asservat-owner-c73e1a2d060c51d07022d2edde31cbe0e9dd99c056b0b10901a45688d20b8150-client-sign
+        created: owner-pki/roles/asservat-owner-pki-329fb833c82cb3794f19dd02f7dc41048a8158b27b7c9f4243746014dd7673c4-server
+        created: owner-pki/roles/asservat-owner-pki-329fb833c82cb3794f19dd02f7dc41048a8158b27b7c9f4243746014dd7673c4-client
+        created: sys/policies/acl/asservat-owner-public-28939b0254471278-browser-seal
+        created: auth/owner-auth/role/asservat-owner-public-28939b0254471278-browser-seal
+        created: sys/policies/acl/asservat-owner-public-28939b0254471278-browser-open
+        created: auth/owner-auth/role/asservat-owner-public-28939b0254471278-browser-open
+        created: sys/policies/acl/asservat-owner-public-28939b0254471278-work-sign
+        created: auth/owner-auth/role/asservat-owner-public-28939b0254471278-work-sign
+        created: sys/policies/acl/asservat-owner-public-28939b0254471278-worker-issue
+        created: auth/owner-auth/role/asservat-owner-public-28939b0254471278-worker-issue
+        created: public-transit-d81154ff/keys/asservat-d81154ffdd9e466db6551b7ee27a4a61-browser-sessions
+        created: public-transit-d81154ff/keys/asservat-d81154ffdd9e466db6551b7ee27a4a61-work-signing
+        created: worker-pki-d81154ff/roles/asservat-d81154ffdd9e466db6551b7ee27a4a61-download-worker
+        created: sys/policies/acl/asservat-federation-e03894f52a19a6225d72a40ec9b3684db004f961ab3f7b09bc3e6e56d483f516-audit-wrap
+        created: auth/owner-auth/role/asservat-federation-e03894f52a19a6225d72a40ec9b3684db004f961ab3f7b09bc3e6e56d483f516-audit-wrap
+        created: sys/policies/acl/asservat-federation-e03894f52a19a6225d72a40ec9b3684db004f961ab3f7b09bc3e6e56d483f516-audit-unwrap
+        created: auth/owner-auth/role/asservat-federation-e03894f52a19a6225d72a40ec9b3684db004f961ab3f7b09bc3e6e56d483f516-audit-unwrap
+        created: sys/policies/acl/asservat-federation-e03894f52a19a6225d72a40ec9b3684db004f961ab3f7b09bc3e6e56d483f516-client-sign
+        created: auth/owner-auth/role/asservat-federation-e03894f52a19a6225d72a40ec9b3684db004f961ab3f7b09bc3e6e56d483f516-client-sign
+        created: sys/policies/acl/asservat-federation-e03894f52a19a6225d72a40ec9b3684db004f961ab3f7b09bc3e6e56d483f516-server-sign
+        created: auth/owner-auth/role/asservat-federation-e03894f52a19a6225d72a40ec9b3684db004f961ab3f7b09bc3e6e56d483f516-server-sign
+        created: connector-pki-d81154ff/roles/asservat-d81154ffdd9e466db6551b7ee27a4a61-connector-client
+        created: connector-pki-d81154ff/roles/asservat-d81154ffdd9e466db6551b7ee27a4a61-connector-server
+        created: bootstrap-chain-transit/keys/asservat-d81154ffdd9e466db6551b7ee27a4a61-federation-audit
+        created: sys/policies/acl/asservat-publisher-1996bfa75b1436e515099937a22d6a23855a6a7979b646e9b058e69251731ffe-audit-wrap
+        created: auth/owner-auth/role/asservat-publisher-1996bfa75b1436e515099937a22d6a23855a6a7979b646e9b058e69251731ffe-audit-wrap
+        created: sys/policies/acl/asservat-publisher-1996bfa75b1436e515099937a22d6a23855a6a7979b646e9b058e69251731ffe-audit-unwrap
+        created: auth/owner-auth/role/asservat-publisher-1996bfa75b1436e515099937a22d6a23855a6a7979b646e9b058e69251731ffe-audit-unwrap
+        created: sys/policies/acl/asservat-publisher-1996bfa75b1436e515099937a22d6a23855a6a7979b646e9b058e69251731ffe-verifier-sign
+        created: auth/owner-auth/role/asservat-publisher-1996bfa75b1436e515099937a22d6a23855a6a7979b646e9b058e69251731ffe-verifier-sign
+        created: worker-pki-d81154ff/roles/asservat-d81154ffdd9e466db6551b7ee27a4a61-verifier
+        created: bootstrap-chain-transit/keys/asservat-d81154ffdd9e466db6551b7ee27a4a61-publisher-audit
+        created: sys/policies/acl/asservat-d81154ffdd9e466db6551b7ee27a4a61-owner-provider-inspection
+        Inbox written; the continuation verifies the provider before any use.
+    initial_bootstrap_chain_test.go:347: permission stream fe1771fd-d1bb-4985-8311-18df19ea4af0 fresh with 2 acknowledged authority audits
+    initial_bootstrap_chain_test.go:347: capacity source initialized for the permission root
+    initial_bootstrap_chain_test.go:347: federation projection published for the permission root
+    initial_bootstrap_chain_test.go:347: federation provider roles applied and verified
+    initial_bootstrap_chain_test.go:347: federation available with zero peers; regional offer published
+    initial_bootstrap_chain_test.go:347: owner native port reachable from outside under its bootstrap name
+    initial_bootstrap_chain_test.go:347: key service available; its configuration accepted at revision 1
+    initial_bootstrap_chain_test.go:347: key service serves the offered roots and refuses an unknown client chain: remote error: tls: unknown certificate authority
+    initial_bootstrap_chain_test.go:347: no Pod mounts the root key; only the key service mounts its logins
+    initial_bootstrap_chain_test.go:347: publisher available without restarts
+    initial_bootstrap_chain_test.go:347: capacity root ReadyAt set for the permission root
+    initial_bootstrap_chain_test.go:347: hub retention source Ready at sequence 2 with the baseline policy
+    initial_bootstrap_chain_test.go:347: hub retention source Ready at sequence 3 with the baseline policy
+    initial_bootstrap_chain_test.go:347: hub retention source Ready at sequence 3 with the baseline policy
+    initial_bootstrap_chain_test.go:347: baseline edit accepted and hub-worker restart Ready under a new epoch
+    initial_bootstrap_chain_test.go:347: promoted owner Ready with download sources, operator public Secret and observation on 9444
+    initial_bootstrap_chain_test.go:347: installer-cluster connector enrolled generation 1 and both leaves
+    initial_bootstrap_chain_test.go:347: join record printed and stored; its connector protection is the staged generation 1
+    initial_bootstrap_chain_test.go:347: regional executor composed from the settings it read by name
+    initial_bootstrap_chain_test.go:347: regional: connector lifecycle enroll took 4.04s, observer 82 calls
+    initial_bootstrap_chain_test.go:347: regional: connector lifecycle client-sign took 3.41s, observer 68 calls
+    initial_bootstrap_chain_test.go:347: regional: connector lifecycle server-sign took 3.4s, observer 68 calls
+    initial_bootstrap_chain_test.go:347: regional: connector lifecycle registration took 1.4s, observer 28 calls
+    initial_bootstrap_chain_test.go:347: regional: connector lifecycle owner-observation-candidates took 20ms, observer 1 calls
+    initial_bootstrap_chain_test.go:347: regional: connector lifecycle owner-candidates took 10ms, observer 0 calls
+    initial_bootstrap_chain_test.go:347: installer-cluster-join wrote the slot's sources, topology and catalog entry; the rerun was exact
+    initial_bootstrap_chain_test.go:347: hub-api restarted its process on the catalog change and is Ready with the joined entry
+    initial_bootstrap_chain_test.go:347: hub-api recorded the join's write-once capacity qualification
+    initial_bootstrap_chain_test.go:347: regional capacity standby composed
+    initial_bootstrap_chain_test.go:347: operator added the regional budget policy, pool slot, workload and maintainer binding
+    initial_bootstrap_chain_test.go:347: demand lane: 5 distinct binding observations and 4 samples with at least 1 s left in 15 s
+    initial_bootstrap_chain_test.go:347: regional workload enrolled through v2 to ready_at; a refresh demand kept refreshing its binding; the pool extended once
+    installer_continuation_native_test.go:492: installed preview_capture attempt 1 after 3.425s request 1a8a24c1-1a0b-43c1-b845-427ad85a0e67: acknowledged operation unavailable (retryable=true)
+    installer_continuation_native_test.go:492: installed preview_capture attempt 2 after 3.317s request 3ee23e6f-85f7-48e1-9708-653ef5767f5a: acknowledged operation unavailable (retryable=true)
+    installer_continuation_native_test.go:492: installed preview_capture attempt 3 after 3.343s request 9ee31dc0-a2a6-458b-a1ad-91974538502b: acknowledged operation unavailable (retryable=true)
+    installer_continuation_native_test.go:492: installed preview_capture attempt 4 after 3.329s request 6299d2cc-41b8-40ea-bffe-a34d8a7253cc: acknowledged operation unavailable (retryable=true)
+    installer_continuation_native_test.go:486: diagnostics: asservat-d81154ffdd9e466db6551b7ee27a4a61-owner pod asservat-d81154ffdd9e466db6551b7ee27a4a61-owner-58bcbc4985c42lz phase Running
+    installer_continuation_native_test.go:486: diagnostics: asservat-d81154ffdd9e466db6551b7ee27a4a61-owner pod asservat-d81154ffdd9e466db6551b7ee27a4a61-owner-58bcbc4985c42lz container hub ready true restarts 1 last "Error" exit 1
+    installer_continuation_native_test.go:486: diagnostics: asservat-d81154ffdd9e466db6551b7ee27a4a61-owner-58bcbc4985c42lz previous=true log:
+        owner port router: started (1)
+        owner router: started (1)
+        owner router: handoff observation (1)
+        owner router: handoff observation (2)
+        owner router: handoff observation (4)
+        owner observer 314 calls 550ms, operation 0 calls 0s, readiness 320 calls 720ms, identity 3 calls 10ms, provider 640 calls 1.26s, credentials 204 calls 400ms total
+        owner router: handoff observation (8)
+        owner observer 610 calls 1.06s, operation 0 calls 0s, readiness 937 calls 1.96s, identity 3 calls 10ms, provider 640 calls 1.26s, credentials 204 calls 400ms total
+        owner startup failed: phase=full-runtime role=none reason=changed native=unspecified detail=unspecified sql=unknown sql-reason=unspecified
+    installer_continuation_native_test.go:486: diagnostics: asservat-d81154ffdd9e466db6551b7ee27a4a61-owner-58bcbc4985c42lz previous=false log:
+        owner port router: started (1)
+        owner router: started (1)
+        owner router: handoff observation (1)
+        owner router: handoff observation (2)
+        owner router: handoff observation (4)
+        owner local claim refused: observe/conversation/registration-3/last-read/exchange/owner-read/final-native/caller-review-again/token-review-call (unavailable)
+        owner observer 381 calls 610ms, operation 198 calls 310ms, readiness 545 calls 970ms, identity 3 calls 10ms, provider 640 calls 1.31s, credentials 204 calls 400ms total
+        owner router: handoff observation (8)
+        owner observer 672 calls 1.07s, operation 352 calls 540ms, readiness 1279 calls 2.23s, identity 3 calls 10ms, provider 640 calls 1.31s, credentials 204 calls 400ms total
+        owner router: handoff observation (16)
+        owner observer 932 calls 1.46s, operation 556 calls 840ms, readiness 2014 calls 3.52s, identity 3 calls 10ms, provider 640 calls 1.31s, credentials 204 calls 400ms total
+        owner observer 1227 calls 1.9s, operation 709 calls 1.07s, readiness 2747 calls 4.76s, identity 3 calls 10ms, provider 1241 calls 2.3s, credentials 204 calls 400ms total
+        owner observer 1483 calls 2.33s, operation 909 calls 1.49s, readiness 3478 calls 6.1s, identity 3 calls 10ms, provider 1280 calls 2.36s, credentials 204 calls 400ms total
+        owner observer 1771 calls 2.81s, operation 1066 calls 1.76s, readiness 4214 calls 7.47s, identity 3 calls 10ms, provider 1280 calls 2.36s, credentials 204 calls 400ms total
+        owner router: handoff observation (32)
+        owner observer 2034 calls 3.24s, operation 1269 calls 2.08s, readiness 4928 calls 8.78s, identity 3 calls 10ms, provider 1280 calls 2.36s, credentials 204 calls 400ms total
+        owner observer 2317 calls 3.68s, operation 1474 calls 2.41s, readiness 5682 calls 10.12s, identity 3 calls 10ms, provider 1840 calls 3.34s, credentials 204 calls 400ms total
+        public preview refused: target (1)
+        public preview refused: target (2)
+        owner observer 2636 calls 4.2s, operation 2025 calls 3.32s, readiness 6400 calls 11.53s, identity 81 calls 130ms, provider 1920 calls 3.48s, credentials 510 calls 970ms total
+        public preview refused: target (4)
+    installer_continuation_native_test.go:486: diagnostics: asservat-d81154ffdd9e466db6551b7ee27a4a61-worker pod asservat-d81154ffdd9e466db6551b7ee27a4a61-worker-7d47b49d9t72k6 phase Running
+    installer_continuation_native_test.go:486: diagnostics: asservat-d81154ffdd9e466db6551b7ee27a4a61-worker pod asservat-d81154ffdd9e466db6551b7ee27a4a61-worker-7d47b49d9t72k6 container worker ready true restarts 1 last "Error" exit 137
+    installer_continuation_native_test.go:486: diagnostics: asservat-d81154ffdd9e466db6551b7ee27a4a61-worker-7d47b49d9t72k6 previous=true log:
+        I1018 16:19:49.806198       1 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+        I1018 16:19:49.816702       1 leaderelection.go:272] "Successfully acquired lease" lock="asservat configuration reconciliation"
+        capacity waiting: projection hint pending
+        hub-worker context deletion: waiting for the capacity projection
+        hub-worker retention: reconciler/store.begin/client (unavailable)
+        hub-worker worker configuration: source (unavailable)
+        hub-worker worker configuration: audit.admission (unavailable)
+        hub-worker worker configuration: ok
+        capacity waiting: projection mount pending
+        capacity started with 0 regional clusters
+        capacity local observation capacity-namespace-candidates: candidates (unavailable) after 30ms
+        capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+        capacity local observation capacity-namespace-candidates: tls (denied) after 4.49s
+        capacity local observation capacity-namespace-candidates: unavailable after 3.94s
+        capacity local discovery: steps=89 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+    installer_continuation_native_test.go:486: diagnostics: asservat-d81154ffdd9e466db6551b7ee27a4a61-worker-7d47b49d9t72k6 previous=false log:
+        I1018 16:28:06.390077       1 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+        I1018 16:28:24.127324       1 leaderelection.go:272] "Successfully acquired lease" lock="asservat configuration reconciliation"
+        capacity started with 0 regional clusters
+        capacity local observation capacity-namespace-candidates: candidates (unavailable) after 10ms
+        capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+        permission reconciler stopped: start/begin (changed)
+        capacity source: accept (unavailable)
+        capacity local observation capacity-namespace-candidates: unavailable after 4.1s
+        capacity local observation capacity-namespace-candidates: post (unavailable) after 3.63s
+        capacity local observation capacity-namespace-candidates: unavailable after 4.24s
+        capacity local observation capacity-namespace-candidates: post (unavailable) after 3.98s
+        capacity local observation capacity-namespace-candidates: ok after 4.37s
+        capacity local discovery: steps=12 candidates=0 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+        capacity source: ok
+        capacity local observation capacity-workload-candidates: unavailable after 4.16s
+        capacity local observation capacity-workload-candidates: dial (unavailable) after 0s
+        capacity clusters changed; capacity restarts with the new set
+        capacity started with 1 regional clusters
+        capacity local observation capacity-namespace-candidates: dial (unavailable) after 10ms
+        capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+        capacity regional observation capacity-namespace-candidates: locate (unavailable) after 20ms
+        capacity regional discovery: steps=1 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+        capacity source: accept (unavailable)
+        permission reconciler stopped: refresh/confirm-expired (unavailable)
+        capacity local observation capacity-namespace-candidates: tls (denied) after 4.18s
+        capacity local discovery: steps=7 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+        capacity source: ok
+        capacity regional observation capacity-namespace-candidates: claim/post (unavailable) after 4.04s
+        capacity regional discovery: steps=5 candidates=0 namespace-index=0 namespace-count=0 kind-index=0 workload-index=0 workload-count=0
+        capacity local observation capacity-namespace-candidates: unavailable after 3.59s
+        capacity regional observation capacity-namespace-candidates: ok after 2.2s
+        capacity local observation capacity-namespace-candidates: ok after 4.38s
+        capacity regional observation capacity-workload-candidates: ok after 2.19s
+        capacity local observation capacity-workload-candidates: ok after 4.48s
+        capacity regional observation capacity-guarded-workload: ok after 2.19s
+        capacity regional workload: compose/permission-scope (not-allocated) after 2.2s
+        capacity regional observation capacity-workload-candidates: ok after 2.19s
+        capacity local discovery: steps=12 candidates=0 namespace-index=0 namespace-count=10 kind-index=2 workload-index=0 workload-count=0
+        capacity regional discovery: steps=10 candidates=1 namespace-index=0 namespace-count=9 kind-index=2 workload-index=0 workload-count=0
+        capacity local observation capacity-workload-candidates: unavailable after 3.97s
+        capacity local observation capacity-workload-candidates: ok after 4.47s
+        capacity local discovery: steps=19 candidates=0 namespace-index=2 namespace-count=10 kind-index=1 workload-index=0 workload-count=0
+        capacity regional discovery: steps=15 candidates=1 namespace-index=2 namespace-count=9 kind-index=0 workload-index=0 workload-count=0
+        capacity local observation capacity-workload-candidates: unavailable after 4.56s
+        capacity local observation capacity-workload-candidates: ok after 4.47s
+        capacity local observation capacity-workload-candidates: unavailable after 4.07s
+        capacity local discovery: steps=26 candidates=0 namespace-index=4 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+        capacity regional discovery: steps=20 candidates=1 namespace-index=3 namespace-count=9 kind-index=0 workload-index=0 workload-count=0
+        capacity local observation capacity-workload-candidates: ok after 4.48s
+        capacity local observation capacity-workload-candidates: unavailable after 4.52s
+        capacity local discovery: steps=32 candidates=0 namespace-index=5 namespace-count=10 kind-index=2 workload-index=0 workload-count=0
+        capacity regional discovery: steps=25 candidates=1 namespace-index=4 namespace-count=9 kind-index=1 workload-index=0 workload-count=0
+        capacity local observation capacity-workload-candidates: ok after 4.47s
+        capacity local observation capacity-workload-candidates: unavailable after 4.66s
+        capacity regional observation capacity-guarded-workload: ok after 2.19s
+        capacity local discovery: steps=39 candidates=0 namespace-index=7 namespace-count=10 kind-index=1 workload-index=0 workload-count=0
+        capacity regional observation capacity-workload-candidates: ok after 2.19s
+        capacity regional discovery: steps=30 candidates=2 namespace-index=5 namespace-count=9 kind-index=1 workload-index=0 workload-count=0
+        capacity local observation capacity-workload-candidates: ok after 4.47s
+        capacity regional observation capacity-guarded-workload: ok after 2.18s
+        capacity local observation capacity-workload-candidates: unavailable after 3.97s
+        capacity local discovery: steps=46 candidates=0 namespace-index=9 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+        capacity regional observation capacity-workload-candidates: ok after 2.18s
+        capacity regional discovery: steps=35 candidates=3 namespace-index=6 namespace-count=9 kind-index=1 workload-index=0 workload-count=0
+        capacity local observation capacity-workload-candidates: ok after 4.47s
+        capacity local observation capacity-workload-candidates: unavailable after 4.42s
+        capacity local observation capacity-namespace-candidates: unavailable after 4.13s
+        capacity local observation capacity-namespace-candidates: ok after 4.37s
+        capacity regional observation capacity-guarded-workload: ok after 2.18s
+        capacity regional workload: ok after 2.48s
+        capacity demand refresh: refresh-fresh (unavailable) after 2.29s, read left 60ms
+        capacity local observation capacity-workload-candidates: unavailable after 4.23s
+        capacity local discovery: steps=52 candidates=0 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+        capacity regional observation capacity-workload-candidates: locate (unavailable) after 50ms
+        capacity regional discovery: steps=40 candidates=4 namespace-index=7 namespace-count=9 kind-index=1 workload-index=0 workload-count=0
+        capacity regional observation capacity-guarded-workload: ok after 2.43s
+        capacity demand refresh: ok after 2.52s, read left 1.79s
+        capacity demand refresh: ok after 2.47s, read left 2.12s
+        capacity regional observation capacity-workload-candidates: locate (unavailable) after 240ms
+        capacity regional observation capacity-guarded-workload: ok after 2.55s
+        capacity demand refresh: ok after 2.63s, read left 1.55s
+        capacity demand refresh: ok after 2.48s, read left 1.61s
+        capacity demand refresh: ok after 2.57s, read left 1.88s
+        capacity demand refresh: ok after 2.45s, read left 2.24s
+        capacity regional observation capacity-workload-candidates: locate (unavailable) after 1.13s
+        capacity regional observation capacity-guarded-workload: ok after 2.58s
+        capacity demand refresh: ok after 2.66s, read left 1.4s
+        capacity demand refresh: ok after 2.52s, read left 1.72s
+        capacity local observation capacity-workload-candidates: ok after 4.47s
+        capacity regional observation capacity-workload-candidates: locate (unavailable) after 670ms
+        capacity regional observation capacity-guarded-workload: ok after 2.41s
+        capacity demand refresh: ok after 2.48s, read left 2.03s
+        capacity demand refresh: ok after 2.52s, read left 1.56s
+        capacity local observation capacity-workload-candidates: unavailable after 3.97s
+        capacity regional observation capacity-workload-candidates: locate (unavailable) after 1.05s
+        capacity regional observation capacity-guarded-workload: ok after 2.46s
+        capacity demand refresh: ok after 2.53s, read left 1.6s
+    installer_continuation_native_test.go:486: diagnostics: asservat-d81154ffdd9e466db6551b7ee27a4a61-publisher pod asservat-d81154ffdd9e466db6551b7ee27a4a61-publisher-556954t622m phase Running
+    installer_continuation_native_test.go:486: diagnostics: asservat-d81154ffdd9e466db6551b7ee27a4a61-publisher pod asservat-d81154ffdd9e466db6551b7ee27a4a61-publisher-556954t622m container publisher ready true restarts 1 last "Error" exit 1
+    installer_continuation_native_test.go:486: diagnostics: asservat-d81154ffdd9e466db6551b7ee27a4a61-publisher-556954t622m previous=true log:
+        service stopped at publisher/catalog-changed (changed): protected configuration, credentials or original deadline unavailable
+    installer_continuation_native_test.go:492: installed preview_capture: acknowledged operation unavailable (retryable=true)
+    regional_install_native_test.go:753: connector pod connector-6d94777c9c-xpp6v ready=true restarts=0 waiting=false
+    regional_install_native_test.go:753: regional: connector lifecycle enroll took 4.04s, observer 82 calls
+    regional_install_native_test.go:753: regional: connector lifecycle client-sign took 3.41s, observer 68 calls
+    regional_install_native_test.go:753: regional: connector lifecycle server-sign took 3.4s, observer 68 calls
+    regional_install_native_test.go:753: regional: connector lifecycle registration took 1.4s, observer 28 calls
+    regional_install_native_test.go:753: regional: connector process credentials active
+    regional_install_native_test.go:753: regional: regional capacity standby active
+    regional_install_native_test.go:753: regional: connector lifecycle owner-observation-candidates took 20ms, observer 1 calls
+    regional_install_native_test.go:753: regional: regional capacity standby: open (unavailable)
+    regional_install_native_test.go:753: regional: regional capacity standby: open (unavailable)
+    regional_install_native_test.go:753: regional: regional context start stopped: execution-process/source-close@5s after [source-open@700ms owned-process@2.1s process-proof@3.4s execution-account@3.45s settings-guard@3.75s settings-snapshot@3.9s workload@4.15s settings-guard-after@4.45s settings-snapshot-after@4.6s workload-guard-after@4.95s] (changed); attempt 5.1s, observer 102 calls 220ms, probe 30 calls 50ms
+    regional_install_native_test.go:753: regional: regional context start active
+    regional_install_native_test.go:753: regional: connector lifecycle owner-candidates took 10ms, observer 0 calls
+    regional_install_native_test.go:753: regional: connector local source failed: source-guard/source.guard-policy-read (unavailable) after 600ms of 630ms
+    regional_install_native_test.go:753: regional: regional context standby refused: open (unavailable) (1)
+    regional_install_native_test.go:753: regional: regional context standby refused: open (unavailable) (2)
+    regional_install_native_test.go:753: regional: regional capacity standby: open (denied)
+    regional_install_native_test.go:753: regional: regional capacity standby: open (denied)
+    regional_install_native_test.go:753: regional: regional context standby refused: open (unavailable) (4)
+    regional_install_native_test.go:753: regional: connector local source failed: source-protection (changed) after 0s of 10ms
+    regional_install_native_test.go:753: regional: regional context standby refused: open (unavailable) (8)
+    regional_install_native_test.go:753: regional: connector lifecycle owner-registration took 10ms, observer 1 calls
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 50ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 50ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 90ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-namespace-candidates: ok after 0s, 1 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity standby: serve/receive (unavailable) after 3.27s
+    regional_install_native_test.go:753: regional: connector local source failed: source-guard/source.guard-binding-read (unavailable) after 1.94s of 2.03s
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 70ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 100ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-namespace-candidates: ok after 0s, 1 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 50ms, 3 calls
+    regional_install_native_test.go:753: regional: connector local source failed: source-protection (changed) after 400ms of 420ms
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 460ms, 22 calls
+    regional_install_native_test.go:753: regional: connector local source failed: source-protection (changed) after 600ms of 720ms
+    regional_install_native_test.go:753: regional: connector local source failed: source-protection (changed) after 500ms of 500ms
+    regional_install_native_test.go:753: regional: connector enrollment pending: unavailable
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 100ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 470ms, 22 calls
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 70ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 100ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-guarded-workload: ok after 30ms, 14 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 30ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 460ms, 22 calls
+    regional_install_native_test.go:753: regional: regional context standby refused: open (unavailable) (16)
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 100ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 50ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 460ms, 22 calls
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 90ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 10ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 50ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 460ms, 22 calls
+    regional_install_native_test.go:753: regional: connector local source failed: source-protection/source.guard-policy-read (unavailable) after 90ms of 140ms
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 50ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 50ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 100ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 10ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 70ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 440ms, 22 calls
+    regional_install_native_test.go:753: regional: connector local source failed: source-protection (changed) after 490ms of 530ms
+    regional_install_native_test.go:753: regional: connector local source failed: source-guard/source.guard-policy-read (unavailable) after 1.15s of 1.18s
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 90ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 10ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 40ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 450ms, 22 calls
+    regional_install_native_test.go:753: regional: regional capacity standby: serve/receive (unavailable) after 30s
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 50ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 50ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 100ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 10ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 450ms, 22 calls
+    regional_install_native_test.go:753: regional: regional context standby refused: open (unavailable) (32)
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 100ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 10ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 30ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 450ms, 22 calls
+    regional_install_native_test.go:753: regional: connector local source failed: source-guard/source.guard-binding-read (unavailable) after 1.95s of 2.08s
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 100ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 10ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 460ms, 22 calls
+    regional_install_native_test.go:753: regional: connector local source failed: source-protection/source.guard-binding-read (unavailable) after 300ms of 370ms
+    regional_install_native_test.go:753: regional: connector local source failed: source-protection/source.guard-binding-read (unavailable) after 300ms of 320ms
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 100ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 10ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 50ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 460ms, 22 calls
+    regional_install_native_test.go:753: regional: regional capacity standby: serve/receive (unavailable) after 30s
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 100ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 10ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 70ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 460ms, 22 calls
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 90ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 70ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 450ms, 22 calls
+    regional_install_native_test.go:753: regional: regional capacity native open: ok after 40ms, 19 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 1: ok after 60ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 2: ok after 100ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity metadata capacity-workload-candidates: ok after 10ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 3: ok after 70ms, 3 calls
+    regional_install_native_test.go:753: regional: regional capacity native read 4: ok after 460ms, 22 calls
+    regional_install_native_test.go:753: regional: regional capacity
+    installer_continuation_native_test.go:740: continuation produce 
+    installer_continuation_native_test.go:740: continuation continue installer continuation: resources/audit-secrets done in 8ms
+        installer continuation: resources/producer done in 680ms
+        installer continuation: resources/journal done in 2.1s
+        installer continuation: resources/advance done in 1m6.506s
+        installer continuation: resources/inventory done in 700ms
+        installer continuation: bridge/observer done in 28ms
+        installer continuation: bridge/protection done in 1ms
+        installer continuation: bridge/source done in 0s
+        installer continuation: bridge/journal done in 1.228s
+        installer continuation: bridge/probe done in 3.452s
+        installer continuation: bridge/retained done in 4.9s
+        installer continuation: bridge/settle done in 6.028s
+        installer continuation: worker/configuration-documents done in 1ms
+        installer continuation: worker/outbox done in 5ms
+        installer continuation: worker/inbox done in 2.006s
+        installer continuation: worker/inspection done in 0s
+        installer continuation: worker/audit-secret done in 5ms
+        installer continuation: worker/roles-root done in 0s
+        installer continuation: worker/roles-sql done in 11ms
+        installer continuation: worker/roles-provision done in 12.387s
+        installer continuation: worker/roles-projection done in 3.319s
+        installer continuation: worker/inputs done in 3ms
+        installer continuation: worker/inputs-complete done in 7.647s
+        installer continuation: worker/launch done in 7.754s
+        installer continuation: public/sources done in 13ms
+        installer continuation: owner/accepted-source done in 3.044s
+        installer continuation: public/roles-binding done in 55ms
+        installer continuation: public/roles-root done in 0s
+        installer continuation: public/roles-sql done in 12ms
+        installer continuation: public/roles-provision done in 3m48.084s
+        installer continuation: public/roles-projection done in 3.174s
+        installer continuation: owner/roles done in 3.406s
+        installer continuation: owner/roles-sql done in 16ms
+        installer continuation: owner/selection done in 0s
+        installer continuation: owner/selection-complete done in 10.535s
+        installer continuation: downloads/workers done in 640ms
+        installer continuation: permission/guard done in 8ms
+        installer continuation: retention/guard done in 10ms
+        installer continuation: permission/projection done in 1.099s
+        installer continuation: capacity/sources done in 241ms
+        installer continuation: capacity/proofs done in 673ms
+        installer continuation: capacity/qualification done in 1.951s
+        installer continuation: capacity/initialize done in 1m12.801s
+        installer continuation: federation/projection done in 3.95s
+        installer continuation: federation/identity done in 1.55s
+        installer continuation: publisher/identity done in 8ms
+        installer continuation: public/download-sources done in 0s
+        installer continuation: public/sources done in 25ms
+        installer continuation: capacity/local-observation done in 3.571s
+        installer continuation: owner/outbox done in 16ms
+        installer continuation: owner/inbox done in 4.008s
+        installer continuation: owner/audit-secret done in 6ms
+        installer continuation: federation/audit-secret done in 4ms
+        installer continuation: federation/verify done in 39ms
+        installer continuation: public/readback done in 37ms
+        installer continuation: downloads/store done in 4ms
+        installer continuation: downloads/control done in 5ms
+        installer continuation: downloads/profile done in 4ms
+        installer continuation: public/derive done in 2ms
+        installer continuation: public/observation-projection done in 3ms
+        installer continuation: public/operator-secret done in 2ms
+        installer continuation: publisher/credentials done in 7ms
+        installer continuation: publisher/verify done in 30ms
+        installer continuation: deletion/credential done in 7ms
+        installer continuation: deletion/verify done in 3ms
+        installer continuation: downloads/accepted done in 4.011s
+        installer continuation: owner/projection done in 2ms
+        installer continuation: owner/installation done in 1m44.308s
+        installer continuation: public/exposure done in 18ms
+        installer continuation: capacity/projection done in 3.994s
+        installer continuation: federation/serving done in 2ms
+        installer continuation: federation/workload done in 328ms
+        installer continuation: federation/settle done in 2.007s
+        installer continuation: federation/offer done in 0s
+        installer continuation: federation/owner-exposure done in 12ms
+        installer continuation: key-service/projection done in 2.958s
+        installer continuation: back up Secret bootstrap-chain-10000000-target/asservat-d81154ffdd9e466db6551b7ee27a4a61-key-service-root-v1; stored artifacts are unreadable without it
+        installer continuation: key-service/root done in 12ms
+        installer continuation: key-service/serving done in 2ms
+        installer continuation: key-service/workload done in 353ms
+        installer continuation: key-service/settle done in 2.033s
+        installer continuation: publisher/projection done in 3.262s
+        installer continuation: publisher/workload done in 318ms
+        installer continuation: publisher/settle done in 2.006s
+        installer continuation: federation/executor-offer done in 4ms
+        installer continuation: retention/first-acceptance done in 8ms
+        
+=== RUN   TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation
+=== NAME  TestInitialBootstrapChainWithRealServices
+    initial_bootstrap_chain_test.go:380: actual four fixed commands in Restricted fsGroup/tmpfs/subPath runner, original compiled activation Pod, generated manager/schema/encrypted activation/positive retirement and setup-free replay; positive managed setup-copy deletion and setup-free replay; no upstream credential/backup erasure or public runtime claim
+--- FAIL: TestInitialBootstrapChainWithRealServices (1318.12s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files (22.80s)
+    --- FAIL: TestInitialBootstrapChainWithRealServices/installer-continuation (994.37s)
+    --- PASS: TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation (3.86s)
+FAIL
+FAIL	asservat.local/asservat/test/integration	1318.216s
+FAIL

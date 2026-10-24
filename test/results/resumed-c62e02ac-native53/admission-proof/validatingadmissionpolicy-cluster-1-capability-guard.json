@@ -1,0 +1,57 @@
+{
+  "apiVersion": "admissionregistration.k8s.io/v1",
+  "kind": "ValidatingAdmissionPolicy",
+  "metadata": {
+    "creationTimestamp": "2026-10-22T20:39:29Z",
+    "generation": 1,
+    "name": "asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability-guard",
+    "resourceVersion": "3026",
+    "uid": "d9adef96-d25d-4a03-87a9-535ccdebd065"
+  },
+  "spec": {
+    "failurePolicy": "Fail",
+    "matchConditions": [
+      {
+        "expression": "request.namespace == \"bootstrap-chain-10000000-target\"",
+        "name": "protected-context-capability"
+      }
+    ],
+    "matchConstraints": {
+      "matchPolicy": "Equivalent",
+      "namespaceSelector": {},
+      "objectSelector": {},
+      "resourceRules": [
+        {
+          "apiGroups": [
+            ""
+          ],
+          "apiVersions": [
+            "v1"
+          ],
+          "operations": [
+            "CREATE",
+            "UPDATE",
+            "DELETE"
+          ],
+          "resourceNames": [
+            "asservat-c71fa5be1d3b459da57b1234889affda-cluster-1-capability"
+          ],
+          "resources": [
+            "configmaps"
+          ],
+          "scope": "Namespaced"
+        }
+      ]
+    },
+    "validations": [
+      {
+        "expression": "request.userInfo.username == \"system:serviceaccount:bootstrap-chain-10000000:install-bootstrap-runner\"",
+        "message": "Asservat context capability administrator is required."
+      }
+    ]
+  },
+  "status": {
+    "observedGeneration": 1,
+    "typeChecking": {}
+  }
+}

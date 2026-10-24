@@ -1,0 +1,13 @@
+{
+  "sourceCommit": "157026815311c56016d5fc975772827ab4ff6b07",
+  "function": "internal/bootstrap/installer_cluster_join.go regionalJoinEntry",
+  "objectBuilder": "internal/adapters/kubernetes/cluster_join.go ensureImmutableData",
+  "inputFiles": [
+    "owner-selected.json",
+    "offer.json",
+    "regional-join.json"
+  ],
+  "projectionDefinitionSource": "internal/domain/artifact/context.go",
+  "projectionDigest": "ddb974bae2428c1469a5cab504cf410a8b2d5331fd5bfe3bdf2b8856579a4141",
+  "objectSHA256": "83ea39b4467d19cd354d6a779bf89f937793e83f1e373e3535239697ac6c3c1b"
+}

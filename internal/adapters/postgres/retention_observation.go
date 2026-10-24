@@ -22,24 +22,32 @@ func (s *RetentionSources) ObserveRetention(ctx context.Context, o app.Retention
 		return value.ErrInvalid
 	}
 	behind := false
+	// The ledger maps closure errors to bare sentinels; keep the step aside.
+	failed := ""
+	mark := func(step string, err error) error {
+		if err != nil {
+			failed = step
+		}
+		return err
+	}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		behind = false
 		if _, err := q.LockPermissionStream(ctx, id(s.root)); err != nil {
-			return err
+			return mark("permission-lock", err)
 		}
 		row, err := lockRetentionSource(ctx, q, s.root, f.Source)
 		if err != nil {
-			return err
+			return mark("source-lock", err)
 		}
 		now, err := liveRetentionSource(ctx, q, row, f)
 		if err != nil {
-			return err
+			return mark("source-live", err)
 		}
 		if !identity.Fresh(p.ObservedAt, p.FreshUntil, now, 5*time.Second) {
-			return value.ErrUnavailable
+			return mark("proof-fresh", value.ErrUnavailable)
 		}
 		if _, err = app.NewRetentionJournal(o.List, now); err != nil {
-			return value.ErrInvalid
+			return mark("journal-new", value.ErrInvalid)
 		}
 		recordCursor := func() error {
 			return q.RecordRetentionListCursor(ctx, custodydb.RecordRetentionListCursorParams{RootID: row.RootID, ClusterID: row.ClusterID, NamespaceUid: row.NamespaceUid, ListCursor: o.List.ResourceVersion})
@@ -59,27 +67,27 @@ func (s *RetentionSources) ObserveRetention(ctx context.Context, o app.Retention
 		// deleted between LISTs. Process history through the LIST watermark first.
 		order, err := resourceversion.CompareResourceVersion(row.WatchCursor, o.List.ResourceVersion)
 		if err != nil {
-			return value.ErrInvalid
+			return mark("watch-cursor", value.ErrInvalid)
 		}
 		if row.ListCursor != "" {
 			newer, err := resourceversion.CompareResourceVersion(o.List.ResourceVersion, row.ListCursor)
 			if err != nil {
-				return value.ErrInvalid
+				return mark("list-cursor", value.ErrInvalid)
 			}
 			if newer < 0 {
-				return value.ErrRetentionObservationObsolete
+				return mark("list-obsolete", value.ErrRetentionObservationObsolete)
 			}
 		}
 		checkpoint, err := currentRetentionCheckpoint(ctx, q, row)
 		if err != nil {
-			return err
+			return mark("checkpoint", err)
 		}
 		if checkpoint == nil || checkpoint.Transition.Fence.Source != f.Source {
-			return value.ErrChanged
+			return mark("checkpoint-source", value.ErrChanged)
 		}
 		journal, err := app.ResumeRetentionJournal(checkpoint.Transition.List)
 		if err != nil {
-			return err
+			return mark("journal-resume", err)
 		}
 		if err = journal.Confirm(o.List, now); err != nil {
 			return invalidate()
@@ -92,37 +100,54 @@ func (s *RetentionSources) ObserveRetention(ctx context.Context, o app.Retention
 			return nil
 		}
 		observed := identity.Earlier(o.List.Snapshot.ObservedAt, p.ObservedAt).UTC().Truncate(time.Microsecond)
-		until := identity.Earlier(o.List.Snapshot.FreshUntil, p.FreshUntil)
-		until = identity.Earlier(until, f.LeaseUntil).UTC().Truncate(time.Microsecond)
-		if !identity.Fresh(observed, until, now, 5*time.Second) {
-			return value.ErrUnavailable
+		input := identity.Earlier(o.List.Snapshot.FreshUntil, p.FreshUntil)
+		// Same microsecond precision as observed, or the five-second span check
+		// fails by the truncated nanoseconds (native75-77).
+		input = identity.Earlier(input, f.LeaseUntil).UTC().Truncate(time.Microsecond)
+		// The LIST and guard proof must still be inside their original five
+		// seconds now; only the stored observation lives longer.
+		if !identity.Fresh(observed, input, now, 5*time.Second) {
+			return mark("input-fresh", value.ErrUnavailable)
 		}
+		until := retentionSourceUntil(observed)
 		// Out-of-order observation replies cannot extend an older observation.
 		if row.ObservedAt.Valid && (observed.Before(row.ObservedAt.Time) || (observed.Equal(row.ObservedAt.Time) && until.After(row.FreshUntil.Time))) {
-			return value.ErrRetentionObservationObsolete
+			return mark("out-of-order", value.ErrRetentionObservationObsolete)
 		}
 		if err = recordCursor(); err != nil {
-			return err
+			return mark("record-cursor", err)
 		}
 		if err = q.ObserveRetentionSource(ctx, custodydb.ObserveRetentionSourceParams{RootID: row.RootID, ClusterID: row.ClusterID, NamespaceUid: row.NamespaceUid, ObservedAt: ts(observed), FreshUntil: ts(until)}); err != nil {
-			return err
+			return mark("observe-write", err)
 		}
 		after, err := liveRetentionSource(ctx, q, row, f)
 		if err != nil {
-			return err
+			return mark("source-live-after", err)
 		}
-		if !identity.Fresh(observed, until, after, 5*time.Second) {
-			return value.ErrUnavailable
+		if !identity.Fresh(observed, until, after, privacy.RetentionSourceInterval) {
+			return mark("stored-fresh", value.ErrUnavailable)
 		}
 		return nil
 	})
 	if err != nil {
+		if failed != "" {
+			return &retentionObserveError{step: failed, err: permissionError(err)}
+		}
 		return permissionError(err)
 	}
 	if behind {
 		return value.ErrRetentionHistoryBehind
 	}
 	return nil
+}
+
+// retentionSourceUntil is the stored lifetime of an accepted retention source
+// observation (ADR-200 revision, 2026-10-23): 30 seconds after its original
+// LIST/guard observation, so a late hub-worker refresh does not refuse
+// retained-policy resolution. ObserveRetentionSource keeps the lease at least
+// that long. Invalidation, suspension and takeover still clear it at once.
+func retentionSourceUntil(observed time.Time) time.Time {
+	return observed.Add(privacy.RetentionSourceInterval).UTC().Truncate(time.Microsecond)
 }
 
 func (s *RetentionSources) AcceptedRetentionSource(ctx context.Context, root string, ref privacy.PolicySourceRef) (privacy.AcceptedSource, error) {
@@ -157,7 +182,7 @@ func acceptedRetentionSource(ctx context.Context, q *custodydb.Queries, root str
 		return out, err
 	}
 	f := retentionFence(row)
-	if f.Source != ref || row.RecoveryBlocked || row.Suspended || row.Sequence < 1 || !row.ObservedSequence.Valid || row.ObservedSequence.Int64 != row.Sequence || !now.Time.Before(row.LeaseUntil.Time) || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now.Time, 5*time.Second) {
+	if f.Source != ref || row.RecoveryBlocked || row.Suspended || row.Sequence < 1 || !row.ObservedSequence.Valid || row.ObservedSequence.Int64 != row.Sequence || !now.Time.Before(row.LeaseUntil.Time) || !identity.Fresh(row.ObservedAt.Time, row.FreshUntil.Time, now.Time, privacy.RetentionSourceInterval) {
 		return out, value.ErrUnavailable
 	}
 	complete, err := q.RetentionSourceCaughtUp(ctx, custodydb.RetentionSourceCaughtUpParams{RootID: row.RootID, ClusterID: row.ClusterID, NamespaceUid: row.NamespaceUid})
@@ -204,3 +229,14 @@ func acceptedRetentionSource(ctx context.Context, q *custodydb.Queries, root str
 	}
 	return out, nil
 }
+
+// retentionObserveStep names the refusing observe check for the hub-worker
+// report; errors.Is/As still see the original error unchanged.
+type retentionObserveError struct {
+	step string
+	err  error
+}
+
+func (e *retentionObserveError) Error() string     { return e.err.Error() }
+func (e *retentionObserveError) Unwrap() error     { return e.err }
+func (e *retentionObserveError) FixedStep() string { return "observe-" + e.step }

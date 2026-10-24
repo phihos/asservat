@@ -1,0 +1,100 @@
+{
+  "scope": "Closed private request, storage read and owner route diagnostics; no authority or deadline changes. Real storage-reader qualification pending.",
+  "sourceBase": "8b153eb25b47e8b075d97ef24327ba793cf8adb8",
+  "sourceSHA256": {
+    "internal/adapters/postgres/context_storage_read.go": "62093306b16e45ef138a103b4ebcef39875c19352c723859be6fe1e9423d7dcf",
+    "internal/application/capture/context_investigation.go": "63c7059a614792a38c1a0b25351c638ccd9b4dfccc0c948f91335e2ea4f6ce05",
+    "internal/application/capture/context_storage_margin_test.go": "03f6d499e8e281552f27071a0bf7aa817cb86cb18af79ecaa87f85c917761785",
+    "internal/application/capture/context_request_diagnostic_test.go": "071460c9eb01e81a438f5fc848583b137f8326bc5a9eebfe2e36c451e73a4750",
+    "internal/application/fleet/owner.go": "3c80c91588d00eae223738ce36d5096e4de286dd5726f53dcafa3ac002c8f385",
+    "internal/application/fleet/owner_route_diagnostic.go": "8beb3131e4869fddc43d0f2e5e9ff4d87cb50975a8b2b2118d72f8f20d08c443",
+    "internal/application/fleet/owner_route_diagnostic_test.go": "20c3d7550b228d5b9774e202488138c92ff2b2fb5346fb6793c49f4ba9226766",
+    "test/integration/context_preview_test.go": "573056fe06782cb189671dda5c10c378f45e24ec6227ee9da04f58f9d87cd510"
+  },
+  "checks": {
+    "requestDiagnosticRed": {
+      "exit": 1,
+      "packageSeconds": 0.031
+    },
+    "requestFocusedRace": {
+      "exit": 0,
+      "packageSeconds": 1.104
+    },
+    "requestFullRace": {
+      "exit": 0,
+      "packageSeconds": 3.078
+    },
+    "ownerRouteDiagnosticRed": {
+      "exit": 1
+    },
+    "ownerRouteFocusedRace": {
+      "exit": 0,
+      "packageSeconds": 1.008
+    },
+    "ownerRouteFullRace": {
+      "exit": 0,
+      "packageSeconds": 15.961
+    },
+    "gates": {
+      "exit": 0,
+      "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 GOFLAGS='-buildvcs=false -p=1' make PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python spec-check architecture-check go-architecture-check sql-check",
+      "toolSession": 3708,
+      "terminalChunk": "7eead4"
+    },
+    "vet": {
+      "exit": 0,
+      "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 GOFLAGS='-buildvcs=false -p=1' go vet ./...",
+      "toolSession": 93391,
+      "terminalChunk": "1eec98"
+    },
+    "postgresRaceBeforeRetryLabelCorrection": {
+      "exit": 0,
+      "packageSeconds": 2.447,
+      "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 GOFLAGS='-buildvcs=false -p=1' go test -race ./internal/adapters/postgres",
+      "toolSession": 32480,
+      "terminalChunk": "764bb8",
+      "storageReaderSHA256": "a5d3f268f77bbd8cd84b1d43f7e934e1a1705e3feca49cdb92b1ad4dffb33758"
+    },
+    "postgresFullRace": {
+      "exit": 0,
+      "packageSeconds": 2.448,
+      "command": "env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 GOFLAGS='-buildvcs=false -p=1' go test -race ./internal/adapters/postgres",
+      "toolSession": 53377,
+      "terminalChunk": "307aef",
+      "storageReaderSHA256": "62093306b16e45ef138a103b4ebcef39875c19352c723859be6fe1e9423d7dcf"
+    },
+    "finalSpec": {
+      "exit": 0,
+      "toolSession": 16688,
+      "terminalChunk": "1f532f",
+      "command": "make PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python spec-check"
+    }
+  },
+  "preflight": "Default system Python lacks specification dependencies; initial make exited 2 before validation. Rerun used the existing requirements-spec virtual environment including format checks.",
+  "fileSHA256": {
+    "native46-diagnostic-gates-default-python-preflight.log": "e4bd491e1ea391d0953fcefd2f0f8936f45af2f5533c9660a25fcf1f04dc6f89",
+    "native46-diagnostic-gates.log": "c8e070f30999ac5b4326d32eb15573b7b6ac0e4b9b78cce51a2fda8b08415a1b",
+    "native46-diagnostic-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "native46-storage-diagnostic-postgres-final-race.log": "a00a0059597d8a3dd3be3b7a0f44e80482fdf14a1979979c178e7cf11e3c5bbe",
+    "native46-storage-diagnostic-postgres-race.log": "32652d611237f92b5af2a292d89b0797b6e4c683550ff9eb94119c09546f4395",
+    "owner-route-diagnostic-fleet-race.json": "cb07b79ab436c026f26a1e9b42ecbec64683e79f9f00d2b5066dadf299883a31",
+    "owner-route-diagnostic-fleet-race.log": "6250c49bea7c85736644b583383d02d47e9d6204f5ad9982921da257208a86fc",
+    "owner-route-diagnostic-green.json": "8dae6e3f62bfd438478208fa8d715083e4f21610fac0c540e5918f5f354bc535",
+    "owner-route-diagnostic-green.log": "caccc6bdcba27640626aa0f5fee14f6b0c384c798b6933212034905f123f6d9d",
+    "owner-route-diagnostic-red.json": "6a3079848b3c66aa241ab31a3b5d77966ccd46fe842e72d8c16d94f3966f6811",
+    "owner-route-diagnostic-red.log": "3a54962a3fba186915127bb219993c6ac6e99d7d4693196aee8e6a086e622012",
+    "owner-route-diagnostic-verification-transcript.txt": "ea635d67189d6b1f8561d883bdb3db0dc578f6150684b54c46a30a9fc38bdb32",
+    "request-facts-diagnostics-full-race-command.txt": "f608bcd31a7992bee94a61f353c2c80e6d1d5eb8068fdb6599368b374960601a",
+    "request-facts-diagnostics-full-race.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "request-facts-diagnostics-full-race.log": "8f1d8fd3de84ff7db307cffaf8a32a0368a107dcf4d32fafcf54a08fb74350be",
+    "request-facts-diagnostics-green-command.txt": "761b6a0beaabed28cc8e0129f1207574f3bd8637ee65a473f7cfb12a8d494aa9",
+    "request-facts-diagnostics-green.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "request-facts-diagnostics-green.log": "455af232db46f84341788d266fe0ef671b205cf0b0e78ef3a53eb28086c33022",
+    "request-facts-diagnostics-red-command.txt": "499eadc9f4c306e1dd413481cbd670f4dfbea4511626c1ada8c6909cab7f3d0b",
+    "request-facts-diagnostics-red.exit": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "request-facts-diagnostics-red.log": "52e8140bff8bd79024f82e923824fac029de9dafebf124ae0d94fe30b4164d70",
+    "request-facts-diagnostics-verification-transcript.txt": "bdd1ea65c90a0f4d3d88367dff900483ad145567ce721ac0147356398776481b",
+    "native46-diagnostic-final-spec.log": "b7421cf10cbe81f630a4e5c93beaa2d554040b9738904843953a3a96ebd9a916"
+  },
+  "independentReview": "No blockers after final retry-label correction. Capture and route checks/order/deadlines/public error classification/effect counts unchanged; private labels fixed and redacted."
+}

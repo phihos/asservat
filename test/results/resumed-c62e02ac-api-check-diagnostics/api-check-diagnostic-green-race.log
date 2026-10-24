@@ -1,0 +1,122 @@
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ReadAPIContextWork
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod#01
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod#02
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Eligibility
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Capability
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Retention
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Compile
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Recovery
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Process
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Current
+=== RUN   TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Context
+--- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects (0.02s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ReadAPIContextWork (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod#01 (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/ResolvePod#02 (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Eligibility (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Capability (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Retention (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Compile (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Recovery (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Process (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Current (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsSeparateReadsWithoutEffects/Context (0.00s)
+=== RUN   TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary
+=== RUN   TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary/PrepareContext/ResolvePod
+=== RUN   TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary/ReadyStart/ResolvePod
+--- PASS: TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary (0.01s)
+    --- PASS: TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary/PrepareContext/ResolvePod (0.00s)
+    --- PASS: TestAPIContextCheckDiagnosticsRetainLaterEffectBoundary/ReadyStart/ResolvePod (0.00s)
+=== RUN   TestAPIContextRunnerOneEffectAndClosedKeys
+--- PASS: TestAPIContextRunnerOneEffectAndClosedKeys (0.01s)
+=== RUN   TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire
+=== RUN   TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/legacy-writer-protocol
+=== RUN   TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/revoked-after-keys
+=== RUN   TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/expired-after-keys
+=== RUN   TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/replacement-pod
+=== RUN   TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/restarted-process
+=== RUN   TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-preparation-reply
+=== RUN   TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-create-reply
+=== RUN   TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-start-reply
+=== RUN   TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-start-record-reply
+=== RUN   TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/expired-start-record-reply
+--- PASS: TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire (0.04s)
+    --- PASS: TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/legacy-writer-protocol (0.00s)
+    --- PASS: TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/revoked-after-keys (0.00s)
+    --- PASS: TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/expired-after-keys (0.00s)
+    --- PASS: TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/replacement-pod (0.00s)
+    --- PASS: TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/restarted-process (0.00s)
+    --- PASS: TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-preparation-reply (0.00s)
+    --- PASS: TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-create-reply (0.00s)
+    --- PASS: TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-start-reply (0.01s)
+    --- PASS: TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/lost-start-record-reply (0.01s)
+    --- PASS: TestAPIContextRunnerBlockingOrUncertainBoundaryDoesNotReacquire/expired-start-record-reply (0.01s)
+=== RUN   TestAPIContextRunnerFailureIsImmutableSpentOutcome
+=== RUN   TestAPIContextRunnerFailureIsImmutableSpentOutcome/capture
+=== RUN   TestAPIContextRunnerFailureIsImmutableSpentOutcome/oversize
+=== RUN   TestAPIContextRunnerFailureIsImmutableSpentOutcome/write
+--- PASS: TestAPIContextRunnerFailureIsImmutableSpentOutcome (0.02s)
+    --- PASS: TestAPIContextRunnerFailureIsImmutableSpentOutcome/capture (0.01s)
+    --- PASS: TestAPIContextRunnerFailureIsImmutableSpentOutcome/oversize (0.01s)
+    --- PASS: TestAPIContextRunnerFailureIsImmutableSpentOutcome/write (0.01s)
+=== RUN   TestAPIContextRunnerAcquiringOutputCapturesAtTheOutput
+--- PASS: TestAPIContextRunnerAcquiringOutputCapturesAtTheOutput (0.02s)
+=== RUN   TestAPIContextConcurrentPreparedReplayNeverCreatesSecondKeys
+--- PASS: TestAPIContextConcurrentPreparedReplayNeverCreatesSecondKeys (0.01s)
+=== RUN   TestAPIContextUnknownPreparationReplyDoesNotCreateKeysOnRetry
+--- PASS: TestAPIContextUnknownPreparationReplyDoesNotCreateKeysOnRetry (0.00s)
+=== RUN   TestAPIContextOriginalPreparationIntervalExpiresBeforeKeys
+--- PASS: TestAPIContextOriginalPreparationIntervalExpiresBeforeKeys (0.03s)
+=== RUN   TestContextExecutionHasOneEffectUnderConcurrentDelivery
+--- PASS: TestContextExecutionHasOneEffectUnderConcurrentDelivery (0.00s)
+=== RUN   TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend
+=== RUN   TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/signature
+=== RUN   TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/authority
+=== RUN   TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/lookup
+=== RUN   TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/keys
+=== RUN   TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/key-revoked
+=== RUN   TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/revoked-after-keys
+=== RUN   TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/replacement-reservation
+=== RUN   TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/changed-audience
+=== RUN   TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/expiry-after-start
+--- PASS: TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend (0.00s)
+    --- PASS: TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/signature (0.00s)
+    --- PASS: TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/authority (0.00s)
+    --- PASS: TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/lookup (0.00s)
+    --- PASS: TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/keys (0.00s)
+    --- PASS: TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/key-revoked (0.00s)
+    --- PASS: TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/revoked-after-keys (0.00s)
+    --- PASS: TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/replacement-reservation (0.00s)
+    --- PASS: TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/changed-audience (0.00s)
+    --- PASS: TestContextExecutionFailuresCannotAcquireBeforeAuthorityAndSpend/expiry-after-start (0.00s)
+=== RUN   TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect
+=== RUN   TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/lost-start-reply
+=== RUN   TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/capture
+=== RUN   TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/oversize
+=== RUN   TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/write
+--- PASS: TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect (0.00s)
+    --- PASS: TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/lost-start-reply (0.00s)
+    --- PASS: TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/capture (0.00s)
+    --- PASS: TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/oversize (0.00s)
+    --- PASS: TestContextExecutionLostStartAndPostStartFailuresNeverRetryEffect/write (0.00s)
+=== RUN   TestContextExecutionRejectsReplacedCollectorOrMismatchedReference
+=== RUN   TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/collector
+=== RUN   TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/epoch
+=== RUN   TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/budget
+=== RUN   TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/scope
+=== RUN   TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/audit
+=== RUN   TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/raw
+=== RUN   TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/capability
+--- PASS: TestContextExecutionRejectsReplacedCollectorOrMismatchedReference (0.00s)
+    --- PASS: TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/collector (0.00s)
+    --- PASS: TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/epoch (0.00s)
+    --- PASS: TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/budget (0.00s)
+    --- PASS: TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/scope (0.00s)
+    --- PASS: TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/audit (0.00s)
+    --- PASS: TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/raw (0.00s)
+    --- PASS: TestContextExecutionRejectsReplacedCollectorOrMismatchedReference/capability (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/execution	1.169s

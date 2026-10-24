@@ -11,6 +11,66 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const abandonUnclaimedQueryWorker = `-- name: AbandonUnclaimedQueryWorker :execrows
+UPDATE download_worker SET abandoned_at=clock_timestamp()
+WHERE id=$1 AND root_id=$2 AND query_id IS NOT NULL AND claimed_at IS NULL
+ AND run_until<=clock_timestamp() AND abandoned_at IS NULL
+`
+
+type AbandonUnclaimedQueryWorkerParams struct {
+	ID     pgtype.UUID
+	RootID pgtype.UUID
+}
+
+func (q *Queries) AbandonUnclaimedQueryWorker(ctx context.Context, arg AbandonUnclaimedQueryWorkerParams) (int64, error) {
+	result, err := q.db.Exec(ctx, abandonUnclaimedQueryWorker, arg.ID, arg.RootID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const acquisitionWorkerCapacity = `-- name: AcquisitionWorkerCapacity :one
+SELECT count(*)::bigint AS total,
+ count(*) FILTER (WHERE coalesce(d.cluster_id,q.cluster_id)=$1
+   AND coalesce(d.namespace_uid,q.namespace_uid)=$2
+   AND coalesce(d.workload_uid,q.workload_uid)=$3)::bigint AS workload,
+ count(*) FILTER (WHERE w.principal_key=$4)::bigint AS principal
+FROM download_worker w
+LEFT JOIN download_allocation d ON d.id=w.allocation_id
+LEFT JOIN context_query_allocation q ON q.id=w.query_allocation_id
+WHERE w.installation_id=$5 AND w.retired_proof_json IS NULL AND w.abandoned_at IS NULL
+`
+
+type AcquisitionWorkerCapacityParams struct {
+	ClusterID      pgtype.UUID
+	NamespaceUid   string
+	WorkloadUid    string
+	PrincipalKey   []byte
+	InstallationID pgtype.UUID
+}
+
+type AcquisitionWorkerCapacityRow struct {
+	Total     int64
+	Workload  int64
+	Principal int64
+}
+
+// Both purposes count under the same permission-root lock. Match workload
+// identity rather than purpose-specific allocation IDs; unknown work stays paid.
+func (q *Queries) AcquisitionWorkerCapacity(ctx context.Context, arg AcquisitionWorkerCapacityParams) (AcquisitionWorkerCapacityRow, error) {
+	row := q.db.QueryRow(ctx, acquisitionWorkerCapacity,
+		arg.ClusterID,
+		arg.NamespaceUid,
+		arg.WorkloadUid,
+		arg.PrincipalKey,
+		arg.InstallationID,
+	)
+	var i AcquisitionWorkerCapacityRow
+	err := row.Scan(&i.Total, &i.Workload, &i.Principal)
+	return i, err
+}
+
 const auditDownloadWorker = `-- name: AuditDownloadWorker :execrows
 UPDATE download_worker SET audit_receipt_json=$3 WHERE id=$1 AND root_id=$2 AND audit_receipt_json IS NULL
 `
@@ -48,7 +108,7 @@ func (q *Queries) BindDownloadWorker(ctx context.Context, arg BindDownloadWorker
 }
 
 const claimDownloadWorker = `-- name: ClaimDownloadWorker :execrows
-UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1 AND root_id=$2 AND audit_receipt_json IS NOT NULL AND claimed_at IS NULL AND retired_proof_json IS NULL
+UPDATE download_worker SET claimed_at=clock_timestamp() WHERE id=$1 AND root_id=$2 AND audit_receipt_json IS NOT NULL AND claimed_at IS NULL AND retired_proof_json IS NULL AND abandoned_at IS NULL
 `
 
 type ClaimDownloadWorkerParams struct {
@@ -82,30 +142,55 @@ func (q *Queries) ConfirmDownloadWorkerTermination(ctx context.Context, arg Conf
 	return result.RowsAffected(), nil
 }
 
-const downloadWorkerCapacity = `-- name: DownloadWorkerCapacity :one
-SELECT count(*)::bigint AS total,
- count(*) FILTER (WHERE allocation_id=$2)::bigint AS workload,
- count(*) FILTER (WHERE principal_key=$3)::bigint AS principal
-FROM download_worker WHERE installation_id=$1 AND retired_proof_json IS NULL
+const expiredQueryAcquisitionWorkers = `-- name: ExpiredQueryAcquisitionWorkers :many
+SELECT id, session_id, root_id, installation_id, allocation_id, principal_key, generation, intent_json, run_until, audit_receipt_json, claimed_at, job_json, binding_json, termination_json, retired_proof_json, query_id, query_allocation_id, abandoned_at FROM download_worker
+WHERE root_id=$1 AND installation_id=$2 AND query_id IS NOT NULL
+ AND retired_proof_json IS NULL AND abandoned_at IS NULL AND run_until<=clock_timestamp()
+ORDER BY run_until,id LIMIT 16
 `
 
-type DownloadWorkerCapacityParams struct {
+type ExpiredQueryAcquisitionWorkersParams struct {
+	RootID         pgtype.UUID
 	InstallationID pgtype.UUID
-	AllocationID   pgtype.UUID
-	PrincipalKey   []byte
 }
 
-type DownloadWorkerCapacityRow struct {
-	Total     int64
-	Workload  int64
-	Principal int64
-}
-
-func (q *Queries) DownloadWorkerCapacity(ctx context.Context, arg DownloadWorkerCapacityParams) (DownloadWorkerCapacityRow, error) {
-	row := q.db.QueryRow(ctx, downloadWorkerCapacity, arg.InstallationID, arg.AllocationID, arg.PrincipalKey)
-	var i DownloadWorkerCapacityRow
-	err := row.Scan(&i.Total, &i.Workload, &i.Principal)
-	return i, err
+func (q *Queries) ExpiredQueryAcquisitionWorkers(ctx context.Context, arg ExpiredQueryAcquisitionWorkersParams) ([]DownloadWorker, error) {
+	rows, err := q.db.Query(ctx, expiredQueryAcquisitionWorkers, arg.RootID, arg.InstallationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DownloadWorker{}
+	for rows.Next() {
+		var i DownloadWorker
+		if err := rows.Scan(
+			&i.ID,
+			&i.SessionID,
+			&i.RootID,
+			&i.InstallationID,
+			&i.AllocationID,
+			&i.PrincipalKey,
+			&i.Generation,
+			&i.IntentJson,
+			&i.RunUntil,
+			&i.AuditReceiptJson,
+			&i.ClaimedAt,
+			&i.JobJson,
+			&i.BindingJson,
+			&i.TerminationJson,
+			&i.RetiredProofJson,
+			&i.QueryID,
+			&i.QueryAllocationID,
+			&i.AbandonedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const insertDownloadWorker = `-- name: InsertDownloadWorker :exec
@@ -140,8 +225,38 @@ func (q *Queries) InsertDownloadWorker(ctx context.Context, arg InsertDownloadWo
 	return err
 }
 
+const insertQueryAcquisitionWorker = `-- name: InsertQueryAcquisitionWorker :exec
+INSERT INTO download_worker(id,query_id,root_id,installation_id,query_allocation_id,principal_key,generation,intent_json,run_until)
+VALUES($1,$2,$3,$4,$5,$6,1,$7,$8)
+`
+
+type InsertQueryAcquisitionWorkerParams struct {
+	ID                pgtype.UUID
+	QueryID           pgtype.UUID
+	RootID            pgtype.UUID
+	InstallationID    pgtype.UUID
+	QueryAllocationID pgtype.UUID
+	PrincipalKey      []byte
+	IntentJson        []byte
+	RunUntil          pgtype.Timestamptz
+}
+
+func (q *Queries) InsertQueryAcquisitionWorker(ctx context.Context, arg InsertQueryAcquisitionWorkerParams) error {
+	_, err := q.db.Exec(ctx, insertQueryAcquisitionWorker,
+		arg.ID,
+		arg.QueryID,
+		arg.RootID,
+		arg.InstallationID,
+		arg.QueryAllocationID,
+		arg.PrincipalKey,
+		arg.IntentJson,
+		arg.RunUntil,
+	)
+	return err
+}
+
 const latestDownloadWorker = `-- name: LatestDownloadWorker :one
-SELECT id, session_id, root_id, installation_id, allocation_id, principal_key, generation, intent_json, run_until, audit_receipt_json, claimed_at, job_json, binding_json, termination_json, retired_proof_json FROM download_worker WHERE session_id=$1 AND root_id=$2 ORDER BY generation DESC LIMIT 1
+SELECT id, session_id, root_id, installation_id, allocation_id, principal_key, generation, intent_json, run_until, audit_receipt_json, claimed_at, job_json, binding_json, termination_json, retired_proof_json, query_id, query_allocation_id, abandoned_at FROM download_worker WHERE session_id=$1 AND root_id=$2 ORDER BY generation DESC LIMIT 1
 `
 
 type LatestDownloadWorkerParams struct {
@@ -168,12 +283,15 @@ func (q *Queries) LatestDownloadWorker(ctx context.Context, arg LatestDownloadWo
 		&i.BindingJson,
 		&i.TerminationJson,
 		&i.RetiredProofJson,
+		&i.QueryID,
+		&i.QueryAllocationID,
+		&i.AbandonedAt,
 	)
 	return i, err
 }
 
 const lockDownloadWorker = `-- name: LockDownloadWorker :one
-SELECT id, session_id, root_id, installation_id, allocation_id, principal_key, generation, intent_json, run_until, audit_receipt_json, claimed_at, job_json, binding_json, termination_json, retired_proof_json FROM download_worker WHERE id=$1 AND root_id=$2 FOR UPDATE
+SELECT id, session_id, root_id, installation_id, allocation_id, principal_key, generation, intent_json, run_until, audit_receipt_json, claimed_at, job_json, binding_json, termination_json, retired_proof_json, query_id, query_allocation_id, abandoned_at FROM download_worker WHERE id=$1 AND root_id=$2 FOR UPDATE
 `
 
 type LockDownloadWorkerParams struct {
@@ -200,6 +318,44 @@ func (q *Queries) LockDownloadWorker(ctx context.Context, arg LockDownloadWorker
 		&i.BindingJson,
 		&i.TerminationJson,
 		&i.RetiredProofJson,
+		&i.QueryID,
+		&i.QueryAllocationID,
+		&i.AbandonedAt,
+	)
+	return i, err
+}
+
+const readQueryAcquisitionWorker = `-- name: ReadQueryAcquisitionWorker :one
+SELECT id, session_id, root_id, installation_id, allocation_id, principal_key, generation, intent_json, run_until, audit_receipt_json, claimed_at, job_json, binding_json, termination_json, retired_proof_json, query_id, query_allocation_id, abandoned_at FROM download_worker WHERE query_id=$1 AND root_id=$2
+`
+
+type ReadQueryAcquisitionWorkerParams struct {
+	QueryID pgtype.UUID
+	RootID  pgtype.UUID
+}
+
+func (q *Queries) ReadQueryAcquisitionWorker(ctx context.Context, arg ReadQueryAcquisitionWorkerParams) (DownloadWorker, error) {
+	row := q.db.QueryRow(ctx, readQueryAcquisitionWorker, arg.QueryID, arg.RootID)
+	var i DownloadWorker
+	err := row.Scan(
+		&i.ID,
+		&i.SessionID,
+		&i.RootID,
+		&i.InstallationID,
+		&i.AllocationID,
+		&i.PrincipalKey,
+		&i.Generation,
+		&i.IntentJson,
+		&i.RunUntil,
+		&i.AuditReceiptJson,
+		&i.ClaimedAt,
+		&i.JobJson,
+		&i.BindingJson,
+		&i.TerminationJson,
+		&i.RetiredProofJson,
+		&i.QueryID,
+		&i.QueryAllocationID,
+		&i.AbandonedAt,
 	)
 	return i, err
 }
@@ -238,4 +394,57 @@ func (q *Queries) RetireDownloadWorker(ctx context.Context, arg RetireDownloadWo
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const unretiredBoundDownloadWorkers = `-- name: UnretiredBoundDownloadWorkers :many
+SELECT id, session_id, root_id, installation_id, allocation_id, principal_key, generation, intent_json, run_until, audit_receipt_json, claimed_at, job_json, binding_json, termination_json, retired_proof_json, query_id, query_allocation_id, abandoned_at FROM download_worker
+WHERE root_id=$1 AND installation_id=$2 AND session_id IS NOT NULL AND binding_json IS NOT NULL
+ AND retired_proof_json IS NULL AND abandoned_at IS NULL
+ORDER BY run_until,id LIMIT 16
+`
+
+type UnretiredBoundDownloadWorkersParams struct {
+	RootID         pgtype.UUID
+	InstallationID pgtype.UUID
+}
+
+// Native download workers can end before run_until; cleanup still requires
+// positive Kubernetes termination evidence for each exact bound row.
+func (q *Queries) UnretiredBoundDownloadWorkers(ctx context.Context, arg UnretiredBoundDownloadWorkersParams) ([]DownloadWorker, error) {
+	rows, err := q.db.Query(ctx, unretiredBoundDownloadWorkers, arg.RootID, arg.InstallationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DownloadWorker{}
+	for rows.Next() {
+		var i DownloadWorker
+		if err := rows.Scan(
+			&i.ID,
+			&i.SessionID,
+			&i.RootID,
+			&i.InstallationID,
+			&i.AllocationID,
+			&i.PrincipalKey,
+			&i.Generation,
+			&i.IntentJson,
+			&i.RunUntil,
+			&i.AuditReceiptJson,
+			&i.ClaimedAt,
+			&i.JobJson,
+			&i.BindingJson,
+			&i.TerminationJson,
+			&i.RetiredProofJson,
+			&i.QueryID,
+			&i.QueryAllocationID,
+			&i.AbandonedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

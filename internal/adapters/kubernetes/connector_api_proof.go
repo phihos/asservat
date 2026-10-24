@@ -19,6 +19,8 @@ import (
 type connectorAPIProof struct {
 	proof                  fleet.ConnectorProcessProof
 	owned                  mtls.ConnectorProcessObservation
+	source                 fleet.ConnectorIdentitySource
+	generation             uint64 // attached atomically with the returned proof
 	observedAt, validUntil time.Time
 }
 
@@ -63,6 +65,7 @@ func (s *connectorAPIProofState) finish(ctx context.Context, now func() time.Tim
 	if !p.valid(now()) {
 		return connectorAPIProof{}, cfg.ErrUnavailable
 	}
+	p.generation = f.generation
 	return p, nil
 }
 
@@ -148,32 +151,46 @@ func (g *ConnectorAPIExecutionProtection) recheckProof(ctx context.Context, p co
 	p.validUntil = identity.Earlier(p.validUntil, owned.ValidUntil)
 	call, stop := context.WithDeadline(ctx, p.validUntil)
 	defer stop()
-	ns, e := g.attester.client.namespace(call, g.attester.client.control)
-	if e != nil || ns.Deleting {
-		return fail(cfg.ErrChanged)
-	}
-	s := g.installed
-	account, e := ownerResource[core.ServiceAccount](&OwnerEndpoints{client: g.attester.client}, call, "/api/v1/namespaces/"+s.Namespace+"/serviceaccounts/"+s.Account, "v1", "ServiceAccount")
-	if e != nil || !ownerMetadata(account.ObjectMeta, s.Namespace, s.Account, s.AccountUID) {
-		return fail(cfg.ErrChanged)
-	}
-	if e = g.executionAccount(call, p.proof); e != nil {
-		return fail(e)
-	}
-	if _, e = checkAdmissionGuard(call, g.attester.client, g.attester.protection.plan.Name, g.attester.protection.pin, g.attester.protection.policy, g.attester.protection.binding); e != nil {
-		return fail(e)
-	}
-	if _, e = checkAdmissionGuard(call, g.attester.client, g.settings.plan.Name, g.settings.pin, g.settings.policy, g.settings.binding); e != nil {
-		return fail(e)
-	}
-	if e = g.snapshot(call); e != nil {
-		return fail(e)
-	}
-	if e = g.workload(call, p.proof); e != nil {
+	if e := g.recheckNative(call, p); e != nil {
 		return fail(e)
 	}
 	if call.Err() != nil || !p.valid(g.attester.client.now()) {
 		return fail(cfg.ErrUnavailable)
 	}
 	return p, nil
+}
+
+// Native current-value checks shared by an ordinary recheck and the explicit
+// setup close. Neither caller can replace the original denial/TokenReview
+// interval. The setup close separately performs its full source proof and
+// local owned-credential confirmation after this work.
+func (g *ConnectorAPIExecutionProtection) recheckNative(call context.Context, p connectorAPIProof) error {
+	ns, e := g.attester.client.namespace(call, g.attester.client.control)
+	if e != nil || ns.Deleting {
+		return cfg.ErrChanged
+	}
+	s := g.installed
+	account, e := ownerResource[core.ServiceAccount](&OwnerEndpoints{client: g.attester.client}, call, "/api/v1/namespaces/"+s.Namespace+"/serviceaccounts/"+s.Account, "v1", "ServiceAccount")
+	if e != nil || !ownerMetadata(account.ObjectMeta, s.Namespace, s.Account, s.AccountUID) {
+		return cfg.ErrChanged
+	}
+	if e = g.executionAccount(call, p.proof); e != nil {
+		return e
+	}
+	if _, e = checkAdmissionGuard(call, g.attester.client, g.attester.protection.plan.Name, g.attester.protection.pin, g.attester.protection.policy, g.attester.protection.binding); e != nil {
+		return e
+	}
+	if _, e = checkAdmissionGuard(call, g.attester.client, g.settings.plan.Name, g.settings.pin, g.settings.policy, g.settings.binding); e != nil {
+		return e
+	}
+	if e = g.snapshot(call); e != nil {
+		return e
+	}
+	if e = g.workload(call, p.proof); e != nil {
+		return e
+	}
+	if call.Err() != nil || !p.valid(g.attester.client.now()) {
+		return cfg.ErrUnavailable
+	}
+	return nil
 }

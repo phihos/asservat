@@ -1,0 +1,13 @@
+{
+  "files": {
+    "test/integration/shared_projection_lifecycle_test.go": "475e1f31e8202ffe683a1deb73d5ee464bdbde3e7770aa7c94715d363d552e0a",
+    "test/integration/context_query_ledger_fixture_test.go": "741624976db5905640aa3cb57d41964d608710e088c4558e41d4ed856f1f9835"
+  },
+  "compile_exit": 0,
+  "compile_tool_session": 95642,
+  "compile_terminal_chunk": "4e9c38",
+  "compile_command_seconds": 21.774800777435303,
+  "compile_package_seconds": 1.064,
+  "scope": "compile-only; all2651 Go/module sources unchanged; no external fixture run",
+  "post_compile_change": "One existing f.refresh(t) call before independent enrollment plus comment, reviewed with CI; no renewed query/worker dates; not recompiled."
+}

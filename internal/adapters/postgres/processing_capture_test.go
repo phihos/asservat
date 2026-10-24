@@ -154,9 +154,9 @@ func TestProcessingCaptureCoverageRetainsEachOriginalRule(t *testing.T) {
 	}
 }
 
-func TestProcessingCaptureCoveragePurposePrivileges(t *testing.T) {
-	for _, purpose := range []string{"capture-admit", "processing-read"} {
-		grants, ok := publicRuntimeRoleGrants(purpose)
+func TestProcessingCaptureCoverageDutyPrivileges(t *testing.T) {
+	for _, purpose := range []string{"capture-admit", "hub-metadata-read"} {
+		grants, ok := publicRuntimeDutyGrants(purpose)
 		if !ok {
 			t.Fatal("missing purpose")
 		}

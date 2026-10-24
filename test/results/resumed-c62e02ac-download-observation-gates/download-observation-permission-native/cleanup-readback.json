@@ -1,0 +1,20 @@
+{
+  "containers": [
+    {
+      "resource": "asservat-permissions-13wwwq8y-control-plane",
+      "actualExit": 1,
+      "absent": true
+    },
+    {
+      "resource": "a875a37559b390cb3f32e4de9fff150bf5e4b5441e61daca361761db29896733",
+      "actualExit": 1,
+      "absent": true
+    },
+    {
+      "resource": "286d6df06bbb32ca402ff3c757200d9d73283758769a70e3458de7e731601533",
+      "actualExit": 1,
+      "absent": true
+    }
+  ],
+  "allAbsent": true
+}

@@ -1,5 +1,15 @@
 # Download worker enrollment
 
+Current installed composition is revised by [ADR-219](../decisions/219-shared-approved-acquisition.md)
+and [ADR-221](../decisions/221-admitted-worker-identity-enrollment.md): one closed
+acquisition parent selects native download or approved pod-status. Certificate
+enrollment uses the exact admitted worker and its own bounded HTTP request,
+without a human certificate-owner registry/locator/relay. Native-operation
+ownership and each purpose's current key/evidence authority remain separate.
+The older certificate-routing components and their tests below are historical
+component evidence, not the installed certificate path. Shared composition
+qualification is still pending.
+
 [ADR-071](../decisions/071-download-worker-enrollment.md) refines REQ-DLD-003, REQ-DEP-003 and REQ-CAP-003. C-14 owns enrollment/renewal as part of the existing ArtifactDownload worker; C-08 owns its encrypted audit, C-21 the Kubernetes/SQL/X.509/provider adapters, and C-24 the pure values. This is private control behavior, not a new developer permission, entity, approval or public HTTP API.
 
 ## Bootstrap proof and key ownership

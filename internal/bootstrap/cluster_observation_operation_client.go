@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"bytes"
 	"context"
 	"crypto/tls"
@@ -132,7 +133,9 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	}()
 	// Fixed step labels name the failing stage for the operator diagnostic
 	// (ADR-197); every cause stays value.ErrUnavailable to callers.
+	mark := time.Now()
 	candidates, err := c.candidates.ReadOwnerObservationCandidates(call)
+	auditapp.MarkStep(ctx, "o-candidates", mark)
 	if err != nil || !candidates.Valid(c.now()) || candidates.Pool != c.pin.Pool || len(candidates.Owners) == 0 {
 		return zero, &fixedStepError{"candidates", value.ErrUnavailable}
 	}
@@ -142,7 +145,9 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	defer stopSQL()
 	nativeCandidates := candidates
 	nativeCandidates.Owners = slices.Clone(candidates.Owners)
+	mark = time.Now()
 	routes, err := c.ready.ReadOwnerObservationDialCandidates(sqlCall, nativeCandidates)
+	auditapp.MarkStep(ctx, "o-routes", mark)
 	if err != nil || !routes.Groups.Valid(c.now()) || !sameForwardCandidates(candidates, routes.Groups.Candidates) {
 		return zero, &fixedStepError{"routes", value.ErrUnavailable}
 	}
@@ -165,7 +170,9 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	end = identity.Earlier(end, routes.Groups.ValidUntil)
 	bounded, stopBounded := context.WithDeadline(sqlCall, end)
 	defer stopBounded()
+	mark = time.Now()
 	selected, err := c.locate(bounded, request.LocatorQuery(), routes)
+	auditapp.MarkStep(ctx, "o-locate", mark)
 	if err != nil || selected == nil {
 		return zero, &fixedStepError{"locate", value.ErrUnavailable}
 	}
@@ -173,7 +180,9 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 	if bounded.Err() != nil || !routes.Groups.Valid(c.now()) || !selected.locator.Matches(request.LocatorQuery(), selected.leaf.Binding, c.now()) {
 		return zero, &fixedStepError{"locator", value.ErrUnavailable}
 	}
+	mark = time.Now()
 	result, err := c.claim(bounded, request, selected)
+	auditapp.MarkStep(ctx, "o-claim", mark)
 	if err != nil {
 		return zero, &fixedStepError{"claim", err}
 	}
@@ -458,7 +467,9 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 	if err != nil {
 		return zero, err
 	}
+	mark := time.Now()
 	socket, err := c.open(call, s.address, name)
+	auditapp.MarkStep(ctx, "c-open", mark)
 	if err != nil {
 		return zero, &fixedStepError{"open", err}
 	}
@@ -472,7 +483,9 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 	if err != nil || leaf != s.leaf {
 		return zero, &fixedStepError{"peer", value.ErrDenied}
 	}
+	mark = time.Now()
 	before, err := c.current(call, connection, &s.first)
+	auditapp.MarkStep(ctx, "c-before", mark)
 	if err != nil {
 		return zero, &fixedStepError{"before", err}
 	}
@@ -484,26 +497,34 @@ func (c *DirectHolderObservationClient) claim(ctx context.Context, request value
 		return zero, err
 	}
 	defer clear(body)
+	mark = time.Now()
 	data, err := socket.request(bounded, http.MethodPost, contracts.ClusterObservationLocalClaimPath, contracts.ClusterObservationLocalClaimMedia, body, s.token)
 	if err != nil {
 		return zero, &fixedStepError{"post", err}
 	}
+	auditapp.MarkStep(ctx, "c-post", mark)
 	defer clear(data)
+	mark = time.Now()
 	after, err := c.current(bounded, connection, &s.first)
+	auditapp.MarkStep(ctx, "c-after", mark)
 	if err != nil {
 		return zero, &fixedStepError{"after", err}
 	}
 	end = identity.Earlier(end, after.FreshUntil)
 	nativeCall, stopNative := context.WithDeadline(bounded, end)
 	defer stopNative()
+	mark = time.Now()
 	final, err := s.native.Final(nativeCall)
+	auditapp.MarkStep(ctx, "c-final", mark)
 	if err != nil || !final.Valid(c.now()) || !final.Final || !ownerLocalSameFacts(s.initial, final) || !ownerLocalNativePeer(final, after, s.address) {
 		return zero, &fixedStepError{"native-final", errors.Join(value.ErrUnavailable, err)}
 	}
 	end = identity.Earlier(end, final.FreshUntil)
 	finalCall, stopFinal := context.WithDeadline(nativeCall, end)
 	defer stopFinal()
+	mark = time.Now()
 	current, err := c.current(finalCall, connection, &s.first)
+	auditapp.MarkStep(ctx, "c-current", mark)
 	if err != nil {
 		return zero, &fixedStepError{"current", err}
 	}

@@ -5,6 +5,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/identity"
 	"context"
+	"crypto/tls"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -230,5 +231,33 @@ func TestNativeContentCredentialOutageIsNotInvalidCredential(t *testing.T) {
 	r.Header.Set("Authorization", "Bearer synthetic")
 	if _, _, _, _, _, e := h.authenticate(t.Context(), r, time.Now().Add(time.Minute)); !errors.Is(e, identity.ErrUnavailable) {
 		t.Fatal("credential observation outage changed to authentication denial", e)
+	}
+}
+
+type contentSocketRecorder struct{ *httptest.ResponseRecorder }
+
+func (contentSocketRecorder) SetReadDeadline(time.Time) error  { return nil }
+func (contentSocketRecorder) SetWriteDeadline(time.Time) error { return nil }
+
+// Installed native91 answered the content GET with a bare 503 and no log line.
+// Every unavailable reply now names its closed stage for the operator report.
+func TestNativeContentUnavailableNamesItsStage(t *testing.T) {
+	credential := &contentCredentialFixture{err: identity.ErrUnavailable}
+	h := &DownloadContentHandler{config: DownloadContentConfig{PublicOrigin: "https://console.invalid", Issuer: "https://issuer.invalid", Now: time.Now}, credentials: credential, slots: make(chan struct{}, 1), active: map[identity.Principal]int{}}
+	var steps []string
+	h.Refused = func(_ context.Context, operation string, err error) {
+		var fixed interface{ FixedStep() string }
+		if !errors.As(err, &fixed) || !errors.Is(err, identity.ErrUnavailable) {
+			t.Fatal("refusal lost its stage or cause", err)
+		}
+		steps = append(steps, operation+"/"+fixed.FixedStep())
+	}
+	r := httptest.NewRequest(http.MethodGet, DownloadContentPrefix+"00000000-0000-4000-8000-000000000001/content", nil)
+	r.Host, r.TLS = "console.invalid", &tls.ConnectionState{}
+	r.Header.Set("Authorization", "Bearer synthetic")
+	w := contentSocketRecorder{httptest.NewRecorder()}
+	h.ServeHTTP(w, r)
+	if w.Code != http.StatusServiceUnavailable || len(steps) != 1 || steps[0] != "content/authenticate" {
+		t.Fatal("unavailable content reply did not name its stage", w.Code, steps)
 	}
 }

@@ -1,0 +1,86 @@
+[
+  {
+    "kind": "container",
+    "name": "asservat-context-hsp75ign-s3",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-hsp75ign-s3"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-hsp75ign-kms",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-hsp75ign-kms"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-hsp75ign-postgres",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-hsp75ign-postgres"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-hsp75ign-tls",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-hsp75ign-tls"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-hsp75ign-keycloak",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-hsp75ign-keycloak"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-hsp75ign-0-seed",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-hsp75ign-0-seed"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-hsp75ign-0-control-plane",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-hsp75ign-0-control-plane"
+  },
+  {
+    "kind": "container",
+    "name": "asservat-context-hsp75ign-1-control-plane",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such container: asservat-context-hsp75ign-1-control-plane"
+  },
+  {
+    "kind": "volume",
+    "name": "asservat-context-hsp75ign-0-var",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: get asservat-context-hsp75ign-0-var: no such volume"
+  },
+  {
+    "kind": "image",
+    "name": "asservat-context-worker:context-hsp75ign",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: No such image: asservat-context-worker:context-hsp75ign"
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-hsp75ign",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: network asservat-context-hsp75ign not found"
+  },
+  {
+    "kind": "network",
+    "name": "asservat-context-hsp75ign-kind",
+    "exit": 1,
+    "absent": true,
+    "stderr": "Error response from daemon: network asservat-context-hsp75ign-kind not found"
+  }
+]

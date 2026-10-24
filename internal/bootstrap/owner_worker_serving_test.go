@@ -119,7 +119,11 @@ func workerServingRuntime(t *testing.T, ctx context.Context) (*runtimeFixture, *
 	origins := evidence.NativeOrigins{Locators: reads, Operations: reads, Now: time.Now, Proofs: func(evidence.DownloadPeerToken) (evidence.DownloadPeerProofReader, error) {
 		return nil, artifact.ErrDownloadUnavailable
 	}}
-	c.Native = &OwnerNativeRuntimeConfig{Peers: &mtls.NativePeerChecks{Workers: f, WorkerTrust: c.WorkerTrust, Certificates: reads, Origins: origins, ConnectorVerifier: verifier, Connectors: &fleetapp.PeerAuthenticator{}, Now: time.Now}, ConnectorRoots: f.roots, Connections: 2, Concurrency: 1}
+	trust, err := mtls.NewWorkerTrustCatalog(runtimeID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c.Native = &OwnerNativeRuntimeConfig{Peers: &mtls.NativePeerChecks{Workers: f, WorkerTrust: trust, Certificates: reads, Origins: origins, ConnectorVerifier: verifier, Connectors: &fleetapp.PeerAuthenticator{}, Now: time.Now}, ConnectorRoots: f.roots, Connections: 2, Concurrency: 1}
 	r, err := NewOwnerRuntime(ctx, c)
 	if err != nil {
 		t.Fatal(err)
@@ -128,10 +132,10 @@ func workerServingRuntime(t *testing.T, ctx context.Context) (*runtimeFixture, *
 	return f, r, listener, nativeListener
 }
 
-// ADR-204 decision 9: the owner port serves worker enrollment and the worker
-// native path under the pool's fixed name exactly when downloads composed
-// them; the exact-name owner relay and the native port are unchanged.
-func TestOwnerRuntimeServesDownloadWorkersOnlyWhenComposed(t *testing.T) {
+// ADR-221: the owner port serves local admitted-worker enrollment and native
+// traffic under the fixed name. The certificate-owner relay is retired; the
+// separate connector native port keeps its existing exact-process profile.
+func TestOwnerRuntimeServesAcquisitionWorkersOnlyWhenComposed(t *testing.T) {
 	for _, composed := range []bool{false, true} {
 		t.Run(map[bool]string{false: "unconfigured", true: "configured"}[composed], func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
@@ -142,10 +146,10 @@ func TestOwnerRuntimeServesDownloadWorkersOnlyWhenComposed(t *testing.T) {
 			issuerRoots, workerLeaf := workerServingIssuer(t)
 			var rootReads atomic.Int32
 			if composed {
-				if err := r.ServeDownloadWorkers(func(time.Time) (*x509.CertPool, error) { rootReads.Add(1); return issuerRoots, nil }); err != nil {
+				if err := r.ServeAcquisitionWorkers(func(time.Time) (*x509.CertPool, error) { rootReads.Add(1); return issuerRoots, nil }, f); err != nil {
 					t.Fatal(err)
 				}
-				if r.ServeDownloadWorkers(func(time.Time) (*x509.CertPool, error) { return issuerRoots, nil }) == nil {
+				if r.ServeAcquisitionWorkers(func(time.Time) (*x509.CertPool, error) { return issuerRoots, nil }, f) == nil {
 					t.Fatal("worker serving composed twice")
 				}
 			}
@@ -161,7 +165,7 @@ func TestOwnerRuntimeServesDownloadWorkersOnlyWhenComposed(t *testing.T) {
 				t.Fatal("worker endpoints are not the pool's fixed name on the owner port", endpoints)
 			}
 
-			// The exact-name owner relay is unchanged either way.
+			// No certificate-owner relay is served in either composition.
 			exact, _ := mtls.OwnerServerName(r.Binding())
 			tr := &http.Transport{TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, MaxVersion: tls.VersionTLS13, RootCAs: f.roots, ServerName: exact, GetClientCertificate: r.client.GetClientCertificate}, DisableKeepAlives: true}
 			defer tr.CloseIdleConnections()
@@ -169,12 +173,9 @@ func TestOwnerRuntimeServesDownloadWorkersOnlyWhenComposed(t *testing.T) {
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Authorization", "Bearer synthetic.token")
 			resp, err := (&http.Client{Transport: tr, Timeout: 3 * time.Second}).Do(req)
-			if err != nil {
-				t.Fatal("owner relay unreachable", err)
-			}
-			resp.Body.Close()
-			if resp.StatusCode != 403 {
-				t.Fatal("owner relay changed", resp.StatusCode)
+			if err == nil {
+				resp.Body.Close()
+				t.Fatal("retired certificate relay remained reachable")
 			}
 
 			// Enrollment: the actual worker client, dialing the owner port by
@@ -193,7 +194,7 @@ func TestOwnerRuntimeServesDownloadWorkersOnlyWhenComposed(t *testing.T) {
 				t.Fatal("synthetic refusal produced a certificate")
 			}
 			if reached := f.ownerReads.Load() > 0; reached != composed {
-				t.Fatal("enrollment reached the exact-owner forwarder", reached, "composed", composed)
+				t.Fatal("enrollment reached the local admitted-worker handler", reached, "composed", composed)
 			}
 
 			// The worker native path: h2 under the fixed name, worker client
@@ -222,7 +223,7 @@ func TestOwnerRuntimeServesDownloadWorkersOnlyWhenComposed(t *testing.T) {
 				c.Close()
 				t.Fatal("native port accepted the worker-facing name")
 			}
-			if r.ServeDownloadWorkers(func(time.Time) (*x509.CertPool, error) { return issuerRoots, nil }) == nil {
+			if r.ServeAcquisitionWorkers(func(time.Time) (*x509.CertPool, error) { return issuerRoots, nil }, f) == nil {
 				t.Fatal("worker serving composed after Run started")
 			}
 			cancel()
@@ -239,12 +240,12 @@ func TestOwnerRuntimeServesDownloadWorkersOnlyWhenComposed(t *testing.T) {
 }
 
 // The fixed worker-facing name needs an owner-bootstrap/v1 pool.
-func TestServeDownloadWorkersRequiresBootstrapPool(t *testing.T) {
+func TestServeAcquisitionWorkersRequiresBootstrapPool(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, r, _, _ := workerServingRuntime(t, ctx)
+	f, r, _, _ := workerServingRuntime(t, ctx)
 	r.pool.NativeBootstrap = ""
-	if r.ServeDownloadWorkers(func(time.Time) (*x509.CertPool, error) { return x509.NewCertPool(), nil }) == nil {
+	if r.ServeAcquisitionWorkers(func(time.Time) (*x509.CertPool, error) { return x509.NewCertPool(), nil }, f) == nil {
 		t.Fatal("worker serving without the pool's fixed serving name")
 	}
 	_, c, _ := newRuntimeFixture(t)
@@ -253,7 +254,7 @@ func TestServeDownloadWorkersRequiresBootstrapPool(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer plain.Close()
-	if plain.ServeDownloadWorkers(func(time.Time) (*x509.CertPool, error) { return x509.NewCertPool(), nil }) == nil {
+	if plain.ServeAcquisitionWorkers(func(time.Time) (*x509.CertPool, error) { return x509.NewCertPool(), nil }, f) == nil {
 		t.Fatal("worker serving without a native runtime")
 	}
 }

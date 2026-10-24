@@ -18,17 +18,27 @@ import (
 )
 
 type Handler struct {
-	enrollment   evidence.WorkerEnrollmentExchange
+	enrollment   evidence.AcquisitionEnrollmentExchange
 	installation string
 	now          func() time.Time
 	slots        chan struct{}
+	// Refused, if set before serving, receives the parent purpose and the
+	// staged error of a refused enrollment. The response stays a bare 503.
+	Refused func(context.Context, string, error)
 }
 
 func NewHandler(installation string, enrollment evidence.WorkerEnrollmentExchange, now func() time.Time, concurrency int) (*Handler, error) {
+	if enrollment == nil {
+		return nil, artifact.ErrInvalid
+	}
+	return NewAcquisitionHandler(installation, evidence.DownloadEnrollmentExchange{Download: enrollment}, now, concurrency)
+}
+
+func NewAcquisitionHandler(installation string, enrollment evidence.AcquisitionEnrollmentExchange, now func() time.Time, concurrency int) (*Handler, error) {
 	if !value.UUID(installation) || enrollment == nil || now == nil || concurrency < 1 || concurrency > 16 {
 		return nil, artifact.ErrInvalid
 	}
-	return &Handler{enrollment, installation, now, make(chan struct{}, concurrency)}, nil
+	return &Handler{enrollment: enrollment, installation: installation, now: now, slots: make(chan struct{}, concurrency)}, nil
 }
 
 // The private listener must pin server trust, enforce TLS 1.3, header/idle/time
@@ -75,15 +85,19 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	defer control.SetReadDeadline(time.Time{})
 	defer control.SetWriteDeadline(time.Time{})
 	in, err := contracts.DecodeWorkerEnrollmentRequest(http.MaxBytesReader(w, r.Body, contracts.WorkerEnrollmentMaxRequest))
-	if err != nil || in.Format != contracts.WorkerEnrollmentFormat || in.InstallationID != h.installation || !value.UUID(in.SessionID) || !value.UUID(in.WorkerID) || !contracts.ValidWorkerNonce(in.Nonce) || len(in.CSR) < 32 || len(in.CSR) > 8192 {
+	parent := value.AcquisitionParentFor(in.SessionID, in.QueryID)
+	if err != nil || in.Format != contracts.WorkerEnrollmentFormat || in.InstallationID != h.installation || !parent.Valid() || !value.UUID(in.WorkerID) || !contracts.ValidWorkerNonce(in.Nonce) || len(in.CSR) < 32 || len(in.CSR) > 8192 {
 		fail(400)
 		return
 	}
-	delivery, err := h.enrollment.BeginWorkerEnrollment(ctx, in.InstallationID, in.SessionID, in.WorkerID, secret, in.CSR)
+	delivery, err := h.enrollment.BeginAcquisitionEnrollment(ctx, in.InstallationID, parent, in.WorkerID, secret, in.CSR)
 	if delivery != nil {
 		defer delivery.Close()
 	}
 	if err != nil || delivery == nil || delivery.Context() == nil {
+		if err != nil && h.Refused != nil {
+			h.Refused(ctx, string(parent.Purpose), err)
+		}
 		fail(503)
 		return
 	}
@@ -115,7 +129,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		fail(503)
 		return
 	}
-	out := contracts.WorkerEnrollmentResponse{Format: contracts.WorkerEnrollmentFormat, InstallationID: in.InstallationID, SessionID: in.SessionID, WorkerID: in.WorkerID, Nonce: in.Nonce, Certificate: cert.DER, Chain: chain}
+	out := contracts.WorkerEnrollmentResponse{Format: contracts.WorkerEnrollmentFormat, InstallationID: in.InstallationID, SessionID: in.SessionID, QueryID: in.QueryID, WorkerID: in.WorkerID, Nonce: in.Nonce, Certificate: cert.DER, Chain: chain}
 	b, err := json.Marshal(out)
 	if err != nil || len(b) > contracts.WorkerEnrollmentMaxResponse || ctx.Err() != nil || owner.Err() != nil || !cert.Peer.Valid(h.now()) {
 		fail(503)

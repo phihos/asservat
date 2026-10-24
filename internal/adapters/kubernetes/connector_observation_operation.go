@@ -60,6 +60,7 @@ func NewConnectorObservationOperationReader(c *PermissionClient, source *Connect
 	if err != nil || workGuard.digest != pin.ProtectionDigest {
 		return nil, cfg.ErrInvalid
 	}
+	workGuard = guard.share(workGuard)
 	var sourcePlan cfg.ConfigMapAdministration
 	raw, err = json.Marshal(source.protection.plan)
 	if err != nil || json.Unmarshal(raw, &sourcePlan) != nil {

@@ -1,0 +1,10 @@
+{
+  "commit": "9543cff77c78bd7a3262e575820c47bd413dc430",
+  "argv": [
+    "python3",
+    "scripts/test-custody.py",
+    "--run",
+    "^TestContextAdmissionWithRealServices$/^api-execution-(preparation-boundaries|retained-check-revoked-during-permission-lock|one-preparation-exact-result-historical-publication)$"
+  ],
+  "startedUnix": 1792704879.3684173
+}

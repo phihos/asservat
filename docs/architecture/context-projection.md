@@ -4,8 +4,30 @@
 S-02 implementation: inspect existing approved pod status through the canonical
 browser/MCP `get_file_excerpt` and `get_query_result` contracts. This is an
 accepted implementation contract. Pure values, strict decoding/formatting and
-the C-18 coordinator component are implemented. Protected adapters, installed
-wiring and qualification remain pending; no tool availability is established.
+the C-18 coordinator component are implemented. The
+[shared acquisition composition](../decisions/219-shared-approved-acquisition.md)
+is an implementation candidate; its installed qualification remains pending.
+
+## Public composition candidate
+
+The protected installation may supply its complete `ContextProjectionService`
+to the shared public operation assembly. Only then does browser/MCP routing
+advertise `get_file_excerpt` and `get_query_result`; an absent service preserves
+the existing operation set, and a partial or foreign installation service is
+rejected. Both calls require the existing live audited invocation owner. A
+server request ID or an unaudited application call cannot replace that owner.
+Read scope does not become download scope, and disabling new captures does not
+disable authorized inspection of saved evidence.
+
+The case evidence screen mounts one view owner for each unexpired pod-status
+metadata artifact. Mounting performs no query. **Inspect saved status** starts
+the fixed fourteen-line request; a pending result offers an explicit **Check
+result**, with no automatic polling or replacement query. The server supplies
+current ordinary-read authority and decides availability independently of the
+descriptor. The view clears its managed result on original expiry, session loss,
+artifact removal or closure. Native download remains a separate explicit action;
+an unavailable query never falls back to a download. These composition and UI
+changes do not by themselves establish a passing installed approved read.
 
 ## Exact result
 
@@ -133,7 +155,8 @@ qualification result must be recorded separately before claiming they passed.
 ## Query and request lifetime
 
 At admission fix an original query start and deadline: start plus the protected
-profile lifetime (default ten seconds, maximum sixty), shortened by original
+profile lifetime (installed shared profile sixty seconds; generic fallback ten,
+maximum sixty), shortened by original
 effective evidence access. Store those bounds, not a current credential or
 renewable identity lease. A later
 shortening is irreversible. A pending handle cannot preserve access across
@@ -577,19 +600,33 @@ advertises a public operation when one of those capabilities is absent.
    wrapper/nested schema, byte ceilings, text escaping and browser clearing.
 7. Qualify installed SQL/S3/key/worker/relay composition, scoped negative probes,
    positive/uncertain closure, bounded copy/history cleanup and sustained browser
-   plus MCP reads inside the original five-second requests and ten-second
-   default query lifetime under normal background work. Record source/image
+   plus MCP reads inside the original request bounds and the installed sixty-second
+   query lifetime under normal background work. Record source/image
    identities, actual exits and terminal cleanup. Component tests and offline
    document gates do not complete this installed qualification or all of S-02.
 
-## Protected query backing and environment component
+## Shared installed backing and environment candidate
 
-The [C-07 producer and C-03 environment](context-query-capacity.md) now have
-private compiler/source/read/write components. The optional original-install
-extension preserves omitted bytes and reserves additional capacity without
-changing the base graph. Separate measured deployment limits, immutable
-report/profile provenance, exact original dates and four independent guards
-are required. Their production native composition and the SQL ledger's mandatory
-anchor hook remain separate work. The C-03 environment consumes query policy,
-recovery and purpose-neutral processing state; no download permission or static
-region fallback is introduced. No public tool is enabled.
+[ADR-219](../decisions/219-shared-approved-acquisition.md) replaces the proposed
+four-deployment qualification/observation engine with the existing protected
+capacity root and exact workload enrollment. The original setup reserves query
+history, audit and key/provider costs; plans bind the accepted shared acquisition
+profile and the exact target path. No source report or deployment limit is
+invented as measured evidence. See [shared query capacity](context-query-capacity.md)
+for the SQL/root contract and the remaining qualification.
+
+The C-03 environment consumes protected placement, recovery and purpose-neutral
+processing state. `ReadApproved` and `evidence:read` remain independent of native
+download permission. The installed query selects sixty seconds within original
+access/backing limits; each invocation keeps its original bound. Its four polls
+and two batches are finite and do not renew that lifetime.
+
+The common worker endpoint serves identity-only enrollment under
+[ADR-221](../decisions/221-admitted-worker-identity-enrollment.md). Native query
+operations still require a live exact ReadApproved owner and real key/evidence
+checks. Physical cleanup is driven by existing bounded admission/status demand;
+it requires persisted exact termination and independent deletion proof, or a
+locked never-claimed expired row. Unknown work and all logical query history
+remain charged. This implementation candidate still needs the installed
+read-without-download, exact-content and cleanup qualification; component
+compilation and browser rendering alone do not enable or qualify collection.

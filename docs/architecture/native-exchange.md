@@ -2,7 +2,15 @@
 
 C-14 uses `asservat-context-native/v1` on I-13 for the existing verified pod-status artifact. The acquisition worker opens an outbound HTTP/2, TLS 1.3 conversation to its installation-selected connector. The connector independently resolves the existing SQL45 operation and exact hub Pod/process. It forwards to that process only after current route, certificate and registry checks. An incoming Hello never creates work or chooses a different owner.
 
-The first mechanism handles the existing native context limit of 4096 bytes. SQL42's response/window accounting supports larger artifacts, but this reader and wire composition do not qualify a large artifact decoder or large-file throughput. One native payload per hop is outstanding, with a separately bounded next-phase control input to observe owner closure; the 1 MiB data limit is a ceiling, not a minimum. A five-second current lease bounds each admitted conversation. Actual sink backpressure can exhaust that lease; automatic pipelining and adaptive large-file behavior remain unqualified.
+The first mechanism handles the existing native context limit of 4096 bytes. SQL42's response/window accounting supports larger artifacts, but this reader and wire composition do not qualify a large artifact decoder or large-file throughput. One native payload per hop is outstanding, with a separately bounded next-phase control input to observe owner closure; the 1 MiB data limit is a ceiling, not a minimum. A five-second current lease bounds each admitted conversation.
+[ADR-220](../decisions/220-response-owned-download-permissions.md) lets the actual
+context response consume the response coordinator's exact already-checked short
+authority and current identity batch through package-private methods. Original
+`CheckedAt`/`ValidUntil`, exact scope and caller/session bounds survive; current
+attachment/source/SQL/key checks still run. Direct current-reader calls and
+independent runtime operations retain their own complete authorization. The
+response's separate ordinary-permission cadence neither changes this wire nor
+extends an admitted conversation. Actual sink backpressure can exhaust that lease; automatic pipelining and adaptive large-file behavior remain unqualified.
 
 ## Command size and memory planning
 
@@ -16,7 +24,7 @@ The v2 native worker has a provisional 64 MiB configuration minimum, separate fr
 
 The public hub request retains its actual request-owned `CurrentIdentity` and original current-check closure. `NativeAttachment` registers a local factory before publishing its SQL locator. The factory cannot be reconstructed after process loss from SQL or a certificate. `CurrentNativeResponseSource` receives the existing C02 identity batch from `DownloadResponseTransfer`; a serialized delivery lease is insufficient. The remote source rejects the legacy identity-free source methods.
 
-The connector authenticates the actual acquisition TLS leaf against the exact accepted worker profile, then uses the dedicated Pod token for current worker proof. The hub authenticates the actual connector TLS peer, independently matches its reported acquisition leaf to the activated worker certificate, and repeats current Pod/operation checks. This reports the original peer; it does not fabricate a hub-side acquisition TLS handshake. Every frame retains the original proof/operation/lease deadline and rechecks current registry/operation and original caller authority. Known cancellation or shortening closes the live conversation. A stored locator, nonce, operation reference, certificate or route is never a byte or key permit.
+The connector authenticates the actual acquisition TLS leaf against the exact accepted worker profile, then uses the dedicated Pod token for current worker proof. The hub authenticates the actual connector TLS peer, independently matches its reported acquisition leaf to the activated worker certificate, and repeats current Pod/operation checks. This reports the original peer; it does not fabricate a hub-side acquisition TLS handshake. Every frame retains the original proof/operation/lease deadline and rechecks current registry/operation and original caller authority. The hub shares one operation observation (`NativeOrigins.Recheck`, a fenced SQL read keyed by exact operation reference and peer) for at most `NativeRecheckInterval` (one second); every caller still checks it against its own original origin, lease and deadlines. This is the maintainer-authorized relaxed recheck interval: installed native79 repeated that read about eleven times between a woken worker's attachment and its first command frame and exhausted the five-second projection authority. Known cancellation or shortening closes the live conversation. A stored locator, nonce, operation reference, certificate or route is never a byte or key permit.
 
 The outbound connector uses a separately scoped connector client certificate. Hub-owner enrollment forwarding remains a different protocol and role. Exact owner routing uses the accepted Pod addresses and the deterministic owner server name; it has no developer callback, DNS route selection or public address override. TLS/session/root/key provisioning still requires protected installation producers.
 
@@ -41,11 +49,22 @@ Content uses an exact SQL42 response/window and a separate SQL45 key binding wit
 
 The worker retains its pending buffer until delivery acknowledgement or joined cancellation, then clears it. The connector and hub each hold at most one bounded pending chunk. A lost acknowledgement after a successful sink write stays conservatively charged. Source and sink close join blocking I/O before local capacity is released.
 
+An approved projection operation may span the evidence-read request window
+(twenty seconds, 2026-10-23, after installed native78-80 expired the read at
+the worker); its command lease, the batch and the projection authority still
+bound the worker's read. The worker reports per-read step buckets (`native
+read: unwrap-1 unwrap-2 unwrap-3 object-decrypt parse frames`, outcome) for
+installed timing. Since the follow-up, a projection frame gate is bounded by
+its operation instead of each frame's five-second observation: every frame
+must pass its complete current check, the first failure closes the
+conversation, and the hub's projection request and native connections may
+last up to the window (30 s connection residency).
+
 ## Conversation outcomes and recovery
 
 The actual h2 client uses a non-rewindable live POST body, no retry-enabling headers and no redirects. One original setup bound covers handshake, headers and Hello. It never retries an uncertain POST automatically.
 
-A positive no-command response requires actual verified h2/TLS, the exact Hello nonce and worker identities, and an original current deadline of at most five seconds. Generic HTTP errors, EOF, timeouts and stale/ambiguous rows are not no-command responses. Idle checks use at least one second of backoff, at most 32768 conversations, and the worker's original `RunUntil`; none renews authority, SQL ownership or capacity.
+A positive no-command response requires actual verified h2/TLS, the exact Hello nonce and worker identities, and an original current deadline of at most five seconds. Generic HTTP errors, EOF, timeouts and stale/ambiguous rows are not no-command responses. Idle checks use at least one second of backoff, at most 32768 conversations, and the worker's original `RunUntil`; none renews authority, SQL ownership or capacity. On the hub-local worker path the hub parks an idle request, without a handler slot, until this process publishes that worker's own operation or shortly before the idle reply's deadline; a wake-up repeats the complete worker/SQL admission. Workers start at most one idle lookup per second, counting the time a parked reply took, so an operation claimed by a human request no longer has to coincide with the worker's retry schedule inside one five-second request.
 
 A positive final Done marker runs its blocking current-authority check and positively closes its exact original SQL owner before the write. The private completion callback locks and matches the original operation/reference/fence and lease sequence, requires one acknowledged open-to-closed transition, and checks the original deadline after blocking work and commit. Already-closed, missing, replaced, expired and unknown results cannot supply this proof. Ordinary cancellation cleanup remains idempotent and cannot certify success or close another generation. After that restrictive transition, only the hub’s private exact-completion capability can send the same zero-byte final marker using the unextended last complete gate bound; no metadata, data, key or new-work effect uses it. The transport then checks the original deadline and known cancellation around the write/flush, with no new blocking authority work after the marker has already reached the peer. A peer may close normally upon receiving Done. Metadata, data and other control frames retain their post-I/O current checks; the application's final metadata authorization remains separate. A failed or partial final write is unavailable, and successful HTTP flush does not prove downstream persistence or all participants' independent quiescence.
 

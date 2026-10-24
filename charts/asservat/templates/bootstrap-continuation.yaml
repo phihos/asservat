@@ -35,10 +35,18 @@ rules:
   - apiGroups: [asservat.io]
     resources: [evidencestoragepools, evidencebudgetpolicies]
     verbs: [get, list, create]
+  # Regional operator maintenance extends the existing pool allocation.
+  - apiGroups: [asservat.io]
+    resources: [evidencestoragepools]
+    verbs: [update]
   # ADR-189: the hub-worker's permission reader and guard probe.
   - apiGroups: [asservat.io]
     resources: [accessbindings, permissionsources]
     verbs: [get, list, watch, create]
+  # The selected administrator can remove a previously applied binding.
+  - apiGroups: [asservat.io]
+    resources: [accessbindings]
+    verbs: [delete]
   # ADR-195: the hub-worker's retention reader and guard probe, and the
   # installation administrator's baseline policy and its later edits.
   - apiGroups: [asservat.io]
@@ -87,104 +95,4 @@ metadata:
 immutable: true
 data:
   continuation.json: {{ $input | quote }}
----
-apiVersion: v1
-kind: Pod
-metadata:
-  name: {{ printf "%s-continuation" $b.name }}
-  namespace: {{ .Release.Namespace }}
-  labels:
-    app.kubernetes.io/name: asservat
-    asservat.io/private-role: bootstrap-continuation
-  annotations:
-    helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "10"
-    helm.sh/hook-delete-policy: hook-succeeded
-    asservat.io/bootstrap-input: {{ include "asservat.bootstrap.inputDigest" . | quote }}
-spec:
-  serviceAccountName: {{ printf "%s-bootstrap-runner" $b.name }}
-  automountServiceAccountToken: false
-  enableServiceLinks: false
-  restartPolicy: Never
-  activeDeadlineSeconds: 1800
-  terminationGracePeriodSeconds: 15
-  {{- if $b.registrySecret }}
-  imagePullSecrets:
-    - name: {{ $b.registrySecret | quote }}
-  {{- end }}
-  securityContext:
-    runAsNonRoot: true
-    runAsUser: 65532
-    runAsGroup: 65532
-    fsGroup: 65532
-    fsGroupChangePolicy: OnRootMismatch
-    seccompProfile:
-      type: RuntimeDefault
-  initContainers:
-    # Re-projects the preparer inputs from passive history; on a completed
-    # installation it changes nothing.
-    - name: produce
-      image: {{ $b.image | quote }}
-      imagePullPolicy: IfNotPresent
-      command: [/asservat, initial-bootstrap]
-      securityContext: {{ include "asservat.bootstrap.security" . | nindent 8 }}
-      resources: {{ include "asservat.bootstrap.resources" . | nindent 8 }}
-      volumeMounts:
-        - name: scratch
-          mountPath: /run/asservat/initial-bootstrap-work
-        - name: producer-input
-          mountPath: /run/asservat/initial-bootstrap
-          readOnly: true
-  containers:
-    - name: continue
-      image: {{ $b.image | quote }}
-      imagePullPolicy: IfNotPresent
-      command: [/asservat, installer-continue]
-      securityContext: {{ include "asservat.bootstrap.security" . | nindent 8 }}
-      resources: {{ include "asservat.bootstrap.resources" . | nindent 8 }}
-      volumeMounts:
-        - name: scratch
-          mountPath: /run/asservat/initial-preparer
-          subPath: projection/preparer
-          readOnly: true
-        - name: continuation-input
-          mountPath: /run/asservat/installer-continue
-          readOnly: true
-  volumes:
-    - name: scratch
-      emptyDir:
-        medium: Memory
-        sizeLimit: 8Mi
-    - name: producer-input
-      projected:
-        defaultMode: 0440
-        sources: {{ include "asservat.bootstrap.commonProjection" . | nindent 10 }}
-          - secret:
-              name: {{ $b.secrets.producer | quote }}
-              optional: true
-              items:
-                - key: postgres-administrator.json
-                  path: postgres-administrator.json
-    - name: continuation-input
-      projected:
-        defaultMode: 0440
-        sources:
-          - configMap:
-              name: {{ $name }}
-              optional: false
-              items:
-                - key: continuation.json
-                  path: continuation.json
-          - serviceAccountToken:
-              path: administrator-token
-              expirationSeconds: 600
-              {{- if $b.probeAudience }}
-              audience: {{ $b.probeAudience | quote }}
-              {{- end }}
-          - secret:
-              name: {{ $b.secrets.producer | quote }}
-              optional: false
-              items:
-                - key: postgres-administrator.json
-                  path: postgres-administrator.json
 {{- end }}

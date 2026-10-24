@@ -136,7 +136,7 @@ func (w *WorkerCredentials) Enroll(ctx context.Context) error {
 	if err != nil || !contracts.ValidWorkerToken(token) {
 		return artifact.ErrDownloadUnavailable
 	}
-	in := contracts.WorkerEnrollmentRequest{Format: contracts.WorkerEnrollmentFormat, InstallationID: w.target.InstallationID, SessionID: w.target.SessionID, WorkerID: w.target.WorkerID, Nonce: base64.RawURLEncoding.EncodeToString(nonce[:]), CSR: csr}
+	in := contracts.WorkerEnrollmentRequest{Format: contracts.WorkerEnrollmentFormat, InstallationID: w.target.InstallationID, SessionID: w.target.SessionID, QueryID: w.target.QueryID, WorkerID: w.target.WorkerID, Nonce: base64.RawURLEncoding.EncodeToString(nonce[:]), CSR: csr}
 	b, err := json.Marshal(in)
 	if err != nil || len(b) > contracts.WorkerEnrollmentMaxRequest {
 		return artifact.ErrInvalid
@@ -158,7 +158,7 @@ func (w *WorkerCredentials) Enroll(ctx context.Context) error {
 		return artifact.ErrDownloadUnavailable
 	}
 	out, err := contracts.DecodeWorkerEnrollmentResponse(response.Body)
-	if err != nil || out.Format != in.Format || out.InstallationID != in.InstallationID || out.SessionID != in.SessionID || out.WorkerID != in.WorkerID || out.Nonce != in.Nonce || out.Chain == nil {
+	if err != nil || out.Format != in.Format || out.InstallationID != in.InstallationID || out.SessionID != in.SessionID || out.QueryID != in.QueryID || out.WorkerID != in.WorkerID || out.Nonce != in.Nonce || out.Chain == nil {
 		return artifact.ErrIntegrity
 	}
 	cert, peer, err := w.checkCertificate(start, csr, out.Certificate, out.Chain)

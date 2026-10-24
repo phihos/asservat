@@ -1,0 +1,29 @@
+{
+  "algorithm": "sha256",
+  "files": {
+    "README.md": "27006f65df0ad9ef0f0d1183d3823c84f62a0d974aeb361d73f9e904190993dc",
+    "cleanup-compile/compile-result.json": "534ab753ed7649d3b000b7a458cb57e62c8e51960977400201014a829f31acd9",
+    "cleanup-compile/compile.log": "d75c5a7a0d151baf72a6eb2a66a1188629738532059ce589d39e5197da41892f",
+    "design/gate.log": "7e412c5bbaa57caa0f2e580d14a982f3754db16beb300d60646fe7af4f35ba47",
+    "design/invocation.json": "9c4f27311a1510bce7983a710b3483325ecee914c40343f4a87c6fb520376283",
+    "design/result.json": "0a5b5093be91be1049ff31c5d8d936f1529485487fc4047c36bb9122bd16a379",
+    "design/source-before.json": "1bff52389dc95f2020525269d333390cf0fc449cfa5f3236b7f4828bfa4ba547",
+    "roles/command.json": "fd397b0f6e5dfeb036eb0df2f9a568b69068693ead6c49313073ee580b30829f",
+    "roles/fleet-environment.json": "995fe98b6f818ea0ceaa157735ffc8186a50044d143710676be0daa225e79570",
+    "roles/fleet.log": "b0d83ae9e2a40822b5bd567aee52f84ff1ecaa12992da3155b0811174c4888e7",
+    "roles/manifest.json": "ef1a82910df83e2c6ddf028922313f4ff2a5723e73afada59061112b753c28ef",
+    "roles/owned-resource-checks.json": "c7d0e366226f142865c3f3540ef7c07e82750bf28106f996b5adac4815babb6a",
+    "roles/result.json": "88f400d21c1dc65914e2647b355209573ddf44b78cf949604a8f3f7a4da09084",
+    "roles/source-after.json": "53caee60333f85be251c70468694b569cfdfe1e14b4cbe721a472b23acab5460",
+    "roles/source-before.json": "53caee60333f85be251c70468694b569cfdfe1e14b4cbe721a472b23acab5460",
+    "roles/stdout.log": "e01e12c9f69bb1fc92f1b42fc29a0c1bd60bd7001d142e60f6cc6cd3e075b883",
+    "sql/custody-environment.json": "6e0ee9e9f10833309715a8e2779770c48734ca7c0c971a3e64a7f7e7e81698c3",
+    "sql/custody.log": "2302533093362bf849664f5e5e75e87272f9bb8d42e31285d1f0c9339a3a2a0b",
+    "sql/gate.log": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373",
+    "sql/invocation.json": "2b22b4f1908cf7b5ae6bd2c808feccf1b6d48c389708b3e2053d12ad46307684",
+    "sql/owned-resource-absence.json": "4b63b78b9a1069a8fd810352d1ed3e346bd802a31e7edb387574c9df0aa88817",
+    "sql/result.json": "ab336af457790432788f0ab18edfcf0d9edc6b0f121055844b7579ce78882f66",
+    "sql/source-before.json": "1bff52389dc95f2020525269d333390cf0fc449cfa5f3236b7f4828bfa4ba547",
+    "sql/source-verification.json": "3166daa51918a6cd3502a528aba339d323249a1f7a31abcbabb2ad20735d37a0"
+  }
+}

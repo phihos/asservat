@@ -1,0 +1,35 @@
+Owner route diagnostic verification transcript
+This file records observed commands and terminal tool evidence; tests were not rerun to create it. Raw logs and JSON metadata were saved by the original subprocess runner.
+
+owner-route-diagnostic-red
+CWD: /home/phil/Projekte/asservat-resume-0450e73c
+HEAD: 8b153eb25b47e8b075d97ef24327ba793cf8adb8
+Command: env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 'GOFLAGS=-buildvcs=false -p=1' GOCACHE=/home/phil/.cache/asservat-build/recovered-c62e02ac/native41-full go test ./internal/application/fleet -run '^TestOwnerRouteRefusal(DiagnosticsKeepBoundaries|ReachesAuthenticatorSink)$' -count=1 -v
+Started UTC: 2026-10-20T16:57:26.010024+00:00
+Observed terminal functions.write_stdin: session 76402, chunk 930bb2, exit 1
+Elapsed seconds: 1.1278622099780478
+Raw log: /home/phil/.cache/asservat-build/recovered-c62e02ac/owner-route-diagnostic-red.log
+Metadata including before/after source SHA256: /home/phil/.cache/asservat-build/recovered-c62e02ac/owner-route-diagnostic-red.json
+19 missing fixed route stages and composed receiving sink detail; valid/no-reporter and result/order/deadline assertions held.
+
+owner-route-diagnostic-green
+CWD: /home/phil/Projekte/asservat-resume-0450e73c
+HEAD: 8b153eb25b47e8b075d97ef24327ba793cf8adb8
+Command: env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 'GOFLAGS=-buildvcs=false -p=1' GOCACHE=/home/phil/.cache/asservat-build/recovered-c62e02ac/native41-full go test -race ./internal/application/fleet -run '^TestOwnerRouteRefusal(DiagnosticsKeepBoundaries|ReachesAuthenticatorSink)$' -count=1 -v
+Started UTC: 2026-10-20T16:58:19.132497+00:00
+Observed terminal functions.write_stdin: session 56615, chunk eea0ea, exit 0
+Elapsed seconds: 2.8489958999562077
+Raw log: /home/phil/.cache/asservat-build/recovered-c62e02ac/owner-route-diagnostic-green.log
+Metadata including before/after source SHA256: /home/phil/.cache/asservat-build/recovered-c62e02ac/owner-route-diagnostic-green.json
+Both focused tests pass under race detection; package duration 1.008s.
+
+owner-route-diagnostic-fleet-race
+CWD: /home/phil/Projekte/asservat-resume-0450e73c
+HEAD: 8b153eb25b47e8b075d97ef24327ba793cf8adb8
+Command: env TMPDIR=/home/phil/.cache/asservat-build/tmp GOTMPDIR=/home/phil/.cache/asservat-build/tmp GOMAXPROCS=2 'GOFLAGS=-buildvcs=false -p=1' GOCACHE=/home/phil/.cache/asservat-build/recovered-c62e02ac/native41-full go test -race ./internal/application/fleet -count=1
+Started UTC: 2026-10-20T16:58:53.925758+00:00
+Observed terminal functions.write_stdin: session 23266, chunk 83af60, exit 0
+Elapsed seconds: 16.23657769098645
+Raw log: /home/phil/.cache/asservat-build/recovered-c62e02ac/owner-route-diagnostic-fleet-race.log
+Metadata including before/after source SHA256: /home/phil/.cache/asservat-build/recovered-c62e02ac/owner-route-diagnostic-fleet-race.json
+Full fleet package passes under race detection; package duration 15.961s.

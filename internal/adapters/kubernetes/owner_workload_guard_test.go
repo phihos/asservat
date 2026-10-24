@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -25,7 +26,7 @@ import (
 )
 
 func TestOwnerWorkloadProtectionRequiresActualCurrentDenial(t *testing.T) {
-	for _, mode := range []string{"valid", "conflict-once", "conflict-always", "conflict-foreign", "conflict-then-replaced", "conflict-then-late", "ordinary-rbac-denial", "admin-probe", "controller-probe", "changed-binding", "changed-policy", "type-warning", "missing-policy", "foreign-deployment", "namespace-replaced", "namespace-replaced-after", "late", "wrong-cause", "wrong-kind", "accepted-dry-run", "changed-during-proof"} {
+	for _, mode := range []string{"valid", "conflict-once", "conflict-always", "conflict-foreign", "conflict-then-replaced", "conflict-then-late", "ordinary-rbac-denial", "admin-probe", "controller-probe", "changed-binding", "changed-policy", "type-warning", "missing-policy", "missing-policy-after", "foreign-deployment", "namespace-replaced", "namespace-replaced-after", "namespace-read-after", "late", "wrong-cause", "wrong-kind", "accepted-dry-run", "changed-during-proof", "reuse", "reuse-after-failure", "reuse-concurrent"} {
 		t.Run(mode, func(t *testing.T) {
 			start := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
 			var clock atomic.Int64
@@ -41,12 +42,17 @@ func TestOwnerWorkloadProtectionRequiresActualCurrentDenial(t *testing.T) {
 			policy.Status.TypeChecking = &admission.TypeChecking{}
 			binding.UID, binding.ResourceVersion = types.UID(pin.BindingUID), "20"
 			deployment := apps.Deployment{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, ObjectMeta: meta.ObjectMeta{Name: plan.Deployment, Namespace: plan.ControlNamespace.Name, UID: types.UID(plan.DeploymentUID), ResourceVersion: "30"}}
-			var policyReads, namespaceReads, deploymentReads, writes atomic.Int32
+			var policyReads, namespaceReads, deploymentReads, writes, requests atomic.Int32
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				requests.Add(1)
 				switch r.URL.Path {
 				case "/api/v1/namespaces/owners":
 					uid := plan.ControlNamespace.UID
 					n := namespaceReads.Add(1)
+					if mode == "namespace-read-after" && n > 1 {
+						http.Error(w, "private native API message", http.StatusInternalServerError)
+						return
+					}
 					if mode == "namespace-replaced" || mode == "namespace-replaced-after" && n > 1 {
 						uid = ownerID(99)
 					}
@@ -54,7 +60,7 @@ func TestOwnerWorkloadProtectionRequiresActualCurrentDenial(t *testing.T) {
 				case "/apis/admissionregistration.k8s.io/v1/validatingadmissionpolicies/owner-workload":
 					n := policyReads.Add(1)
 					p := policy.DeepCopy()
-					if mode == "missing-policy" {
+					if mode == "missing-policy" || mode == "missing-policy-after" && n > 1 || mode == "reuse-after-failure" && n == 1 {
 						http.NotFound(w, r)
 						return
 					}
@@ -170,11 +176,11 @@ func TestOwnerWorkloadProtectionRequiresActualCurrentDenial(t *testing.T) {
 			plan.SchedulingLeases[0].Lease = "mutated-caller"
 			digest, until, e := guard.Current(context.Background())
 			if mode == "valid" {
-				if e != nil || digest != guard.digest || !until.Equal(start.Add(5*time.Second)) || writes.Load() != 1 {
+				if e != nil || digest != guard.digest || !until.Equal(start.Add(OwnerProtectionReuse)) || writes.Load() != 1 {
 					t.Fatal("valid guard", e)
 				}
 				pool := value.OwnerPool{InstallationID: ownerID(6), ClusterID: permissionCluster, IssuerEpoch: ownerID(7), Namespace: plan.ControlNamespace.Name, NamespaceUID: plan.ControlNamespace.UID, Deployment: plan.Deployment, DeploymentUID: plan.DeploymentUID, Service: "hub", ServiceUID: ownerID(8), ServiceAccount: "hub", AccountUID: ownerID(9), Port: 8443}
-				if observed, e := guard.ReadOwnerProtection(context.Background(), pool); e != nil || !observed.Valid(now()) || observed.Pool != pool || observed.Digest != digest || !observed.FreshUntil.Equal(until) {
+				if observed, e := guard.ReadOwnerProtection(context.Background(), pool); e != nil || !observed.Valid(now()) || observed.Pool != pool || observed.Digest != digest || !observed.FreshUntil.Equal(start.Add(5*time.Second)) {
 					t.Fatal("pool-bound protection", e)
 				}
 				reads := policyReads.Load()
@@ -197,11 +203,33 @@ func TestOwnerWorkloadProtectionRequiresActualCurrentDenial(t *testing.T) {
 					}
 				}
 			} else if mode == "conflict-once" {
-				if e != nil || digest != guard.digest || !until.Equal(start.Add(5*time.Second)) || writes.Load() != 2 || deploymentReads.Load() != 2 {
+				if e != nil || digest != guard.digest || !until.Equal(start.Add(OwnerProtectionReuse)) || writes.Load() != 2 || deploymentReads.Load() != 2 {
 					t.Fatalf("bounded conflict retry: %v, writes=%d, until=%v", e, writes.Load(), until)
 				}
+			} else if strings.HasPrefix(mode, "reuse") {
+				checkOwnerProtectionReuse(t, mode, guard, start, &clock, &requests, until, e)
 			} else if e == nil {
 				t.Fatal("unsafe proof accepted")
+			}
+			expected := map[string]struct {
+				step     string
+				class    error
+				requests int32
+			}{
+				"namespace-replaced":       {"protection.namespace-first", cfg.ErrChanged, 1},
+				"namespace-replaced-after": {"protection.namespace-last", cfg.ErrChanged, 10},
+				"namespace-read-after":     {"protection.namespace-last", cfg.ErrChanged, 10},
+				"missing-policy":           {"protection.guard-first/source.guard-policy-read", cfg.ErrChanged, 2},
+				"missing-policy-after":     {"protection.guard-last/source.guard-policy-read", cfg.ErrChanged, 8},
+				"ordinary-rbac-denial":     {"protection.probe/source.probe-access-verdict", cfg.ErrUnavailable, 5},
+				"changed-during-proof":     {"protection.guard-changed", cfg.ErrChanged, 9},
+				"late":                     {"protection.original-interval", cfg.ErrChanged, 9},
+			}[mode]
+			if expected.step != "" {
+				var fixed interface{ FixedStep() string }
+				if !errors.Is(e, expected.class) || !errors.As(e, &fixed) || fixed.FixedStep() != expected.step || requests.Load() != expected.requests {
+					t.Fatalf("native protection lost phase/class or changed reads: error=%v requests=%d want=%+v", e, requests.Load(), expected)
+				}
 			}
 			if mode == "conflict-always" && writes.Load() != 3 {
 				t.Fatalf("conflict retries not bounded: %d", writes.Load())
@@ -213,6 +241,59 @@ func TestOwnerWorkloadProtectionRequiresActualCurrentDenial(t *testing.T) {
 				t.Fatal("invalid probe attempted mutation")
 			}
 		})
+	}
+}
+
+// checkOwnerProtectionReuse covers the 2026-10-23 reuse revision: one proof
+// costs ten native calls; a reused one costs none.
+func checkOwnerProtectionReuse(t *testing.T, mode string, guard *OwnerWorkloadProtection, start time.Time, clock *atomic.Int64, requests *atomic.Int32, until time.Time, first error) {
+	t.Helper()
+	const proof = 10
+	switch mode {
+	case "reuse":
+		if first != nil || requests.Load() != proof {
+			t.Fatal("first proof", first, requests.Load())
+		}
+		// Reused while more than the refresh margin remains of the 30 s.
+		renew := start.Add(OwnerProtectionReuse - ownerProtectionRefresh)
+		clock.Store(renew.Add(-time.Nanosecond).UnixNano())
+		if _, again, e := guard.Current(context.Background()); e != nil || !again.Equal(until) || requests.Load() != proof {
+			t.Fatal("proof within the reuse window repeated API calls", e, requests.Load())
+		}
+		clock.Store(renew.UnixNano())
+		if _, again, e := guard.Current(context.Background()); e != nil || !again.Equal(renew.Add(OwnerProtectionReuse)) || requests.Load() != 2*proof {
+			t.Fatal("expiring proof was not re-read", e, requests.Load())
+		}
+		cancelled, cancel := context.WithCancel(context.Background())
+		cancel()
+		if _, _, e := guard.Current(cancelled); e == nil {
+			t.Fatal("reused proof ignored caller cancellation")
+		}
+	case "reuse-after-failure":
+		if first == nil || requests.Load() != 2 {
+			t.Fatal("failing first proof", first, requests.Load())
+		}
+		if _, _, e := guard.Current(context.Background()); e != nil || requests.Load() != 2+proof {
+			t.Fatal("failed proof was reused", e, requests.Load())
+		}
+	case "reuse-concurrent":
+		if first != nil {
+			t.Fatal(first)
+		}
+		guard.reuse.until = time.Time{}
+		before := requests.Load()
+		errs := make(chan error, 8)
+		for range 8 {
+			go func() { _, _, e := guard.Current(context.Background()); errs <- e }()
+		}
+		for range 8 {
+			if e := <-errs; e != nil {
+				t.Fatal(e)
+			}
+		}
+		if requests.Load()-before != proof {
+			t.Fatal("concurrent callers did not share one proof", requests.Load()-before)
+		}
 	}
 }
 

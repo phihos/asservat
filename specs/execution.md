@@ -30,6 +30,18 @@ Given an approved policy, when its eligible grant handle is renewed or only reci
 
 ## REQ-EXE-002 — Acceptance, deadlines and progress
 
+For the fixed API pod-status execution, require at least one second remaining
+before its first irreversible execution-preparation insert, as specified in
+[ADR-212](../docs/decisions/212-api-preparation-remaining-interval.md).
+Use database time after blocking authority/storage locks and the earlier
+original check/caller cutoff. Refusal creates no execution row or key permit;
+the accepted capture and its accounting remain unchanged. This conservative
+floor does not guarantee completion. A later explicit continuation may become
+the first winner under current request-owned authority and unchanged capture
+and write deadlines. An exact existing prepared row remains passive no-create
+uncertainty after its original expiry; it cannot renew keys, start authority,
+charges or the target.
+
 The private regional transport in
 [ADR-135](../docs/decisions/135-live-regional-api-context-start.md) preserves the
 same accepted API snapshot and original start interval. A connector-originated
@@ -39,8 +51,28 @@ its work. Under [ADR-171](../docs/decisions/171-hub-run-context-execution.md)
 the hub runs the SQL, permission, recovery and capability checks with the
 human's own current identity, and the region answers the process, target and
 local start checks as bounded operations for the verified work only. All of
-them remain mandatory. A transport result is not artifact
+them remain mandatory. Under
+[ADR-216](../docs/decisions/216-request-owned-context-start-observation.md), one
+start reuses one complete hub authority observation within its earliest original
+cutoff, at most five seconds. Its pre-signing accepted-work, caller, recovery and
+capability reads are reused by the in-process runner. Later helper boundaries
+check cancellation and the original observation's validity locally. Current SQL
+permission, retention, recovery and storage checks remain mandatory at each
+effect, and acquisition still checks the exact pinned Pod. Unobserved external
+identity or capability changes may remain unknown within that original interval;
+a new start observes them again. No observation crosses requests or renews a
+deadline. A transport result is not artifact
 publication or a successful download.
+
+The admission receipt's metadata freshness is response-only. Consume its exact
+accepted identity while current; do not use that cutoff as authority for the
+subsequent independently checked start. Preserve the original caller/identity,
+persisted audit first-write, capture, write and execution deadlines. If receipt
+metadata expires during a successful start, one current exact-key read-only
+lookup may supply response metadata for the identical accepted operation. It
+must not read a replacement capture, extend stored dates, repeat admission or
+retry any effect. A failed lookup returns an error with the known admission;
+ordinary accepted replay remains passive.
 
 Before any capture exists, preview and request target resolution use pre-work
 target queries on an idle standby under
@@ -49,6 +81,13 @@ region answers while it still waits for work, from its own cluster, after a
 current check of the hub owner. The hub uses an answer only while the region
 receiver checked for that query remains valid. A query executes no operation
 and confers no capture authority. Each exchange answers at most four queries.
+Under [ADR-211](../docs/decisions/211-completed-query-standby-transition.md), a
+fully matched and completed hub query may return its socket deadlines to the
+original passive standby cutoff after joining its I/O callbacks. Its result
+retains the original target/receiver freshness. Queries exclusively reserve
+their standby until completion; capture attachment cannot interleave source
+reads. Failed, cancelled, expired or uncertain exchanges never regain time,
+and an attempted work lease permanently excludes this passive transition.
 
 The private API context exchange may reuse one complete exact transport peer
 observation for ordered regional operation request/response frames under
@@ -72,6 +111,46 @@ both admission guards enforce every start write. Unobserved changes to the
 executor workload can therefore remain unknown for at most five seconds after
 that observation began.
 
+A concrete executor may return the connector observation already checked by
+its complete native proof to the context-start transport. It must require the
+same process-owned credentials instance, retain both original intervals and
+return independently owned public buffers. This avoids a duplicate outer
+connector observation without replacing any proof, extending freshness or
+changing the later setup/work checks. A different credentials owner cannot
+borrow the result; process readers without that concrete composition retain
+independent observations.
+
+Within that same complete native proof, the explicit source bracket may also
+supply the nested read-only registration lookup's two source replies under
+[ADR-207](../docs/decisions/207-context-setup-proof-bracket.md). The temporary
+reader is bound to one exact known leaf/process and original interval, copies
+public buffers, refuses all lifecycle/configuration work and closes after that
+conversation. Current SQL registration/recovery checks and the enclosing full
+native closing source check remain mandatory; this is no ambient source cache.
+
+The same concrete executor may lend one complete native proof to one private
+context-start setup. The original proof generation and exact owned credentials
+remain binding through the earliest original discovery, setup, proof and caller
+cutoffs. A single initial source frame may use that proof's actual closing source
+with original dates. After HTTP response headers and Hello delivery, a current
+native workload/settings/input and full source close is mandatory. Both remote
+owner authentications remain current; a final local credential/generation check
+follows the second. Close cancels and joins owned work before a positive opening
+returns. The setup handle is never reused by later exchange checks, target
+queries or accepted work. Any failure, known change, cancellation or expiry
+refuses the opening without a stale fallback or renewed interval.
+
+Private context-start opening diagnostics distinguish discovery, initial setup
+and local process, TLS/peer, first owner, source frame, headers/Hello, native
+Finish, closing owner/local process and joined close. A failed cold setup may
+also identify its fixed source/proof/settings/workload stage. Only closed codes,
+elapsed wall time and time remaining to the earliest already learned original
+cutoff are reported after existing cleanup joins. These values are diagnostics,
+never authority; cancellation and original error classification are unchanged.
+Dependency text, identities, credentials and payloads are excluded. Numeric
+timings are outside the finite exponentially suppressed event-count key. This
+adds no read, retry, timeout renewal, result field or acceptance capability.
+
 For the initial regional Kubernetes API snapshot, `apiContextStart/v1` binds the
 protected executor Pod/account/process and exact collector image, without target
 node/boot claims. One immutable SQL execution row and the original Kubernetes
@@ -92,6 +171,15 @@ Before starting, revalidate identity, authority, current grant, source freshness
 A summary phase is a projection of action states: Running while any action runs, AwaitingApproval only when no runnable action is active and some remain eligible pending review, Finalizing after acquisition ends. Terminate Succeeded only when every required action succeeds; Partial when useful artifacts exist with missing/failed work; Failed when required evidence failed without usable output. Report cancellation and uncertain execution explicitly. No successful artifact is hidden by a waiting optional action.
 
 ### SC-EXE-002
+
+Given an accepted API context capture with no execution preparation, hold a
+required SQL lock until fewer than one second remains in its original
+check/caller interval. Preparation must refuse with no execution row or key
+permit. An explicit fresh continuation for the same accepted identity can
+then produce only one first-preparation winner. Given an existing exact
+prepared row whose start interval has expired, current-authorized replay must
+retain its original binding and produce no-create preparation uncertainty,
+without another key effect, start or acquisition.
 
 Given cheap context and a required intrusive action, when approval takes longer than the capture deadline, then context runs once and becomes visible immediately, the intrusive start never occurs and the terminal result explains partial evidence. A refreshed page or repeated MCP request returns the same capture without resetting its clock or counters.
 

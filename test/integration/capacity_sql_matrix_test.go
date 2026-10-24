@@ -216,6 +216,17 @@ func qualifyCapacityProducerSQL(t *testing.T, ctx context.Context, admin *pgxpoo
 			t.Fatal("current exact binding observation", err)
 		}
 		f.assertAdmission(t, 0, first, true)
+		// ADR-200 revision (2026-10-23): the refreshed binding lives 30
+		// seconds from its own observation, independent of the caller receipt.
+		var lifetime bool
+		if err := admin.QueryRow(ctx, `SELECT fresh_until-observed_at=interval '30 seconds' FROM context_storage_binding WHERE root_id=$1 AND allocation_id=$2`, f.input.PermissionRootID, first.AllocationID).Scan(&lifetime); err != nil || !lifetime {
+			t.Fatal("refreshed binding lifetime", lifetime, err)
+		}
+		// Migration 00073: the accepted root source observation likewise lives
+		// 30 seconds from its own observation.
+		if err := admin.QueryRow(ctx, `SELECT fresh_until-observed_at=interval '30 seconds' FROM capacity_source WHERE root_id=$1 AND NOT suspended`, f.input.PermissionRootID).Scan(&lifetime); err != nil || !lifetime {
+			t.Fatal("accepted source lifetime", lifetime, err)
+		}
 		after := f.accounting(t)
 		if before != after {
 			t.Fatal("binding observation changed fixed backing or charges")
@@ -351,7 +362,7 @@ func (f *capacitySQLFixture) assertAdmission(t *testing.T, index int, e app.Enro
 		t.Fatal("native storage target invalid before readiness assertion")
 	}
 	f.assertLegacyAdmission(t, e, want)
-	reader, err := postgres.NewContextStorageReader(f.ctx, f.roles["storage-read"], f.input.PermissionRootID)
+	reader, err := postgres.NewContextStorageReader(f.ctx, f.roles["hub-runtime"], f.input.PermissionRootID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -362,7 +373,7 @@ func (f *capacitySQLFixture) assertAdmission(t *testing.T, index int, e app.Enro
 	if (err == nil) != want {
 		t.Fatalf("current storage reader readiness=%t want=%t error=%v", err == nil, want, err)
 	}
-	for _, purpose := range []string{"storage-read", "capture-admit"} {
+	for _, purpose := range []string{"hub-runtime", "capture-admit"} {
 		for _, kind := range []string{"context", "download"} {
 			allocation := e.AllocationID
 			if kind == "download" {

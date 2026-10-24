@@ -1,0 +1,28 @@
+{
+  "scope": "Actual pgxpool against a synthetic TCP/TLS PostgreSQL protocol server; not native PostgreSQL or installed lifecycle qualification",
+  "redExit": 1,
+  "greenExit": 0,
+  "fullPostgresRaceExit": 0,
+  "redDurationSeconds": 4.384,
+  "greenDurationSeconds": 1.402,
+  "fullPostgresRaceDurationSeconds": 2.493,
+  "sourceSHA256": {
+    "internal/adapters/postgres/connection_governor.go": "3ee29a54bec1a3a10ea2d8a3a11f703d9b4cfbe5cf65984d26e5c9ed866053ce",
+    "internal/adapters/postgres/connection_governor_cancellation_test.go": "0705eac87ab83d61f9aa62216f8ddcf5ba1fccfcc9a6b9d69896832110071d4b"
+  },
+  "fileSHA256": {
+    "sql-governor-red-command.txt": "3bbe3d57736b87629c34b3444333fee00d49e311a617097703bc3c7f7ad918ec",
+    "sql-governor-red.log": "858e9f446c193de5799ed4948a8d04b0e9ace314357e77f51e7d347b5e236022",
+    "sql-governor-red.exit": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "sql-governor-red-joined-command.txt": "3bbe3d57736b87629c34b3444333fee00d49e311a617097703bc3c7f7ad918ec",
+    "sql-governor-red-joined.log": "6266229769585b047e2991d151286c22cc4247cfb39fb6a584124b1f67281ccb",
+    "sql-governor-red-joined.exit": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "sql-governor-green-command.txt": "3bbe3d57736b87629c34b3444333fee00d49e311a617097703bc3c7f7ad918ec",
+    "sql-governor-green.log": "e638d924af6d35b41bd06b2bc2706ca96c9935854092dee22657bd08c824b146",
+    "sql-governor-green.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "sql-governor-full-race-command.txt": "5f607e6ca03a57026610e9caa9f6cba5d4bdab2f27da31948414966089d427f2",
+    "sql-governor-full-race.log": "e00ca663fa04a23b6aa0cc3c631529665ed5a8f2ab2a87ca3c45080eb95b3ad2",
+    "sql-governor-full-race.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+    "sql-governor-verification-transcript.txt": "011b99e258855392cdbab1b7a1c1b262342eb0ad492dd53640f0da333ff11a54"
+  }
+}

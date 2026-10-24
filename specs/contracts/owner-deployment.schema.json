@@ -539,7 +539,7 @@
         "peers",
         "activation"
       ],
-      "description": "Fresh installer-selected own-owner observation phase only; incompatible with native backend. Exactly four owner identity SQL facets plus independently checked owner-roles.json. No process/Pod identity guessed for connectors and no worker/context/public route. Original aggregate deployment size remains 256 KiB.",
+      "description": "Fresh installer-selected own-owner observation phase only; incompatible with native backend. One consolidated owner SQL credential serves the typed identity and routing facets, with independently checked owner-roles.json. No process/Pod identity guessed for connectors and no worker/context/public route. Original aggregate deployment size remains 256 KiB.",
       "properties": {
         "format": {
           "const": "owner-observation/v1"

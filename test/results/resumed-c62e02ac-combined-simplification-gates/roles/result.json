@@ -1,0 +1,52 @@
+{
+  "phase": "roles-current-observer",
+  "argv": [
+    "/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "scripts/test-custody.py",
+    "--fleet",
+    "--run",
+    "^TestInitialInstallationWithRealServices$/^public-runtime-roles-(matrix|unknown-claim|lost-completion|held-lock|recovery-after-lock)$"
+  ],
+  "cwd": "/home/phil/Projekte/asservat-simplify-c62e02ac",
+  "commit": "98f7e181bca3d075c3b42adefc604a993f22e1ac",
+  "startedAt": "2026-10-22T22:38:20.764398+00:00",
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1",
+    "ASSERVAT_INITIAL_INSTALLATION": "1"
+  },
+  "sourceCount": 2759,
+  "sourceMatchesCommitBefore": true,
+  "exitCode": 0,
+  "elapsedSeconds": 41.147,
+  "finishedAt": "2026-10-22T22:39:01.912358+00:00",
+  "sourceUnchanged": true,
+  "sourceMatchesCommitAfter": true,
+  "reportSourceMatches": true,
+  "reportSourceUnchanged": true,
+  "reportedTestExit": 0,
+  "cleanupFailures": [],
+  "passedTestNames": [
+    "TestInitialInstallationWithRealServices/public-runtime-roles-matrix",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-matrix/capture-preview-generated-role-effects",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-matrix/capture-resolution-generated-role-effects",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-unknown-claim",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-preview-generated-role-effects",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion/capture-resolution-generated-role-effects",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-held-lock",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-recovery-after-lock"
+  ],
+  "ownedResourcesAbsent": true,
+  "requiredPasses": [
+    "TestInitialInstallationWithRealServices/public-runtime-roles-matrix",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-unknown-claim",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-lost-completion",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-held-lock",
+    "TestInitialInstallationWithRealServices/public-runtime-roles-recovery-after-lock"
+  ],
+  "requiredPassesPresent": true,
+  "qualified": true
+}

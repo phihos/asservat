@@ -1,0 +1,10 @@
+--- FAIL: TestContextDownloadRequestUsesOneObservationThroughPending (0.00s)
+    --- FAIL: TestContextDownloadRequestUsesOneObservationThroughPending/0s (0.00s)
+        context_download_request_observation_test.go:34: duplicate reconstruction or missing current observations: full=3 launch=[reserve-worker read-worker-audit write-worker-audit ack-worker-audit claim-worker create-job record-job observe-job] control=[identity recovery lookup-key route identity authority plan reserve source identity identity authority identity authority observe identity]
+    --- FAIL: TestContextDownloadRequestUsesOneObservationThroughPending/1.6s (0.00s)
+        context_download_request_observation_test.go:31: one original request lost acknowledged Pending: full checks=3 launch=[reserve-worker read-worker-audit write-worker-audit ack-worker-audit claim-worker create-job record-job observe-job] error=download unavailable
+--- FAIL: TestContextDownloadRequestReadyReplayUsesFreshSingleObservation (0.00s)
+    context_download_request_observation_test.go:101: request did not obtain one fresh authority with current SQL checks 1 3 2 [identity recovery lookup-key identity authority identity authority observe identity identity authority observe identity]
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.006s
+FAIL

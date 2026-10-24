@@ -1,0 +1,8 @@
+{
+  "exit": 0,
+  "elapsedSeconds": 0.012090638978406787,
+  "policySHA256": "9a91a5b41c24ca217569cdba3b837761740e9798c4053312adc8deb8ecf647a9",
+  "exactOriginalPolicyRestored": true,
+  "reference": "../resumed-c62e02ac-native49/postmortem-bucket-policy.json",
+  "scope": "Read-only strict JSON comparison after fixture fault cleanup; no evidence transfer or deletion claim"
+}

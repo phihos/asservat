@@ -1,0 +1,12 @@
+=== RUN   TestDownloadPolicyObservationNewRequestNearExpiry
+=== RUN   TestDownloadPolicyObservationNewRequestNearExpiry/fresh-request
+    download_policy_observation_test.go:76: short=false raw_reads=1 processing_bound_after_old=0s err=download unavailable
+    download_policy_observation_test.go:84: near-expiry observation shortened a new request instead of refreshing 1 download unavailable
+=== RUN   TestDownloadPolicyObservationNewRequestNearExpiry/original-short-caller
+    download_policy_observation_test.go:76: short=true raw_reads=1 processing_bound_after_old=-59.9897ms err=download unavailable
+--- FAIL: TestDownloadPolicyObservationNewRequestNearExpiry (0.14s)
+    --- FAIL: TestDownloadPolicyObservationNewRequestNearExpiry/fresh-request (0.10s)
+    --- PASS: TestDownloadPolicyObservationNewRequestNearExpiry/original-short-caller (0.04s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/authorization	0.142s
+FAIL

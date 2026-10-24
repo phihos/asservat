@@ -2,7 +2,6 @@ package integration
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
 	"testing"
@@ -10,19 +9,22 @@ import (
 
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
+	authapp "asservat.local/asservat/internal/application/authorization"
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/application/evidence"
 	value "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
+	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/fleet"
-	"github.com/jackc/pgx/v5"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // This owns a pristine installation, its real protected capacity root and
 // additive query reservation. Run separately from other pristine-root cases.
-// Native resource measurements/deployment guards, human identity and C14
+// Protected placement/native source observations, human identity and C14
 // ownership remain explicit synthetic inputs; this is SQL/S3 qualification.
 func TestContextQueryLedgerWithRealPostgres(t *testing.T) {
 	withCapacityProducerFixture(t, qualifyProtectedContextQueryLedger)
@@ -42,31 +44,42 @@ func TestContextQueryLedgerOriginalQualification(t *testing.T) {
 }
 
 type queryLedgerFixture struct {
-	base      *capacitySQLFixture
-	enrolled  app.Enrollment
-	current   app.ProtectedContextQueryCapacity
-	producer  app.ProtectedContextQueryProducer
-	key       app.WorkloadCapacityKey
-	scenario  captureAdmissionScenario
-	published artifact.PublishedContext
-	audit     audit.AcceptedCapacityAuditProfiles
+	base           *capacitySQLFixture
+	enrolled       app.Enrollment
+	current        *postgres.SharedContextQueryPlans
+	policies       *authapp.ContextProjectionPolicies
+	profile        value.ContextQueryResourceProfile
+	workerProfile  authorization.DownloadWorkerProfile
+	workerObserver *evidence.WorkerConfigurationObserver
+	workerConfig   *postgres.WorkerConfigurations
+	scenario       captureAdmissionScenario
+	published      artifact.PublishedContext
+	audit          audit.AcceptedCapacityAuditProfiles
+	root           app.RootConfiguration
+	// workloadGone stops refreshing the workload's capacity observation, as
+	// after the source workload's deletion (maintainer decision 2026-10-23).
+	workloadGone bool
 }
 
 func (f *queryLedgerFixture) currentProfile() value.ContextQueryResourceProfile {
-	return f.base.qualification.ContextQuery.Profile
+	return f.profile
 }
 
 // New source observations precede new requests. They never modify an admitted
-// query, batch or its original deadlines. Each producer reconciliation spends
-// the finite allowance accepted in the original installation qualification.
+// query, batch or its original deadlines. The existing capacity source
+// producer refreshes the same accepted workload; query charges never refill.
 func (f *queryLedgerFixture) refresh(t *testing.T) {
 	t.Helper()
-	o := f.base.workloadObservation(t, 0)
-	if err := f.base.enrollments.RefreshCapacityEnrollment(f.base.ctx, o, f.enrolled); err != nil {
-		t.Fatal("current managed workload", err)
+	if !f.workloadGone {
+		o := f.base.workloadObservation(t, 0)
+		if err := f.base.enrollments.RefreshCapacityEnrollment(f.base.ctx, o, f.enrolled); err != nil {
+			t.Fatal("current managed workload", err)
+		}
 	}
-	if err := f.producer.Reconcile(f.base.ctx, &f.key); err != nil {
-		t.Fatal("current protected query backing", err)
+	if f.workerObserver != nil {
+		if err := f.workerObserver.Observe(f.base.ctx); err != nil {
+			t.Fatal("current accepted shared worker", err)
+		}
 	}
 }
 
@@ -76,15 +89,6 @@ func queryLedgerQualification(t *testing.T, f *capacitySQLFixture) {
 	q := f.qualification.ContextQuery
 	q.Profile.Lifetime = 60 * time.Second
 	q.PrincipalQueries = 2
-	q.SourceTransitionLimit = 64
-	q.Envelope.ProviderRequests += 64 - 6
-	q.Envelope.AuthenticationRequests += 64 - 6
-	q.Clients = append(q.Clients, value.ContextProjectionClient{Issuer: "https://id.example.test", ID: "fixture-other-client", Kind: q.Clients[0].Kind, Purposes: []string{"diagnostics"}})
-	body, err := json.Marshal(q.Profile)
-	if err != nil {
-		t.Fatal(err)
-	}
-	q.Native.ProfileDigest = sha256.Sum256(body)
 	// Cover the original 60-second evidence and its deletion allowance from
 	// before capture preparation. Query admission remains its original 60s.
 	f.qualification.RootBacking.AdmissionSeconds = 120
@@ -102,6 +106,10 @@ func queryLedgerQualification(t *testing.T, f *capacitySQLFixture) {
 }
 
 func qualifyProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects) {
+	withProtectedContextQueryLedger(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, qualifyContextQueries)
+}
+
+func withProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin *pgxpool.Pool, address string, tlsConfig *tls.Config, scope fleet.InstallationWitnessScope, claim string, administration fleet.Administration, objects *objectstore.AuthorityObjects, qualify func(*testing.T, *queryLedgerFixture)) {
 	f := newCapacitySQLFixture(t, ctx, admin, address, tlsConfig, scope, claim, administration, objects, func(f *capacitySQLFixture) { queryLedgerQualification(t, f) })
 	// Pools opened by this owned extension close on function return. The base
 	// fixture's pools and source loop close with this sole top-level fixture.
@@ -139,39 +147,42 @@ func qualifyProtectedContextQueryLedger(t *testing.T, ctx context.Context, admin
 	if err != nil {
 		t.Fatal("actual managed workload", err)
 	}
-	writer := pgx.Identifier{f.roles["capacity"].Config().ConnConfig.User}.Sanitize()
-	reader := pgx.Identifier{f.roles["capacity-profile-read"].Config().ConnConfig.User}.Sanitize()
-	if _, err = admin.Exec(ctx, "GRANT EXECUTE ON FUNCTION read_context_query_capacity_source(uuid,jsonb),read_context_query_capacity_plan(uuid,uuid,uuid,text,text,jsonb,bytea,uuid) TO "+reader+"; GRANT EXECUTE ON FUNCTION begin_context_query_capacity_observation(uuid,jsonb,jsonb,uuid,bigint),accept_context_query_capacity(uuid,jsonb,jsonb,jsonb),complete_context_query_capacity_observation(uuid,jsonb,timestamptz),allocate_context_query_capacity(uuid,uuid,uuid,text,text,uuid),suspend_context_query_capacity(uuid,timestamptz) TO "+writer); err != nil {
-		t.Fatal("explicit fixture query purpose grants", err)
-	}
-	reads, err := postgres.NewContextQueryCapacityReads(ctx, f.roles["capacity-profile-read"], f.input.PermissionRootID, f.input.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	writes, err := postgres.NewContextQueryCapacityProducer(ctx, f.roles["capacity"], f.input.PermissionRootID, f.input.InstallationID)
-	if err != nil {
-		t.Fatal(err)
-	}
-	guard := queryCapacitySyntheticGuard{}
-	current := app.ProtectedContextQueryCapacity{RootID: f.input.PermissionRootID, InstallationID: f.input.InstallationID, Store: reads, Recovery: f.source, Deployments: app.QueryDeploymentGuards{Worker: guard, Hub: guard, KeyService: guard, Provider: guard}, Now: time.Now, NewID: custodyID}
-	query := &queryLedgerFixture{base: f, enrolled: enrolled, current: current, producer: app.ProtectedContextQueryProducer{Current: current, Writer: writes}, key: app.WorkloadCapacityKey{RootID: current.RootID, ClusterID: scope.ClusterID, NamespaceUID: f.namespace.UID, WorkloadUID: f.workloads[0].UID}}
-	// A real installed base root is insufficient without its separate accepted
-	// query anchor. Check through the same narrow credential used by the ledger.
-	probe := f.fixturePool("context_query_runtime", "synthetic-context-query")
-	var allowed bool
-	if err = probe.QueryRow(ctx, "SELECT lock_context_query_capacity($1,$2)", current.RootID, custodyID()).Scan(&allowed); err != nil || allowed {
-		t.Fatal("missing query anchor did not deny", allowed, err)
-	}
-	probe.Close()
+	// The existing capacity role published the anchor/allocation in its own
+	// transactions. There is no query producer or extra source-observation claim.
+	query := &queryLedgerFixture{base: f, enrolled: enrolled, root: root}
 	processingPools := len(pools)
 	f.initializeManagedProcessing(t, root)
 	for _, p := range pools[processingPools:] {
 		p.Close()
 	}
 	query.scenario, query.published = publishQueryLedgerContext(t, f, root, enrolled)
+	profile := syntheticWorkerProfile(f.input.InstallationID)
+	profile.ClusterID = scope.ClusterID
+	profile.Configuration = f.qualification.ContextQuery.Profile.Source
+	profile.StoreCredentialSecret, profile.StoreCredentialSecretUID = "query-fixture-store", custodyID()
+	query.workerProfile = profile
+	recovery, err := f.source.RecoveryState(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query.workerConfig, _, query.workerObserver, _ = acceptedWorkerConfiguration(t, ctx, f.fixturePool, f.store, f.keys, profile, recovery.IssuerEpoch)
+	path := value.ContextProjectionPath{Purpose: value.ContextProjectionPurpose, ID: f.qualification.ContextQuery.Profile.ID, TargetClusterID: scope.ClusterID, StoreID: f.qualification.Backends[0].EvidenceStoreID, StorageRegion: "local", AcquisitionClusterID: profile.ClusterID, AcquisitionRegion: "local", ConnectorClusterID: profile.ClusterID, ConnectorRegion: "local", HubClusterID: scope.ClusterID, HubRegion: "local", WorkerConfiguration: profile.Configuration, HubConfiguration: profile.Configuration}
+	query.profile, err = f.qualification.ContextQuery.Profile.WithSharedPath(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query.current, err = postgres.NewSharedContextQueryPlans(ctx, f.roles["capacity-profile-read"], f.input.PermissionRootID, f.input.InstallationID, profile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw := querySQLPolicy{root: f.input.PermissionRootID, installation: f.input.InstallationID, epoch: recovery.IssuerEpoch, path: path}
+	query.policies, err = authapp.NewContextProjectionPolicies(raw, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
 	query.refresh(t)
 	query.audit = f.readAuditProfiles(t)
-	qualifyContextQueries(t, query)
+	qualify(t, query)
 }
 
 // Produce and independently publish an actual managed context. No download
@@ -235,4 +246,25 @@ func publishQueryLedgerContext(t *testing.T, f *capacitySQLFixture, root app.Roo
 		t.Fatal("managed independent query source publication", err)
 	}
 	return s, published
+}
+
+// Protected placement is synthetic in this SQL fixture. The production typed
+// adapter is exercised; human read approval and current SQL fences stay real.
+type querySQLPolicy struct {
+	root, installation, epoch string
+	path                      value.ContextProjectionPath
+}
+
+func (p querySQLPolicy) DownloadPolicy(ctx context.Context) (privacy.DownloadPolicy, error) {
+	if ctx.Err() != nil {
+		return privacy.DownloadPolicy{}, ctx.Err()
+	}
+	n := time.Now().UTC().Truncate(time.Microsecond)
+	x := p.path
+	path := artifact.DownloadPath{ID: x.ID, TargetClusterID: x.TargetClusterID, StoreID: x.StoreID, StorageRegion: x.StorageRegion, AcquisitionClusterID: x.AcquisitionClusterID, AcquisitionRegion: x.AcquisitionRegion, ConnectorClusterID: x.ConnectorClusterID, ConnectorRegion: x.ConnectorRegion, HubClusterID: x.HubClusterID, HubRegion: x.HubRegion, WorkerConfiguration: x.WorkerConfiguration, HubConfiguration: x.HubConfiguration}
+	clients := []privacy.DownloadClient{}
+	for _, name := range []string{"console", "fixture-other-client"} {
+		clients = append(clients, privacy.DownloadClient{Issuer: "https://id.example.test", ID: name, Kind: identity.Human, DataClasses: []string{"metadata"}, PrivacyClasses: []string{"potentialPersonalData"}, EvidenceTypes: []string{"context"}, Purposes: []string{"diagnostics"}, PathIDs: []string{path.ID}})
+	}
+	return privacy.DownloadPolicy{RootID: p.root, InstallationID: p.installation, RecoveryEpoch: p.epoch, Revision: x.WorkerConfiguration, ProtectionDigest: artifact.Digest{41}, PermittedRegions: []string{"local"}, Paths: []artifact.DownloadPath{path}, Clients: clients, Operators: []privacy.ProcessingOperator{{Issuer: "https://id.example.test", ClientID: "console", Kind: "User", ID: "fixture"}}, ObservedAt: n, FreshUntil: n.Add(5 * time.Second)}, nil
 }

@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "kind",
+    "get",
+    "clusters"
+  ],
+  "exitCode": 0,
+  "remainingHelmClusters": [],
+  "docker": {
+    "argv": [
+      "docker",
+      "ps",
+      "-a",
+      "--filter",
+      "name=asservat-helm-",
+      "--format",
+      "{{.Names}}"
+    ],
+    "exitCode": 0,
+    "remainingContainers": []
+  }
+}

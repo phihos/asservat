@@ -1,0 +1,82 @@
+{
+  "observedAt": "2026-10-22T20:03:46.637398+00:00",
+  "note": "Raw subprocess output retained unchanged. Original wrapper expected capitalized Docker no-such-object text; direct readback uses actual lowercase object and named-network-not-found responses. Original result.json remains preserved.",
+  "checks": [
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "b44779655f9cd396b3e35a2350522bfcd8a3010b0b3ee8449d7660be9c0e34ff"
+      ],
+      "name": "asservat-custody-8geci3c0-postgres",
+      "exitCode": 1,
+      "stdout": "[]\n",
+      "stderr": "error: no such object: b44779655f9cd396b3e35a2350522bfcd8a3010b0b3ee8449d7660be9c0e34ff\n",
+      "absent": true
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "298872e892c34d09deb1fb278cfa5a1d41e10b3b56066feb8941f79e01182777"
+      ],
+      "name": "asservat-custody-8geci3c0-s3",
+      "exitCode": 1,
+      "stdout": "[]\n",
+      "stderr": "error: no such object: 298872e892c34d09deb1fb278cfa5a1d41e10b3b56066feb8941f79e01182777\n",
+      "absent": true
+    },
+    {
+      "argv": [
+        "docker",
+        "inspect",
+        "319cc444729e7f1c9c9f073fa51f2651e304aa3f5c1c3d9f104499f29769b7b4"
+      ],
+      "name": "asservat-custody-8geci3c0-kms",
+      "exitCode": 1,
+      "stdout": "[]\n",
+      "stderr": "error: no such object: 319cc444729e7f1c9c9f073fa51f2651e304aa3f5c1c3d9f104499f29769b7b4\n",
+      "absent": true
+    },
+    {
+      "argv": [
+        "docker",
+        "network",
+        "inspect",
+        "asservat-custody-8geci3c0"
+      ],
+      "exitCode": 1,
+      "stdout": "[]\n",
+      "stderr": "Error response from daemon: network asservat-custody-8geci3c0 not found\n",
+      "absent": true
+    },
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-aq",
+        "--filter",
+        "label=asservat.test=custody-8geci3c0"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": "",
+      "absent": true
+    },
+    {
+      "argv": [
+        "docker",
+        "network",
+        "ls",
+        "-q",
+        "--filter",
+        "label=asservat.test=custody-8geci3c0"
+      ],
+      "exitCode": 0,
+      "stdout": "",
+      "stderr": "",
+      "absent": true
+    }
+  ],
+  "allOwnedResourcesAbsent": true
+}

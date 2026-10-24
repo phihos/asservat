@@ -1,6 +1,7 @@
 package evidence
 
 import (
+	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
@@ -49,6 +50,8 @@ type RegionalContextResult struct {
 	cancel                               context.CancelFunc
 	worker                               value.WorkerCredentialTarget
 	reader                               NativeContextRead
+	approved                             NativeApprovedContextRead
+	projectionBatches                    [query.ContextMaxReadBatches]string
 	now                                  func() time.Time
 	attempted, active, closed, committed bool
 	source                               NativeContextSource
@@ -59,7 +62,7 @@ type RegionalContextResult struct {
 }
 
 func NewRegionalContextResult(ctx context.Context, worker value.WorkerCredentialTarget, reader NativeContextRead, now func() time.Time) (*RegionalContextResult, error) {
-	if ctx == nil || ctx.Err() != nil || !worker.Valid() || reader == nil || now == nil || !now().Before(worker.RunUntil) {
+	if ctx == nil || ctx.Err() != nil || !worker.Valid() || worker.Parent().Purpose != value.AcquisitionDownload || reader == nil || now == nil || !now().Before(worker.RunUntil) {
 		return nil, artifact.ErrInvalid
 	}
 	work, cancel := context.WithDeadline(ctx, worker.RunUntil)
@@ -70,6 +73,7 @@ func NewRegionalContextResult(ctx context.Context, worker value.WorkerCredential
 func (r *RegionalContextResult) finishLocked() {
 	if r.closed && !r.active && !r.doneClosed {
 		r.reader = nil
+		r.approved = nil
 		r.source = NativeContextSource{}
 		r.metadata = artifact.NativeDownloadMetadata{}
 		close(r.done)
@@ -98,14 +102,14 @@ func (r *RegionalContextResult) Wait(ctx context.Context) error {
 	}
 }
 func (r *RegionalContextResult) matches(o value.NativeOperation) bool {
-	return o.CurrentValid(r.now()) && o.Reference.InstallationID == r.worker.InstallationID && o.Reference.SessionID == r.worker.SessionID && o.Reference.WorkerID == r.worker.WorkerID && o.WorkerPodUID == r.worker.PodUID && !o.Until.After(r.worker.RunUntil)
+	return o.CurrentValid(r.now()) && o.Reference.InstallationID == r.worker.InstallationID && o.Reference.Parent() == r.worker.Parent() && o.Reference.WorkerID == r.worker.WorkerID && o.WorkerPodUID == r.worker.PodUID && !o.Until.After(r.worker.RunUntil)
 }
 func (r *RegionalContextResult) enter(ctx context.Context, o value.NativeOperation) (context.Context, func(), error) {
 	if r == nil || ctx == nil || ctx.Err() != nil {
 		return nil, nil, artifact.ErrDownloadUnavailable
 	}
 	deadline, ok := ctx.Deadline()
-	if !ok || deadline.After(r.now().Add(5*time.Second)) {
+	if !ok || deadline.After(r.now().Add(value.NativeLeaseWindow(o.Kind))) {
 		return nil, nil, artifact.ErrDownloadUnavailable
 	}
 	r.mu.Lock()

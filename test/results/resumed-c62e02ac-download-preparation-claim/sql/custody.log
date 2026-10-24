@@ -1,0 +1,16 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/download-worker-installed-original-authority
+    installed_download_preparation_test.go:162: preparation stage=authority elapsed=41.185692ms call-left=4.958810718s authority-left=-2562047h47m16.854775808s error=<nil>/<nil>
+    installed_download_preparation_test.go:163: authority checked=2026-10-23T00:16:19.406549919+02:00 valid-until=2026-10-23T00:16:23.894057+02:00 retention-until=2026-10-23T00:16:23.894057+02:00 environment-until=2026-10-23T00:16:24.406488038+02:00
+    installed_download_preparation_test.go:170: preparation stage=reserve elapsed=90.661877ms call-left=4.396903455s authority-left=4.396902625s error=<nil>/<nil>
+    installed_download_preparation_test.go:176: preparation stage=read-audit elapsed=107.457994ms call-left=4.380107348s authority-left=4.380106418s error=<nil>/<nil>
+    installed_download_preparation_test.go:185: preparation stage=write-audit elapsed=116.587785ms call-left=4.370977497s authority-left=4.370976487s error=<nil>/<nil>
+    installed_download_preparation_test.go:191: preparation stage=ack-audit elapsed=137.015684ms call-left=4.350549658s authority-left=4.350548688s error=<nil>/<nil>
+    installed_download_preparation_test.go:198: preparation stage=claim elapsed=184.588672ms call-left=4.30297671s authority-left=4.30297601s error=<nil>/<nil>
+    installed_download_preparation_test.go:212: preparation stage=create-job-boundary elapsed=184.795744ms call-left=4.302769658s authority-left=4.302768878s error=<nil>/<nil>
+    download_sessions_test.go:197: preparation result elapsed=184.866615ms original-request-left=4.815129825s authority-left=4.302698637s stages=[authority reserve read-audit write-audit ack-audit claim create-job-boundary] error=*errors.errorString/test stopped before Kubernetes Job creation
+    native_exchange_test.go:469: native fixture observation longest-refresh=55.364667ms widest-completion-gap=1.055853454s
+--- PASS: TestContextAdmissionWithRealServices (2.70s)
+    --- PASS: TestContextAdmissionWithRealServices/download-worker-installed-original-authority (2.29s)
+PASS
+ok  	asservat.local/asservat/test/integration	3.771s

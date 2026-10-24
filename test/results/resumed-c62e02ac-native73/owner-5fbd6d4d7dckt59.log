@@ -1,0 +1,147 @@
+2026-10-23T11:54:08.159134330Z owner port router: started (1)
+2026-10-23T11:54:08.159145890Z owner router: started (1)
+2026-10-23T11:54:08.159272401Z owner router: handoff observation (1)
+2026-10-23T11:54:08.159745232Z owner router: unknown-name (1)
+2026-10-23T11:54:08.159875973Z owner router: handoff native (1)
+2026-10-23T11:54:08.416444088Z owner router: handoff observation (2)
+2026-10-23T11:54:11.863971082Z owner router: handoff observation (4)
+2026-10-23T11:54:18.795609902Z owner local claim timing: claim (1), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-10-23T11:54:20.494735723Z owner router: handoff observation (8)
+2026-10-23T11:54:23.833693814Z owner local claim timing: claim (2), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-10-23T11:54:33.938445628Z owner local claim timing: claim (4), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-10-23T11:54:35.064656006Z owner observer 427 calls 310ms, operation 204 calls 150ms, readiness 548 calls 380ms, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 20ms, context-start 0 calls 0s total
+2026-10-23T11:54:37.662660733Z owner router: unknown-name (2)
+2026-10-23T11:54:37.662878324Z owner router: handoff native (2)
+2026-10-23T11:54:41.534408679Z owner router: handoff observation (16)
+2026-10-23T11:55:02.574080632Z owner local claim timing: claim (8), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-10-23T11:55:05.064568840Z owner observer 841 calls 600ms, operation 408 calls 300ms, readiness 1134 calls 790ms, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 20ms, context-start 9 calls 10ms total
+2026-10-23T11:55:19.009027599Z owner router: handoff observation (32)
+2026-10-23T11:55:35.064425056Z owner observer 1164 calls 840ms, operation 662 calls 480ms, readiness 1720 calls 1.2s, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 20ms, context-start 18 calls 90ms total
+2026-10-23T11:55:39.650102425Z owner router: unknown-name (4)
+2026-10-23T11:55:40.648404584Z owner router: handoff native (4)
+2026-10-23T11:55:59.443123596Z owner local claim timing: claim (16), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-10-23T11:56:05.064024009Z owner observer 1521 calls 1.09s, operation 867 calls 640ms, readiness 2330 calls 1.62s, identity 3 calls 0s, provider 11 calls 10ms, credentials 15 calls 20ms, context-start 27 calls 100ms total
+2026-10-23T11:56:35.063899772Z owner observer 1892 calls 1.35s, operation 1071 calls 800ms, readiness 2916 calls 2.02s, identity 3 calls 0s, provider 22 calls 20ms, credentials 15 calls 20ms, context-start 36 calls 100ms total
+2026-10-23T11:56:37.711267964Z owner router: handoff observation (64)
+2026-10-23T11:57:05.064551166Z owner observer 2279 calls 1.63s, operation 1326 calls 980ms, readiness 3502 calls 2.44s, identity 3 calls 0s, provider 22 calls 20ms, credentials 15 calls 20ms, context-start 45 calls 110ms total
+2026-10-23T11:57:22.305563580Z owner local claim timing: claim (32), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-10-23T11:57:26.484735824Z context target query refused: ok (1), start@>=2s end@>=2s [q-source=20ms q-check=20ms q-answer=320ms q-total=390ms]
+2026-10-23T11:57:26.601661890Z mcp timing: normal (1), pre@<100ms begin@<100ms call@<500ms finish@<100ms total@<1s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms p-identity@<100ms p-recovery@<100ms p-target@<500ms p-eligibility@<100ms p-await-storage@<100ms p-capability@<100ms p-retention@<100ms p-storage@<100ms p-processing@<100ms p-store@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+2026-10-23T11:57:27.833192213Z context target query refused: ok (2), start@>=2s end@>=2s [q-source=10ms q-check=220ms q-answer=450ms q-total=1.14s]
+2026-10-23T11:57:30.211511857Z mcp timing: normal (2), pre@<100ms begin@<100ms call@>=3s finish@<100ms total@>=3s [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms p-await-storage@<100ms q-resolve@<2s p-eligibility@<100ms p-capability@<100ms p-retention@<100ms p-storage@<100ms p-processing@<100ms q-admit@<250ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms s-intent@<250ms st-read@<100ms st-capability@<100ms st-attach@<100ms st-receiver@<100ms st-sign@<100ms st-run@<2s s-start@<2s finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+2026-10-23T11:57:30.380696282Z mcp timing: resolution (1), pre@<100ms begin@<250ms call@<100ms finish@<100ms total@<250ms [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+2026-10-23T11:57:31.657325452Z owner router: handoff native (8)
+2026-10-23T11:57:32.677829440Z mcp timing: normal (4), pre@<100ms begin@<100ms call@<100ms finish@<100ms total@<250ms [begin-reserve@<100ms begin-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms begin-object@<100ms begin-ack@<100ms finish-freeze@<100ms finish-claim@<100ms credentials-configuration@<100ms credentials-mounted@<100ms credentials-verify@<100ms credentials@<100ms finish-object@<100ms finish-ack@<100ms]
+2026-10-23T11:57:35.064044273Z owner observer 2752 calls 1.97s, operation 1885 calls 1.41s, readiness 4100 calls 2.86s, identity 6 calls 10ms, provider 22 calls 20ms, credentials 45 calls 50ms, context-start 144 calls 180ms total
+2026-10-23T11:57:35.245553199Z query refused: excerpt/worker-admission/claim/claim/topology (unavailable) left@>=2s (1)
+2026-10-23T11:57:35.280005420Z mcp unavailable: operation-failed get_file_excerpt service/query/worker-admission/claim/claim/topology (1)
+2026-10-23T11:57:43.656504596Z owner router: unknown-name (8)
+2026-10-23T11:58:05.064905102Z owner observer 3217 calls 2.31s, operation 2473 calls 1.85s, readiness 4684 calls 3.28s, identity 6 calls 10ms, provider 22 calls 20ms, credentials 68 calls 60ms, context-start 153 calls 190ms total
+2026-10-23T11:58:06.085241010Z owner provider refresh: audit-wrap renew (1)
+2026-10-23T11:58:06.091102559Z owner provider refresh: audit-unwrap renew (1)
+2026-10-23T11:58:06.097042159Z owner provider refresh: server-sign renew (1)
+2026-10-23T11:58:06.102839367Z owner provider refresh: client-sign renew (1)
+2026-10-23T11:58:06.108785226Z owner provider refresh: browser-seal renew (1)
+2026-10-23T11:58:06.114608085Z owner provider refresh: browser-open renew (1)
+2026-10-23T11:58:06.120475204Z owner provider refresh: work-sign renew (1)
+2026-10-23T11:58:06.126356763Z owner provider refresh: worker-issue renew (1)
+2026-10-23T11:58:24.181585181Z owner local claim refused: observe/conversation/registration-3/last-read/exchange/owner-read/final-registration (unavailable)
+2026-10-23T11:58:35.064389941Z owner observer 3537 calls 2.55s, operation 2856 calls 2.16s, readiness 5270 calls 3.72s, identity 6 calls 10ms, provider 33 calls 30ms, credentials 68 calls 60ms, context-start 162 calls 190ms total
+2026-10-23T11:59:04.288934568Z owner local claim refused: observe/conversation/attach (unavailable)
+2026-10-23T11:59:05.045937085Z owner router: handoff observation (128)
+2026-10-23T11:59:05.064876317Z owner observer 4000 calls 2.91s, operation 3039 calls 2.31s, readiness 5844 calls 4.13s, identity 6 calls 10ms, provider 33 calls 30ms, credentials 81 calls 70ms, context-start 162 calls 190ms total
+2026-10-23T11:59:28.207465589Z owner local claim timing: claim (64), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-10-23T11:59:35.064027939Z owner observer 4346 calls 3.16s, operation 3284 calls 2.5s, readiness 6451 calls 4.57s, identity 6 calls 10ms, provider 33 calls 30ms, credentials 81 calls 70ms, context-start 171 calls 200ms total
+2026-10-23T12:00:05.064266135Z owner observer 4703 calls 3.42s, operation 3498 calls 2.66s, readiness 7028 calls 4.98s, identity 6 calls 10ms, provider 33 calls 30ms, credentials 81 calls 70ms, context-start 180 calls 210ms total
+2026-10-23T12:00:09.087519435Z owner provider refresh: audit-wrap renew (2)
+2026-10-23T12:00:09.097205461Z owner provider refresh: audit-unwrap renew (2)
+2026-10-23T12:00:09.106207444Z owner provider refresh: server-sign renew (2)
+2026-10-23T12:00:09.118245021Z owner provider refresh: client-sign renew (2)
+2026-10-23T12:00:09.127082413Z owner provider refresh: browser-seal renew (2)
+2026-10-23T12:00:09.140566747Z owner provider refresh: browser-open renew (2)
+2026-10-23T12:00:09.152127912Z owner provider refresh: work-sign renew (2)
+2026-10-23T12:00:09.160716673Z owner provider refresh: worker-issue renew (2)
+2026-10-23T12:00:35.064142280Z owner observer 5042 calls 3.68s, operation 3776 calls 2.87s, readiness 7602 calls 5.38s, identity 6 calls 10ms, provider 65 calls 60ms, credentials 81 calls 70ms, context-start 189 calls 210ms total
+2026-10-23T12:00:40.073617377Z owner provider refresh: audit-wrap renew (4)
+2026-10-23T12:00:40.086018285Z owner provider refresh: audit-unwrap renew (4)
+2026-10-23T12:00:40.094712386Z owner provider refresh: server-sign renew (4)
+2026-10-23T12:00:40.103365427Z owner provider refresh: client-sign renew (4)
+2026-10-23T12:00:40.114081967Z owner provider refresh: browser-seal renew (4)
+2026-10-23T12:00:40.122595718Z owner provider refresh: browser-open renew (4)
+2026-10-23T12:00:40.135359008Z owner provider refresh: work-sign renew (4)
+2026-10-23T12:00:40.143931938Z owner provider refresh: worker-issue renew (4)
+2026-10-23T12:00:56.077115521Z owner provider refresh: audit-wrap renew (8)
+2026-10-23T12:00:56.089394159Z owner provider refresh: audit-unwrap renew (8)
+2026-10-23T12:00:56.097536387Z owner provider refresh: server-sign renew (8)
+2026-10-23T12:00:56.112244226Z owner provider refresh: client-sign renew (8)
+2026-10-23T12:00:56.121040987Z owner provider refresh: browser-seal renew (8)
+2026-10-23T12:00:56.129451217Z owner provider refresh: browser-open renew (8)
+2026-10-23T12:00:56.137970177Z owner provider refresh: work-sign renew (8)
+2026-10-23T12:00:56.145881584Z owner provider refresh: worker-issue renew (8)
+2026-10-23T12:01:05.064690017Z owner observer 5425 calls 3.95s, operation 4008 calls 3.04s, readiness 8198 calls 5.81s, identity 6 calls 10ms, provider 107 calls 90ms, credentials 81 calls 70ms, context-start 198 calls 220ms total
+2026-10-23T12:01:06.072993951Z owner provider refresh: audit-wrap login (1)
+2026-10-23T12:01:06.081947832Z owner provider refresh: audit-unwrap login (1)
+2026-10-23T12:01:06.092515232Z owner provider refresh: server-sign login (1)
+2026-10-23T12:01:06.100981062Z owner provider refresh: client-sign login (1)
+2026-10-23T12:01:06.109499502Z owner provider refresh: browser-seal login (1)
+2026-10-23T12:01:06.117751410Z owner provider refresh: browser-open login (1)
+2026-10-23T12:01:06.126083729Z owner provider refresh: work-sign login (1)
+2026-10-23T12:01:06.135137632Z owner provider refresh: worker-issue login (1)
+2026-10-23T12:01:09.073567280Z owner provider refresh: audit-wrap login (2)
+2026-10-23T12:01:09.082624363Z owner provider refresh: audit-unwrap login (2)
+2026-10-23T12:01:09.091048032Z owner provider refresh: server-sign login (2)
+2026-10-23T12:01:09.100086284Z owner provider refresh: client-sign login (2)
+2026-10-23T12:01:09.109250467Z owner provider refresh: browser-seal login (2)
+2026-10-23T12:01:09.117944968Z owner provider refresh: browser-open login (2)
+2026-10-23T12:01:09.127447052Z owner provider refresh: work-sign login (2)
+2026-10-23T12:01:09.136083662Z owner provider refresh: worker-issue login (2)
+2026-10-23T12:01:23.073438603Z owner provider refresh: audit-wrap login (4)
+2026-10-23T12:01:23.085810730Z owner provider refresh: audit-unwrap login (4)
+2026-10-23T12:01:23.098431570Z owner provider refresh: server-sign login (4)
+2026-10-23T12:01:23.107322321Z owner provider refresh: client-sign login (4)
+2026-10-23T12:01:23.115998221Z owner provider refresh: browser-seal login (4)
+2026-10-23T12:01:23.124368780Z owner provider refresh: browser-open login (4)
+2026-10-23T12:01:23.137055239Z owner provider refresh: work-sign login (4)
+2026-10-23T12:01:23.149942610Z owner provider refresh: worker-issue login (4)
+2026-10-23T12:01:35.064210142Z owner observer 5735 calls 4.18s, operation 4263 calls 3.24s, readiness 8784 calls 6.24s, identity 6 calls 10ms, provider 107 calls 90ms, credentials 81 calls 70ms, context-start 207 calls 230ms total
+2026-10-23T12:01:44.660581613Z owner router: handoff native (16)
+2026-10-23T12:02:05.064611913Z owner observer 6103 calls 4.46s, operation 4495 calls 3.41s, readiness 9370 calls 6.66s, identity 6 calls 10ms, provider 118 calls 90ms, credentials 81 calls 70ms, context-start 216 calls 230ms total
+2026-10-23T12:02:35.064722642Z owner observer 6438 calls 4.69s, operation 4722 calls 3.58s, readiness 9956 calls 7.07s, identity 6 calls 10ms, provider 129 calls 100ms, credentials 81 calls 70ms, context-start 225 calls 240ms total
+2026-10-23T12:03:05.064874154Z owner observer 6832 calls 4.97s, operation 4926 calls 3.74s, readiness 10542 calls 7.47s, identity 6 calls 10ms, provider 140 calls 110ms, credentials 81 calls 70ms, context-start 234 calls 250ms total
+2026-10-23T12:03:13.085310664Z owner provider refresh: audit-wrap login (8)
+2026-10-23T12:03:13.095199649Z owner provider refresh: audit-unwrap login (8)
+2026-10-23T12:03:13.105181794Z owner provider refresh: server-sign login (8)
+2026-10-23T12:03:13.116268615Z owner provider refresh: client-sign login (8)
+2026-10-23T12:03:13.125991989Z owner provider refresh: browser-seal login (8)
+2026-10-23T12:03:13.136211915Z owner provider refresh: browser-open login (8)
+2026-10-23T12:03:13.145237796Z owner provider refresh: work-sign login (8)
+2026-10-23T12:03:13.154773670Z owner provider refresh: worker-issue login (8)
+2026-10-23T12:03:35.063928165Z owner observer 7170 calls 5.2s, operation 5181 calls 3.97s, readiness 11114 calls 7.87s, identity 6 calls 10ms, provider 151 calls 120ms, credentials 81 calls 70ms, context-start 243 calls 310ms total
+2026-10-23T12:04:05.064327403Z owner observer 7536 calls 5.46s, operation 5385 calls 4.12s, readiness 11700 calls 8.27s, identity 6 calls 10ms, provider 162 calls 120ms, credentials 81 calls 70ms, context-start 252 calls 310ms total
+2026-10-23T12:04:29.494448135Z owner router: handoff observation (256)
+2026-10-23T12:04:35.064672227Z owner observer 7881 calls 5.7s, operation 5612 calls 4.28s, readiness 12286 calls 8.68s, identity 6 calls 10ms, provider 173 calls 130ms, credentials 81 calls 70ms, context-start 261 calls 320ms total
+2026-10-23T12:05:05.064810249Z owner observer 8271 calls 5.97s, operation 5840 calls 4.46s, readiness 12872 calls 9.09s, identity 6 calls 10ms, provider 184 calls 140ms, credentials 81 calls 70ms, context-start 270 calls 320ms total
+2026-10-23T12:05:35.064615348Z owner observer 8617 calls 6.23s, operation 6099 calls 4.69s, readiness 13458 calls 9.5s, identity 6 calls 10ms, provider 195 calls 150ms, credentials 81 calls 70ms, context-start 279 calls 330ms total
+2026-10-23T12:06:05.064186132Z owner observer 8974 calls 6.48s, operation 6303 calls 4.89s, readiness 14054 calls 9.91s, identity 6 calls 10ms, provider 206 calls 150ms, credentials 81 calls 70ms, context-start 288 calls 340ms total
+2026-10-23T12:06:31.338702054Z owner local claim timing: claim (128), pending@<100ms registration@<100ms native-claim@<500ms select@<100ms observe@<2s final@<100ms
+2026-10-23T12:06:35.064503280Z owner observer 9320 calls 6.73s, operation 6532 calls 5.1s, readiness 14640 calls 10.33s, identity 6 calls 10ms, provider 217 calls 160ms, credentials 81 calls 70ms, context-start 297 calls 340ms total
+2026-10-23T12:07:05.064475153Z owner observer 9732 calls 7.02s, operation 6711 calls 5.23s, readiness 15226 calls 10.74s, identity 6 calls 10ms, provider 228 calls 170ms, credentials 81 calls 70ms, context-start 306 calls 350ms total
+2026-10-23T12:07:21.090071896Z owner provider refresh: audit-wrap login (16)
+2026-10-23T12:07:21.102796611Z owner provider refresh: audit-unwrap login (16)
+2026-10-23T12:07:21.122582838Z owner provider refresh: server-sign login (16)
+2026-10-23T12:07:21.135490784Z owner provider refresh: client-sign login (16)
+2026-10-23T12:07:21.148334630Z owner provider refresh: browser-seal login (16)
+2026-10-23T12:07:21.157851622Z owner provider refresh: browser-open login (16)
+2026-10-23T12:07:21.170046355Z owner provider refresh: work-sign login (16)
+2026-10-23T12:07:21.179805888Z owner provider refresh: worker-issue login (16)
+2026-10-23T12:07:35.063967000Z owner observer 10056 calls 7.25s, operation 6991 calls 5.44s, readiness 15812 calls 11.15s, identity 6 calls 10ms, provider 239 calls 180ms, credentials 81 calls 70ms, context-start 315 calls 360ms total
+2026-10-23T12:08:05.064602328Z owner observer 10420 calls 7.52s, operation 7221 calls 5.62s, readiness 16398 calls 11.58s, identity 6 calls 10ms, provider 250 calls 180ms, credentials 81 calls 70ms, context-start 324 calls 360ms total
+2026-10-23T12:08:06.459922155Z owner local claim refused: observe/conversation/exchange (unavailable)
+2026-10-23T12:08:35.064005006Z owner observer 10766 calls 7.77s, operation 7455 calls 5.84s, readiness 16985 calls 12s, identity 6 calls 10ms, provider 261 calls 190ms, credentials 81 calls 70ms, context-start 333 calls 370ms total
+2026-10-23T12:09:05.063995048Z owner observer 11138 calls 8.05s, operation 7680 calls 6.06s, readiness 17556 calls 12.41s, identity 6 calls 10ms, provider 282 calls 210ms, credentials 81 calls 70ms, context-start 333 calls 370ms total
+2026-10-23T12:09:35.064613039Z owner observer 11495 calls 8.32s, operation 7914 calls 6.24s, readiness 18142 calls 12.84s, identity 6 calls 10ms, provider 293 calls 220ms, credentials 81 calls 70ms, context-start 342 calls 370ms total
+2026-10-23T12:10:05.064019494Z owner observer 11848 calls 8.59s, operation 8118 calls 6.41s, readiness 18728 calls 13.27s, identity 6 calls 10ms, provider 304 calls 230ms, credentials 81 calls 70ms, context-start 351 calls 440ms total
+2026-10-23T12:10:10.661667660Z owner router: handoff native (32)
+2026-10-23T12:10:35.064736207Z owner observer 12194 calls 8.84s, operation 8373 calls 6.6s, readiness 19314 calls 13.69s, identity 6 calls 10ms, provider 315 calls 240ms, credentials 81 calls 70ms, context-start 360 calls 440ms total
+2026-10-23T12:11:05.063907066Z owner observer 12570 calls 9.11s, operation 8577 calls 6.74s, readiness 19900 calls 14.1s, identity 6 calls 10ms, provider 326 calls 250ms, credentials 81 calls 70ms, context-start 369 calls 450ms total
+2026-10-23T12:11:35.063909352Z owner observer 12937 calls 9.37s, operation 8832 calls 6.93s, readiness 20496 calls 14.53s, identity 6 calls 10ms, provider 337 calls 250ms, credentials 81 calls 70ms, context-start 378 calls 460ms total

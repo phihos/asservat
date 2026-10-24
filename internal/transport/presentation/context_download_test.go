@@ -186,3 +186,16 @@ func TestDownloadStopMalformedInputCannotUsePrepaidLane(t *testing.T) {
 		t.Fatal("invalid input reached protected stop", e)
 	}
 }
+
+// native61: an approved-inspection-only login asking for a download gets the
+// ordinary audited denial reply, never a transport failure or service call.
+func TestDownloadWithoutDownloadScopeIsAnAuditedDenialReply(t *testing.T) {
+	for _, scopes := range [][]string{{"evidence:read"}, {"evidence:download"}, nil} {
+		s, f, c := downloadProjection(t)
+		c.i.Scopes = scopes
+		out, e := s.Call(t.Context(), c, "prepare_artifact_download", []byte(`{"artifact_id":"`+artifactID+`","idempotency_key":"key"}`))
+		if e != nil || f.prepares != 0 || out.auditDecision != operationAuditDenied || !strings.Contains(string(out.Body), `"status":"error"`) {
+			t.Fatal(scopes, string(out.Body), e, f.prepares)
+		}
+	}
+}

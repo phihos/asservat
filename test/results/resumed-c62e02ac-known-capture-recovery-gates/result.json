@@ -1,0 +1,54 @@
+{
+  "sourceBaseCommit": "d6dabdabbe72a04606de7bd301a307c119aef615",
+  "uncommittedOverlay": true,
+  "contracts": {
+    "command": [
+      "make",
+      "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "spec-check",
+      "architecture-check",
+      "go-architecture-check",
+      "design-check"
+    ],
+    "exit": 0,
+    "elapsedSeconds": 11.234587671991903,
+    "sourceBaseCommit": "d6dabdabbe72a04606de7bd301a307c119aef615",
+    "uncommittedOverlay": true
+  },
+  "finalChecks": {
+    "final-spec": {
+      "command": [
+        "make",
+        "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+        "spec-check"
+      ],
+      "exit": 0,
+      "elapsedSeconds": 5.003037559974473
+    },
+    "fixture-vet": {
+      "command": [
+        "go",
+        "vet",
+        "./test/integration"
+      ],
+      "exit": 0,
+      "elapsedSeconds": 1.9010093720280565
+    }
+  },
+  "sourceSHA256": {
+    "test/integration/installed_journey_native_test.go": "6e1d25d128bb1aa88e23b341a4137364f462ec982009b6259ce9802308b9aac1",
+    "test/integration/installed_journey_unit_test.go": "db8e460e9076da49ec4c87bad2dc632cf30c0667f1c0759c03fee477a3930713"
+  },
+  "sourceUnchanged": true,
+  "qualification": "Specification, design, architecture and fixture vet only; installed rerun pending. Full in-process integration race and independent review recorded in adjacent known-capture-recovery archive.",
+  "contractTerminal": {
+    "session": 19757,
+    "chunk": "83c0e8",
+    "actualExit": 0
+  },
+  "finalChecksTerminal": {
+    "session": 68481,
+    "chunk": "13c7af",
+    "actualExit": 0
+  }
+}

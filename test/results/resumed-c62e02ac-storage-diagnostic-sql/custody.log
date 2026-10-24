@@ -1,0 +1,6 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/current-context-placement-is-scoped-read-only-and-preserves-original-freshness
+--- PASS: TestContextAdmissionWithRealServices (0.92s)
+    --- PASS: TestContextAdmissionWithRealServices/current-context-placement-is-scoped-read-only-and-preserves-original-freshness (0.55s)
+PASS
+ok  	asservat.local/asservat/test/integration	1.989s

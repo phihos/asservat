@@ -1,0 +1,3 @@
+2026-10-23T19:58:10.267553595Z worker credentials established
+2026-10-23T19:58:21.531763582Z native read: object-decrypt@<100ms, stopped at read
+2026-10-23T19:58:21.531779112Z service stopped at native/conversation/read (unavailable): protected configuration, credentials or original deadline unavailable

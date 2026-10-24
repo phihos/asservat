@@ -1,0 +1,23 @@
+Focused local regression RED, recorded from actual tool evidence.
+No test was rerun to create this record.
+Working directory: /home/phil/Projekte/asservat-resume-0450e73c
+
+Exact command:
+TMPDIR=/home/phil/.cache/asservat-build/tmp GOCACHE=/home/phil/.cache/asservat-build/recovered-c62e02ac/native41-full GOMAXPROCS=2 go test -count=1 -p=1 -run '^TestAPIPreparationRefusalPreservesRollbackDeadline$' ./internal/adapters/postgres > /home/phil/.cache/asservat-build/recovered-c62e02ac/api-preparation-rollback-deadline-red.log 2>&1
+
+Launch: exec_command chunk 3a7aba; session 2003; yielded after 1.0006 seconds.
+Terminal: write_stdin chunk 2309ff; process exited with code 1.
+Raw output: api-preparation-rollback-deadline-red.log (redirected at execution).
+Output read-back: exec_command chunk 992364, exit 0.
+Go package result: FAIL in 0.010s.
+Failed subcases: deadline-during-rollback, wrapped-deadline-during-rollback, bare-custody-sentinel.
+All failures reported replacement of the original cause/error chain with local start state unavailable.
+
+At RED, the local apiPreparationRefusalError function contained the existing broad conversion:
+    if headroomRefused && errors.Is(err, privacyapp.ErrUnavailable) {
+        return value.ErrUnavailable
+    }
+    return err
+This was a behavior-preserving extraction for the realistic rollback-deadline regression.
+No pre-run source manifest was captured for this local RED.
+The subsequent GREEN records its own actual command, timing and before/after source hashes separately.

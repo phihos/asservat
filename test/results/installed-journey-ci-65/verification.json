@@ -1,0 +1,15 @@
+{
+  "sourceSHA": "f6680d5cced3588664daced5cff2fa1b55203991",
+  "reportSHA256": "166ef6a5a5c3323e3d4c4e81a68309240ab22668c4129f678d2d0af2bd9e3d6c",
+  "sourceFiles": 2711,
+  "allMatchCommitArchive": true,
+  "mismatches": [],
+  "testPattern": "^TestInitialBootstrapChainWithRealServices$",
+  "passedTests": [
+    "TestInitialBootstrapChainWithRealServices/all-four-commands-passive-without-setup-files",
+    "TestInitialBootstrapChainWithRealServices/administrator-removal-detected-without-recreation"
+  ],
+  "testExit": 1,
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": []
+}

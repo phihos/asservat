@@ -6,10 +6,14 @@ import (
 	"crypto/tls"
 	"encoding/base64"
 	"errors"
+	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -32,6 +36,23 @@ type workerNativeLoop struct {
 	nonce  func() string
 }
 
+// workerNativeStep is the loop's refusal: always ErrDownloadUnavailable for
+// every caller decision, labelled with its closed stage and any nested fixed
+// stage of the cause (never its text) for the worker's stop report.
+func workerNativeStep(stage string, cause error) error {
+	var inner interface{ FixedStep() string }
+	if errors.As(cause, &inner) {
+		return &fixedStepError{stage, &nativeLoopCause{inner}}
+	}
+	return &fixedStepError{stage, artifact.ErrDownloadUnavailable}
+}
+
+type nativeLoopCause struct{ inner interface{ FixedStep() string } }
+
+func (e *nativeLoopCause) Error() string { return artifact.ErrDownloadUnavailable.Error() }
+func (e *nativeLoopCause) Unwrap() error { return artifact.ErrDownloadUnavailable }
+func (e *nativeLoopCause) FixedStep() string { return e.inner.FixedStep() }
+
 func workerNativeNonce() string {
 	var nonce [32]byte
 	if _, err := rand.Read(nonce[:]); err != nil {
@@ -53,9 +74,9 @@ func (l workerNativeLoop) Run(parent context.Context) error {
 		token, err := l.token.ReadDownloadPeerToken(ctx)
 		if err != nil {
 			clear(token)
-			return artifact.ErrDownloadUnavailable
+			return workerNativeStep("token", err)
 		}
-		h := contracts.NativeHello{Format: contracts.NativeExchangeFormat, Reference: contracts.NativeReference{InstallationID: l.target.InstallationID, SessionID: l.target.SessionID, WorkerID: l.target.WorkerID}, Nonce: l.nonce(), WorkerToken: token}
+		h := contracts.NativeHello{Format: contracts.NativeExchangeFormat, Reference: contracts.NativeReference{InstallationID: l.target.InstallationID, SessionID: l.target.SessionID, QueryID: l.target.QueryID, WorkerID: l.target.WorkerID}, Nonce: l.nonce(), WorkerToken: token}
 		if !contracts.ValidWorkerNonce(h.Nonce) || !contracts.ValidWorkerToken(token) {
 			clear(token)
 			return artifact.ErrInvalid
@@ -66,24 +87,32 @@ func (l workerNativeLoop) Run(parent context.Context) error {
 			clear(token)
 			if stream != nil {
 				stream.Close()
-				return artifact.ErrDownloadUnavailable
+				return workerNativeStep("open", err)
 			}
 			var idle *contracts.NativeNoCommand
 			receivedAt := l.now()
 			// The server's current observation starts after connection setup.
 			// Check its remaining freshness at receipt, independently of the
 			// original setup budget. Neither interval extends the worker lifetime.
-			if !errors.As(err, &idle) || idle == nil || idle.Reference != h.Reference || idle.Nonce != h.Nonce || !receivedAt.Before(openedAt.Add(5*time.Second)) || !receivedAt.Before(idle.Until) || idle.Until.After(receivedAt.Add(5*time.Second)) || idle.Until.After(l.target.RunUntil) {
-				return artifact.ErrDownloadUnavailable
+			if !errors.As(err, &idle) || idle == nil {
+				return workerNativeStep("open", err)
 			}
-			if err := l.wait(ctx, contracts.NativeIdleRetry); err != nil {
-				return err
+			if idle.Reference != h.Reference || idle.Nonce != h.Nonce || !receivedAt.Before(openedAt.Add(5*time.Second)) || !receivedAt.Before(idle.Until) || idle.Until.After(receivedAt.Add(5*time.Second)) || idle.Until.After(l.target.RunUntil) {
+				return workerNativeStep("idle", nil)
+			}
+			// At most one idle lookup per NativeIdleRetry. A hub that parked the
+			// request until shortly before its reply already spent that interval,
+			// so the next lookup follows at once instead of leaving a gap.
+			if d := contracts.NativeIdleRetry - receivedAt.Sub(openedAt); d > 0 {
+				if err := l.wait(ctx, d); err != nil {
+					return err
+				}
 			}
 			continue
 		}
 		if stream == nil {
 			clear(token)
-			return artifact.ErrDownloadUnavailable
+			return workerNativeStep("open", nil)
 		}
 		outcome, err := l.run(ctx, stream, h)
 		// The actual conversation joins its reader/buffers/stream before return.
@@ -91,7 +120,7 @@ func (l workerNativeLoop) Run(parent context.Context) error {
 		closeErr := stream.Close()
 		clear(token)
 		if err != nil || closeErr != nil || outcome.State != contracts.NativeJoined {
-			return artifact.ErrDownloadUnavailable
+			return workerNativeStep("conversation", err)
 		}
 		if err := l.wait(ctx, contracts.NativeIdleRetry); err != nil {
 			return err
@@ -197,7 +226,15 @@ func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.Worke
 	if err != nil {
 		return err
 	}
-	result, err := evidence.NewRegionalContextResult(ctx, input.Target, reader, time.Now)
+	var result *evidence.RegionalContextResult
+	switch input.Target.Parent().Purpose {
+	case value.AcquisitionDownload:
+		result, err = evidence.NewRegionalContextResult(ctx, input.Target, reader, time.Now)
+	case value.AcquisitionProjection:
+		result, err = evidence.NewRegionalApprovedResult(ctx, input.Target, reader, time.Now)
+	default:
+		return artifact.ErrInvalid
+	}
 	if err != nil {
 		return err
 	}
@@ -215,8 +252,29 @@ func runWorkerNative(ctx context.Context, input WorkerStartup, trust *mtls.Worke
 			return s, nil
 		},
 		run: func(ctx context.Context, s contracts.NativeStream, h contracts.NativeHello) (contracts.NativeConversationResult, error) {
-			return native.RunWorkerConversation(ctx, s, h, input.Target, key, result)
+			ctx, steps := auditapp.WithStepTimes(ctx)
+			out, err := native.RunWorkerConversation(ctx, s, h, input.Target, key, result)
+			reportNativeRead(os.Stderr, steps.String(), err)
+			return out, err
 		},
 	}
 	return loop.Run(ctx)
+}
+
+// reportNativeRead writes one approved read's worker-side step timing (key
+// unwraps, object read and decryption, parsing, result frames) with its outcome.
+// Only fixed step names, buckets and the closed stop stage are written.
+func reportNativeRead(out io.Writer, steps string, err error) {
+	if steps == "" {
+		return
+	}
+	outcome := "joined"
+	if err != nil {
+		outcome = "stopped"
+		var fixed interface{ FixedStep() string }
+		if errors.As(err, &fixed) {
+			outcome += " at " + fixed.FixedStep()
+		}
+	}
+	fmt.Fprintf(out, "native read: %s, %s\n", steps, outcome)
 }

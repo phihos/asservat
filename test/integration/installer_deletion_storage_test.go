@@ -36,7 +36,9 @@ func installerEvidenceBucketPolicy(bucket string) string {
 		// actions even for Deny, including AbortMultipartUpload. Its own
 		// request-method condition distinguishes cleanup DELETE from PUT/POST.
 		// This fixture-specific condition grants no coarse Write permission.
-		map[string]any{"Sid": "DenyEvidenceWrite", "Effect": "Deny", "Principal": deletion, "Action": []string{"s3:PutObject"}, "Resource": object, "Condition": map[string]any{"StringNotEquals": map[string]any{"s3:RequestMethod": "DELETE"}}},
+		// GET returns the sole Action as a scalar. Emit that form so strict
+		// policy comparison and fault restoration need no normalization.
+		map[string]any{"Sid": "DenyEvidenceWrite", "Effect": "Deny", "Principal": deletion, "Action": "s3:PutObject", "Resource": object, "Condition": map[string]any{"StringNotEquals": map[string]any{"s3:RequestMethod": "DELETE"}}},
 		map[string]any{"Sid": "DenyEvidenceAdministration", "Effect": "Deny", "Principal": deletion, "Action": []string{"s3:PutBucketVersioning", "s3:PutBucketPolicy", "s3:DeleteBucketPolicy", "s3:PutLifecycleConfiguration", "s3:PutBucketAcl", "s3:DeleteBucket"}, "Resource": resource},
 	}})
 	return string(policy)
@@ -65,6 +67,10 @@ func qualifyInstalledEvidenceDeleteCredential(t *testing.T, ctx context.Context,
 	policy := installerEvidenceBucketPolicy(bucket)
 	if _, err = admin.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &bucket, Policy: &policy}); err != nil {
 		t.Fatal("evidence deletion policy", err)
+	}
+	observed, err := admin.GetBucketPolicy(ctx, &s3.GetBucketPolicyInput{Bucket: &bucket})
+	if err != nil || observed == nil || observed.Policy == nil || len(*observed.Policy) > 64<<10 || !installedDeletionSamePolicy(*observed.Policy, policy) {
+		t.Fatal("evidence deletion policy read-back", err)
 	}
 	// Versioning is fixture setup before the installed writer starts. It lets
 	// the permission probes and the later journey exercise version/marker purge.

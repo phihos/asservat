@@ -1,0 +1,103 @@
+{
+  "runId": "context-84bi0pmu",
+  "harnessCleanupExit": 0,
+  "harnessTerminalEvidence": "write_stdin session21825 chunk4d535c exit0",
+  "resources": [
+    {
+      "kind": "container",
+      "name": "asservat-context-84bi0pmu-0-control-plane",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-84bi0pmu-0-control-plane"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-84bi0pmu-1-control-plane",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-84bi0pmu-1-control-plane"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-84bi0pmu-s3",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-84bi0pmu-s3"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-84bi0pmu-kms",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-84bi0pmu-kms"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-84bi0pmu-postgres",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-84bi0pmu-postgres"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-84bi0pmu-tls",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-84bi0pmu-tls"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-84bi0pmu-keycloak",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-84bi0pmu-keycloak"
+    },
+    {
+      "kind": "container",
+      "name": "asservat-context-84bi0pmu-0-seed",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such container: asservat-context-84bi0pmu-0-seed"
+    },
+    {
+      "kind": "volume",
+      "name": "asservat-context-84bi0pmu-0-var",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: get asservat-context-84bi0pmu-0-var: no such volume"
+    },
+    {
+      "kind": "image",
+      "name": "asservat-context-worker:context-84bi0pmu",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: No such image: asservat-context-worker:context-84bi0pmu"
+    },
+    {
+      "kind": "network",
+      "name": "asservat-context-84bi0pmu",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: network asservat-context-84bi0pmu not found"
+    },
+    {
+      "kind": "network",
+      "name": "asservat-context-84bi0pmu-kind",
+      "exit": 1,
+      "absent": true,
+      "stderr": "Error response from daemon: network asservat-context-84bi0pmu-kind not found"
+    }
+  ],
+  "resourceCount": 12,
+  "clustersAbsent": true,
+  "privateConfigsRemoved": true,
+  "startedUnix": 1792698495.2956815,
+  "finishedUnix": 1792698495.5687573,
+  "success": true,
+  "correction": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/native52-full/cleanup-verification.json",
+    "kind": "case-insensitive classification of existing authoritative Docker responses; no resource operation repeated",
+    "detail": "Docker volume uses lowercase no such volume; initial report retained unchanged",
+    "writtenAt": "2026-10-22T19:50:22.364411+00:00"
+  }
+}

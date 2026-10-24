@@ -1,0 +1,30 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "./internal/application/authorization",
+    "-run",
+    "^TestDownloadPolicyObservationNewRequestNearExpiry$",
+    "-timeout=30s",
+    "-v"
+  ],
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exit": 1,
+  "wall_seconds": 0.8618499229778536,
+  "before": {
+    "internal/application/authorization/download_policy_observation.go": "39809499c1f8f78ed2a6483400d781f61dfb6a5a778a7d07d985469852f126a9",
+    "internal/application/authorization/download_policy_observation_test.go": "cf43478f213c966e2da54fbc8ed91f39f7835396ca7aaa94c38e766d9ef19443",
+    "internal/application/authorization/download_environment.go": "c0244c93f3f807d4726d5bcf0bc6ef5463d310c020f27a90c58cc5c7d8a8c3e6"
+  },
+  "after": {
+    "internal/application/authorization/download_policy_observation.go": "39809499c1f8f78ed2a6483400d781f61dfb6a5a778a7d07d985469852f126a9",
+    "internal/application/authorization/download_policy_observation_test.go": "cf43478f213c966e2da54fbc8ed91f39f7835396ca7aaa94c38e766d9ef19443",
+    "internal/application/authorization/download_environment.go": "c0244c93f3f807d4726d5bcf0bc6ef5463d310c020f27a90c58cc5c7d8a8c3e6"
+  }
+}

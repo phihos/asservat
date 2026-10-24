@@ -1,5 +1,49 @@
 # Asservat handoff to Claude Code
 
+## Current continuation (2026-10-23)
+
+The maintainer subsequently resumed implementation and approved the complexity
+review follow-up. The historical stop and no-Git statements below describe
+2026-10-14 only. Git now exists. The current simplification worktree is
+`/home/phil/Projekte/asservat-simplify-c62e02ac`, branch
+`codex/simplify-installed-lifecycle`; the original checkout remains separate.
+
+Start with the [current progress checkpoint](docs/implementation-progress.md),
+[AGENTS.md](AGENTS.md) and the accepted
+[complexity review](docs/reviews/complexity-2026-10-20/README.md). Candidate
+`072e42a3` includes ADR-222 credential consolidation and the reviewed
+`89bfff49` response-metadata/start phase correction on top
+of `17e0ff63`: one authority construction per finite download preparation,
+response-owned ordinary-permission reconstruction at 30 seconds, and removal of
+two namespace GETs from candidate-only workload listing. Exact effect checks and
+short current SQL/identity/retention/recovery checks remain. Selected race, real
+SQL/S3 and design gates pass; the full current Go gate remains pending.
+
+Native57 passes interrupted installation, regional enrollment, demand readiness
+and console processing setup, then fails during capture resolution audit reserve.
+One intent-audited capture has no execution/publication. Its persisted audit first-write cutoff was
+only 1.433310 seconds after admission; execution preparation later
+has insufficient parent headroom. The winning earlier cutoff and initial SQL
+ReviewChanged predicate remain unknown. A separate regression now fixes the use
+of response metadata freshness to shorten independently authorized startup, with
+original effect deadlines preserved; capture/audit race and design gates pass. The two resolution records
+are spent under the fixture's configured allowance. No download is attempted.
+All 2,792 source hashes match; diagnostics are archived and all owned resources
+are independently confirmed removed. No complete installed journey is claimed.
+
+The implementation mandate remains active. ADR-219/221 from the isolated
+projection tree is now integrated (`1d46304e`, followed by contract alignment
+`9da475cd`): approved inspection shares acquisition, worker enrollment no longer
+needs the human preparation socket, and shared capacity replaces four dedicated
+query components. ADR-222 gives those hub facets one exact SQL grant union/pool;
+key acquisition and pinned readers remain separate. Component/race/console checks
+pass; combined compilation and design commands pass, with one generated design
+report update retained for a stable repeat. Full Go, scoped real SQL and installed
+qualification are next. Continue through complete workflows; status questions and
+component handoffs do not revoke approval.
+
+## Historical handoff (2026-10-14)
+
 Prepared 2026-10-14 at approximately 08:20 Europe/Berlin.
 
 ## Start here

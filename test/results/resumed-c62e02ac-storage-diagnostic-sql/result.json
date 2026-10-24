@@ -1,0 +1,21 @@
+{
+  "sourceCommit": "f7d3fe142b693eb7a1c29b4dd32b7492792982f0",
+  "testExit": 0,
+  "harnessExit": 0,
+  "testDurationSeconds": 1.989,
+  "sourceHashesVerified": 2730,
+  "sourceHashMismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "cleanupFailures": [],
+  "ownedResourcesAbsent": true,
+  "qualification": "Actual compiled scoped read role preserves binding freshness, reports missing exact workload without revealing SQL, and cannot write. Synthetic authority fixture; not installed lifecycle qualification.",
+  "runnerSession": 85129,
+  "terminalChunk": "da9b05",
+  "fileSHA256": {
+    "cleanup-readback.json": "f6ffba4c500659e6754d86cc3fd7b8ddd89adc20a0682ff205b9eab64400e20e",
+    "custody-environment.json": "0cf623a2708b90a4713e65899f2d2a3e09082e1eb758047caf6e43ecbde23120",
+    "custody.log": "e7a4321e1596ef7ffbc2fae3a3cc072e18f5eba03de8ce9a41f6b600ca9ff13c",
+    "storage-diagnostic-sql-preflight.log": "b8cc971c928923931c24de7820134a94dbfac152ecf2dcbd9a84023152878b58",
+    "storage-diagnostic-sql-runner.log": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373"
+  }
+}

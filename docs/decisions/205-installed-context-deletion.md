@@ -1,11 +1,19 @@
 # ADR-205 — Installed context deletion
 
-Date: 2026-10-18. Status: accepted; implementation in progress.
+Date: 2026-10-18. Status: accepted; implemented and merged; installed deletion qualification pending.
 Requirements: S-02 (expiry and deletion in the installed journey); REQ-EVD-006,
 REQ-PRV-004, REQ-DEP-003; TASK-03.
 Composes [ADR-111](111-positive-context-writer-deletion.md) into the installed
 layout. Follows ADR-204 (installed downloads), whose worker configuration
 child is the pattern used here.
+
+Current qualification (2026-10-20): the deletion composition merged in PR #41
+at `29a24582`. SQL deletion and finite paging, provider/signing composition and
+the [focused evidence-delete credential test](../research/installed-evidence-deletion-permissions.md)
+pass. The installed expiry, failed-cleanup recovery, acknowledged audit and
+charge-release journey remains unqualified. Capture-operation audit cleanup
+and installation upgrades remain separate gaps. The exact evidence and limits
+are recorded in [implementation progress](../implementation-progress.md).
 
 ## Context
 
@@ -111,11 +119,13 @@ and its storage charge is never released.
 - The operator supplies one more storage credential.
 - The deletion purposes add six connections for two retained hub-worker
   processes during a rollout. The [complete installed SQL inventory](../research/installed-sql-budget.md)
-  also counts five concurrent installer pools: one hub requires 112 ordinary
-  connections, or `max_connections` of at least 115 with three superuser-reserved
-  slots and no other reserved slots. The earlier 107/110 estimate omitted those
-  installer pools. The installer checks the actual available ordinary capacity;
-  these are configured upper bounds, not measured simultaneous use.
+  also counts five concurrent installer pools. ADR-205 required 112 ordinary
+  connections; ADR-210's browser observer adds one per retained worker, making
+  the current one-hub plan 114 ordinary connections, or `max_connections` of at
+  least 117 with three superuser-reserved slots and no other reserved slots.
+  The earlier 107/110 estimate omitted the installer pools. The installer
+  checks the actual available ordinary capacity; these are configured upper
+  bounds, not measured simultaneous use.
 - Copies a user downloaded are outside managed deletion, as before.
 - Capture operation audit cleanup is still not installed; it remains a
   separate gap.
@@ -126,6 +136,8 @@ and its storage charge is never released.
   image replacement or upgrade protocol.
 
 ## Progress
+
+Historical checkpoints recorded before the 2026-10-20 status refresh above:
 
 - **SQL** (#35, unit tests and `sql-check`): purposes 89–91 with the fixture
   grants, the worst-case plan at 107 connections, and

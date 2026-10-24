@@ -35,7 +35,7 @@ func (s ContextInvestigation) CheckDiagnostic(ctx context.Context, source identi
 	if err != nil {
 		return time.Time{}, err
 	}
-	f, err := s.facts(ctx, source, i.Principal, value.ContextIntent{Target: targetRef, Diagnostic: value.ContextDiagnosticName}, target, started.UTC().Truncate(time.Microsecond))
+	f, err := s.facts(ctx, source, i.Principal, value.ContextIntent{Target: targetRef, Diagnostic: value.ContextDiagnosticName}, target, started.UTC().Truncate(time.Microsecond), identity.Earlier(i.ValidUntil, recovery.FreshUntil))
 	if err != nil {
 		return time.Time{}, err
 	}

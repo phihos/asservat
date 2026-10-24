@@ -1,0 +1,92 @@
+[
+  {
+    "label": "green-core-race",
+    "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+    "argv": [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "./internal/contracts",
+      "./internal/adapters/postgres"
+    ],
+    "environment": {
+      "GOMAXPROCS": "2",
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOFLAGS": "-buildvcs=false -p=1"
+    },
+    "exitCode": 0,
+    "elapsedSeconds": 38.209011,
+    "sourceCount": 3782,
+    "changedSources": []
+  },
+  {
+    "label": "green-composition-race",
+    "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+    "argv": [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "-run",
+      "^(TestPublic|TestOwnerPublicInputs)",
+      "./internal/bootstrap",
+      "./internal/adapters/kubernetes"
+    ],
+    "environment": {
+      "GOMAXPROCS": "2",
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOFLAGS": "-buildvcs=false -p=1"
+    },
+    "exitCode": 0,
+    "elapsedSeconds": 581.861832,
+    "sourceCount": 3782,
+    "changedSources": []
+  },
+  {
+    "label": "green-integration-compile",
+    "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+    "argv": [
+      "go",
+      "test",
+      "-race",
+      "-run",
+      "^$",
+      "./test/integration"
+    ],
+    "environment": {
+      "GOMAXPROCS": "2",
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOFLAGS": "-buildvcs=false -p=1"
+    },
+    "exitCode": 0,
+    "elapsedSeconds": 24.324937,
+    "sourceCount": 3782,
+    "changedSources": []
+  },
+  {
+    "label": "green-design",
+    "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+    "argv": [
+      "make",
+      "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "spec-check",
+      "architecture-check",
+      "design-check",
+      "go-architecture-check"
+    ],
+    "environment": {
+      "GOMAXPROCS": "2",
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOFLAGS": "-buildvcs=false -p=1"
+    },
+    "exitCode": 0,
+    "elapsedSeconds": 12.102537,
+    "sourceCount": 3782,
+    "changedSources": []
+  }
+]

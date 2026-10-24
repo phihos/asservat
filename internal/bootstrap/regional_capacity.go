@@ -75,7 +75,7 @@ func newRegionalCapacity(ctx context.Context, c contracts.RegionalDeployment, in
 	if out.observer, read, err = regionalCapacityClients(in, out.timed.stats, c.ClusterID, control, probeNS); err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
-	probe, err := kube.NewPermissionClient(in.kubernetes("kube-probe.token"), c.ClusterID, control, time.Now)
+	probe, err := kube.NewPermissionClient(kube.WithOpeningBurst(in.kubernetes("kube-probe.token")), c.ClusterID, control, time.Now)
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
@@ -134,12 +134,12 @@ func newRegionalCapacity(ctx context.Context, c contracts.RegionalDeployment, in
 // final native bracket (ADR-197 CI continuation run 10). Calls stay counted
 // together for the per-change timing lines.
 func regionalCapacityClients(in *providerInputs, stats *regionalAPIStats, cluster string, control, probe cfg.NamespaceRef) (observer, metadata *kube.PermissionClient, err error) {
-	observerConfig := in.kubernetes("kube-observer.token")
+	observerConfig := kube.WithOpeningBurst(in.kubernetes("kube-observer.token"))
 	observerConfig.Wrap(stats.wrap)
 	if observer, err = kube.NewPermissionClient(observerConfig, cluster, control, time.Now); err != nil {
 		return nil, nil, err
 	}
-	metadataConfig := in.kubernetes("kube-observer.token")
+	metadataConfig := kube.WithOpeningBurst(in.kubernetes("kube-observer.token"))
 	metadataConfig.Wrap(stats.wrap)
 	if metadata, err = kube.NewPermissionClient(metadataConfig, cluster, probe, time.Now); err != nil {
 		return nil, nil, err

@@ -387,3 +387,38 @@ func FuzzAccessTokenSyntax(f *testing.F) {
 		_, _, _ = parse(s)
 	})
 }
+
+// Installed native84: a request authenticated 1.4 s before the key snapshot
+// expired inherited that end and was cut mid-read. Within one evidence-read
+// window of its end the snapshot is refreshed on demand; a failed refresh
+// keeps the still-current snapshot and its original end, and a fetched set
+// without the key still revokes it.
+func TestKeySnapshotRefreshedBeforeItsLastRequestWindow(t *testing.T) {
+	f := newFixture(t)
+	token := sign(t, f.key, "key-1", "at+jwt", f.claims())
+	first, err := f.v.Verify(context.Background(), token)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.advance(time.Minute - identity.EvidenceReadRequestWindow + time.Second)
+	f.set([]byte("unavailable"), 503)
+	c, err := f.v.Verify(context.Background(), token)
+	if err != nil || !c.KeyUntil.Equal(first.KeyUntil) || f.count() != 2 {
+		t.Fatal("failed early refresh dropped the still-current snapshot", err, f.count())
+	}
+	f.advance(2 * time.Second)
+	f.set(jwks(t, f.key, "key-1"), 200)
+	c, err = f.v.Verify(context.Background(), token)
+	if err != nil || c.KeyUntil.Sub(f.now()) < identity.EvidenceReadRequestWindow || f.count() != 3 {
+		t.Fatal("snapshot near its end was not refreshed", err, c.KeyUntil.Sub(f.now()))
+	}
+	other, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.advance(time.Minute - identity.EvidenceReadRequestWindow + time.Second)
+	f.set(jwks(t, other, "key-2"), 200)
+	if _, err = f.v.Verify(context.Background(), token); err == nil {
+		t.Fatal("refreshed set without the key kept it")
+	}
+}

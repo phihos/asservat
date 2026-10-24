@@ -328,9 +328,14 @@ func awaitProviderWorker(t *testing.T, parent context.Context, bound time.Durati
 
 func providerWorkerNativeCleanup(t *testing.T, api kubernetes.Interface, original *apps.Deployment) {
 	t.Helper()
+	providerWorkerNativeCleanupAs(t, api, api, original)
+}
+
+func providerWorkerNativeCleanupAs(t *testing.T, api, actor kubernetes.Interface, original *apps.Deployment) {
+	t.Helper()
 	ctx, end := context.WithTimeout(context.Background(), 60*time.Second)
 	defer end()
-	err := api.AppsV1().Deployments(original.Namespace).Delete(ctx, original.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &original.UID}, PropagationPolicy: ptr.To(meta.DeletePropagationForeground)})
+	err := actor.AppsV1().Deployments(original.Namespace).Delete(ctx, original.Name, meta.DeleteOptions{Preconditions: &meta.Preconditions{UID: &original.UID}, PropagationPolicy: ptr.To(meta.DeletePropagationForeground)})
 	if err != nil && !apierrors.IsNotFound(err) {
 		t.Error("original worker foreground deletion", err)
 		return

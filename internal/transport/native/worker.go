@@ -1,8 +1,10 @@
 package native
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
+	query "asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"bytes"
@@ -33,7 +35,7 @@ func nativeDecodeBounded(b []byte, v any, limit int) error {
 }
 func nativeReference(o value.NativeOperation) contracts.NativeReference {
 	r := o.Reference
-	return contracts.NativeReference{InstallationID: r.InstallationID, SessionID: r.SessionID, WorkerID: r.WorkerID, OperationID: r.OperationID, Fence: r.Fence}
+	return contracts.NativeReference{InstallationID: r.InstallationID, SessionID: r.SessionID, QueryID: r.QueryID, WorkerID: r.WorkerID, OperationID: r.OperationID, Fence: r.Fence}
 }
 func nativeControl(kind contracts.NativeFrameKind, v any) (contracts.NativeFrame, error) {
 	limit := contracts.NativeControlBytes
@@ -59,10 +61,18 @@ func commandValues(c contracts.NativeCommand, h contracts.NativeHello, target va
 	var o value.NativeOperation
 	var source evidence.NativeContextSource
 	until, e := time.Parse(time.RFC3339Nano, c.Until)
-	if e != nil || nativeDecode(c.Operation, &o) != nil || !o.Valid() || c.Format != contracts.NativeExchangeFormat || c.Nonce != h.Nonce || c.Reference != nativeReference(o) || o.Reference.InstallationID != target.InstallationID || o.Reference.SessionID != target.SessionID || o.Reference.WorkerID != target.WorkerID || o.WorkerPodUID != target.PodUID || o.WorkerPublicKey != key || o.Until.After(target.RunUntil) || c.Kind != string(o.Kind) || c.ParentID != o.ParentID || c.Generation != o.Generation || !now.Before(until) || until.After(now.Add(5*time.Second)) || until.After(o.Until) {
+	if e != nil || nativeDecode(c.Operation, &o) != nil || !o.Valid() || c.Format != contracts.NativeExchangeFormat || c.Nonce != h.Nonce || c.Reference != nativeReference(o) || o.Reference.InstallationID != target.InstallationID || o.Reference.Parent() != target.Parent() || o.Reference.WorkerID != target.WorkerID || o.WorkerPodUID != target.PodUID || o.WorkerPublicKey != key || o.Until.After(target.RunUntil) || c.Kind != string(o.Kind) || c.ParentID != o.ParentID || c.Generation != o.Generation || !now.Before(until) || until.After(now.Add(value.NativeLeaseWindow(o.Kind))) || until.After(o.Until) {
+		return o, source, until, contracts.ErrNativeProtocol
+	}
+	if o.Kind != value.NativeProjection && len(c.Projection) != 0 {
 		return o, source, until, contracts.ErrNativeProtocol
 	}
 	switch o.Kind {
+	case value.NativeProjection:
+		var scope query.ContextProjectionScope
+		if c.WindowID != "" || c.LeaseSequence != 1 || c.Offset != 0 || c.Length != 0 || nativeDecode(c.Projection, &scope) != nil || !scope.Valid() || scope.Version != o.SourceVersion || nativeDecodeBounded(c.Source, &source, contracts.NativeCommandBytes) != nil || !source.Valid(o.SourceVersion) {
+			return o, source, until, contracts.ErrNativeProtocol
+		}
 	case value.NativePrepare:
 		if c.WindowID != "" || c.LeaseSequence != 1 || c.Offset != 0 || c.Length != 0 || nativeDecodeBounded(c.Source, &source, contracts.NativeCommandBytes) != nil || !source.Valid(o.SourceVersion) {
 			return o, source, until, contracts.ErrNativeProtocol
@@ -110,8 +120,11 @@ func RunWorkerConversation(ctx context.Context, s Stream, h contracts.NativeHell
 	}
 	return disposition, err
 }
-func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target value.WorkerCredentialTarget, key artifact.Digest, result *evidence.RegionalContextResult, disposition *contracts.NativeConversationResult) error {
-	if ctx == nil || s == nil || result == nil || !target.Valid() || key == (artifact.Digest{}) || h.Reference.InstallationID != target.InstallationID || h.Reference.SessionID != target.SessionID || h.Reference.WorkerID != target.WorkerID || h.Reference.OperationID != "" || h.Reference.Fence != 0 || len(h.WorkerLeaf) != 0 {
+func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target value.WorkerCredentialTarget, key artifact.Digest, result *evidence.RegionalContextResult, disposition *contracts.NativeConversationResult) (err error) {
+	// The closed stage of a failed conversation, for the worker's stop report.
+	stage := "command"
+	defer func() { err = step(stage, err) }()
+	if ctx == nil || s == nil || result == nil || !target.Valid() || key == (artifact.Digest{}) || h.Reference.InstallationID != target.InstallationID || value.AcquisitionParentFor(h.Reference.SessionID, h.Reference.QueryID) != target.Parent() || h.Reference.WorkerID != target.WorkerID || h.Reference.OperationID != "" || h.Reference.Fence != 0 || len(h.WorkerLeaf) != 0 {
 		return contracts.ErrNativeProtocol
 	}
 	defer s.Close()
@@ -130,6 +143,12 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 	// failure remains uncertain and never grants reconnection to that reference.
 	disposition.Reference = c.Reference
 	o, source, until, e := commandValues(c, h, target, key, time.Now())
+	var approvedScope query.ContextProjectionScope
+	if e == nil && o.Kind == value.NativeProjection {
+		e = nativeDecode(c.Projection, &approvedScope)
+	}
+	clear(c.Projection)
+	c.Projection = nil
 	clear(c.Source)
 	clear(c.Operation)
 	c.Source, c.Operation = nil, nil
@@ -162,6 +181,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		}
 	}()
 	take := func(kind contracts.NativeFrameKind, phase string, n int64) error {
+		stage = "acknowledge"
 		r := <-received
 		joined = true
 		if r.err != nil {
@@ -170,7 +190,40 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		}
 		return exactAck(r.frame, kind, c, phase, n)
 	}
+	stage = "read"
 	switch o.Kind {
+	case value.NativeProjection:
+		projection, e := result.ReadApproved(work, o, source, approvedScope)
+		if e != nil {
+			return e
+		}
+		// Result write, acknowledgement and close, for the worker's read report.
+		framesStarted := time.Now()
+		defer func() { auditapp.MarkStep(ctx, "frames", framesStarted) }()
+		b, e := json.Marshal(projection)
+		projection = query.PodStatusProjection{}
+		if e != nil || len(b) > query.ContextResultBytes {
+			clear(b)
+			return contracts.ErrNativeProtocol
+		}
+		stage = "result"
+		e = sendControl(work, s, contracts.NativeMetadataFrame, contracts.NativeMetadata{Format: c.Format, Reference: c.Reference, Nonce: c.Nonce, Metadata: b})
+		clear(b)
+		if e != nil {
+			return e
+		}
+		if e = take(contracts.NativeAcknowledgeFrame, "approved", 0); e != nil {
+			return e
+		}
+		stage = "close"
+		if e = sendControl(work, s, contracts.NativeDoneFrame, ack(c, "closed", 0)); e != nil {
+			return e
+		}
+		f, e = s.Receive(work)
+		if e != nil {
+			return e
+		}
+		return exactAck(f, contracts.NativeDoneFrame, c, "joined", 0)
 	case value.NativePrepare:
 		m, e := result.Prepare(work, o, source)
 		if e != nil {
@@ -180,6 +233,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		if e != nil {
 			return e
 		}
+		stage = "result"
 		e = sendControl(work, s, contracts.NativeMetadataFrame, contracts.NativeMetadata{Format: c.Format, Reference: c.Reference, Nonce: c.Nonce, Metadata: b})
 		clear(b)
 		if e != nil {
@@ -188,9 +242,11 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		if e = take(contracts.NativeCommitFrame, "prepared", 0); e != nil {
 			return e
 		}
+		stage = "commit"
 		if e = result.Commit(work, o); e != nil {
 			return e
 		}
+		stage = "close"
 		if e = sendControl(work, s, contracts.NativeAcknowledgeFrame, ack(c, "prepared", 0)); e != nil {
 			return e
 		}
@@ -208,6 +264,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		if e != nil {
 			return e
 		}
+		stage = "result"
 		e = sendControl(work, s, contracts.NativeMetadataFrame, contracts.NativeMetadata{Format: c.Format, Reference: c.Reference, Nonce: c.Nonce, Metadata: b})
 		clear(b)
 		if e != nil {
@@ -220,6 +277,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 		if e != nil {
 			return e
 		}
+		stage = "result"
 		if e = s.Send(work, contracts.NativeFrame{Kind: contracts.NativeDataFrame, Payload: body}); e != nil {
 			return e
 		}
@@ -227,6 +285,7 @@ func runWorker(ctx context.Context, s Stream, h contracts.NativeHello, target va
 			return e
 		}
 		clear(body)
+		stage = "close"
 		if e = sendControl(work, s, contracts.NativeDoneFrame, ack(c, "closed", 0)); e != nil {
 			return e
 		}

@@ -7,9 +7,8 @@ import (
 
 func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	all, hub := PublicRuntimeRolePurposes(), PublicRuntimeHubRolePurposes()
-	// ADR-204 added three logins outside the hub projection (80 to 83), and
-	// ADR-205 three more (86).
-	if len(all) != 86 || len(hub) != 51 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
+	// Physical hub credentials are consolidated; separate process roles remain.
+	if len(all) != 43 || len(hub) != 7 || PublicRuntimeRetainedWorkerProcesses != 2 || PublicRuntimeRetainedHubProcesses != 4 {
 		t.Fatal("unreviewed compartment expansion")
 	}
 	// ADR-205 decision 2: the hub-worker's deletion logins, in this order.
@@ -30,8 +29,12 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 			t.Fatal("download compartment changed", purpose)
 		}
 	}
-	if !slices.Equal(PermissionProjectionPurposes(false, true, false), []string{"permission-accept", "permission-audit", "worker-config-observe", "worker-config-audit"}) || slices.Contains(PermissionProjectionPurposes(true, false, false), "worker-config-observe") || !slices.Contains(PublicRuntimeKeyServicePurposes(), "key-acquisition") {
+	if !slices.Equal(PermissionProjectionPurposes(false, true, false, false), []string{"permission-accept", "permission-audit", "worker-config-observe", "worker-config-audit"}) || slices.Contains(PermissionProjectionPurposes(true, false, false, false), "worker-config-observe") || !slices.Contains(PublicRuntimeKeyServicePurposes(), "key-acquisition") {
 		t.Fatal("download logins left their projections")
+	}
+	// ADR-210: a browser section adds the hub-worker's settings login last.
+	if got := PermissionProjectionPurposes(false, false, false, true); !slices.Equal(got, []string{"permission-accept", "permission-audit", "browser-settings"}) {
+		t.Fatal("browser section logins changed", got)
 	}
 	seen := map[int]bool{}
 	for _, purpose := range all {
@@ -73,7 +76,11 @@ func TestPublicRuntimeCleanupCompartmentCannotEnterHubProjection(t *testing.T) {
 	}
 	for _, purpose := range hub {
 		limit, ok := PublicRuntimeRoleConnectionLimit(purpose)
-		if !ok || limit != 5 {
+		want := 5
+		if purpose == "hub-runtime" {
+			want = 81
+		}
+		if !ok || limit != want {
 			t.Fatal("hub envelope changed", purpose)
 		}
 	}

@@ -1,0 +1,36 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "./internal/application/authorization",
+    "./internal/domain/privacy",
+    "-run",
+    "TestDownloadPolicy|TestCurrentDownloadEnvironment",
+    "-timeout=90s",
+    "-v"
+  ],
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exit": 0,
+  "wall_seconds": 3.6912465629866347,
+  "before": {
+    "internal/application/authorization/download_policy_observation.go": "b10fc00e724bafbe0e61bc0c8c66766ca2c5dac52ff4c0bf3013d8cf6ea664e2",
+    "internal/application/authorization/download_policy_observation_test.go": "caa9eaa8ccdb8fa6d71076d9f4cbb56cf2b6933f18a81b9d50bfa18bbd7a05f1",
+    "internal/application/authorization/download_environment.go": "c0244c93f3f807d4726d5bcf0bc6ef5463d310c020f27a90c58cc5c7d8a8c3e6",
+    "internal/domain/privacy/download_environment.go": "9c97e7ce3a957d6ce5ec171305bcc46ba06a4f17018d6e1deaf8fc302ac1604c",
+    "internal/domain/privacy/download_environment_test.go": "6eba7941707a221a6678ce85f98043221a8d1425415ebcccd11d5a171436c149"
+  },
+  "after": {
+    "internal/application/authorization/download_policy_observation.go": "b10fc00e724bafbe0e61bc0c8c66766ca2c5dac52ff4c0bf3013d8cf6ea664e2",
+    "internal/application/authorization/download_policy_observation_test.go": "caa9eaa8ccdb8fa6d71076d9f4cbb56cf2b6933f18a81b9d50bfa18bbd7a05f1",
+    "internal/application/authorization/download_environment.go": "c0244c93f3f807d4726d5bcf0bc6ef5463d310c020f27a90c58cc5c7d8a8c3e6",
+    "internal/domain/privacy/download_environment.go": "9c97e7ce3a957d6ce5ec171305bcc46ba06a4f17018d6e1deaf8fc302ac1604c",
+    "internal/domain/privacy/download_environment_test.go": "6eba7941707a221a6678ce85f98043221a8d1425415ebcccd11d5a171436c149"
+  }
+}

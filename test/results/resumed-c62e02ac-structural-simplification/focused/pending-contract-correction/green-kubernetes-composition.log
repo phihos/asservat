@@ -1,0 +1,50 @@
+=== RUN   TestDownloadPreparationFirstJobFitsOriginalIdentityAndPolicyBudget
+    download_preparation_identity_budget_test.go:148: near_expiry=false initial_identity_remaining=4.990855245s original_request_remaining=4.95851004s
+    download_preparation_identity_budget_test.go:148: elapsed=66.821527ms original_interval=5s authority_checks=3 raw_policy_reads=1 completed_policy_reads=1 policy_observer=14 identity_observer=3 identity_policy_reads=1 token_checks=10 permissions=6 catalog=3 retention=3 probe=3 denied=1 created=true recorded=true job_pending=true continued=true err=<nil>
+    download_preparation_identity_budget_test.go:148: production_path=[verify-token verify-token recovery lookup-key route verify-token permissions catalog retention recovery processing recovery processing verify-token permissions runtime-ready configuration plan reserve-session source verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions attachment reserve-worker read-intent-audit write-intent-audit ack-intent-audit claim-worker create-job record-job observe-job verify-token permissions catalog retention recovery processing recovery processing verify-token permissions observe-session verify-token]
+--- PASS: TestDownloadPreparationFirstJobFitsOriginalIdentityAndPolicyBudget (0.14s)
+=== RUN   TestDownloadPreparationNearExpiredIdentityObservation
+    download_preparation_identity_budget_test.go:152: near_expiry=true initial_identity_remaining=4.997803622s original_request_remaining=4.958555784s
+    download_preparation_identity_budget_test.go:152: elapsed=413.884858ms original_interval=5s authority_checks=3 raw_policy_reads=1 completed_policy_reads=1 policy_observer=14 identity_observer=6 identity_policy_reads=2 token_checks=10 permissions=6 catalog=3 retention=3 probe=3 denied=1 created=true recorded=true job_pending=true continued=true err=<nil>
+    download_preparation_identity_budget_test.go:152: production_path=[verify-token verify-token recovery lookup-key route verify-token permissions catalog retention recovery processing recovery processing verify-token permissions runtime-ready configuration plan reserve-session source verify-token verify-token permissions catalog retention recovery processing recovery processing verify-token permissions attachment reserve-worker read-intent-audit write-intent-audit ack-intent-audit claim-worker create-job record-job observe-job verify-token permissions catalog retention recovery processing recovery processing verify-token permissions observe-session verify-token]
+--- PASS: TestDownloadPreparationNearExpiredIdentityObservation (0.48s)
+=== RUN   TestInitialInstallerRunnerSharesProjectionWithoutSharingPhaseCredentials
+--- PASS: TestInitialInstallerRunnerSharesProjectionWithoutSharingPhaseCredentials (0.00s)
+=== RUN   TestInitialInstallerRunnerRequiresContinuationTermination
+=== RUN   TestInitialInstallerRunnerRequiresContinuationTermination/retirement-in-main
+=== RUN   TestInitialInstallerRunnerRequiresContinuationTermination/continuation-restarted
+=== RUN   TestInitialInstallerRunnerRequiresContinuationTermination/unknown-continuation-end
+=== RUN   TestInitialInstallerRunnerRequiresContinuationTermination/node-lost
+=== RUN   TestInitialInstallerRunnerRequiresContinuationTermination/live-continuation
+=== RUN   TestInitialInstallerRunnerRequiresContinuationTermination/missing-continuation
+=== RUN   TestInitialInstallerRunnerRequiresContinuationTermination/missing-retirement
+--- PASS: TestInitialInstallerRunnerRequiresContinuationTermination (0.01s)
+    --- PASS: TestInitialInstallerRunnerRequiresContinuationTermination/retirement-in-main (0.00s)
+    --- PASS: TestInitialInstallerRunnerRequiresContinuationTermination/continuation-restarted (0.00s)
+    --- PASS: TestInitialInstallerRunnerRequiresContinuationTermination/unknown-continuation-end (0.00s)
+    --- PASS: TestInitialInstallerRunnerRequiresContinuationTermination/node-lost (0.00s)
+    --- PASS: TestInitialInstallerRunnerRequiresContinuationTermination/live-continuation (0.00s)
+    --- PASS: TestInitialInstallerRunnerRequiresContinuationTermination/missing-continuation (0.00s)
+    --- PASS: TestInitialInstallerRunnerRequiresContinuationTermination/missing-retirement (0.00s)
+=== RUN   TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead
+=== RUN   TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/missing-continuation
+=== RUN   TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/unavailable-continuation
+=== RUN   TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/changed-original-digest
+=== RUN   TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/changed-projected-name
+=== RUN   TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/changed-original-version
+=== RUN   TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/canceled-final-read
+=== RUN   TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/lost-delete-reply
+--- PASS: TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead (0.09s)
+    --- PASS: TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/missing-continuation (0.01s)
+    --- PASS: TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/unavailable-continuation (0.01s)
+    --- PASS: TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/changed-original-digest (0.01s)
+    --- PASS: TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/changed-projected-name (0.01s)
+    --- PASS: TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/changed-original-version (0.01s)
+    --- PASS: TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/canceled-final-read (0.01s)
+    --- PASS: TestInitialInstallerRunnerResumeNeedsNoDownstreamContinuationRead/lost-delete-reply (0.01s)
+=== RUN   TestPublicRuntimeOldLayoutCannotReplaceRetainedJournal
+--- PASS: TestPublicRuntimeOldLayoutCannotReplaceRetainedJournal (1.52s)
+=== RUN   TestPublicMetadataProjectionContainsOneCredential
+--- PASS: TestPublicMetadataProjectionContainsOneCredential (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/kubernetes	3.302s

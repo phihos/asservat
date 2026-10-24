@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/initial-bootstrap-runner.schema.json",
   "title": "Fixed Helm runner source references",
-  "description": "At most 2 KiB, stable Secret names only. Never private material or generated installation pins. All four commands use the independently protected canonical input and original effect journals.",
+  "description": "At most 2 KiB, stable Secret references and an optional public continuation digest. Never private material or generated installation pins. The fixed sequential runner preserves the original effect journals and separate credential mounts.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -26,6 +26,11 @@
     },
     "registrySecret": {
       "$ref": "https://asservat.io/spec/v1/owner-configuration.schema.json#/$defs/name"
+    },
+    "continuationDigest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Full SHA-256 of the immutable continuation.json bytes. Its ConfigMap name is derived from the original bootstrap name and the first 32 digest characters; the full digest binds the runner input."
     }
   }
 }

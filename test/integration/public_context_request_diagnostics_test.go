@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -204,7 +205,7 @@ func TestPublicJourneyDiagnosticsFirstRequestPublication(t *testing.T) {
 				t.Fatal("decorator invented missing publication ports")
 			}
 			_, e := publication.AcknowledgedCaptureIntent(ctx, id)
-			if e != auditapp.ErrUnavailable {
+			if !errors.Is(e, auditapp.ErrUnavailable) {
 				t.Fatal("publication normalization changed")
 			}
 			if canceled {

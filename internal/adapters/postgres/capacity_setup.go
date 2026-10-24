@@ -238,7 +238,7 @@ func capacitySetupPermissionCurrent(ctx context.Context, q publicRoleQuery, in c
 	var valid bool
 	err := q.QueryRow(ctx, `SELECT LEAST(t.fresh_until,p.fresh_until,p.lease_until),
  NOT t.suspended AND NOT t.recovery_blocked AND t.observed_at<=clock_timestamp() AND NOT p.suspended AND p.observed_at<=clock_timestamp()
- AND p.fresh_until<=p.observed_at+interval '5 seconds'
+ AND p.fresh_until<=p.observed_at+interval '30 seconds'
  AND EXISTS(SELECT 1 FROM public.authority_audit a WHERE a.id=p.initial_audit_id AND a.stream_id=p.id AND a.acknowledged_at IS NOT NULL)
  AND EXISTS(SELECT 1 FROM public.authority_audit a WHERE a.id=p.epoch AND a.stream_id=p.id AND a.acknowledged_at IS NOT NULL)
  FROM public.fleet_current_trust t CROSS JOIN public.permission_stream p WHERE t.installation_id=$1 AND p.id=$2`, in.value.InstallationID, in.value.PermissionRootID).Scan(&until, &valid)

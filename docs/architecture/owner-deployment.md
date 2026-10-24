@@ -1,5 +1,15 @@
 # Protected owner deployment
 
+The current installed credential layout is refined by
+[ADR-222](../decisions/222-hub-process-sql-credentials.md): `sql-owner-runtime.json`
+contains the exact owner identity/routing grant union with one six-connection
+pool. The public projection contains its shared hub credential plus six pinned
+or independently acquired credentials, and excludes browser settings/cleanup.
+The process still has at most 32 physical SQL connections. The older individual
+file/pool descriptions below document the legacy component loader; they do not
+describe the new installed projection. Unsupported retained layouts are refused.
+Implementation and qualification of this refinement are in progress.
+
 [ADR-090](../decisions/090-protected-owner-deployment.md) makes the [owner runtime](owner-startup.md) constructible from installation-managed files. `internal/bootstrap` owns composition; C-21 owns bounded file/provider adapters. C-04's accepted configuration and credential lifecycle, C-08's audit and C-14's worker authority retain their existing owners. No public permission interface or new domain entity is added.
 
 ## Installation inputs

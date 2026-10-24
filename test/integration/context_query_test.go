@@ -133,7 +133,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		environment := authapp.CurrentProjectionEnvironment{RootID: rootID, InstallationID: f.base.input.InstallationID, Policies: f.current, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}
+		environment := authapp.CurrentProjectionEnvironment{RootID: rootID, InstallationID: f.base.input.InstallationID, Policies: f.policies, Recovery: s.recovery.reader, Processing: processing, Now: time.Now}
 		authorityGate := authapp.ContextProjectionAuthority{RootID: rootID, Permissions: s.p, Catalog: catalog, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: environment, Now: time.Now}
 		scope := value.ContextProjectionScope{RootID: rootID, CaseID: e.CaseID, CaptureID: e.CaptureUID, ArtifactID: e.Registration.Location.ArtifactID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: evidence.ContextCopiesDigest(published.Copies), SourceProjectionDigest: value.ContextSourceProjectionDigest(), SourceFormat: artifact.ContextFormat, DisplayVersion: value.ContextDisplayVersion, Selection: value.LineSelection{LineStart: 1, MaxLines: 14}, Principal: principal}
 		authority := func(principal identity.Principal) value.ContextProjectionAuthority {
@@ -409,7 +409,7 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 			}
 		}
 		stopObserved()
-		if _, err = admin.Exec(ctx, "UPDATE context_query_backing SET suspended=true WHERE root_id=$1", plan.RootID); err != nil {
+		if err = f.workerConfig.FenceWorkerConfiguration(ctx, time.Now()); err != nil {
 			t.Fatal(err)
 		}
 		if err = blocker.Commit(ctx); err != nil {
@@ -418,13 +418,13 @@ func qualifyContextQueries(t *testing.T, f *queryLedgerFixture) {
 		select {
 		case err = <-result:
 			if err == nil {
-				t.Fatal("post-lock changed backing authorized query")
+				t.Fatal("post-lock expired accepted worker configuration authorized query")
 			}
 		case <-time.After(5 * time.Second):
 			t.Fatal("blocked query did not join original deadline")
 		}
 		backing.beforeSQL = nil
-		// Restore only through a fresh independently guarded producer observation.
+		// Restore only through a fresh observation of the same accepted configuration.
 		f.refresh(t)
 		charged(1)
 		// A lost guard/commit response returns no Fresh result, while private lookup

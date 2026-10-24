@@ -46,6 +46,43 @@ func (q *Queries) CloseContextQueryBatch(ctx context.Context, arg CloseContextQu
 	return result.RowsAffected(), nil
 }
 
+const closeProjectionNativeBatch = `-- name: CloseProjectionNativeBatch :execrows
+UPDATE context_query_batch SET native_closed=true
+WHERE id=$1 AND query_id=$2 AND NOT closed AND NOT native_closed AND native_operation=$3
+`
+
+type CloseProjectionNativeBatchParams struct {
+	ID              pgtype.UUID
+	QueryID         pgtype.UUID
+	NativeOperation []byte
+}
+
+func (q *Queries) CloseProjectionNativeBatch(ctx context.Context, arg CloseProjectionNativeBatchParams) (int64, error) {
+	result, err := q.db.Exec(ctx, closeProjectionNativeBatch, arg.ID, arg.QueryID, arg.NativeOperation)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const consumeProjectionKeyRole = `-- name: ConsumeProjectionKeyRole :execrows
+UPDATE context_query_key_binding SET used_roles=used_roles|$1::smallint
+WHERE batch_id=$2 AND (used_roles&$1::smallint)=0
+`
+
+type ConsumeProjectionKeyRoleParams struct {
+	Role    int16
+	BatchID pgtype.UUID
+}
+
+func (q *Queries) ConsumeProjectionKeyRole(ctx context.Context, arg ConsumeProjectionKeyRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, consumeProjectionKeyRole, arg.Role, arg.BatchID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const contextQueryCaseExists = `-- name: ContextQueryCaseExists :one
 SELECT EXISTS(SELECT 1 FROM context_case_locator WHERE root_id=$1 AND case_id=$2 AND capture_id=$3 AND artifact_id=$4)
 `
@@ -143,7 +180,7 @@ func (q *Queries) InsertContextQuery(ctx context.Context, arg InsertContextQuery
 }
 
 const insertContextQueryBatch = `-- name: InsertContextQueryBatch :one
-INSERT INTO context_query_batch(id,query_id,operation_id,generation,batch) VALUES($1,$2,$3,$4,$5) RETURNING id, query_id, operation_id, generation, batch, claim_id, closed
+INSERT INTO context_query_batch(id,query_id,operation_id,generation,batch) VALUES($1,$2,$3,$4,$5) RETURNING id, query_id, operation_id, generation, batch, claim_id, closed, native_operation, native_authority, native_closed
 `
 
 type InsertContextQueryBatchParams struct {
@@ -171,6 +208,9 @@ func (q *Queries) InsertContextQueryBatch(ctx context.Context, arg InsertContext
 		&i.Batch,
 		&i.ClaimID,
 		&i.Closed,
+		&i.NativeOperation,
+		&i.NativeAuthority,
+		&i.NativeClosed,
 	)
 	return i, err
 }
@@ -216,6 +256,42 @@ func (q *Queries) InsertContextQueryPrincipal(ctx context.Context, arg InsertCon
 		&i.Allocated,
 	)
 	return i, err
+}
+
+const insertProjectionKeyBinding = `-- name: InsertProjectionKeyBinding :exec
+INSERT INTO context_query_key_binding(batch_id,query_id,binding) VALUES($1,$2,$3)
+`
+
+type InsertProjectionKeyBindingParams struct {
+	BatchID pgtype.UUID
+	QueryID pgtype.UUID
+	Binding []byte
+}
+
+func (q *Queries) InsertProjectionKeyBinding(ctx context.Context, arg InsertProjectionKeyBindingParams) error {
+	_, err := q.db.Exec(ctx, insertProjectionKeyBinding, arg.BatchID, arg.QueryID, arg.Binding)
+	return err
+}
+
+const insertProjectionQueryWorker = `-- name: InsertProjectionQueryWorker :exec
+INSERT INTO context_query_worker(query_id,worker_id,binding,proof) VALUES($1,$2,$3,$4)
+`
+
+type InsertProjectionQueryWorkerParams struct {
+	QueryID  pgtype.UUID
+	WorkerID pgtype.UUID
+	Binding  []byte
+	Proof    []byte
+}
+
+func (q *Queries) InsertProjectionQueryWorker(ctx context.Context, arg InsertProjectionQueryWorkerParams) error {
+	_, err := q.db.Exec(ctx, insertProjectionQueryWorker,
+		arg.QueryID,
+		arg.WorkerID,
+		arg.Binding,
+		arg.Proof,
+	)
+	return err
 }
 
 const lockContextQuery = `-- name: LockContextQuery :one
@@ -317,7 +393,7 @@ func (q *Queries) LockContextQueryBacking(ctx context.Context, rootID pgtype.UUI
 }
 
 const lockContextQueryBatch = `-- name: LockContextQueryBatch :one
-SELECT id, query_id, operation_id, generation, batch, claim_id, closed FROM context_query_batch WHERE id=$1 AND query_id=$2 FOR UPDATE
+SELECT id, query_id, operation_id, generation, batch, claim_id, closed, native_operation, native_authority, native_closed FROM context_query_batch WHERE id=$1 AND query_id=$2 FOR UPDATE
 `
 
 type LockContextQueryBatchParams struct {
@@ -336,6 +412,9 @@ func (q *Queries) LockContextQueryBatch(ctx context.Context, arg LockContextQuer
 		&i.Batch,
 		&i.ClaimID,
 		&i.Closed,
+		&i.NativeOperation,
+		&i.NativeAuthority,
+		&i.NativeClosed,
 	)
 	return i, err
 }
@@ -357,6 +436,86 @@ func (q *Queries) LockContextQueryPrincipal(ctx context.Context, arg LockContext
 		&i.RootID,
 		&i.PrincipalKey,
 		&i.Allocated,
+	)
+	return i, err
+}
+
+const lockProjectionKeyBinding = `-- name: LockProjectionKeyBinding :one
+SELECT batch_id, query_id, binding, used_roles FROM context_query_key_binding WHERE batch_id=$1 FOR UPDATE
+`
+
+func (q *Queries) LockProjectionKeyBinding(ctx context.Context, batchID pgtype.UUID) (ContextQueryKeyBinding, error) {
+	row := q.db.QueryRow(ctx, lockProjectionKeyBinding, batchID)
+	var i ContextQueryKeyBinding
+	err := row.Scan(
+		&i.BatchID,
+		&i.QueryID,
+		&i.Binding,
+		&i.UsedRoles,
+	)
+	return i, err
+}
+
+const openProjectionNativeBatch = `-- name: OpenProjectionNativeBatch :execrows
+UPDATE context_query_batch SET native_operation=$3,native_authority=$4
+WHERE id=$1 AND query_id=$2 AND claim_id=id AND NOT closed AND native_operation IS NULL
+`
+
+type OpenProjectionNativeBatchParams struct {
+	ID              pgtype.UUID
+	QueryID         pgtype.UUID
+	NativeOperation []byte
+	NativeAuthority []byte
+}
+
+func (q *Queries) OpenProjectionNativeBatch(ctx context.Context, arg OpenProjectionNativeBatchParams) (int64, error) {
+	result, err := q.db.Exec(ctx, openProjectionNativeBatch,
+		arg.ID,
+		arg.QueryID,
+		arg.NativeOperation,
+		arg.NativeAuthority,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const readAcquisitionQuery = `-- name: ReadAcquisitionQuery :one
+SELECT id, root_id, allocation_id, account_id, principal_key, actor, query, initial_request, operation_id, worker_id, created_at, deadline, cleanup_until, retire_by, issuer_epoch, postmaster_at, database_oid, generation, active_batch, polls, controls, uncertain FROM context_query WHERE id=$1 AND root_id=$2
+`
+
+type ReadAcquisitionQueryParams struct {
+	ID     pgtype.UUID
+	RootID pgtype.UUID
+}
+
+func (q *Queries) ReadAcquisitionQuery(ctx context.Context, arg ReadAcquisitionQueryParams) (ContextQuery, error) {
+	row := q.db.QueryRow(ctx, readAcquisitionQuery, arg.ID, arg.RootID)
+	var i ContextQuery
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.AllocationID,
+		&i.AccountID,
+		&i.PrincipalKey,
+		&i.Actor,
+		&i.Query,
+		&i.InitialRequest,
+		&i.OperationID,
+		&i.WorkerID,
+		&i.CreatedAt,
+		&i.Deadline,
+		&i.CleanupUntil,
+		&i.RetireBy,
+		&i.IssuerEpoch,
+		&i.PostmasterAt,
+		&i.DatabaseOid,
+		&i.Generation,
+		&i.ActiveBatch,
+		&i.Polls,
+		&i.Controls,
+		&i.Uncertain,
 	)
 	return i, err
 }
@@ -498,6 +657,51 @@ func (q *Queries) ReadContextQueryWorker(ctx context.Context, queryID pgtype.UUI
 		&i.WorkerID,
 		&i.Binding,
 		&i.Proof,
+	)
+	return i, err
+}
+
+const readProjectionKeyBinding = `-- name: ReadProjectionKeyBinding :one
+SELECT batch_id, query_id, binding, used_roles FROM context_query_key_binding WHERE batch_id=$1
+`
+
+func (q *Queries) ReadProjectionKeyBinding(ctx context.Context, batchID pgtype.UUID) (ContextQueryKeyBinding, error) {
+	row := q.db.QueryRow(ctx, readProjectionKeyBinding, batchID)
+	var i ContextQueryKeyBinding
+	err := row.Scan(
+		&i.BatchID,
+		&i.QueryID,
+		&i.Binding,
+		&i.UsedRoles,
+	)
+	return i, err
+}
+
+const readProjectionNativeBatch = `-- name: ReadProjectionNativeBatch :one
+SELECT b.id, b.query_id, b.operation_id, b.generation, b.batch, b.claim_id, b.closed, b.native_operation, b.native_authority, b.native_closed FROM context_query_batch b JOIN context_query q ON q.active_batch=b.id
+WHERE q.id=$1 AND q.root_id=$2 AND q.worker_id=$3 AND NOT b.closed
+`
+
+type ReadProjectionNativeBatchParams struct {
+	ID       pgtype.UUID
+	RootID   pgtype.UUID
+	WorkerID pgtype.UUID
+}
+
+func (q *Queries) ReadProjectionNativeBatch(ctx context.Context, arg ReadProjectionNativeBatchParams) (ContextQueryBatch, error) {
+	row := q.db.QueryRow(ctx, readProjectionNativeBatch, arg.ID, arg.RootID, arg.WorkerID)
+	var i ContextQueryBatch
+	err := row.Scan(
+		&i.ID,
+		&i.QueryID,
+		&i.OperationID,
+		&i.Generation,
+		&i.Batch,
+		&i.ClaimID,
+		&i.Closed,
+		&i.NativeOperation,
+		&i.NativeAuthority,
+		&i.NativeClosed,
 	)
 	return i, err
 }

@@ -10,20 +10,26 @@ import (
 type NativeOperationKind string
 
 const (
-	NativePrepare  NativeOperationKind = "prepare-context"
-	NativeObserve  NativeOperationKind = "observe-prepared-context"
-	NativeResponse NativeOperationKind = "read-context-response"
+	NativePrepare    NativeOperationKind = "prepare-context"
+	NativeObserve    NativeOperationKind = "observe-prepared-context"
+	NativeResponse   NativeOperationKind = "read-context-response"
+	NativeProjection NativeOperationKind = "read-approved-context"
 )
 
 // NativeReference is a locator, not a capability. In particular neither the
 // certificate enrollment locator nor an arbitrary UUID grants native access.
 type NativeReference struct {
 	InstallationID, SessionID, WorkerID, OperationID string
+	QueryID                                          string `json:",omitempty"`
 	Fence                                            int64
 }
 
 func (r NativeReference) Valid() bool {
-	return UUID(r.InstallationID) && UUID(r.SessionID) && UUID(r.WorkerID) && UUID(r.OperationID) && r.Fence > 0 && r.Fence <= 1<<60
+	return UUID(r.InstallationID) && r.Parent().Valid() && UUID(r.WorkerID) && UUID(r.OperationID) && r.Fence > 0 && r.Fence <= 1<<60
+}
+
+func (r NativeReference) Parent() AcquisitionParent {
+	return AcquisitionParentFor(r.SessionID, r.QueryID)
 }
 
 type NativeOperation struct {
@@ -45,9 +51,11 @@ func (o NativeOperation) Valid() bool {
 	}
 	switch o.Kind {
 	case NativePrepare, NativeObserve:
-		return !o.Until.After(o.StartedAt.Add(5 * time.Second))
+		return o.Reference.Parent().Purpose == AcquisitionDownload && !o.Until.After(o.StartedAt.Add(5*time.Second))
 	case NativeResponse:
-		return !o.Until.After(o.StartedAt.Add(8 * time.Hour))
+		return o.Reference.Parent().Purpose == AcquisitionDownload && !o.Until.After(o.StartedAt.Add(8*time.Hour))
+	case NativeProjection:
+		return o.Reference.Parent().Purpose == AcquisitionProjection && !o.Until.After(o.StartedAt.Add(identity.EvidenceReadRequestWindow))
 	default:
 		return false
 	}
@@ -64,7 +72,18 @@ type NativeLease struct {
 }
 
 func (l NativeLease) Valid(now time.Time) bool {
-	return l.Operation.Valid() && l.Certificate != (artifact.Digest{}) && l.Sequence > 0 && l.Sequence <= 1<<60 && identity.Fresh(l.ObservedAt, l.Until, now, 5*time.Second) && !l.Until.After(l.Operation.Until)
+	return l.Operation.Valid() && l.Certificate != (artifact.Digest{}) && l.Sequence > 0 && l.Sequence <= 1<<60 && identity.Fresh(l.ObservedAt, l.Until, now, NativeLeaseWindow(l.Operation.Kind)) && !l.Until.After(l.Operation.Until)
+}
+
+// NativeLeaseWindow is the longest native lease/conversation interval of an
+// operation kind: the evidence-read request window for approved projection
+// reads (installed native78-80 needed more than five seconds between command
+// and result), five seconds for every other kind.
+func NativeLeaseWindow(kind NativeOperationKind) time.Duration {
+	if kind == NativeProjection {
+		return identity.EvidenceReadRequestWindow
+	}
+	return 5 * time.Second
 }
 
 // Accepted qualification/backing is supplied by protected installation input,

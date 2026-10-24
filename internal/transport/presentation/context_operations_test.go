@@ -92,6 +92,30 @@ const wireTarget = `"target_ref":{"cluster_id":"00000000-0000-4000-8000-00000000
 const wirePreview = `{` + wireTarget + `,"preset_ref":{"name":"pod-status","version":"v1"},"requested_retention_seconds":60}`
 const wireRequest = `{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"same-key"}`
 
+type privatePreviewStep struct{ cause error }
+
+func (e privatePreviewStep) Error() string     { return "private target and provider detail" }
+func (e privatePreviewStep) Unwrap() error     { return e.cause }
+func (e privatePreviewStep) FixedStep() string { return "facts/retention" }
+
+func TestContextOperationsPrivatePreviewStepPreservesPublicWire(t *testing.T) {
+	for _, cause := range []error{value.ErrDenied, value.ErrUnavailable, value.ErrProcessingCoverage, value.ErrChanged} {
+		t.Run(cause.Error(), func(t *testing.T) {
+			s, f := operationFixture(t, true)
+			f.err = cause
+			original, err := s.Call(t.Context(), f, "preview_capture", []byte(wirePreview))
+			if err != nil {
+				t.Fatal(err)
+			}
+			f.err = privatePreviewStep{cause: cause}
+			observed, err := s.Call(t.Context(), f, "preview_capture", []byte(wirePreview))
+			if err != nil || string(observed.Body) != string(original.Body) || observed.auditDecision != original.auditDecision || observed.ValidUntil != original.ValidUntil {
+				t.Fatalf("private step changed public wire, audit classification or deadline: %v", err)
+			}
+		})
+	}
+}
+
 func TestContextOperationsProjectBoundedSharedWorkflow(t *testing.T) {
 	s, f := operationFixture(t, true)
 	for name, in := range map[string]string{"list_diagnostics": `{` + wireTarget + `}`, "preview_capture": wirePreview, "request_capture": wireRequest, "resolve_capture_request": wireRequest, "get_capture": `{"capture_id":"00000000-0000-4000-8000-000000000030"}`} {

@@ -161,6 +161,11 @@ func (s *capacityEnrollmentReader) effect(ctx context.Context, o app.EnrollmentO
 		if capture && out.Enrollment.CaptureBackedAt == nil || (phase == "publish" || phase == "continue-publish" || phase == "observe") && out.Enrollment.ReadyAt == nil {
 			return cfg.ErrUnavailable
 		}
+		if !capture && out.Enrollment.ReadyAt != nil {
+			if err = q.EnsureSharedContextQueryAllocation(live, custodydb.EnsureSharedContextQueryAllocationParams{RootID: id(s.root), ClusterID: id(o.Key.ClusterID), NamespaceUid: o.Key.NamespaceUID, WorkloadUid: o.Key.WorkloadUID}); err != nil {
+				return err
+			}
+		}
 		until = identity.Earlier(until, out.FreshUntil)
 		if live.Err() != nil || !time.Now().Before(until) {
 			return cfg.ErrUnavailable

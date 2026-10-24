@@ -1,0 +1,45 @@
+{
+  "argv": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-run",
+    "^TestIdentityPolicy",
+    "-v",
+    "./internal/adapters/kubernetes"
+  ],
+  "env": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "cwd": "/home/phil/Projekte/asservat-resume-0450e73c",
+  "started_at": 1792530569.5147738,
+  "duration_seconds": 28.829983234405518,
+  "exit_code": 0,
+  "source_hashes_before": {
+    "internal/adapters/kubernetes/identity_policy.go": "e7980c598f5d7df2b5e8e34cbd5df6f72f1d3b50a1df134a05ced6d5d26e4c57",
+    "internal/adapters/kubernetes/identity_policy_test.go": "ff2204d6cb56c0275ff72bd35e728adaeffa06ff3eb3b9048a487e7fd0a91983",
+    "internal/adapters/kubernetes/identity_policy_observation_test.go": "fc6229ba00bc33de5d2e68a6f14afdd99fc812ab2265915796bb355c311a8075",
+    "internal/adapters/kubernetes/download_preparation_phase_budget_test.go": "32bf3bce83978f8bc2206854e4c8a8315a4e82bcad87b45d8d404b726b674345",
+    "internal/adapters/kubernetes/download_preparation_identity_budget_test.go": "c212dd3bbb2a1a8683c8f0ae0c37a27fae668b6b3499ca53691053eaca2cd70b"
+  },
+  "source_hashes_after": {
+    "internal/adapters/kubernetes/identity_policy.go": "e7980c598f5d7df2b5e8e34cbd5df6f72f1d3b50a1df134a05ced6d5d26e4c57",
+    "internal/adapters/kubernetes/identity_policy_test.go": "ff2204d6cb56c0275ff72bd35e728adaeffa06ff3eb3b9048a487e7fd0a91983",
+    "internal/adapters/kubernetes/identity_policy_observation_test.go": "fc6229ba00bc33de5d2e68a6f14afdd99fc812ab2265915796bb355c311a8075",
+    "internal/adapters/kubernetes/download_preparation_phase_budget_test.go": "32bf3bce83978f8bc2206854e4c8a8315a4e82bcad87b45d8d404b726b674345",
+    "internal/adapters/kubernetes/download_preparation_identity_budget_test.go": "c212dd3bbb2a1a8683c8f0ae0c37a27fae668b6b3499ca53691053eaca2cd70b"
+  },
+  "qualification": "Identity adapter tests only; composed download tests excluded while separate cache files are edited.",
+  "terminal": {
+    "session_id": 36572,
+    "chunk_id": "e7854b",
+    "exit_code": 0
+  },
+  "go_package_seconds": 2.269,
+  "original_result_sha256": "9eb097e794bba0213a18244a202e9e8b57d29cb25c1b428e746c6643141379fa",
+  "original_result_cache_path": "/home/phil/.cache/asservat-build/recovered-c62e02ac/identity-policy-observation/initial-green-race.json"
+}

@@ -1,0 +1,24 @@
+{
+  "label": "green-composition-race",
+  "cwd": "/home/phil/Projekte/asservat-api-execution-c62e02ac",
+  "argv": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-run",
+    "^(TestPublic|TestOwnerPublicInputs)",
+    "./internal/bootstrap",
+    "./internal/adapters/kubernetes"
+  ],
+  "environment": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exitCode": 0,
+  "elapsedSeconds": 581.861832,
+  "sourceCount": 3782,
+  "changedSources": []
+}

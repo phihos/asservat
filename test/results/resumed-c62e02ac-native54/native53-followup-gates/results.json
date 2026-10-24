@@ -1,0 +1,44 @@
+[
+  {
+    "name": "design",
+    "sourceCommit": "840f27fc338f0c170a4f6069bc95db4c109bbfaf",
+    "command": [
+      "make",
+      "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "spec-check",
+      "architecture-check",
+      "design-check",
+      "go-architecture-check"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 13.82,
+    "changedSources": []
+  },
+  {
+    "name": "compile",
+    "sourceCommit": "840f27fc338f0c170a4f6069bc95db4c109bbfaf",
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "-run",
+      "^$",
+      "./test/integration"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 23.56,
+    "changedSources": []
+  },
+  {
+    "name": "helm",
+    "sourceCommit": "840f27fc338f0c170a4f6069bc95db4c109bbfaf",
+    "command": [
+      "make",
+      "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+      "helm-integration"
+    ],
+    "exitCode": 0,
+    "elapsedSeconds": 53.985,
+    "changedSources": []
+  }
+]

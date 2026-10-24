@@ -4,7 +4,8 @@ ADR-137 packages the existing ADR-131/133 commands. C-20 owns the closed public
 input/runner DTOs; the provider configuration adapter normalizes PEM and the
 non-authorizing audience hint; Kubernetes owns fixed runner/terminal observation;
 bootstrap owns local CLI/command composition. Helm supplies static trusted setup
-RBAC and nonsecret desired inputs. No public runtime is enabled.
+RBAC and nonsecret desired inputs. Runtime continuation remains an explicit
+option; the default chart installs configuration foundations only.
 
 ## Original identity and phase boundaries
 
@@ -16,10 +17,23 @@ The namespace is an explicit trust entry, not proof of historical cleanliness.
 
 The hook runs `initial-bootstrap`, `initial-bootstrap-schema`,
 `initial-bootstrap-prepare`, then `initial-bootstrap-retire` in one fixed Pod.
+With `bootstrap.continuation.enabled`, `installer-continue` is the final
+container of that same Pod. This replaces two Pods, six process starts, two
+scratch volumes and two projection producers with one Pod, five process starts,
+one scratch volume and one producer. The first four commands retain their exact
+credential mounts. Retirement refreshes the common/public/history projection
+and removes the maintenance credential before continuation receives the read-only
+preparer subdirectory. Continuation receives its own rotating projected API
+token and only the SQL administrator file from the producer Secret; it does not
+mount producer material, DDL credentials or registry credentials.
+
 The 30-minute orchestration ceiling does not extend a five-second observation,
 original SQL/provider effect, fifteen-minute copy-cleanup claim or any retained
 history. The existing manager retirement, history grant transfer, current schema
 incarnation checks and positive v3 setup-copy deletion are unchanged.
+There is no fresh lifetime for the last container. Helm's client wait timeout
+also does not extend the Pod or any phase. The bootstrap-only four-command
+profile remains available when continuation is disabled.
 
 The public compiler accepts ordinary PEM roots and sorts qualified DER roots.
 An omitted API CA comes from the native public projection. An omitted audience
@@ -29,7 +43,12 @@ Actual administrator/API/probe identity and independent denial precede private
 effects. Unsupported private input cannot fall back to an ambient credential.
 
 Each runner pins a full digest and revision name for its two immutable public
-JSON objects. Resume reads that original snapshot, not current values. A
+JSON objects. With continuation enabled, `runner.json` also contains the full
+SHA-256 of the exact immutable public `continuation.json`. Its existing
+ConfigMap name uses the first 32 hexadecimal characters; the complete digest
+remains bound by the runner's original input digest. The optional
+field leaves original bootstrap-only input bytes and layout unchanged.
+Resume reads the original bootstrap/runner snapshot, not current values. A
 corrected first-attempt typo may create another snapshot; known product state
 continues to require its original scope. Missing or contradictory inputs cannot
 recreate the installation. Snapshots are currently retained pending qualified
@@ -46,10 +65,22 @@ receipts permit one exact UID/RV DELETE and require observed absence. An unknown
 DELETE is not a replacement grant; a later invocation repeats exact observation.
 No background retry, Helm shell call, seed read or recovery activation occurs.
 
-A missing hook means only that orchestration may be invoked. The four commands
+A missing hook means only that orchestration may be invoked. The fixed commands
 still classify protected existing progress independently. Failed hooks are
 retained; only successful hooks are deleted automatically. Application/schema
 rollback is outside this initial-install protocol.
+
+For the combined runner, the same terminal proof covers continuation and its
+projected input name is part of the exact Pod spec comparison. Terminal-only
+cleanup does not read the downstream continuation ConfigMap: its absence or
+outage cannot keep a proven terminated runner alive. No journal, operation
+identity, provider attempt or uncertain spend is reset. A chart upgrade also
+uses Helm's existing administrative connection for one render-time lookup of
+the legacy `<name>-continuation` Pod. Missing or completed (`Succeeded`/`Failed`)
+legacy Pods permit rendering; nonterminal, node-lost or deleting Pods refuse it.
+Helm never deletes or adopts that Pod. This check does not replace terminal
+process proof or fence concurrent administrative changes. Offline `helm
+template` has no live lookup and cannot qualify an upgrade's overlap check.
 
 ## Explicit private registry input
 
@@ -79,6 +110,14 @@ from the named pull Secret. Primary sources: [API validation](https://github.com
 
 ## Qualification and remaining installed prerequisites
 
+The single five-command layout and expanded resume path are a packaging
+refactor awaiting their own runtime qualification. Earlier four-command and
+separate-continuation evidence below does not qualify removal of the second
+producer. The new owned Helm lookup cases use deliberately unscheduled Pods
+with fixture-written status; they test real render-time API lookup and refusal,
+not kubelet process termination. The installed product chain must separately
+exercise the combined commands, their credential boundaries and retained replay.
+
 The new owned `scripts/test-context-storage.py --helm-bootstrap` selection
 packages the actual chart, builds the actual product, starts empty PostgreSQL
 and actual OpenBao/S3, and pushes only that test image to an owned authenticated
@@ -103,13 +142,11 @@ a startup-availability fix or independently qualified production bootstrap
 environments. Unit/API metadata tracing and compiled setup-free replay qualify
 separate scopes; no production tracing is added.
 
-Installed end-user operation still requires protected identity/session sources,
-permission/deny/capability acceptance, retention topology/history/catch-up,
-qualified storage/backup/WAL and finite workload/audit/capture/Stop backing,
-processing initialization/release reserve and complete client/native paths,
-worker/owner/connector trust and credential provisioning, actual public HTTPS
-browser/MCP/content composition, joined ongoing supervisors, and independently
-qualified restart/restore activation. Existing components are not substitutes
-for those installed accepted inputs. Internal identity/static-key services and
-bundled database/store profiles remain separate accepted work. Hook success
-starts no hub, console, MCP endpoint or collector.
+Subsequent installed continuation and end-user evidence are tracked in
+[implementation status](../implementation-status.md). They require protected
+identity/session, permission, retention, capacity, processing and provider
+inputs; a successful bootstrap-only hook supplies none of those runtime
+guarantees. Independently qualified restart/restore activation, internal
+identity/static-key services and bundled database/store profiles remain
+separate accepted work. Consolidating the runner does not implement those
+capabilities or turn Helm rollback into application recovery.

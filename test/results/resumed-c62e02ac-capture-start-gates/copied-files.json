@@ -1,0 +1,57 @@
+{
+  "design/gate.log": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capture-simplification-design/gate.log",
+    "sha256": "82cd3bd40de31c519a23efd9f80255ab70b66e78f3280216ae167b01896457e3",
+    "bytes": 1094
+  },
+  "design/invocation.json": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capture-simplification-design/invocation.json",
+    "sha256": "8683c859352cd8c9de19e589085b05d5220e699ec5497448ef9f17483f3714b2",
+    "bytes": 285
+  },
+  "design/result.json": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capture-simplification-design/result.json",
+    "sha256": "cee82f09ab43e863396256967dd8836591bde446fd2cbccb710e2e4d42b3f8ef",
+    "bytes": 377
+  },
+  "design/source-before.json": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capture-simplification-design/source-before.json",
+    "sha256": "3624df61e52c8b780dd7e0c02d24309895de4dbc66f35eb9bfc530be9d473225",
+    "bytes": 461998
+  },
+  "sql/cleanup-readback.json": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capture-simplification-sql/cleanup-readback.json",
+    "sha256": "1134fcee359f58c1941d21bc0f4c682456b8e15ebe3a943fa8ccd55131e8d67a",
+    "bytes": 475
+  },
+  "sql/custody-environment.json": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capture-simplification-sql/custody-environment.json",
+    "sha256": "8fd9f3e0a524e61900ac3e9dfe56d4bb2d8a4c75ae21697b426e1f014e852c19",
+    "bytes": 354727
+  },
+  "sql/custody.log": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capture-simplification-sql/custody.log",
+    "sha256": "901d615384d855897470e6acee554f322b71c7e2d47afdf72745d3f384d02f59",
+    "bytes": 3220
+  },
+  "sql/gate.log": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capture-simplification-sql/gate.log",
+    "sha256": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373",
+    "bytes": 28
+  },
+  "sql/invocation.json": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capture-simplification-sql/invocation.json",
+    "sha256": "1d83c192d4e2af1a51dd8bff31915312e4151239d4c5067d4f26585b472c19e6",
+    "bytes": 356
+  },
+  "sql/result.json": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capture-simplification-sql/result.json",
+    "sha256": "f3504c80c337426e1912115ba28197742caf5c8c52ec0c8e51d288692328ae19",
+    "bytes": 448
+  },
+  "sql/source-before.json": {
+    "source": "/home/phil/.cache/asservat-build/recovered-c62e02ac/capture-simplification-sql/source-before.json",
+    "sha256": "3624df61e52c8b780dd7e0c02d24309895de4dbc66f35eb9bfc530be9d473225",
+    "bytes": 461998
+  }
+}

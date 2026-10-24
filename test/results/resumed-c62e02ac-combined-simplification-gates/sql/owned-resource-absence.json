@@ -1,0 +1,24 @@
+[
+  {
+    "name": "asservat-custody-6ju3a7mr-postgres",
+    "exitCode": 1,
+    "absent": true
+  },
+  {
+    "name": "asservat-custody-6ju3a7mr-s3",
+    "exitCode": 1,
+    "absent": true
+  },
+  {
+    "kind": "containers",
+    "label": "custody-6ju3a7mr",
+    "exitCode": 0,
+    "absent": true
+  },
+  {
+    "kind": "networks",
+    "label": "custody-6ju3a7mr",
+    "exitCode": 0,
+    "absent": true
+  }
+]

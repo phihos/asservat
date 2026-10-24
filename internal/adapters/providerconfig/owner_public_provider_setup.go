@@ -48,7 +48,11 @@ func ownerPublicSetup(in contracts.OwnerDeployment, profile contracts.OwnerProvi
 	requests = append(requests, ownerProviderSetupRequest{Method: "POST", Path: p.WorkerPKI.Mount + "/roles/" + p.WorkerPKI.Role, Body: json.RawMessage(role)})
 	root, installation := in.PermissionRootID, in.InstallationID
 	prefixes = []string{"operation-audit/v1/" + root + "/", "capture-intent/v1/" + root + "/", "download-audit/v1/" + root + "/", "download-worker-audit/v1/" + root + "/",
-		"download-window-audit/v1/" + root + "/", "download-stop/v1/" + root + "/", "download-worker-enrollment/v1/" + installation + "/", "download-worker-certificate/v1/" + installation + "/"}
+		"download-window-audit/v1/" + root + "/", "download-stop/v1/" + root + "/", "download-worker-enrollment/v1/" + installation + "/", "download-worker-certificate/v1/" + installation + "/",
+		// Shared acquisition workers (native download and approved inspection).
+		"acquisition-enrollment/v1/native-download/" + installation + "/", "acquisition-enrollment/v1/approved-pod-status/" + installation + "/",
+		"acquisition-certificate/v1/native-download/" + installation + "/", "acquisition-certificate/v1/approved-pod-status/" + installation + "/",
+		"context-query-worker/v1/" + root + "/"}
 	return requests, append(inspect, p.WorkerPKI.Mount+"/roles/"+p.WorkerPKI.Role), prefixes, nil
 }
 

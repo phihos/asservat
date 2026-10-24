@@ -1,5 +1,2948 @@
 # Sustained implementation progress
 
+## Installed journey passes end to end (2026-10-24)
+
+Installed native92 on `aa4eac9a` exits 0 (1886.8 s): install with resumed installer,
+regional enrollment, Keycloak MCP capture, regional collection/verification/publication,
+approved pod-status inspection via the shared acquisition worker (read-only scope refused for
+download), native download, query-worker retirement, Stop after Deny, Deny revocation,
+cleanup-lease denial safety, expiry refusal and verified deletion. The
+[record](../test/results/resumed-c62e02ac-native92/README.md) lists every milestone. Runs
+native58–91 drove the fixes recorded in their own `resumed-c62e02ac-nativeNN` folders: grant and
+storage-prefix gaps from credential consolidation, 5 s freshness windows relaxed to the
+authorized 30 s (bindings, capacity, permission, trust, retention, topology, self-proofs),
+stored-evidence reads decoupled from workload capacity (maintainer decision 2026-10-23), 20 s
+evidence-read windows, early-refreshed caches, native transport deadline/gate fixes and
+positive worker retirement. Open: 25 real-SQL `download-worker-*` subtests already failing at
+`dd788576` (`reserve worker custody unavailable`), active-stream interruption on Stop.
+
+## Capacity-backed download windows and content refusal stages (2026-10-24)
+
+Installed native91 prepared the native download, then the content GET got a
+bare 503 with no hub log. SQL showed one closed `download_response` with
+`window_count=0`, no `download_window` row and no SQL error: the first
+`BeginWindow` refused in Go. SQL pins a window's `WriteUntil` to its control
+allocation's `audit_write_until`; a protected-capacity control sets it at the
+admission end plus grace (about 24 h, here 2026-10-24 21:56 for a window
+starting 2026-10-23 22:01), but `DownloadWindow.Valid` still capped it at the
+pre-capacity 8 h + 5 min, so every capacity-backed window was `ErrInvalid`.
+The cap is now `MaxDownloadWindowWrite` (24 h admission maximum + 5 min); SQL
+keeps the exact control pin and audit writes keep their 5 s call bounds.
+The content handler and `DownloadResponseTransfer` now report every 503/abort
+as `download content refused: content/<stage>/...` with the closed transfer
+stage (identity, preflight-audit, session, authority, describe, select,
+body, current, response, open, window, window-audit, lease, read, write, ...).
+Unit regressions reproduce the refusal; real SQL capacity-window coverage and
+a new installed run remain to be qualified. `download-worker-*` real-SQL
+subtests other than configuration/short-runtime/native-https already fail at
+`reserve worker` on fa10017c (unchanged by this change).
+
+## Hub serving observation reuse and download frame-check sharing (2026-10-23)
+
+Installed native89 passed the approved inspection end to end, then failed the
+native download at
+`serve/result/gate-after/check/hub/serving/route-read/endpoints/read/other`:
+download conversations still ran a complete check at every frame, and each
+`CheckNativeHub` re-authenticated the hub's own serving identity, re-reading
+its Kubernetes Endpoints; one read failed under load. By maintainer decision
+(relaxed cadence, like the hub's self-protection proof): the hub's own
+serving observation (`OwnerRequestPeers`, process-wide per authenticator and
+serving credentials) is reused for up to `OwnerServingReuse` (30 s), renewed
+on demand when less than one evidence-read window remains; a failed renewal
+keeps the still-current observation, failures are never stored, the current
+serving certificate must still match, and every caller still gets at most a
+five-second serving bound. Remote peers are still authenticated per request.
+Download native conversations now share frame checks for
+`NativeRecheckInterval` like projections; a written evidence data frame keeps
+its own complete post-write check, and admission, consumption,
+acknowledgement and completion checks stay complete. Tests:
+`TestOwnerServingObservationReusedRenewedAndNeverStoresFailure`,
+`TestNativeDownloadPreparationSharesFrameChecksWithinInterval` (250 ms
+complete checks: without sharing the preparation outlived its 4 s
+operation), the handler revocation test now revokes after the recheck
+interval. Real-SQL `TestSharedProjectionLifecycleWithRealServices` and
+`TestContextAdmissionWithRealServices/download-worker-installed-original-authority`
+pass. Installed qualification has not rerun.
+
+## Final close through the peer gate (2026-10-23)
+
+Installed native88 completed the approved read in the worker (all three key
+roles consumed, `used_roles=7`) and the hub closed the native SQL row
+(`context_query_batch.native_closed=true`), then refused its own final Done
+frame at `serve/close`. `HubOperation.finish` proves its exact SQL close
+against the operation's own (inner) frame gate; a hub-local worker
+conversation (and a relayed one) streams under the outer peer gate, and
+`serverStream.sendCompleted` required the proof's gate to be the stream's,
+so every such final close was refused. The synthetic native close tests
+attach the operation directly and never covered the peer conversation.
+`peerConversation.Serve` now carries the proof across: it accepts only a
+proof for its own inner operation gate and re-states it for its outer gate
+(bounded by the inner one); the stream's complete terminal-lease, lease and
+frame checks are unchanged. Close refusals now name their stage
+(`serve/close/<action|ack|worker-closed|finish>/<gate|complete|expired|
+send-done>/<proof-gate|proof-lease|proof-frame|terminal-lease>`).
+`TestHubWorkerProjectionConversationJoinsThroughPeerGate` (production worker
+admission, router, registration, both gates, handler, real TLS/h2) fails
+before at `serve/close/finish/send-done/proof-gate` and joins after.
+Installed qualification has not rerun.
+
+## Hello read deadline outlived by the projection conversation (2026-10-23)
+
+Installed native87 failed both sides within 9 ms: hub
+`serve/result/read/refused` at 19:58:21.523, worker `stopped at read`
+(object-decrypt@<100ms, no key unwrap) at 19:58:21.532. The worker's last
+native request reached the hub at 19:58:16.41; admission, the handler's
+attachment check and the command frame's check took about five seconds, and
+the hub's first result read began after 19:58:21.41. The handler had set a
+five-second read deadline at request start for the Hello and never moved it
+before Serve, so the HTTP/2 stream's body failed at that deadline; the
+worker's concurrent receive saw the closed stream and cancelled its
+object-store read before any key unwrap (key binding `used_roles=0`, op/batch
+valid to 19:58:23.05). An attached projection conversation now sets the read
+deadline to its checked lease before serving (every frame read still sets
+its own). `TestNativeApprovedProjectionResultReadOutlivesHelloDeadline` (real
+TLS/h2, 1.8 s complete checks) failed before and passes after. The worker's
+read stop now names its step (`read/approved/<operation|deadline|key-client|
+store|expectation|cutoff|commit-get|commit-parse|manifest-get|manifest-open|
+manifest-parse|data-pin|index-pin|data-open|data-read|validate|parse>`,
+`/cancelled` when its context ended) and the key service logs refused
+requests' closed stages (`key service refused: <stage>`). Installed
+qualification has not rerun.
+
+## Retention topology observation cut the read (2026-10-23)
+
+Installed native86 refused the poll at `result/until-authority/prepare/read`.
+The stored batch: authority checked 19:33:06.557865417, valid until
+19:33:07.825941307 (1.27 s); environment, batch and native operation ended
+there too, while recovery and processing ran to 19:33:26 and the request
+window to 19:33:26.484. The retention proof carried ObservedAt
+19:32:37.825941307 and ValidUntil 19:33:07.825941307: the hub's retention
+topology client (`RetentionTopologyClient`, 30 s `PolicyTopologyInterval`)
+reused its cached ConfigMap observation to its last instant, so every
+retention resolution, and the authority built on it, inherited that end.
+The topology is now re-read on demand when less than one evidence-read
+window remains (a failed early re-read keeps the still-current observation
+and its original end unless the configuration changed, was removed or is
+invalid). The projection authority carries a report-only `Bound` (not
+serialized or digested) naming the component that ended it, so the query
+report reads `until-authority/<identity|permissions|audience|catalog|expiry|
+retention|environment/<recovery|processing|policy>|window|request>`. Tests:
+the topology pin test's early re-read/fallback case and
+`TestContextProjectionAuthorityNamesItsEarliestBound`. Installed
+qualification has not rerun.
+
+## Shared frame checks for approved projection conversations (2026-10-23)
+
+Installed native85 read the evidence in the worker in under a second
+(`native read: unwrap-1..3@<100ms object-decrypt@<100ms parse@<100ms
+frames@<250ms, stopped at acknowledge`), but the hub held the command frame
+for more than three seconds and then refused at `serve/command`: the hub
+stream ran a complete current check (owner serving authentication, worker
+enrollment/certificate, operation) before and again after every frame, and
+the refusal after the command write discarded the gate's cause. A projection
+conversation's frame checks now share one successful complete check for
+`NativeRecheckInterval` (one second, the maintainer-authorized relaxed
+cadence); revocation is seen at the first frame check after it, and
+admission, consumption, acknowledgement and completion checks stay complete.
+Downloads keep a complete check at every frame (an earlier gate-wide reuse
+again broke their admission/terminal contracts and was not kept). Frame
+refusals now carry their stage and the gate's cause
+(`serve/command/gate-after/check/...`, `.../read`, `.../write`).
+`TestNativeApprovedProjectionSharesFrameChecksWithinInterval` (real TLS/h2,
+250 ms per complete check) completes with 8 complete checks in 1.5 s; without
+sharing it made 15 in 3.3 s. Installed qualification has not rerun.
+
+## Identity key snapshot cut the read; hub refusal stages (2026-10-23)
+
+Installed native84 refused the projection worker at
+`admission/gate/check/hub (denied)`. `OwnerRequestPeers.CheckNativeHub`
+mapped every serving-authentication failure, the operation's own validity and
+the placement comparison to a bare `ErrDenied`. The stored batch shows why
+the conversation was ending: the poll's projection authority was checked at
+18:27:16.058 and valid only until 18:27:17.325354278 (1.27 s), and so were
+its environment, retention proof, batch and native operation, while recovery
+(18:27:36), processing (18:27:35) and the request window (18:27:35.96) ran
+much longer. The nanosecond-precision end came from the request identity:
+the OIDC verifier used its JWKS key snapshot (`KeyMaxAge` one minute) to its
+last instant, so the identity's `KeyUntil` cut the whole poll 1.36 s after
+it started, and the worker gate's hub check ran against that ending
+operation (the gate was built 31 ms before it). The key snapshot is now
+refreshed on demand when less than one evidence-read window remains (one
+JWKS fetch at most every ~40 s; a failed early refresh keeps the
+still-current snapshot and its original end; a set without the key revokes
+it), and the identity-policy cache uses the same margin instead of five
+seconds. `CheckNativeHub` keeps `ErrDenied` but names the stage
+(`hub/serving/<authentication step>@<remaining>`, `hub/operation@...`,
+`hub/placement`). Tests: `TestKeySnapshotRefreshedBeforeItsLastRequestWindow`,
+the native placement `deadline-during-route` case
+(`serving/route-read@0`), updated identity-policy boundary tests. The exact
+authentication sub-step of native84 is not in its log; the next run prints
+it. Installed qualification has not rerun.
+
+## Projection worker attachment over the read window (2026-10-23)
+
+Installed native82 (f0fc6ec4) refused the projection worker at
+`worker native refused: admission/gate (unavailable)`; the gate's inner
+check discarded its cause, so the exact sub-check is not in that log. A
+composition test with installed-like intervals
+(`TestHubWorkerAdmissionAttachesTwentySecondProjection`: production
+HubWorkerAdmission, router, registration and both frame gates; a 20 s
+projection operation; five-second worker/serving observations) showed the
+attachment refused the 20 s operation: `NativeRegistration.attach` still
+required the attached gate's lease to end by the admission origin's
+five-second `Until`, while 81c8926b lets a projection gate span its
+operation. `attachBound` now uses the operation's `Until` for projection
+operations; per-frame worker gates also no longer end at the admission's
+stale serving observation for projection (each frame's own
+`CheckNativeHub` serving check stays). Downloads keep both five-second
+bounds. Gate refusals now carry their inner stage
+(`gate/check/<hub|worker|operation|match>/...`, Recheck
+`original-lease|pod-proof|observe|changed|expired`, projection
+`request|batch|binding|origin|operation|lease`, worker recheck
+`enrollment|certificate|binding|origin|expired`); a revoked operation at the
+worker gate reports `gate/check/worker/observe`. If installed native82's
+failure was not this mismatch, the next run's report names it. Installed
+qualification has not rerun.
+
+## Processing snapshot interval for evidence reads (2026-10-23)
+
+Installed native81 (81c8926b) refused the first get_file_excerpt within
+100 ms at `excerpt/authority/environment/processing`. The approved-query
+processing read (`ContextProjectionProcessing` -> `readProcessingSnapshot`)
+builds its snapshot from the evidence observation's `ObservedAt` until the
+earliest of the evidence (now 20 s), evidence-read recovery (now 20 s),
+retention expiry and processing root bounds, and then requires
+`ProcessingSnapshot.Allows`, which still capped the snapshot at five
+seconds; every such snapshot was refused. `Allows` now admits up to
+`identity.EvidenceReadRequestWindow`; download and capture processing
+reads still build five-second snapshots, and the snapshot still ends at its
+earliest real bound. `TestProcessingSnapshotAllowsEvidenceReadInterval`
+failed before the fix and passes after. The real-SQL fixtures passed before
+and after because they drive this read with five-second inputs; installed
+qualification has not rerun.
+
+## Evidence-read authority, worker proof and lease window (2026-10-23)
+
+Code review after the request-window change showed the approved read was
+still capped at five seconds by inner agent-authored intervals: the cached
+projection authority, its environment/recovery/processing/catalog evidence
+observations, the worker observation, the acquisition Pod proof, the native
+lease/frame gate (which shrank to each frame's 5 s observation), the hub's
+5 s native request context and 10 s connection lifetime, and the worker's
+command/frame caps. Under the maintainer's relaxed-cadence authorization,
+for approved projection reads only these now allow
+`identity.EvidenceReadRequestWindow` (20 s), still bounded by every
+underlying value (identity, 30 s permission/retention/trust rows,
+evidence expiry, request deadline, `RunUntil`, certificate `NotAfter`).
+Recovery uses a projection-only `RecoveryReader.ForEvidenceReads`; the
+recovery and processing proof validators admit up to 20 s while other
+producers keep five. A projection frame gate spans its operation: each
+frame repeats the complete SQL operation, enrollment, certificate and
+authority checks and must be current, and a failing check closes it. Key
+permits stay five seconds per unwrap. Native connections may reside 30 s.
+Download preparation/get keep their five-second download authority and
+leases (only their request window is 20 s). No SQL constraint enforced
+these bounds, so migration 00077 is unchanged.
+`TestQueryTwelveSecondReadWithinOneEvidenceRequest` and
+`TestNativeFrameGateProjectionSpansOperationAndRefusesRevokedFrame` cover a
+12 s read and next-frame revocation; the existing SQL-fence and
+other-tool five-second tests still pass. The real-SQL fixture's binding
+expiry used two `clock_timestamp()` calls and could exceed the exact 30 s
+CHECK; it now uses one statement timestamp. Installed qualification has not
+rerun.
+
+## Twenty-second evidence-read request window (2026-10-23)
+
+Installed native78-80 refused approved pod-status reads: one five-second
+request had to cover audit Begin, the projection authority, the SQL
+poll/permit/batch/claim fences, publication, waking the parked worker and the
+worker's three key unwraps and object read; in native80 the worker consumed
+one key role before the window expired at its read step, and each attempt
+spent a paid poll. Using the maintainer-authorized relaxed intervals,
+`identity.EvidenceReadRequestWindow` (20 s) now bounds `get_file_excerpt`,
+`get_query_result`, `prepare_artifact_download` and `get_artifact_download`:
+audit `RequestUntil` (domain and migration 00077's `guard_operation_audit`,
+schema 77), `ContextQueryCall`, the projection request, the native projection
+operation, the MCP request context/identity binding and the response write
+deadline. Other tools keep five seconds (the MCP handler shortens them once
+the route is known); `WriteUntil` stays 30 s. No authority, identity,
+observation, batch or lease `ValidUntil` is extended, so the request still
+ends at the earliest of them; in particular the cached projection authority
+(five seconds from its check) and the worker's five-second command lease
+still bound the read (superseded the same day, below). Hub `mcp timing` is keyed by tool for evidence reads and
+`query refused` carries `q-*` step buckets; the worker prints
+`native read: unwrap-N object-decrypt parse frames, <outcome>`.
+`TestEvidenceReadRequestWindowOutlastsOrdinaryRequests` runs a 12 s
+get_query_result successfully while get_capture is refused after 5 s.
+Go build/vet, race tests (domain/application/transport/bootstrap/postgres/
+objectstore), architecture/spec checks and the real-SQL
+`TestSharedProjectionLifecycleWithRealServices` and
+`TestEvidenceReadsWithoutWorkloadCapacityWithRealPostgres` pass. Installed
+qualification has not rerun.
+
+## Shared native operation observation (2026-10-23)
+
+Installed native79 parked the idle worker request as intended (7e72396b); the
+poll published its operation, the woken request attached, and the hub then
+refused at `serve/command` at the same instant the worker stopped waiting for
+its first frame and the poll failed at `result/prepare/projection`. No SQL
+lock waits over 300 ms were logged (`log_lock_waits` on) and the key binding
+was unused, so the command was never written. Code review shows the transport
+is not at fault (the park test, extended to receive the command over real
+TLS/h2, passes with a 0.7–2.8 s park): between the wake-up and the command
+frame the hub ran about eleven sequential complete checks — the re-admission
+locator, the operation gate's creation, attachment `before`/admission checks,
+the worker gate's creation (worker recheck plus nested operation gate), the
+handler's check and the send's pre-write check — each a fenced SQL
+transaction (~0.2 s installed, consistent with native78), and the poll's
+five-second projection authority expired first. `NativeOrigins.Recheck` now
+shares one successful operation observation, keyed by its exact inputs
+(operation reference and peer), for `NativeRecheckInterval` (one second, the
+maintainer-authorized relaxed recheck interval); the locator's observation
+seeds it. Every gate still runs its complete check against its own original
+origin, lease and deadlines; failed reads are never reused and revocation
+takes effect within the second. A gate-wide reuse was tried first and
+rejected: it broke deliberate admission/post-effect/terminal check contracts.
+The new `installed-cost` mode of
+`TestHubWorkerParkedRequestAttachesLaterPublishedOperation` (250 ms per
+observation through `Origins.Recheck` on both gates, 1.5 s left after
+publication) fails without the memo (refused before the command) and passes
+with it (at most two reads); `TestOriginsRecheckSharesObservationWithinInterval`
+pins the bound. Installed qualification has not rerun.
+
+## One projection authority per request (2026-10-23)
+
+Installed native78 expired the approved projection read at
+`result/prepare/projection`; the run note attributed it to roughly eleven
+per-frame full authority checks. Code review of the native78 source
+(dee19307) shows the hub already constructs the complete projection authority
+once per public request (`projectionRequest.CheckCurrent`, since 50467c96) and
+downloads already reuse one observation per request (`workerCurrentCheck`).
+Per-frame hub work is SQL only: each native frame passes the operation gate
+(`Origins.Recheck`, an operation lease read) and, for directly connected
+workers, the worker admission gate (enrollment read plus the same lease read).
+Those fences stay. No runtime code changed; new unit tests
+`TestQueryOneAuthorityPerRequestAcrossPrepareAndFrames` and
+`TestQuerySQLFenceRefusesNextFrameWithinOneRequest` pin one reconstruction
+across preparation, eight frames and repeated disclosure checks, and immediate
+refusal on a SQL-level revocation. Reverting the cache makes them fail (23
+reconstructions per request). The remaining read cost (three key unwraps and
+duplicated per-frame lease reads on the two gates) is unmeasured; installed
+qualification has not rerun.
+
+## Reads without workload capacity (2026-10-23)
+
+Maintainer decision (explicit): reading stored evidence (approved pod-status
+queries and native download preparation/transfer) must not depend on live
+capacity observations of the source workload. Migration 00076 (schema 76)
+removes that coupling and adds no machinery or configuration:
+`lock_context_query_capacity`, `context_query_capacity_allocation_current` and
+`read_shared_context_query_plan` check only the immutable accepted anchor,
+the workload's reserved query allocation and the original `HardUntil`;
+`require_capacity_download_snapshot` keeps the original enrollment snapshot
+without the binding check or the capacity-source `NOWAIT` lock; the
+`artifact_download` admission trigger is dropped, and operation audit outside
+the `capture` lane is no longer gated by `capacity_managed_root_until`. The
+download stale-binding retry, `demand_capacity_refresh_for_download`, its grant
+and diagnostic are deleted. Reads remain bounded by the shared two-worker
+acquisition limit, original query/download charges, per-principal audit
+allowances and all authorization, retention, recovery, processing and catalog
+checks. Capture admission is unchanged (ADR-219 and ADR-200 revisions,
+artifact-downloads specification). The new real-SQL
+`TestEvidenceReadsWithoutWorkloadCapacityWithRealPostgres` expires the
+workload binding, asserts capture refusal, then runs download preparation and
+charge plus the complete approved query flow. It and the affected real-SQL
+suites have not run yet; installed qualification has not run.
+
+## Thirty-second retention source observation (2026-10-23)
+
+Installed native74 refused `get_query_result` at `current/authority/retention`:
+retained-policy resolution (`AcceptedRetentionReader`, shared by query
+projection, downloads, catalog listing and the retention transaction guard)
+required the accepted `retention_source` observation within five seconds, and
+the hub-worker retention follower writes it late under load. Migration 00075
+(schema 75) widens the table CHECK to 30 seconds; `ObserveRetention` still
+requires the LIST and guard proof inside their original five seconds at write
+time, then stores `observed_at + 30 s` and keeps the source lease at least that
+long. The Go accepted-source/snapshot bound (`privacy.RetentionSourceInterval`),
+accepted-source matching, the reader's final bound and `RetentionProof`
+(`artifact.RetentionProofInterval`) accept 30 seconds; raw LIST snapshots, guard
+proofs and protected selector facts keep five. Data events, a changed LIST,
+suspension, takeover and recovery blocking still clear the observation at
+once; bookmarks never renew it (ADR-200 revision; notes in ADR-056 and the
+retention checkpoint/effects/observation architecture). The reader already
+reuses the pinned topology for 30 s (8f10b477) and performs no other
+per-request Kubernetes read. Unit tests cover the 30 s rule, the overlong and
+expired refusals, raw-LIST five seconds and the immediate-clear queries; two
+real-SQL tests now assert the 30 s stored lifetime instead of a 100 ms/10 s
+expiry. Real PostgreSQL (owned fixtures, sequential):
+`TestContextAdmissionWithRealServices/retention` (25 subtests) and
+`TestRetentionReceiptPredicatesWithRealPostgres` passed with empty cleanup
+failures and unchanged sources; a disposable goose up/down/up confirmed the
+30 s and restored 5 s CHECK. Installed native qualification of this change has
+not run.
+
+## Thirty-second permission stream and fleet trust (2026-10-23)
+
+With binding and root source at 30 s, `capacity_managed_root_until` still
+lapsed through the permission stream and fleet trust observations, both
+written for five seconds by hub-worker refreshes that run late under load.
+Migration 00074 (schema 74) widens the permission_stream CHECK and the four
+SQL capacity readers/locks that bound the stream interval to 30 seconds, and
+makes `observe_fleet_administration` store the positive fleet row for 30
+seconds after its own observation (ADR-200 revision; one-line notes in ADR-189,
+ADR-161 and permission-observation.md). The Go permission store writes
+`observed_at + 30 s` and keeps the lease at least that long; the Go stream
+fences and the ordinary/automation deny bounds use
+`authorization.PermissionObservationInterval` (30 s). Batch/caller receipts,
+request deadlines, audit freshness, protection proofs, incarnation checks,
+suspension and the failure fence are unchanged. Unit tests cover the Go rule
+and the migration's Up/Down text. Real PostgreSQL (owned fixtures, sequential):
+`TestCapacityProducerWithRealPostgres` (--fleet), `TestEnrollmentFleetObservationWithRealPostgres`
+(--fleet, now asserting the 30-second positive row) and
+`TestPermissionAuthorityWithRealServices` passed with clean fixture cleanup; a
+manual goose up/down/up on a disposable PostgreSQL confirmed the rewritten
+bounds and the restored five-second rule. Installed native qualification of
+this change has not run.
+
+## Thirty-second root capacity source (2026-10-23)
+
+With the binding at 30 s, admission still lapsed through the root
+`capacity_source` observation, whose five-second window depends on a separate
+hub-worker refresh that failed under load (`capacity demand refresh:
+guarded-read (unavailable)`). Migration 00073 (schema 73) makes
+`accept_capacity_source` store an accepted observation for 30 seconds after
+its own observation and widens the table CHECK to 30 seconds (ADR-200
+revision). No admission consumer bounded the stored source interval itself, so
+`capacity_managed_root_until` and the query-capacity lock accept it unchanged.
+Negative/invalidating observations, the acceptance receipt, trust,
+permission-stream, recovery and request bounds are unchanged. A unit test
+checks the migration's Up/Down rule; the real-SQL capacity matrix asserts the
+30-second source lifetime but has not run yet. Installed native qualification
+of this change has not run.
+
+## Thirty-second context storage binding (2026-10-23)
+
+Installed runs native64 and native68 refused captures, approved queries and
+downloads intermittently ("query workload capacity unavailable") because the
+hub-worker's binding refresh took 2 s or more, or failed, and the binding's
+five-second window lapsed. Migration 00072 (schema 72) stores a refreshed
+`context_storage_binding` for 30 seconds after its own observation and lets
+`capacity_managed_admission_until` accept that interval (ADR-200 revision).
+Root source, trust, permission, recovery and request bounds are unchanged. A
+unit test admits a binding observed 20 s ago and refuses one observed 31 s
+ago; the real-SQL capacity matrix asserts the refreshed 30-second lifetime.
+Installed native qualification of this change has not run.
+
+## Reused hub self-protection proof (2026-10-23)
+
+The hub's proof of its own installed guard (`OwnerWorkloadProtection.Current`)
+and installed identity (`InstalledOwnerIdentityReader.Verify`) is now one
+process-local observation reused for at most 30 seconds and renewed when less
+than five seconds remain; failures are never reused and concurrent callers
+share one proof (ADR-208/ADR-173 revisions). Duplicate in-call rechecks are
+removed. Measured in the component tests: an audited request's credential
+reads drop from 51 native calls each (102 per single-phase request) to 23
+cold and 2 warm; a hub context-start opening drops from four guard proofs
+(about 40 calls) to at most one (10 calls cold, 0 warm). The hub context-start
+and audit credential clients return to the default limiter. Installed native
+qualification of this change has not run.
+
+## Integrated qualification corrections (2026-10-23)
+
+The stable design repeat on `bc94a188` exits 0 in 13.187 seconds, with all
+3,837 non-result sources unchanged. The complete Go command then exits 2 after
+399.683 seconds. It completes the non-Kubernetes package selection and stops
+before Kubernetes groups because PostgreSQL/bootstrap/integration assertions
+fail; it is not a passing full gate. The failures expose an obsolete installed
+six-owner-pool validation formula and two tests that still assume a retired
+physical role or identical context pointers across execution phases. The
+corrections retain the fixed installed owner pool, logical read-facet checks,
+original deadlines/values and actual caller cancellation.
+
+The first shared-query real-service run omits the harness's `--fleet` flag and
+fails during missing-KMS setup (exit 1, 52.122 seconds). The corrected invocation
+reaches query admission, where PostgreSQL reports ambiguous subtraction inside
+migration 71's JSON expression (exit 1, 27.707 seconds). Parenthesizing the
+extracted profile fixes that expression; real lifecycle qualification must rerun.
+Both attempts preserve source hashes, finish cleanup and independently confirm
+their owned resources absent. These are failures, not SQL lifecycle passes.
+
+Installed preflight review also replaces the fixture's four retired bootstrap
+logins with the actual shared hub credential/pool. Approved inspection and two
+native sessions share the unchanged two-worker limit. The fixture therefore
+observes the original query worker's natural termination, then requires product
+demand cleanup to retain positive retirement before the distinct Stop case.
+It neither rewrites dates nor releases capacity itself. Focused owner/projection
+tests pass in 25.120 seconds; PostgreSQL facet and regional diagnostic race tests
+pass in 39.846 seconds, with recorded sources unchanged. The
+[integrated archive](../test/results/resumed-c62e02ac-integrated-simplification/README.md)
+retains the preceding failures and exact receipts. Full integrated Go/SQL and
+installed qualification remain next; implementation continues.
+
+## Approved inspection and independent enrollment integrated (2026-10-23)
+
+Candidate `9da475cd` combines ADR-219/221 with ADR-222 and the capture/download
+phase corrections. Approved pod-status inspection reuses the isolated acquisition
+Job, binary, enrollment and native transport. The console and MCP expose explicit
+inspection and same-query polling; the hub receives only the approved DTO.
+ReadApproved remains separate from native-download scope. The existing worker
+endpoint enrolls an exact admitted worker independently of a human preparation
+socket; current admitted parent/workload/configuration/recovery, audit and finite
+signing checks remain. No certificate alone authorizes evidence or key access.
+Four dedicated query deployment/capacity components are replaced by the actual
+shared installed resources and logical query charges. Cleanup is bounded work
+on demand; unknown physical state remains charged.
+
+The [component archive](../test/results/resumed-c62e02ac-approved-projection-component/README.md)
+records passing focused tests, complete affected evidence/native/worker race tests
+(43.204 seconds), console check/build and browser checks. The console check runs
+168 tests; the browser gate covers 19 journeys plus native restart. Actual HTTP/2
+projection tests cover joined delivery, cancellation, wrong identity and spent
+batches. A separate real SQL/S3 lifecycle qualifier compiles but has not executed.
+Its merged fixture now gives every hub facet the same compiled `hub-runtime` pool;
+A-KEY and capacity profile reading remain separate. Independent source reviews
+pass. Earlier compile/assertion failures and the deliberately interrupted overly
+broad test selection remain archived. Revised tests explicitly retain original
+observation expiry and current SQL refusal rather than expecting repeated external
+reads within one short request.
+
+Combined compilation of all packages exits 0 in 85.767 seconds. The design,
+specification and dependency commands exit 0 in 12.212 seconds. Their outer source
+check records one generated documentation change (`validation.json`, positive
+checks 1321 to 1314); all Go/SQL sources stayed unchanged. The generated report is
+retained for a stable repeat. Full current Go, scoped real SQL and the installed
+workflow remain pending. Native57 is still the latest installed result, and the
+complete specification remains the active implementation task.
+
+## Shared hub credentials integrated (2026-10-23)
+
+Candidate `072e42a3` integrates ADR-222 on top of the capture phase correction.
+The reviewed exact grant unions remove 41 credential lifecycles: 79 public logins
+become 43 and six owner logins become one. Ten openable pools retain the existing
+32 physical connections. Two resolution-audit connections remain reserved; other
+resolution reads still use the ordinary pool. Actual key/publication/deletion
+process boundaries and database state-transition checks remain. Unused installed
+browser-cleanup credentials are retired; its component still lacks runtime
+composition and this change does not implement it.
+
+The [component archive](../test/results/resumed-c62e02ac-hub-credentials/README.md)
+retains passing focused contract/bootstrap/PostgreSQL tests, integration
+compilation, Kubernetes adapter tests (595.418 seconds), and design/import checks
+(11.142 seconds). All recorded source hashes remain unchanged during their runs.
+Earlier fixture failures and the initial diagnostic interruption are preserved.
+Independent reviews verify the grant unions, pools and adapted real-SQL tests.
+The latter's aggregate-login test now reads PostgreSQL's actual limit and rejects
+a changed value instead of opening 81 connections against a 48-connection fixture;
+per-process 18+2 saturation/cancellation/reuse tests retain their actual assertions.
+No fixture server limit is raised.
+
+ADR-219/221 is still being tested in the isolated projection tree. It removes the
+old worker-owner composition required before this combined hub can start. The
+full current Go gate, real scoped SQL and complete installed journey therefore
+remain pending on the integrated source. Native57's failure is still the latest
+installed result; this component checkpoint does not complete S-02 or the active
+implementation mandate.
+
+## Capture response metadata no longer shortens startup (2026-10-23)
+
+Candidate `89bfff49` refines ADR-216: submission consumes the exact accepted
+receipt while its metadata is current, then lets the separately authorized start
+use the original caller/identity/capture/write bounds. If metadata expires during
+successful startup, one exact-key passive lookup supplies current response data.
+It cannot admit, repeat audit or start again, replace the capture, or extend dates.
+Unexpired metadata is returned without renewal. The persisted audit first-write
+cutoff remains binding.
+
+The [regression archive](../test/results/resumed-c62e02ac-capture-phase-lifetime/README.md)
+records a genuine failing baseline for request and continuation across intent/start
+work. Focused tests and the complete capture/audit race suites pass; the latter
+runs in 18.949 seconds with all 2,613 Go/module hashes unchanged. Exact operation
+replacement, identity changes, cancellation, real caller expiry and the actual
+audit publisher's original first-write cutoff retain negative coverage. An
+independent source review passes. The [combined design checks](../test/results/resumed-c62e02ac-capture-phase-design/README.md)
+exit 0 in 13.011 seconds with 3,793 source hashes unchanged.
+
+This fixes a reproduced phase-lifetime defect; it does not identify which source
+provided native57's minimum timestamp or prove the installed journey now passes.
+ADR-219/221 shared acquisition and ADR-222 credential consolidation remain in
+isolated implementation/testing. The full implementation mandate remains active.
+
+## Combined download checks and installed native57 (2026-10-23)
+
+The implementation mandate remains active. Candidate `17e0ff63` includes the
+response-owned 30-second ordinary-permission cadence, one complete authority
+construction per finite download preparation, and removal of two namespace GETs
+from candidate-only workload listing. The latter still requires exact target and
+guarded reads before effects; its [component archive](../test/results/resumed-c62e02ac-capacity-candidate-list/README.md)
+records the genuine failing baseline and passing synthetic TLS/race checks.
+
+The [combined gates](../test/results/resumed-c62e02ac-download-finite-cadence-gates/README.md)
+pass on frozen sources: specification/architecture/design/dependency checks
+(11.126 seconds) and the selected real SQL/S3 launch/response cases (67.863 seconds
+wrapper). The response case verifies current SQL suspension inside the relaxed
+ordinary-permission interval. All 2,764 harness hashes and 3,791 outer source
+hashes remain unchanged; cleanup and independent resource absence pass. The
+initial design run's generated assertion-count update and repeat are retained.
+The full current Go gate remains pending.
+
+Installed [native57](../test/results/resumed-c62e02ac-native57/README.md) exits 1
+(1,228.512 seconds Go; 1,342.424 seconds wrapper). Initial activation, interrupted
+installer resume, runtime startup, regional enrollment and capacity readiness
+pass. Demand readiness records six distinct binding observations and 33 samples
+with at least one second left during 15 seconds. Console processing setup passes.
+Capture then returns ReviewChanged and two OutcomeUnknown results, followed by
+`resolve_capture_request` failing at `audit-begin/reserve` with HTTP 503.
+
+The retained database has one intent-audited capture, no execution/publication,
+and no download session, worker, response or emitted bytes. Its persisted audit first-write
+cutoff was only 1.433310 seconds after admission; execution preparation later
+reports insufficient parent headroom. The winning earlier observation cutoff
+and initial SQL ReviewChanged predicate are not established by these logs.
+The fixture's two resolution records are spent; this is its configured allowance,
+not a fixed product limit. This run does not qualify the new download behavior.
+
+All 2,792 harness source hashes match the candidate and remain unchanged. The
+35-command retained-fixture collection and additional read-only download SQL pass.
+Exact-manifest cleanup exits 0 in 12.456 seconds; independent checks confirm all
+12 owned resources and both clusters absent, with private diagnostic configs
+removed. Native delivery, Stop, expiry, managed deletion and success-path
+foreground cleanup remain unqualified.
+
+Approved inspection through shared acquisition and independent admitted-worker
+identity enrollment (ADR-219/221) are being implemented in the isolated projection
+tree. A further same-process credential consolidation (ADR-222) is isolated too.
+Neither is part of native57. Continue the complete workflow; do not stop at this
+failed qualification or infer that component checks complete S-02.
+
+## One authority construction per finite download preparation (2026-10-23)
+
+The continuing ADR-214 simplification now shares the prepare coordinator's initial
+complete authority with the installed native runtime and final Preparing/Ready
+view. This reuses ADR-220's private short-proof handoff; it adds no public interface,
+cache, timer, durable state, credential or timeout. Standalone runtime calls and
+each new public request still authorize afresh. Original deadlines, exact scope,
+current SQL observations, final identity checks and unknown-effect refusal remain.
+
+The [composed regression](../test/results/resumed-c62e02ac-download-coordinator-observation/README.md)
+records genuine baseline failures: three full reconstructions; successful Job
+recording/observation followed by expiry in the final reconstruction under synthetic
+1.6-second authority cost. Warm Ready replay also reconstructs three times. After
+the change both paths use one construction and retain current SQL reads. Focused
+tests pass; the full evidence race suite passes (4.069 seconds Go, 8.140 seconds
+wrapper), with all 2,611 recorded Go/module sources unchanged. Final SQL refusal,
+changed groups/scopes/policy, cancellation, original expiry, unknown Job reply and
+fresh authorization on another request remain tested. The initial Ready fixture
+request-digest mismatch and corrected genuine baseline are both retained.
+
+ADR-220 is integrated: one active response reconstructs ordinary permissions at
+30 seconds while shorter identity/retention/recovery and current SQL checks remain.
+Its independent component/race evidence is in the
+[response cadence archive](../test/results/resumed-c62e02ac-response-permission-cadence/README.md).
+Combined design/real SQL checks subsequently pass as recorded above. Native57
+fails before reaching downloads; installed download qualification remains pending.
+Neither refinement is claimed to explain native56's exact refusal.
+
+## Current installed qualification and credential consolidation (2026-10-23)
+
+The active instruction remains implementation with sensible simplification. The
+current candidate is `98f7e181`. ADR-217 consolidates the three same-process API
+execution SQL credentials/pools into one, preserving the exact union of 46 grants
+and all typed read/prepare/record checks. Two credentials and pools disappear;
+no new grants, schema migration, background work or public option are added.
+The shared pool permits three connections within the unchanged global budget.
+
+The [combined gates](../test/results/resumed-c62e02ac-combined-simplification-gates/README.md)
+pass: specification/architecture/design/dependency checks (12.461 seconds),
+selected real SQL/S3 execution and download-launch cases (74.734 seconds wrapper),
+and five fresh installation-role cases (41.147 seconds wrapper). The SQL runs
+verify the compiled role union, three-connection bound, excluded-write refusals,
+permission revocation during a real lock wait and the original download authority
+through launch claim. Both fixture cleanups and independent absence checks pass;
+2,759 harness hashes per run match the candidate and remain unchanged. The full
+current Go gate remains pending.
+
+Installed [native56](../test/results/resumed-c62e02ac-native56/README.md) exits 1
+(1,248.277 seconds Go; 1,360.834 seconds wrapper). Installer interruption/resume,
+five runtime Deployments, regional enrollment/join and demand readiness progress.
+The Keycloak/MCP journey collects, verifies, audits and publishes the regional
+pod-status artifact after several unknown capture-start outcomes. Its first
+download preparation returns acknowledged unavailable after 4.496 seconds.
+
+This time the exact original worker is claimed, audited and recorded with a real
+Kubernetes Job, advancing beyond native55's unclaimed intent. It has no Pod
+binding, batch, response or emitted bytes. A worker Pod later exits after its
+30-second startup wait; that later exit does not explain the earlier prepare
+failure. The remaining refusal lies after Job recording, including Pod observation
+or the final response view. Three complete authority reconstructions still occur
+within the same original request; final-view source activity is consistent with
+that last reconstruction but does not prove the failure branch. The next composed
+regression targets that duplicate work while retaining current SQL checks and all
+original caller, authority and session bounds.
+
+All 2,787 native harness hashes match the candidate and remain unchanged.
+Retained diagnostics and their read-only SQL queries pass. Exact-manifest cleanup
+exits 0; independent read-back confirms all 12 owned resources and both clusters
+absent, and private diagnostic configurations are removed. Native delivery, Stop,
+expiry and managed deletion remain unqualified. Successful-journey foreground
+fixture cleanup was not reached. Approved pod-status projection composition and
+the response-owned 30-second ordinary-permission check cadence are being developed
+in isolated trees; neither is included in this candidate or claimed qualified.
+
+## Download preflight lifetime simplification (2026-10-23)
+
+The maintainer's continuing mandate is to implement the specification and simplify
+it when sensible. ADR-218 removes two phase-lifetime couplings in download startup:
+readiness is consumed at its check, and plan freshness is consumed through
+acknowledged session reservation. Neither consumed observation limits later work.
+Original caller, authority, recovery, retention, source and session bounds remain;
+worker reservation/launch and evidence effects retain their current SQL checks.
+No timeout, permission, request count, durable state or background task is added.
+
+The [focused real SQL/S3 reproduction](../test/results/resumed-c62e02ac-download-preparation-claim/README.md)
+passes on frozen `d47f9a3c` (actual wrapper exit 0, 43.882 seconds; selected subtest
+2.29 seconds). The actual dispatcher and compiled session/worker/audit grants
+carry one original authority through reserve, encrypted intent audit,
+acknowledgement and launch claim. The test deliberately stops at the first Job
+port after 184.8 milliseconds; it creates no Job and does not model upstream
+readiness/plan latency. All 2,754 harness hashes match the commit and remain
+unchanged; cleanup and independent absence checks pass. This does not reproduce
+native55's failure and does not establish native transfer success.
+
+The [composed preflight regression](../test/results/resumed-c62e02ac-download-preflight-freshness/README.md)
+does reproduce an availability defect. Three baseline cases cross a 200-millisecond
+readiness/configuration/plan observation during 400 milliseconds of simulated audit
+work. All acknowledge the synthetic audit then refuse with zero claims and Jobs,
+despite still-live original authority. After the change they return acknowledged
+Preparing through the actual coordinator, native runtime and dispatcher. SQL,
+configuration, audit and Job ports in this test remain synthetic.
+
+Caller, identity, authority and hard-session expiry, cancellation after audit,
+expired readiness, and expiry/cancellation during reservation still refuse.
+Focused race tests pass (exit 0, 1.041 seconds) and the complete evidence race
+suite passes (exit 0, 3.978 seconds); all 2,600 recorded Go sources remain unchanged.
+The initial setup failure is retained separately from genuine baseline failures.
+Independent review finds no blocker. The next installed run must establish whether
+this correction resolves native startup; native55's exact cause remains unproven.
+
+The next installed candidate also corrects native55's separate fixture cleanup
+failure. Final foreground deletion uses the original accepted installer identity,
+with a temporary fixture-only DELETE grant for the two exact Deployment names.
+The unchanged guard and normal controller cleanup remain active; failed fixtures
+selected for diagnostics remain intact. No production RBAC is expanded. Native
+qualification of this correction is pending.
+
+## Simplification delivery checkpoint (2026-10-23)
+
+The announced whole-design simplification is **partly implemented** on
+`codex/simplify-installed-lifecycle`; it has not been integrated into the original
+project checkout. Four concrete reductions are present in frozen `9543cff7`:
+download preparation performs three complete authority evaluations instead of ten;
+seven hub metadata SQL credentials/pools become one; two bootstrap/continuation
+Pods become one sequential runner; and a context start performs one full runner
+observation instead of three. The composed pre-preparation capability path drops
+from 48 HTTP requests to 24. These counts have component regressions; they are not
+claims about installed latency or a completed architecture rewrite.
+
+The [selected real SQL and design gates](../test/results/resumed-c62e02ac-capture-start-gates/README.md)
+pass on that commit. PostgreSQL/S3 execution cases exit 0 (14.395 seconds Go /
+50.458 seconds wrapper), including a permission change committed during a real
+lock wait, all four preparation-boundary cases and both compiled
+verifier/publisher lifecycle cases. All 2,753 harness source hashes match the
+commit and remain unchanged; cleanup and independent resource-absence checks
+pass. Specification, architecture, design and Go dependency checks exit 0 in
+13.203 seconds. The full Go gate has not yet run on this candidate.
+
+Installed [native55](../test/results/resumed-c62e02ac-native55/README.md) exits 1
+(1,247.424 seconds Go / 1,373.129 seconds wrapper).
+The unified installer, interruption/resume and regional join progress. The MCP
+journey reaches a real regional pod-status capture, verification and publication
+after two earlier unknown start outcomes. Its first native-download preparation
+then returns acknowledged unavailable after 2.459 seconds. Native file delivery,
+Stop and later lifecycle outcomes are not qualified. All 2,781 harness source
+hashes match `9543cff7` and remain unchanged; the harness removed its build scratch.
+All 35 bounded retained-diagnostic commands pass. Exact-manifest cleanup exits 0
+with no failures; independent read-back confirms all 12 owned resources and both
+clusters absent, and private diagnostic configurations are removed.
+
+The retained SQL read-back contains a Preparing download session and an audited
+generation-one worker, with no claim, acknowledged Job, worker binding, transfer
+batch, response or emitted bytes. Source review narrows the refusal to the audit
+acknowledgement's return after its durable commit, the following local bound check
+or the SQL worker claim, before Job creation/discovery. The current logs do not
+distinguish these branches. The next focused reproduction should exercise reserve,
+durable audit acknowledgement and claim through the compiled SQL role with a
+retained bounded observation before
+another installed run; no timeout, retry or discovery change follows from this
+evidence.
+
+The [original complexity review](reviews/complexity-2026-10-20/README.md) remains
+the review baseline, not an implementation checklist marked complete. Broader
+credential consolidation, owner/certificate lifecycle simplification, audit and
+cleanup consolidation, and operator restart/upgrade/rollback/restore outcomes
+remain unfinished. The next runtime investigation is the recorded download
+preparation failure; a successful component gate does not close that gap.
+
+## Structural simplification candidate (2026-10-22)
+
+The maintainer asked whether the announced design simplification had actually
+been delivered. At that point only ADR-214's bounded configuration observations
+were implemented and qualified at component level; the broader recommendations
+were still unimplemented. The work below is a new candidate, not a completed
+installed qualification.
+
+- Request-owned worker authority is evaluated once and reused within the original
+  at-most-five-second operation. Current SQL effect checks remain. The composed
+  regression measures three complete evaluations instead of ten and ten token
+  validations instead of forty, with six permission reads instead of twenty.
+- ADR-215 consolidates seven same-process metadata-reader credentials and pools
+  into one, retaining their typed interfaces and union grants. Fresh installation
+  uses one current layout; unsupported development state is rejected without
+  adoption or deletion. The implemented counts are 81 public-runtime credentials and
+  46 hub entries, with the existing 32-connection process ceiling.
+- The chart's bootstrap and continuation become one sequential five-command Pod,
+  removing the second producer/projection pass and scratch volume. Credential
+  mounts remain phase-specific. The existing runner-resume path covers the final
+  continuation container under the original identities and deadlines.
+
+These changes are isolated from the frozen `b9e63320` native52 baseline run.
+Focused regressions, selected real SQL and Helm lifecycle qualification pass;
+the full Go gate and installed qualification remain pending. The historical
+complexity review is preserved as the original review
+baseline rather than rewritten to imply these changes were already delivered.
+
+The specification, architecture, design, Go dependency and Helm rendering checks
+pass for this candidate (actual exit 0, 15.938 seconds). The first specification
+run found three fragment-only schema references unsupported by the repository's
+registry; they now use their canonical absolute schema URI. The checker was not
+changed. The request-observation regression fails against the original production
+source as expected. The candidate's first full evidence race run finds two older
+pending-response tests expecting immediate re-observation; those tests now follow
+the selected bounded-operation contract while retaining fresh-operation revocation
+and observed-shorter-deadline checks. The full evidence race suite, focused
+Kubernetes/installer/metadata tests and metadata/bootstrap contract checks pass.
+The composed cold preparation takes 66.822 milliseconds; the near-expiry case takes
+413.885 milliseconds including a synthetic 350-millisecond permission delay.
+These are component measurements with synthetic SQL and worker effects, not
+installed timings. The [qualification archive](../test/results/resumed-c62e02ac-structural-simplification/README.md)
+records exact commands, scopes, failures and unchanged-source checks. At that
+component checkpoint, PostgreSQL, Helm lifecycle and installed qualification
+were still pending; the completed external checks follow below.
+
+The [real SQL qualification](../test/results/resumed-c62e02ac-simplification-sql/README.md)
+now passes on frozen `114dd899`. All five role scenarios pass (actual exit 0,
+46.527 seconds Go / 131.646 seconds harness), including the compiled grant matrix,
+unknown claim, lost completion, held lock and recovery after lock. The full
+capacity fixture also passes (exit 0, 79.525 seconds Go / 90.857 seconds harness).
+Its new shared-reader test exercises all seven typed adapters concurrently using
+the compiled metadata login and one cold seven-connection pool; excluded
+privileges, caller/identity expiry and cancellation after a SQL lock wait pass.
+Each run retains 2,750 source hashes matching its commit, unchanged throughout;
+cleanup reports no failures and the owned containers/networks are independently
+absent. Protected Kubernetes/root and human inputs remain synthetic. The separate
+SQL-generation check passes (exit 0, 0.378 seconds; 54 files match sqlc v1.31.1).
+
+The SQL archive preserves the initial and diagnostic failures. The diagnostic
+completed all 81 role receipts in 5.376 seconds but found the fixture's single
+five-second fleet observation expired. Positive full-inventory fixture calls now
+maintain the existing independent fleet observer and join its shutdown before
+later assertions. Observation intervals and production code are unchanged;
+deliberate unknown-result, privilege, lock and recovery cases retain their
+controlled negative state.
+
+The [Helm lifecycle qualification](../test/results/resumed-c62e02ac-simplification-helm/README.md)
+passes on frozen `c6be50ca` (actual exit 0, 50.352 seconds). All 22 recorded inputs
+remain unchanged; lifecycle and legacy-guard tests pass, and no owned resources
+remain. This qualifies the chart lifecycle, not execution of the combined
+five-command installer or the installed investigation. Those runtime checks and
+the full Go gate remain pending.
+
+## Baseline installed failure and discovery follow-up (2026-10-22)
+
+The frozen `b9e63320` [native52 run](../test/results/resumed-c62e02ac-native52/README.md)
+exits 1 after 1,425.418 seconds, before the installed download. Regional workload
+readiness times out despite an acknowledged permission assignment for the exact
+target. The workload discovery cursor advances after a failed LIST of the target
+namespace, postponing it until another complete scan. This establishes a discovery
+availability defect; the upstream `claim/post` failure's cause remains unproven.
+The generic permission-scope refusal in the diagnostic log cannot be attributed to
+this target. All 2,771 harness source hashes match the baseline commit and remain
+unchanged during the test. The owned fixtures and private diagnostic configurations
+have been removed, with independent read-back recorded in the archive. This run
+does not test the isolated structural simplification candidate.
+
+The follow-up cursor regression fails against the original source in all four
+first-page/continuation and transient/persistent cases. The correction retains a
+failed page for one retry on the next ordinary turn, then advances after another
+failure so one inaccessible namespace cannot block the remainder of that cluster.
+It adds no call within a turn and changes no pacing or authority interval. The
+complete capacity race suite passes (actual exit 0, 8.136 seconds wall time), with
+unchanged package sources. Independent review finds no blockers; installed
+readiness after this correction is still unqualified.
+
+## First simplified installed run: fixture join identity (2026-10-22)
+
+Frozen `15702681` [native53](../test/results/resumed-c62e02ac-native53/README.md)
+exits 1 (932.362 seconds Go / 1,046.914 seconds harness). The fresh unified runner
+performs original activation, retirement and managed-copy closure. Its continuation
+is interrupted before the first provider apply, positively terminates, and resumes
+with a new Pod UID while retaining the original installation, root and resource
+journal. The resumed five-command Pod reaches Succeeded; hub services and the
+regional connector start. Completed post-bridge replay is not reached.
+
+The fixture then calls `installer-cluster-join` as `kubernetes-admin`, although
+the public compiler and installed guards pin only the bootstrap runner as
+installation administrator. The first regional capability ConfigMap remains
+absent. An exact server-side dry-run CREATE is denied under the old identity and
+accepted under the pinned runner, with the object still absent afterward.
+The [admission proof](../test/results/resumed-c62e02ac-native53/admission-proof/README.md)
+establishes this fixture mismatch without a persistent write or relaxed guard;
+it does not qualify later join stages. Capture, execution, publication and download
+rows are zero. Installed capture/download/Stop remain pending.
+
+All 2,778 source hashes match the candidate and remain unchanged. Exact-manifest
+cleanup exits 0 with no failures; independent read-back confirms all 12 owned
+resources and both clusters absent. Private diagnostic configurations are removed.
+The archive preserves raw logs byte-for-byte, command exits and qualification
+limits. The next run must use the existing pinned runner identity for the fixture
+join and requalify the remaining installed path.
+
+The fixture correction and minimal chart RBAC follow-up pass the
+[recorded gates](../test/results/resumed-c62e02ac-native54/native53-followup-gates/README.md)
+on `840f27fc`: specification, architecture, design and Go dependency checks exit 0
+in 13.820 seconds; race-instrumented integration compilation with no selected
+tests exits 0 in 23.560 seconds; Helm lifecycle integration exits 0 in 53.985
+seconds. All 3,773 tracked non-result source hashes remain unchanged. The Helm
+read-back finds no owned clusters or matching containers. These checks qualify
+their stated component scopes, not a completed installed investigation.
+
+## Accepted capture remains pending (2026-10-22)
+
+Frozen `840f27fc` [native54](../test/results/resumed-c62e02ac-native54/README.md)
+exits 1 (1,191.451 seconds Go / 1,292.094 seconds harness). Regional join and
+readiness now progress. One capture is accepted and its intent audit acknowledged;
+the same accepted capture remains Pending after four explicit continuations and
+successful current progress reads. SQL contains zero execution rows, one reserved
+custody record, no published artifact and no download session.
+
+The initial intent has 0.938375 seconds remaining at insertion. Subsequent start
+attempts refuse at current route, Pod resolution, execution preparation, process
+check and final preparation headroom boundaries. The timestamped logs and SQL
+identify those stages, but do not establish one shared cause or justify extending
+the original authority intervals. Acquisition, publication, download and Stop
+remain unqualified for this installed candidate.
+
+All 2,778 harness source hashes match the candidate and remain unchanged. The
+bounded retained collection exits 0 with no failures. Exact-manifest cleanup
+exits 0; independent read-back confirms all 12 owned resources and both clusters
+absent, and private diagnostic configurations are removed. Raw evidence and
+preceding gate records are archived byte-for-byte; no new tests were run during
+this housekeeping.
+
+## One observation per capture start (2026-10-22)
+
+ADR-216 removes repeated complete authority observations within one context start.
+The bootstrap passes its original caller, accepted work, capability and recovery
+to the runner through a local service call. The runner resolves target, eligibility,
+retention and process once, then checks the completed observation and cancellation
+locally after wrapping and readiness. Every original cutoff remains binding; SQL
+still checks current permission, retention, recovery and storage at each effect.
+Acquisition still checks the exact pinned Pod. No credential, endpoint, background
+task, durable state or timeout increase is added.
+
+Both baseline regressions fail on the original runtime. The complete runner
+repeats target/eligibility/capability/retention three times each. The composed
+bootstrap-to-first-preparation path repeats the accepted-work read and performs
+48 capability HTTP requests (36 observer, 12 probe). The changed path uses one
+runner observation, one accepted-work read and 24 capability requests (18 observer,
+six probe). This uses the actual runner, router, evaluator and TLS capability
+adapter with synthetic SQL, identity, retention and regional replies. It measures
+duplicate work; it is not installed latency or proof of native54's complete cause.
+
+Focused execution/bootstrap race tests pass (actual exit 0, 31.815 seconds wall
+time; package times 1.215 and 1.162 seconds). All six recorded Go sources are
+unchanged during the run. Original-bound expiry/cancellation, changed handoff
+identity/scope, SQL refusal and returned-process conflict pass. The initial
+composed fixture setup failure is retained separately from the genuine baseline
+failures. The complete affected race suites also pass: execution 1.259 seconds,
+bootstrap 32.260 seconds, context-start 2.784 seconds and mTLS 35.042 seconds,
+with all six recorded sources unchanged. Independent review finds no remaining
+blockers. The [component archive](../test/results/resumed-c62e02ac-capture-start-observation/README.md)
+retains exact commands, original failures and qualification limits. Real SQL
+lock-wait revocation and the installed journey are still pending at this checkpoint.
+
+## Qualification read-back (2026-10-22)
+
+Frozen candidate `768316a3` passes the full `make go-check` gate: actual exit 0,
+2,924.562 seconds, with all 3,765 tracked source hashes unchanged. Specification,
+architecture, design and Go dependency checks also pass. The
+[complete qualification archive](../test/results/resumed-c62e02ac-download-observation-gates/README.md)
+retains the exact commands, logs and hashes.
+
+`make permission-integration` passes against real Kubernetes, PostgreSQL and S3
+(actual exit 0, 174.040 seconds). The identity-settings fixture now demonstrates
+reuse without restamping, then removal and same-name replacement detection after
+the original real observation expiries. Its parent admission test passes in
+71.20 seconds; local start and retention cases also pass. Synthetic KMS/setup
+authority remains explicit. All 2,905 native source hashes match the candidate;
+cleanup reports no failures, and independent inspection confirms the owned node
+and both service containers are absent. The installed download journey is next.
+
+## Applying the complexity review (2026-10-20)
+
+The maintainer approved the [whole-design review](reviews/complexity-2026-10-20/README.md)
+and its execution order. [ADR-214](decisions/214-bounded-download-policy-observation.md)
+first removes repeated protected-policy reads from download preparation. The
+installed download environment now reuses a successful observation for 60 seconds
+from its original read start. Administrative reads remain five-second observations;
+complete identity/authorization, SQL permission, retention, recovery, processing
+and spend decisions are not cached. The interval does not renew caller, session
+or evidence deadlines.
+
+The [narrow cache/domain/environment race selection](../test/results/resumed-c62e02ac-download-policy-observation/README.md)
+passes after a genuine failing baseline (exit 1, then exit 0; authorization 1.035
+seconds and privacy 1.008 seconds). Independent review found no blockers. The
+[composed first-Job regression](../test/results/resumed-c62e02ac-download-composed-budget/README.md)
+now passes in 6.884 milliseconds with
+one protected policy read (14 observer and three probe requests) across ten
+authority evaluations. Its other ports remain synthetic. This removes the
+previous 280-observer-request lower bound without raising QPS or the five-second
+operation deadline.
+
+A stronger regression then composes the actual identity service, bearer request,
+identity-settings reader and download authorizer. It fails in 4.958 seconds after
+119 identity API requests on that reader's separate 20-QPS/burst-20 client. The
+worker Job is created and observed Pending, but final identity validation exhausts
+the original request interval. Claims/signatures and SQL/catalog/retention remain
+synthetic. The combined command exits 1 with unchanged source hashes. The next
+correction reuses identity settings within their already existing 30-second
+observation; token/session and eligibility checks still run at every resolution.
+The final focused race selection passes (exit 0, package 3.060 seconds): the
+cold composed preparation reaches acknowledged Job Pending in 74.363 milliseconds
+with three identity API requests. It retains all 40 token checks, 20 permission
+reads, ten catalog reads and ten retention resolutions. Its near-expiry variant
+passes in 424.186 milliseconds, including a deliberate 350-millisecond permission
+read and one initial policy prime plus refresh. The corresponding failing case
+had inherited only 247.6 milliseconds despite a 4.99-second caller budget. All
+eight relevant source hashes remain unchanged. Independent review finds no
+blockers in either final cache change.
+
+The [download observation headroom regression](../test/results/resumed-c62e02ac-download-policy-observation/headroom/README.md)
+also reproduces an availability edge: a new request using a 59.9-second-old
+observation inherited roughly 100 milliseconds, so a 150-millisecond processing
+read failed despite its original five-second request budget (exit 1, package
+0.142 seconds). The reader now refreshes on demand when less than five seconds
+remain. Its focused race selection passes (exit 0; authorization 1.228 seconds,
+privacy 1.008 seconds), including preservation of an original 40-millisecond
+caller deadline. All five relevant source hashes stay unchanged. Successful
+refresh creates a new source observation; a cache hit never renews one.
+
+The [installed Stop fixture addition](../test/results/resumed-c62e02ac-installed-stop-fixture/README.md)
+uses a second nonterminal download within existing allocations, after the first
+native download succeeds. It then stops that session after accepted Deny,
+verifies exact-key receipt replay, and requires continued cancellation/content
+refusal after access returns. Focused journey race tests pass (exit 0, package
+1.150 seconds; both source hashes unchanged). This adds meaningful installed
+coverage without claiming active-stream interruption or recorded audit when its
+status is pending. The existing real-Kubernetes identity-settings fixture now
+waits for each original observation expiry before requiring group removal or
+same-name replacement to be detected. Full gates and external qualification are
+next; no new installed result is claimed here.
+
+## Resumed review and installed qualification (2026-10-20)
+
+The focused investigation now exposes a composition budget problem before any
+further installed run. The
+[actual TLS policy-reader measurement](../test/results/resumed-c62e02ac-download-policy-budget/README.md)
+counts 14 observer requests and three independent probe requests per policy read.
+Each complete download-authority evaluation reads that policy twice. After the
+adjacent duplicate correction below, the new-worker path still requires ten full
+evaluations before its first acknowledged Job-pending response: 280 observer
+requests. At the unchanged 20 QPS/burst-20 client limit, even an otherwise idle
+full bucket requires at least `(280-20)/20 = 13` seconds. The owning request lasts
+at most five seconds. This is a lower bound derived from measured reader counts
+and the composed source path, not a measured complete operation or proof of the
+exact check that failed in native50.
+
+The
+[initial-authority handoff](../test/results/resumed-c62e02ac-download-initial-authority/README.md)
+removes one immediately duplicated evaluation before attachment SQL. Only local
+validation separates the original observation from that read; later checks after
+blocking work stay current. The genuine before-fix regression exits 1; focused
+race tests and the full evidence package race suite exit 0 in 1.047 and 3.896
+seconds respectively. All 2,582 Go source hashes stay unchanged during the full
+package run, and independent review finds no blockers. The TLS reader's separate
+focused race run exits 0 in 2.858 seconds with unchanged Kubernetes sources.
+These results qualify the narrow correction and establish the reader's request
+cost. They do not resolve the complete preparation budget or justify another
+full installed run by themselves.
+
+The [complete first-Job phase reproducer](../test/results/resumed-c62e02ac-download-whole-phase-budget/README.md)
+now fails with the actual coordinator, native runtime, dispatcher, current
+environment and TLS policy reader under one original five-second request.
+Identity/catalog/retention, SQL/audit, readiness and Job ports are explicitly
+synthetic and return without delay. The command exits 1 (package 4.977 seconds);
+the operation fails after 4.951 seconds, before audit acknowledgement or Job
+creation. It enters five authority evaluations and attempts nine policy reads,
+eight completed, with 119 observer requests and 27 probe requests. All 2,583 Go
+source hashes stay unchanged. The expected acknowledged Job-pending response is
+absent, and the regression remains intentionally failing. This reproduces the
+composed request-budget defect, not the precise failed native50 check.
+
+The maintainer clarified that permission changes interrupting downloads was not
+a user requirement. Existing permission-change handling should remain, with a
+relaxed, bounded recheck interval selected using actual runtime behavior.
+Agent-added security restrictions with unproven benefits must not stall delivery
+or cause performance problems. This supersedes the earlier pending decision and
+is recorded prominently in `AGENTS.md`; the exact interval and runtime correction
+remain to be implemented and qualified.
+
+The [latest frozen installed run `context-cqjvthn6`](../test/results/resumed-c62e02ac-native50/result.json)
+on `b4fbd37d` again completes installed acquisition, verification, publication and
+authorized capture/case retrieval. The request eventually receives an acknowledged
+success for its original capture. The corrected deletion fixture also establishes
+the exact cleaner inventory denial while preserving the independent-prefix control.
+The first `prepare_artifact_download` then returns acknowledged unavailable after
+4.433 seconds. The test exits 1 after 1,226.986 seconds.
+
+The [read-only download state](../test/results/resumed-c62e02ac-native50/postmortem-download.log)
+contains one `Preparing` session, created at `19:24:29.457101Z`, with its original
+`19:29:29.374261Z` deadline and reserved output/read/session allocation. There is
+no worker, batch, response or native owner, and no emitted bytes. Failure is after
+reservation and before successful worker reservation; the public response does
+not identify the exact failed check. Its generic retry flag does not acknowledge
+pending preparation or authorize automatic continuation. Deliberate same-key
+recovery is a separate supported user action.
+
+All 2,763 source hashes match and stayed unchanged. The 33-command postmortem
+collection and extra bounded read-only queries pass. Independent read-back confirms
+the original bucket policy was restored exactly. Cleanup exits 0, all twelve owned
+Docker resources are absent, and build scratch/private control files are removed.
+Native download, revocation/expiry and failed-deletion recovery remain unqualified.
+Current work isolates the pre-worker preparation path; another installed run must
+follow a focused defect/reproduction, not a larger retry or authority interval.
+
+The [preceding frozen installed run `context-sagzb681`](../test/results/resumed-c62e02ac-native49/result.json)
+on `62bfc0bb` reaches installed acquisition, independent publication and fresh
+authorized public capture/case retrieval. Bootstrap, exact regional join replay,
+console processing initialization and capacity readiness pass; the demand lane
+supplies six distinct observations and 26 usable samples over 15 seconds.
+Test and harness still exit 1 after 1,211.891 seconds. All 2,762 source hashes
+match and stayed unchanged. Cleanup exits 0, all twelve owned Docker resources
+are independently absent, and build scratch and private postmortem kubeconfigs
+are removed.
+
+The first review is acknowledged closed before a second review admits one
+capture. Its accepted identity survives an unknown continuation reply: fresh
+`get_capture` reads recover progress without another resolution record.
+Preparation retains 1.858338 seconds, and start, acquisition and stored completion
+precede its original cutoff. Verification, audit acknowledgement and publication
+complete independently; a fresh `get_case` succeeds and returns the one artifact.
+The [operation audit](../test/results/resumed-c62e02ac-native49/postmortem-requests.log)
+records three successful capture reads and one successful case read. These
+ordinary reads do not renew acquisition or infer success from `OutcomeUnknown`.
+
+The next failure is in the deletion fixture's setup, before download or fault
+injection. Its original writer, four current/versioned objects and retained
+allocation checks pass, but strict bucket-policy equality rejects the provider's
+JSON representation. The
+[read-only policy response](../test/results/resumed-c62e02ac-native49/postmortem-bucket-policy.json)
+returns `DenyEvidenceWrite.Action` as `"s3:PutObject"`; the fixture builder emits
+the one-element array `["s3:PutObject"]`. All other policy fields match.
+The correction emits the provider's scalar form and adds strict PUT/GET
+read-back qualification; generic equality, permission scope and fault restoration
+remain unchanged. There are zero download sessions. Native download, revocation,
+expiry, failed-cleanup recovery and deletion charge release remain unqualified
+in the installed journey.
+
+The [bucket-policy regression](../test/results/resumed-c62e02ac-bucket-policy/result.json)
+uses the exact provider response retained above. It fails with the original
+builder (exit 1, 0.015 seconds), then passes the focused race selection after
+the one-action scalar correction (exit 0, 1.068 seconds). The combined in-process
+integration race suite also passes (exit 0, 6.262 seconds), covering both fixture
+corrections. All 2,582 recorded Go/module hashes stay unchanged during each
+phase. Strict scalar/array distinction, scope and uncertain restoration controls
+remain passing. Independent review found no blockers.
+
+The [exact real-provider qualification](../test/results/resumed-c62e02ac-bucket-policy-native/result.json)
+on frozen `ddfcbd0f` now passes: the selected
+`TestInstalledEvidenceDeleteCredentialWithRealServices` test takes 0.26 seconds
+(race package 1.321 seconds), and the harness exits 0. Strict policy PUT/GET
+read-back and the existing deletion credential controls pass against the pinned
+S3 provider. All 2,735 source hashes match and stay unchanged; both owned
+containers and their network are independently absent after cleanup.
+The complete installed journey still needs a passing rerun.
+
+Read-only review also found that the fixture ends its terminal wait too early
+when `Succeeded` omits its independently authorized case link. The service
+intentionally permits that response when current navigation is unavailable.
+The [separate regression](../test/results/resumed-c62e02ac-case-link/README.md)
+fails on the original immediate refusal (exit 1, 0.016 seconds), then passes
+the focused race suite with the correction (exit 0, 1.063 seconds). Capture and
+case waits share one original five-minute deadline. Exact identity, cancellation,
+fresh decoding and independent case authorization remain required. Independent
+review found no blockers; source hashes stayed unchanged during the passing
+selection. Native49 did receive an authorized link, so it does not reproduce
+that separate fixture defect. Installed qualification of the correction is next.
+
+The [preceding frozen installed run `context-siix2l2z`](../test/results/resumed-c62e02ac-native48/result.json)
+on `d6dabdab` passed bootstrap, exact regional join replay, capacity readiness
+and console processing initialization. Capacity supplied six distinct
+observations and 25 usable samples over 15 seconds. The first reviewed request
+admitted one capture; two explicit continuations retained that same capture.
+Test and harness still exited 1 after 1,242.527 seconds. All 2,762 source hashes
+match the frozen commit and stayed unchanged. Owned cleanup exited 0, all
+twelve recorded Docker resources were independently confirmed absent, and
+build scratch was removed.
+
+The first continuation refused preparation at the new headroom check. Its
+outer request still had at least two seconds, but that diagnostic does not
+include the earlier retained target, eligibility, capability, retention,
+recovery or process cutoff used by preparation. The exact winning observation
+was not recorded. The second continuation became the first preparation winner
+with 1.095163 seconds remaining, committed the regional start, acquired and
+stored the artifact before its original cutoff. Its
+[execution row](../test/results/resumed-c62e02ac-native48/postmortem-execution.log)
+is `stored`, and the exact
+[CapacityReservation](../test/results/resumed-c62e02ac-native48/postmortem-regional-capacity.json)
+is `StartCommitted`. No preparation was renewed or repeated.
+
+Independent publication also completed. The
+[read-only SQL transaction](../test/results/resumed-c62e02ac-native48/postmortem-publication.log)
+records verification at `18:09:05.706456Z`, acknowledged audit at
+`18:09:05.728939Z` and catalog publication at `18:09:06.234647Z`, matching the
+installed publisher's log. Generic custody remains `stored_unpublished`;
+the separate verification/audit/catalog rows establish semantic publication.
+There were no download sessions. This is evidence of installed acquisition
+and publication, not a completed public retrieval or lifecycle test.
+
+All three outward request replies remained `OutcomeUnknown`. The last outcome
+was recorded about 3.3 ms after the execution's original cutoff, although its
+outer caller was still live. Stored completion preceded that cutoff by
+166.710 ms. The remaining current-source/peer checks and final stream exchange
+retain their own original bounds; these timestamps do not prove the exact
+last failing frame or winning cutoff. The unavailable outward reply cannot
+erase completed work or authorize its repetition.
+
+The fixture then required a third admission-resolution record, exceeding its
+unchanged two-record reservation. Both earlier resolutions had already
+acknowledged the same accepted capture. Re-resolving admission cannot determine
+execution progress. The product retains that accepted ID and offers a fresh,
+independently authorized `get_capture` read; the fixture must use that path
+before considering another explicit continuation.
+
+The [known-capture recovery regression](../test/results/resumed-c62e02ac-known-capture-recovery/verification.json)
+reproduces the third redundant resolution before correction (exit 1), then
+passes the focused race suite (1.068 seconds) and the full in-process integration
+race suite (6.250 seconds), both exit 0. The corrected fixture retains the
+first accepted identity and acknowledgement time, reads fresh same-capture
+progress after unknown replies, and permits another explicit continuation
+only from `Pending`, within the unchanged four-call bound. `Running`,
+`Finalizing` and `Succeeded` enter the existing independent terminal/publication
+checks; this recovery helper does not declare success. Failed progress reads,
+replacement identities, uncertain spent preparation and cancellation stop it.
+Independent review found no blockers. The source hashes stayed unchanged
+during the full suite. Native49 subsequently qualifies this correction through
+terminal success and an authorized case read, as recorded above. Native bytes,
+revocation, expiry and independent deletion checks remain required.
+
+The preceding [frozen installed run `context-4b2d6czv`](../test/results/resumed-c62e02ac-native47/result.json)
+on `f7d3fe14` passed bootstrap, exact regional join replay, capacity readiness
+and console processing initialization. Capacity supplied six distinct
+observations and 37 usable samples over 15 seconds. Test and harness exited 1
+after 1,263.415 seconds; all 2,758 source hashes match the frozen commit and
+stayed unchanged. Owned cleanup subsequently exited 0, independent read-back
+confirmed all twelve recorded Docker resources absent, and build scratch was
+removed.
+
+The first request's new private diagnostic identifies
+`request/facts/storage/margin`: the final authoritative storage selection had
+less than one second remaining. Its early readiness hint did not preserve
+headroom through the intervening work. The second request failed at target
+query routing. Both original reviews were resolved closed, using the unchanged
+two-record resolution reservation. [ADR-213](decisions/213-storage-readiness-at-consumption.md)
+defines a bounded consumption phase for the same owned storage wait. Its
+implementation and component checks now pass; native47 did not test it.
+
+The third request admitted one capture and acknowledged its intent. Its
+[SQL postmortem](../test/results/resumed-c62e02ac-native47/postmortem-execution.log)
+shows `intent_audited`, one reserved custody row, zero execution rows and no
+regional CapacityReservation. The original intent interval was 1.370169 seconds,
+with 1.095886 seconds remaining after acknowledgement. Execution stopped under
+an inherited deadline before preparation. The old `ReadAPIContextWork` diagnostic
+also covered subsequent current-authority checks, so it cannot identify the
+specific dependency. This run did not reach ADR-212's preparation floor.
+The next resolution exceeded the already-spent two-record reservation;
+same-capture continuation was not reached. No quota or deadline was enlarged.
+Acquisition, publication, native download, revocation and deletion remain
+unqualified in the complete installed journey.
+
+The [execution diagnostic regression](../test/results/resumed-c62e02ac-api-check-diagnostics/result.json)
+first reproduces the ambiguous check labels, then passes the full execution
+package under race detection (1.169 seconds, exit 0). Actual SQL reads retain
+`ReadAPIContextWork`; subsequent checks distinguish exact target, eligibility,
+capability, retention, compilation, recovery, process, validity and cancellation.
+Later checks keep their preparation/start boundary prefixes. Original error
+chains, ordered reads, deadlines and effect counts remain unchanged.
+Independent review found no blockers. These synthetic component cases do not
+identify the specific dependency that failed in native47.
+
+The [storage consumption regression](../test/results/resumed-c62e02ac-storage-consumption/verification.json)
+first fails against the old immediate margin refusal, then passes with the
+same owned hint transferring into consumption. It retains the one demand
+attempt, 250 ms cadence, exact storage selection and all original non-storage
+authority bounds. Tests cover independent binding timestamps, every original
+cutoff, invalid or changed storage, failed demands, joined cancellation and
+the exact one-second margin. Successful Request retains its existing final
+eligibility recheck; no extra facts refresh or admission retry is introduced.
+The full capture race suite passes in 10.066 seconds, and the integration
+package compiles with no tests selected. Independent review found no blockers.
+[Specification, architecture, design and Go vet checks](../test/results/resumed-c62e02ac-storage-consumption-gates/result.json)
+pass. Native48 above includes the correction and reaches admission; its timing
+logs do not establish whether a consumption-phase poll was required.
+
+The [scoped storage-reader SQL regression](../test/results/resumed-c62e02ac-storage-diagnostic-sql/result.json)
+on `f7d3fe14` passes with the actual compiled read-only role: original binding
+freshness is preserved, a missing exact workload emits the closed diagnostic,
+and writes remain denied. Test and harness exited 0 in 1.989 seconds; all 2,730
+source hashes match and stayed unchanged. Both owned containers and their
+network were independently confirmed absent. Synthetic authority in this
+component fixture does not qualify the installed lifecycle.
+
+The preceding [frozen installed run `context-hsp75ign`](../test/results/resumed-c62e02ac-native46/result.json)
+on `8b153eb2` includes the preparation and pool-cleanup corrections below.
+Bootstrap, exact regional join replay, capacity readiness and processing
+initialization passed. Capacity supplied six distinct observations and 30 usable
+samples over 15 seconds. The installed test and harness exited 1 after
+1,257.556 seconds; all 2,755 source hashes match the frozen commit and stayed
+unchanged.
+
+Three original capture requests, each following a fresh review, returned
+`OutcomeUnknown`. Their [retained audit outcomes](../test/results/resumed-c62e02ac-native46/postmortem-requests.log)
+are acknowledged `authority_unavailable` results. The first two resolutions
+acknowledged closure of their reviews; the third resolution exhausted the
+unchanged two-record audit reservation. These were not same-capture
+continuations. [SQL inspection](../test/results/resumed-c62e02ac-native46/postmortem-sql.log)
+found no capture, execution or custody rows, so this run did not reach
+preparation or exercise its new floor/passive replay.
+
+The [first request's timing](../test/results/resumed-c62e02ac-native46/context-storage.log)
+reaches the final storage read, then stops before processing/admission. Its
+private error stage was not reported, so storage-read failure and insufficient
+remaining storage margin cannot be distinguished. The second request failed
+earlier at target-query closing route lookup. The third request's timing was
+suppressed by the existing sampling. Successful capacity refresh samples do
+not establish the remaining interval at any later authoritative request read.
+No new deadline, quota or refresh relaxation follows from these observations.
+
+[Closed diagnostic regressions](../test/results/resumed-c62e02ac-request-route-diagnostics/result.json)
+reproduce the missing request and route labels, then pass under race detection.
+Request distinguishes storage-read failure, insufficient margin and stale
+current facts while retaining the existing preview stages and error causes.
+Optional storage-read detail accepts only fixed query/clock/observation/
+transaction labels; SQL errors remain sanitized. Route diagnostics distinguish
+the first configuration read, endpoint read, final configuration read and
+current-result/cancellation checks without changing their order or result.
+The full capture and fleet race packages pass in 3.078 and 15.961 seconds.
+The PostgreSQL adapter, Go vet, specification, architecture and SQL generation
+checks also pass. The existing scoped SQL-reader regression now requires the
+missing-target diagnostic; its subsequent real-service pass is recorded above.
+
+The fixture was retained for read-only SQL and Kubernetes inspection, then its
+owned cleanup exited 0 with no failures. Independent read-back confirmed all
+12 recorded Docker resources absent, and build scratch was removed. Acquisition,
+publication, native download, revocation and deletion remain unqualified.
+
+The preceding [frozen installed run `context-boqlf6my`](../test/results/resumed-c62e02ac-native45/result.json)
+on `a6546de8` passed bootstrap, exact regional join replay, processing
+initialization and preview. The demand lane produced six distinct observations
+and 32 usable samples in 15 seconds. [CI on this commit](https://github.com/phihos/asservat/actions/runs/39446523599)
+passed all 15 jobs, including ten Go test shards and console browser checks.
+The installed test and harness nevertheless exited 1 after 1,222.530 seconds.
+All 2,752 source hashes match the commit and stayed unchanged.
+
+The first capture reached execution preparation and `ReadyStart`. Its
+[read-only SQL postmortem](../test/results/resumed-c62e02ac-native45/postmortem-execution.log)
+shows only 433.731 ms remained between the preparation insert and its immutable
+`NotAfter`. The exact regional
+[CapacityReservation](../test/results/resumed-c62e02ac-native45/postmortem-regional-capacity.json)
+reached `Ready`, with no `StartCommitted` status; SQL remained `prepared` with
+no start, acquisition or completion timestamps. The first invocation's inherited
+cutoff was preserved. Its equality with the capture-intent deadline reflects a
+shared original bound, not proof that storage was the limiting observation.
+The capture intent and all three request audit outcomes were acknowledged.
+
+Both continuations failed at `PrepareAPIExecution/effect/expired/client`:
+the existing preparation had expired. The final `client` label comes from
+generic SQL error normalization; it does not identify a network failure.
+Rejecting this historical row before the runner can observe its no-create
+result bypasses the existing `PreparationUncertain` classification. The next
+resolution exhausted the unchanged two-record audit reservation. The separate
+correction and its qualification follow; existing preparation must never acquire a new
+deadline, key attempt or start authority.
+
+The [real PostgreSQL/S3 preparation regression](../test/results/resumed-c62e02ac-api-preparation-red/result.json)
+on `815c42db` reproduces both defects with the compiled narrow runtime grants.
+Both observation and caller deadlines started above one second; an independently
+observed capture-row lock consumed headroom, yet the old code inserted a
+preparation below that floor. A short-caller runner also reached its first
+effect port. An expired preparation failed exact passive replay and the real
+runner's uncertainty classification. All four cases failed in 5.971 seconds;
+all 2,726 source hashes match the frozen commit, cleanup reported no failures,
+and independent inspection confirmed both containers and their network absent.
+The first attempted run failed only on duplicate fixture role names; it is
+retained separately and supplies no defect evidence. Current authority inputs
+remain synthetic, and the later runner ports refuse effects. ADR-212 defines
+the new first-insert floor and the unchanged no-create replay contract.
+
+The correction checks database time immediately before a first insert and
+returns exact existing `prepared` rows without creation, including after their
+stored interval. Current authority and exact identity/scope checks still run
+before and after that result. The [local race suites](../test/results/resumed-c62e02ac-preparation-local/result.json)
+pass for PostgreSQL (2.454 seconds), execution (1.146 seconds) and the in-process
+integration package (6.488 seconds); independent review found no blockers.
+The final real-service green result is recorded below; installed qualification
+remains pending.
+
+The first [real-service correction run](../test/results/resumed-c62e02ac-api-preparation-classification/result.json)
+on `e19738c8` passed expired-row uncertainty, zero-effect headroom refusal
+and both compiled execution/publication role cases. Three assertions still
+failed because custody normalized the new
+headroom refusal to its own unavailable sentinel rather than the execution
+contract's sentinel. Test and harness exited 1 after 12.368 seconds; all 2,726
+source hashes matched and stayed unchanged, and owned teardown was verified.
+The follow-up preserves only that explicit headroom refusal across the adapter
+boundary; it does not change generic SQL error handling or the regression tests.
+The post-lock classification assertions stopped those cases before their fresh
+first-winner and exact-replay checks in that failed run.
+Review also identified cancellation during rollback as a distinct normalized
+deadline cause. A focused failing regression now requires that original cause
+and error chain to survive; only the explicitly recorded headroom/client
+combination becomes execution-unavailable. The full PostgreSQL race suite
+passes in 2.466 seconds with identical before/after source hashes.
+
+The [final real PostgreSQL/S3 run](../test/results/resumed-c62e02ac-api-preparation-green/result.json)
+on `899f6433` passes all four preparation-boundary cases, including a fresh
+first winner and unchanged replay after each post-lock refusal, and both
+compiled verifier/publisher execution and historical-publication lifecycles.
+Go and harness exits are 0 (13.645 seconds); all 2,727 source hashes match the
+commit and stayed unchanged. Cleanup reported no failures, and independent
+read-back confirmed both owned containers and their network absent. This
+qualifies the affected SQL composition with synthetic current authority; it
+does not replace the full installed journey.
+
+The installed fixture also spent a redundant resolution record after a
+successful continuation. A deterministic regression reproduced a third
+resolution exceeding its unchanged two-record reservation after the second
+continuation succeeded. It now uses the accepted receipt for that exact request
+and the successful same-capture response; immediate success still performs
+its separate resolution. Closure, replacement-ID and cancellation checks remain.
+The focused race suite passes in 1.065 seconds, and independent review found
+no blockers. This changes neither product budgets nor continuation authority.
+
+The new SQL activity diagnostic captured 30 installation-scoped rows before
+owner removal, with no lock wait in that snapshot. It cannot establish earlier
+waits or client-side pool state. The fixture was retained for read-only SQL and
+Kubernetes inspection, then owned cleanup exited 0 with no failures.
+Independent Docker read-back confirmed all 12 recorded resources absent;
+private postmortem kubeconfigs and build scratch were removed. Acquisition,
+publication, native download, revocation and deletion remain unqualified.
+
+An independent [TCP/TLS protocol regression](../test/results/resumed-c62e02ac-sql-governor/result.json)
+reproduced a separate SQL pool cleanup defect. pgx's asynchronous cancellation
+attempted another governed socket while the failed connection retained its
+sole dedicated slot. All four explicit-cancellation/deadline cases failed the
+next transaction's unchanged one-second deadline on the original code.
+The conditional `BeforeClose` correction closes only a connection already
+marked discarded by pgx, after any existing hook and before joining driver
+cleanup. Physical slot accounting, default cancellation/error behavior,
+healthy reuse and graceful closure remain unchanged. The corrected regression
+passes under race detection in 1.402 seconds, and the full PostgreSQL adapter
+race suite passes in 2.493 seconds. Independent review found no blockers.
+These are actual pgxpool tests against a synthetic PostgreSQL protocol server,
+not a native PostgreSQL or installed lifecycle qualification. Native44 has a
+plausible initiating cancellation path, but its logs cannot prove attribution;
+native45's preparation-expiry failure is separate.
+
+An independent deterministic regression reproduced admission with only 50 ms
+left on the final storage observation after the early readiness hint succeeded.
+The authoritative read now requires the existing one-second margin, refusing
+before admission when it is insufficient. It adds no read, refresh demand or
+deadline extension. The exact one-second boundary, original identity/target
+expiry and joined cancellation pass; the full capture race suite passed in
+3.038 seconds. This selection-time readiness correction is not an attribution
+of native43 or native44.
+
+The MCP diagnostic regression also reproduced an audit-begin failure being
+hidden when the final identity check found the original deadline expired.
+The existing private, closed failure is now reported before that check;
+the public response, current identity read, socket deadlines and single audit
+attempt are unchanged. Both supported protocol revisions pass the focused
+race tests, including private-error redaction; the full MCP race suite passed
+in 12.214 seconds. A separate fixture-only SQL activity snapshot now runs
+before journey Pod diagnostics and owner removal. It reads the existing
+administrator pool under the original context capped at two seconds, selects
+only this installation's runtime roles and emits at most 64 rows of state,
+wait type/event and ages. It emits no query text, credentials or provider
+errors and creates no pool or retry. Its focused race tests passed in
+1.065 seconds. Such a server snapshot cannot show client-side pool waiters
+and is supporting evidence only.
+
+Start diagnostics now distinguish the inherited caller cutoff from the
+start's own five-second cap. Native protection failures retain closed
+namespace/guard/probe phases and the original error class; the authenticator
+separates read failure, invalid proof, pool mismatch and changed digest.
+An actual TLS/HTTP2 regression composes successful attachment with refusal at
+the work-send check's closing protection read, preserving the inherited
+deadline, one connection, zero execution effects and joined cancellation.
+Its injected proof failure is component evidence, not native API performance
+qualification. The complete fleet and mTLS race suites passed in 15.962 and
+35.028 seconds; focused Kubernetes/bootstrap race checks passed in 7.775 and
+1.057 seconds. Independent review found no blockers. Specification,
+architecture, embedded contracts and `go vet ./...` gates passed, as did the
+full in-process integration race suite (6.286 seconds). Native45 above
+qualifies these sources only to its recorded failure; local limiter versus
+network failure and client-side SQL contention are not established causes.
+
+The [frozen diagnostic run `context-5ngvkl2b`](../test/results/resumed-c62e02ac-native44/result.json)
+on `ccdde1a3` passed bootstrap, regional join/replay, processing initialization
+and preview. The demand lane produced six distinct observations and 27 usable
+samples in 15 seconds. Unlike native43, capture-intent persistence completed.
+The retained fixture's [read-only SQL postmortem](../test/results/resumed-c62e02ac-native44/postmortem-sql.log)
+shows its original intent interval was 1.578494 seconds from capture insertion,
+the encrypted intent was stored after 157 ms, both audit phases were acknowledged,
+and the capture remained `intent_audited` with one reserved custody attempt and
+no execution row.
+
+The first start failed the closing local protection check during dispatch with
+less than 0.5 seconds left. That diagnostic still represents positive remaining
+time; it does not identify expiry as the underlying cause. The original
+`bound=start` label also conflates an inherited earlier request cutoff with
+the start's own five-second cap. After one acknowledged resolution, the next
+same-identity request and its resolution ended in HTTP/2 transport errors.
+Their SQL audit intents were started but never acknowledged. The visible
+resolution timing spent at least three seconds reading the provider's current
+configuration, before mounted credentials or provider access. Its single
+registry SQL pool is under investigation; the logs do not establish pool
+exhaustion or justify increasing connection limits. Acquisition, publication,
+native download, revocation and deletion remain unqualified.
+
+Test and harness exited 1 after 1,236.374 seconds. All 2,745 source hashes
+match the commit and stayed unchanged. The failed fixture was retained only
+for read-only inspection; subsequent owned cleanup exited 0 with no failures.
+Independent Docker read-back confirmed both clusters, six service containers,
+the owned volume, image and two networks absent. Build scratch was removed.
+The first postmortem query used an incorrect table name and exited 3; the
+corrected read-only query exited 0. Both outputs remain in the local full archive.
+
+The [subsequent frozen run `context-mcw3di7n`](../test/results/resumed-c62e02ac-native43/result.json)
+on `a565c2db` includes the canonical regional start CRD prerequisite and
+corrected publication grants. Bootstrap, exact regional join replay, readiness,
+processing initialization and preview passed. The regional demand lane returned
+six distinct observations and 24 usable samples in 15 seconds. The original
+capture and two acknowledged same-identity continuations returned
+`OutcomeUnknown`; the next resolution exhausted the unchanged two-record audit
+reservation. The visible continuation timing stops at capture-intent handling,
+before the start call. Its underlying failure remains under investigation;
+the unsampled first request's missing timing line is not evidence that admission
+was skipped. No acquisition, publication, download, revocation or deletion is
+qualified by this run.
+
+Test and harness exited 1 after 1,223.896 seconds. All 2,742 source hashes match
+the commit, sources stayed unchanged, cleanup reported no failures, build
+scratch was removed and owned resources were absent. [CI on this exact candidate](https://github.com/phihos/asservat/actions/runs/39433014527)
+passed all 15 jobs, including ten Go shards and browser checks. Independent
+review found no further blockers in the regional prerequisite and publication
+grant changes; this does not supersede the failed installed qualification.
+
+The subsequent diagnostic regressions reproduced lost capture-intent failure
+stages, absent submission diagnostics and discarded HTTP read status. Fixed
+private labels now distinguish persistence stages, allowlisted dependency
+results and the original phase call's live/cancelled/expired state. Actual TLS
+read tests retain exactly one GET and no PUT for 403, 404 and 503 responses.
+The partial-write regression preserves the spent claim and two finite
+reconciliation reads; it never recreates a missing object or starts acquisition.
+Focused race tests and the full audit/capture/objectstore race suites pass
+(1.172, 3.026 and 4.516 seconds). Specification, architecture, dependency,
+embedded schema/CRD and `go vet ./...` gates pass. These diagnostics do not fix
+or establish the underlying native43 failure. Native44 above includes them
+and its retained-fixture postmortem.
+
+The [frozen run `context-thfmy2s8`](../test/results/resumed-c62e02ac-native42/result.json)
+on `4110072f` progressed beyond the previous target-query failures. The preview
+and exact-Pod request queries completed in 840 ms and 1.1 seconds. The request
+reached SQL admission and capture-intent handling; two acknowledged original-key
+resolutions retained the same accepted capture identity and permitted
+continuation. The first dispatch failed its final local-route check with less
+than 0.5 seconds left on the original start bound. A later continuation failed
+`execute/PrepareStart` with at least two seconds left. The third resolution
+exhausted the unchanged two-record audit reservation. Acquisition, publication,
+native download, revocation and deletion remain unqualified.
+
+The test failed after 1,287.109 seconds; test and harness both exited 1.
+All 2,740 source hashes match the commit, sources stayed unchanged, cleanup
+reported no failures, build scratch was removed and owned resources were absent.
+The regional refresh lane produced six distinct observations and 31 usable
+samples in 15 seconds. [CI on the same source](https://github.com/phihos/asservat/actions/runs/39426520951)
+passed all checks, including all ten Go shards and console browser checks.
+
+Read-only review also found that the compiled `context-verify` and
+`context-publish` roles omit five retention-table reads required inside their
+effect transactions. Existing fixture roles grant those reads separately,
+masking this installed-role defect. The run did not reach publication.
+A regression using the exact compiled roles and the new `PrepareStart`
+failure investigation reproduced two independent defects. The
+[real SQL/S3 regression](../test/results/resumed-c62e02ac-publication-grants-red/result.json)
+on `67638285` failed both fresh compiled-role publication cases; PostgreSQL
+reported `permission denied for table retention_source` at each transaction's
+accepted-source read. Test and harness exited 1, all 2,713 source hashes
+matched, sources stayed unchanged and cleanup reported no failures.
+The grant correction adds only the five retention SELECTs to each purpose.
+PostgreSQL package race checks (2.111 seconds) and SQL generation checks
+(54 matching files) pass. The [corrected real SQL/S3 run](../test/results/resumed-c62e02ac-publication-grants-green/result.json)
+on `45e509cc` passes both independent fresh compiled-role lifecycles, including
+publication, historical replay, purpose isolation and deletion assertions.
+The test package completed in 8.673 seconds; test and harness exited 0, all
+2,714 source hashes matched, sources stayed unchanged, cleanup reported no
+failures and owned containers were absent. Authority inputs remain explicit
+synthetic fixtures; installed publication still requires native qualification.
+
+The regional fixture also omitted the operator-installed
+`CapacityReservation` CRD required by `PrepareStart`. The existing Helm
+contract assigns CRDs to the operator in every cluster. A TLS CLI regression
+confirmed that the installer previously attempted namespace creation without
+checking this API. An executor-only bounded discovery preflight and canonical
+regional fixture prerequisite are implemented. All 24 preflight race scenarios
+pass, including oversized success/error bodies, retry suppression, original
+caller bounds and unchanged connector-only behavior. Independent review found
+no remaining production blockers. Discovery provides no
+schema or execution authority, and the installer gains no CRD mutation rights.
+Native42's closed `PrepareStart` error did not expose the underlying API status;
+the prerequisite gap is established from the fixture and request path, not a
+captured native 404 response.
+
+The full bootstrap race suite (33.140 seconds), focused existing regional
+Kubernetes race checks (1.056 seconds), integration compile check, `go vet ./...`,
+specification, architecture, dependency and embedded schema/CRD gates pass.
+An earlier combined bootstrap/Kubernetes race command was explicitly cancelled
+with exit 143 before the Kubernetes tests began; it is not passing evidence.
+The repository's full Kubernetes test sharding remains the CI gate.
+
+The subsequent storage-wait regression reproduced blocked independent facts
+reads and a duplicate request wait: Request performed two readiness reads
+before its authoritative storage read. A single cancellable wait now overlaps
+the unchanged eligibility/capability/retention sequence and joins before that
+authoritative read. Barrier tests cover overlap, one request wait, original
+target expiry and joined cancellation after early fact failure. The complete
+capture package passed the race detector (3.030 seconds). This addresses
+secondary latency pressure; native41's capture requests failed earlier, in
+their target exchanges.
+
+An actual HTTP/2 regression also reproduced a completed query's retained
+socket deadline cancelling the next query with more than three seconds left
+on its independent caller and a live original standby.
+[ADR-211](decisions/211-completed-query-standby-transition.md) records the
+implemented bounded phase transition and exclusive query reservation.
+The native log alone cannot attribute every stream failure to this mechanism.
+Only a complete matched answer under all original bounds restores both hub
+socket deadlines to the original standby cutoff. Returned facts retain the
+earliest contributing proof cutoff. A busy query excludes attachment and other
+queries through joined completion; a terminal failure withdraws the standby
+before publishing its result, without releasing closing capacity.
+
+Actual HTTP/2 regressions pass for a delayed next peer check, an idle gap and
+subsequent independently leased work. Negative component tests cover original
+expiry/cancellation, malformed answers, unknown failures, peer revocation,
+attempted work, failed deadline hooks and closure races. The full context-start
+and mTLS packages passed `go test -race -count=1 -timeout=180s` (2.783 and
+34.382 seconds); independent review found no remaining blockers. Specification,
+architecture, Go dependency, embedded schema/CRD gates and `go vet ./...` pass.
+These changes still require a fresh frozen installed qualification.
+
+The [next owned run `context--pw-gu20`](../test/results/resumed-c62e02ac-native41/result.json)
+on frozen `4db57af3` used the corrected 114 ordinary/118 total SQL connection
+budget. The test failed after 1,313.476 seconds; test and harness both exited 1.
+All 2,735 recorded source hashes match the commit, sources stayed unchanged,
+cleanup reported no failures, build scratch was removed and owned resources
+were absent afterward.
+
+Bootstrap, cluster join/replay, hub restart, processing initialization and
+multiple previews passed. The regional demand lane produced six distinct
+binding observations and 22 samples with at least one second left in 15 seconds.
+Three capture requests failed their target exchanges (`receive-call/canceled`,
+`read/other` and `owner/canceled`). The first two original-key resolutions
+acknowledged closure; the third resolution was refused at `audit-begin/reserve`.
+No accepted capture, publication, download, revocation or deletion was qualified.
+The earlier multi-second audit credential SQL reads did not recur, which does
+not establish their previous cause. The subsequent stream phase/deadline
+and storage-wait fixes above have component evidence only; original authority
+cutoffs and finite audit budgets are unchanged.
+
+Final composition review reproduced two additional diagnostic defects.
+Processing refusal diagnostics detached from request cancellation and could
+perform three new dependency reads after cancellation. They now retain the
+original caller's deadline/cancellation and a five-second child cap, checking
+cancellation between reads. Diagnostic timing values also became permanent
+log-count keys: 32 timing variants emitted 32 first-occurrence lines. Stable
+event keys now remain separate from timing payloads; each logger retains at
+most 128 keys and one overflow counter, with finite text and saturating counts.
+Focused failing-before regressions and affected diagnostic race tests pass.
+These changes are separate from the frozen installed run on `4db57af3`.
+The complete bootstrap, context-start and presentation packages subsequently
+passed `go test -race -count=1 -timeout=3m` (31.562, 2.186 and 13.277 seconds).
+Specification, architecture and Go dependency gates also passed.
+
+[CI on `4db57af3`](https://github.com/phihos/asservat/actions/runs/39420452650)
+passed every check except test shard zero and the aggregate gate. The sole
+test failure was the bootstrap stop-message assertion still expecting 112
+ordinary connections after the inventory correction to 114. That assertion
+now matches the compiled budget; the focused bootstrap/contract tests pass.
+The other nine test shards, console, build and static checks passed.
+
+Ordinary [CI on `5675db4b`](https://github.com/phihos/asservat/actions/runs/39416417613)
+passes all checks, including console browser tests and all ten Go test shards.
+The first resumed CI exposed a stale pointer-equality assertion in the regional
+diagnostic fixture: errors now carry a fixed stage while preserving their cause.
+The assertion now uses `errors.Is`; the complete in-process integration package
+passes under the race detector. This is not external fixture qualification.
+
+Independent review found two composition defects. The processing route's
+context timeout did not interrupt a stalled body read, and principal accounting
+started only after that read. The handler now installs socket deadlines, owns
+the principal slot before body parsing, joins cancellation before releasing
+slots, and retains the earliest original request/session/receipt deadline
+through response flush. Real TLS regressions first reproduced the stalled
+body, duplicate principal and lost response-bound failures; the full browser
+package passes with the race detector. The diagnostic nil-handler panic also
+has a failing-then-passing regression and passing package tests.
+
+The second defect omitted each worker's browser-settings connection from the
+installed SQL inventory. The budget now derives its permission purposes from
+the same selection as the worker: 20 purposes per worker, 114 ordinary product
+connections, or 117 total with three superuser-reserved connections. The
+unchanged fixture helper adds its independent observer and derives 118 total.
+No role ceiling or individual pool limit changes. Contract/PostgreSQL race
+tests, six fixture-selection tests and specification/architecture gates pass.
+This corrects a declared maximum, not a measured connection leak.
+
+The [owned two-cluster run `context-9vds9lz9`](../test/results/resumed-c62e02ac-native40/result.json)
+failed at `534b0735`, before these review fixes, with its original
+116-connection fixture budget. The test and harness both exited 1. All 2,731
+recorded source hashes match the commit; sources stayed unchanged, build
+scratch was removed, cleanup reported no failures, and owned containers and
+clusters were absent afterward. It cannot qualify the corrected budget or
+processing transport.
+
+Bootstrap, cluster join, sustained regional capacity demand, console processing
+initialization and preview succeeded. The preview's target exchange took
+800 ms and its decoded result passed final validation. The capture request's
+target exchange then failed at `read/other` after 100 ms. Its outcome audit and
+the original-key resolution audit spent at least three seconds in
+`credentials-configuration`, and both client calls ended with transport errors.
+No accepted capture result was obtained. Capture, publication, native download,
+revocation and deletion remain unqualified. The shared configuration SQL read
+is under investigation; these timings alone do not establish its blocking
+cause, and no authority interval has been extended.
+
+The subsequent diagnostic regression reproduces lost SQL failure detail at
+both audit credential reads and provider refresh. Closed labels now preserve
+transaction-entry deadline, statement failure and rejected original-interval
+distinctions. Focused failing-before tests and full PostgreSQL/KMS package race
+tests pass. This instrumentation does not establish native40's blocking cause.
+
+The router regression also reproduced selection of a cancelled stream while
+socket cleanup remained blocked. Router selection/current checks now inspect
+the stream's cancellation directly, and a joined callback cancels its standby.
+Both standby and capture reservations stay charged until operation and socket
+cleanup join. The original retained read deadline is unchanged. Full
+context-start race tests and actual HTTP/2 context-start tests pass; independent
+review found no blocker. This is a demonstrated lifecycle defect, not proof
+that it caused native40's request failure.
+
+## Recovered installed journey, hold 38 (2026-10-20)
+
+Claude session `c62e02ac-2970-4821-8f4d-d584e5ea4d8c` stopped before
+reading hold 38 on `007f1fb5`. The [recovered result](../test/results/resumed-c62e02ac-hold38/result.json)
+records the actual test exit 1; the local shell wrapper incorrectly returned 0.
+All 2,716 recorded source hashes match that commit. The harness retained its
+owned resources; an empty cleanup-failure list does not mean those resources
+were removed. The retained database had one preview, no capture and no
+execution. The first request and four accepted-only continuation calls returned
+`OutcomeUnknown`; no capture, publication, download or deletion was qualified.
+
+The journey now resolves the original preview/key after an uncertain or changed
+request. Only acknowledged closure permits another fixture review; only an
+acknowledged accepted capture permits continuation. Unknown resolution,
+changed accepted identity and spent preparation cannot create a replacement.
+Focused journey race regressions pass, including cancellation and finite
+continuation. This corrects the client fixture, not product acquisition authority.
+
+The target-query diagnostic previously logged `ok` before checking the
+decoded answer and its original receiver/target cutoffs. It now reports the
+final validation result, distinguishing receiver expiry, regional target expiry
+and an invalid result without exposing target metadata. The actual-router
+regression passes under the race detector. Hold 38 does not establish which
+cutoff expired; that remains a hypothesis until these diagnostics run natively.
+No original deadline or authorization check has been relaxed.
+
+PR #40's latest ordinary CI failed before Go tests because `gh pr diff` refused
+more than 300 changed files. The bounded file-list lookup now runs all code
+checks for a full page or any unavailable/incomplete result, and considers both
+paths of a rename. Seven detector regressions and the complete 53-test harness
+self-test step pass locally.
+
+[PR #41](https://github.com/phihos/asservat/pull/41) merged at
+`29a24582ebd46f66e4448ce48fb1d109a9e07690` after independent local review,
+verification of its archived source hashes and successful ordinary CI.
+That lands the scoped deletion composition; the installed end-to-end journey
+and S-02 remain incomplete on PR #40.
+
+## Local holds 11–24: processing initialization and console login (2026-10-20)
+
+Hold 11 showed `processing_root.initialized_at` NULL: no installed path performs
+ADR-127's operator initialization, so every preview refused at
+`processing/read/root-invalid`. Holds 12–14 marked the root initialized by
+direct fixture SQL (experiment only, not a product path). Coverage then refused
+every preview as known insufficient coverage: the deletion date (600 s plus the
+3600 s deletion budget) lay after the processing root's end, which 60 s
+renewals keep about a minute ahead. With the journey profile's one-day
+`AdmissionSeconds` (`75a51df`), hold 14 returned four of seven previews `ok`.
+Hold 15 then ran the journey on to `request_capture`, which returned
+`OutcomeUnknown`.
+
+ADR-210 adds the installed path: the console route
+`POST /api/v1/processing/changes`, the hub SQL purpose `processing-decision`
+(ordinal 92, the component role's exact grants), the hub-api's guarded read of
+the capacity processing source with the joined clusters' derived paths, and the
+hub-worker's browser settings projection (ADR-184's open gap; no installed
+console login was possible before). Holds 17–23 each found one composition
+defect (nil paths, unmounted login, missing derived paths) or an intermittent
+install failure. Hold 24 (`adf3ce0`) logged "the processing operator
+initialized processing through the console".
+
+Hold 24's capture requests then took 3 s or more outside every marked preview
+step, one at the 5 s transport bound and one `OutcomeUnknown`. `1a09145`
+marks target resolution, admission, the intent read, the regional start's
+reads, attach, signing and run. Release changes and browser session cleanup
+remain unimplemented. Longer retention than the remaining processing root
+interval is refused by design (ADR-210 consequences).
+
+## Local holds 7–10: regional limiter, then the processing root budget (2026-10-20)
+
+Hold 7 (`bd2b244`) split the remaining time. The region's target answer spent
+1–3 s in the connector's local proof (`r-local`), and every capacity refresh
+spent 2.16–2.25 s in the claim (`c-post`, owner `observe`). The region's
+kube-apiserver answered non-watch requests in about 1 ms on average, while one
+regional capacity cycle makes about 63 calls on 20 QPS / burst 20 clients
+(≈2.15 s of limiter waits). ADR-208 now covers the regional capacity and
+lifecycle clients (`0c25531`). Hold 10 measured `r-local` under 100 ms,
+`q-answer` about 0.9 s, every target query `ok`, and capacity refreshes of
+1.9–2.3 s.
+
+Hold 10's previews then refused at `processing/read/root-invalid` and
+`processing/current`. Live SQL showed the cause: every sixty-second capacity
+root renewal spends one processing `root_transitions` (lifetime, never
+reclaimed) and one `configuration_spent`. The journey profile set
+`MaxRootTransitions: 8` and `ConfigurationTransitions: 100`, so the ninth
+renewal failed `processing_root_check3` (100 logged attempts) and the processing
+root expired about nine minutes after install; `configuration_spent` was 81.
+CI native 75 (`0c25531`, run 39336623616) refused at the same step. The journey
+profile now sizes both for about 150 renewals (512 / 4096), and the root loop
+logs its outcome per change (`capacity root:`); it was discarded before.
+
+Holds 8 and 9 stopped during install (owner exit after `provider refresh:
+audit-wrap final-proof`, and `public/roles-provision ... (changed)`) while
+another session loaded the host; both are hub-side and unrelated to the
+regional change. Each hold allows about seven previews: the installed
+per-account audit record budget then refuses `audit-begin/reserve`.
+
+## Local journey holds 4–6: claim and regional answer dominate (2026-10-19)
+
+Hold 4 produced no previews: the collector read hold 3's stale `out` file
+before the new run replaced it. After the 90-minute hold expired, the resumed
+journey's Keycloak refresh returned 400 (expected after a long pause; holds are
+ended with `stop`). Hold 5 stopped at `public/roles-projection` (unavailable,
+23 attempts), earlier seen once in `adr183-continuation-native-14`; not on the
+preview path and not yet explained.
+
+Hold 6 (`edbb701`) ran eight previews: five `NotAvailable`, two 5 s transport
+stream errors and one `audit-begin/reserve` 503. Measured, not inferred:
+
+- hub target query `q-answer` (waiting for the region's answer) 2–2.4 s of a
+  2.6–3.7 s query; `q-source`/`q-check` stay under 400 ms except one 1.04 s
+  source pull. One region check failed at its local source protection probe
+  (`source.probe-object-read` cancelled at its 960 ms bound).
+- capacity demand refresh: `o-claim` under 3 s bucket of a 2.2–3.2 s guarded
+  read; candidates/routes/locate stay under 250 ms (one locate under 2 s).
+  Refreshes with no located owner fail fast in 50–100 ms.
+
+`e0480b3`/`bd2b244` add region answer steps (`r-check` with `r-local`/`r-owner`,
+`r-resolve`, `r-write`), hub claim steps (`c-open`, `c-before`, `c-post`,
+`c-after`, `c-final`, `c-current`) and owner claim steps (pending,
+registration, native-claim, select, observe, final). Hold 7 runs on `bd2b244`.
+
+## Local journey hold 3: binding refresh is latency, not rate (2026-10-19)
+
+With the regional observation clients on the opening limiter (frozen
+`8ce7951`), eight live previews all failed on time. Demand refreshes were
+steady at 2.3 s, 2.2 s of it the guarded regional read, so that read is path
+latency rather than client throttling; each refreshed binding has about 2 s
+left. Target queries took 1 to over 3 s and the region's query check failed in
+its local process proof (`regional-query-local`). Other refusals
+(`facts/current`, `processing/read/root-invalid`, retention `topology`,
+`facts/storage`) are facts whose five-second windows lapsed during the
+preview. Hub target queries now report source, check, answer and total
+durations on every query, and the hub-worker's regional observation reports
+its candidates, routes, locate and claim stages in the demand line.
+
+## Local journey hold: live previews (2026-10-19)
+
+`ASSERVAT_JOURNEY_HOLD` (local only) now pauses the installed journey with the
+installation live and runs preview commands from a directory, so a preview
+takes seconds instead of a 22-minute run. Native 72 stopped before preview at
+the regional capacity demand check (`regional binding was not refreshed on
+demand`), with only a diagnostic change; native 73 (`b6aab94`) showed the
+capability read under 100 ms and refused at `processing/read/root-invalid`
+twice. The processing root is renewed only in its last ten seconds; one
+renewal landed at expiry, another 9 s before it.
+
+Six live previews on frozen `c8ed270` all failed on time: target queries took
+1–3 s and the region's current owner check during a query failed in about half
+of them (`exchange/regional-query-owner/unavailable|denied`, seen by the hub
+as `read/other`); the storage wait took 2–3 s because each demand refresh's
+guarded regional read takes 2.6–3.7 s (the region's own read about 0.45 s)
+and leaves the binding about 2 s of freshness. The region's check now names
+the failing half (`regional-query-local` or `regional-query-owner-auth`), and
+demand refreshes report their stage durations.
+
+## Local run 3 and native 71: preview stage timing (2026-10-19)
+
+Local run 3 (frozen `225444f`) and native 71 (`2c005fd`, preview `ErrChanged`
+mapped to retryable) failed at preview. Stage timing in local run 3: identity,
+recovery, storage wait, eligibility and storage under 100 ms; target 0.5–1 s;
+retention under 500 ms; capability 1–2 s. The capability source and catalog
+protection used the owner's shared 20/20 observer, so the public context now
+gets its own clients with the ADR-208 opening limiter. Later attempts spent 3 s
+or more in the audit credential read again; its configuration, mounted,
+verify and final steps now report their durations too. Native 71 refused at
+`processing/read`, at `router` after waiting, with a target query reaching its
+deadline (`receive-bound/deadline`), and at eligibility.
+
+## Installed native 70: retention passes; processing step lost in the ledger (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39279970394)
+on frozen `0dd887c3a77217897264b52a71a6944578a73468` (separate retention
+clients, before the preview `ReviewChanged` mapping) failed at preview without
+a retention refusal: one attempt refused at `processing/read`, one ran out of
+time at eligibility, and the third ended `ReviewChanged` from `facts/current`,
+fixed in the following commit. The processing refusal carried no step because
+the ledger transaction normalizes errors returned through it; the coverage read
+now keeps its step beside the transaction and reports `tx` for pool, BEGIN or
+COMMIT failures.
+
+[Archive verification](../test/results/installed-journey-ci-70/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Local run 2: retention source current; previews still run out of time (2026-10-19)
+
+The local run on frozen `0dd887c` (separate retention follower clients)
+sampled the hub `retention_source` row once per second through installation
+and the journey: 425 of 456 samples were current, against about half before
+and about one in seven after a hub-worker restart. No preview refused at
+retention. Previews instead ran out of their five seconds at
+`facts/eligibility/authority` (twice), and the last call was refused with 401.
+The preview's own stages (identity, recovery, target, storage wait,
+eligibility, capability, retention, storage, processing, store) now add
+bucketed durations to the `mcp timing` line. The local run is not archived as
+CI qualification evidence.
+
+## Installed native 69: a lapsed preview fact surfaced as ReviewChanged (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39277451723)
+on frozen `3b91ab707435bbbdbb1c55b5f9e1a231751ca727` (router waits for a
+standby) failed at preview. One attempt refused at
+`facts/retention/read/source-hub`, one at `target` (`read/other`), and the
+third at `facts/current`: an observation lapsed while the preview was being
+assembled. That `ErrChanged` reached MCP as the non-retryable `ReviewChanged`,
+which the journey rejects (the unexpected code in native 63 too). A preview has
+no earlier review to resolve, so preview `ErrChanged` now maps to the retryable
+`NotAvailable`; request and resolution keep `ReviewChanged`.
+
+[Archive verification](../test/results/installed-journey-ci-69/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Local reproduction: hub retention source current only about half the time (2026-10-19)
+
+A local `--keep-on-failure` run of the same suite (frozen `0480509`) sampled the
+hub `retention_source` row once per second for 40 s during installation: each
+observation was written with 2–3 s of its five seconds left and the next one
+landed 3–6 s later, so `fresh_until` had passed for roughly half the samples
+while the 30-second lease stayed live. That explains native 68's
+`facts/retention/read/source-hub`. The retention follower shared the permission
+worker's 20/20 observer and probe clients with the permission reconciler; it
+now has its own clients with the ADR-208 opening limiter. Observation content,
+cadence rules and freshness bounds are unchanged; whether this restores
+continuous freshness is for the next run to show.
+
+## Installed native 68: hub retention source not current; router waits for a standby (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39272153061)
+on frozen `0480509c864b4e5f02416166e42f6a93c5543292` failed at preview. The
+attempt that passed target and eligibility refused at
+`facts/retention/read/source-hub`: the hub's accepted retention source was not
+current when read. The others found no idle standby or a broken query stream.
+A target query that finds no idle standby now waits for the next registration
+within its original deadline, keeping 2.5 seconds for the query and the
+preview's later checks; without that room it fails at once as before. The
+harness's in-Pod build scratch now honours `TMPDIR` (CI is unchanged), so the
+suite also runs locally with `--keep-on-failure` on disk-backed scratch.
+
+[Archive verification](../test/results/installed-journey-ci-68/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 67: preview reaches processing coverage (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39265098434)
+on frozen `825466ad4753c3e819659496afded02c5bbb5a27` failed at preview. With the
+thirty-second retry after TLS refusals, openings refused at TLS fell from 32 or
+more to under 8 and at `setup-begin` from 8 or more to under 4. The first
+attempt passed target resolution, eligibility, retention and storage and was
+refused at `processing/read` with a retryable `NotAvailable` (no PostgreSQL
+error for the processing role, so an `ErrUnavailable` check rather than a
+known coverage limitation). The others found no idle standby, a broken hub
+query (`hub-query/unavailable`) or ran out of time at eligibility. Processing
+coverage reads now name their failing step. The local Go gate passed.
+
+[Archive verification](../test/results/installed-journey-ci-67/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 66: openings to unserved owners starve the live opening (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39257553144)
+on frozen `0aa44cc03c4ee5fe1455a298cb52d26709e8af7d` failed at preview: one cold
+attempt ran out of time at eligibility and three found no idle standby. Only
+two regional exchanges opened. Openings to the live owner mostly refused at
+`setup-begin` within 10 ms–2.4 s and without a setup trace, while openings to
+registered owner processes the hub no longer serves (after the test's hub
+restart) were refused at TLS 32 or more times (`unknown-name` on the hub). Each
+of those runs a full connector setup proof first, and concurrent openings share
+one coalesced proof whose failure or invalidation fails every waiter. After a
+TLS refusal the region now waits thirty seconds before trying that owner again;
+other ends keep the one-second retry, and every opening check is unchanged.
+Retention steps for a failed accepted-policy read are also named now. The local
+Go gate for this commit passed.
+
+[Archive verification](../test/results/installed-journey-ci-66/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 65: ADR-209 withdrawn; retention refuses after eligibility (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39253398865)
+on frozen `f6680d5cced3588664daced5cff2fa1b55203991` (ADR-209) failed at
+preview. One attempt passed target resolution and eligibility in under 3 s and
+refused at `facts/retention`, as in native 61; two found no idle standby.
+ADR-209 rested on a wrong limit: the cluster join reserves one standby per
+cluster by default, so the hub refused second exchanges at `standby` and the
+concurrent setups refused each other at `setup-begin` (32 or more). ADR-209 is
+withdrawn and its code reverted. Retention preview refusals now name a closed
+class (`read`, `invalid`, `conflict`, `expired`, `unavailable`, `other`). The
+local Go gate failed once in the browser test
+`TestInvestigationFinalIdentityShorteningReachesSocket`, which passed five of
+five isolated race runs on this commit and on the commit before the MCP timing
+change.
+
+[Archive verification](../test/results/installed-journey-ci-65/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 64: audits fast; previews wait for storage or find no standby (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39249314109)
+on frozen `47067a747a5182d76332f249e3dd47a02e732d2d` failed at preview, all
+attempts `NotAvailable` and retryable. Each operation audit now takes under
+250 ms, so ADR-208's audit credential change took effect. The first preview
+resolved its target and then spent the rest of its five seconds in
+`awaitStorage`: a cold storage binding needs a capacity demand refresh, which
+took about 2.5 s, before eligibility met an expired request. The other attempts
+found no idle standby (`router`). The region held one exchange per hub owner;
+over the journey window it had three standbys of at most 30 s, each reopened
+one second after ending and often after several refused attempts. ADR-209 now
+allows two exchanges per owner within the hub's existing per-cluster standby
+limit. Native 63's unexpected public code did not recur.
+
+[Archive verification](../test/results/installed-journey-ci-64/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 63: preview answers quickly with an unexpected public code (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39245953884)
+on frozen `b6d9eace5eed35c0cb7cf2aac2a1ab5f817126fd` (opening limiter for the
+audit credential reader) answered preview attempts in 3.5 s and then 410 ms.
+The third attempt returned a schema-valid public error whose code was not
+`NotAvailable`; the journey test failed on it without logging the code or
+collecting hub diagnostics. The test now names the closed public code and
+collects diagnostics before failing. The local Go gate failed once in
+`TestConfigurationWorkerDiagnosticBlockedReadKeepsOriginalDeadline`, which
+passed three of three isolated race runs and is in code this branch does not
+change.
+
+[Archive verification](../test/results/installed-journey-ci-63/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 62: audit credential reads take 1–3 s each (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39240209621)
+on frozen `3103ae9c1586343def69a337f35ed0ac1f38d92c` failed at preview with the
+same refusals. The audit step marks put the time in the installed audit
+credential observation: 1–3 s before each of the two audit object writes, while
+SQL reserve/claim/acknowledge, sealing, the PUT and verification each took under
+100 ms. That read re-verifies the owner identity, the credential Secret and the
+workload guard, about 50–70 sequential calls on clients limited to 20/20. Under
+ADR-208 its two clients now use the opening limiter; the proofs and the
+request's original five seconds are unchanged. The local Go gate for this
+commit passed.
+
+[Archive verification](../test/results/installed-journey-ci-62/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 61: operation audits take over three of the five seconds (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39234310862)
+on frozen `4db57311e13ca977c280b81456ff589e095a7dd3` failed at preview. The new
+`mcp timing` lines show the audited call's opening audit Begin at 1–2 s and its
+closing Finish at 1–3 s; a call that failed at once still totalled over 3 s.
+Calls that resolved a target took 2–3 s or more, so eligibility met an expired
+request (`facts/eligibility/authority`); one attempt reached `facts/retention`.
+Audit SQL logins are pooled (four connections per audit role over the run), so
+the time is in the audit object path. Begin and Finish now also report bucketed
+reserve/claim/object/acknowledge steps, and the installed object path
+credential observation, seal, put and verify. The local Go gate for this commit
+passed.
+
+[Archive verification](../test/results/installed-journey-ci-61/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 60: targets resolve; preview runs out of its five seconds (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39227859804)
+on frozen `0be9901ce98621162fe21a585570f6c2f785f4c4` (regional target reads)
+resolved preview targets for the first time and then refused at
+`facts/eligibility/authority`. That reason means the request context had
+expired (permission stream failures report `PermissionUnavailable`). The
+alternating attempts refused at `router` after exactly 3.34 s: the MCP
+operation's original deadline (at most five seconds, set before its audit
+Begin) covers the opening audit, an identity recheck, the preview and the
+closing audit, and an earlier interrupted preview had consumed the standby.
+Audited MCP calls now report fixed duration buckets for preparation, audit
+Begin, the call and audit Finish (`mcp timing`) to locate the time; no
+deadline changed.
+
+The single `permission_stream` denial for `permission-read` recorded in earlier
+runs is the regional journey's own negative probe
+(`installedPermissionObserver` requires `42501` for `UPDATE ... WHERE false`),
+not a product failure. After the test's deliberate hub-worker restart the
+permission reconciler logs one `start/begin (changed)` while the crashed
+process's 30-second lease is live and retries after 31 s, as designed.
+
+The full local Go gate for this commit passed; an additional isolated rerun of
+the three load-sensitive owner fixture tests failed once under a load average
+of about 23.
+
+[Archive verification](../test/results/installed-journey-ci-60/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 59: regional target resolution denied by RBAC (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39222603037)
+on frozen `91e0cd02ea37ccdaf648cf0e5ae091f40206cbc7` passed capacity projection
+and reached preview. Every target query now reached the region and got a closed
+`answer/denied`; two previews were therefore non-retryable. The region resolves
+the target through Pod → ReplicaSet → Deployment, but its installed ClusterRole
+only allowed ReplicaSet reads in its own namespace, so the API returned 403
+(ADR-179 had assumed this access existed for collection). The regional executor
+ClusterRole now grants read-only get on namespaces, Deployments, StatefulSets
+and ReplicaSets and get/list on Pods cluster-wide; a unit test failed before
+the change and passes after it. The hub's context-start clients made about
+1015 calls over the run (roughly 2–4 per second), well under the opening
+limiter. A one-time `publisher/catalog-changed` service restart was also
+logged.
+
+[Archive verification](../test/results/installed-journey-ci-59/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 58: capacity projection claimed with 3 ms left (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39219349203)
+on frozen `bb90c7d2b74a87db294b6eda73b700f5fd55cd6b` (50 QPS opening clients)
+stopped before preview, at `capacity/projection`, which took about 3.4 s in
+native 56/57. Its first attempt reached `claim-write` 155 ms in with 3 ms of
+original validity left, so it wrote a claim it could not complete. An attempted
+claim is lookup-only afterwards, so the remaining 33 attempts within the
+minute failed (last at `local-owner`). `capacity/initialize` also took 1m18s
+against about 35 s before. The hub's context-start clients had made no calls,
+so the limiter change was not involved. Capacity and permission projection
+claims now require at least one second of original validity before the claim
+write (`projectionClaimUntil`, as the worker admission floor); declining starts
+no effect and the original bounds are unchanged.
+
+Local Go gates for native 56–58 commits failed each time in one or two
+different timing-sensitive Kubernetes fixture tests while an unrelated build on
+this host held the load average near 60 on 16 cores; each failure is in code
+this branch does not change.
+
+[Archive verification](../test/results/installed-journey-ci-58/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 57: target queries fail three ways; opening clients revised to 50 QPS (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39215209940)
+on frozen `60e6d45c4bf0846ef973755e72e0537e6e7a41ee` failed before capture.
+No target query succeeded. The new steps show `read/other` (stream broken,
+start at least 2 s, end under 2 s), `receive-peer/denied` (waiting for the
+regional answer until under 0.5 s remained) and `router` (no idle standby).
+Regional exchanges ended `passive-call/deadline`. One attempt stopped earlier
+at `audit-begin/reserve`. The restarted hub refused its own protection reads
+with at least 2 seconds left after about eight openings, which matches a
+drained 100-token bucket at 20 QPS. ADR-208 now gives the four opening clients
+50 QPS/burst 100, and the hub reports their call count. The single
+`permission_stream` denial for `permission-read` recurs once per run, as in
+earlier runs; its statement is not logged and it is not yet tied to a step.
+
+[Archive verification](../test/results/installed-journey-ci-57/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+The local Go gate failed once again in Kubernetes group 13
+(`TestOwnerProjectionSplitExactGraphsAndPrivateAdmission/launch-receipt`,
+`projection.provider-observe`), the same unmodified owner-projection fixture
+family as before.
+
+## Installed native 56: openings reach exchanges, preview target queries fail (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39211173709)
+on frozen `9d074033fd6119d98fce9da4f44f16885a79b454` (ADR-208 burst-100 opening
+clients) failed before capture. Hub ingress refusals fell from about 25 to 4
+and regional standbys reached `exchange` for the first time, ending
+`unavailable`. Three of four preview calls ran to the five-second request bound
+(HTTP/2 `INTERNAL_ERROR`) and the fourth refused at `target` after 3.35 s. The
+hub restart (`phase=full-runtime reason=changed`) and `unknown-name` router
+counts were already present in native 54/55. Neither the hub target query nor
+the regional exchange reported a step, so query failures now report the
+stream's first fixed stage/reason (new `hub-query-source`, `hub-query-check`,
+`regional-query-owner`, `regional-query-write`), a closed regional `answer`
+label or `router`, with remaining-time buckets at start and end.
+
+[Archive verification](../test/results/installed-journey-ci-56/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+The local Go gate for this commit failed once in
+`TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults` (`unavailable
+after 760ms`); the test passed three of three isolated race runs and in the
+previous full gate. It is recorded as timing-sensitive under load, not fixed.
+
+## Context-start opening clients get a burst of 100 (2026-10-19)
+
+[ADR-208](decisions/208-context-opening-client-burst.md): the regional context
+and hub ingress self-authentication observer/probe clients keep 20 QPS with a
+burst of 100 instead of 20. Native 55 measured about 1.3 ms per API call while
+setup steps took 150–350 ms each, matching token waits past the burst. Checks
+and deadlines are unchanged. Not yet qualified by an installed run.
+
+## Installed native 55: opening self-authentication passes, both sides run out of time (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39206342897)
+on frozen `94798519bf9a4929c0de1f0cd32296a55a3e0ebb` (separate hub ingress API
+clients) failed before capture at the same preview point. Opening
+self-authentication refusals with time left are gone; every hub refusal is now
+closing (`final-local`, `final-source`) with under 0.5 seconds left. Connector
+setup marks show the opening source read at 540 ms, the process proof at 1.84 s
+and each later guard/settings check 150–350 ms, reaching 3.39 s; openings reach
+`headers` after 3.0–4.6 seconds. Individual API calls average about 1.3 ms, so
+the time fits the fixed 20 QPS/burst-20 client bucket (about 50 ms per call
+after the burst) rather than API latency. Changing that documented limit or the
+five-second window is a maintainer decision; neither was changed.
+
+[Archive verification](../test/results/installed-journey-ci-55/verification.json)
+matched all 2702 source hashes to the frozen commit; sources were unchanged,
+test exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Hub context-start self-authentication gets its own API clients (2026-10-19)
+
+Native54's opening self-authentication refusals with at least 2 seconds left
+fit client-go's token bucket: `x/time/rate.Wait` fails at once when the wait
+for a token would pass the context deadline, and the owner's shared 20 QPS
+observer also serves the request paths (3429 calls over the run, average call
+about 1.3 ms). The context-start ingress now builds its owner authenticator
+from separate observer/probe clients through `OwnerWorkloadProtection.WithClients`
+with the same guard plan, pins, routes and registry, as ADR-173 did for
+readiness. The `route` refusal step now distinguishes `route-read` (read
+error) from `route` (mismatch or expiry). No deadline or check changed. Not
+yet qualified by an installed run.
+
+## Installed native 54: setup completes, hub self-authentication still refuses (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39179599368)
+on frozen `b955ecb0a142b932a4cfea8097306c2db76c9587` (separate regional context
+API clients) failed before capture at the same preview point. Setup-step
+refusals no longer appear apart from one at `setup-begin`, so the separate
+clients let setup complete; openings still reach `headers` after about 3.0–3.4
+seconds. Hub refusals are unchanged in kind: opening self-authentication
+`unavailable` with at least 2 seconds left (`route`, protection reads) and
+closing self-authentication with under 0.5 seconds left. The hub's ingress
+self-authentication may share the owner's API clients with its readiness and
+observer loops, as the regional context did; that, and why `route` fails with
+time remaining, are unmeasured.
+
+[Archive verification](../test/results/installed-journey-ci-54/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 53: setup reads queue on a shared API limiter (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39177467147)
+on frozen `f42341db029fa14ea05a2992ed461f07702d9ff6` failed before capture at
+the same preview point, now with setup marks. Of the setup proof's own five
+seconds, the opening source read took 1.04–1.39 seconds and the process proof
+1.3–2.6 seconds; the owned-process check took about 10 milliseconds, the
+execution account 50–100 milliseconds and the six later checks about 1.5
+seconds together. The regional context start shared one fixed 20 QPS
+Kubernetes client with the regional source, workload guard and lifecycle
+readers, while regional capacity already uses its own client instances of the
+same identities after the same starvation (ADR-197 run 10). Context start now
+builds its own observer/probe instances and its own guard and source readers
+from the same plans: same identities, rights and fixed limits, separate
+buckets. That this removes the queueing is a hypothesis for the next run.
+
+[Archive verification](../test/results/installed-journey-ci-53/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 52: setup marks dropped by the producer re-wrap (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39175416010)
+on frozen `5295886ede94a8e4c55d5623ac87177890b01b84` failed before capture with
+the same timing shape as native51 (`setup-settings-guard` at 3.3–4.3 seconds
+with 10–70 milliseconds left). Marks were still absent: the setup producer's
+re-wrap kept only the fixed code and cutoff. It now also keeps the completed
+check marks, which the receiving diagnostic restricts again.
+
+[Archive verification](../test/results/installed-journey-ci-52/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 51: setup trace missing, first setup checks take ~3 seconds (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39173419544)
+on frozen `5d5e7bdd74b4b8ca97d690b2449d6a8c1194cda0` failed before capture at
+the same preview point. No setup marks were printed: the extraction matched an
+outer wrapper's fixed step instead of the setup proof error, now fixed with a
+regression. Openings spend about 0.7 seconds before setup, and
+`setup-settings-guard` refusals at 3.0–4.0 seconds with 20–60 milliseconds left
+place about three seconds in the first four setup checks (source open, owned
+process, process proof, execution account). Which of those dominates is not
+yet measured.
+
+[Archive verification](../test/results/installed-journey-ci-51/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 50: connector setup consumes the opening interval (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39171254007)
+on frozen `d322af7680b20de04d6edb0bc8d330ead3918375` (concurrent independent
+ingress reads) failed before capture at the same preview point. Closing hub
+refusals still had under 0.5 seconds left, so the hub-side concurrency did not
+recover enough time. Client timings place the cost before the hub: openings
+reach `headers` after 3.1–4.4 seconds of a 4.4–4.7 second bound, and setup
+steps fail at 3–4 seconds with 0–80 milliseconds left. The connector setup
+proof's per-check marks were not forwarded; the timing line now carries them
+(fixed names and durations only, outside the count key) to locate the slow
+checks. Review follow-ups now always join the closing ingress read and stop
+step reports from a deliberately abandoned opening read.
+
+[Archive verification](../test/results/installed-journey-ci-50/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 49: closing hub check runs out of time (2026-10-19)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39168966828)
+on frozen `b2d443b3328ac1c1405aa821d4739219656ac377` failed before capture at
+the same preview point. Remaining-time buckets separate two refusals. Every
+closing `final-local` refusal had under 0.5 seconds or no time left (mostly at
+`route`), so the closing hub self-authentication exhausts the original bound.
+Opening `local` refusals had at least 2 seconds left (`route`, protection and
+registration reads), so they are not time exhaustion and remain unexplained.
+The connector bound cannot grow: it follows the lent source's original
+interval, about 3 seconds of which setup already used. The ingress now runs
+the hub's opening self-authentication alongside the connector source,
+certificate and registration reads, and the closing source and hub rechecks
+together, after both opening results. Every read and check remains and every
+result still narrows the bound.
+
+[Archive verification](../test/results/installed-journey-ci-49/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. PR40/41 remain held.
+
+## Installed native 48: leaf read passes, hub self-authentication refuses (2026-10-18)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39166806580)
+on frozen `b2a5ddd40e315e40855817248134d5a99d6b458e` (native47 plus the
+native-read leaf grant) failed before capture at the same preview point. The
+`registration` refusals and the function permission errors no longer occur.
+Remaining ingress refusals are the hub's own serving-identity authentication:
+the closing `final-local` check (at least 16), and the opening check at
+`protection-before`, `route` and `protection-after`, all `unavailable`. The
+capacity standby, which uses the same pair of owner checks with less work in
+between, still completed. A remaining-time shortage after narrowing to the
+connector's lent source is a hypothesis, not established; refusals now carry a
+coarse remaining-time bucket and closing-step detail for the next run.
+
+[Archive verification](../test/results/installed-journey-ci-48/verification.json)
+matched all source hashes to the frozen commit; sources were unchanged, test
+exit was 1 and owned cleanup reported no failures. Capture and later steps were
+not reached. PR40/41 remain held.
+
+## Installed native 47: hub refusals named, native-read lacked the leaf read (2026-10-18)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39164409930)
+on frozen `173961a4c0e97b4277a3b96030c816765ef539b6` (native46 plus hub
+refusal stages) failed before capture at the same preview point. The hub now
+names its refusals: every `authenticate` refusal came from the ingress at
+either `local` (the hub's own serving-identity authentication) or
+`registration` (the connector's activated-leaf read), interleaved from the
+first attempt. PostgreSQL recorded 25 `permission denied for function
+read_connector_activated_leaf` for the owner `native-read` role, the pool the
+ingress registry uses. That role now holds EXECUTE on that one read-only
+function, with a regression requiring it for native-read only. The `local`
+refusals remain unexplained; the owner authenticator now reports its failing
+step for the next run. A separate `permission denied for table
+permission_stream` on one publisher login is not yet explained.
+
+The [retained log](../test/results/installed-journey-ci-47/context-storage.log)
+shows the passive-command and administrator-removal subcases passing; capture
+and later steps were not reached. PR40/41 remain held.
+[Archive verification](../test/results/installed-journey-ci-47/verification.json)
+matched all 2,701 source hashes to the frozen commit; sources were unchanged,
+test exit was 1 and owned cleanup reported no failures.
+
+## Installed native 46: owner authentication passes, hub refuses the opening (2026-10-18)
+
+The [continuation](https://github.com/phihos/asservat/actions/runs/39162007897)
+on frozen `12c9473695c79f638db7a9ece2958c82ad9a7680` (native45 plus the exact
+federation owner-account read grant) again failed before capture: four preview
+requests returned unavailable after 3.30–3.36 seconds at target resolution.
+The native45 `owner-first (denied)` refusals no longer occur. Regional openings
+now fail later, at `headers`: four `denied` (the hub answered with its private
+404) and four `unavailable`, alongside setup, settings-guard, dial and TLS
+failures. The hub handler and ingress refuse silently, so the refusing check is
+not identified; they now report fixed stage names to the owner log for the next
+run. This does not establish the underlying cause.
+
+The [retained log](../test/results/installed-journey-ci-46/context-storage.log)
+records the continuation subtest failing after 963.46 seconds; passive-command
+and administrator-removal subcases passed. Capture, publication, native
+download, expiry/deletion and faulted cleanup were not reached. PR40/41 remain
+held. [Archive verification](../test/results/installed-journey-ci-46/verification.json)
+matched all 2,700 source hashes to the frozen commit; sources were unchanged,
+test exit was 1 and owned cleanup reported no failures.
+
+## Installed native 45: first owner-authentication refusal (2026-10-18)
+
+The [diagnostic continuation](https://github.com/phihos/asservat/actions/runs/39157052161)
+on frozen `73316a3618a88635350c7169959936efdbc1e746` failed before capture.
+Four preview requests returned unavailable after 3.328–3.437 seconds, again at
+target resolution. The new regional opening diagnostics distinguish repeated
+`owner-first` refusals after 3.30–3.31 seconds, with 0.66–1.46 seconds remaining
+on the original bound, from separate setup, dial and TLS failures. Some setup
+and TLS attempts exhausted their bound. The first-owner stage includes the
+delegated authentication call and validation of its returned owner; it does
+not establish the underlying refusal cause. No successful owner-authentication
+conversation timing was recorded. The independent capacity channel continued
+to complete observations.
+
+The [retained log](../test/results/installed-journey-ci-45/context-storage.log)
+records a 1,281.73-second top-level failure and a 958.17-second continuation
+failure (package 1,281.826 seconds). Passive-command and administrator-removal
+subcases passed. Capture, publication, native download, expiry/deletion and
+faulted cleanup were not reached. PR40/41 remain held.
+
+[Independent archive verification](../test/results/installed-journey-ci-45/verification.json)
+matched all 2,699 source hashes to the frozen commit. Sources remained unchanged,
+test exit was 1 and owned cleanup completed with no failures. The environment
+report SHA-256 is `cd7178b984c94ec75dd92d86177085166d20eadd4f6c2be1059a34b7836ced00`.
+All fifteen ordinary CI jobs passed for that same source; they do not replace
+the failed installed acceptance test. The next task is to reproduce the
+delegated owner-authentication refusal with concrete composition before another
+full run. Original deadlines, permissions and resource ceilings remain binding.
+
+## Context opening diagnostic candidate (2026-10-18)
+
+The installed client passes the concrete setup producer directly; its capability
+is not lost through a wrapper. Native44 still does not identify the failed
+opening boundary. The candidate now reports closed discovery/setup/process,
+TLS/peer, first-owner, source, headers/Hello, native Finish, closing-owner/process
+and joined-close stages. A cold setup can report its exact fixed source/proof or
+settings/workload check. Numeric elapsed and remaining original time are separate
+from the finite event-count key. No authority read, deadline, retry, public field
+or error classification changes. Dependency text and identities are excluded.
+
+Before instrumentation, all 14 actual TLS/HTTP2 refusal-stage cases failed for
+missing diagnostic metadata. Corrected races passed 32 top-level / 78 named
+tests across mTLS, Kubernetes and bootstrap, including exact owner/process/source
+call counts, original cutoff, cancellation, joined-close timing and exponential
+suppression across different timings. Independent review found the cold proof's
+final freshness code missing from the closed list; its added source-bound and
+logger regression passed a further two top-level / six named races.
+Touched-package vet and Go architecture (58 packages / 338 edges) passed.
+Spec check passed 11,379 assertions and design architecture passed 1,306 positive
+/ 120 negative checks. These component tests use synthetic current authority; they do not
+resolve native44 or qualify a complete installed opening. The next external
+qualification remains one reviewed, frozen complete installed continuation.
+The smaller-reproducer requirements and existing fixture limits are documented
+in [ADR-207](decisions/207-context-setup-proof-bracket.md#installed-opening-diagnostics).
+
+## Installed native 44: preview still unavailable (2026-10-18)
+
+The [full continuation run](https://github.com/phihos/asservat/actions/runs/39152191972)
+on frozen `fab45036f3cda153d06ea56898d92cae535e7d72` failed. Four independent
+preview requests returned unavailable after 3.339–3.445 seconds; private
+stage diagnostics again identify target resolution. The regional context
+standby repeatedly refused opening with unavailable/denied outcomes, while
+separate regional capacity observations succeeded. This does not establish
+which context setup, owner or source boundary failed. The selected one-input
+native setup pass above did not qualify this installed graph.
+
+[The retained log](../test/results/installed-journey-ci-44/context-storage.log)
+records the top-level failure after 1,346.49 seconds and the continuation failure
+after 1,023.35 seconds (package 1,346.583 seconds). Passive command and final
+administrator-removal subcases passed. Capture, publication, native download,
+expiry/deletion and faulted-cleanup continuation were not reached. PR40/41
+remain held; no complete installed user workflow is claimed.
+
+[Independent archive verification](../test/results/installed-journey-ci-44/verification.json)
+matched all 2,695 hashes to the frozen commit. Sources remained unchanged,
+test exit was 1 and owned cleanup completed without failures. The environment
+report SHA-256 is `8fe6447c666c2ad55f7ee06d4392a69587896897b79d097c57bd287508e615e5`.
+The next step is to reproduce or instrument the failing installed context-open
+boundary without changing original deadlines, permissions or retry ceilings.
+
+## Context setup native 2: selected fixture passed (2026-10-18)
+
+The [corrected owned run](../test/results/context-setup-native-2/context-storage-environment.json)
+on frozen `0099e2295d3fdd63cb2892170a6152872e2e56b8` passed the selected
+`TestConnectorAPIProcessWithRealKubernetes` and all five children: named whole
+Secret/foreign denial, original setup bracket, actual start status under both
+guards, capacity-token admission and changed-input metadata. Top-level time was
+22.11 seconds; race-enabled package time was 23.174 seconds.
+
+Cold setup took 1.804 seconds and current native close 0.699 seconds. Local
+source/read reuse issued no API requests. The independent work, opened after CRD
+readiness and the previous phase's original end, completed its native read,
+CREATE, Ready and StartCommitted in 2.572 seconds within its original five
+seconds. Changed-input refusal was checked before the opening proof expired.
+There is no wait or renewed observation within an operation. These are actual
+Kubernetes API/admission results with one startup input and synthetic connector
+source, issuer and registry facts; they do not qualify the complete installed
+source graph, owner authentication or investigation journey.
+
+[Independent archive verification](../test/results/context-setup-native-2/verification.json)
+matched all 2,695 source hashes, unchanged throughout the test. Test exit was
+zero and cleanup reported no failures. Environment report SHA-256 is
+`4fb2b6d2890ff4d7ff2448498b18be0f47deb5f1904c1d68432c0e747d07cc6e`.
+The failed first run remains below. Installed native43 still failed before
+collection; the context changes must be assembled and the full installed
+journey qualified before PR40/41 can merge.
+
+## Context setup native 1: setup passed, selected fixture failed (2026-10-18)
+
+The [owned native run](../test/results/context-setup-native-1/context-storage-environment.json)
+on frozen `b705387f600982903aec500e1cc9becc35eaf147` passed the new cold setup
+case: complete opening proof took 1.805 seconds and current closing native
+checks took 0.699 seconds. Local reads/source reuse performed no additional API
+requests, retained the original interval and refused reuse after closure. This
+fixture uses one approved input and synthetic connector source/issuer/registry
+facts; these timings do not represent the installed complete source graph or
+both remote-owner authentications.
+
+The selected top-level test failed (12.78 seconds; package 12.842 seconds).
+The following independent capacity-start case spent 2.014 seconds waiting for
+new CRD admission readiness, then reused the setup case's nearly spent cached
+observation. Ready refused a binding read with only 17 milliseconds remaining
+in that original interval. The later input-change case could not open its proof,
+so it did not qualify input-change denial. The full fixture is not a pass.
+
+[Archive verification](../test/results/context-setup-native-1/verification.json)
+matched all 2,695 source hashes; source bytes stayed unchanged and cleanup
+reported no failures. The fixture now waits for the preceding independent
+phase's recorded original end before opening a new operation, after CRD
+readiness where applicable. It does not wait, refresh or retry within a work,
+and changes no production deadline, limiter or guard. Input-change refusal must
+occur before that new operation's original expiry. The corrected selected run
+is recorded above.
+
+## Context-start private setup bracket (ADR-207, component, 2026-10-18)
+
+The concrete executor now lends one full native proof to one private opening,
+with an atomically captured generation and exact process-owned credentials. Its
+single source frame carries the actual initial closing source. After headers
+and Hello delivery, Finish checks current native workload/settings/inputs and a
+full current source; both owner authentications and a final local confirmation
+remain. Close joins owned work before Open can return. The returned exchange's
+later Check still takes the ordinary full current path.
+
+The final affected race selection passed 30 top-level / 69 named cases (mTLS
+8.543 seconds; Kubernetes 1.058 seconds), followed by mTLS/Kubernetes/integration
+vet and integration compile-only (zero selected native tests). The earlier wider
+selection passed 32 top-level / 90 named cases, including unchanged template
+validation. Go architecture passed 58 packages / 338 edges. Removing setup
+dispatch with the exact final limiter fixture reproduced both intended failures;
+the original source bytes were restored before the passing selections.
+
+Independent review found and reproduced two existing credential-confirmation
+races: an active process/leaf change during chain verification, and caller expiry
+before the cancellation timer fired. Confirmation now rechecks the exact active
+process/leaf/root and original source/registration/caller cutoffs under its lock.
+The new Finish path's shorter-caller cutoff is narrowed before final freshness
+validation; its failing-first regression also passes. Closing retains all owned
+work until it joins. Independent producer, transport and fixture reviews cleared
+the changes.
+
+The actual loopback HTTP/2 limiter model uses synthetic authority and counts 114
+observer / 24 probe requests plus two owner checks. Its measured 4.706-second
+opening at 20 QPS/burst 20 does not establish native or installed availability.
+The added native fixture checks the complete setup close and an intervening
+input metadata change; its selected passing run is recorded above. Installed
+journey qualification remains pending; no collection result is claimed. Exact failure,
+mutation, race/vet/compile logs and source hashes are retained in the session
+cache under `context-start-combined-proof/`.
+
+## Executor registration source bracket (ADR-207, 2026-10-18)
+
+The executor's explicit `ObserveConnectorProcessAt` can now pass its original
+opened source into the nested read-only registration conversation. A private
+single-conversation reader allows exactly two copied source replies, retains
+original cancellation/expiry and refuses configuration/lifecycle operations.
+Known issued leaf/process checks and actual current SQL49 registration/recovery
+checks remain; the outer native proof still closes the source independently.
+Ordinary observations, enrollment and signing do not use this handoff.
+
+The dispatch regression failed before the change. Corrected mTLS/bootstrap
+selection passed nine top-level / 19 named races, both package vets and Go
+architecture (58 packages / 338 edges). Real loopback TLS1.3/HTTP2 tests exercise
+original cutoff, source copies, finite callbacks, foreign/unknown input,
+revocation, cancellation, expiry and closed-reader refusal; source/SQL facts
+are synthetic. Spec check passed 11,368 assertions; architecture passed 1,306
+positive / 120 negative checks. Logs remain in the session cache under
+`context-start-combined-proof/registry-at-*`.
+
+Independent review requested preserving the original nonnil installed Local
+composition invariant. The added pre-I/O refusal and final registration-focused
+race selection passed two top-level / 13 named cases, followed by bootstrap vet.
+
+This earlier step removed only the nested cold-proof source reads. At that
+checkpoint the complete opening still could not fit by static call accounting.
+The setup-owned native bracket is tracked above; no installed rerun or
+collection pass is claimed.
+
+## Context-start duplicate local proof regression (2026-10-18)
+
+The installed native43 failure remains before target selection/collection:
+context-start opening is unavailable despite the distinct capacity lane being
+active. The whole opening invokes three local process proofs and two owner
+authentications within the original discovery/setup deadlines. Each local read
+previously observed the owned connector separately before invoking the concrete
+executor, whose complete proof already observes that same connector.
+
+The concrete combined reader removes that outer duplicate, requires the exact
+credentials instance, preserves the native proof and original intervals, and
+copies public CSR/profile buffers. The existing full/current proof, invalidation,
+owner authentication and source frame checks remain. No setup lease or new
+authority is introduced.
+
+An explicit 20-QPS/burst-20 limiter model with synthetic authority reproduced
+the duplicate-read failure inside a two-second caller interval. The unchanged
+production path failed; the combined path passes with the same two source reads
+already made inside the executor. The initial focused race selection passed
+14 top-level / 20 named tests across mTLS and Kubernetes, followed by both
+package vets and Go architecture (58 packages / 338 internal edges). Independent
+local review found no blocker in the narrow change. The final focused race run
+passed 15 top-level / 21 named tests, including concrete-reader credential-owner
+rejection before proof access, copied public buffers, original caller cutoff,
+cancellation and expired-proof refusal. Both vets and Go architecture passed
+again. Spec check passed 11,367 assertions; architecture passed 1,306 positive /
+120 negative checks. These are component/design results, not a native API or
+whole-opening qualification; no installed rerun has been made for this change.
+
+Next: account for and reproduce the remaining whole-opening call graph under
+the original five seconds. No QPS,
+freshness interval, admission proof or current effect check is relaxed.
+
+## Installed journey native 43: target and context-start opening refusal (2026-10-18)
+
+[Run 39143620577](https://github.com/phihos/asservat/actions/runs/39143620577)
+tested frozen source `4ba2f4818ccee9a2c7297078f816bfc34a9ef1b7`. All four
+`preview_capture` calls returned acknowledged, retryable `NotAvailable` replies
+in 3.317–3.425 seconds. The new private diagnostic identifies `target`, before
+eligibility, capability, retention, storage, processing or draft creation.
+Regional diagnostics repeatedly report `context standby refused: open
+(unavailable)`. Five capacity binding observations and four samples with at least
+one second remaining in fifteen seconds establish only the independent capacity
+lane; they do not establish an available context-start standby.
+
+The initial execution-process proof also reached its original five-second
+`source-close` bound after 102 observer and 30 probe calls, then subsequently
+reported context-start active. Other source reads exhausted short original
+observation tails. The complete opening path nests local native proof checks
+before and after route/TLS work; these logs motivate a focused whole-open budget
+regression but do not identify the exact failed open substage or establish a
+semantic identity mutation. No SQL permission error is assigned as the cause.
+Collection, publication, transfer, revocation, expiry and deletion were not reached.
+
+The parent test failed after 1,318.12 seconds; the continuation failed after
+994.37 seconds. Terminal exit is 1. All 2,688 recorded source hashes independently
+match the frozen commit archive, tested sources were unchanged and cleanup
+failures are empty. The [environment report](../test/results/installed-journey-ci-43/context-storage-environment.json)
+has SHA-256 `b4cf399bdc683996049b76d1afa01c547254a789d10427a1ab563110c80f9121`;
+the adjacent [archive verification](../test/results/installed-journey-ci-43/verification.json)
+and original run, PostgreSQL and kubelet logs retain the failure. The next task
+is the focused context-start opening investigation under unchanged original
+five-second bounds and 20-QPS clients. There is no automatic full rerun or S-02
+acceptance from this diagnostic result.
+
+## Installed preview private diagnostics (2026-10-18)
+
+Native42's schema-valid `NotAvailable` replies establish that those error
+envelopes passed the public audit and final delivery boundary; they do not
+identify which preview dependency refused. The installed C09 service now reports
+one fixed private failure stage, preserving `errors.Is`, public response bytes,
+audit classification and original deadlines. No provider/SQL error text, target
+identity, credential or arbitrary nested diagnostic enters the log. The regional
+context-start supervisor separately reports candidate/open/exchange failures
+through the existing exponentially suppressed logger. Its channel is independent
+of the capacity standby already observed by the fixture.
+
+The fixture retains the original request ID, elapsed time and public retryable
+flag on a refused preview, plus bounded regional process logs on journey failure.
+Those observations change neither attempts nor current checks. Inspection found
+no owner permission-read reconnection during the native42 preview interval;
+refusal before that read is an inference, not a confirmed cause or a product fix.
+
+The focused capture/presentation/bootstrap race selection passes (31 top-level,
+142 named cases); the full capture race suite passes (39 top-level, 130 named
+cases), including shared Request/replay callers of the wrapped facts/processing
+helpers. Integration compilation selects no external tests and passes. Tests
+cover closed labels, preserved causes, public wire parity, post-draft expiry,
+foreign diagnostic suppression and missing optional reporters. Affected-package
+vet and Go architecture checks pass; specification/architecture gates pass.
+Native43 below exercises these diagnostics and identifies the target/open
+boundary. Preview, collection and the later S-02 journey remain unqualified;
+this diagnostic run establishes no product fix, increased limit or freshness
+extension.
+
+## Installed journey native 42: structured preview refusal (2026-10-18)
+
+[Run 39139924613](https://github.com/phihos/asservat/actions/runs/39139924613)
+tested frozen source `9130cb626fa7e0d8870cf0883814e8c94e9734b1`, including the
+operation-owned audit credential and shared transport-slot corrections. Installed
+services, regional enrollment and capacity binding reached their checks: six
+distinct binding observations and twelve samples with at least one second left
+in fifteen seconds. All four `preview_capture` calls returned schema-valid
+`NotAvailable` envelopes. The earlier audit-begin credential diagnostic did not
+recur in these logs, but this does not identify the remaining refusal or prove
+successful preview availability. Collection, publication, native download,
+revocation, expiry and deletion assertions were not reached.
+
+The parent test failed after 1,332.72 seconds; the continuation failed after
+1,009.47 seconds. Terminal exit is 1, all 2,684 recorded source hashes independently
+match the frozen commit archive, tested sources were unchanged and cleanup
+failures are empty. The [environment report](../test/results/installed-journey-ci-42/context-storage-environment.json)
+has SHA-256 `3070b2188b0583535b89f4cd4ce6adcd92de930946523627b051e9127267d1a3`;
+the adjacent run, PostgreSQL and kubelet logs preserve the failure. The next task
+is bounded diagnosis of the structured refusal before another full campaign.
+Original deadlines and current checks remain unchanged; S-02 remains incomplete.
+
+
+## Installed public audit credential deadline correction (2026-10-18)
+
+The installed public operation and capture-intent audit adapters now obtain one
+current audit-store credential per finite create or lookup, preserving its
+original deadline through seal, conditional PUT, exact-version GET, body close
+and verification. The previous SDK credential adapter discarded that deadline
+and repeated the complete native proof on each S3 request. No credential cache,
+request extension, higher QPS or admission retry was added; SQL audit claims,
+acknowledgements, recovery and final identity checks remain independent.
+
+The blocked PUT and GET regressions failed against the old behavior: a 100 ms
+credential proof allowed I/O to run until the 700 ms caller deadline. Both pass
+with the operation-owned context. Actual loopback TLS/S3 SDK tests cover exact
+version verification, expired credentials before sealing, cancellation, unknown
+or conflicting writes, and lookup without another PUT. Native identity failures
+now distinguish failed resource reads from changed security-relevant Pod state;
+errors expose only closed labels.
+
+The unchanged, separate 20-QPS/burst-20 native clients measured 51 API calls per
+credential proof. A fresh five-second single-object SDK PUT/GET still passes with
+the old behavior (two proofs, 102 calls, 3.203 s); it does not reproduce the whole
+installed preview failure. With an original three-second remaining bound the old
+sequence fails during its second proof, while one scoped proof completes in
+2.101 s. A synthetic C08 Begin/Finish pair under one original five-second caller
+bound exhausts the old sequence during its third proof; the scoped pair finishes
+in 4.198 s with two proofs, 102 API calls and two PUTs/two GETs. This uses the real
+coordinator, SDK and native readers with synthetic SQL acknowledgements, stored
+bytes and API authority. It excludes real SQL, key-service, application and
+identity latency and does not qualify installed preview availability or identify
+the exact cause of native41's coarse final-Pod diagnostic.
+
+Focused bootstrap/Kubernetes race tests and both-package vet pass. A subsequent
+follow-up covers all remaining shared consumers: bootstrap issue audit and
+download dispatch, enrollment/certificate, batch, window and stop audit. The
+unsafe dynamic SDK credential store is removed from the installed layout;
+legacy static-material layouts keep their original adapters. Stop/window original
+cutoffs and the distinction between lookup and positive completion are preserved.
+
+The follow-up uses one shared semaphore bounded by the installed owner concurrency
+(one through sixteen), retaining each slot until actual verification/body/transport
+closure even after expiry. This prevents private transport clones multiplying
+the old shared connection ceiling. Focused tests cover ten writer paths with
+success, blocked PUT/GET/body, late key verification, original write expiry,
+lookup without another PUT/closure and historical stop lookup after its write
+cutoff. A blocked verification regression confirms that expiry alone does not
+release the slot. The full bootstrap race suite and vet pass; per-operation TLS
+setup and the complete installed journey still need native qualification. No
+S-02 acceptance follows from these component results.
+
+## Installed journey native 41: public preview remains unavailable
+
+[Run 39128220426](https://github.com/phihos/asservat/actions/runs/39128220426)
+qualified frozen source `fa1080d73dfc3e71051306e5f82abe501d64ac37` only as far as
+regional enrollment and current capacity binding. It observed six distinct
+binding revisions and eleven samples with at least one second remaining during
+fifteen seconds. The scoped permission observer constructed successfully.
+All four installed `preview_capture` attempts then failed with HTTP/2 stream
+errors or service unavailable. Owner diagnostics recorded
+`audit-begin/object/closed/read/credentials-verify/identity/final-pod`; the exact
+cause is under investigation. Collection, publication, native transfer, revocation,
+expiry and faulted cleanup assertions were not reached.
+
+The parent test failed after 1,344.97 seconds (continuation: 1,023.51 seconds).
+The harness reports terminal exit 1, unchanged sources and no cleanup failures;
+all 2,630 recorded hashes independently match the frozen commit archive.
+Report: [`test/results/installed-journey-ci-41/context-storage-environment.json`](../test/results/installed-journey-ci-41/context-storage-environment.json),
+SHA-256 `7b708a3ef8f7e45438b88fcc98f19a51cbc0c9eea9d62c0418701649f287e4ae`.
+This supersedes native40's immediate permission-constructor blocker, not its
+unqualified lifecycle outcome. Preserve the original five-second proof/request
+intervals while diagnosing the public audit credential path; no automatic full
+campaign retry or relaxed gate is justified by this failure.
+
+## Installed investigation continuation (ADR-202–205, 2026-10-18)
+
+The installer now provisions the public listener, publisher and hub-local
+download workers under ADR-202–204. The installed two-cluster investigation
+remains under qualification: collection, publication, native download,
+revocation, expiry and deletion have not yet passed together. The journey test
+is being completed on its own branch; no S-02 acceptance follows from the
+component results below.
+
+Native journey runs 35 and 36 reached running owner, publisher and capacity
+processes, then failed a stale fixture check for the worker configuration
+source. [PR #39](https://github.com/phihos/asservat/pull/39) checks the actual
+download-worker namespace. Earlier installed failures exposed the download
+content auditor rejecting the installed audit lane
+([#37](https://github.com/phihos/asservat/pull/37)) and the owner startup proof
+rejecting an installer journal change
+([#38](https://github.com/phihos/asservat/pull/38)). Those fixes have merged.
+Purpose-specific Kubernetes clients also isolate owner readiness, provider
+refresh and audit credential reads; their original five-second bounds and
+20-QPS client limits remain unchanged.
+
+The subsequent [run 37](../test/results/installed-journey-ci-37/context-storage-environment.json)
+and [run 38](../test/results/installed-journey-ci-38/context-storage-environment.json)
+both failed before collection: the regional workload never reached `ready_at`.
+Both exercised `179c376f752285a035de1ac8e4d939beb32cb6bc`, exited 1 with
+unchanged source hashes and no cleanup failures. The retained logs show
+permission reconciliation stopping, hub-worker restarts and unsuccessful
+regional capacity composition; the root cause remains under investigation.
+Neither run reached the MCP capture/download/expiry checks.
+
+[Run 39](https://github.com/phihos/asservat/actions/runs/39122326430), at
+`9ef1103f83fd8377d007de89cedbb4aef5855c6d`, stopped at the deletion credential's
+positive multipart-abort probe: the owned S3 backend returned `AccessDenied`.
+It did not reach regional collection or the user journey. The
+[report](../test/results/installed-journey-ci-39/context-storage-environment.json)
+records exit 1, unchanged sources, no cleanup failures, and the earlier
+107-ordinary/110-total SQL profile. All 2,627 source hashes match that commit.
+The subsequent complete inventory counts five additional installer pools;
+neither its 112-ordinary plan nor the failed-deletion assertion is qualified by
+this run. The abort-permission failure is under investigation; no broader
+runtime storage permission has been granted.
+
+[Run 40](https://github.com/phihos/asservat/actions/runs/39124983082), at
+`7321bacbfb7da3cf50c8eebd81053c7bca3f2a78`, passed the deletion credential
+probes and reached the regional workload's `ready_at`: six distinct binding
+observations and fourteen samples with at least one second left in fifteen
+seconds. It then failed before collection when the fixture passed its plaintext
+administrator pool to `NewPermissions`. That constructor correctly requires
+verified TLS and a restricted runtime role. The
+[report](../test/results/installed-journey-ci-40/context-storage-environment.json)
+records exit 1, the 112-ordinary/116-total fixture profile, all 2,629 hashes
+matching the frozen commit and no cleanup failures. This run does not qualify
+collection, native download or installed expiry/deletion.
+
+The fixture now uses the installed `permission-read` credential through verified
+TLS with one scoped monitoring connection, closed when the journey returns.
+This fits the existing operator/monitoring reserve; no connection limit or
+runtime grant was raised. Four issuance helper pools now close before regional
+installation instead of remaining open until the parent test ends. The focused
+[PostgreSQL regression](../test/results/installed-permission-observer-native-1/custody.log)
+at `1b989271b572d5055230dea5ee00ea2efde65d97` passes: both administrator paths
+are rejected, the projected scoped reader constructs and rejects authority
+mutation, and its connection closes. Its
+[report](../test/results/installed-permission-observer-native-1/custody-environment.json)
+records exit 0, 2,602 matching hashes and no cleanup failures. The projection in
+that focused check is synthetic; installed projection protection and the
+complete journey still require the next frozen run. The subsequent probe also
+requires PostgreSQL's exact insufficient-privilege SQLSTATE, not a generic error.
+
+ADR-205's SQL purposes/due list and provider signing/delete-credential
+components merged in [#35](https://github.com/phihos/asservat/pull/35) and
+[#36](https://github.com/phihos/asservat/pull/36), after passing CI and current
+Gitar review. The exact SQL candidate `22c19dae9588618545b5baf2312cb6a64235dc99`
+passed [native run 39119394822](https://github.com/phihos/asservat/actions/runs/39119394822):
+`TestContextAdmissionWithRealServices` and its `native-api-runner` subtest,
+exit 0, unchanged sources and no cleanup failures. All 2,602 hashes in the
+[retained report](../test/results/adr205-context-sql-ci-2/context-storage-environment.json)
+match that candidate; the [test log](../test/results/adr205-context-sql-ci-2/context-storage.log)
+records the selected execution. That context-harness branch does not run the
+SQL deletion regression. The separate custody run 39122322616 on
+`25c7195900dd2d323c6a848cdb0e19bc19d0016a` passes the actual
+execution/publication/deletion case and its bounded paging regression, with
+exit 0, all 2,593 source hashes matching and no cleanup failures. These are
+component checks with fixture authority, not installed deletion scheduling.
+
+The deletion-child composition now receives its settings through the installed
+provider capacity path. The journey assertions use fresh real-user tokens,
+request-owned preparation continuations, and independent checks of
+object/version/upload absence, the exact retained audit ciphertext and the
+storage refund. The new failed-cleanup branch denies only one attempt's cleaner
+inventory, requires an unsuccessful installed lease with unchanged receipts,
+deadlines and charges, restores the original policy, and requires a later purge
+before the original deletion deadline. Focused race checks pass; the installed
+journey, including that failure/recovery branch, remains unqualified.
+
 ## Delayed query negatives: reproduced and qualified correction (2026-10-18)
 
 Review found that `SuspendQueryCapacity` derived its SQL deadline from the
@@ -960,12 +3903,14 @@ unit-tested only. The [installed SQL budget correction](research/installed-sql-b
 now wires the compiled one-hub plan into the promoted continuation before
 runtime resource creation, against actual non-reserved server capacity. The
 ADR-205 graph plus five overlapping installer pools, a separate verifier and
-four maintenance slots requires 112 ordinary slots. The continuation's passive
+four maintenance slots required 112 ordinary slots. The continuation's passive
 history reader closes before bridge opening and is limited to one connection.
-Only its installed fixture derives 116 total slots: 112 product, one independent
+At that checkpoint its installed fixture derived 116 total slots: 112 product, one independent
 fixture observer, and three superuser-reserved. Ordinary component fixtures
 remain at 48; early superuser sessions are not treated as isolated reserved
-capacity.
+capacity. ADR-210's browser-settings observer adds two retained worker
+connections; the corrected current plan requires 114 product slots and derives
+118 total fixture slots, as recorded in the resumed review above.
 Native installed qualification of this correction remains pending.
 
 ## Regional investigation journey passes end to end (native36/37)

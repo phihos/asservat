@@ -1,0 +1,1458 @@
+[
+  {
+    "id": "ADR-165",
+    "title": "ADR-165 — Original observation capability selection",
+    "source": "docs/decisions/165-original-observation-capability-selection.md",
+    "disposition": "simplify",
+    "provenance": "Engineering compatibility decision; no explicit user demand for both observation protocols.",
+    "qualification": "Component-3 passed; later installed composition selects v2. No general upgrade campaign shown.",
+    "questions": {
+      "q1": "Protocol mismatch is concrete; deployment incidence is unmeasured.",
+      "q2": "No documented acceptance of mixed protocols; dual-format support is engineering scope.",
+      "q3": "Installation compatibility, rather than normal evidence use.",
+      "q4": "No comparative protocol-version migration study in this ADR.",
+      "q5": "No new credentials; adds format fields across several installation contracts.",
+      "q6": "v1, v2 and mixed/unknown refusal branches span root, claim and deployment.",
+      "q7": "Yes: observationFormat configures machinery, not a user capability.",
+      "q8": "Depends on coordinated binary and immutable projection versions.",
+      "q9": "No added I/O; additional validation and compatibility paths, cost unmeasured.",
+      "q10": "Component mixed-state tests exist; deployed v1-to-v2 upgrade is not qualified.",
+      "q11": "A single installed protocol with explicit unsupported-version error could suffice."
+    },
+    "rationale": "Original-version pinning is useful; permanent legacy branches need an actual supported installation population.",
+    "action": "Inventory existing v1 installations, then retain an explicit migration only if needed; otherwise make v2 the single installed format.",
+    "evidence": [
+      "docs/decisions/165-original-observation-capability-selection.md",
+      "internal/contracts/owner_deployment.go"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-166",
+    "title": "ADR-166 — Bounded streaming custody for larger native outputs",
+    "source": "docs/decisions/166-bounded-streaming-custody.md",
+    "disposition": "keep",
+    "provenance": "Mixed: larger native artifacts are documented accepted scope; multipart journal and limits are engineering choices.",
+    "qualification": "Real SQL/SeaweedFS exercised 20 MiB/three parts; 128 MiB, throughput and complete producer/publication/download remain pending.",
+    "questions": {
+      "q1": "Current small writer cannot store promised profiles/traces; real product gap, not incident frequency.",
+      "q2": "User accepted large native artifacts; no requirement for this exact journal shape.",
+      "q3": "Needed for profiles, traces and packet saves; not 4 KiB pod-status.",
+      "q4": "ADR cites S3 multipart APIs; compare a maintained SDK uploader while retaining uncertain-spend semantics.",
+      "q5": "Adds multipart create/list/abort permissions on the evidence prefix.",
+      "q6": "At least create-unknown, parts, complete-unknown, abort and release states.",
+      "q7": "Fixed 8 MiB parts/17 slots; no operator tuning switch described.",
+      "q8": "Depends on backend conditional completion, inventory and error semantics.",
+      "q9": "Sequential memory is bounded; full ciphertext reread doubles relevant data I/O. Only20 MiB measured.",
+      "q10": "Append-only migration61; rollback and full-version backend compatibility unqualified.",
+      "q11": "A shared bounded multipart library is preferable to separate writers per artifact kind."
+    },
+    "rationale": "Native larger outputs require streaming; isolated custody correctness does not complete that product path.",
+    "action": "After the basic installed S-02 journey works, finish one real runtime-profile encoder through publication and download at 128 MiB before adding more multipart states or larger ceilings.",
+    "evidence": [
+      "docs/decisions/166-bounded-streaming-custody.md",
+      "internal/application/privacy/streaming.go",
+      "test/results/adr166-streaming-custody-6/result.json"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-167",
+    "title": "ADR-167 — Phase-bounded context download continuation",
+    "source": "docs/decisions/167-phase-bounded-download-continuation.md",
+    "disposition": "simplify",
+    "provenance": "Engineering response to short request/identity windows; latest maintainer explicitly relaxes download recheck timing.",
+    "qualification": "Fixture native36/37 passed; installed native50 and whole-phase RED still fail preparation.",
+    "questions": {
+      "q1": "Repeated native fixtures failed enrollment/preparation/view deadlines; production frequency unknown.",
+      "q2": "Maintainer now accepts relaxed bounded permission rechecks; five-second repeated checks are not immutable.",
+      "q3": "Cold download is a normal first-use path.",
+      "q4": "No comparative end-to-end download preparation study in this ADR.",
+      "q5": "No new role; retains worker enrollment, owner routing and metadata-cache authority boundaries.",
+      "q6": "Adds enrollment-pending, native-preparing and one-shot metadata-handoff paths.",
+      "q7": "Fixed one-second arrival and two-second continuation pacing tune the machinery.",
+      "q8": "Depends on worker scheduling, credential delivery and live owning process.",
+      "q9": "Typically three HTTP prepares plus polls; whole composed cost was not established by fixture successes.",
+      "q10": "Same-process handoff is lost on restart; replay is tested, full installed upgrade is not.",
+      "q11": "A measured longer bounded authorization interval may avoid artificial phase fragmentation."
+    },
+    "rationale": "Known positive continuations are useful, but splitting a workflow to satisfy an agent-selected short interval has not made installed downloads usable.",
+    "action": "Re-budget the complete download under the accepted relaxed interval; retain same-key recovery and unknown-outcome rules, remove phase splits that measurements show unnecessary.",
+    "evidence": [
+      "docs/decisions/167-phase-bounded-download-continuation.md",
+      "AGENTS.md",
+      "test/results/resumed-c62e02ac-download-whole-phase-budget/README.md",
+      "internal/application/evidence/context_native_runtime.go"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-168",
+    "title": "ADR-168 — Rotating cluster enrollment credential with outbound-only connectivity",
+    "source": "docs/decisions/168-rotating-cluster-enrollment-credential.md",
+    "disposition": "keep",
+    "provenance": "Explicit documented maintainer choice: regional rotating enrollment Secret instead of hub API/TokenReview access. Lifetimes and fork protocol are engineering choices.",
+    "qualification": "SQL lineage/rotation/replay tests passed; later installed federation/join supersede this ADR historical pending header.",
+    "questions": {
+      "q1": "Restart after short bootstrap expiry is inevitable; stolen-key exploitation frequency is unknown.",
+      "q2": "Yes: maintainer accepted delegated regional trust and cluster-held credential.",
+      "q3": "All outbound-only regional deployments need restart identity.",
+      "q4": "ADR cites SPIRE key managers and kubelet rotation only as identity-separation precedent, not lifetime evidence.",
+      "q5": "Connector gains get/update of one Secret; hub retains public key and scoped lineage.",
+      "q6": "Pending rotation, uncertain reply, superseded replay, fork fence, expiry and reenrollment.",
+      "q7": "Yes: validity/rotation intervals and shorter per-profile overrides.",
+      "q8": "Depends on Secret CAS, clock skew, TLS exporter and SQL audit availability.",
+      "q9": "One rotating key per profile; default daily rotation; exact cumulative proof/audit cost unmeasured.",
+      "q10": "Exact pending replay tested; expiry/fork require admin reenrollment; installed long-outage rotation unqualified.",
+      "q11": "Keep one regional credential; first compare simpler bounded certificate renewal before expanding lineage policy."
+    },
+    "rationale": "The credential follows an explicit connectivity/trust decision; arbitrary lifetime defaults and permanent fork fencing still require operational justification.",
+    "action": "Retain the chosen trust anchor, qualify restart and missed-rotation recovery in the installed flow, and document admin recovery before adding more rotation states.",
+    "evidence": [
+      "docs/decisions/168-rotating-cluster-enrollment-credential.md",
+      "internal/domain/fleet/cluster_credential.go",
+      "test/results/adr168-cluster-credential-sql-2/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-169",
+    "title": "ADR-169 — Delegated regional lifecycle channel",
+    "source": "docs/decisions/169-delegated-regional-lifecycle-channel.md",
+    "disposition": "simplify",
+    "provenance": "Engineering implementation of the explicit outbound-only credential decision; four phase observations are not a separate user requirement.",
+    "qualification": "Two-cluster native run4 passed with synthetic issuer/setup roots; later product federation composition exists.",
+    "questions": {
+      "q1": "Outbound topology makes hub-side regional API reads impossible; repeated phase-proof benefit is unmeasured.",
+      "q2": "Delegated proof trust is explicitly accepted by ADR168.",
+      "q3": "Required for every regional connector enrollment/renewal.",
+      "q4": "No evidence that comparable systems require this four-phase self-attestation exchange.",
+      "q5": "Region loses hub SQL credentials; hub adds a private lifecycle endpoint.",
+      "q6": "Eight bounded region frames plus phase/order/unknown-stream states.",
+      "q7": "No new user tuning; protocol/frame ceilings are engineering machinery.",
+      "q8": "Depends on HTTP2 full duplex, TLS exporter, regional API and hub SQL/audit/PKI.",
+      "q9": "Four local proof phases per lifecycle; per-cluster aggregate API and renewal cost not measured here.",
+      "q10": "Bounded failure tests pass; cross-version channel upgrade/rollback is unqualified.",
+      "q11": "One bounded regional observation plus hub-local effect checks may satisfy the accepted delegated-trust model."
+    },
+    "rationale": "Repeating observations from the same credential holder does not independently verify a compromised region; retain scope binding without assuming each phase adds proportional protection.",
+    "action": "Compare single-operation regional observation against four repeated proofs using actual renewal latency and a stated TOCTOU threat; keep SQL/signing effects hub-local.",
+    "evidence": [
+      "docs/decisions/169-delegated-regional-lifecycle-channel.md",
+      "internal/transport/connectorlifecycle/channel.go",
+      "test/results/adr169-direct-native-4/result.json"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-170",
+    "title": "ADR-170 — Federation compartment for connector-facing hub duties",
+    "source": "docs/decisions/170-federation-compartment.md",
+    "disposition": "simplify",
+    "provenance": "Engineering compartment decision driven primarily by then-current per-purpose connection budget.",
+    "qualification": "Product federation/regional native10 passed with synthetic setup; installed provisioning subsequently exists.",
+    "questions": {
+      "q1": "32-pool budget exhaustion was real design arithmetic, not a measured attack.",
+      "q2": "User selected outbound-only clusters, not a separate federation Deployment.",
+      "q3": "Every regional install pays this process and provisioning cost.",
+      "q4": "No comparative process-boundary evaluation recorded.",
+      "q5": "Adds federation SQL, audit, PKI credentials and listener; removes those from hub-api.",
+      "q6": "Independent startup, provider renewal, credential fencing and regional listener readiness.",
+      "q7": "Separate deployment/projection/provider recipes exist to operate the compartment.",
+      "q8": "Depends on SQL, OpenBao, S3, Kubernetes and TLS simultaneously.",
+      "q9": "Historical+10 connections/two retained processes; current plan supersedes63 ordinary slots. CPU/memory unmeasured.",
+      "q10": "Native fresh startup tested; process merge/split and rolling-upgrade behavior unqualified.",
+      "q11": "ADR177 governor removes the original one-pool-per-purpose budget premise; reassess process isolation on concrete threat grounds."
+    },
+    "rationale": "A process boundary can protect exposed credential duties, but old connection arithmetic alone no longer pays for another full lifecycle.",
+    "action": "Compare federation co-location with an existing non-public control worker against measured privilege/exposure differences; retain separation only for a documented boundary.",
+    "evidence": [
+      "docs/decisions/170-federation-compartment.md",
+      "internal/bootstrap/federation.go",
+      "docs/decisions/177-hub-sql-connection-governor.md",
+      "test/results/adr170-product-native-10/result.json"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-171",
+    "title": "ADR-171 — Hub-run context execution with delegated regional operations",
+    "source": "docs/decisions/171-hub-run-context-execution.md",
+    "disposition": "keep",
+    "provenance": "Mixed: outbound-only/no regional hub SQL follows accepted goals; runner relocation is an engineering simplification.",
+    "qualification": "Real TLS operations and fixture-native public journey passed; installed native48–50 reached capture/publication.",
+    "questions": {
+      "q1": "Regional SQL credentials contradicted outbound-only composition.",
+      "q2": "Accepted topology requires hub-local SQL; no user request for a regional SQL runner.",
+      "q3": "Typical multi-cluster collection path.",
+      "q4": "No comparative remote-execution framework evaluation recorded.",
+      "q5": "Removes regional SQL/unwrap authority; retains regional write-only object and wrap-only key access.",
+      "q6": "Fixed remote-operation ordering and unknown replies remain; legacy identity-question mode removed.",
+      "q7": "No added user knob;16-operation/36-frame ceilings are internal bounds.",
+      "q8": "Depends on the live hub-region stream and regional Kubernetes/store.",
+      "q9": "About14 operation pairs; limits16 operations32 KiB each. Installed aggregate cost needs ongoing measurement.",
+      "q10": "Retired frame kinds reject; no mixed-version rollout qualification cited.",
+      "q11": "Hub-local authority with a small regional execution API is smaller than delegating every SQL port."
+    },
+    "rationale": "This corrects placement and removes credential exposure instead of merely adding a compensating mechanism.",
+    "action": "Keep the placement; consolidate redundant regional proof operations and qualify one supported protocol rollout rather than restoring the removed mode.",
+    "evidence": [
+      "docs/decisions/171-hub-run-context-execution.md",
+      "internal/transport/contextstart/operations.go",
+      "test/results/adr171-journey-2/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-172",
+    "title": "ADR-172 — Delegated owner discovery and authentication for regional exchanges",
+    "source": "docs/decisions/172-delegated-owner-discovery.md",
+    "disposition": "simplify",
+    "provenance": "Engineering remote-owner authentication design; exact-Pod routing and per-check delegation are not explicit user choices.",
+    "qualification": "Real TLS/component owner checks and exact SQL roles passed; multi-replica deterministic routing remains open.",
+    "questions": {
+      "q1": "Hub Pod addresses/API/SQL are unreachable outbound-only; genuine composition gap.",
+      "q2": "Regional trust model accepted; exact per-Pod SNI retries were engineering scope.",
+      "q3": "Normal regional operation; randomized multi-replica routing is an uncommon scaling path today.",
+      "q4": "No comparison with a single stable authenticated gateway is recorded.",
+      "q5": "Adds connector-owner-read login, owner guard/EndpointSlice reads and probe token.",
+      "q6": "Candidate discovery, remote authentication, local TLS comparison and wrong-Pod retry states.",
+      "q7": "Pinned endpoint plus owner pins; second pool discovery multiplies machinery.",
+      "q8": "Depends on Service load balancing, certificate routing and federation availability.",
+      "q9": "One federation conversation per authentication plus hub registry/guard reads; scale unmeasured.",
+      "q10": "Single-replica path works; multi-replica rollout/routing remains explicitly unqualified.",
+      "q11": "Use one stable authenticated gateway identity and explicit internal routing if exact-Pod SNI has no required threat advantage."
+    },
+    "rationale": "Local TLS binding is necessary; repeating an elaborate owner proof through another process and retrying wrong Service targets needs a deployment-scale justification.",
+    "action": "Measure and compare stable gateway routing with current exact-owner scheme before supporting more replicas; retain real TLS and scoped current registry checks.",
+    "evidence": [
+      "docs/decisions/172-delegated-owner-discovery.md",
+      "internal/bootstrap/regional_lifecycle.go",
+      "test/results/adr172-roles-1/result.json"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-173",
+    "title": "ADR-173 — Work-scoped regional process observation",
+    "source": "docs/decisions/173-work-scoped-process-observation.md",
+    "disposition": "keep",
+    "provenance": "Engineering performance correction; accepts bounded process-observation staleness explicitly.",
+    "qualification": "Native connector start run6 completed2.57s; fixture roots and preparation remain synthetic.",
+    "questions": {
+      "q1": "Measured repeated checks exhausted original window:2.8s cold plus2.15s repeats.",
+      "q2": "ADR explicitly accepts unseen process-setting changes within original observation; latest user supports proportionate rechecks.",
+      "q3": "Every API context start benefits.",
+      "q4": "No external comparison; this is local evidence-backed elimination of duplicate work.",
+      "q5": "No new privilege or credential.",
+      "q6": "One work-owned observation and expiry; no cross-work state.",
+      "q7": "No tuning solely for cache behavior.",
+      "q8": "Still depends on current capacity identity, admission/CAS and Kubernetes.",
+      "q9": "Measured71-call cold proof plus9/14/3 start operations; whole2.57s. Wider cluster load unmeasured.",
+      "q10": "Foreign-process/expiry tests exist; no additional persistent migration.",
+      "q11": "Retaining one bounded observation is smaller than repeated full attestation."
+    },
+    "rationale": "This is a useful consolidation, although the71-call cold proof itself deserves cumulative review.",
+    "action": "Keep work ownership and exact scope; use the same measured-bound principle elsewhere and simplify the cold proof before adding parallel control loops.",
+    "evidence": [
+      "docs/decisions/173-work-scoped-process-observation.md",
+      "internal/transport/contextstart/operations.go",
+      "test/results/connector-api-timing-6/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-174",
+    "title": "ADR-174 — Regional context-start composition in the connector process",
+    "source": "docs/decisions/174-regional-context-start-composition.md",
+    "disposition": "superseded",
+    "provenance": "Engineering composition umbrella; wrap choice and capacity delivery were superseded by176/175.",
+    "qualification": "Component composition exists; later installed journey covers regional context capture.",
+    "questions": {
+      "q1": "Three missing dependencies blocked the actual connector binary.",
+      "q2": "No user requirement for the abandoned OpenBao-only wrapping path.",
+      "q3": "Normal regional context collection.",
+      "q4": "No comparative composition study recorded.",
+      "q5": "Adds delegated recovery, wrapping endpoint and second account credential inputs.",
+      "q6": "Identity-ready/start/restart states plus three incomplete dependencies.",
+      "q7": "Several fixed projections; stale open capacity alternatives are no longer current options.",
+      "q8": "Depends on federation, key service, Kubernetes and store.",
+      "q9": "Aggregate cost belongs to174–178 composition; no independent measurement here.",
+      "q10": "No independent migration; current installed contract is spread over later ADRs.",
+      "q11": "A single current regional runtime contract can replace this transitional decision."
+    },
+    "rationale": "The composition is needed, but leaving superseded implementation alternatives as current guidance increases reader and maintenance cost.",
+    "action": "Retain historical rationale; publish a concise current regional runtime contract referencing175/176/198 and stop treating174 as a separate implementation obligation.",
+    "evidence": [
+      "docs/decisions/174-regional-context-start-composition.md",
+      "internal/bootstrap/regional_context.go",
+      "docs/decisions/175-capacity-token-request.md",
+      "docs/decisions/176-artifact-keys-local-key-service.md"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-175",
+    "title": "ADR-175 — Capacity account token by admitted, Pod-bound TokenRequest",
+    "source": "docs/decisions/175-capacity-token-request.md",
+    "disposition": "simplify",
+    "provenance": "Engineering tradeoff explicitly accepts a600s unbound capacity token and same-process dual identity; not an independent maintainer-selected isolation requirement.",
+    "qualification": "Native run4 passed allowed/denied TokenRequest and start cases; first run disproved Pod binding.",
+    "questions": {
+      "q1": "Kubernetes rejects binding another account token to executor Pod; real compatibility defect.",
+      "q2": "ADR already accepts forged local records by compromised connector; do not invent isolation between its two credentials.",
+      "q3": "Every installed regional API context start.",
+      "q4": "Kubernetes TokenRequest semantics constrain implementation; no comparative need for dual accounts established.",
+      "q5": "Adds create on one serviceaccounts/token and a second account; token survives Pod deletion up to600s.",
+      "q6": "Mint, refresh, expired token and requester/admission refusal states.",
+      "q7": "Fixed600s/60s-refresh rules tune credential machinery.",
+      "q8": "Depends on Kubernetes admission representation and token APIs.",
+      "q9": "Cached token avoids hot-path minting; per-process renewal roughly each540s, aggregate cost unmeasured.",
+      "q10": "Native negative tests pass; token/account migration and rollback not shown.",
+      "q11": "A single executor identity may suffice if local journal authenticity is not a security boundary; hub signed work/SQL binding remain."
+    },
+    "rationale": "Separate accounts inside one compromised process do not provide the stronger isolation rejected by this ADR.",
+    "action": "Review one-account local start authorization versus dual-account minting; retain exact signed-work/journal CAS and quota, and document the actual compromise boundary.",
+    "evidence": [
+      "docs/decisions/175-capacity-token-request.md",
+      "internal/adapters/kubernetes/capacity_token.go",
+      "test/results/adr175-native-4/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-176",
+    "title": "ADR-176 — Artifact keys through the local key service with attempt-scoped wrap authority",
+    "source": "docs/decisions/176-artifact-keys-local-key-service.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: managed encryption and no collector unwrap are user goals; three one-use wrap claims are engineering anti-forgery machinery.",
+    "qualification": "Scoped wrap SQL tests passed; installed native48–50 later used key service and publication.",
+    "questions": {
+      "q1": "OpenBao-wrapped artifacts were unreadable by the existing local opener; concrete integration defect.",
+      "q2": "No user choice of incompatible key formats or three irreversible wrap slots documented.",
+      "q3": "Every captured artifact needs interoperable wrapping and reading.",
+      "q4": "No comparison of KMS encryption-context binding or idempotent exact wrap replay recorded.",
+      "q5": "Dedicated key service owns roots and SQL authority; region gains collector mTLS wrap only.",
+      "q6": "Prepared/spent-role/unknown-wrap states can strand an otherwise valid attempt.",
+      "q7": "Endpoint/root/key-scope pins; fixed3-wrap limit is internal machinery.",
+      "q8": "Depends on network key service, SQL, connector PKI and Kubernetes.",
+      "q9": "Three wraps per attempt plus SQL/peer checks; whole installed key latency not isolated.",
+      "q10": "Key format is fixed; backend migration and rotation rollback not demonstrated here.",
+      "q11": "Keep a common format and wrap-only collector; evaluate idempotent exact-binding wrap rather than irrecoverable one-use slots."
+    },
+    "rationale": "Key-service isolation has concrete privilege value; wrap forgery protection and irreversible spend need comparison with the already checked capture/publication binding.",
+    "action": "Preserve encryption/root separation, document the actual forgery threat, and test exact idempotent wrap recovery before adding further wrap journals.",
+    "evidence": [
+      "docs/decisions/176-artifact-keys-local-key-service.md",
+      "internal/adapters/postgres/context_key_wraps.go",
+      "test/results/adr176-sql-1/result.json"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-177",
+    "title": "ADR-177 — Per-purpose logins under a process-wide SQL connection governor",
+    "source": "docs/decisions/177-hub-sql-connection-governor.md",
+    "disposition": "simplify",
+    "provenance": "Engineering accommodation of per-purpose NOINHERIT roles and32-connection cap; role-per-function is not documented user requirement.",
+    "qualification": "Real role provisioning passed; cancellation regression reproduced and fixed; full installed download remains failed.",
+    "questions": {
+      "q1": "Connection exhaustion and pgx cancellation self-wait are observed; production incidence unknown.",
+      "q2": "User requires PostgreSQL and isolation, not55 in-process logins or permanent single-connection pools.",
+      "q3": "All hub requests pay pool serialization/handshake behavior.",
+      "q4": "No comparison with a small process-trust role set or standard connection proxy recorded.",
+      "q5": "Same process retains all purpose credentials; protects query mistakes, not process compromise.",
+      "q6": "Hot/cold/reserved queues, closing sockets, retryable53300 and constructor-cleanup states.",
+      "q7": "Hot-purpose inventory and cold/reserved caps tune the governor itself.",
+      "q8": "Depends on pgx cleanup internals, PostgreSQL role limits and TLS/SCRAM.",
+      "q9": "Physical cap 32 per hub; cold transactions add handshakes. The installed 114 ordinary slots are configured upper bounds, not measured simultaneous connections; load cost remains unqualified.",
+      "q10": "Hook chaining/race regression passes; nested-acquisition detection is absent; role consolidation migration untested.",
+      "q11": "Consolidate logins by actual process trust boundary and use ordinary bounded pools before maintaining a custom socket governor indefinitely."
+    },
+    "rationale": "The governor treats symptoms of role multiplication and caused a demonstrated cleanup deadlock; same-process secrets limit its compromise isolation benefit.",
+    "action": "Inventory distinct trust boundaries and query-confusion threats, prototype fewer roles with equal table/function restrictions, then remove unnecessary cold reconnect/governor paths using installed benchmarks.",
+    "evidence": [
+      "docs/decisions/177-hub-sql-connection-governor.md",
+      "internal/adapters/postgres/connection_governor.go",
+      "internal/contracts/sql_connection_budget.go",
+      "internal/adapters/postgres/connection_governor_cancellation_test.go",
+      "AGENTS.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-178",
+    "title": "ADR-178 — Delegated connector source on the context-start exchange",
+    "source": "docs/decisions/178-delegated-connector-source-on-context-start.md",
+    "disposition": "simplify",
+    "provenance": "Engineering delegation/protocol choice under explicit outbound-only requirement.",
+    "qualification": "Real HTTP2 and fixture journey passed; source-bracket implementation diverged from decision and later207/199 optimize it.",
+    "questions": {
+      "q1": "Hub regional API access violated topology; repeated probes also produced measured setup cost.",
+      "q2": "Delegated trust accepted; immediate repeated source checks are not user-mandated.",
+      "q3": "All outbound context-start exchanges.",
+      "q4": "No comparison with one signed/connection-bound source observation per operation recorded.",
+      "q5": "Adds registry grants to native-read; removes regional API requirement.",
+      "q6": "Numbered source feeds, six-frame budget, accept/attach/work/result transitions.",
+      "q7": "No user tuning; source/frame ceilings are protocol machinery.",
+      "q8": "Depends on live bidirectional stream, regional API and hub registry.",
+      "q9": "Implemented full source reads were about12API each; up to6 source frames. Cost must include other regional calls.",
+      "q10": "Frame changes tested; mixed-version rollout and later optimization compatibility not shown.",
+      "q11": "Use one bounded scoped source observation plus explicit known-negative invalidation instead of multiplying full source proofs."
+    },
+    "rationale": "The ADR itself records a cheaper design and a more expensive implementation; succeeding once in a shared-cluster fixture did not settle installed cost.",
+    "action": "Consolidate 178/199/207 into one documented source-observation lifecycle with measured whole-exchange cost and an explicitly justified recheck policy for this path.",
+    "evidence": [
+      "docs/decisions/178-delegated-connector-source-on-context-start.md",
+      "internal/transport/contextstart/source.go",
+      "docs/decisions/207-context-setup-proof-bracket.md",
+      "test/results/adr178-journey-2/result.json"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-179",
+    "title": "ADR-179 — Outbound-only scope of the first installed investigation profile",
+    "source": "docs/decisions/179-outbound-only-first-installed-profile.md",
+    "disposition": "keep",
+    "provenance": "Mixed: outbound-only/multi-cluster are explicit requirements; hub-region first profile and selector restrictions are engineering delivery sequencing.",
+    "qualification": "Real TLS target-query tests; installed native48–50 reached regional capture with hub-local publication.",
+    "questions": {
+      "q1": "Single-cluster fixtures hid four real remote-API dependencies.",
+      "q2": "Regional credential choice forbids hidden hub API tunnelling; hub-local storage scope must remain visible.",
+      "q3": "Typical supported first profile; regional-local decryption deferred.",
+      "q4": "No comparative topology review here; do not infer novelty.",
+      "q5": "Hub loses regional API access; regional executor gains read-only workload/Pod inventory.",
+      "q6": "Adds idle target-query states and explicit unsupported selector/local-retention cases.",
+      "q7": "Profile locality and installed cluster pins serve product choices.",
+      "q8": "Depends on existing outbound stream and regional Kubernetes reads.",
+      "q9": "At most4queries per standby; workload/list scale and aggregate polling cost unmeasured.",
+      "q10": "Scope fences tested; later regional-local migration and selector enablement unqualified.",
+      "q11": "A deliberately limited useful profile is smaller than implementing every remote path before delivery."
+    },
+    "rationale": "This is constructive scope reduction, provided unsupported retention/placement is clear and does not erase the eventual multi-cluster goals.",
+    "action": "Keep the first profile, expose unsupported selections early, and finish its native download/deletion before adding regional-local dispatch.",
+    "evidence": [
+      "docs/decisions/179-outbound-only-first-installed-profile.md",
+      "internal/transport/contextstart/targets.go",
+      "docs/decisions/211-completed-query-standby-transition.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-180",
+    "title": "ADR-180 — hub-api public composition and its protected inputs",
+    "source": "docs/decisions/180-hub-api-public-composition.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: usable console/MCP/native download is explicit; fixed multi-purpose projection and startup graph are engineering choices.",
+    "qualification": "Product assembly exists; installed native50 reached capture/publication/case but failed first download prepare.",
+    "questions": {
+      "q1": "Only tests assembled the public service; real delivery gap.",
+      "q2": "User requested usable product, not each assembly layer as a separate requirement.",
+      "q3": "All installations enabling the investigation UI/API.",
+      "q4": "No comparison with simpler service configuration and process-role bundling recorded.",
+      "q5": "Hub-api holds all public duty credentials; protected fixed inputs prevent request-selected endpoints.",
+      "q6": "Missing any dependency can stop startup; identity/native/public lifecycles are coupled.",
+      "q7": "Large fixed projection/provider recipe graph exposes machinery through installation.",
+      "q8": "Depends on Keycloak, OpenBao, PostgreSQL, S3, Kubernetes and key service.",
+      "q9": "Lazy per-purpose pools plus repeated guards; native50 and whole-phase RED expose cumulative latency.",
+      "q10": "TLS rotation unit-tested; complete upgrade/rollback profile remains unqualified.",
+      "q11": "One coherent installed profile and minimal process credential bundles can replace transitional optional layouts."
+    },
+    "rationale": "Composition is mandatory; retaining many mutually constrained legacy/public/provider modes obscures what is actually supported.",
+    "action": "Make the supported installed profile explicit, consolidate input validation/credential groups, and qualify its complete user journey before further optional modes.",
+    "evidence": [
+      "docs/decisions/180-hub-api-public-composition.md",
+      "internal/bootstrap/public_downloads.go",
+      "internal/bootstrap/public_context_compose.go",
+      "test/results/resumed-c62e02ac-native50/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-181",
+    "title": "ADR-181 — Asynchronous publication in a dedicated verifier process",
+    "source": "docs/decisions/181-asynchronous-publication-verifier.md",
+    "disposition": "keep",
+    "provenance": "Engineering separation supports explicit encryption and no hub raw-key access; exact unwrap-attempt allowance is not user-mandated.",
+    "qualification": "Scoped SQL/roles passed; native48–50 independently verified and published real installed artifacts.",
+    "questions": {
+      "q1": "No trusted component could decrypt and independently verify artifacts; concrete architecture gap.",
+      "q2": "User needs trusted evidence/encryption; no requirement for twelve irreversible verifier unwraps.",
+      "q3": "Every capture publication.",
+      "q4": "No comparative encrypted-artifact verifier study recorded; asynchronous bounded queues are familiar but not qualified by analogy.",
+      "q5": "Publisher gains read-only ciphertext and bounded verifier unwrap; hub-api remains without unwrap.",
+      "q6": "Stored-unpublished, queued, verifying, retry-budget-exhausted and published states.",
+      "q7": "Polling and fixed4-verification-attempt allowance tune machinery.",
+      "q8": "Depends on SQL queue, object store, key service and certificate lifecycle.",
+      "q9": "Three unwraps/attempt, fixed12total; queue polling/ciphertext rereads scale per artifact, installed throughput unmeasured.",
+      "q10": "Crash replay tested in components; allowance exhaustion and version upgrades need user-facing recovery.",
+      "q11": "Dedicated verifier is a clear boundary; simplify retry accounting while preserving independent full verification."
+    },
+    "rationale": "Unlike splitting merely for pool counts, this process separates ciphertext access from root keys and from the untrusted producer.",
+    "action": "Keep independent asynchronous verification; provide measured queue latency and recoverable exact verification attempts instead of silently stranding captures on arbitrary budget exhaustion.",
+    "evidence": [
+      "docs/decisions/181-asynchronous-publication-verifier.md",
+      "internal/bootstrap/publisher.go",
+      "test/results/adr181-sql-2/result.json",
+      "test/results/resumed-c62e02ac-native48/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-182",
+    "title": "ADR-182 — Promoting the installed owner to native backend and public layers",
+    "source": "docs/decisions/182-installed-owner-promotion.md",
+    "disposition": "simplify",
+    "provenance": "Engineering transitional layering; no explicit user requirement for observation-only versus promoted owner variants.",
+    "qualification": "Product input/provider composition exists; later184 chooses full first launch and installed runs exercise it.",
+    "questions": {
+      "q1": "Three mutually exclusive input rules made required public installation impossible.",
+      "q2": "User requested an installed service; intermediate promotion mechanism is not a product requirement.",
+      "q3": "Fresh installations; legacy fixture layouts are atypical.",
+      "q4": "No comparative layered bootstrap analysis recorded.",
+      "q5": "Same process accumulates layer credentials; adds four provider-auth purposes.",
+      "q6": "Identity-only/backend/public plus receipt/projection/provider readiness combinations.",
+      "q7": "Optional layers, fixed projection roots and recipes configure implementation machinery.",
+      "q8": "Depends on provider auth, mounted projections, journal and multiple listeners.",
+      "q9": "Four extra provider lifetimes; cumulative memory/API cost not measured.",
+      "q10": "Withdrawal requires restart; actual rolling layer rollback unqualified.",
+      "q11": "Full immutable first-launch input as184 selects is simpler than live promotion."
+    },
+    "rationale": "The decision was amended and partly overtaken; one supported launch mode is easier to reason about than latent optional layers.",
+    "action": "Fold current behavior into184/194, remove unused promotion branches after checking real installations, and keep legacy fixture adapters outside product selection.",
+    "evidence": [
+      "docs/decisions/182-installed-owner-promotion.md",
+      "internal/bootstrap/owner_inputs.go",
+      "docs/decisions/184-promoted-owner-first-launch.md"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-183",
+    "title": "ADR-183 — Installer runtime continuation",
+    "source": "docs/decisions/183-installer-runtime-continuation.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: Helm/low-effort install and operator-owned external IAM are accepted goals; short staged outbox/inbox protocol is engineering design.",
+    "qualification": "Native continuation run10 passed limited worker/owner startup; later native50 bootstrap passes but end-to-end journey fails.",
+    "questions": {
+      "q1": "Product installer stopped after activation; runtime provisioning existed only in fixtures.",
+      "q2": "User wants low-effort installation; no explicit30-minute manual choreography requirement.",
+      "q3": "Every fresh installation and potentially every Helm hook replay.",
+      "q4": "No comparative Helm operator/GitOps provisioning workflow evaluation here.",
+      "q5": "Privileged installer gains runtime RBAC and SQL admin; external provider admin remains outside cluster.",
+      "q6": "Four phases, external waits, inspection expiry, unknown claims, bridge and replay states.",
+      "q7": "Outbox/inbox names, recipes, provider waits and fixed journal lifetime operate the machinery.",
+      "q8": "Depends on operator timing, provider IAM/inspection, Kubernetes, SQL and S3.",
+      "q9": "Multiple full proofs per role plus provider round trips; measured retries compensate for5s windows.",
+      "q10": "187 fixes bridge replay; full in-place product upgrade remains unqualified.",
+      "q11": "Operator-prepared provider credentials plus a resumable declarative installer may avoid timed interactive handshakes."
+    },
+    "rationale": "The non-root runtime boundary is valuable; installation should not require racing several provider steps against a short original journal.",
+    "action": "Compare pre-provisioned provider setup or durable resumable checkpoints with expiring external waits; qualify unattended install/upgrade and report actionable partial state.",
+    "evidence": [
+      "docs/decisions/183-installer-runtime-continuation.md",
+      "internal/bootstrap/installer_continue.go",
+      "docs/decisions/187-replay-after-guard-bridge.md",
+      "test/results/adr183-continuation-native-10/result.json"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-184",
+    "title": "ADR-184 — Promoted owner on its first launch",
+    "source": "docs/decisions/184-promoted-owner-first-launch.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: usable Helm installation is required; one immutable launch, revision 1 and expiring projection journal are engineering constraints.",
+    "qualification": "Native continuation18 qualified parts; ADR194 completed promoted inputs, and native50 reached installed publication.",
+    "questions": {
+      "q1": "Every initial public installation lacked the inputs and matching mounts needed to run.",
+      "q2": "No documented user requirement for a permanently single launch or immutable deployment template.",
+      "q3": "Typical fresh installs; also determines whether upgrades can ever replace the executable.",
+      "q4": "No comparison with ordinary versioned Helm rollout supplied; common prior-art review is separate.",
+      "q5": "Adds backend/public SQL projections and operator TLS/OIDC secrets to their owning processes.",
+      "q6": "Empty worker catalog, zero-replica provisioning, incomplete projections and expired installer window remain distinct states.",
+      "q7": "Layout, projection references and promotion options mostly maintain the installation protocol.",
+      "q8": "Depends on external IAM setup, TLS rotation, Secret delivery and Kubernetes controller behavior.",
+      "q9": "Approximately forty public role claims were required before launch; current inventory differs. No fleet-scale install measurement.",
+      "q10": "First launch passed; changed immutable template and role-layout upgrades remain unqualified.",
+      "q11": "A versioned desired-state installation with explicit migrations could permit normal rolling replacement."
+    },
+    "rationale": "The first-launch fix repairs a self-imposed deployment cycle; its immutability creates later restart and upgrade workarounds.",
+    "action": "Consolidate 182/184/194 into one supported installation flow. Before expanding profiles, design exact versioned projection migration and deployment replacement instead of preserving the one-launch restriction indefinitely.",
+    "evidence": [
+      "docs/decisions/184-promoted-owner-first-launch.md",
+      "docs/decisions/194-promoted-owner-inputs.md",
+      "internal/bootstrap/installer_continue.go",
+      "test/results/resumed-c62e02ac-native50/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-185",
+    "title": "ADR-185 — Public sources and the cluster catalog",
+    "source": "docs/decisions/185-public-sources-and-cluster-catalog.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: adding regional clusters is explicit; fixed catalog slots, guard probes and restart-on-add are engineering choices.",
+    "qualification": "Source installation and subsequent ADR196 join pass; first installed profile still has one regional slot.",
+    "questions": {
+      "q1": "Every post-install regional join needed a catalog entry absent from immutable owner input.",
+      "q2": "User selected multi-cluster management, not a one-slot limit derived from probe count.",
+      "q3": "Normal cluster onboarding and configuration changes.",
+      "q4": "No evidence here that comparable control planes require a process restart per catalog change.",
+      "q5": "Named get/update for dry-run tests plus source policy/binding reads; catalog is not collection permission.",
+      "q6": "Empty, joined-but-unaccepted, source-changed and restart-required states add operational branches.",
+      "q7": "Slot names and probe-list caps tune implementation constraints rather than the user cluster model.",
+      "q8": "Depends on admission behavior, accepted connector registration and Kubernetes restart availability.",
+      "q9": "Per-source guard/probe reads grow with slots; the original eight-probe cap blocks larger deployments.",
+      "q10": "Joining works via ADR196 process restart; arbitrary catalog evolution and upgrade remain unqualified.",
+      "q11": "One bounded reconciled catalog with atomic validated snapshots could replace fixed slots and restarts."
+    },
+    "rationale": "The mutable catalog is useful; coupling cluster count to native probe inventory and pinned RBAC makes scale a code migration.",
+    "action": "Keep exact cluster identities and source validation; measure one reconciler for catalog changes, generate scoped RBAC from declared clusters, and qualify change/rollback before adding more fixed slots.",
+    "evidence": [
+      "docs/decisions/185-public-sources-and-cluster-catalog.md",
+      "docs/decisions/196-regional-cluster-join.md",
+      "internal/bootstrap/installer_continue.go"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-186",
+    "title": "ADR-186 — Operation-scoped public role proof",
+    "source": "docs/decisions/186-operation-scoped-public-role-proof.md",
+    "disposition": "simplify",
+    "provenance": "Engineering response to measured excessive proof repetition; role-per-operation isolation is not an explicit user requirement.",
+    "qualification": "Native continuation18 provisioned all historical66 roles; unit request-count regressions pass.",
+    "questions": {
+      "q1": "Runs12/13 stopped on role2: approximately141 API requests per role exceeded the five-second window.",
+      "q2": "No evidence user required repeating the same native proof for each narrow login.",
+      "q3": "Every install or credential-layout provisioning operation.",
+      "q4": "No comparable-project case for this many per-role native proofs established here.",
+      "q5": "No new privileges; an administrator still creates roles through protected installer inputs.",
+      "q6": "Opening, post-SQL proof, completion and unknown claim states must coordinate one retained operation.",
+      "q7": "No user-facing knob; five-second operation and role inventory dictate behavior.",
+      "q8": "Depends on API throttling and PostgreSQL lock duration.",
+      "q9": "Minimal fixture reduced141 to about56 requests per role; aggregate installed-role cost remains unmeasured here.",
+      "q10": "Fresh install qualified; immutable role-layout migration is not.",
+      "q11": "Provision fewer trust-boundary roles under one reviewed installer plan and batch immutable inventory checks."
+    },
+    "rationale": "Proof reuse is a valid local fix, but optimizes a high-cost role graph instead of justifying its granularity.",
+    "action": "Retain the scoped operation until role inventory is redesigned; compare a small set of privilege boundaries and one installer proof per bounded batch, preserving exact grants and transaction checks.",
+    "evidence": [
+      "docs/decisions/186-operation-scoped-public-role-proof.md",
+      "internal/adapters/kubernetes/public_runtime_roles.go",
+      "internal/adapters/postgres/public_runtime_roles.go",
+      "docs/decisions/177-hub-sql-connection-governor.md"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-187",
+    "title": "ADR-187 — Replay after the guard bridge",
+    "source": "docs/decisions/187-replay-after-guard-bridge.md",
+    "disposition": "simplify",
+    "provenance": "Engineering repair for guard-generation pinning; replayable Helm upgrades support the explicit installation goal.",
+    "qualification": "Native continuation23 passed completed hook/continuation replay with unchanged guard and journal.",
+    "questions": {
+      "q1": "Helm upgrade always failed after bridge generation advanced; deterministic design defect.",
+      "q2": "No accepted requirement to make completed installation unreadable after its own guard transition.",
+      "q3": "Normal upgrade/replay path.",
+      "q4": "Idempotent desired-state reconciliation is the relevant comparison; detailed external review is separate.",
+      "q5": "Read-only bridge reconstruction adds no runtime authority; credential inbox cleanup remains privileged.",
+      "q6": "Original, probe and retained phases plus partial/complete replay need different effect rules.",
+      "q7": "No new setting; exact phase/template machinery requires code maintenance.",
+      "q8": "Depends on live policy generations and retained journal object identities.",
+      "q9": "Adds one journal and policy GET to passive reads; cumulative installer proof cost remains larger.",
+      "q10": "Completed replay tested; partial replay after worker launch explicitly outside scope.",
+      "q11": "One versioned reconciler with explicit completed checkpoints could avoid phase-specific readers."
+    },
+    "rationale": "The fix is necessary under the present bridge, but completed replay alone is not an upgrade protocol.",
+    "action": "Keep the regression and read-only/effect distinction; replace the bridge-specific replay branches when introducing a versioned, resumable installer. Prioritize recovery from partial completion.",
+    "evidence": [
+      "docs/decisions/187-replay-after-guard-bridge.md",
+      "docs/decisions/183-installer-runtime-continuation.md",
+      "docs/decisions/188-configuration-role-post-lock-proof.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-188",
+    "title": "ADR-188 — Configuration role proof after the SQL locks and the bridge",
+    "source": "docs/decisions/188-configuration-role-post-lock-proof.md",
+    "disposition": "simplify",
+    "provenance": "Engineering decision addressing measured proof cost and normal controller status writes.",
+    "qualification": "Runs19–22 failed; continuation23 passed post-lock proof reuse and controller settling.",
+    "questions": {
+      "q1": "First configuration role failed when legitimate Deployment status updated during its exact-resourceVersion proof.",
+      "q2": "No documented user requirement to treat ordinary controller status changes as configuration tampering.",
+      "q3": "Normal installation after controllers are ungated.",
+      "q4": "No equivalent exact-resourceVersion settle requirement established for comparable installers.",
+      "q5": "No new privilege; CREATE ROLE retains administrator/root checks.",
+      "q6": "Opening/latest/rechecked proofs plus two-minute settling and uncertain one-use claims add branches.",
+      "q7": "Two stable reads one second apart and two-minute limit tune the workaround.",
+      "q8": "Depends on controller backoff, status churn and API/SQL timing.",
+      "q9": "Fixture118 requests/4.55s became83/3.25s per role; final verification85 versus120 requests.",
+      "q10": "Completed replay qualified, but ordinary rollout/version migration remains separate.",
+      "q11": "Pin security-relevant spec/UID/generation rather than unrelated status resourceVersion where safe."
+    },
+    "rationale": "Waiting for status quiescence compensates for overbroad identity comparison and still leaves high proof cost.",
+    "action": "Separate policy/spec changes from controller-owned status, with mutation-negative tests. Unify configuration/public role operations after reducing role granularity; keep current post-lock protection until replacement is qualified.",
+    "evidence": [
+      "docs/decisions/188-configuration-role-post-lock-proof.md",
+      "internal/adapters/kubernetes/configuration_role_recheck.go",
+      "internal/adapters/kubernetes/configuration_role_operation.go"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-189",
+    "title": "ADR-189 — Installed permission stream",
+    "source": "docs/decisions/189-installed-permission-stream.md",
+    "disposition": "keep",
+    "provenance": "Mixed: Kubernetes-managed permissions and audit are explicit; SQL stream/epochs, two purposes and supervising lane are engineering mechanisms.",
+    "qualification": "Continuation26 qualified fresh acknowledged stream; epoch/restart components exist. Finite permission-audit cleanup still identified as prerequisite.",
+    "questions": {
+      "q1": "Installed eligibility always failed because no product process produced the accepted permission stream.",
+      "q2": "User selected configurable Kubernetes permissions; not every freshness/epoch mechanism was separately required.",
+      "q3": "Every authorized capture or download depends on this path.",
+      "q4": "Kubernetes-backed permission reconciliation has precedent; exact stream/audit protocol comparison remains open.",
+      "q5": "Worker gains binding/source reads, narrowly denied probe-create and two SQL logins plus audit prefix.",
+      "q6": "Initial review, suspended epoch, unavailable source, pending audit and restart backoff require scrutiny.",
+      "q7": "Delegations are product policy; restart/lease timing is implementation-only.",
+      "q8": "Depends on watches, SQL, S3 and Transit; failure can block otherwise healthy capture paths.",
+      "q9": "Continuous source reconciliation and audit scale with bindings/changes; no production rate or WAL measurement here.",
+      "q10": "Restart covered; delegation-guard revision and finite audit cleanup remain gaps.",
+      "q11": "Compose the existing permission service; avoid inventing another evaluator or duplicating projection secrets."
+    },
+    "rationale": "This closes a real product authority gap. Keep its role, but do not treat rapid stream refresh or all audit state as immutable requirements.",
+    "action": "Complete bounded history cleanup and change recovery, then measure permission-update latency and steady-state reads jointly with capture/download budgets before adding more probes.",
+    "evidence": [
+      "docs/decisions/189-installed-permission-stream.md",
+      "docs/architecture/permission-observation.md",
+      "docs/decisions/200-on-demand-capacity-refresh.md",
+      "internal/contracts/public_runtime_worker.go"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-190",
+    "title": "ADR-190 — Capacity readiness around the promoted owner launch",
+    "source": "docs/decisions/190-capacity-readiness-and-promoted-owner.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: bounded resource/audit use is required; launch-dependent readiness cycle, dual SNI serving and exhaustive footprint inputs are engineering design.",
+    "qualification": "Promoted owner and capacity ReadyAt qualified by ADR194run9; native50 passes capacity and processing setup.",
+    "questions": {
+      "q1": "Capacity needed launched owner while owner startup needed capacity; deterministic bootstrap cycle.",
+      "q2": "No user requirement ties basic audit readiness to a particular owner launch or full resource-proof graph.",
+      "q3": "Every promoted installation and audited operation.",
+      "q4": "No comparable bootstrap cycle requirement established; compare staged ordinary service readiness.",
+      "q5": "Adds observation listener routing, broad workload metadata reads and dedicated namespace-probe TokenRequest.",
+      "q6": "Initialized-but-unready capacity, unavailable audit lanes, late projection and dual TLS routes are distinct states.",
+      "q7": "Numerous history/backups/footprint/proof-window inputs lack measured release defaults.",
+      "q8": "Depends on Kubernetes controllers, SQL, auditing providers and operator-supplied capacity qualification.",
+      "q9": "Per-Begin current profiles plus retained auditors; entire operational overhead unmeasured at scale.",
+      "q10": "First startup covered; longer retention, rotation and upgrades remain incomplete.",
+      "q11": "Initialize stable quotas/audit storage independently, then enable operations using ordinary service readiness."
+    },
+    "rationale": "Pinning current policies at Begin is useful; the capacity bootstrap apparatus exposes many internal assumptions as operator input.",
+    "action": "Produce one measured default small-install profile and separate durable quotas from volatile workload observations. Remove the launch cycle rather than accumulating extra launch modes and routers.",
+    "evidence": [
+      "docs/decisions/190-capacity-readiness-and-promoted-owner.md",
+      "internal/bootstrap/capacity_hub_worker.go",
+      "docs/architecture/capacity-production.md",
+      "test/results/resumed-c62e02ac-native50/result.json"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-191",
+    "title": "ADR-191 — Worker projection writes under one retained bracket",
+    "source": "docs/decisions/191-retained-bracket-projection-writes.md",
+    "disposition": "keep",
+    "provenance": "Engineering elimination of repeated proofs, not a new product requirement.",
+    "qualification": "Permission projection native26 passed; later installed continuation exercises related projection paths.",
+    "questions": {
+      "q1": "One journal read took about3s; permission claim had27ms left and failed.",
+      "q2": "No explicit requirement to reread the same guard graph before every CAS.",
+      "q3": "Every worker projection publication during install.",
+      "q4": "Versioned CAS with bounded observations is conventional; exact comparative study is separate.",
+      "q5": "No new permissions or credentials; existing role operation supplies authority.",
+      "q6": "One opening bracket, acknowledged CAS versions and closing policy check replace repeated branches.",
+      "q7": "No operator tuning added.",
+      "q8": "Kubernetes CAS and admission behavior remain external dependencies.",
+      "q9": "One handover proof plus about8 requests replaces up to8 full bridge reads; measured install scaling remains limited.",
+      "q10": "Unknown writes stay lookup-only; no existing-layout upgrade protocol supplied.",
+      "q11": "This is the smaller fix under current journals; eventual installer consolidation may remove the bridge."
+    },
+    "rationale": "Explicit ownership and CAS remove duplicated work without extra background state.",
+    "action": "Retain this local simplification and regressions; consolidate its bracket implementation with the versioned installer rather than creating one new wrapper per projection.",
+    "evidence": [
+      "docs/decisions/191-retained-bracket-projection-writes.md",
+      "internal/adapters/kubernetes/public_runtime_projection.go",
+      "docs/decisions/186-operation-scoped-public-role-proof.md"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-192",
+    "title": "ADR-192 — Capacity readiness before download paths",
+    "source": "docs/decisions/192-capacity-before-download-paths.md",
+    "disposition": "superseded",
+    "provenance": "Engineering staged-composition decision; deterministic replay and unavailable unconfigured downloads support accepted goals.",
+    "qualification": "Capacity ReadyAt qualified in continuation43; ADR194/204 later supply promoted inputs and installed download paths.",
+    "questions": {
+      "q1": "Bootstrap was blocked on unbuilt download services and replay minted different supposedly immutable identities.",
+      "q2": "User did not require all future subsystems to exist before starting capacity.",
+      "q3": "Every fresh install and replay.",
+      "q4": "No special prior-art claim; deterministic operation identifiers and explicit not-configured states are established patterns.",
+      "q5": "No new authority from empty paths; no download path means denial.",
+      "q6": "Unconfigured download, pending source, provider-prime retries and unrecoverable launch finalization remain.",
+      "q7": "Empty paths are a transitional state, not useful permanent configuration for full S-02.",
+      "q8": "Controller/provider startup behavior and SQL freshness affect readiness.",
+      "q9": "Removes needless startup dependency; duplicate environment and processing documents still require synchronized maintenance.",
+      "q10": "Deterministic replay fixed; no complete upgrade path.",
+      "q11": "Keep deterministic identities but fold transitional ordering into one current installation design."
+    },
+    "rationale": "The useful replay fix remains; regional worker placement and missing-product context were amended by ADR204.",
+    "action": "Mark superseded ordering/placement explicitly and consolidate current source ownership. Eliminate duplicate download-policy documents or define one canonical producer before adding path variants.",
+    "evidence": [
+      "docs/decisions/192-capacity-before-download-paths.md",
+      "docs/decisions/194-promoted-owner-inputs.md",
+      "docs/decisions/204-installed-downloads.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-193",
+    "title": "ADR-193 — Installed federation and regional cluster enrollment",
+    "source": "docs/decisions/193-installed-federation-and-regional-enrollment.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: explicit multi-cluster/outbound-only and rotating enrollment credential choices; provider recipe, fork fences and finite backing formula are engineering.",
+    "qualification": "Real two-cluster enrollment, restart and exact replay pass; Keycloak issuance components and Helm cluster hook pass. Layout upgrades unresolved.",
+    "questions": {
+      "q1": "Product could not enroll regions without fixture roots; typical required function, not hypothetical.",
+      "q2": "User selected rotating regional Secret; did not choose a30-minute installer or immutable role layout.",
+      "q3": "All new regional clusters and credential renewals.",
+      "q4": "Outbound agents/gateways are comparable; exact compound bootstrap/fork/audit protocol precedent not established here.",
+      "q5": "Adds federation endpoint, scoped PKI/KV/audit roles, regional installer admin and one named credential Secret update.",
+      "q6": "Generation0/pending/active/fenced, expired bootstrap, lost replies and provider setup waits create many states.",
+      "q7": "Backing retention/slots/proof-window arithmetic and several provider mounts are operator machinery.",
+      "q8": "Depends on OpenBao auth/PKI/KV, external TLS, SQL, S3 and two Kubernetes APIs.",
+      "q9": "Registration/signing proofs measured1.38/3.4s later; idle credential churn and aggregate installation cost unmeasured.",
+      "q10": "Exact same-input replay tested; different expired bootstrap requires namespace reinstall and new role layout lacks migration.",
+      "q11": "Keep outbound connector and one bootstrap capability; simplify onboarding around one resumable join record and supported credential recovery."
+    },
+    "rationale": "The user goal is real; manually transferring provider records and reinstalling on expiry creates avoidable operational burden.",
+    "action": "Qualify expired-bootstrap replacement and existing-install role migration before more cluster features. Compare operator-provisioned credentials or a single authenticated enrollment channel without duplicate installation journals.",
+    "evidence": [
+      "docs/decisions/193-installed-federation-and-regional-enrollment.md",
+      "docs/decisions/168-rotating-cluster-enrollment-credential.md",
+      "docs/decisions/197-regional-capacity.md"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-194",
+    "title": "ADR-194 — Promoted owner inputs",
+    "source": "docs/decisions/194-promoted-owner-inputs.md",
+    "disposition": "simplify",
+    "provenance": "Engineering resolution of missing producers; promotion toggle and disabled subprofiles are not independent user requirements.",
+    "qualification": "Native run9 promoted owner Ready and regional enrollment passed; native50 extends to publication.",
+    "questions": {
+      "q1": "Promoted binary could not start without worker, API and retention inputs that no installer produced.",
+      "q2": "No user requirement to preserve observation-only and partially promoted product modes indefinitely.",
+      "q3": "Typical installation; many branches exist solely for staged development.",
+      "q4": "No comparative need for this mode matrix established here.",
+      "q5": "Adds public TLS/OIDC, provider keys and immutable role projection checks; keeps roots out of hub.",
+      "q6": "Observation-only, empty topology, unconfigured workers, incomplete provider inputs and accepted mode combinations.",
+      "q7": "Promotion toggle and test-derived limits mostly preserve transitional paths; defaults explicitly unqualified.",
+      "q8": "Provider key readback, Kubernetes projection identity and catalog restart behavior.",
+      "q9": "Full projection byte comparisons and source proofs on startup; total resource behavior not measured by unit defaults.",
+      "q10": "Fresh install passed; mutable credentials versus immutable startup digest complicate rotation/upgrade.",
+      "q11": "One complete supported small-install profile with explicit unavailable optional features can replace transitional launch modes."
+    },
+    "rationale": "Completing input production is necessary; carrying every intermediate composition increases validation and maintenance cost.",
+    "action": "Consolidate 180/182/184/194 into current installer contracts, remove unused historical modes only after inventory, and provide measured defaults plus normal credential rotation.",
+    "evidence": [
+      "docs/decisions/194-promoted-owner-inputs.md",
+      "internal/bootstrap/installer_continue.go",
+      "docs/decisions/204-installed-downloads.md",
+      "test/results/resumed-c62e02ac-native50/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-195",
+    "title": "ADR-195 — Installed hub retention source",
+    "source": "docs/decisions/195-installed-hub-retention-source.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: administrator maximum retention and monotonic shortening are explicit; continuously fresh audited source and four SQL purposes are engineering.",
+    "qualification": "Native continuation8 proved baseline edit/restart; native50 publication consumes retention. Installed shortening and complete cleanup are separate gaps.",
+    "questions": {
+      "q1": "Installed captures always failed because no accepted hub retention source existed.",
+      "q2": "User requires effective deletion and maximum retention, not four same-process logins or five-second source liveness.",
+      "q3": "Every capture, publication and read; source changes are less frequent than reads, frequency unmeasured.",
+      "q4": "No comparison establishes this checkpoint/catch-up/audit graph as necessary for retention enforcement.",
+      "q5": "Four worker SQL purposes, retention CRD watch/probes and audit signing; no additional deployment.",
+      "q6": "Unaccepted baseline, initial review, pending checkpoint, catch-up, unsigned lifecycle and expired source can block users.",
+      "q7": "Baseline is real policy; extra status sentinel and source intervals are machinery.",
+      "q8": "Depends on Kubernetes watch continuity, SQL, object audit and Transit; outage propagates into ordinary reads.",
+      "q9": "Continuous watch plus fresh proof loops and catch-up pages; actual memory/API/WAL totals at scale unknown.",
+      "q10": "Restart tested; installed historical shortening and retention-policy evolution need qualification.",
+      "q11": "Use one retained versioned policy plus durable monotonic deletion deadlines; revalidate policy at a measured cadence."
+    },
+    "rationale": "Combining permission and retention projections was a concrete simplification. Requiring rapid source freshness even for an unchanged accepted retention ceiling needs separate justification.",
+    "action": "Keep monotonic effective dates and auditable policy changes. Evaluate event-driven policy acceptance with bounded stale-read semantics, retaining restrictive known changes, and consolidate same-process SQL roles where privilege analysis permits.",
+    "evidence": [
+      "docs/decisions/195-installed-hub-retention-source.md",
+      "internal/bootstrap/retention_worker.go",
+      "docs/architecture/retention-effects.md",
+      "docs/decisions/208-context-opening-client-burst.md"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-196",
+    "title": "ADR-196 — Regional cluster join",
+    "source": "docs/decisions/196-regional-cluster-join.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: regional cluster joining and write-only collectors are explicit; copying a join record and restarting pinned processes are engineering workarounds.",
+    "qualification": "Native continuation8 passed join, executor, restart and exact replay; native50 acquired regional evidence.",
+    "questions": {
+      "q1": "Installed catalog stayed empty and pinned templates prohibited ordinary Pod replacement.",
+      "q2": "No user requirement to restart the entire API process for one new cluster or rejoin for S3 credential rotation.",
+      "q3": "Normal regional onboarding and rotation.",
+      "q4": "Compare reconciled agent registration; no demonstrated need for immutable process-catalog snapshots here.",
+      "q5": "Adds owner L4 exposure, regional write-only S3 secret and administrator join command.",
+      "q6": "Partial offer, staged region, accepted join, process restart and failed immutable source reopen are distinct states.",
+      "q7": "Fixed slots, copied digests and several pin sets expose implementation constraints.",
+      "q8": "Depends on two APIs, connector PKI, object credentials, kubelet restart and hub availability.",
+      "q9": "Catalog digest read every second; join restarts API and later publisher/key service. Workload impact unmeasured.",
+      "q10": "Exact replay works; credential rotation changes startup digest and needs rejoin, and version upgrade lacks protocol.",
+      "q11": "Validated atomic catalog snapshots and versioned credential references could avoid process restarts and manual recopy."
+    },
+    "rationale": "The join record preserves exact identity, but immutability turns normal configuration changes into lifecycle operations.",
+    "action": "Retain explicit operator trust and exact target IDs; design one resumable join reconciliation and credential rotation path, then replace restart-on-catalog-change with bounded snapshot replacement if measured worthwhile.",
+    "evidence": [
+      "docs/decisions/196-regional-cluster-join.md",
+      "docs/decisions/185-public-sources-and-cluster-catalog.md",
+      "docs/decisions/203-installed-publisher.md",
+      "test/results/resumed-c62e02ac-native50/result.json"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-197",
+    "title": "ADR-197 — Regional capacity",
+    "source": "docs/decisions/197-regional-capacity.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: multi-cluster capture and administrator capacity ceilings are explicit; distributed five-second observations, per-root slots and freshness coupling are engineering.",
+    "qualification": "Regional qualification/enrollment pass named two-cluster tests and native47/50. Repeated historical runs expose availability defects, not production incident frequency.",
+    "questions": {
+      "q1": "Initially no regional admission; later bindings were usable only a few seconds per minute-scale discovery pass.",
+      "q2": "User did not select the observation graph or five-second physical-mapping interval; latest download timing clarification permits reevaluation there.",
+      "q3": "Every regional capture/download, including the first supported deployment.",
+      "q4": "Agent/gateway precedent supports outbound topology, not this exact holder/claim/federation proof graph.",
+      "q5": "Adds port9448, regional-capacity SQL login, namespace probe account, TokenRequest and cluster workload reads.",
+      "q6": "Qualification, pool revisions, standbys, source/permission freshness, child restart and demand/discovery interference multiply states.",
+      "q7": "Fixed16 accounts/qualification rows, one regional slot, pace and slot settings tune implementation limitations.",
+      "q8": "Two Kubernetes APIs, TLS routing, federation conversations, SQL and controller leases must cooperate.",
+      "q9": "Measured135–143 observer plus24–27 probe calls per remote observation; full-scale aggregate remains unknown.",
+      "q10": "Append-only qualifications/additive pool changes work; removal/non-additive changes and upgrades remain constrained.",
+      "q11": "Separate durable quota reservations from short-lived workload mapping; validate the requested target directly when needed."
+    },
+    "rationale": "The observed bottleneck is architectural: exhaustive discovery cannot maintain per-workload five-second readiness. Extra lanes and clients compensate for that mismatch.",
+    "action": "Prototype one demand-owned exact-workload validation with durable quota accounting and a documented freshness contract. Compare with bounded retained observations before adding clusters, standbys or higher client rates; retain known-negative handling and no replacement target.",
+    "evidence": [
+      "docs/decisions/197-regional-capacity.md",
+      "docs/decisions/200-on-demand-capacity-refresh.md",
+      "internal/application/capacity/reconciliation.go",
+      "internal/application/capacity/workload_discovery.go",
+      "docs/decisions/208-context-opening-client-burst.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-198",
+    "title": "ADR-198 — Installed key service",
+    "source": "docs/decisions/198-installed-key-service.md",
+    "disposition": "keep",
+    "provenance": "Mixed: managed encryption and keeping wrapping roots out of collectors/hub are explicit; one local key-service deployment and three/four purpose logins are engineering.",
+    "qualification": "Native key-service startup, TLS rejection and configuration acceptance pass; native48–50 show real wraps and verifier publication. Recovery/retirement remain unfinished.",
+    "questions": {
+      "q1": "Without a deployed key service every regional capture failed before source acquisition.",
+      "q2": "Hub-cluster administrator access to local root is explicitly accepted for small deployment; repeated probes cannot remove that risk.",
+      "q3": "Every encrypted capture and native download in the local-key profile.",
+      "q4": "Separate key authority is standard; repository compares local keys/OpenBao, not a full operational benchmark.",
+      "q5": "Only key service mounts root and dedicated SQL credentials; outbound regions reach9447; operator supplies serving TLS.",
+      "q6": "Unaccepted configuration, unavailable key service, rejected peer, lost root and unknown spent wrap are distinct failures.",
+      "q7": "Endpoint/roots are necessary; purpose/role inventory and immutable pins add setup work.",
+      "q8": "Depends on Kubernetes Secret durability, SQL, TLS rotation and operator backups.",
+      "q9": "Per-attempt bounded key operations, not per chunk; actual aggregate authentication/provider load remains unqualified.",
+      "q10": "Exact rerun preserves root; root rotation, retirement and disaster recovery are still open.",
+      "q11": "Keep one key boundary; complete restore and routine rotation before adding alternate key backends."
+    },
+    "rationale": "This process boundary has a concrete consequence: collectors cannot obtain the wrapping root or decrypt stored evidence. Its unfinished root recovery is more urgent than extra proof layers.",
+    "action": "Keep the isolated service and ciphertext-only producer. Qualify backup/restore and root rotation, then consider consolidating same-service SQL purposes and idempotent exact key operations without exposing roots.",
+    "evidence": [
+      "docs/decisions/198-installed-key-service.md",
+      "internal/bootstrap/key_service.go",
+      "internal/adapters/kubernetes/key_service_workload.go",
+      "docs/decisions/176-artifact-keys-local-key-service.md",
+      "test/results/resumed-c62e02ac-native50/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-199",
+    "title": "ADR-199 — One source read at each end of the executor proof",
+    "source": "docs/decisions/199-executor-proof-source-reads.md",
+    "disposition": "keep",
+    "provenance": "Engineering removal of redundant reads; bounded unobserved hub revocation was explicitly recorded in173/199, not instantaneous revocation.",
+    "qualification": "Installed executor cold proof passed ADR196run8 after failures measuring100–120 calls before expiry.",
+    "questions": {
+      "q1": "Full installed proof required about145 calls, exceeding20/20 five-second minimum; synthetic71-call fixture missed it.",
+      "q2": "Original observation already allowed unknown change within its bound; repeating every nested read was not user-required.",
+      "q3": "Every regional executor cold proof.",
+      "q4": "No novel protocol claimed; sharing one explicitly owned observation is ordinary composition.",
+      "q5": "No new rights, credentials or endpoint.",
+      "q6": "Opening/closing source and local process confirmation remain; intermediate duplicate states removed.",
+      "q7": "No new operator setting.",
+      "q8": "Opening still depends on hub registration and live Kubernetes source/guards.",
+      "q9": "Removes four of six approximately15-call source reads and a closing lifecycle conversation; native cold proof then fits.",
+      "q10": "No wire migration; other callers retain original behavior. Broader setup still needed207.",
+      "q11": "This is the smaller fix; further simplify the entire setup rather than layering more At variants blindly."
+    },
+    "rationale": "The evidence demonstrates local composition duplication, and the change makes ownership explicit without an ambient cache.",
+    "action": "Retain the regression and fold source ownership into one documented setup interface with173/178/207. Measure complete installed Open, not only the cold component.",
+    "evidence": [
+      "docs/decisions/199-executor-proof-source-reads.md",
+      "docs/decisions/207-context-setup-proof-bracket.md",
+      "test/results/adr196-continuation-native-8/environment.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-200",
+    "title": "ADR-200 — On-demand capacity refresh",
+    "source": "docs/decisions/200-on-demand-capacity-refresh.md",
+    "disposition": "simplify",
+    "provenance": "Engineering workaround for short capacity freshness; the user requires bounded resources, not a durable refresh-demand protocol.",
+    "qualification": "SQL demand checks and native47/48/50 sampling pass; native47 still refused final storage margin. ADR213 addresses use-time staleness.",
+    "questions": {
+      "q1": "Discovery made regional admission mostly unavailable; historical five-of-twelve passes depended on sampling a short window.",
+      "q2": "Five-second mapping freshness is labelled invariant in this ADR, but provenance is engineering and merits explicit risk review.",
+      "q3": "Every preview/admission/download on active regional workloads.",
+      "q4": "No comparable demand-table-plus-poll protocol necessity established; request-triggered refresh is the simpler baseline to compare.",
+      "q5": "Adds SECURITY DEFINER demand functions to preview/session roles; worker uses existing observation privileges.",
+      "q6": "Discovery, active demand, stale binding, waiting, thin result, failed demand and rearmed download add states.",
+      "q7": "60-second demand,250ms polling,16 demands and1-second margin tune this machinery.",
+      "q8": "Depends on worker scheduling and distributed proofs returning within existing source intervals.",
+      "q9": "One full regional observation repeatedly per demanded workload plus4 SQL polls/s per waiting request; aggregate concurrency unmeasured.",
+      "q10": "Two migrations retain names/rearm expired demands; no general workload removal or installation-upgrade qualification.",
+      "q11": "Request-owned direct validation plus durable allocation may avoid refreshing inactive bindings and SQL polling."
+    },
+    "rationale": "Demand refresh improves the known mismatch but turns a foreground read into coordination with a separate recurrent worker lane.",
+    "action": "Measure one complete foreground flow, then replace discovery-derived short authority with an explicitly reviewed mapping policy. Keep demand only if comparison beats a direct coalesced refresh; avoid widening effect retries.",
+    "evidence": [
+      "docs/decisions/200-on-demand-capacity-refresh.md",
+      "internal/application/capacity/refresh_demand.go",
+      "internal/application/capture/context_storage_wait.go",
+      "internal/adapters/postgres/capacity_refresh_demand.go",
+      "docs/decisions/213-storage-readiness-at-consumption.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-201",
+    "title": "ADR-201 — eBPF CPU profiles for every runtime",
+    "source": "docs/decisions/201-ebpf-cpu-profiles.md",
+    "disposition": "defer",
+    "provenance": "Mixed: first-class runtime profiles are explicitly required; one host-wide eBPF CPU sampler and supported runtimes are engineering selection.",
+    "qualification": "Design only; no adapter, target isolation qualification or Asservat overhead measurement. Upstream numbers are not product evidence.",
+    "questions": {
+      "q1": "Per-runtime adapter proliferation is anticipated; no implemented performance incident or user frequency measured.",
+      "q2": "User requires profiles and restricted workloads, not host-wide sampling as the only CPU implementation.",
+      "q3": "CPU profiling is normal product scope; universal runtime coverage is broader than initial Go pprof delivery.",
+      "q4": "ADR research cites official OTel profiler and Alloy; coverage/API statements require current verification before implementation.",
+      "q5": "Privileged node sampler reads runtime memory and temporarily sees other workloads; workload Pods remain restricted.",
+      "q6": "Unsupported kernel/runtime, unattributed samples, busy node, missing symbols and dependency changes need distinct handling.",
+      "q7": "Kernel/runtime matrix, duration and node concurrency are necessary product limits; avoid extra compatibility modes initially.",
+      "q8": "Kernel behavior, unstable upstream API, JIT layouts and GPL object distribution are outside project control.",
+      "q9": "Host-wide CPU/memory cost and attribution scalability unmeasured; upstream1%/250MB cannot be treated as qualification.",
+      "q10": "Pinned dependency and per-upgrade adapter qualification planned, not demonstrated.",
+      "q11": "Deliver existing Go pprof and a bounded native CPU spike before promising every runtime."
+    },
+    "rationale": "Reusing a maintained profiler is preferable to implementing many profilers, but universality adds privacy and qualification scope before the first installed download works.",
+    "action": "Defer production adapter until S-02 delivery and deletion succeed. Then qualify one supported kernel/runtime with real pod exclusion, local symbols and measured node overhead; expand from evidence.",
+    "evidence": [
+      "docs/decisions/201-ebpf-cpu-profiles.md",
+      "docs/research/ebpf-profiler.md",
+      "specs/profiles.md"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-202",
+    "title": "ADR-202 — Public API exposure",
+    "source": "docs/decisions/202-public-api-exposure.md",
+    "disposition": "keep",
+    "provenance": "Mixed: browser/MCP access is explicit; direct TLS and separate L4 service are engineering constraints.",
+    "qualification": "Unit exposure checks; native50 used installed public routes through capture/case and download preparation, although full journey failed.",
+    "questions": {
+      "q1": "Installed UI/MCP could not be reached outside the cluster at all.",
+      "q2": "Public authenticated access is required; no evidence user chose permanent exclusion of TLS-terminating ingress.",
+      "q3": "Every installation serving humans or MCP clients.",
+      "q4": "NodePort/LoadBalancer are ordinary Kubernetes mechanisms; supported ingress integration remains a separate comparison.",
+      "q5": "One public L4 Service exposing existing authenticated TLS listener; no additional application permissions.",
+      "q6": "Absent exposure, wrong origin/cert and unreachable Service fail; few new states.",
+      "q7": "Service type/node port/origin are ordinary deployment settings.",
+      "q8": "Depends on DNS, TLS certificate and cluster load balancer networking.",
+      "q9": "Negligible new application work per request; network/load-balancer scaling not measured.",
+      "q10": "Exact Service rerun tested; changed Service rejected rather than migrated.",
+      "q11": "This small exposure step is necessary; document one supported configuration before broad gateway adapters."
+    },
+    "rationale": "This is a small feature with direct user benefit and no extra authority subsystem.",
+    "action": "Keep direct TLS exposure and clear origin rules. Add a supported ingress/TLS termination mode only when users need it and trust-header behavior is qualified.",
+    "evidence": [
+      "docs/decisions/202-public-api-exposure.md",
+      "test/results/resumed-c62e02ac-native50/result.json",
+      "docs/decisions/194-promoted-owner-inputs.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-203",
+    "title": "ADR-203 — Installed publisher",
+    "source": "docs/decisions/203-installed-publisher.md",
+    "disposition": "keep",
+    "provenance": "Mixed: encrypted verification before visibility is required; process-isolated publisher and provider recipe are engineering implementation.",
+    "qualification": "Native48–50 independently verified, audit-acknowledged and published artifacts. Compiled-role SQL/S3 regression passes; complete S-02 still fails at download.",
+    "questions": {
+      "q1": "Every stored artifact remained invisible because installed publisher was absent; actual omitted retention grants later blocked it.",
+      "q2": "User did not require static tokens or fixture authority; independent evidence verification remains valuable.",
+      "q3": "Every completed capture.",
+      "q4": "Independent verification is sensible; exact six-purpose/provider setup is not established as minimal by comparison.",
+      "q5": "Adds separate ciphertext read principal, verifier-only cert and audit principal; keeps roots and producer writes separate.",
+      "q6": "Pending verification, spent unwraps, pending audit, expired credential and changed catalog create failure states.",
+      "q7": "Several provider keys/roles and credential inputs increase installer workload.",
+      "q8": "OpenBao authentication/signing, SQL, versioned object reads and catalog guards must all succeed.",
+      "q9": "Full artifact verification plus renewal and catalog polling; throughput and concurrent publication load not measured.",
+      "q10": "Process credentials rotate; catalog changes force restart; role-layout and image upgrade unqualified.",
+      "q11": "Keep an isolated verifier but share installation/controller machinery and consolidate same-process logins where safe."
+    },
+    "rationale": "Unlike every-purpose SQL isolation, this process boundary separates producer writes from decrypted verification. It now has meaningful installed evidence.",
+    "action": "Preserve publisher isolation and full verification; prioritize recoverable retries and operational visibility, then reduce provider/role setup duplication without combining it with the collector.",
+    "evidence": [
+      "docs/decisions/203-installed-publisher.md",
+      "test/results/resumed-c62e02ac-publication-grants-green/result.json",
+      "test/results/resumed-c62e02ac-native50/result.json",
+      "docs/decisions/181-asynchronous-publication-verifier.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-204",
+    "title": "ADR-204 — Installed native downloads",
+    "source": "docs/decisions/204-installed-downloads.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: authenticated native downloads are explicit. Per-download Pod/enrollment, repeated five-second policy proofs and role graph are engineering; relaxed bounded permission recheck is now authorized.",
+    "qualification": "Provisioning/configuration acceptance pass. Native50 reserved one Preparing session but no worker/batch/bytes; whole-phase TLS reproducer fails at4.951s before claim/create.",
+    "questions": {
+      "q1": "Installed download is unusable in native50; component successes did not exercise full protected-reader cost.",
+      "q2": "User accepts bounded permission-change latency and does not require interrupting in-flight downloads immediately.",
+      "q3": "Every gathered artifact must be downloadable; this is core delivery, not an edge case.",
+      "q4": "Compare isolated bounded download services with short-lived workers; no evidence each4096-byte context needs a new Pod.",
+      "q5": "Adds worker namespace/Job rights, TokenReview, read-only S3, acquisition PKI/key authority and download-audience client.",
+      "q6": "Reservation, dispatch audit, one-use claim, Pending, enrollment, native attachment, batches, uncertainty and cleanup are many states.",
+      "q7": "Worker controls, path templates, provider lifetimes and separate client settings partly operate this machinery.",
+      "q8": "Kubernetes scheduling, API guards, SQL, IdP, PKI and key service all precede first bytes.",
+      "q9": "Actual policy: 14 observer/3 probe calls, twice per full environment gate. Ten launch gates imply 280 observer calls and a 13s ideal 20/20 wait. This is arithmetic, not native-cause proof.",
+      "q10": "Fresh provisioning works; existing-layout upgrade, worker replacement and installed lifecycle not qualified.",
+      "q11": "Use one measured bounded policy observation per request/interval and evaluate a reusable isolated acquisition service for small artifacts."
+    },
+    "rationale": "A secure download requirement has accumulated a launch protocol whose measured protected reads cannot fit its chosen request budget. More continuation stages alone do not solve it.",
+    "action": "First implement the already-authorized relaxed bounded recheck contract and remove adjacent duplicate checks, preserving human scope, encryption, accounting and cancellation. Qualify full prepare-to-first-byte flow. Then compare per-download Pods with bounded pooled isolated readers before expanding download profiles.",
+    "evidence": [
+      "docs/decisions/204-installed-downloads.md",
+      "AGENTS.md",
+      "internal/application/evidence/context_native_runtime.go",
+      "docs/architecture/download-environment.md",
+      "test/results/resumed-c62e02ac-download-policy-budget",
+      "test/results/resumed-c62e02ac-download-whole-phase-budget",
+      "test/results/resumed-c62e02ac-native50/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-205",
+    "title": "ADR-205 — Installed context deletion",
+    "source": "docs/decisions/205-installed-context-deletion.md",
+    "disposition": "keep",
+    "provenance": "Mixed: effective managed deletion and finite storage are explicit; three same-process SQL duties and signed deletion protocol are engineering.",
+    "qualification": "Merged PR41; SQL paging/deletion and real scoped S3 credential qualification pass. Native50 armed the deletion fault but failed download before lifecycle completion.",
+    "questions": {
+      "q1": "Expired installed artifacts were never removed and their charges never released; deterministic missing composition.",
+      "q2": "User accepts inability to erase downloaded external copies, not indefinite managed evidence retention.",
+      "q3": "Every expired artifact; failed cleanup and restore are operationally important but field frequency unknown.",
+      "q4": "Garbage collection/inventory and retryable deletion have precedent; exact signed three-role protocol needs separate proportionality review.",
+      "q5": "Worker gains list/delete/abort-only evidence principal and dedicated signing path, never evidence read/put.",
+      "q6": "Eligible, leased, partial purge, inventory complete, audit pending and release pending states preserve uncertain deletion.",
+      "q7": "30-second sweep and16-row pages are internal controls; operator must supply another scoped credential.",
+      "q8": "Provider version/multipart semantics and policy implementation matter; SeaweedFS required a qualified method condition.",
+      "q9": "Bounded pages prevent starvation; inventory work grows with versions/uploads. Production sweep throughput remains unmeasured.",
+      "q10": "Failed cleanup is retryable; current changed templates/role pins are fresh-install-only and upgrades unqualified.",
+      "q11": "Keep positive inventory-before-release; consider one cleanup transaction role instead of three logins held by one process."
+    },
+    "rationale": "Deletion has direct privacy/storage value and the pager fixes a concrete starvation case. Do not postpone installed cleanup qualification for more proof machinery.",
+    "action": "Complete expiry, failed purge, durable audit and charge-release in the installed journey. Preserve denied reads/writes and inventory evidence; separately assess whether same-process role/signing separation adds enough value.",
+    "evidence": [
+      "docs/decisions/205-installed-context-deletion.md",
+      "docs/research/installed-evidence-deletion-permissions.md",
+      "test/results/resumed-c62e02ac-native50/result.json",
+      "docs/research/installed-sql-budget.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-206",
+    "title": "ADR-206 — Bounded approved pod-status projection reads",
+    "source": "docs/decisions/206-bounded-context-projection.md",
+    "disposition": "defer",
+    "provenance": "Mixed: approved browser/MCP inspection is explicitly required; separate query ledger, worker purpose and four-deployment backing are engineering, not a new user-selected feature.",
+    "qualification": "Component query/capacity/transport foundations exist; production composition and native query qualification absent.",
+    "questions": {
+      "q1": "Users need approved content inspection; no deployed query failure frequency. Current design adds machinery for a4096-byte artifact.",
+      "q2": "No user requirement for per-read acquisition workers, separate finite installation backing or five-second repeated probes.",
+      "q3": "Ordinary inspection is core; full general-query isolation is unnecessary for fixed14-field pod status.",
+      "q4": "No comparable requirement for four deployment-capacity proofs before a tiny metadata projection established here.",
+      "q5": "New query-specific SQL/key/worker purposes and acquisition authority; no plaintext disk cache allowed.",
+      "q6": "Pending admission, worker enrollment, one-use batch start, delivery uncertainty, joined closure, exhaustion and expiry form another lifecycle.",
+      "q7": "10-second total,60-second maximum, two4MiB batches and finite guard/provider/history allowances are engineering policy.",
+      "q8": "Depends on four deployment guards, measured-image reports, Kubernetes workers, SQL, TLS, keys and durable audit.",
+      "q9": "Up to8MiB charged read work for ≤4096-byte source; conservative accounting, not measured bytes. Separate guards/history multiply cost; no installed measurement.",
+      "q10": "Original-install-only backing; adding extension, renewal, retirement and upgrade are unresolved.",
+      "q11": "Reuse a bounded isolated acquisition/delivery service with a typed projection permission and existing resource accounting."
+    },
+    "rationale": "Separate authorization for approved reads is sound; a second end-to-end worker/accounting protocol duplicates an already unfinished download system.",
+    "action": "Defer production query composition until native download works. Compare a typed fixed projection within the same isolated reader/lifecycle, with distinct operation authorization and bounded output, before implementing extra guard and ledger layers. Keep the inspection requirement.",
+    "evidence": [
+      "docs/decisions/206-bounded-context-projection.md",
+      "docs/architecture/context-projection.md",
+      "docs/architecture/context-query-capacity.md",
+      "internal/application/evidence/context_projection.go"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-207",
+    "title": "ADR-207 — One native proof bracket for context-start setup",
+    "source": "docs/decisions/207-context-setup-proof-bracket.md",
+    "disposition": "simplify",
+    "provenance": "Engineering reduction of setup proof duplication; original bounded unknown-change semantics are explicit in173/199.",
+    "qualification": "Selected native setup and component races pass; native48–50 reach acquisition/publication. Sustained installed opening availability remains unmeasured.",
+    "questions": {
+      "q1": "Installed openings failed; nested registration re-read the same source and full setup exceeded its chosen budget.",
+      "q2": "No user demand for repeated own-credential proofs at every nested callback.",
+      "q3": "Every regional standby opening, not just failures.",
+      "q4": "Owned observations are conventional; this multi-layer delegated proof graph is not justified by prior art here.",
+      "q5": "No new privileges; private observation handoff cannot authorize other lifecycle purposes.",
+      "q6": "Atomic generation, private reader lifetime, closing proof, callback count and joined cleanup add state to optimize earlier state.",
+      "q7": "No public setting; observer/input count changes alter feasibility.",
+      "q8": "Actual TLS/exporter, SQL registry and regional/hub API proofs all contribute latency.",
+      "q9": "Synthetic full opening114 observer/24 probe calls measured4.706s; selected simpler native cold setup1.804s is not installed timing.",
+      "q10": "Private implementation change; broad native lifecycle/upgrade still open.",
+      "q11": "One documented connector-session validation boundary could subsume the nested process/source wrappers."
+    },
+    "rationale": "The local reductions are supported, but a synthetic4.7-second best-case setup inside five seconds leaves no usable contention budget.",
+    "action": "Retain current correctness tests; consolidate173/178/199/207 into one explicit session/setup contract, re-evaluate redundant self-attestation and measure installed setup under concurrent capacity/audit work.",
+    "evidence": [
+      "docs/decisions/207-context-setup-proof-bracket.md",
+      "docs/decisions/199-executor-proof-source-reads.md",
+      "docs/decisions/208-context-opening-client-burst.md",
+      "test/results/resumed-c62e02ac-native50/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-208",
+    "title": "ADR-208 — Opening limiter for context-start Kubernetes clients",
+    "source": "docs/decisions/208-context-opening-client-burst.md",
+    "disposition": "simplify",
+    "provenance": "Engineering performance tuning after native failures; fixed20/20, later50/100 and preserving all repeated probes were not explicit user requirements.",
+    "qualification": "Installed acquisition/publication observed; no causal isolation or sustained aggregate API-load qualification. Initial burst-only revision failed under retries.",
+    "questions": {
+      "q1": "Installed openings and audit/retention/capacity paths repeatedly exhausted local limiter budgets despite millisecond API responses.",
+      "q2": "User now expressly rejects unproven security machinery causing runtime problems and permits relaxed download rechecks.",
+      "q3": "Normal openings, audits and readiness, with retries worsening demand.",
+      "q4": "Kubernetes APF is server-side protection, not evidence this application request graph is efficient.",
+      "q5": "No new RBAC; more dedicated clients can issue concurrent requests under the same identities.",
+      "q6": "Cold burst, depleted bucket, independent limiter starvation and retry feedback add performance states.",
+      "q7": "OpeningQPS/burst and growing client exemptions are implementation tuning.",
+      "q8": "Depends on API server capacity/APF fairness and shared-cluster workload.",
+      "q9": "Each selected client allows50 QPS/burst100; several added instances increase aggregate allowed pressure. Actual total steady-state load unknown.",
+      "q10": "Code-selected tuning is reversible; concurrency/load and upgrade behavior not qualified.",
+      "q11": "Reduce repeated reads and use measured bounded policy observations before increasing per-client rates again."
+    },
+    "rationale": "Separate rate limiters isolate unrelated work but do not cap total installation demand. A growing exemption list hides cumulative cost.",
+    "action": "Inventory actual client instances and measured total requests by operation. Replace duplicated proof work, select a practical bounded policy interval, and establish one installation-wide request budget before further rate changes.",
+    "evidence": [
+      "docs/decisions/208-context-opening-client-burst.md",
+      "AGENTS.md",
+      "internal/adapters/kubernetes/download_policy_request_budget_test.go",
+      "test/results/resumed-c62e02ac-download-whole-phase-budget",
+      "docs/decisions/197-regional-capacity.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-209",
+    "title": "ADR-209 — Two context-start standbys per hub owner",
+    "source": "docs/decisions/209-two-context-start-standbys-per-owner.md",
+    "disposition": "remove",
+    "provenance": "Engineering experiment based on a mistaken per-cluster standby assumption; no user requirement.",
+    "qualification": "Withdrawn after native65; implementation reverted.",
+    "questions": {
+      "q1": "Preview found no standby, but guessed solution conflicted with actual per-cluster slot and setup ownership.",
+      "q2": "User did not require duplicate standby connections.",
+      "q3": "Would have affected every owner opening to address intermittent availability.",
+      "q4": "No comparative justification needed for retaining a failed experiment as history.",
+      "q5": "No new privilege, but doubled concurrent authenticated connections/opening work.",
+      "q6": "Concurrent setup contention and standby rejection worsened existing failure modes.",
+      "q7": "Two-per-owner setting was internal machinery inconsistent with installed--standby1.",
+      "q8": "Depends on correct hub/region slot composition.",
+      "q9": "Opening load doubled when both reopened; no availability benefit established.",
+      "q10": "Actual revert completed; no migration required.",
+      "q11": "Keep one standby and fix opening cost/phase deadlines; do not revive multiplicity without evidence."
+    },
+    "rationale": "The premise was false and the experiment failed; it has no current implementation to preserve.",
+    "action": "Retain the withdrawn ADR as evidence, remove any active specification or comment promising two exchanges per owner, and require whole-path slot/cost evidence before a replacement.",
+    "evidence": [
+      "docs/decisions/209-two-context-start-standbys-per-owner.md",
+      "docs/decisions/211-completed-query-standby-transition.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-210",
+    "title": "ADR-210 — Installed processing changes by a privacy operator",
+    "source": "docs/decisions/210-installed-processing-changes.md",
+    "disposition": "simplify",
+    "provenance": "Mixed: privacy operators/control are accepted; separate initial processing ceremony, release lane and repeated short backing horizon are engineering.",
+    "qualification": "Native47–50 initialize via real authenticated console path. Restriction effects, release audit lane and browser cleanup remain incompletely qualified or absent.",
+    "questions": {
+      "q1": "Every preview failed because processing was never initialized; console login also lacked its SQL settings producer.",
+      "q2": "No explicit user requirement for a separate one-time privacy-operator action before every installation can capture.",
+      "q3": "Browser settings are universal; separate processing initialization/release workflow depends on operator needs.",
+      "q4": "No comparable requirement for an extra initialization ceremony established here.",
+      "q5": "Adds processing-decision SQL purpose, guarded source probe, browser observer and authenticatedCSRF route.",
+      "q6": "Uninitialized, restricted, release-unavailable, settings-unavailable and expired backing add operational states.",
+      "q7": "Processing operators are policy; one-day root interval and last-ten-second renewal constrain otherwise valid retention.",
+      "q8": "Depends on browser IdP, SQL, Kubernetes source and durable operation audit.",
+      "q9": "One extra pool per retained worker plus1Hz settings read; whole request proof cost remains material and unmeasured at scale.",
+      "q10": "Layout digest changes; release and cleanup absent, longer retention unsupported by current backing.",
+      "q11": "Accept initial processing policy as part of explicit installation, retaining authenticated operator changes afterward."
+    },
+    "rationale": "Wiring real operator control is necessary under current contracts, but mandatory initialization and backing expiry create avoidable blocked states.",
+    "action": "Evaluate installation-time explicit policy acceptance instead of an extra ceremony; complete reversible restriction/release and browser cleanup, and separate retention duration from short control freshness before adding controls.",
+    "evidence": [
+      "docs/decisions/210-installed-processing-changes.md",
+      "internal/transport/browser/processing.go",
+      "internal/bootstrap/public_processing.go",
+      "docs/research/installed-sql-budget.md",
+      "test/results/resumed-c62e02ac-native50/result.json"
+    ],
+    "confidence": "medium"
+  },
+  {
+    "id": "ADR-211",
+    "title": "ADR-211 — Return a completed target query to its original standby interval",
+    "source": "docs/decisions/211-completed-query-standby-transition.md",
+    "disposition": "keep",
+    "provenance": "Engineering transport correctness repair; no new user requirement or relaxation of work authority.",
+    "qualification": "Genuine actualHTTP2 failing-before regression; complete contextstart/mtls race packages pass. Later installed runs reach acquisition.",
+    "questions": {
+      "q1": "Completed query left an HTTP2 timer terminating next independent query; router also allowed concurrent frame readers.",
+      "q2": "No accepted behavior allows one completed query to corrupt a later operation or steal its frames.",
+      "q3": "Normal repeated previews then capture on a standby.",
+      "q4": "Explicit protocol phase ownership/deadline lifecycle is conventional; exact framework timer behavior tested directly.",
+      "q5": "No additional privilege, endpoint or capacity.",
+      "q6": "Query-busy and completed-idle transitions clarify existing states; unknown/failed queries remain terminal.",
+      "q7": "No added knob; original residency and all existing ceilings retained.",
+      "q8": "Depends on Go HTTP2 socket-deadline behavior, verified with real transport tests.",
+      "q9": "No added network calls; lock/reservation accounting prevents concurrent frame consumption.",
+      "q10": "Internal fix with preserved wire format; exact cancellation/expiry regressions cover reuse.",
+      "q11": "This is the minimal correction while retaining multiplexed passive standbys."
+    },
+    "rationale": "The extra lifecycle logic fixes a demonstrated transport race; removing it without replacing standby protocol would regress correctness.",
+    "action": "Keep exclusive query ownership, joined completion and original passive deadline restoration. If setup is redesigned, preserve equivalent semantics with fewer protocol modes.",
+    "evidence": [
+      "docs/decisions/211-completed-query-standby-transition.md",
+      "internal/transport/contextstart/router.go",
+      "internal/transport/contextstart/stream_query.go",
+      "docs/decisions/207-context-setup-proof-bracket.md"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-212",
+    "title": "ADR-212 — Remaining interval before one-use API preparation",
+    "source": "docs/decisions/212-api-preparation-remaining-interval.md",
+    "disposition": "simplify",
+    "provenance": "Engineering conservative one-second floor and passive replay correction; numeric floor is not user-selected or measured execution requirement.",
+    "qualification": "Real SQL red/green qualifies locks, no effects and expired replay; native48 headroom refusal then1.095163s preparation/acquisition succeeded.",
+    "questions": {
+      "q1": "Native45 persisted preparation with433.731ms left, consuming one-use opportunity without starting; expired replay masked uncertainty.",
+      "q2": "No user requirement to permanently lose an attempt solely because a speculative wrapping reply is uncertain.",
+      "q3": "Slow/contended ordinary capture path; production frequency unknown.",
+      "q4": "Idempotent preparation/reconciliation is the alternative to irreversible one-use effects; no exact prior-art comparison here.",
+      "q5": "No new privilege; existing authority/process/scope checks remain.",
+      "q6": "Adds known headroom refusal while distinguishing expired prepared passive state and actual effect uncertainty.",
+      "q7": "Hard-coded1s floor is a policy heuristic, not a measured safety/performance guarantee.",
+      "q8": "Post-lock DB clock and actual request deadlines depend on SQL scheduling and downstream work.",
+      "q9": "One extra database-time read; helps avoid futile preparation but does not reduce expensive prerequisite proofs.",
+      "q10": "Existing prepared rows remain immutable; no schema change. Long-term recovery still restricted.",
+      "q11": "Keep passive uncertainty fix; use idempotent exact preparation and measured workflow budgeting instead of permanent one-use loss where possible."
+    },
+    "rationale": "The passive replay repair is necessary. A fixed headroom floor reduces one symptom but cannot make an over-budget pipeline usable.",
+    "action": "Retain precise expired-row/no-create semantics and rollback error preservation. Reassess irreversible wrap/start accounting and derive any preparation floor from measured complete phases; do not treat1s as a performance guarantee.",
+    "evidence": [
+      "docs/decisions/212-api-preparation-remaining-interval.md",
+      "internal/adapters/postgres/api_context_execution.go",
+      "test/results/resumed-c62e02ac-api-preparation-green/result.json",
+      "test/results/resumed-c62e02ac-native48/result.json"
+    ],
+    "confidence": "high"
+  },
+  {
+    "id": "ADR-213",
+    "title": "ADR-213 — Storage readiness at consumption",
+    "source": "docs/decisions/213-storage-readiness-at-consumption.md",
+    "disposition": "simplify",
+    "provenance": "Engineering follow-up to readiness timing; no user requirement for two-phase polling or one-second storage selection margin.",
+    "qualification": "Genuine component red, full capture race10.066s green; native48 includes correction but does not establish consumption polling caused success.",
+    "questions": {
+      "q1": "Native47 demand sampling passed, then final authoritative storage had less than1s and refused.",
+      "q2": "User did not select this freshness-margin/wait protocol; no evidence accepted inconsistent replacement storage.",
+      "q3": "Normal requests with slow target/facts work.",
+      "q4": "No prior-art need for a durable background demand plus foreground two-phase wait established here.",
+      "q5": "No new privilege; same single demand attempt and storage read ports.",
+      "q6": "Hint running/joined, demand spent/failed, thin same-selection, polling and terminal cutoff require careful state tracking.",
+      "q7": "250ms poll/1s margin are inherited tuning; all retained fact deadlines constrain progress.",
+      "q8": "Depends on another process refreshing the exact binding before every original fact expires.",
+      "q9": "Adds up to4 storage reads/s while waiting and no fact re-resolution; aggregate requests/availability unmeasured.",
+      "q10": "No wire/schema migration; component cancellation/join tests pass, installed causal benefit not established.",
+      "q11": "Validate requested storage at consumption directly or use a measured retained mapping policy, eliminating the hint race."
+    },
+    "rationale": "Correct within the chosen contract, but compounds the demand design rather than eliminating its tight stale-read cycle.",
+    "action": "Keep current negative/identity tests while redesigning197/200 as one admission-readiness flow. Compare direct coalesced validation versus retained mappings, and remove early hint/consumption state if no measured benefit remains.",
+    "evidence": [
+      "docs/decisions/213-storage-readiness-at-consumption.md",
+      "internal/application/capture/context_storage_wait.go",
+      "test/results/resumed-c62e02ac-storage-consumption/verification.json",
+      "test/results/resumed-c62e02ac-native48/result.json"
+    ],
+    "confidence": "high"
+  }
+]

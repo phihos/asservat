@@ -206,7 +206,7 @@ func (r ContextQueryCall) Valid(now time.Time) bool {
 	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.InputFormat == "context-query-input/v1" &&
 		identity.Text(r.MACVersion, 64) && r.InputDigest != (artifact.Digest{}) && r.PrincipalDigest != (artifact.Digest{}) &&
 		(r.Tool == "get_file_excerpt" || r.Tool == "get_query_result") && r.Principal.Valid() &&
-		identity.Fresh(r.StartedAt, r.Until, now, 5*time.Second) && !r.WriteUntil.Before(r.Until) &&
+		identity.Fresh(r.StartedAt, r.Until, now, identity.EvidenceReadRequestWindow) && !r.WriteUntil.Before(r.Until) &&
 		!r.WriteUntil.After(r.StartedAt.Add(30*time.Second))
 }
 

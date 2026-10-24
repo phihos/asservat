@@ -1,0 +1,42 @@
+{
+  "scope": "Focused synthetic policy-observation ownership and domain/environment contract regression; no external fixtures.",
+  "baseline": {
+    "command_record": "red.json",
+    "log": "red.log",
+    "exact_test_snapshot": "red-test.go.txt",
+    "actual_exit": 1,
+    "go_package_seconds": 0.002,
+    "environment": {
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOMAXPROCS": "2",
+      "GOFLAGS": "-buildvcs=false -p=1"
+    },
+    "environment_provenance": "Actual recorded command invocation; original red.json omitted environment fields."
+  },
+  "intermediate": {
+    "command_record": "green.json",
+    "log": "green.log",
+    "actual_exit": 0,
+    "package_seconds": {
+      "authorization": 1.038,
+      "privacy": 1.007
+    }
+  },
+  "final": {
+    "command_record": "final-green.json",
+    "log": "final-green.log",
+    "actual_exit": 0,
+    "package_seconds": {
+      "authorization": 1.035,
+      "privacy": 1.008
+    },
+    "five_owned_source_hashes_unchanged": true
+  },
+  "qualification_limits": [
+    "Synthetic policy, recovery and processing ports; no real installed authority.",
+    "RED uses the existing raw port directly; no claim that concrete Kubernetes reader returns mutable aliased slices.",
+    "Does not qualify complete download preparation, byte delivery or installed workflow."
+  ],
+  "diff_check_actual_exit": 0
+}

@@ -1,0 +1,16 @@
+{
+  "passed": false,
+  "checks": [
+    "unavailable session stays hidden; local sign-in; 320px reflow",
+    "real cookie, CSRF and POST-refresh transport; no duplicate pageshow refresh or web storage",
+    "actual session handler rejects wrong-origin logout",
+    "actual canonical catalog/preview, selected pod, custom retention, privacy and stale assessment without forced replacement preview",
+    "explicit same-key acquisition continuation uses retained receipt, no new request or preview; reload remains passive",
+    "same-user session refresh preserves only reviewed handle, uncertain commit retries same key, accepted Pending, Finalizing, exact progress reload, real operation CSRF denial"
+  ],
+  "errors": [],
+  "external": [],
+  "violations": [],
+  "failure": "Error: response.json: Protocol error (Network.getResponseBody): No data found for resource with given identifier\nResponse body is not available for a response that was navigated away from. Read response.body() before triggering any navigation.",
+  "visiblePage": "- link \"Skip to content\":\n  - /url: \"#main\"\n- banner:\n  - link \"Asservat\":\n    - /url: /\n  - button \"Sign out\"\n- main:\n  - heading \"Evidence\" [level=1]\n  - paragraph: Inspect the saved details, or download the native file for your preferred compatible local tools.\n  - region \"Pod status\":\n    - heading \"Pod status\" [level=2]\n    - paragraph: Approved metadata · complete\n    - paragraph: \"May contain user data: personal identifiers, network addresses, paths.\"\n    - term: Access until\n    - definition: 10/12/2026, 3:01:48 PM\n    - term: Managed deletion\n    - definition: By 10/12/2026, 3:06:48 PM\n    - button \"Download\"\n  - paragraph: Downloaded copies are outside Asservat's automatic deletion. Follow your organization's handling and deletion policy.\n  - button \"Refresh evidence details\""
+}

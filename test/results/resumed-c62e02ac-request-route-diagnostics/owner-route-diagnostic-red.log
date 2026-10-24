@@ -1,0 +1,69 @@
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/valid
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-first-error
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/config-first/read/other
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-first-deadline
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/config-first/read/deadline
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-first-canceled
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/config-first/read/canceled
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-first-invalid
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/config-first/current
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-first-suspended
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/config-first/current
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/scope
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/config-first/scope
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-error
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/endpoints/read/other
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-deadline
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/endpoints/read/deadline
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-canceled
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/endpoints/read/canceled
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-binding
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/endpoints/current
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-pool
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/endpoints/current
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-invalid
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/endpoints/current
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-final-error
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/config-final/read/other
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-final-deadline
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/config-final/read/deadline
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-final-canceled
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/config-final/read/canceled
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-final-invalid
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/config-final/current
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-final-changed
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/config-final/current
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/context-canceled
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/context/canceled
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/current-route
+    owner_route_diagnostic_test.go:178: missing closed route refusal stage [] route-read/current
+=== RUN   TestOwnerRouteRefusalDiagnosticsKeepBoundaries/unreported
+--- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries (0.00s)
+    --- PASS: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/valid (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-first-error (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-first-deadline (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-first-canceled (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-first-invalid (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-first-suspended (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/scope (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-error (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-deadline (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-canceled (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-binding (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-pool (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/endpoints-invalid (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-final-error (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-final-deadline (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-final-canceled (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-final-invalid (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/config-final-changed (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/context-canceled (0.00s)
+    --- FAIL: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/current-route (0.00s)
+    --- PASS: TestOwnerRouteRefusalDiagnosticsKeepBoundaries/unreported (0.00s)
+=== RUN   TestOwnerRouteRefusalReachesAuthenticatorSink
+    owner_route_diagnostic_test.go:217: receiving diagnostic sink lost detailed route stage [final-local/route-read@>=2s]
+--- FAIL: TestOwnerRouteRefusalReachesAuthenticatorSink (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/fleet	0.002s
+FAIL

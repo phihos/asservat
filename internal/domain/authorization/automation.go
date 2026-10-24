@@ -153,7 +153,7 @@ func EvaluatePolicy(a AcceptedPolicyAuthority, p AutomationProjection, use Polic
 		}
 	}
 	q := p.Permissions
-	if !q.Revision.Valid() || q.Target != use.Target || !q.DeniesComplete || !identity.Fresh(q.ObservedAt, q.FreshUntil, now, 60*time.Second) || !identity.Fresh(q.DeniesObservedAt, q.DeniesFreshUntil, now, 5*time.Second) || !rowsValid(q.Allows) || !rowsValid(q.Denies) {
+	if !q.Revision.Valid() || q.Target != use.Target || !q.DeniesComplete || !identity.Fresh(q.ObservedAt, q.FreshUntil, now, 60*time.Second) || !identity.Fresh(q.DeniesObservedAt, q.DeniesFreshUntil, now, PermissionObservationInterval) || !rowsValid(q.Allows) || !rowsValid(q.Denies) {
 		return deny("PermissionUnavailable")
 	}
 	until := identity.Earlier(a.NotAfter, identity.Earlier(p.FreshUntil, identity.Earlier(q.FreshUntil, q.DeniesFreshUntil)))
@@ -163,7 +163,7 @@ func EvaluatePolicy(a AcceptedPolicyAuthority, p AutomationProjection, use Polic
 	// A deny affecting any pinned sponsoring team or this executor blocks the
 	// policy. An unrelated personal deny does not revoke team delegation.
 	for _, d := range q.Denies {
-		if !identity.Fresh(d.ObservedAt, d.FreshUntil, now, 5*time.Second) {
+		if !identity.Fresh(d.ObservedAt, d.FreshUntil, now, PermissionObservationInterval) {
 			return deny("PermissionUnavailable")
 		}
 		until = identity.Earlier(until, d.FreshUntil)

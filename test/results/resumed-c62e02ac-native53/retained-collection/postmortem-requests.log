@@ -1,0 +1,14 @@
+BEGIN
+SET
+ id | created_at | deadline | closed_at 
+----+------------+----------+-----------
+(0 rows)
+
+                  id                  |        operation_name        | status  |  reason  |  effect  |         recorded_at         |       metadata_until        
+--------------------------------------+------------------------------+---------+----------+----------+-----------------------------+-----------------------------
+ 42d6fcaa-0542-4fd4-8cb8-b08c0f3fa822 | connector_process_enrollment | success | prepared | accepted | 2026-10-22T20:39:24.120866Z | 2026-10-22T20:39:28.559426Z
+ 97896ccd-2b2e-4b02-b9ca-4883f235f718 | connector_client_certificate | success | prepared | accepted | 2026-10-22T20:39:24.627677Z | 2026-10-22T20:39:28.559426Z
+ 58a5fd79-9a62-4cf2-bb12-8faf9730733c | connector_server_certificate | success | prepared | accepted | 2026-10-22T20:39:26.218691Z | 2026-10-22T20:39:30.532435Z
+(3 rows)
+
+COMMIT

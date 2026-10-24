@@ -11,4 +11,4 @@
     --- PASS: TestPermissionsWithRealKubernetes/watch_retains_rapid_ownership_transitions (0.54s)
     --- PASS: TestPermissionsWithRealKubernetes/binding_recreation_and_namespace_UID_pin (0.85s)
 PASS
-ok  	asservat.local/asservat/test/integration	15.524s
+ok  	asservat.local/asservat/test/integration	15.538s

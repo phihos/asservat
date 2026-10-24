@@ -1,0 +1,4 @@
+{
+  "baseCommit": "17e0ff6387e5e472037bb3a0bfdd7239ddbec95b",
+  "scope": "ADR222 isolated component, before ADR219/221 integration"
+}

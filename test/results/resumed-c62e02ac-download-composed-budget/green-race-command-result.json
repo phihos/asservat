@@ -1,0 +1,51 @@
+{
+  "argv": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "-run",
+    "^(TestIdentityPolicy|TestDownloadPreparationFirstJobFitsOriginal|TestDownloadPreparationNearExpiredIdentityObservation)",
+    "-v",
+    "./internal/adapters/kubernetes"
+  ],
+  "env": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "cwd": "/home/phil/Projekte/asservat-resume-0450e73c",
+  "started_at": 1792530791.3209853,
+  "duration_seconds": 23.367263793945312,
+  "exit_code": 0,
+  "source_hashes_before": {
+    "internal/adapters/kubernetes/identity_policy.go": "29c6f1cf27ec1db461203cc6769fcf2ac816463642717eb1aebd009986859c6f",
+    "internal/adapters/kubernetes/identity_policy_test.go": "ff2204d6cb56c0275ff72bd35e728adaeffa06ff3eb3b9048a487e7fd0a91983",
+    "internal/adapters/kubernetes/identity_policy_observation_test.go": "70333a679f027de81ef37781b10f9ad13a8bc7b0edc5c15fc5c6f2bbe50def61",
+    "internal/adapters/kubernetes/download_preparation_phase_budget_test.go": "32bf3bce83978f8bc2206854e4c8a8315a4e82bcad87b45d8d404b726b674345",
+    "internal/adapters/kubernetes/download_preparation_identity_budget_test.go": "a6ed7138359344536fd394e10c25db717e831081137861ac3fc431323ab90c1c",
+    "internal/application/authorization/download_policy_observation.go": "b10fc00e724bafbe0e61bc0c8c66766ca2c5dac52ff4c0bf3013d8cf6ea664e2",
+    "internal/application/authorization/download_environment.go": "c0244c93f3f807d4726d5bcf0bc6ef5463d310c020f27a90c58cc5c7d8a8c3e6",
+    "internal/domain/privacy/download_environment.go": "9c97e7ce3a957d6ce5ec171305bcc46ba06a4f17018d6e1deaf8fc302ac1604c"
+  },
+  "source_hashes_after": {
+    "internal/adapters/kubernetes/identity_policy.go": "29c6f1cf27ec1db461203cc6769fcf2ac816463642717eb1aebd009986859c6f",
+    "internal/adapters/kubernetes/identity_policy_test.go": "ff2204d6cb56c0275ff72bd35e728adaeffa06ff3eb3b9048a487e7fd0a91983",
+    "internal/adapters/kubernetes/identity_policy_observation_test.go": "70333a679f027de81ef37781b10f9ad13a8bc7b0edc5c15fc5c6f2bbe50def61",
+    "internal/adapters/kubernetes/download_preparation_phase_budget_test.go": "32bf3bce83978f8bc2206854e4c8a8315a4e82bcad87b45d8d404b726b674345",
+    "internal/adapters/kubernetes/download_preparation_identity_budget_test.go": "a6ed7138359344536fd394e10c25db717e831081137861ac3fc431323ab90c1c",
+    "internal/application/authorization/download_policy_observation.go": "b10fc00e724bafbe0e61bc0c8c66766ca2c5dac52ff4c0bf3013d8cf6ea664e2",
+    "internal/application/authorization/download_environment.go": "c0244c93f3f807d4726d5bcf0bc6ef5463d310c020f27a90c58cc5c7d8a8c3e6",
+    "internal/domain/privacy/download_environment.go": "9c97e7ce3a957d6ce5ec171305bcc46ba06a4f17018d6e1deaf8fc302ac1604c"
+  },
+  "qualification": "Real loopback TLS and independent installed20QPS identity/policy clients, actual identity and download authority/coordinator/runtime/dispatcher; synthetic token crypto, SQL/audit/Job ports. No external fixture or installed end-to-end qualification.",
+  "terminal": {
+    "session_id": 72913,
+    "chunk_id": "28ea84",
+    "exit_code": 0
+  },
+  "go_package_seconds": 3.06,
+  "original_result_sha256": "d32c461f452af2dd95428815dd41943dd022625e7d39e8e63ab7d5a6a606ff37",
+  "original_result_cache_path": "/home/phil/.cache/asservat-build/recovered-c62e02ac/identity-policy-observation/green-race.json"
+}

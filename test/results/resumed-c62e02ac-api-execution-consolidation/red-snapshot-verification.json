@@ -1,0 +1,14 @@
+[
+  {
+    "source": "internal/contracts/public_runtime_api_execution_test.go",
+    "snapshot": "red-contracts-test.go.txt",
+    "sha256": "affd59138ea76e788afe65912ab4e3698b971002e6e8f32c80a2897b93722875",
+    "qualification": "Reconstructed from unchanged current test source and matched against the actual RED before/after SHA256 receipt."
+  },
+  {
+    "source": "internal/adapters/postgres/public_runtime_api_execution_test.go",
+    "snapshot": "red-postgres-test.go.txt",
+    "sha256": "842f02debb8d6305b48415483ab0d3355af9649892b74afe1de10a55a8be9970",
+    "qualification": "Reconstructed from unchanged current test source and matched against the actual RED before/after SHA256 receipt."
+  }
+]

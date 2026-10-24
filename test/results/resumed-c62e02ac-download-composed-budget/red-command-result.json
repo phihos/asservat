@@ -1,0 +1,28 @@
+{
+  "cwd": "/home/phil/Projekte/asservat-resume-0450e73c",
+  "command": [
+    "go",
+    "test",
+    "-count=1",
+    "-run",
+    "^TestDownloadPreparationFirstJobFitsOriginal(Policy|IdentityAndPolicy)Budget$",
+    "-v",
+    "./internal/adapters/kubernetes"
+  ],
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "started_utc": "2026-10-20T20:59:27.022564+00:00",
+  "exit_code": 1,
+  "wall_seconds": 21.181928399018943,
+  "finished_utc": "2026-10-20T20:59:48.960519+00:00",
+  "source_hashes_unchanged": true,
+  "source_hash_manifest": "red-source-sha256.txt",
+  "source_hash_count": 2588,
+  "original_result_sha256": "8678791d54cb33cf9a186cc1d034738a4ef6eebd2d49aa40c1c8032f42ed733d",
+  "original_result_cache_path": "/home/phil/.cache/asservat-build/recovered-c62e02ac/download-preparation-composed-budget/policy-cache-and-identity-first.json",
+  "hash_compaction": "Original before and after maps were verified equal; the single repository-relative manifest preserves every source hash."
+}

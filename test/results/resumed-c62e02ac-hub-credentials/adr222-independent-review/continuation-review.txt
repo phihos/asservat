@@ -1,0 +1,63 @@
+ADR222 continuation independent review by /root/review_pr41, 2026-10-23
+Tree: /home/phil/Projekte/asservat-hub-credentials-c62e02ac
+Scope: browser-cleanup retirement, physical SQL budget and adapted real-SQL
+fixture expectations after the prior exact grant-union source review.
+Read-only. No Go builds, tests, external fixtures or provider operations run.
+
+Final verdict: no remaining source blocker in the reviewed follow-ups.
+
+Found and corrected during review:
+public_runtime_roles_test.go attempted 81 simultaneous hub-runtime logins while
+test-custody.py starts max_connections=48. The parent replaced that impossible
+fixture assertion with actual pg_roles.rolconnlimit=81 readback, an ALTER to82
+that the producer must reject, and restoration to81. The existing actual18-slot
+ordinary pool plus two reserved1-slot pools still exercises saturation,
+cancellation/deadline and reuse. The owner role's actual25-login ceiling test
+remains. I inspected the correction; it does not increase fixture capacity.
+
+Checked source conclusions:
+- browser-cleanup has no current runtime consumer or SQL role-OID pin. Its
+  inventory/ordinal/grant arm is retired. The component cleanup API/tests remain;
+  installed browser cleanup is explicitly still pending. Browser-settings stays
+  outside the hub union and now uses the worker's retained-process role ceiling.
+- Physical hub pool capacity remains32: owner6 + ordinary18 + resolution1+1 +
+  capture3 + separate cold readers3. PoolCapacity describes compiled physical
+  capacity rather than credential count. One-hub installation requirement114
+  and server minimum117 including3 superuser slots remain unchanged.
+- Shared runtime verifier accepts only physical18 or1 for hub-runtime, not its
+  aggregate20 as a single pool. Exact manifest/role/grant checks remain.
+- Adapted real SQL negatives still exclude publication/catalog writes, capture
+  insertion/expectation changes, custody copy mutation, context key unwrap,
+  recovery clearing and audit deletion. These are real process boundaries.
+- Preview tests retain SQL23514 checks for immutable bindings, created-closed
+  previews and deletion of live previews; they no longer assert obsolete
+  same-process facet separation. API retained-check permission-lock revocation,
+  preparation headroom, expiry and cancellation tests retain their assertions.
+- Metadata helper still calls all seven typed adapters on real positive facts,
+  retains excluded privileges and post-permission-lock caller/identity/cancel
+  refusal. Helper pools are joined by subtest cleanup; no raised server budget.
+- This isolated222 base still has the already-known old worker-owner public
+  composition. Integrate the planned ADR219/221 removal before installed
+  startup qualification. This is not a request for compatibility machinery.
+
+Minimal existing external selections, sequentially on frozen integrated source:
+
+1. python scripts/test-custody.py --initial-installation
+   Existing mandatory fresh-database selection includes public/owner role
+   provenance and grant matrices, altered/ambient privileges, retained layout,
+   unknown effects, lock/expiry/recovery refusals and compiled draft SQL guards.
+   --run cannot be combined with --initial-installation in the current harness.
+
+2. python scripts/test-custody.py --run '^TestContextAdmissionWithRealServices$/^(api-execution-preparation-boundaries|api-execution-retained-check-revoked-during-permission-lock|api-execution-one-preparation-exact-result-historical-publication|download-worker-installed-original-authority)$'
+   Real shared18+2 pool concurrency/cancellation, three typed execution ports,
+   original preparation and revocation fences, separately compiled verifier and
+   publisher, and original-authority worker reserve/audit/claim chain.
+
+3. python scripts/test-custody.py --run '^TestCapacityProducerWithRealPostgres$'
+   Actual seven shared metadata readers after encrypted publication, exact
+   retained facts and post-lock deadline/cancellation guards. Do not select only
+   its final metadata child: earlier sibling subtests build the root/workload
+   state on which it depends.
+
+These are recommendations for qualification, not executed results. They do not
+replace the final installed workflow or prove wall-clock performance savings.

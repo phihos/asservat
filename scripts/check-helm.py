@@ -124,28 +124,53 @@ def check_bootstrap(directory):
     assert "registryAuthentication" not in json.loads(plain_input["data"]["bootstrap.json"])
     assert plain_pod["spec"]["volumes"][1]["projected"]["sources"][1]["serviceAccountToken"]["audience"] == "https://explicit-api.example"
 
-    # ADR-183 continuation: a later hook under the same runner account. Its
-    # public input names provider choices only; the superuser is projected.
+    # One fixed installer Pod owns both stages. Retirement refreshes the
+    # shared preparer projection before continuation; no second producer runs.
     continued = copy.deepcopy(values)
     c = continued["bootstrap"]["continuation"]
     c.update(enabled=True, ownerIssuerRootsPEM="-----BEGIN CERTIFICATE-----\nPUBLIC\n-----END CERTIFICATE-----\n")
     c["workerProvider"] = {"authMount": "worker-k8s", "authMountAccessor": "auth_kubernetes_1"}
     c["ownerProvider"] = {"authMount": "owner-k8s", "authMountAccessor": "auth_kubernetes_2"}
     cdocs = render(continued)
-    cpod, = [r for r in cdocs if r["kind"] == "Pod" and r["metadata"]["name"] == b["name"] + "-continuation"]
+    cpod, = [r for r in cdocs if r["kind"] == "Pod"]
+    assert cpod["metadata"]["name"] == b["name"] + "-bootstrap"
     cinput, = [r for r in cdocs if "continuation.json" in r.get("data", {})]
     assert cinput["immutable"] is True
     assert json.loads(cinput["data"]["continuation.json"])["namespace"] == "trusted-bootstrap"
-    assert int(cpod["metadata"]["annotations"]["helm.sh/hook-weight"]) > 0
+    assert cpod["metadata"]["annotations"]["asservat.io/bootstrap-runner"] == "five-command/v1"
+    assert "helm.sh/hook-weight" not in cpod["metadata"]["annotations"]
     assert cpod["spec"]["serviceAccountName"] == b["name"] + "-bootstrap-runner" and cpod["spec"]["activeDeadlineSeconds"] == 1800
-    assert [p["command"] for p in cpod["spec"]["initContainers"] + cpod["spec"]["containers"]] == [["/asservat", "initial-bootstrap"], ["/asservat", "installer-continue"]]
+    cphases = cpod["spec"]["initContainers"] + cpod["spec"]["containers"]
+    assert [p["name"] for p in cphases] == ["produce", "schema", "prepare", "retire", "continue"]
+    assert [p["command"] for p in cphases] == [["/asservat", c] for c in ["initial-bootstrap", "initial-bootstrap-schema", "initial-bootstrap-prepare", "initial-bootstrap-retire", "installer-continue"]]
+    assert len(cpod["spec"]["initContainers"]) == 4 and len(cpod["spec"]["containers"]) == 1
+    cmounts = {p["name"]: p["volumeMounts"] for p in cphases}
+    for phase in ["produce", "schema", "prepare", "retire"]:
+        assert cmounts[phase] == mounts[phase], "joining continuation broadened an earlier credential compartment"
+    assert cmounts["continue"] == [{"name": "scratch", "mountPath": "/run/asservat/initial-preparer", "subPath": "projection/preparer", "readOnly": True}, {"name": "continuation-input", "mountPath": "/run/asservat/installer-continue", "readOnly": True}]
+    cvolumes = {v["name"]: v for v in cpod["spec"]["volumes"]}
+    assert sum("emptyDir" in v for v in cvolumes.values()) == 1 and cvolumes["scratch"] == volumes["scratch"]
+    continuation_sources = cvolumes["continuation-input"]["projected"]["sources"]
+    assert continuation_sources[0]["configMap"]["name"] == cinput["metadata"]["name"]
+    assert continuation_sources[1] == {"serviceAccountToken": {"path": "administrator-token", "expirationSeconds": 600}}
+    assert continuation_sources[2] == {"secret": {"name": "operator-producer", "optional": False, "items": [{"key": "postgres-administrator.json", "path": "postgres-administrator.json"}]}}
+    cpublic, = [r for r in cdocs if "runner.json" in r.get("data", {})]
+    cref = json.loads(cpublic["data"]["runner.json"])
+    assert cref["continuationDigest"] == hashlib.sha256(cinput["data"]["continuation.json"].encode()).hexdigest()
+    assert cinput["metadata"]["name"] == b["name"] + "-continuation." + cref["continuationDigest"][:32]
+    cdigest = hashlib.sha256((cpublic["data"]["bootstrap.json"] + "\n" + cpublic["data"]["runner.json"]).encode()).hexdigest()
+    assert cpod["metadata"]["annotations"]["asservat.io/bootstrap-input"] == cdigest and cdigest != digest
     assert "token" not in cinput["data"]["continuation.json"].lower()
     crole, = [r for r in cdocs if r["kind"] == "ClusterRole" and r["metadata"]["name"].endswith("-bootstrap-continuation")]
-    # ADR-204: the only delete is on Jobs, which the runner must hold to grant
-    # the hub-api's worker dispatch Role (RBAC admits only rules it holds).
+    # ADR-204 worker dispatch and ADR-196 operator maintenance retain exact
+    # resource/verb additions, never a blanket administrative wildcard.
     jobs, = [rule for rule in crole["rules"] if "jobs" in rule["resources"]]
     assert jobs == {"apiGroups": ["batch"], "resources": ["jobs"], "verbs": ["get", "create", "delete"]}
-    cverbs = {v for rule in crole["rules"] if rule is not jobs for v in rule["verbs"]}
+    binding_delete, = [rule for rule in crole["rules"] if "accessbindings" in rule["resources"] and "delete" in rule["verbs"]]
+    assert binding_delete == {"apiGroups": ["asservat.io"], "resources": ["accessbindings"], "verbs": ["delete"]}
+    pool_update, = [rule for rule in crole["rules"] if "evidencestoragepools" in rule["resources"] and "update" in rule["verbs"]]
+    assert pool_update == {"apiGroups": ["asservat.io"], "resources": ["evidencestoragepools"], "verbs": ["update"]}
+    cverbs = {v for rule in crole["rules"] if rule is not jobs and rule is not binding_delete for v in rule["verbs"]}
     assert "*" not in json.dumps(crole["rules"]) and not cverbs & {"escalate", "bind", "impersonate", "delete", "patch"}
     cbinding, = [r for r in cdocs if r["kind"] == "ClusterRoleBinding" and r["roleRef"]["name"] == crole["metadata"]["name"]]
     assert cbinding["subjects"] == [{"kind": "ServiceAccount", "namespace": "trusted-bootstrap", "name": b["name"] + "-bootstrap-runner"}]

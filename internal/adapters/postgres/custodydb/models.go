@@ -1013,13 +1013,16 @@ type ContextQueryBacking struct {
 }
 
 type ContextQueryBatch struct {
-	ID          pgtype.UUID
-	QueryID     pgtype.UUID
-	OperationID pgtype.UUID
-	Generation  int16
-	Batch       []byte
-	ClaimID     pgtype.UUID
-	Closed      bool
+	ID              pgtype.UUID
+	QueryID         pgtype.UUID
+	OperationID     pgtype.UUID
+	Generation      int16
+	Batch           []byte
+	ClaimID         pgtype.UUID
+	Closed          bool
+	NativeOperation []byte
+	NativeAuthority []byte
+	NativeClosed    bool
 }
 
 type ContextQueryCall struct {
@@ -1430,21 +1433,24 @@ type DownloadWindow struct {
 }
 
 type DownloadWorker struct {
-	ID               pgtype.UUID
-	SessionID        pgtype.UUID
-	RootID           pgtype.UUID
-	InstallationID   pgtype.UUID
-	AllocationID     pgtype.UUID
-	PrincipalKey     []byte
-	Generation       int64
-	IntentJson       []byte
-	RunUntil         pgtype.Timestamptz
-	AuditReceiptJson []byte
-	ClaimedAt        pgtype.Timestamptz
-	JobJson          []byte
-	BindingJson      []byte
-	TerminationJson  []byte
-	RetiredProofJson []byte
+	ID                pgtype.UUID
+	SessionID         pgtype.UUID
+	RootID            pgtype.UUID
+	InstallationID    pgtype.UUID
+	AllocationID      pgtype.UUID
+	PrincipalKey      []byte
+	Generation        int64
+	IntentJson        []byte
+	RunUntil          pgtype.Timestamptz
+	AuditReceiptJson  []byte
+	ClaimedAt         pgtype.Timestamptz
+	JobJson           []byte
+	BindingJson       []byte
+	TerminationJson   []byte
+	RetiredProofJson  []byte
+	QueryID           pgtype.UUID
+	QueryAllocationID pgtype.UUID
+	AbandonedAt       pgtype.Timestamptz
 }
 
 type DownloadWorkerCertificate struct {

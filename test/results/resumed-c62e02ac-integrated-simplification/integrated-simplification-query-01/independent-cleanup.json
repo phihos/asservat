@@ -1,0 +1,75 @@
+{
+  "at": "2026-10-23T00:58:53.598788+00:00",
+  "ownedNames": [
+    "asservat-custody-4205dsij-postgres",
+    "asservat-custody-4205dsij-s3"
+  ],
+  "network": "asservat-custody-4205dsij",
+  "checks": [
+    {
+      "command": [
+        "docker",
+        "ps",
+        "-aq",
+        "--filter",
+        "label=asservat.test=custody-4205dsij"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "docker",
+        "network",
+        "ls",
+        "-q",
+        "--filter",
+        "label=asservat.test=custody-4205dsij"
+      ],
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Id}}",
+        "asservat-custody-4205dsij-postgres"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error response from daemon: No such container: asservat-custody-4205dsij-postgres"
+    },
+    {
+      "command": [
+        "docker",
+        "container",
+        "inspect",
+        "--format",
+        "{{.Id}}",
+        "asservat-custody-4205dsij-s3"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error response from daemon: No such container: asservat-custody-4205dsij-s3"
+    },
+    {
+      "command": [
+        "docker",
+        "network",
+        "inspect",
+        "--format",
+        "{{.Id}}",
+        "asservat-custody-4205dsij"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": "Error response from daemon: network asservat-custody-4205dsij not found"
+    }
+  ],
+  "absent": true
+}

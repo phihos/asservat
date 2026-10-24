@@ -1,0 +1,16 @@
+{
+  "commit": "9543cff77c78bd7a3262e575820c47bd413dc430",
+  "argv": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "spec-check",
+    "architecture-check",
+    "design-check",
+    "go-architecture-check"
+  ],
+  "startedUnix": 1792704859.4695728,
+  "exitCode": 0,
+  "elapsedSeconds": 13.203,
+  "sourceCount": 3777,
+  "changedSources": []
+}

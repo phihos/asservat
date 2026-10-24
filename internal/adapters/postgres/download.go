@@ -15,7 +15,6 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"time"
@@ -207,7 +206,7 @@ func (s *Downloads) downloadFence(ctx context.Context, q *custodydb.Queries, p c
 	if err != nil {
 		return err
 	}
-	if !a.Valid(n.Time) || a.DeleteBy.IsZero() || id(a.Scope.RootID) != p.ID || id(a.PermissionEpoch) != p.Epoch || a.PermissionSequence != p.Sequence || !bytes.Equal(a.ProjectionDigest[:], p.ProjectionDigest) || p.Suspended || !p.InitialAuditID.Valid || !n.Time.Before(p.LeaseUntil.Time) || !identity.Fresh(p.ObservedAt.Time, p.FreshUntil.Time, n.Time, 5*time.Second) {
+	if !a.Valid(n.Time) || a.DeleteBy.IsZero() || id(a.Scope.RootID) != p.ID || id(a.PermissionEpoch) != p.Epoch || a.PermissionSequence != p.Sequence || !bytes.Equal(a.ProjectionDigest[:], p.ProjectionDigest) || p.Suspended || !p.InitialAuditID.Valid || !n.Time.Before(p.LeaseUntil.Time) || !identity.Fresh(p.ObservedAt.Time, p.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
 		return privacy.ErrFence
 	}
 	for _, v := range []pgtype.UUID{p.Epoch, p.InitialAuditID} {
@@ -237,10 +236,6 @@ func (s *Downloads) downloadFence(ctx context.Context, q *custodydb.Queries, p c
 	return s.recovery.check(ctx, q, recovery, a.Scope.RootID, a.Environment.Recovery())
 }
 
-// staleDownloadBinding is require_capacity_download_snapshot's refusal
-// (migration 00054) while the workload's capacity binding is stale (ADR-200).
-const staleDownloadBinding = "managed session backing unavailable"
-
 func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadReservation) (artifact.DownloadSession, error) {
 	var out artifact.DownloadSession
 	request := r.Session
@@ -252,9 +247,7 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 	if err != nil {
 		return out, err
 	}
-	stale := false // the last attempt's insert met a stale capacity binding
 	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		stale = false
 		recovery, err := s.recovery.lock(ctx, q, a.Scope.RootID, a.Environment.Recovery())
 		if err != nil {
 			return err
@@ -307,8 +300,6 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 		}
 		row, err := q.InsertDownloadSession(ctx, custodydb.InsertDownloadSessionParams{ID: id(request.ID), RootID: id(s.root), AllocationID: id(request.AllocationID), ArtifactID: id(request.Scope.ArtifactID), PrincipalKey: principalKey(request.Scope.Principal), ActorKey: digest(request.Scope.Principal), IdempotencyDigest: r.IdempotencyDigest[:], RequestDigest: request.RequestDigest[:], ScopeJson: encoded, Deadline: ts(request.Deadline), OutputLimit: request.OutputLimit, ReadLimit: request.ReadLimit, RequestLimit: request.RequestLimit, StopProtocol: pgtype.Text{String: request.StopProtocol, Valid: request.StopProtocol != ""}})
 		if err != nil {
-			var pe *pgconn.PgError
-			stale = errors.As(err, &pe) && pe.Code == "23514" && pe.Message == staleDownloadBinding
 			return err
 		}
 		if _, err = q.ChargeDownloadAllocation(ctx, custodydb.ChargeDownloadAllocationParams{ID: allocation.ID, RootID: allocation.RootID, ReservedOutput: request.OutputLimit, ReservedRead: request.ReadLimit}); err != nil {
@@ -320,9 +311,6 @@ func (s *Downloads) ReserveDownload(ctx context.Context, r evidence.DownloadRese
 		}
 		return s.downloadFence(ctx, q, p, a, topology, recovery)
 	})
-	if err != nil && stale && errors.Is(err, privacy.ErrUnavailable) {
-		return artifact.DownloadSession{}, evidence.ErrDownloadBindingStale
-	}
 	if err != nil {
 		return artifact.DownloadSession{}, err
 	}

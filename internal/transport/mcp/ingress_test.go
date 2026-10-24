@@ -30,6 +30,9 @@ type ingressAuditFixture struct {
 	outcomes  []audit.OperationOutcome
 	onReserve func(context.Context)
 	onOutcome func()
+	onCreate  func(context.Context) error
+	claims    atomic.Int64
+	creates   atomic.Int64
 	fail      bool
 }
 
@@ -46,6 +49,9 @@ func (f *ingressAuditFixture) ReserveOperation(ctx context.Context, in audit.Ope
 	if f.fail {
 		return audit.OperationSnapshot{}, errors.New("private provider error")
 	}
+	if f.onCreate != nil {
+		return audit.OperationSnapshot{Intent: in}, nil
+	}
 	return audit.OperationSnapshot{Intent: in, IntentReceipt: ingressReceipt(in, "intent")}, nil
 }
 func (f *ingressAuditFixture) FreezeOperationOutcome(_ context.Context, out audit.OperationOutcome) (audit.OperationSnapshot, error) {
@@ -57,13 +63,21 @@ func (f *ingressAuditFixture) FreezeOperationOutcome(_ context.Context, out audi
 	}
 	return audit.OperationSnapshot{Intent: out.Intent, IntentReceipt: ingressReceipt(out.Intent, "intent"), Outcome: &out, OutcomeReceipt: ingressReceipt(out.Intent, "outcome")}, nil
 }
-func (*ingressAuditFixture) ClaimOperationWrite(context.Context, audit.OperationIntent, string) (bool, error) {
+func (f *ingressAuditFixture) ClaimOperationWrite(context.Context, audit.OperationIntent, string) (bool, error) {
+	if f.onCreate != nil {
+		f.claims.Add(1)
+		return true, nil
+	}
 	panic("fixture receipt must exist")
 }
 func (*ingressAuditFixture) AcknowledgeOperation(context.Context, audit.OperationIntent, string, audit.Receipt) error {
 	panic("fixture receipt must exist")
 }
-func (*ingressAuditFixture) CreateOperationIntent(context.Context, audit.OperationIntent) (audit.Receipt, error) {
+func (f *ingressAuditFixture) CreateOperationIntent(ctx context.Context, _ audit.OperationIntent) (audit.Receipt, error) {
+	if f.onCreate != nil {
+		f.creates.Add(1)
+		return audit.Receipt{}, f.onCreate(ctx)
+	}
 	panic("fixture receipt must exist")
 }
 func (*ingressAuditFixture) FindOperationIntent(context.Context, audit.OperationIntent) (audit.Receipt, error) {

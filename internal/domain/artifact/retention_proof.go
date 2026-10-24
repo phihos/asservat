@@ -26,8 +26,15 @@ type RetentionSourceVersion struct {
 func (s RetentionSourceVersion) Valid() bool {
 	return uuid(s.ClusterID) && identity.Text(s.ControlNamespaceUID, 64) && uuid(s.Epoch) && s.ProtectionDigest != (Digest{}) && s.SnapshotDigest != (Digest{}) && uuid(s.Acceptance.UID) && s.Acceptance.Valid()
 }
+
+// RetentionProofInterval bounds a retention proof's observation interval. It
+// derives from accepted retention sources current for 30 seconds after their
+// own observation (ADR-200 revision 2026-10-23); invalidation still applies at
+// once because every effect rechecks the current source rows.
+const RetentionProofInterval = 30 * time.Second
+
 func (p RetentionProof) Valid(now time.Time) bool {
-	if !uuid(p.RootID) || !uuid(p.ClusterID) || !identity.Text(p.NamespaceUID, 64) || !identity.Text(p.WorkloadUID, 64) || !identity.Text(p.PodUID, 64) || !p.Topology.Valid() || !p.Policy.Valid() || !p.Selectors.Valid() || !identity.Fresh(p.ObservedAt, p.ValidUntil, now, 5*time.Second) || p.SourceCount < 1 || p.SourceCount > 2 {
+	if !uuid(p.RootID) || !uuid(p.ClusterID) || !identity.Text(p.NamespaceUID, 64) || !identity.Text(p.WorkloadUID, 64) || !identity.Text(p.PodUID, 64) || !p.Topology.Valid() || !p.Policy.Valid() || !p.Selectors.Valid() || !identity.Fresh(p.ObservedAt, p.ValidUntil, now, RetentionProofInterval) || p.SourceCount < 1 || p.SourceCount > 2 {
 		return false
 	}
 	for i, s := range p.Sources {

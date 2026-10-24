@@ -37,6 +37,7 @@ type serveExchange struct {
 	hold     bool
 	entered  chan struct{}
 	returned atomic.Bool
+	refused  atomic.Value
 }
 
 func (e *serveExchange) BeginWorkerEnrollment(ctx context.Context, installation, session, w string, token, csr []byte) (evidence.WorkerEnrollmentDelivery, error) {
@@ -97,6 +98,11 @@ func startServe(t *testing.T, exchange *serveExchange) (context.CancelFunc, chan
 	if err != nil {
 		t.Fatal(err)
 	}
+	handler.Refused = func(_ context.Context, purpose string, err error) {
+		if errors.Is(err, artifact.ErrDownloadUnavailable) {
+			exchange.refused.Store(purpose)
+		}
+	}
 	authority := net.JoinHostPort(serveName, strconv.Itoa(listener.Addr().(*net.TCPAddr).Port))
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -153,7 +159,7 @@ func TestServeReachesEnrollmentOnlyUnderItsProfile(t *testing.T) {
 			switch mode {
 			case "enrollment":
 				// The synthetic exchange refuses: 503 proves the handler ran.
-				if err != nil || resp.StatusCode != http.StatusServiceUnavailable || resp.Header.Get("Cache-Control") != "no-store, private" || exchange.calls.Load() != before+1 {
+				if err != nil || resp.StatusCode != http.StatusServiceUnavailable || resp.Header.Get("Cache-Control") != "no-store, private" || exchange.calls.Load() != before+1 || exchange.refused.Load() != "native-download" {
 					t.Fatal("enrollment did not reach the handler", err)
 				}
 				resp.Body.Close()

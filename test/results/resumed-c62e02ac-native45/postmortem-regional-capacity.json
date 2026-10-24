@@ -1,0 +1,34 @@
+[
+  {
+    "metadata": {
+      "creationTimestamp": "2026-10-20T15:37:02Z",
+      "name": "start-d7bb5be6-3e1e-4bd8-aca6-507de3780d3f",
+      "namespace": "asservat-connector",
+      "resourceVersion": "2380",
+      "uid": "2d1b472e-890c-46b9-b9a4-a1ce4ffe0e44"
+    },
+    "spec": {
+      "actionID": "pod-status",
+      "attemptID": "d7bb5be6-3e1e-4bd8-aca6-507de3780d3f",
+      "auditDigest": "e8749c78e4c50b0a38ff724e61b606406ab48adb91a3d0bef1514685f9a9e8a3",
+      "authorityDigest": "210ad47f8410eb12754a1bfa7c5f0f1976278075aabb562fd770445763b765d9",
+      "budgetDigest": "e01d75028d97a15f3750ee9cc1edf0607e5506fef7ac949876d0d461bd9a3588",
+      "captureID": "af3b6636-c8d3-470b-a7bb-721b0c13011f",
+      "clusterID": "3011982e-236a-4286-9c9c-3a1daa197450",
+      "collectorEpoch": "4c5b0da5-5d9c-4471-b60f-3a320a1b5edd",
+      "executorAccountUID": "7bce6fec-6cfb-4d88-a742-2f73dc0be72c",
+      "executorPodUID": "9c5bccc6-28cf-4079-af60-6c58a4bca14d",
+      "issuerEpoch": "5624e3be-28e0-4154-aef5-eaa3cbec5ecf",
+      "nativeBytes": 4096,
+      "notAfter": "2026-10-20T15:37:03.150747Z",
+      "notBefore": "2026-10-20T15:37:02.2523Z",
+      "operationID": "af3b6636-c8d3-470b-a7bb-721b0c13011f",
+      "podUID": "bf5d47b0-3106-442d-94ac-1a84801a44cc",
+      "profile": "apiContextStart/v1",
+      "scopeDigest": "cbe2cbac5beaa4ffd542fa112debf23945d70ca4698a91a4e4a715dbda9d92a1"
+    },
+    "status": {
+      "phase": "Ready"
+    }
+  }
+]

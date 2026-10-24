@@ -8,6 +8,16 @@ Version 1 fixes each accounting window at at most 64 MiB. The exact selected ran
 
 A 1 TiB selection has 16,384 windows and 32,768 audit objects, reserving 4 GiB of audit object capacity at the maximum object size. These are limits, not measured storage use or throughput. The implementation still requires realistic SQL/object-store/KMS cost measurement. Current source tests model this arithmetic without allocating a 1 TiB file.
 
+[ADR-220](../decisions/220-response-owned-download-permissions.md) gives this
+original response one private C-03 ordinary-entitlement observation, owned through
+C-14's bootstrap-supplied factory. Its 30-second reconstruction interval starts
+before the first permission I/O. Short batch closure retains only that ordinary
+decision; final response Close cancels/joins active work and discards it. Changed
+claims require new target eligibility before catalog reads; changed audience or
+artifact version cannot reuse it. New responses and preparation remain fresh.
+A failed refresh/safety check is terminal for that owner. This adds no global
+cache, SQL state or C-14 import of the C-03 implementation.
+
 Within one window, a fresh current identity observation and current SQL permission/retention/recovery checks establish a delivery lease of at most five seconds. Sequential reads/writes of at most 1 MiB reuse that lease only within its original interval. Every chunk checks the exact response/window/owner/generation, range, context cancellation and deadline. No bytes flow while obtaining a new observation. A new observation does not renew any old CurrentIdentity or lease; old work closes before the next identity batch begins. Reentry after an expired lease also reacquires the finite installation/principal stream lane. Known cancellation follows the owning context; independent remote changes are bounded by the original five-second interval plus bytes already emitted into transport buffers.
 
 The synchronous coordinator first checks identity and existing session authority and obtains verified native metadata/read-cost limits from a protected source. Unavailable source preflight has no reservation effects. It derives the selection through the existing HTTP conditional/range parser and derives whole-file status from the verified native size. It then reserves the exact response, admits one window, writes and independently verifies its encrypted intent, and obtains the audit acknowledgement before exposing headers or bytes. Intent/outcome keys use their own `download-window-audit/v1` namespace and cryptographic purposes. Existing v1 per-chunk records retain their original contract.

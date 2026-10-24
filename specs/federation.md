@@ -12,6 +12,14 @@ For the optional fresh-install observation-bootstrap profile, the original prote
 
 [ADR-155](../docs/decisions/155-unchanged-fleet-persistence-contention.md) permits only a classified failed persistence of an independently observed unchanged positive fleet source to retain its previous original SQL expiry without an additional suspension. Under [ADR-161](../docs/decisions/161-fleet-observation-separation.md), classification MUST require the fixed producer's exact authority-row lock abort before any mutation, rollback, and complete current source/row/semantic-version/database-incarnation comparison before and after blocking work. Table/observation-row failures and unknown commit outcomes MUST NOT select this exception. It MUST remain unavailable and MUST invalidate scheduling notices, create no write/success hint and never refresh a selected proof. Source-read errors, new/changed/suspended/recovery state, expiry, failed confirmation and uncertain commits MUST retain ordinary fencing. The next observation MUST be independently selected under normal cadence; no timeout, role, lock or retry bound changes follow.
 
+The installed federation's delegated owner authentication MUST perform the
+unchanged current registry, workload-protection and route checks. Its rendered
+Kubernetes role MUST permit GET of the exact owner ServiceAccount selected by
+the original installer inventory, so discovery can independently compare the
+account UID. This read MUST NOT grant account listing, token creation, credential
+reads or account mutation. Missing native permissions remain a refusal; no
+certificate-only or source-only fallback is permitted.
+
 ### SC-FED-001
 
 Given an enrollment token used once or a connector from another cluster, when registration/work polling is attempted, then replay/identity substitution is rejected. A hub request cannot widen a locally denied namespace.

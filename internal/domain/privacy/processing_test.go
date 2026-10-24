@@ -3,6 +3,7 @@ package privacy
 import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/identity"
 	"testing"
 	"time"
 )
@@ -97,5 +98,25 @@ func TestProcessingExpiredAdministrativeCoverageDoesNotRelease(t *testing.T) {
 	s.Rules[0].ReleaseAcknowledged = true
 	if !s.Allows(n) {
 		t.Fatal("independently acknowledged historical release not recognized")
+	}
+}
+
+// Installed native81: the approved-query processing read builds its snapshot
+// over the evidence observation (20 s), the evidence-read recovery proof
+// (20 s) and the processing root (valid for its backing period). That
+// snapshot must be allowed, and still ends at its earliest real bound.
+func TestProcessingSnapshotAllowsEvidenceReadInterval(t *testing.T) {
+	s, n := processingSnapshotFixture()
+	evidenceUntil, recoveryUntil, rootUntil := n.Add(identity.EvidenceReadRequestWindow), n.Add(identity.EvidenceReadRequestWindow), n.Add(time.Hour)
+	s.FreshUntil = identity.Earlier(identity.Earlier(evidenceUntil, recoveryUntil), rootUntil)
+	if !s.Allows(n.Add(time.Second)) {
+		t.Fatal("evidence-read processing snapshot refused")
+	}
+	if s.Allows(s.FreshUntil) {
+		t.Fatal("processing snapshot outlived its earliest bound")
+	}
+	s.FreshUntil = n.Add(identity.EvidenceReadRequestWindow + time.Microsecond)
+	if s.Allows(n.Add(time.Second)) {
+		t.Fatal("processing snapshot beyond the evidence-read window allowed")
 	}
 }

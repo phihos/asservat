@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	identities "asservat.local/asservat/internal/application/identity"
 	"bytes"
 	"context"
 	"errors"
@@ -40,7 +41,10 @@ type permissionWorker struct {
 	// contextDeletion deletes expired context evidence (ADR-205); nil
 	// without its section.
 	contextDeletion *contextDeletionWorker
-	closers         []func()
+	// browser projects the browser settings into SQL (ADR-210); nil without
+	// its section.
+	browser *identities.BrowserSettingsObserver
+	closers []func()
 }
 
 func (p *permissionWorker) Close() {
@@ -139,7 +143,7 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 	sql := &providerInputs{files: b.mounts, dir: contracts.PermissionWorkerProjectionDirectory, postgresEndpoint: c.Postgres}
 	w.closers = append(w.closers, sql.closeHTTP)
 	pools := map[string]*pgxpool.Pool{}
-	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil, c.WorkerConfiguration != nil, c.ContextDeletion) {
+	for _, purpose := range contracts.PermissionProjectionPurposes(c.Retention != nil, c.WorkerConfiguration != nil, c.ContextDeletion, c.Browser != nil) {
 		p, e := sql.sqlConfig(startup, "sql-"+purpose+".json")
 		if e != nil {
 			return nil, mounts.ErrUnavailable
@@ -184,6 +188,21 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	if b := c.Browser; b != nil {
+		browserObserver, e := kube.NewPermissionClient(kube.WithOpeningBurst(local.kubernetes("kube-observer.token")), c.Control.ClusterID, control, time.Now)
+		if e != nil {
+			return nil, &fixedStepError{"browser/client", e}
+		}
+		source, e := kube.NewBrowserSettingsClient(browserObserver, b.Settings.Name, b.Settings.UID, b.RootID)
+		if e != nil {
+			return nil, &fixedStepError{"browser/source", e}
+		}
+		projection, e := postgres.NewBrowserSettingsProjection(startup, pools["browser-settings"], b.RootID)
+		if e != nil {
+			return nil, &fixedStepError{"browser/projection", e}
+		}
+		w.browser = &identities.BrowserSettingsObserver{Source: source, Projection: projection, Now: time.Now}
+	}
 	w.reconciler = app.BindingReconciler{RootID: c.RootID, Reader: observer, Watcher: observer, Trust: guard, Store: store, Now: time.Now, NewID: uuid.NewString}
 	if r := c.Review; r != nil {
 		review, e := kube.NewBootstrapReviewClient(observer, r.Name, r.UID)
@@ -200,7 +219,20 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 	w.publisher = auditapp.AuthorityPublisher{Ledger: oneAuthorityAudit{ledger}, Objects: &installedAuthorityAudit{root: c.RootID, audit: writer}}
 	w.admission = b.admission
 	if c.Retention != nil {
-		if w.retention, err = newRetentionWorker(startup, c, pools, observer, probe, writer); err != nil {
+		// ADR-208: the retention source follower gets its own clients with the
+		// opening limiter. Behind the permission reconciler on the shared 20/20
+		// clients it wrote each observation with 2-3 s of its five seconds left
+		// and the next one 3-6 s later, so the hub source was current about half
+		// the time and previews refused at retention (installed native 68).
+		retentionObserver, e := kube.NewPermissionClient(kube.WithOpeningBurst(local.kubernetes("kube-observer.token")), c.Control.ClusterID, control, time.Now)
+		if e != nil {
+			return nil, &fixedStepError{"retention/clients", e}
+		}
+		retentionProbe, e := kube.NewPermissionClient(kube.WithOpeningBurst(local.kubernetes("kube-probe.token")), c.Control.ClusterID, control, time.Now)
+		if e != nil {
+			return nil, &fixedStepError{"retention/clients", e}
+		}
+		if w.retention, err = newRetentionWorker(startup, c, pools, retentionObserver, retentionProbe, writer); err != nil {
 			return nil, &fixedStepError{"retention/open", err}
 		}
 	}
@@ -257,6 +289,22 @@ func (p *permissionWorker) run(ctx context.Context) error {
 		defer close(done)
 		p.publish(ctx)
 	}()
+	// ADR-210: one projection per second keeps the five-second settings
+	// observation current for console logins; a failed read fences it.
+	if p.browser != nil {
+		browser := make(chan struct{})
+		go func() {
+			defer close(browser)
+			report := capacitySourceReporter("hub-worker browser settings: ")
+			for ctx.Err() == nil {
+				report(p.browser.Reconcile(ctx))
+				if !sleepContext(ctx, time.Second) {
+					return
+				}
+			}
+		}()
+		defer func() { <-browser }()
+	}
 	if p.retention != nil {
 		retention := make(chan struct{})
 		go func() {

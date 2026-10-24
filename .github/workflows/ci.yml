@@ -22,6 +22,9 @@ jobs:
   changes:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       code: ${{ steps.diff.outputs.code }}
     steps:
@@ -33,13 +36,30 @@ jobs:
           PR: ${{ github.event.number }}
         run: |
           files=""
+          endpoint=""
+          limit=300
+          filter='.files[] | (.filename, .previous_filename // empty)'
           case $EVENT in
-            push) [[ $BEFORE =~ ^0*$ ]] || files=$(gh api "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$GITHUB_SHA" --jq '.files[].filename') ;;
-            pull_request) files=$(gh pr diff "$PR" --repo "$GITHUB_REPOSITORY" --name-only) ;;
+            push)
+              [[ $BEFORE =~ ^0*$ ]] || endpoint="repos/$GITHUB_REPOSITORY/compare/$BEFORE...$GITHUB_SHA"
+              ;;
+            pull_request)
+              endpoint="repos/$GITHUB_REPOSITORY/pulls/$PR/files?per_page=100"
+              limit=100
+              filter='.[] | (.filename, .previous_filename // empty)'
+              ;;
           esac
+          if [[ -n $endpoint ]]; then
+            files=$(gh api "$endpoint" --jq "$filter") || {
+              echo "::warning::Changed-file lookup failed; running all code checks."
+              files=""
+            }
+          fi
           code=true
-          # The compare API lists at most 300 files; a full list is never trusted as docs-only.
-          if [[ -n $files ]] && (( $(wc -l <<< "$files") < 300 )) &&
+          # Read one bounded page only. A full PR page or compare response may
+          # omit code changes, so only shorter, successful lists can skip checks.
+          # Both paths of renames count; extra names only make this conservative.
+          if [[ -n $files ]] && (( $(wc -l <<< "$files") < limit )) &&
              ! grep -qvE '^(docs/|test/results/|design/|[^/]+\.md$)' <<< "$files" && ! grep -q '^docs/interfaces/' <<< "$files"; then
             code=false
           fi
@@ -63,7 +83,7 @@ jobs:
           policy-schema-check permission-crd-check control-schema-check start-crd-check retention-crd-check
           capacity-crd-check helm-check
       - name: Harness and gate self-tests
-        run: for f in scripts/test-go-shards.py scripts/test-kept-cleanup.py scripts/test-*-selection.py scripts/test-direct-helper-regression.py; do python3 "$f"; done
+        run: for f in scripts/test-ci-changes.py scripts/test-go-shards.py scripts/test-kept-cleanup.py scripts/test-*-selection.py scripts/test-direct-helper-regression.py; do python3 "$f"; done
 
   go:
     needs: changes

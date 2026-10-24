@@ -14,13 +14,10 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/application/evidence"
 	app "asservat.local/asservat/internal/application/fleet"
-	"asservat.local/asservat/internal/domain/artifact"
 	authorization "asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/fleet"
 	native "asservat.local/asservat/internal/transport/native"
-	"asservat.local/asservat/internal/transport/ownerrelay"
 )
 
 // These are installation-owned, independently accepted dependencies, not a
@@ -38,10 +35,6 @@ type OwnerRuntimeConfig struct {
 	ReadinessProofs          app.OwnerEnrollmentProofReader
 	Routes                   app.OwnerRouteReader
 	Protection               app.OwnerProtectionReader
-	Requests                 func(value.OwnerBinding) (evidence.WorkerOwnerEnrollment, error)
-	WorkerTrust              *mtls.WorkerTrustCatalog
-	Workers                  evidence.WorkerEnrollmentBindings
-	Locators                 evidence.WorkerOwnerLookup
 	Connections, Concurrency int
 	Native                   *OwnerNativeRuntimeConfig
 	// Observation additionally serves the observation handler set on the
@@ -64,8 +57,6 @@ type OwnerRuntime struct {
 	pool           value.OwnerPool
 	roots          *x509.CertPool
 	server, client *mtls.OwnerCredentials
-	forwarder      *mtls.OwnerForwarder
-	handler        *ownerrelay.Handler
 	readiness      app.OwnerStartupReadiness
 	connections    int
 	concurrency    int
@@ -74,14 +65,14 @@ type OwnerRuntime struct {
 	native         *ownerNativeRuntime
 	observation    *ownerObservationServing
 	operation      *OwnerOperationConfig
-	// compose orders ServeDownloadWorkers before Run's start; workers is the
+	// compose orders ServeAcquisitionWorkers before Run's start; workers is the
 	// optional ADR-204 worker serving on the owner port.
 	compose sync.Mutex
 	workers *ownerWorkerServing
 }
 
 func NewOwnerRuntime(ctx context.Context, c OwnerRuntimeConfig) (*OwnerRuntime, error) {
-	if ctx == nil || ctx.Err() != nil || !c.Pool.Valid() || !authorization.UUID(c.PodUID) || !authorization.UUID(c.SourceUID) || c.Configuration == nil || c.ServerEnrollment == nil || c.ClientEnrollment == nil || c.Registry == nil || c.Proofs == nil || c.Routes == nil || c.Protection == nil || c.Requests == nil || c.Connections < 1 || c.Connections > 64 || c.Concurrency < 1 || c.Concurrency > 16 || c.Concurrency > c.Connections || !c.WorkerTrust.ForInstallation(c.Pool.InstallationID) || c.Workers == nil || c.Locators == nil {
+	if ctx == nil || ctx.Err() != nil || !c.Pool.Valid() || !authorization.UUID(c.PodUID) || !authorization.UUID(c.SourceUID) || c.Configuration == nil || c.ServerEnrollment == nil || c.ClientEnrollment == nil || c.Registry == nil || c.Proofs == nil || c.Routes == nil || c.Protection == nil || c.Connections < 1 || c.Connections > 64 || c.Concurrency < 1 || c.Concurrency > 16 || c.Concurrency > c.Connections {
 		return nil, value.ErrInvalid
 	}
 	if (c.Native == nil) != (c.Pool.NativePort == 0) {
@@ -127,22 +118,6 @@ func NewOwnerRuntime(ctx context.Context, c OwnerRuntimeConfig) (*OwnerRuntime, 
 		return nil, err
 	}
 	gate := &app.OwnerAuthenticator{Registry: c.Registry, Routes: c.Routes, Protection: c.Protection, Now: time.Now}
-	verifier, err := mtls.NewOwnerPeerVerifierForPool(roots, c.Pool, time.Now)
-	if err != nil {
-		return nil, err
-	}
-	requests, err := c.Requests(binding)
-	if err != nil || requests == nil {
-		return nil, value.ErrInvalid
-	}
-	r.handler, err = ownerrelay.NewHandler(binding, &mtls.OwnerRequestPeers{Verifier: verifier, Authenticator: gate, Server: r.server}, requests, time.Now, c.Concurrency)
-	if err != nil {
-		return nil, err
-	}
-	r.forwarder, err = mtls.NewOwnerForwarder(root, mtls.OwnerForwarderConfig{Pool: c.Pool, WorkerTrust: c.WorkerTrust, Client: r.client, OwnerRoots: roots, Routes: c.Routes, Authentication: gate, Owners: c.Locators, Workers: c.Workers, Now: time.Now, Concurrency: c.Concurrency})
-	if err != nil {
-		return nil, err
-	}
 	if c.Native != nil {
 		r.native, err = newOwnerNativeRuntime(r, *c.Native, gate)
 		if err != nil {
@@ -199,9 +174,6 @@ func (r *OwnerRuntime) stop() {
 	if r.cancel != nil {
 		r.cancel()
 	}
-	if r.forwarder != nil {
-		r.forwarder.Close()
-	}
 	if r.server != nil {
 		r.server.Close()
 	}
@@ -221,13 +193,6 @@ func (r *OwnerRuntime) Close() {
 			r.native.startRouter.Close()
 		}
 	}
-}
-
-func (r *OwnerRuntime) BeginWorkerEnrollment(ctx context.Context, installation, session, worker string, token, csr []byte) (evidence.WorkerEnrollmentDelivery, error) {
-	if !r.Ready() {
-		return nil, artifact.ErrDownloadUnavailable
-	}
-	return r.forwarder.BeginWorkerEnrollment(ctx, installation, session, worker, token, csr)
 }
 
 func (r *OwnerRuntime) observeReadiness() error {
@@ -341,16 +306,17 @@ func (r *OwnerRuntime) Run(listener net.Listener, additional ...net.Listener) (r
 		return err
 	case <-identityReady:
 	}
-	relay := listener
 	if workers != nil {
-		// ADR-204 decision 9: the owner port also carries the pool's fixed
-		// worker-facing name; the exact process name stays the owner relay's.
-		var err error
-		if relay, err = r.launchWorkerServing(workers, listener, launch); err != nil {
+		if err := r.launchWorkerServing(workers, listener, launch); err != nil {
+			return err
+		}
+	} else {
+		// No acquisition endpoint is configured. The old certificate owner
+		// relay is retired; native/observation/operation listeners are separate.
+		if err := listener.Close(); err != nil {
 			return err
 		}
 	}
-	launch(startupRunRelay, func() error { return ownerrelay.Serve(r.root, relay, r.roots, r.server, r.handler, r.connections) })
 	if r.observation != nil {
 		// One port, two servers: each keeps its TLS profile and slots.
 		name, err := mtls.OwnerServerName(r.binding)

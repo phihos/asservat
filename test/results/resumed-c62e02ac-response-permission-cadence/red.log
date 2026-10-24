@@ -1,0 +1,39 @@
+--- FAIL: TestDownloadResponsePermissionCadenceStartsBeforeIO (0.00s)
+    download_response_test.go:58: response cadence renewed from completed source I/O 2026-10-09 12:00:34 +0000 UTC 4 <nil>
+--- FAIL: TestDownloadResponseCancelledRefreshCannotBeRetried (0.00s)
+    download_response_test.go:100: cancelled refresh revived the old response 4 <nil>
+--- FAIL: TestDownloadResponseFailedSafetyReadDoesNotSeedPermissionObservation (0.00s)
+    download_response_test.go:163: failed full authority seeded or revived response 3 <nil>
+--- FAIL: TestDownloadResponsePermissionReconstructionCadence (0.00s)
+    download_response_test.go:223: at 5s: permission reads=4 want=2
+    download_response_test.go:223: at 10s: permission reads=6 want=2
+    download_response_test.go:223: at 29.999999999s: permission reads=8 want=2
+    download_response_test.go:229: short authority passed original reconstruction cutoff
+--- FAIL: TestDownloadResponseChangedIdentityClaimsRecheckBeforeCatalog (0.00s)
+    --- FAIL: TestDownloadResponseChangedIdentityClaimsRecheckBeforeCatalog/reordered-sets (0.00s)
+        download_response_test.go:305: order changed identity set or reconstruction <nil> 4 2
+--- FAIL: TestDownloadResponseFailedPermissionRefreshIsTerminal (0.00s)
+    download_response_test.go:334: failed response was revived instead of requiring a new request <nil> 5
+FAIL
+FAIL	asservat.local/asservat/internal/application/authorization	0.003s
+--- FAIL: TestContextNativeResponseCheckedMetadataDoesNotReconstructAuthority (0.00s)
+    context_native_response_authority_test.go:23: checked metadata repeated full authority or skipped SQL <nil> 2 1
+--- FAIL: TestContextNativeResponseCheckedChunkStillReachesCurrentSQL (0.00s)
+    context_native_response_authority_test.go:62: checked chunk reconstructed authority or bypassed current SQL download unavailable 2 2
+--- FAIL: TestContextNativeResponseCheckedAuthorityPreservesOriginalCutoffs (0.00s)
+    --- FAIL: TestContextNativeResponseCheckedAuthorityPreservesOriginalCutoffs/caller (0.00s)
+        context_native_response_authority_test.go:99: bounded handoff failed or reconstructed authority <nil> 2 1
+    --- FAIL: TestContextNativeResponseCheckedAuthorityPreservesOriginalCutoffs/session (0.00s)
+        context_native_response_authority_test.go:99: bounded handoff failed or reconstructed authority download unavailable 1 1
+    --- FAIL: TestContextNativeResponseCheckedAuthorityPreservesOriginalCutoffs/identity (0.00s)
+        context_native_response_authority_test.go:99: bounded handoff failed or reconstructed authority <nil> 2 1
+    --- FAIL: TestContextNativeResponseCheckedAuthorityPreservesOriginalCutoffs/authority (0.00s)
+        context_native_response_authority_test.go:90: handoff replaced an original cutoff or decision
+        context_native_response_authority_test.go:90: handoff replaced an original cutoff or decision
+        context_native_response_authority_test.go:99: bounded handoff failed or reconstructed authority <nil> 2 1
+--- FAIL: TestContextNativeResponseCheckedAuthorityRejectsChangedIdentityAndScope (0.00s)
+    --- FAIL: TestContextNativeResponseCheckedAuthorityRejectsChangedIdentityAndScope/policy (0.00s)
+        context_native_response_authority_test.go:134: invalid handoff reached SQL policy 2 <nil>
+FAIL
+FAIL	asservat.local/asservat/internal/application/evidence	0.082s
+FAIL

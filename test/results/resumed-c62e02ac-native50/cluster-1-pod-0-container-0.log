@@ -1,0 +1,319 @@
+2026-10-20T19:19:28.633939150Z connector lifecycle enroll took 260ms, observer 82 calls
+2026-10-20T19:19:30.012336127Z connector lifecycle client-sign took 1.36s, observer 68 calls
+2026-10-20T19:19:31.651774360Z connector lifecycle server-sign took 1.36s, observer 68 calls
+2026-10-20T19:19:32.490030455Z connector lifecycle registration took 560ms, observer 28 calls
+2026-10-20T19:19:33.330037887Z connector process credentials active
+2026-10-20T19:19:33.355181897Z regional capacity standby active
+2026-10-20T19:19:33.374482293Z connector lifecycle owner-observation-candidates took 20ms, observer 0 calls
+2026-10-20T19:19:33.374592354Z regional capacity standby: open (unavailable)
+2026-10-20T19:19:33.379343063Z regional capacity standby: open (unavailable)
+2026-10-20T19:19:33.436474369Z regional context start active
+2026-10-20T19:19:33.447665174Z connector lifecycle owner-candidates took 10ms, observer 0 calls
+2026-10-20T19:19:34.634384291Z connector lifecycle owner-authentication took 170ms, observer 0 calls
+2026-10-20T19:19:34.635588386Z regional context standby refused: open/headers (denied) (1), elapsed=1.19s remaining=2.92s
+2026-10-20T19:19:36.698284639Z regional context standby refused: open/headers (denied) (2), elapsed=250ms remaining=860ms
+2026-10-20T19:19:40.525501204Z regional context standby refused: open/dial (unavailable) (1), elapsed=80ms remaining=2.1s
+2026-10-20T19:19:42.523738043Z regional context standby refused: open/dial (unavailable) (2), elapsed=70ms remaining=100ms
+2026-10-20T19:19:48.712470404Z regional context standby refused: open/tls (denied) (1), elapsed=2.26s remaining=0s
+2026-10-20T19:19:49.730116683Z regional capacity standby: open (denied)
+2026-10-20T19:19:49.730126063Z regional capacity standby: open (denied)
+2026-10-20T19:20:18.280410892Z connector lifecycle owner-registration took 10ms, observer 0 calls
+2026-10-20T19:20:18.301942128Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:20:18.304703129Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:20:18.351253094Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:20:18.385620380Z regional capacity metadata capacity-namespace-candidates: ok after 0s, 1 calls
+2026-10-20T19:20:18.445761069Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:20:19.033026563Z regional context standby refused: open/owner-closing (unavailable) (1), elapsed=4.58s remaining=0s
+2026-10-20T19:20:19.358403615Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:20:19.545446279Z regional context standby refused: open/tls (denied) (2), elapsed=100ms remaining=4.05s
+2026-10-20T19:20:24.899999346Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:20:24.902876158Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:20:24.953478879Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:20:24.990875717Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:20:25.047895494Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:20:25.951595385Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:20:31.293719188Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:20:31.296452089Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:20:31.344901361Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:20:31.398982046Z regional capacity metadata capacity-guarded-workload: ok after 20ms, 14 calls
+2026-10-20T19:20:31.461294394Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:20:32.348041949Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:20:37.606149482Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:20:37.608946823Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:20:37.659518324Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:20:37.704377682Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:20:37.780197514Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:20:38.660057472Z regional capacity native read 4: ok after 30ms, 22 calls
+2026-10-20T19:20:44.476441713Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:20:44.479221655Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:20:44.527980264Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:20:44.567072904Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:20:44.625458123Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:20:45.262446168Z regional capacity standby: serve/receive (unavailable) after 30s
+2026-10-20T19:20:45.529086689Z regional capacity native read 4: ok after 30ms, 22 calls
+2026-10-20T19:20:50.448374099Z regional context standby refused: exchange/owner/deadline (unavailable) (1)
+2026-10-20T19:20:55.889869912Z regional capacity native open: ok after 30ms, 19 calls
+2026-10-20T19:20:55.892728894Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:20:55.944007003Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:20:55.983125933Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:20:56.041333251Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:20:56.931775502Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:21:02.383974277Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:21:02.386794718Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:21:02.436873073Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:21:02.478162362Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:21:02.538413818Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:21:03.431342829Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:21:09.479250066Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:21:09.482196918Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:21:09.531926931Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:21:09.568075489Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:21:09.626104646Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:21:10.532583062Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:21:15.262754789Z regional capacity standby: serve/receive (unavailable) after 30s
+2026-10-20T19:21:20.639076535Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:21:20.641846546Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:21:20.692792904Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:21:20.729337173Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:21:20.788504835Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:21:21.449974099Z regional context standby refused: exchange/passive-call/deadline (unavailable) (1)
+2026-10-20T19:21:21.547910479Z regional context standby refused: open/tls (denied) (4), elapsed=100ms remaining=4.36s
+2026-10-20T19:21:21.693497985Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:21:27.739759196Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:21:27.742566327Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:21:27.792015239Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:21:27.828417248Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:21:27.889082926Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:21:28.793128010Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:21:34.007894991Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:21:34.010699772Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:21:34.060218694Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:21:34.101458463Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:21:34.163392646Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:21:35.057769231Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:21:45.980095918Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:21:45.982853859Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:21:46.031483007Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:21:46.067124443Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:21:46.123824895Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:21:47.030210028Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:21:52.484811140Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:21:52.487661062Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:21:52.538459990Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:21:52.574869958Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:21:52.631743191Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:21:53.448166836Z regional context standby refused: exchange/passive-call/deadline (unavailable) (2)
+2026-10-20T19:21:53.516205954Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:21:56.843632045Z regional context standby refused: open/owner-closing (unavailable) (2), elapsed=1.4s remaining=0s
+2026-10-20T19:21:58.841420436Z regional capacity standby: serve/receive (unavailable) after 30s
+2026-10-20T19:21:59.151798493Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:21:59.154603934Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:21:59.205871484Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:21:59.242083342Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:21:59.299497456Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:22:00.203471969Z regional capacity native read 4: ok after 30ms, 22 calls
+2026-10-20T19:22:10.813584390Z regional capacity native open: ok after 30ms, 19 calls
+2026-10-20T19:22:10.817156365Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:22:10.870477043Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:22:10.907858895Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:22:10.967053607Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:22:11.863457428Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:22:17.425613070Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:22:17.428592002Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:22:17.476819449Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:22:17.513491739Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:22:17.570069260Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:22:18.481113980Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:22:24.524216933Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:22:24.526873584Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:22:24.573794646Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:22:24.613997810Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:22:24.671433154Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:22:25.569569201Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:22:32.766044749Z regional context standby refused: open/headers (unavailable) (1), elapsed=2.32s remaining=2.09s
+2026-10-20T19:22:34.836080719Z connector local source failed: source-snapshot-again (invalid) after 220ms of 240ms
+2026-10-20T19:22:34.836261930Z regional context standby refused: open/setup-begin (unavailable) (1), elapsed=390ms remaining=4.07s
+2026-10-20T19:22:35.669834443Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:22:35.672553774Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:22:35.735170409Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:22:35.779234229Z regional capacity metadata capacity-workload-candidates: ok after 10ms, 3 calls
+2026-10-20T19:22:35.838338900Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:22:36.722917961Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:22:42.773403987Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:22:42.776121198Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:22:42.827194247Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:22:42.876223187Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:22:42.938158670Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:22:43.825577422Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:22:48.522022709Z regional capacity standby: serve/receive (unavailable) after 30s
+2026-10-20T19:22:49.334129063Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:22:49.336908325Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:22:49.383723545Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:22:49.420711436Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:22:49.482020747Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:22:50.390824945Z regional capacity native read 4: ok after 30ms, 22 calls
+2026-10-20T19:22:55.438548054Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:22:55.441345135Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:22:55.493076687Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:22:55.533807773Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:22:55.593017644Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:22:56.496091849Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:23:06.456333420Z regional context standby refused: exchange/passive-call/deadline (unavailable) (4)
+2026-10-20T19:23:06.905499232Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:23:06.908226913Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:23:06.957682525Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:23:06.998795613Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:23:07.058453476Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:23:07.952939326Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:23:13.439644319Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:23:13.442388061Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:23:13.493854460Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:23:13.542772490Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:23:13.603761199Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:23:13.870954829Z regional capacity standby: serve/receive (unavailable) after 30s
+2026-10-20T19:23:14.492698285Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:23:20.548503498Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:23:20.552014432Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:23:20.603066491Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:23:20.646340627Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:23:20.712993269Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:23:21.600414119Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:23:25.542627219Z regional context standby refused: open/tls (denied) (8), elapsed=90ms remaining=4.31s
+2026-10-20T19:23:27.144611573Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:23:27.147405494Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:23:27.197629989Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:23:27.236678408Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:23:27.313531412Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:23:28.195995591Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:23:38.806680254Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:23:38.809897667Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:23:38.858057103Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:23:38.896785421Z regional capacity metadata capacity-workload-candidates: ok after 0s, 3 calls
+2026-10-20T19:23:38.955262829Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:23:39.858549103Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:23:45.397060628Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:23:45.400200741Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:23:45.458013176Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:23:45.507707389Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:23:45.567545423Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:23:46.449007747Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:23:47.944839056Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:23:47.947574017Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:23:47.995909754Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:23:48.042248274Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:23:48.099497557Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:23:48.995383000Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:23:50.548649843Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:23:50.551308944Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:23:50.600057962Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:23:50.648544700Z regional capacity metadata capacity-guarded-workload: ok after 20ms, 13 calls
+2026-10-20T19:23:50.707452880Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:23:51.597873871Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:23:53.098297838Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:23:53.101095759Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:23:53.153628734Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:23:53.202313352Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:23:53.261698934Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:23:54.146947004Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:23:55.715172267Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:23:55.718365310Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:23:55.783244855Z regional capacity native read 2: ok after 10ms, 3 calls
+2026-10-20T19:23:55.835500828Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:23:55.900301162Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:23:56.771193442Z regional capacity native read 4: ok after 30ms, 22 calls
+2026-10-20T19:23:58.264400940Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:23:58.267135841Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:23:58.316046601Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:23:58.363969656Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:23:58.429485443Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:23:59.320786317Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:24:00.879485901Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:00.882294842Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:00.932734608Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:00.979550799Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:24:01.046935564Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:24:01.931265779Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:24:03.431386004Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:03.434199915Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:03.482486832Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:03.534373494Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:24:03.596180956Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:24:04.180677889Z regional target answer: answer (1), r-local@<100ms r-owner@<250ms r-check@<500ms r-resolve@<100ms r-write@<100ms
+2026-10-20T19:24:04.485736742Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:24:06.058218042Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:06.061076554Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:06.114686552Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:06.161984175Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:24:06.230738565Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:24:06.578572513Z regional target answer: answer (2), r-local@<100ms r-owner@<250ms r-check@<250ms r-resolve@<100ms r-write@<100ms
+2026-10-20T19:24:07.107281708Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:24:08.620231276Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:08.623251368Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:08.678554063Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:08.734363581Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:24:08.797336768Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:24:09.365113972Z connector lifecycle recovery took 10ms, observer 0 calls
+2026-10-20T19:24:09.661835852Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:24:09.941965453Z regional context standby refused: exchange/send-admission/deadline (unavailable) (1)
+2026-10-20T19:24:11.242493314Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:11.245374396Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:11.295528100Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:11.342273171Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:24:11.405502879Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:24:12.296724571Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:24:13.788581652Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:13.791327883Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:13.840214793Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:13.888897481Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:24:13.947137218Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:24:14.841832045Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:24:15.486334542Z connector local source failed: source-snapshot (invalid) after 150ms of 160ms
+2026-10-20T19:24:15.486545743Z regional context standby refused: exchange/send-peer/other (unavailable) (1)
+2026-10-20T19:24:16.392911077Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:16.395651818Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:16.448571924Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:16.495284594Z regional capacity metadata capacity-guarded-workload: guard (changed) after 10ms, 8 calls
+2026-10-20T19:24:16.495330034Z regional capacity standby: serve/observe/channel (unavailable) after 30s
+2026-10-20T19:24:18.488351917Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:18.491234679Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:18.540923052Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:18.588768077Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:24:18.646393201Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:24:19.539264431Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:24:21.409018261Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:21.411887863Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:21.465822982Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:21.518574607Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:24:21.579157264Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:24:22.476335241Z regional capacity native read 4: ok after 30ms, 22 calls
+2026-10-20T19:24:23.959357355Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:23.962134466Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:24.012230190Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:24.059973245Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:24:24.118637734Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:24:25.014415494Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:24:26.574585122Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:26.577390824Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:26.625719621Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:26.674162918Z regional capacity metadata capacity-guarded-workload: ok after 10ms, 13 calls
+2026-10-20T19:24:26.749101594Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:24:27.625797076Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:24:29.129418564Z regional capacity native open: ok after 20ms, 19 calls
+2026-10-20T19:24:29.133463340Z regional capacity native read 1: ok after 0s, 3 calls
+2026-10-20T19:24:29.186250746Z regional capacity native read 2: ok after 0s, 3 calls
+2026-10-20T19:24:29.222013921Z regional capacity metadata capacity-namespace-candidates: ok after 0s, 1 calls
+2026-10-20T19:24:29.282815749Z regional capacity native read 3: ok after 0s, 3 calls
+2026-10-20T19:24:30.177038633Z regional capacity native read 4: ok after 20ms, 22 calls
+2026-10-20T19:24:31.727196000Z regional capacity standby: serve/receive (unavailable) after 1.51s
+2026-10-20T19:24:31.727231490Z regional capacity standby: serve/receive (unavailable) after 16.84s
+2026-10-20T19:24:31.727373861Z regional context standby refused: exchange/read/short-read (unavailable) (1)
+2026-10-20T19:24:31.744958732Z regional capacity standby: open (unavailable)
+2026-10-20T19:24:31.751190788Z regional capacity standby: open (unavailable)
+2026-10-20T19:24:34.581694271Z regional context standby refused: open/dial (unavailable) (4), elapsed=1.11s remaining=2.22s
+2026-10-20T19:24:37.451401885Z regional context standby refused: candidates (hub-refused) (1)
+2026-10-20T19:24:38.446364569Z regional context standby refused: candidates (hub-refused) (2)
+2026-10-20T19:24:40.444678211Z regional context standby refused: candidates (hub-refused) (4)
+2026-10-20T19:24:44.444458628Z regional context standby refused: candidates (hub-refused) (8)
+2026-10-20T19:24:52.445531795Z regional context standby refused: candidates (hub-refused) (16)
+2026-10-20T19:25:08.444479176Z regional context standby refused: candidates (hub-refused) (32)
+2026-10-20T19:25:34.607448052Z connector enrollment pending: unavailable

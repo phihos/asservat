@@ -1,0 +1,14 @@
+{
+  "passed": false,
+  "checks": [
+    "unavailable session stays hidden; local sign-in; 320px reflow",
+    "real cookie, CSRF and POST-refresh transport; no duplicate pageshow refresh or web storage",
+    "actual session handler rejects wrong-origin logout",
+    "actual canonical catalog/preview, selected pod, custom retention, privacy and stale assessment without forced replacement preview"
+  ],
+  "errors": [],
+  "external": [],
+  "violations": [],
+  "failure": "AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:\n\n401 !== 403\n",
+  "visiblePage": "- link \"Skip to content\":\n  - /url: \"#main\"\n- banner:\n  - link \"Asservat\":\n    - /url: /\n  - button \"Sign out\"\n- main:\n  - heading \"Collection progress\" [level=1]\n  - paragraph: Capture 00000000-0000-4000-8000-000000000008\n  - heading \"Verifying and publishing evidence\" [level=2]\n  - paragraph: Uploaded evidence still needs verification and publication before it is available.\n  - list:\n    - listitem: Pod status Verifying and publishing\n  - button \"Check status\""
+}

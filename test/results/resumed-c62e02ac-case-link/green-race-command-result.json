@@ -1,0 +1,30 @@
+{
+  "cwd": "/home/phil/Projekte/asservat-resume-0450e73c",
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "./test/integration",
+    "-run",
+    "^TestInstalledJourney(PublishedCaptureWaitsForCurrentCaseLink|CaseLinkRequiresFreshDecode|CaseLinkHonorsOriginalCancellation)$",
+    "-count=1",
+    "-v"
+  ],
+  "env": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "started_utc": "2026-10-20T18:52:44.038739+00:00",
+  "source_sha256_before": {
+    "test/integration/installed_journey_native_test.go": "bfda7a9c50e85f17f2d4d9f8e1839b541fc7aa60de17b4adb367c68d6a3a9a91",
+    "test/integration/installed_journey_unit_test.go": "cb6481502336abde982942774dcce9eaf05e1f87570d332baece50d279371eca"
+  },
+  "exit_code": 0,
+  "elapsed_seconds": 19.784625,
+  "source_sha256_after": {
+    "test/integration/installed_journey_native_test.go": "bfda7a9c50e85f17f2d4d9f8e1839b541fc7aa60de17b4adb367c68d6a3a9a91",
+    "test/integration/installed_journey_unit_test.go": "cb6481502336abde982942774dcce9eaf05e1f87570d332baece50d279371eca"
+  }
+}

@@ -25,6 +25,7 @@ func TestOwnerPublicInputsRequireNativeOriginAndBudget(t *testing.T) {
 	for _, mode := range []string{"valid", "no-native", "origin-path", "http-origin", "format", "owner-connections", "same-settings", "audit-transit", "no-provider-roots", "browser-root", "native-port", "per-identity"} {
 		t.Run(mode, func(t *testing.T) {
 			in, dir, c := nativeInputFixture(t)
+			c.Postgres.MaxConnections = 1 // the shared public allocation leaves six owner slots
 			c.Public = &contracts.OwnerPublicDeployment{Format: contracts.OwnerPublicDeploymentFormat, Origin: "https://asservat.example.test",
 				BrowserRootID: runtimeID, BrowserSettings: contracts.WorkerObjectReference{Name: "browser-settings", UID: runtimeID}, IdentitySettings: contracts.WorkerObjectReference{Name: "identity-settings", UID: runtimeID},
 				BrowserAudience: "asservat-api", ProviderRoots: c.Kubernetes.Roots, SessionTransit: contracts.OwnerPublicTransit{Mount: "browser-transit", Key: "sessions"},
@@ -63,7 +64,7 @@ func TestOwnerPublicInputsRequireNativeOriginAndBudget(t *testing.T) {
 }
 
 func publicManifestFixture(c contracts.OwnerDeployment) contracts.PublicRuntimeCredentialManifest {
-	return contracts.PublicRuntimeCredentialManifest{Format: contracts.PublicRuntimeCredentialManifestFormat, Input: contracts.PublicRuntimeRoles{InstallationID: c.InstallationID, ClusterID: c.ClusterID, Namespace: c.Namespace, OwnerConfigurationUID: c.ConfigurationUID}}
+	return contracts.PublicRuntimeCredentialManifest{Format: contracts.PublicRuntimeCredentialManifestFormat, Input: contracts.PublicRuntimeRoles{InstallationID: c.InstallationID, ClusterID: c.ClusterID, Namespace: c.Namespace, OwnerConfigurationUID: c.ConfigurationUID, LayoutDigest: postgres.PublicRuntimeRoleLayoutDigest()}}
 }
 
 func TestPublicRuntimeManifestBindsTheOwnerInstallation(t *testing.T) {
@@ -88,7 +89,7 @@ func TestPublicRuntimeManifestBindsTheOwnerInstallation(t *testing.T) {
 // before any connection; a pool that cannot prove its credential is closed.
 func TestPublicPoolsOpenOnlyVerifiedOwnPurposeLogins(t *testing.T) {
 	in, dir, c := ownerInputFixture(t)
-	governor, e := postgres.NewSQLConnectionGovernor(contracts.SQLConnectionsPerHubReplica, len(hubAPIHotPurposes))
+	governor, e := postgres.NewSQLConnectionGovernor(contracts.SQLConnectionsPerHubReplica, hubAPIHotConnections)
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -96,19 +97,19 @@ func TestPublicPoolsOpenOnlyVerifiedOwnPurposeLogins(t *testing.T) {
 	defer p.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	name, _ := postgres.PublicRuntimeRoleName(c.InstallationID, "capture-preview")
-	other, _ := postgres.PublicRuntimeRoleName(c.InstallationID, "case-read")
+	name, _ := postgres.PublicRuntimeRoleName(c.InstallationID, "hub-runtime")
+	other, _ := postgres.PublicRuntimeRoleName(c.InstallationID, "capture-admit")
 	for _, purpose := range []string{"unknown", "browser-settings", "browser-cleanup"} {
 		writeOwnerJSON(t, dir, "sql-public-"+purpose+".json", contracts.OwnerSQLCredential{Username: name, Password: "synthetic"})
 		if _, e := p.open(ctx, purpose); e == nil {
 			t.Fatal("purpose outside hub-api accepted", purpose)
 		}
 	}
-	writeOwnerJSON(t, dir, "sql-public-capture-preview.json", contracts.OwnerSQLCredential{Username: other, Password: "synthetic"})
+	writeOwnerJSON(t, dir, "sql-public-hub-runtime.json", contracts.OwnerSQLCredential{Username: other, Password: "synthetic"})
 	if _, e := p.open(ctx, "capture-preview"); e == nil {
 		t.Fatal("another purpose's login accepted")
 	}
-	writeOwnerJSON(t, dir, "sql-public-capture-preview.json", contracts.OwnerSQLCredential{Username: name, Password: "synthetic"})
+	writeOwnerJSON(t, dir, "sql-public-hub-runtime.json", contracts.OwnerSQLCredential{Username: name, Password: "synthetic"})
 	if _, e := p.open(ctx, "capture-preview"); e == nil || len(p.pools) != 0 {
 		t.Fatal("unverified credential became a pool")
 	}

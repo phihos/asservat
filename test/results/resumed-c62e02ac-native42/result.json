@@ -1,0 +1,21 @@
+{
+  "sourceCommit": "4110072f2c624ccc81488973c18fbf9b313731b4",
+  "sourceHashesVerified": 2740,
+  "sourceHashMismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "testExit": 1,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "run": "context-thfmy2s8",
+  "command": "python3 scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "runnerExit": 1,
+  "testSeconds": 1287.109,
+  "ownedResourcesAbsent": true,
+  "postgresqlOrdinaryConnections": 114,
+  "postgresqlFixtureTotalConnections": 118,
+  "files": {
+    "context-storage-environment.json": "168a80fa10ac5cdcba03c684fc0243654ee2cd36f7b5cbc979852297ef34eaf4",
+    "context-storage.log": "8fcfc606586dda48ee8820ada24a3e790a6d0dad372e1c3f4001f073af8b4e07"
+  },
+  "scope": "Failed installed journey. Bootstrap, cluster join/replay, runtime readiness, regional capacity refresh, processing initialization and preview passed. Target exchanges completed and the request reached SQL admission and capture intent. Two acknowledged original-key resolutions retained the same accepted capture identity and permitted continuation. Dispatch failed first at final-local/route-read with less than 0.5 seconds left on the original start bound; a later continuation failed execute/PrepareStart with at least two seconds left. The third resolution was refused at the unchanged finite audit reservation. No completed acquisition, publication, native download, revocation or deletion was qualified. A separately reviewed missing-retention-read grant defect in context-verify/context-publish was not reached by this run."
+}

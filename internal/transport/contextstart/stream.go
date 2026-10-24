@@ -246,16 +246,23 @@ func (s *frameStream) count(n int) bool {
 	return true
 }
 func (s *frameStream) Send(ctx context.Context, f contracts.APIContextFrame) error {
+	_, e := s.send(ctx, f)
+	return e
+}
+
+// send retains the actual original frame bound for the hub's acknowledged
+// pre-work query transition. Generic Send never changes completed deadlines.
+func (s *frameStream) send(ctx context.Context, f contracts.APIContextFrame) (time.Time, error) {
 	// ADR-178: the work check needs the region's fresh source first.
 	if s != nil && f.Kind == contracts.APIContextWorkFrame {
 		if e := s.pullSource(ctx); e != nil {
-			return fleet.ErrUnavailable
+			return time.Time{}, fleet.ErrUnavailable
 		}
 	}
 	if s != nil {
 		if e := s.admitLeaseFrame(f.Kind, false); e != nil {
 			s.interruptAt(streamSendAdmission, streamErrorReason(e))
-			return fleet.ErrUnavailable
+			return time.Time{}, fleet.ErrUnavailable
 		}
 	}
 	mode := peerFrame
@@ -267,12 +274,12 @@ func (s *frameStream) Send(ctx context.Context, f contracts.APIContextFrame) err
 	}
 	call, until, end, e := s.beginFrame(ctx, false, mode)
 	if e != nil {
-		return e
+		return time.Time{}, e
 	}
 	defer end()
 	if !s.count(len(f.Payload) + 5) {
 		s.interruptAt(streamSendAdmission, streamBudget)
-		return contracts.ErrAPIContextProtocol
+		return time.Time{}, contracts.ErrAPIContextProtocol
 	}
 	writer := &streamWriteDiagnostic{writer: s.write}
 	e = contracts.WriteAPIContextFrame(writer, f)
@@ -293,9 +300,9 @@ func (s *frameStream) Send(ctx context.Context, f contracts.APIContextFrame) err
 	}
 	if reason != streamNoReason {
 		s.interruptAt(stage, reason)
-		return fleet.ErrUnavailable
+		return time.Time{}, fleet.ErrUnavailable
 	}
-	return nil
+	return until, nil
 }
 
 // The sole reader remains active between identity calls so an actual EOF
@@ -351,28 +358,34 @@ func (s *frameStream) startReader() (<-chan contracts.APIContextFrame, error) {
 	return s.incoming, nil
 }
 func (s *frameStream) Receive(ctx context.Context) (contracts.APIContextFrame, error) {
+	f, _, e := s.receive(ctx)
+	return f, e
+}
+
+// receive returns only after its finite I/O cancellation callbacks have joined.
+func (s *frameStream) receive(ctx context.Context) (contracts.APIContextFrame, time.Time, error) {
 	call, until, end, e := s.begin(ctx, true)
 	if e != nil {
-		return contracts.APIContextFrame{}, e
+		return contracts.APIContextFrame{}, time.Time{}, e
 	}
 	defer end()
 	incoming, e := s.startReader()
 	if e != nil {
-		return contracts.APIContextFrame{}, e
+		return contracts.APIContextFrame{}, time.Time{}, e
 	}
 	var f contracts.APIContextFrame
 	for {
 		select {
 		case received, ok := <-incoming:
 			if !ok {
-				return contracts.APIContextFrame{}, fleet.ErrUnavailable
+				return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
 			}
 			f = received
 		case <-call.Done():
 			s.interruptAt(streamReceiveCall, streamErrorReason(call.Err()))
-			return contracts.APIContextFrame{}, fleet.ErrUnavailable
+			return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
 		case <-s.ctx.Done():
-			return contracts.APIContextFrame{}, fleet.ErrUnavailable
+			return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
 		}
 		if f.Kind != contracts.APIContextSourceFrame {
 			break
@@ -382,7 +395,7 @@ func (s *frameStream) Receive(ctx context.Context) (contracts.APIContextFrame, e
 		clear(f.Payload)
 		if e != nil {
 			s.interruptAt(streamReceiveResult, streamErrorReason(e))
-			return contracts.APIContextFrame{}, fleet.ErrUnavailable
+			return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
 		}
 	}
 	reason := streamNoReason
@@ -396,20 +409,20 @@ func (s *frameStream) Receive(ctx context.Context) (contracts.APIContextFrame, e
 	if reason != streamNoReason {
 		clear(f.Payload)
 		s.interruptAt(streamReceiveResult, reason)
-		return contracts.APIContextFrame{}, fleet.ErrUnavailable
+		return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
 	}
 	if e := s.admitLeaseFrame(f.Kind, true); e != nil {
 		clear(f.Payload)
 		s.interruptAt(streamReceiveResult, streamErrorReason(e))
-		return contracts.APIContextFrame{}, fleet.ErrUnavailable
+		return contracts.APIContextFrame{}, time.Time{}, fleet.ErrUnavailable
 	}
 	if f.Kind == contracts.APIContextResultFrame {
 		if e := s.confirmResultPeer(call); e != nil {
 			clear(f.Payload)
-			return contracts.APIContextFrame{}, e
+			return contracts.APIContextFrame{}, time.Time{}, e
 		}
 	}
-	return f, nil
+	return f, until, nil
 }
 
 // AwaitWork is a once-only passive read before any signed capture exists. Its

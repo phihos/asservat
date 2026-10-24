@@ -1,0 +1,9 @@
+--- FAIL: TestPublicAPIExecutionConsolidatesOnlySameProcessFacets (0.00s)
+    public_runtime_api_execution_test.go:11: execution credentials not consolidated: all=81 hub=46
+FAIL
+FAIL	asservat.local/asservat/internal/contracts	0.004s
+--- FAIL: TestPublicAPIExecutionHasExactFormerGrantUnion (0.00s)
+    public_runtime_api_execution_test.go:14: missing consolidated execution credential
+FAIL
+FAIL	asservat.local/asservat/internal/adapters/postgres	0.012s
+FAIL

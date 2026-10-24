@@ -1,0 +1,24 @@
+{
+  "label": "green-race",
+  "cwd": "/home/phil/Projekte/asservat-download-permission-c62e02ac",
+  "head": "98f7e181bca3d075c3b42adefc604a993f22e1ac",
+  "argv": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "./internal/application/authorization",
+    "./internal/application/evidence"
+  ],
+  "environment": {
+    "GOMAXPROCS": "2",
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "startedUTC": "2026-10-22T23:10:57.556147+00:00",
+  "exitCode": 0,
+  "elapsedSeconds": 14.911272,
+  "sourceCount": 2610,
+  "changedSources": []
+}

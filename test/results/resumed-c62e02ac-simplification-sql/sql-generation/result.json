@@ -1,0 +1,9 @@
+{
+  "command": [
+    "make",
+    "PYTHON=/home/phil/.cache/asservat-build/spec-venv/bin/python",
+    "sql-check"
+  ],
+  "exitCode": 0,
+  "elapsedSeconds": 0.378
+}

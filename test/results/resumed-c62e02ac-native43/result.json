@@ -1,0 +1,21 @@
+{
+  "sourceCommit": "a565c2dbd10acfe3a8663151e9e0258667aedacd",
+  "sourceHashesVerified": 2742,
+  "sourceHashMismatches": [],
+  "sourceUnchangedDuringTest": true,
+  "testExit": 1,
+  "cleanupFailures": [],
+  "buildScratchRemoved": true,
+  "run": "context-mcw3di7n",
+  "command": "python3 scripts/test-context-storage.py --initial-bootstrap-chain --runtime-provider-pair --installer-continuation",
+  "runnerExit": 1,
+  "testSeconds": 1223.896,
+  "ownedResourcesAbsent": true,
+  "postgresqlOrdinaryConnections": 114,
+  "postgresqlFixtureTotalConnections": 118,
+  "files": {
+    "context-storage-environment.json": "f4ceba3585f14091824d6c40748c67950c1a6e00dbf745be4a51d1f9604bd0a4",
+    "context-storage.log": "b9bdc1f1cb84583153761dc493d43984e81971f6d0c425c7b0b49d80bb7a0b8f"
+  },
+  "scope": "Failed installed journey. Bootstrap, exact regional join replay, runtime readiness, canonical regional start CRD prerequisite, sustained capacity refresh, processing initialization and preview passed. Original capture and two acknowledged same-identity continuations returned OutcomeUnknown; the next resolution exhausted the unchanged finite audit reservation. The visible continuation timing stops at intent handling, without a reported dispatch failure. Underlying cause remains under investigation. No completed acquisition, publication, native download, revocation or deletion was qualified."
+}

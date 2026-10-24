@@ -15,6 +15,7 @@
 {{- $b := .Values.bootstrap -}}
 {{- $v := dict "format" "asservat-bootstrap-runner/v1" "producerSecret" $b.secrets.producer "schemaSecret" $b.secrets.schema "retirementSecret" $b.secrets.retirement -}}
 {{- if $b.registrySecret }}{{ $_ := set $v "registrySecret" $b.registrySecret }}{{ end -}}
+{{- if $b.continuation.enabled }}{{ $_ := set $v "continuationDigest" (include "asservat.bootstrap.continuation" . | sha256sum) }}{{ end -}}
 {{- toJson $v -}}
 {{- end -}}
 

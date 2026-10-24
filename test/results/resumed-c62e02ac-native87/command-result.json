@@ -1,0 +1,20 @@
+{
+  "sourceCommit": "4f3fc31cdf1f31f348d82fe8b1ddce59d740f740",
+  "command": [
+    "python3",
+    "scripts/test-context-storage.py",
+    "--initial-bootstrap-chain",
+    "--runtime-provider-pair",
+    "--installer-continuation",
+    "--keep-on-failure"
+  ],
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "startedUnix": 1792784349.124828,
+  "exitCode": 1,
+  "elapsedSeconds": 1157.024029
+}

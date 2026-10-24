@@ -1,0 +1,30 @@
+=== RUN   TestContextDownloadConsumedPreflightDoesNotExpirePreparation
+=== RUN   TestContextDownloadConsumedPreflightDoesNotExpirePreparation/readiness
+=== RUN   TestContextDownloadConsumedPreflightDoesNotExpirePreparation/configuration-readiness
+=== RUN   TestContextDownloadConsumedPreflightDoesNotExpirePreparation/plan
+--- PASS: TestContextDownloadConsumedPreflightDoesNotExpirePreparation (0.00s)
+    --- PASS: TestContextDownloadConsumedPreflightDoesNotExpirePreparation/readiness (0.00s)
+    --- PASS: TestContextDownloadConsumedPreflightDoesNotExpirePreparation/configuration-readiness (0.00s)
+    --- PASS: TestContextDownloadConsumedPreflightDoesNotExpirePreparation/plan (0.00s)
+=== RUN   TestContextDownloadPreflightMustBeLiveWhenConsumed
+=== RUN   TestContextDownloadPreflightMustBeLiveWhenConsumed/expired-readiness
+=== RUN   TestContextDownloadPreflightMustBeLiveWhenConsumed/plan-expired-in-reserve
+=== RUN   TestContextDownloadPreflightMustBeLiveWhenConsumed/reserve-canceled
+--- PASS: TestContextDownloadPreflightMustBeLiveWhenConsumed (0.00s)
+    --- PASS: TestContextDownloadPreflightMustBeLiveWhenConsumed/expired-readiness (0.00s)
+    --- PASS: TestContextDownloadPreflightMustBeLiveWhenConsumed/plan-expired-in-reserve (0.00s)
+    --- PASS: TestContextDownloadPreflightMustBeLiveWhenConsumed/reserve-canceled (0.00s)
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds/caller
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds/identity
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds/authority
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds/session
+=== RUN   TestContextDownloadConsumedPreflightKeepsHardBounds/canceled
+--- PASS: TestContextDownloadConsumedPreflightKeepsHardBounds (0.00s)
+    --- PASS: TestContextDownloadConsumedPreflightKeepsHardBounds/caller (0.00s)
+    --- PASS: TestContextDownloadConsumedPreflightKeepsHardBounds/identity (0.00s)
+    --- PASS: TestContextDownloadConsumedPreflightKeepsHardBounds/authority (0.00s)
+    --- PASS: TestContextDownloadConsumedPreflightKeepsHardBounds/session (0.00s)
+    --- PASS: TestContextDownloadConsumedPreflightKeepsHardBounds/canceled (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/evidence	0.005s

@@ -1,0 +1,94 @@
+{
+  "red": {
+    "command": [
+      "go",
+      "test",
+      "./internal/application/evidence",
+      "-run",
+      "^TestContextRuntimeInitialAuthority",
+      "-count=1",
+      "-v"
+    ],
+    "env": {
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOMAXPROCS": "2",
+      "GOFLAGS": "-buildvcs=false -p=1"
+    },
+    "exit_code": 1,
+    "elapsed_seconds": 1.593723,
+    "source_count": 4,
+    "source_unchanged": true,
+    "top_level_tests_in_verbose_log": 5,
+    "subtests_in_verbose_log": 17
+  },
+  "green-race": {
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "./internal/application/evidence",
+      "-run",
+      "^TestContextRuntimeInitialAuthority",
+      "-count=1",
+      "-v"
+    ],
+    "env": {
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOMAXPROCS": "2",
+      "GOFLAGS": "-buildvcs=false -p=1"
+    },
+    "exit_code": 1,
+    "elapsed_seconds": 4.523565,
+    "source_count": 4,
+    "source_unchanged": true,
+    "top_level_tests_in_verbose_log": 6,
+    "subtests_in_verbose_log": 22
+  },
+  "green-race-final": {
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "./internal/application/evidence",
+      "-run",
+      "^TestContextRuntimeInitialAuthority",
+      "-count=1",
+      "-v"
+    ],
+    "env": {
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOMAXPROCS": "2",
+      "GOFLAGS": "-buildvcs=false -p=1"
+    },
+    "exit_code": 0,
+    "elapsed_seconds": 5.002406,
+    "source_count": 4,
+    "source_unchanged": true,
+    "top_level_tests_in_verbose_log": 6,
+    "subtests_in_verbose_log": 22
+  },
+  "full-race": {
+    "command": [
+      "go",
+      "test",
+      "-race",
+      "-count=1",
+      "./internal/application/evidence"
+    ],
+    "env": {
+      "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+      "GOMAXPROCS": "2",
+      "GOFLAGS": "-buildvcs=false -p=1"
+    },
+    "exit_code": 0,
+    "elapsed_seconds": 4.262807,
+    "source_count": 2582,
+    "source_unchanged": true,
+    "top_level_tests_in_verbose_log": null,
+    "subtests_in_verbose_log": null
+  }
+}

@@ -60,7 +60,7 @@ func TestInstalledOwnerIdentityFirstWorkload(t *testing.T) {
 			sql = append(sql, key.Key)
 		}
 	}
-	if !reflect.DeepEqual(sql, []string{"sql-enrollment.json", "sql-audit.json", "sql-activation.json", "sql-registry.json", "sql-routing.json", "sql-native-read.json"}) {
+	if !reflect.DeepEqual(sql, []string{"sql-owner-runtime.json"}) {
 		t.Fatal("identity startup received worker or public SQL authority", sql)
 	}
 	v, mount := pod.Volumes[1], pod.Containers[0].VolumeMounts[1]

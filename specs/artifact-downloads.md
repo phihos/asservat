@@ -16,7 +16,54 @@ Given an authorized developer and saved packet, ELF core, pprof, log, syscall, f
 
 ## REQ-DLD-002 — Reuse authority; review only missing raw permission
 
+The maintainer accepts bounded permission-change handling during downloads;
+immediate/per-step reconstruction of external policy is not required.
+[ADR-214](../docs/decisions/214-bounded-download-policy-observation.md) permits the
+protected installation download policy to be observed once and reused for at most
+60 seconds from that original observation. Authentication, explicit expiry,
+cancellation and current SQL permission/retention/recovery/processing/spend checks
+remain independently enforced and may deny earlier. This observation bound does
+not extend a request or transfer deadline and does not apply to privacy-operator
+changes. The entire combined authorization decision is not reusable for 60 seconds.
+
+[ADR-220](../docs/decisions/220-response-owned-download-permissions.md) permits one
+original content response to retain its successful ordinary-entitlement decision
+for at most 30 seconds from reconstruction start, recorded before I/O. It MUST
+reconstruct at that cutoff, before output, and MUST discard the observation on
+close or failed refresh/safety check. New GETs and preparation operations are
+fresh. Current principal/client, identity, artifact/version/audience, retention,
+recovery and processing checks remain; changed identity claims require fresh
+scope eligibility before catalog lookup. Source freshness timestamps are never
+rewritten. Each combined authority and native/delivery lease stays at most five
+seconds and within every original caller/session/access bound. Current SQL
+permission fences remain and MAY deny earlier; this is not a promised 30-second
+revocation delay. The native response MAY consume the coordinator's exact checked
+short authority through a private handoff instead of reconstructing it again.
+
+A finite public worker-preparation operation may reuse its initial combined
+authorization until the earliest original request, identity, evidence and proof
+deadline, capped at five seconds. Each subsequent helper checks that retained
+observation and cancellation locally; it need not repeat external identity or
+catalog reads. New operations authorize again. Current SQL effect checks still
+enforce permission revisions, retention, recovery, processing and spend. This
+request-owned reuse neither renews a deadline nor authorizes a different scope.
+The finite prepare coordinator, installed runtime and final status/metadata view
+MAY consume the same original combined authority through private handoff. Current
+SQL state and final identity are still checked. Each new public request MUST
+construct fresh authority; an unknown effect reply MUST NOT become acknowledged
+Preparing merely because its original authority is retained.
+
+[ADR-221](../docs/decisions/221-admitted-worker-identity-enrollment.md) separates
+identity enrollment from public preparation. An exact admitted worker MAY obtain
+or renew its certificate under its own original request, without a connected
+human preparation request. Current admitted parent, workload proof, configuration,
+recovery, immutable key, finite signing and audit checks remain. Its certificate
+MUST NOT confer evidence or key access: each acquisition still requires fresh
+purpose-specific authority within the original worker and parent lifetimes.
+
 Download needs current retained-artifact entitlement or explicit share coverage, no deny/restriction, current authenticated principal/client, `evidence:download`, finite transfer resources and durable audit. Ordinary artifact readers may download the actual approved artifact they can read without independent human review. An extract view does not confer access to its hidden raw parent. Existing ordinary shares that authorize reading an explicit approved artifact also authorize its native download; raw shares require explicit download coverage.
+
+Reading already stored evidence (download preparation/transfer and approved inspection) MUST NOT depend on live capacity observations of the source workload; workload capacity gates collection only. Evidence of a deleted workload remains readable within retention, bounded by the shared acquisition worker limit, original charges, per-principal audit allowances and all authorization checks (maintainer decision 2026-10-23, [ADR-219](../docs/decisions/219-shared-approved-acquisition.md) revision).
 
 A current processing decision MUST cover ordinary metadata reads as well as native bytes. Missing initialization, unknown restored lineage, or unsupported ancestry denies; publication or a new artifact ID cannot clear an existing artifact/workload-time restriction. Installation capacity renewal MUST NOT extend existing processing-history dates or erase a restriction when its administrative coverage expires. Release requires separate current privacy-operator authority and the exact independently acknowledged decision, not an ordinary read or capture approval. The complete installed storage/acquisition/connector/hub route and client/purpose/class policy are checked under [ADR-127](../docs/decisions/127-current-processing-and-download-placement.md); an S3 region or successful SQL lookup is insufficient. Unrelated publication does not invalidate an existing proof. An unrelated restrictive decision may conservatively interrupt a transfer, which may resume the same session under its original authority, range and spent budgets after fresh checks; no recapture or implicit preparation is introduced.
 
@@ -29,6 +76,14 @@ A one-off request may include its intended inspection and download in the same i
 Given an ordinary reader of a sanitized capture, a raw reader with a covering download grant, and an extract-only recipient, when Download is selected, then the first two proceed without new human review and the recipient can download only the shared extract. A query-only grant returns a prefilled missing-permission request. Repeated preparation reuses the same operation and reservation. A different principal/client cannot use the prepared transfer.
 
 ## REQ-DLD-003 — Bounded authenticated transfer and resume
+
+Runtime readiness is consumed when checked; a transfer plan's freshness is
+consumed through acknowledged session reservation. Their expiry after consumption
+does not shorten later startup under a still-live original request and authority.
+Expired preflight, expired/cancelled reservation and unknown replies refuse
+continuation. Preserve the original session's accepted limits and absolute
+access/backing deadlines, and current configuration/permission checks at effects.
+See [ADR-218](../docs/decisions/218-consumed-download-preflight.md).
 
 Use a minimized SQL `ArtifactDownload` session under C-14, referencing the exact immutable artifact/version, actor/client, authority revisions, output/read-work reservations, absolute deadline and conservative delivery counters. It is neither a new CRD nor a new plaintext evidence copy. States: Preparing, Ready, Streaming, Completed, Interrupted, Cancelled, Expired, Denied, Failed. A failed connection may enter Interrupted and resume within its original authority/deadline. Terminal cancellation/expiry/denial cannot restart. Preparation is idempotent; opaque paths are not bearer capabilities. Before verified native metadata is available, Preparing/early failure responses omit filename, format, size, checksum, ETag and coverage together; never invent a zero size or placeholder checksum. Ready/Streaming/Interrupted require that complete metadata group. Completed may omit it; if any native metadata is present, the entire verified group is required. Preparing and terminal states never advertise resume. The UI shows preparation progress and cancellation until the file is ready.
 

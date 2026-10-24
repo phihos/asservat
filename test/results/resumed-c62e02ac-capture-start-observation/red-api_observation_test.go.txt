@@ -1,0 +1,69 @@
+package execution
+
+import (
+	"context"
+	"testing"
+	"time"
+
+	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/execution"
+	"asservat.local/asservat/internal/domain/planning"
+	"asservat.local/asservat/internal/domain/privacy"
+	"asservat.local/asservat/internal/domain/targets"
+)
+
+// These are counts of real runner port calls, not a model of provider latency.
+// The actual evaluator still resolves identity and evaluates the permission
+// projection. SQL/provider ports are the existing explicitly synthetic fixture.
+type apiObservationReads struct {
+	*apiRunnerFixture
+	eligibility APIContextEligibility
+	targets, eligibilityReads, capabilities, retention, processes int
+}
+
+func (p *apiObservationReads) ResolvePod(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
+	p.targets++
+	return p.apiRunnerFixture.ResolvePod(ctx, r)
+}
+func (p *apiObservationReads) ContextEligibilityCurrent(ctx context.Context, current identities.CurrentIdentity, target authorization.Target) authorization.CaptureEligibility {
+	p.eligibilityReads++
+	return p.eligibility.ContextEligibilityCurrent(ctx, current, target)
+}
+func (p *apiObservationReads) ContextCapability(ctx context.Context, target authorization.Target) (planning.ContextCapability, error) {
+	p.capabilities++
+	return p.apiRunnerFixture.ContextCapability(ctx, target)
+}
+func (p *apiObservationReads) ReadAPIProcess(ctx context.Context) (value.APIProcessObservation, error) {
+	p.processes++
+	return p.apiRunnerFixture.ReadAPIProcess(ctx)
+}
+
+type apiObservationRetention struct{ p *apiObservationReads }
+
+func (r apiObservationRetention) Resolve(ctx context.Context, in privacy.Input) (privacy.Resolution, error) {
+	r.p.retention++
+	return r.p.ResolveRetention(ctx, in)
+}
+
+// The entire successful runner, including the post-acquisition process read,
+// owns one start observation. Later effects keep the original SQL guards;
+// an extra target/eligibility/capability/retention observation is not required.
+func TestAPIContextRunnerOneRequestObservation(t *testing.T) {
+	f, runner, current := apiRunner(t)
+	p := &apiObservationReads{apiRunnerFixture: f, eligibility: runner.Eligibility}
+	runner.Targets, runner.Eligibility, runner.Capabilities, runner.Retention, runner.Process = p, p, p, apiObservationRetention{p}, p
+	ctx, cancel := context.WithDeadline(t.Context(), f.now.Add(5*time.Second))
+	defer cancel()
+	out, err := runner.Execute(ctx, current, f.work.Accepted.CaptureID)
+	if err != nil || out.State != "StoredPendingVerification" || f.captures.Load() != 1 || f.stores.Load() != 1 || f.prepares.Load() != f.closes.Load() {
+		t.Fatal("fixture did not complete the real runner", out.State, err)
+	}
+	if p.targets != 1 || p.eligibilityReads != 1 || p.capabilities != 1 || p.retention != 1 || p.processes != 2 {
+		t.Fatalf("one request repeated authority observations: target=%d eligibility=%d capability=%d retention=%d process=%d (includes final completion proof)", p.targets, p.eligibilityReads, p.capabilities, p.retention, p.processes)
+	}
+	if !f.record.Binding.NotAfter.Equal(f.now.Add(5*time.Second)) || f.record.Phase != "stored" || f.record.Copies == (artifact.Copies{}) {
+		t.Fatal("request observation changed its original interval or completion", f.record.Binding.NotAfter, f.record.Phase)
+	}
+}

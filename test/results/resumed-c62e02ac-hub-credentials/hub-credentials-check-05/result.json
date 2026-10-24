@@ -1,0 +1,21 @@
+{
+  "results": [
+    {
+      "argv": [
+        "go",
+        "test",
+        "-v",
+        "-count=1",
+        "-timeout",
+        "20m",
+        "-run",
+        "^Test(Public|Hub|Owner|ProviderOwner|ProviderInstalledOwner|InstalledOwner|FederationRuntimeProjection|PublisherRuntimeProjection)",
+        "./internal/adapters/kubernetes"
+      ],
+      "exitCode": 0,
+      "elapsedSeconds": 595.4176836013794
+    }
+  ],
+  "sourceCount": 2610,
+  "changedSources": []
+}

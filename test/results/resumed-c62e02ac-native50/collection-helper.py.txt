@@ -1,0 +1,268 @@
+#!/usr/bin/env python3
+"""Collect one terminal, retained two-cluster native fixture; never run during a test.
+
+Usage: python3 collect-kept-native.py KEPT_JSON ARCHIVE_DIR PRIVATE_DIR SQL_DIR
+
+ARCHIVE_DIR and PRIVATE_DIR must be empty, separate directories. SQL_DIR must
+contain the four unchanged native48 postmortem SQL scripts. This helper cannot
+prove the harness is terminal: the caller must establish that before invocation.
+It performs no cleanup; private kubeconfigs remain for the caller to remove.
+"""
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import time
+
+
+SQL_HASHES = {
+    "postmortem.sql": "e41ed2ea02deb488e564590e4446df47b3587f399f8ba2007fdbf9afad921775",
+    "postmortem-execution.sql": "950de38ebaa8813cf16c4acc0c6de458759aed36a85539b68752a6fac218982f",
+    "postmortem-requests.sql": "b886624e67eaa688927ae6ff9a77796430fef0596d05d748e006899581f29987",
+    "postmortem-publication.sql": "d1384623725090d90fe7e641656b359cf1e50d202b03b9e9a2b3b8017ee0d5cb",
+}
+SYSTEM_NAMESPACES = {"kube-system", "kube-public", "kube-node-lease", "local-path-storage"}
+NAME = re.compile(r"[a-z0-9][a-z0-9.-]{0,252}")
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+def write_json(path, value):
+    path.write_text(json.dumps(value, indent=2) + "\n")
+
+
+def checked_names(value, description, maximum):
+    require(isinstance(value, list) and 0 < len(value) <= maximum, description)
+    require(all(isinstance(x, str) and NAME.fullmatch(x) for x in value), description)
+    require(len(set(value)) == len(value), description)
+    return value
+
+
+def empty_directory(path):
+    require(not path.is_symlink(), "output directory must not be a symlink")
+    path.mkdir(mode=0o700, parents=True, exist_ok=True)
+    require(path.is_dir() and not any(path.iterdir()), "output directory must be empty")
+    path.chmod(0o700)
+
+
+class Collection:
+    def __init__(self, archive, private, run_id):
+        self.archive, self.private = archive, private
+        self.report = {"runId": run_id, "commands": [], "failures": [],
+                       "cleanupPerformed": False, "privateConfigsRetained": True}
+
+    def save(self):
+        write_json(self.archive / "collection.json", self.report)
+
+    def failure(self, label):
+        self.report["failures"].append(label)
+        self.save()
+
+    def run(self, label, argv, *, input_bytes=None, private=False, sanitize=None,
+            suffix=".log"):
+        """Record every exit; kubeconfig output/error never enter the archive."""
+        folder = self.private if private else self.archive
+        stdout_path, stderr_path = folder / (label + suffix), folder / (label + ".err")
+        started = time.time()
+        code, timed_out, output, error = 127, False, b"", b""
+        try:
+            if private:
+                # Files are created under umask 077 in the caller's 0700 directory.
+                with stdout_path.open("xb") as out, stderr_path.open("xb") as err:
+                    result = subprocess.run(argv, input=input_bytes, stdout=out,
+                                            stderr=err, timeout=30, check=False)
+                code = result.returncode
+            else:
+                result = subprocess.run(argv, input=input_bytes, capture_output=True,
+                                        timeout=30, check=False)
+                code, output, error = result.returncode, result.stdout, result.stderr
+        except subprocess.TimeoutExpired as exc:
+            code, timed_out = 124, True
+            if not private:
+                output, error = exc.stdout or b"", exc.stderr or b""
+        except OSError as exc:
+            error = (type(exc).__name__ + "\n").encode()
+        if not private:
+            # Successful pod JSON is reduced before archival; raw Pod specs are
+            # never written, as they can contain literal environment credentials.
+            archived = output
+            if sanitize is not None:
+                archived = b""
+                if code == 0:
+                    try:
+                        archived = sanitize(output)
+                    except (ValueError, KeyError, TypeError):
+                        self.failure(label + ": invalid or oversized response")
+            stdout_path.write_bytes(archived)
+            stderr_path.write_bytes(error)
+        self.report["commands"].append({
+            "label": label, "argv": argv, "exit": code, "timedOut": timed_out,
+            "startedUnix": started, "finishedUnix": time.time(),
+            "stdout": str(stdout_path) if private else stdout_path.name,
+            "stderr": str(stderr_path) if private else stderr_path.name,
+            "privateOutput": private,
+        })
+        (self.archive / (label + ".exit")).write_text(str(code) + "\n")
+        if code:
+            self.report["failures"].append(label + ": command failed")
+        self.save()
+        return code, output
+
+    def container_labels(self, name, label):
+        fmt = ('{"name":{{json .Name}},'
+               '"run":{{json (index .Config.Labels "asservat.test")}},'
+               '"cluster":{{json (index .Config.Labels "io.x-k8s.kind.cluster")}}}')
+        code, output = self.run(label, ["docker", "container", "inspect",
+                                       "--format", fmt, name])
+        require(code == 0, "container ownership inspection failed")
+        info = json.loads(output)
+        require(info["name"] == "/" + name, "container name mismatch")
+        return {"asservat.test": info["run"], "io.x-k8s.kind.cluster": info["cluster"]}
+
+
+def pod_projection(raw):
+    value = json.loads(raw)
+    require(isinstance(value.get("items"), list) and len(value["items"]) <= 256,
+            "invalid or oversized Pod list")
+    items = []
+    for pod in value["items"]:
+        meta = pod["metadata"]
+        namespace, name = meta["namespace"], meta["name"]
+        require(NAME.fullmatch(namespace) and NAME.fullmatch(name), "invalid Pod identity")
+        if namespace in SYSTEM_NAMESPACES:
+            continue
+        containers = checked_names([c["name"] for c in pod["spec"]["containers"]],
+                                   "invalid container list", 16)
+        items.append({"metadata": {k: meta[k] for k in ("namespace", "name", "uid")},
+                      "containers": containers, "status": pod.get("status", {})})
+    return (json.dumps({"items": items}, indent=2) + "\n").encode()
+
+
+def collect(args):
+    os.umask(0o077)
+    manifest = args.kept_json.resolve(strict=True)
+    kept = json.loads(manifest.read_bytes())
+    require(isinstance(kept, dict) and set(kept) ==
+            {"runId", "clusters", "containers", "volumes", "image", "networks"},
+            "unexpected retained-manifest fields")
+    run_id = kept.get("runId")
+    require(isinstance(run_id, str) and re.fullmatch(r"context-[a-z0-9-]{4,56}", run_id),
+            "invalid native run ID")
+    prefix = "asservat-" + run_id
+    clusters = checked_names(kept.get("clusters"), "invalid cluster list", 2)
+    require(set(clusters) == {prefix + "-0", prefix + "-1"},
+            "expected this run's exact hub and regional cluster names")
+    containers = checked_names(kept.get("containers"), "invalid container list", 32)
+    require(all(x.startswith(prefix + "-") for x in containers), "foreign container name")
+    postgres = [x for x in containers if x == prefix + "-postgres"]
+    require(len(postgres) == 1, "manifest must name exactly one owned PostgreSQL container")
+    networks = checked_names(kept.get("networks"), "invalid network list", 2)
+    require(set(networks) == {prefix, prefix + "-kind"}, "foreign or missing owned network")
+    require(isinstance(kept["volumes"], list) and len(kept["volumes"]) <= 8 and
+            all(isinstance(x, str) and NAME.fullmatch(x) and x.startswith(prefix + "-")
+                for x in kept["volumes"]), "foreign volume name")
+    require(kept["image"] == "asservat-context-worker:" + run_id, "foreign fixture image")
+    sql = {}
+    for name, digest in SQL_HASHES.items():
+        raw = (args.sql_dir / name).read_bytes()
+        require(hashlib.sha256(raw).hexdigest() == digest, "SQL script differs from native48: " + name)
+        sql[name] = raw
+    archive, private = args.archive_dir.absolute(), args.private_dir.absolute()
+    require(not archive.is_symlink() and not private.is_symlink(), "output symlink refused")
+    archive, private = archive.resolve(), private.resolve()
+    require(archive != private and archive not in private.parents and private not in archive.parents,
+            "archive and private control directories must be separate")
+    empty_directory(archive)
+    empty_directory(private)
+    c = Collection(archive, private, run_id)
+    c.report.update({"manifest": str(manifest),
+                     "manifestSHA256": hashlib.sha256(manifest.read_bytes()).hexdigest(),
+                     "sqlSHA256": SQL_HASHES})
+    c.save()
+    try:
+        # Inspect labels only, never container environment, mounts or credentials.
+        for i, name in enumerate(containers):
+            labels = c.container_labels(name, "ownership-container-" + str(i))
+            require(labels.get("asservat.test") == run_id, "container run label mismatch")
+        for i, name in enumerate(networks):
+            code, output = c.run("ownership-network-" + str(i),
+                                 ["docker", "network", "inspect", "--format",
+                                  '{{json (index .Labels "asservat.test")}}', name])
+            require(code == 0 and json.loads(output) == run_id,
+                    "network run label mismatch")
+        for i, cluster in enumerate(clusters):
+            code, output = c.run("ownership-nodes-" + str(i),
+                                 ["kind", "get", "nodes", "--name", cluster])
+            require(code == 0, "kind node discovery failed")
+            nodes = checked_names(output.decode().split(), "invalid kind node list", 8)
+            for j, node in enumerate(nodes):
+                require(node.startswith(cluster + "-"), "foreign kind node name")
+                labels = c.container_labels(node, f"ownership-node-{i}-{j}")
+                require(labels.get("io.x-k8s.kind.cluster") == cluster,
+                        "kind cluster label mismatch")
+        # All intended live resources now match this manifest's run.
+        write_json(archive / "kept-resources.json", kept)
+        for i, cluster in enumerate(clusters):
+            label = "cluster-" + cluster.rsplit("-", 1)[1]
+            code, _ = c.run(label + "-kubeconfig",
+                            ["kind", "get", "kubeconfig", "--name", cluster],
+                            private=True, suffix=".yaml")
+            if code:
+                continue
+            config = private / (label + "-kubeconfig.yaml")
+            config.chmod(0o600)
+            kubectl = ["kubectl", "--kubeconfig", str(config), "--context", "kind-" + cluster,
+                       "--cache-dir", str(private / "kubectl-cache"), "--request-timeout=10s"]
+            code, _ = c.run(label + "-pod-status",
+                            kubectl + ["get", "pods", "--all-namespaces", "-o", "json"],
+                            sanitize=pod_projection, suffix=".json")
+            projected = archive / (label + "-pod-status.json")
+            if code == 0 and projected.stat().st_size:
+                for p, pod in enumerate(json.loads(projected.read_bytes())["items"]):
+                    namespace, name = pod["metadata"]["namespace"], pod["metadata"]["name"]
+                    statuses = {s["name"]: s for s in pod["status"].get("containerStatuses", [])}
+                    for n, container in enumerate(pod["containers"]):
+                        # Full identities remain in argv; filenames stay bounded.
+                        log_label = f"{label}-pod-{p}-container-{n}"
+                        command = kubectl + ["logs", "--namespace", namespace, name,
+                                             "--container", container, "--timestamps=true",
+                                             "--tail=1000", "--limit-bytes=262144"]
+                        c.run(log_label, command)
+                        if statuses.get(container, {}).get("restartCount", 0) > 0:
+                            c.run(log_label + "-previous", command + ["--previous"])
+            if cluster.endswith("-1"):
+                c.run("postmortem-regional-capacity",
+                      kubectl + ["get", "capacityreservations.asservat.io",
+                                 "--all-namespaces", "-o", "json"], suffix=".json")
+        for name, raw in sql.items():
+            (archive / name).write_bytes(raw)
+            c.run(name.removesuffix(".sql"),
+                  ["docker", "exec", "-i", postgres[0], "psql", "-X", "-w",
+                   "-U", "postgres", "-d", "custody_test", "-v", "ON_ERROR_STOP=1",
+                   "-P", "pager=off", "-f", "-"], input_bytes=raw)
+    except (ValueError, KeyError, TypeError, OSError) as exc:
+        # No exception payload from a provider or kubeconfig enters the report.
+        c.failure("collection stopped: " + type(exc).__name__)
+    c.save()
+    print("Collection report:", archive / "collection.json")
+    print("Private control files retained:", private)
+    return 1 if c.report["failures"] else 0
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    for argument in ("kept_json", "archive_dir", "private_dir", "sql_dir"):
+        parser.add_argument(argument, type=Path)
+    try:
+        sys.exit(collect(parser.parse_args()))
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        print("Collection refused before completion:", type(exc).__name__, file=sys.stderr)
+        sys.exit(2)

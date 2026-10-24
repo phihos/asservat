@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "kubectl",
+    "--kubeconfig",
+    "/home/phil/.cache/asservat-build/context-jb2tvobx/kube-0",
+    "--request-timeout=10s",
+    "-n",
+    "bootstrap-chain-10000000-target",
+    "logs",
+    "asservat-5d89c736db7146339dd237b8a75a75c3-worker-78d64bd5dvl7xp",
+    "--timestamps",
+    "--tail=45"
+  ],
+  "exitCode": 0,
+  "observedUnix": 1792706316.7176483
+}

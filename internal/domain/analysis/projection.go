@@ -106,7 +106,8 @@ func (s ContextProjectionScope) Candidate() ContextProjectionCandidate {
 }
 
 // ContextProjectionPath is accepted placement for this query purpose. It is not
-// a DownloadPath alias and cannot derive acceptance from a download policy.
+// a DownloadPath alias. ADR-219 shares the protected processing placement,
+// while ReadApproved remains an independently evaluated disclosure authority.
 type ContextProjectionPath struct {
 	Purpose, ID, TargetClusterID, StoreID   string
 	StorageRegion                           string
@@ -140,7 +141,7 @@ type ContextProjectionEnvironment struct {
 func (e ContextProjectionEnvironment) Valid(now time.Time) bool {
 	return authorization.UUID(e.RootID) && authorization.UUID(e.InstallationID) && authorization.UUID(e.StoreID) &&
 		e.Location.Validate() == nil && e.Principal.Valid() && e.PolicyRevision.Valid() &&
-		identity.Fresh(e.ObservedAt, e.ValidUntil, now, 5*time.Second) &&
+		identity.Fresh(e.ObservedAt, e.ValidUntil, now, identity.EvidenceReadRequestWindow) &&
 		e.Recovery.Valid(now) && e.Recovery.InstallationID == e.InstallationID && !e.ValidUntil.After(e.Recovery.FreshUntil) &&
 		e.Processing.Valid(now) && e.Processing.RootID == e.RootID && e.Processing.Location == e.Location &&
 		!e.ValidUntil.After(e.Processing.ValidUntil) && e.Path.Valid() && e.Region == e.Path.AcquisitionRegion &&
@@ -156,6 +157,9 @@ type ContextProjectionAuthority struct {
 	PermissionRevision, IdentityRevision         identity.Revision
 	DecisionDigest                               artifact.Digest
 	CheckedAt, ValidUntil, AccessUntil, DeleteBy time.Time
+	// Bound names the component whose interval set ValidUntil, for the
+	// operator report only. It is never persisted, digested or authority.
+	Bound string `json:"-"`
 }
 
 func (a ContextProjectionAuthority) Valid(now time.Time) bool {
@@ -164,7 +168,7 @@ func (a ContextProjectionAuthority) Valid(now time.Time) bool {
 		a.Environment.Location.ArtifactID == a.Scope.ArtifactID && a.Environment.Processing.CaptureID == a.Scope.CaptureID &&
 		a.Retention.Valid(now) && a.Retention.Matches(a.Scope.RootID, a.Scope.ClusterID, a.Scope.NamespaceUID, a.Scope.WorkloadUID, a.Scope.PodUID) &&
 		a.PermissionRevision.Valid() && authorization.UUID(a.PermissionRevision.UID) && a.IdentityRevision.Valid() &&
-		a.DecisionDigest != (artifact.Digest{}) && identity.Fresh(a.CheckedAt, a.ValidUntil, now, 5*time.Second) &&
+		a.DecisionDigest != (artifact.Digest{}) && identity.Fresh(a.CheckedAt, a.ValidUntil, now, identity.EvidenceReadRequestWindow) &&
 		!a.ValidUntil.After(a.Environment.ValidUntil) && !a.ValidUntil.After(a.Retention.ValidUntil) &&
 		!a.ValidUntil.After(a.AccessUntil) && a.AccessUntil.Before(a.DeleteBy)
 }
@@ -188,4 +192,13 @@ func ContextQueryDeadline(start time.Time, lifetime time.Duration, accessUntil t
 		return time.Time{}, ErrExpired
 	}
 	return until, nil
+}
+
+// AcquisitionPath extracts placement only. The caller retains the closed query
+// purpose and independent ReadApproved authority; this is never DownloadAuthority.
+func (p ContextProjectionPath) AcquisitionPath() artifact.DownloadPath {
+	if !p.Valid() {
+		return artifact.DownloadPath{}
+	}
+	return artifact.DownloadPath{ID: p.ID, TargetClusterID: p.TargetClusterID, StoreID: p.StoreID, StorageRegion: p.StorageRegion, AcquisitionClusterID: p.AcquisitionClusterID, AcquisitionRegion: p.AcquisitionRegion, ConnectorClusterID: p.ConnectorClusterID, ConnectorRegion: p.ConnectorRegion, HubClusterID: p.HubClusterID, HubRegion: p.HubRegion, WorkerConfiguration: p.WorkerConfiguration, HubConfiguration: p.HubConfiguration}
 }

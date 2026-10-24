@@ -1,0 +1,15 @@
+{
+  "README.md": "21ba727d5f7838a9fbb675cb5c7126b0690c16b33d034afda5f7b3ec5ed3c6da",
+  "compile/compile.json": "fc2641c91da7ba9eb66d52d0d18f062cdb4877c391131ff5795ab449f349ca12",
+  "compile/compile.log": "c541d60f6d33223ed7fce3fb576e1ce47d3bb84f70205567cee435992bb3ba97",
+  "compile/hook.patch": "0d216fe042d6cead17e9b4e22ac352581c3716057857aa6c3df05f2f11984a24",
+  "compile/installed_download_preparation_test.go.txt": "8439026d75059df991638a9eb41c6c7ca8bff3ebd818c84e37e4e44eb1eea43a",
+  "sql/cleanup-readback.json": "fb3c4217163717a1e14a49931f61402df8cf0f0e69b668d7b62c52f8fe8020c6",
+  "sql/custody-environment.json": "a7b921d1b7d80bac645c6baad6be06772f96bbeb6f24dccd4e0b6077e33b8a31",
+  "sql/custody.log": "f08248da67ae8287bd5f2b9802f643ae27e1f3751f9d753df23c338efe04f776",
+  "sql/gate.log": "deb0b4c434e81e34e5065a650fedc8dc7d36f22e46f96b64ae644283e43ac373",
+  "sql/invocation.json": "8cc73f585419d7b1aa724c88fd5e8f273e54e9d78590c55eb0df029fa75cc260",
+  "sql/result.json": "e07d7b6a325ba8e6c98ee6e3c3bd4ec09f332073c62c4132093ef419c037c13a",
+  "sql/source-verification.json": "9dc435b994108c29e602fcb25d1503df4a3352470eac97cb1d71bb28bb4a5126",
+  "verification.json": "4359939eb350429d1add94e05c65b18ec2e34b7360e619b41e9b86eb30e2bc4b"
+}

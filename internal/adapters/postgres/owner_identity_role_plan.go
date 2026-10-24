@@ -21,10 +21,23 @@ func OwnerIdentityRoleName(installation, purpose string) (string, bool) {
 	return "as_" + strings.ReplaceAll(installation, "-", "") + "_own_0" + strconv.Itoa(n), true
 }
 
+// The context-start ingress reads a connector's activated leaf on the hub's
+// native-read pool. The function is a read-only SECURITY DEFINER check.
+const nativeReadConnectorLeaf = "read_connector_activated_leaf(uuid,uuid,text,bytea,jsonb)"
+
 func ownerIdentityRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
-	if _, ok := contracts.OwnerIdentityRoleOrdinal(purpose); !ok {
+	if purpose != "owner-runtime" {
 		return nil, false
 	}
+	var out []publicRuntimeGrant
+	for _, duty := range []string{"enrollment", "audit", "activation", "registry", "routing", "native-read"} {
+		grants, _ := ownerIdentityDutyGrants(duty)
+		out = append(out, grants...)
+	}
+	return ownerIdentityGrantSet(out), true
+}
+
+func ownerIdentityDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	out := []publicRuntimeGrant{{"schema", "public", "", "USAGE"}}
 	add := func(table, privilege string, columns ...string) {
 		if len(columns) == 0 {
@@ -40,7 +53,7 @@ func ownerIdentityRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	// can dispatch, enroll, claim or bind keys.
 	switch purpose {
 	case "routing":
-		for _, table := range []string{"goose_db_version", "download_worker_owner", "download_worker", "artifact_download", "fleet_trust", "fleet_current_trust", "download_worker_configuration", "download_worker_configuration_revision"} {
+		for _, table := range []string{"goose_db_version", "context_query", "download_worker", "artifact_download", "fleet_trust", "fleet_current_trust", "download_worker_configuration", "download_worker_configuration_revision"} {
 			add(table, "SELECT")
 		}
 		add("fleet_trust", "UPDATE", "installation_id")
@@ -58,6 +71,7 @@ func ownerIdentityRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("retention_source", "UPDATE", "root_id")
 		add("download_worker_configuration", "UPDATE", "source_uid")
 		add("download_native_owner", "UPDATE", "worker_id")
+		out = append(out, publicRuntimeGrant{"function", nativeReadConnectorLeaf, "", "EXECUTE"})
 		return ownerIdentityGrantSet(out), true
 	}
 	// Derived from OwnerEnrollments and its current/historical transaction

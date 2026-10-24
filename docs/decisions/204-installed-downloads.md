@@ -1,13 +1,21 @@
 # ADR-204 — Installed native downloads
 
-Date: 2026-10-18. Status: accepted; implementation pending.
+Date: 2026-10-18. Status: accepted; implemented; installed worker/profile provisioning and configuration acceptance pass.
 Requirements: S-02 (inspection and native download in the installed journey);
 REQ-DLD-001, REQ-DEP-003; TASK-03.
 Amends [ADR-194](194-promoted-owner-inputs.md) decision 5 and
 [ADR-192](192-capacity-before-download-paths.md) decision 3. Follows
 [ADR-179](179-outbound-only-first-installed-profile.md) decision 1 (hub-local
 download workers), [ADR-069](069-download-worker-dispatch.md) to
-[ADR-071](071-download-worker-enrollment.md) and ADR-203 (installed publisher, in review).
+[ADR-071](071-download-worker-enrollment.md) and ADR-203 (installed publisher).
+
+Current qualification (2026-10-20): hub-local worker, enrollment,
+native-transfer and acquisition-key composition exists.
+[Resumed native47](../../test/results/resumed-c62e02ac-native47/context-storage.log)
+completed worker/profile provisioning and configuration acceptance, but the
+installed journey did not reach native download. Component download evidence
+remains separate: installed transfer, interruption, Stop, revocation and expiry
+qualification remain pending.
 
 ## Context
 
@@ -109,12 +117,18 @@ first profile's workers in the hub region instead.
   downloads client in the identity provider.
 - Adding a second download path needs a new owner input until runtime path
   acceptance exists.
-- The worst-case SQL connection plan for one hub (two retained hub-worker
-  processes during a rollout) rises from 95 to 101 ordinary connections with
-  the three new logins, above PostgreSQL's default of 97 usable connections.
-  An installation with downloads needs `max_connections` of at least 104.
+- The three download purposes contribute to the
+  [complete installed SQL inventory](../research/installed-sql-budget.md).
+  The current one-hub plan, including two retained hub-worker processes,
+  installer pools and ADR-210's browser observers, requires 114 ordinary
+  connections, or 117 total with three superuser-reserved slots and no other
+  reserved slots. The fixture's additional observer brings its total to 118.
+  These are configured ceilings, not measured simultaneous use. The earlier
+  101-ordinary/104-total estimate covered an incomplete inventory.
 
 ## Progress
+
+Historical checkpoints recorded before the 2026-10-20 status refresh above:
 
 - **Decisions 7 and 8, SQL and composition** (unit-test results only; the
   installer step, native runs and qualification are pending):

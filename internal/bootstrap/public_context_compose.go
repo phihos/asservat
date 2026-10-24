@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"encoding/json/jsontext"
 	"net/http"
+	"os"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/jose"
@@ -81,6 +82,9 @@ type publicContext struct {
 	clustersDigest [32]byte
 	// fleet is the ADR-193 bootstrap issuance; nil without Public.Fleet.
 	fleet *fleetapp.FleetBootstrapIssuance
+	// processingPolicy is the capacity processing source that processing
+	// decisions bind to (ADR-210); nil without Public.Processing.
+	processingPolicy *kube.DownloadEnvironmentSource
 }
 
 func decodeAuditPolicy(raw json.RawMessage, lane, root, installation string) (audit.OperationLifecyclePolicy, error) {
@@ -111,10 +115,11 @@ func publicDigest(s string) (artifact.Digest, bool) {
 // publicAuditStore is the owner's audit store and audit Transit keys, shared
 // by owner enrollment audit and the public capture/operation audit lanes.
 type publicAuditStore struct {
-	store *objectstore.Store
-	seal  *kms.Sealer
-	open  *kms.Opener
-	keys  *http.Client
+	store     *objectstore.Store
+	seal      *kms.Sealer
+	open      *kms.Opener
+	keys      *http.Client
+	operation *installedOperationAudit
 }
 
 // publicShared are the owner native composition's retention topology and
@@ -134,7 +139,7 @@ type publicShared struct {
 func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInputs, providers *kms.InstalledOwnerProviderEffects, pools *publicPools, observer, probe *kube.PermissionClient, shared publicShared, catalog publicCatalog, a publicAuditStore, closers *[]func()) (*publicContext, error) {
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
-	if p == nil || c.Native == nil || pools == nil || observer == nil || probe == nil || shared.topologies == nil || shared.nativeRead == nil || a.store == nil || a.seal == nil || a.open == nil || a.keys == nil ||
+	if p == nil || c.Native == nil || pools == nil || observer == nil || probe == nil || shared.topologies == nil || shared.nativeRead == nil || !a.storageConfigured() || a.seal == nil || a.open == nil || a.keys == nil ||
 		!authorization.UUID(p.ClusterCatalog.Source.UID) || p.Standby < 1 || p.Standby > 64 || p.Captures < 1 || p.Captures > 16 || c.Native.Connections+p.Standby > 64 || p.PreviewSeconds < 1 || p.PreviewSeconds > 300 {
 		return nil, mounts.ErrUnavailable
 	}
@@ -150,7 +155,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		return out, nil
 	}
-	sql, err := need("identity-read", "permission-read", "retention-read", "storage-read", "processing-read", "progress-read", "case-read", "catalog-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution-read", "api-execution-prepare", "api-execution-record")
+	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution")
 	if err != nil {
 		return nil, err
 	}
@@ -244,10 +249,10 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	out.starts = &OwnerContextStartRuntimeConfig{RootID: root, Router: router, Admissions: admissions, Connections: p.Standby, Preflight: p.Standby}
 
 	recovery := shared.guards.Recovery
-	if out.permissions, err = postgres.NewPermissions(ctx, sql["permission-read"], root); err != nil {
+	if out.permissions, err = postgres.NewPermissions(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	sources, err := postgres.NewRetentionSources(ctx, sql["retention-read"], root)
+	sources, err := postgres.NewRetentionSources(ctx, sql["hub-metadata-read"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -267,22 +272,23 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	storage, err := postgres.NewContextStorageReader(ctx, sql["storage-read"], root)
+	storage, err := postgres.NewContextStorageReader(ctx, sql["hub-metadata-read"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	processing, err := postgres.NewProcessingReads(ctx, sql["processing-read"], root, recovery)
+	processing, err := postgres.NewProcessingReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	// ADR-200: a stale binding records a refresh demand with the
-	// capture-preview credentials; storage-read stays SELECT-only.
+	// capture-preview credentials; metadata reads gain no demand-writing privilege.
 	refresh, err := postgres.NewCapacityRefreshDemands(ctx, sql["capture-preview"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	out.investigation = captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: previews, Replay: admissionsSQL, Admission: admissionsSQL, Resolution: resolution,
-		Targets: contextstart.Targets{Router: router, Now: time.Now}, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Recovery: out.recovery,
+		ReportPreviewFailure: eventLog(os.Stderr, "public preview refused"),
+		Targets:              contextstart.Targets{Router: router, Now: time.Now, Report: timedEventLog(os.Stderr, "context target query refused")}, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Recovery: out.recovery,
 		Lifetime: time.Duration(p.PreviewSeconds) * time.Second}
 
 	completed, err := postgres.NewCaptureOperationIntents(ctx, sql["capture-intent-read"], root)
@@ -297,41 +303,53 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	writer, err := objectstore.NewClosedOperationAuditObjects(a.store, capture.StoreID, a.seal, a.open)
+	reader, writer, err := a.operationObjects(capture.StoreID)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.intents = auditapp.CaptureOperationPublication{RootID: root, Completed: completed, Journal: journal, Acknowledgements: acks, Writer: writer, Reader: &objectstore.OperationAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}, MAC: out.mac}
+	out.intents = auditapp.CaptureOperationPublication{RootID: root, Completed: completed, Journal: journal, Acknowledgements: acks, Writer: writer, Reader: reader, MAC: out.mac}
 
-	runner := executionapp.APIContextRunner{Eligibility: eligibility, Retention: out.retention}
-	for purpose, port := range map[string]func(*postgres.APIContextExecutions){
-		"api-execution-read":    func(x *postgres.APIContextExecutions) { runner.Read = x },
-		"api-execution-prepare": func(x *postgres.APIContextExecutions) { runner.Prepare = x },
-		"api-execution-record":  func(x *postgres.APIContextExecutions) { runner.Record = x },
-	} {
-		x, err := postgres.NewAPIContextExecutions(ctx, sql[purpose], root, shared.guards)
-		if err != nil {
-			return nil, mounts.ErrUnavailable
-		}
-		port(x)
+	executionSQL, err := postgres.NewAPIContextExecutions(ctx, sql["api-execution"], root, shared.guards)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
 	}
-	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router}
+	// One governed pool/credential, retaining the three typed runner ports.
+	runner := executionapp.APIContextRunner{Read: executionSQL, Prepare: executionSQL, Record: executionSQL, Eligibility: eligibility, Retention: out.retention}
+	out.regional = RegionalAPIContextStart{Runner: runner, Signer: signers, Router: router, Report: eventLog(os.Stderr, "context start run refused")}
 
-	progress, err := postgres.NewContextProgressReads(ctx, sql["progress-read"], root, recovery)
+	progress, err := postgres.NewContextProgressReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	out.progress = captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: progress}
-	routes, err := postgres.NewContextCaseReads(ctx, sql["case-read"], root, recovery)
+	routes, err := postgres.NewContextCaseReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	if out.catalog, err = postgres.NewContextPublications(ctx, sql["catalog-read"], root); err != nil {
+	if out.catalog, err = postgres.NewContextPublications(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing}
 	if out.fleet, err = newPublicFleet(ctx, c, providers, pools, observer, probe, a); err != nil {
 		return nil, err
+	}
+	// ADR-210: the processing source has no download paths; it is read only
+	// as the policy that names the processing operators.
+	if e := p.Processing; e != nil {
+		pa, pp := capacityWorkerGuard(e.Guard)
+		guard, err := kube.NewDownloadEnvironmentProtection(observer, probe, cfg.ConfigMapAdministration{Name: e.Guard.Name, SourceName: e.Source.Name, ControlNamespace: control, Administrators: pa}, pp)
+		if err != nil {
+			return nil, mounts.ErrUnavailable
+		}
+		// The join adds each cluster's derived path to both sources (ADR-192,
+		// ADR-204), so the reader pins the same derived paths.
+		paths, err := downloadEnvironmentPaths(installation, c.ClusterID, p.DownloadEnvironment.Paths, p.DownloadEnvironment.PathTemplate, catalogTargets(catalog.catalog))
+		if err != nil {
+			return nil, err
+		}
+		if out.processingPolicy, err = kube.NewDownloadEnvironmentSource(observer, guard, e.Source.Name, e.Source.UID, root, installation, paths); err != nil {
+			return nil, mounts.ErrUnavailable
+		}
 	}
 	if ctx.Err() != nil {
 		return nil, mounts.ErrUnavailable

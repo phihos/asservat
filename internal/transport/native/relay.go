@@ -99,7 +99,8 @@ func (r *RelayConversation) Serve(ctx context.Context, worker Stream) error {
 	})
 	clear(command.Source)
 	clear(command.Operation)
-	command.Source, command.Operation = nil, nil
+	clear(command.Projection)
+	command.Source, command.Operation, command.Projection = nil, nil, nil
 	if err != nil {
 		return err
 	}
@@ -151,6 +152,17 @@ func (r *RelayConversation) Serve(ctx context.Context, worker Stream) error {
 		}
 		e = r.forward(ctx, r.upstream, worker, contracts.NativeDoneFrame, control(contracts.NativeDoneFrame, "closed", 0))
 		return e
+	case "read-approved-context":
+		if e := r.forward(ctx, worker, r.upstream, contracts.NativeMetadataFrame, metadata); e != nil {
+			return e
+		}
+		if e := r.forward(ctx, r.upstream, worker, contracts.NativeAcknowledgeFrame, control(contracts.NativeAcknowledgeFrame, "approved", 0)); e != nil {
+			return e
+		}
+		if e := r.forward(ctx, worker, r.upstream, contracts.NativeDoneFrame, control(contracts.NativeDoneFrame, "closed", 0)); e != nil {
+			return e
+		}
+		return r.forward(ctx, r.upstream, worker, contracts.NativeDoneFrame, control(contracts.NativeDoneFrame, "joined", 0))
 	case "read-context-response":
 		e := r.forward(ctx, worker, r.upstream, contracts.NativeDataFrame, data)
 		if e != nil {

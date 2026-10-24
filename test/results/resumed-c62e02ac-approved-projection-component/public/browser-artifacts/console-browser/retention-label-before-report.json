@@ -1,0 +1,12 @@
+{
+  "passed": false,
+  "checks": [
+    "unavailable session stays hidden; local sign-in; 320px reflow",
+    "real cookie, CSRF and POST-refresh transport; no duplicate pageshow refresh or web storage",
+    "actual session handler rejects wrong-origin logout"
+  ],
+  "errors": [],
+  "external": [],
+  "violations": [],
+  "failure": "TimeoutError: locator.selectOption: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByLabel('Requested access duration', { exact: true })\u001b[22m\n"
+}

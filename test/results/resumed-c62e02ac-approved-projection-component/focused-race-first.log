@@ -1,0 +1,1438 @@
+=== RUN   TestAcquisitionIdentityPreservesDownloadWorker
+--- PASS: TestAcquisitionIdentityPreservesDownloadWorker (0.00s)
+=== RUN   TestAcquisitionProjectionHasNoDownloadParent
+--- PASS: TestAcquisitionProjectionHasNoDownloadParent (0.00s)
+=== RUN   TestOngoingAcquisitionRequiresObservationDelegation
+--- PASS: TestOngoingAcquisitionRequiresObservationDelegation (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/authorization	1.011s
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-worker-copy
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-signing
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-poll-budget
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-control-budget
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/renew-worker
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/expire-certificate-at-query
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-acceptance
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-wal
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/insufficient-cleanup-backing
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/expire-provider-at-query
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/expire-cleanup-at-query
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-ephemeral-storage
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-hub-copy
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-provider-concurrency
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-backup
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/extra-key
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/renew-result
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-authentication-concurrency
+=== RUN   TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/third-batch
+--- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-worker-copy (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-signing (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-poll-budget (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-control-budget (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/renew-worker (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/expire-certificate-at-query (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-acceptance (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-wal (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/insufficient-cleanup-backing (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/expire-provider-at-query (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/expire-cleanup-at-query (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-ephemeral-storage (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-hub-copy (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-provider-concurrency (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-backup (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/extra-key (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/renew-result (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/missing-authentication-concurrency (0.00s)
+    --- PASS: TestQueryKeepsDisclosureAndUncertainEffectHorizonsSeparate/third-batch (0.00s)
+=== RUN   TestQueryFreshRequestCannotResetOriginalBindings
+--- PASS: TestQueryFreshRequestCannotResetOriginalBindings (0.00s)
+=== RUN   TestQuerySQLPrecisionNeverRenewsOriginalBounds
+--- PASS: TestQuerySQLPrecisionNeverRenewsOriginalBounds (0.00s)
+=== RUN   TestQueryFlooredDeadlineMustStillFollowActualNow
+--- PASS: TestQueryFlooredDeadlineMustStillFollowActualNow (0.00s)
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-peer
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-certificate
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/wrong-role
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/no-token-proof
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-query
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-worker
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-cluster
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/no-public-key
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/changed-config
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/renewed-certificate
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/renewed-proof
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-process
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/download-purpose
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-claim
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-source
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/audit-key
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/new-owner
+=== RUN   TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/renewed-interval
+--- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-peer (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-certificate (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/wrong-role (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/no-token-proof (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-query (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-worker (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-cluster (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/no-public-key (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/changed-config (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/renewed-certificate (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/renewed-proof (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-process (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/download-purpose (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-claim (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/foreign-source (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/audit-key (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/new-owner (0.00s)
+    --- PASS: TestQueryWorkerProofCannotSwapPurposeProcessOrOriginalInterval/renewed-interval (0.00s)
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-path-target
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-permission
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/future-authority
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/wrong-display
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-processing
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-workload
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-client
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-subject
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-processing-attempt
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-policy
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/extended-environment
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-worker-config
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/extended-retention
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/extended-processing
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/download-purpose
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-region
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/deletion-before-access
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/wrong-native-format
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-cluster
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-store
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/old-retention
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/extended-recovery
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-case
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-version
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-selection
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-path
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-pod
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-processing-root
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-decision
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/wrong-native-projection
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-environment
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-artifact
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-installation
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/foreign-connector
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-identity
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/closed-retention
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/long-authority
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-retention
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/missing-recovery
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-root
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-capture
+=== RUN   TestProjectionAuthorityRequiresEveryCurrentBinding/other-namespace
+--- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-path-target (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-permission (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/future-authority (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/wrong-display (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-processing (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-workload (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-client (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-subject (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-processing-attempt (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-policy (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/extended-environment (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-worker-config (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/extended-retention (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/extended-processing (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/download-purpose (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-region (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/deletion-before-access (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/wrong-native-format (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-cluster (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-store (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/old-retention (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/extended-recovery (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-case (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-version (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-selection (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-path (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-pod (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-processing-root (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-decision (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/wrong-native-projection (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-environment (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-artifact (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-installation (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/foreign-connector (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-identity (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/closed-retention (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/long-authority (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-retention (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/missing-recovery (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-root (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-capture (0.00s)
+    --- PASS: TestProjectionAuthorityRequiresEveryCurrentBinding/other-namespace (0.00s)
+=== RUN   TestProjectionQueryAndRequestDeadlinesStayDistinct
+--- PASS: TestProjectionQueryAndRequestDeadlinesStayDistinct (0.00s)
+=== RUN   TestProjectionLineDefaultsAndSourceScope
+--- PASS: TestProjectionLineDefaultsAndSourceScope (0.00s)
+=== RUN   TestContextSourceProjectionDigestMatchesImmutableDefinition
+--- PASS: TestContextSourceProjectionDigestMatchesImmutableDefinition (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/domain/analysis	1.018s
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/missing-policy
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/missing-processing
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/missing-recovery
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/client
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/purpose
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/data-class
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/source
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/native-limit
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/download-path
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/suspended
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/region
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/changed-policy
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/changed-path
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/changed-processing
+=== RUN   TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/changed-recovery
+--- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/missing-policy (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/missing-processing (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/missing-recovery (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/client (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/purpose (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/data-class (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/source (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/native-limit (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/download-path (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/suspended (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/region (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/changed-policy (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/changed-path (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/changed-processing (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentRequiresIndependentApprovedPolicy/changed-recovery (0.00s)
+=== RUN   TestCurrentProjectionEnvironmentPreservesEveryOriginalEarlierDeadline
+=== RUN   TestCurrentProjectionEnvironmentPreservesEveryOriginalEarlierDeadline/policy
+=== RUN   TestCurrentProjectionEnvironmentPreservesEveryOriginalEarlierDeadline/recovery
+=== RUN   TestCurrentProjectionEnvironmentPreservesEveryOriginalEarlierDeadline/processing
+--- PASS: TestCurrentProjectionEnvironmentPreservesEveryOriginalEarlierDeadline (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentPreservesEveryOriginalEarlierDeadline/policy (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentPreservesEveryOriginalEarlierDeadline/recovery (0.00s)
+    --- PASS: TestCurrentProjectionEnvironmentPreservesEveryOriginalEarlierDeadline/processing (0.00s)
+=== RUN   TestCurrentProjectionEnvironmentNarrowsAfterFinalPolicyRead
+--- PASS: TestCurrentProjectionEnvironmentNarrowsAfterFinalPolicyRead (0.00s)
+=== RUN   TestCurrentProjectionEnvironmentOwnsOriginalPolicySlices
+--- PASS: TestCurrentProjectionEnvironmentOwnsOriginalPolicySlices (0.00s)
+=== RUN   TestProjectionPoliciesUseExactSharedPlacementWithoutDownloadEntitlement
+--- PASS: TestProjectionPoliciesUseExactSharedPlacementWithoutDownloadEntitlement (0.00s)
+=== RUN   TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement
+=== RUN   TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/wrong-target
+=== RUN   TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/wrong-store
+=== RUN   TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/ambiguous
+=== RUN   TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/suspended
+=== RUN   TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/expired
+=== RUN   TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/download-only-lease
+=== RUN   TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/cancel-after-read
+=== RUN   TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/short-parent
+--- PASS: TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement (0.00s)
+    --- PASS: TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/wrong-target (0.00s)
+    --- PASS: TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/wrong-store (0.00s)
+    --- PASS: TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/ambiguous (0.00s)
+    --- PASS: TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/suspended (0.00s)
+    --- PASS: TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/expired (0.00s)
+    --- PASS: TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/download-only-lease (0.00s)
+    --- PASS: TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/cancel-after-read (0.00s)
+    --- PASS: TestProjectionPoliciesRefuseUnavailableOrAmbiguousPlacement/short-parent (0.00s)
+=== RUN   TestContextProjectionAuthorityReadWithoutDownload
+--- PASS: TestContextProjectionAuthorityReadWithoutDownload (0.00s)
+=== RUN   TestContextProjectionAuthorityResolvesOnlyAfterEligibility
+=== RUN   TestContextProjectionAuthorityResolvesOnlyAfterEligibility/deny
+=== RUN   TestContextProjectionAuthorityResolvesOnlyAfterEligibility/download-only
+=== RUN   TestContextProjectionAuthorityResolvesOnlyAfterEligibility/wrong-case
+=== RUN   TestContextProjectionAuthorityResolvesOnlyAfterEligibility/raw-source
+--- PASS: TestContextProjectionAuthorityResolvesOnlyAfterEligibility (0.00s)
+    --- PASS: TestContextProjectionAuthorityResolvesOnlyAfterEligibility/deny (0.00s)
+    --- PASS: TestContextProjectionAuthorityResolvesOnlyAfterEligibility/download-only (0.00s)
+    --- PASS: TestContextProjectionAuthorityResolvesOnlyAfterEligibility/wrong-case (0.00s)
+    --- PASS: TestContextProjectionAuthorityResolvesOnlyAfterEligibility/raw-source (0.00s)
+=== RUN   TestContextProjectionAuthorityDeniesBeforeCatalog
+=== RUN   TestContextProjectionAuthorityDeniesBeforeCatalog/identity
+=== RUN   TestContextProjectionAuthorityDeniesBeforeCatalog/different-client
+=== RUN   TestContextProjectionAuthorityDeniesBeforeCatalog/download-only
+=== RUN   TestContextProjectionAuthorityDeniesBeforeCatalog/no-allow
+=== RUN   TestContextProjectionAuthorityDeniesBeforeCatalog/unknown-denies
+=== RUN   TestContextProjectionAuthorityDeniesBeforeCatalog/explicit-deny
+=== RUN   TestContextProjectionAuthorityDeniesBeforeCatalog/stale-denies
+=== RUN   TestContextProjectionAuthorityDeniesBeforeCatalog/wrong-root
+=== RUN   TestContextProjectionAuthorityDeniesBeforeCatalog/raw-source
+=== RUN   TestContextProjectionAuthorityDeniesBeforeCatalog/wrong-display
+--- PASS: TestContextProjectionAuthorityDeniesBeforeCatalog (0.00s)
+    --- PASS: TestContextProjectionAuthorityDeniesBeforeCatalog/identity (0.00s)
+    --- PASS: TestContextProjectionAuthorityDeniesBeforeCatalog/different-client (0.00s)
+    --- PASS: TestContextProjectionAuthorityDeniesBeforeCatalog/download-only (0.00s)
+    --- PASS: TestContextProjectionAuthorityDeniesBeforeCatalog/no-allow (0.00s)
+    --- PASS: TestContextProjectionAuthorityDeniesBeforeCatalog/unknown-denies (0.00s)
+    --- PASS: TestContextProjectionAuthorityDeniesBeforeCatalog/explicit-deny (0.00s)
+    --- PASS: TestContextProjectionAuthorityDeniesBeforeCatalog/stale-denies (0.00s)
+    --- PASS: TestContextProjectionAuthorityDeniesBeforeCatalog/wrong-root (0.00s)
+    --- PASS: TestContextProjectionAuthorityDeniesBeforeCatalog/raw-source (0.00s)
+    --- PASS: TestContextProjectionAuthorityDeniesBeforeCatalog/wrong-display (0.00s)
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/case
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/capture
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/ciphertext-version
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/projection
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/format
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/raw-class
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/artifact
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/target
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/store
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/attempt
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/limit
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/classification
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/unretained-audience
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/replaced-assignment
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/expired
+=== RUN   TestContextProjectionAuthorityRejectsSourceSubstitution/catalog-deadline
+--- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/case (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/capture (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/ciphertext-version (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/projection (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/format (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/raw-class (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/artifact (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/target (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/store (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/attempt (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/limit (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/classification (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/unretained-audience (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/replaced-assignment (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/expired (0.00s)
+    --- PASS: TestContextProjectionAuthorityRejectsSourceSubstitution/catalog-deadline (0.00s)
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/deny
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/permission-revision
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/groups
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/scopes
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/identity-policy
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/recovery
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/processing
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/path
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/environment-policy
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/retention-cutoff
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/retention-source
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/retention-origins
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/final-identity
+=== RUN   TestContextProjectionAuthorityRechecksAfterBlockingReads/final-environment
+--- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/deny (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/permission-revision (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/groups (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/scopes (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/identity-policy (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/recovery (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/processing (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/path (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/environment-policy (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/retention-cutoff (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/retention-source (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/retention-origins (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/final-identity (0.00s)
+    --- PASS: TestContextProjectionAuthorityRechecksAfterBlockingReads/final-environment (0.00s)
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/recovery
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/processing
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/wrong-processing-capture
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/path
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/download-purpose
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/retention
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/retention-target
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/retention-extension
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/retention-purpose
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/environment
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/catalog
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/permissions
+=== RUN   TestContextProjectionAuthorityRequiresEveryProof/retention-error
+--- PASS: TestContextProjectionAuthorityRequiresEveryProof (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/recovery (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/processing (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/wrong-processing-capture (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/path (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/download-purpose (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/retention (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/retention-target (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/retention-extension (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/retention-purpose (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/environment (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/catalog (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/permissions (0.00s)
+    --- PASS: TestContextProjectionAuthorityRequiresEveryProof/retention-error (0.00s)
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/identity/expire=false
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/identity/expire=true
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/permission/expire=false
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/permission/expire=true
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/denies/expire=false
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/denies/expire=true
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/catalog/expire=false
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/catalog/expire=true
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/retention/expire=false
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/retention/expire=true
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/environment/expire=false
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/environment/expire=true
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/request/expire=false
+=== RUN   TestContextProjectionAuthorityKeepsOriginalIntervals/request/expire=true
+--- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals (0.01s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/identity/expire=false (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/identity/expire=true (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/permission/expire=false (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/permission/expire=true (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/denies/expire=false (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/denies/expire=true (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/catalog/expire=false (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/catalog/expire=true (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/retention/expire=false (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/retention/expire=true (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/environment/expire=false (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/environment/expire=true (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/request/expire=false (0.00s)
+    --- PASS: TestContextProjectionAuthorityKeepsOriginalIntervals/request/expire=true (0.00s)
+=== RUN   TestContextProjectionAuthorityCancellationAndDependencies
+=== RUN   TestContextProjectionAuthorityCancellationAndDependencies/nil-context
+=== RUN   TestContextProjectionAuthorityCancellationAndDependencies/cancelled
+=== RUN   TestContextProjectionAuthorityCancellationAndDependencies/identity
+=== RUN   TestContextProjectionAuthorityCancellationAndDependencies/permissions
+=== RUN   TestContextProjectionAuthorityCancellationAndDependencies/catalog
+=== RUN   TestContextProjectionAuthorityCancellationAndDependencies/retention
+=== RUN   TestContextProjectionAuthorityCancellationAndDependencies/environment
+=== RUN   TestContextProjectionAuthorityCancellationAndDependencies/now
+=== RUN   TestContextProjectionAuthorityCancellationAndDependencies/original-request-deadline-interrupts-catalog
+=== RUN   TestContextProjectionAuthorityCancellationAndDependencies/cancel-during-environment
+--- PASS: TestContextProjectionAuthorityCancellationAndDependencies (0.03s)
+    --- PASS: TestContextProjectionAuthorityCancellationAndDependencies/nil-context (0.00s)
+    --- PASS: TestContextProjectionAuthorityCancellationAndDependencies/cancelled (0.00s)
+    --- PASS: TestContextProjectionAuthorityCancellationAndDependencies/identity (0.00s)
+    --- PASS: TestContextProjectionAuthorityCancellationAndDependencies/permissions (0.00s)
+    --- PASS: TestContextProjectionAuthorityCancellationAndDependencies/catalog (0.00s)
+    --- PASS: TestContextProjectionAuthorityCancellationAndDependencies/retention (0.00s)
+    --- PASS: TestContextProjectionAuthorityCancellationAndDependencies/environment (0.00s)
+    --- PASS: TestContextProjectionAuthorityCancellationAndDependencies/now (0.00s)
+    --- PASS: TestContextProjectionAuthorityCancellationAndDependencies/original-request-deadline-interrupts-catalog (0.03s)
+    --- PASS: TestContextProjectionAuthorityCancellationAndDependencies/cancel-during-environment (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/authorization	1.069s
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/unaudited
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/wrong-input
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/missing-qualified-dimension
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/replayed-admission
+=== RUN   TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/unknown-admission
+--- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent (0.00s)
+    --- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/unaudited (0.00s)
+    --- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/wrong-input (0.00s)
+    --- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/missing-qualified-dimension (0.00s)
+    --- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/replayed-admission (0.00s)
+    --- PASS: TestQueryAdmissionAndReadRequireOriginalAcknowledgedIntent/unknown-admission (0.00s)
+=== RUN   TestQueryDeliveryRemainsActiveThroughExactOutcomeAndJoinedClose
+--- PASS: TestQueryDeliveryRemainsActiveThroughExactOutcomeAndJoinedClose (0.00s)
+=== RUN   TestQueryLostOutwardReplyUsesFreshPaidBatchWithoutNewWorker
+--- PASS: TestQueryLostOutwardReplyUsesFreshPaidBatchWithoutNewWorker (0.00s)
+=== RUN   TestQueryUncertainPrivateCloseAndUnknownStartStayCharged
+=== RUN   TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/batch-replay
+=== RUN   TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/claim-replay
+=== RUN   TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/claim-unknown
+--- PASS: TestQueryUncertainPrivateCloseAndUnknownStartStayCharged (0.00s)
+    --- PASS: TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/batch-replay (0.00s)
+    --- PASS: TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/claim-replay (0.00s)
+    --- PASS: TestQueryUncertainPrivateCloseAndUnknownStartStayCharged/claim-unknown (0.00s)
+=== RUN   TestQueryPendingPollCannotDispatchAndRequiresOutcomeGuard
+--- PASS: TestQueryPendingPollCannotDispatchAndRequiresOutcomeGuard (0.00s)
+=== RUN   TestQueryFinalAuthorityAndOriginalRequestCancellation
+=== RUN   TestQueryFinalAuthorityAndOriginalRequestCancellation/group-revocation
+    context_query_test.go:475: final current fence bypassed
+=== RUN   TestQueryFinalAuthorityAndOriginalRequestCancellation/source-replacement
+    context_query_test.go:475: final current fence bypassed
+=== RUN   TestQueryFinalAuthorityAndOriginalRequestCancellation/retention-cutoff
+    context_query_test.go:475: final current fence bypassed
+=== RUN   TestQueryFinalAuthorityAndOriginalRequestCancellation/recovery-change
+    context_query_test.go:475: final current fence bypassed
+=== RUN   TestQueryFinalAuthorityAndOriginalRequestCancellation/path-change
+    context_query_test.go:475: final current fence bypassed
+=== RUN   TestQueryFinalAuthorityAndOriginalRequestCancellation/sql-fence
+--- FAIL: TestQueryFinalAuthorityAndOriginalRequestCancellation (0.01s)
+    --- FAIL: TestQueryFinalAuthorityAndOriginalRequestCancellation/group-revocation (0.00s)
+    --- FAIL: TestQueryFinalAuthorityAndOriginalRequestCancellation/source-replacement (0.00s)
+    --- FAIL: TestQueryFinalAuthorityAndOriginalRequestCancellation/retention-cutoff (0.00s)
+    --- FAIL: TestQueryFinalAuthorityAndOriginalRequestCancellation/recovery-change (0.00s)
+    --- FAIL: TestQueryFinalAuthorityAndOriginalRequestCancellation/path-change (0.00s)
+    --- PASS: TestQueryFinalAuthorityAndOriginalRequestCancellation/sql-fence (0.00s)
+=== RUN   TestQueryRechecksAfterBlockingObservation
+    context_query_test.go:511: stale observation started read
+--- FAIL: TestQueryRechecksAfterBlockingObservation (0.00s)
+=== RUN   TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff
+=== RUN   TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/route
+=== RUN   TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/plan
+=== RUN   TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/claim
+--- PASS: TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff (0.24s)
+    --- PASS: TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/route (0.08s)
+    --- PASS: TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/plan (0.08s)
+    --- PASS: TestQueryEveryBlockingPortRetainsEarlierOriginalCutoff/claim (0.08s)
+=== RUN   TestQueryRetainsIdentitySnapshotAgainstPortSliceReuse
+    context_query_test.go:562: mutable identity slice rewrote original observation
+--- FAIL: TestQueryRetainsIdentitySnapshotAgainstPortSliceReuse (0.00s)
+=== RUN   TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun
+=== RUN   TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun/first-identity
+=== RUN   TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun/audit-lineage
+--- PASS: TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun (0.08s)
+    --- PASS: TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun/first-identity (0.00s)
+    --- PASS: TestQueryInitialBlockingReadsAreBoundedBeforeTheyRun/audit-lineage (0.08s)
+=== RUN   TestQueryExpiredPublicContextCannotActAsCleanupPermit
+--- PASS: TestQueryExpiredPublicContextCannotActAsCleanupPermit (0.00s)
+=== RUN   TestQueryDeliveryTimingDoesNotRenewLatePollOrPreparedCutoff
+    context_query_test.go:652: prepared longer evidence cutoff survived shortening
+--- FAIL: TestQueryDeliveryTimingDoesNotRenewLatePollOrPreparedCutoff (0.00s)
+=== RUN   TestQueryDeliveryDoneTracksOriginalOwner
+--- PASS: TestQueryDeliveryDoneTracksOriginalOwner (0.00s)
+FAIL
+FAIL	asservat.local/asservat/internal/application/analysis	0.359s
+=== RUN   TestQueryCapacityReservesResidualAndOriginalHorizons
+--- PASS: TestQueryCapacityReservesResidualAndOriginalHorizons (0.01s)
+=== RUN   TestQueryCapacityEveryResidualDimensionIsIndependent
+=== RUN   TestQueryCapacityEveryResidualDimensionIsIndependent/sql
+=== RUN   TestQueryCapacityEveryResidualDimensionIsIndependent/backup
+=== RUN   TestQueryCapacityEveryResidualDimensionIsIndependent/wal
+=== RUN   TestQueryCapacityEveryResidualDimensionIsIndependent/key
+=== RUN   TestQueryCapacityEveryResidualDimensionIsIndependent/system-bytes
+=== RUN   TestQueryCapacityEveryResidualDimensionIsIndependent/system-objects
+=== RUN   TestQueryCapacityEveryResidualDimensionIsIndependent/physical-system
+--- PASS: TestQueryCapacityEveryResidualDimensionIsIndependent (0.03s)
+    --- PASS: TestQueryCapacityEveryResidualDimensionIsIndependent/sql (0.00s)
+    --- PASS: TestQueryCapacityEveryResidualDimensionIsIndependent/backup (0.00s)
+    --- PASS: TestQueryCapacityEveryResidualDimensionIsIndependent/wal (0.00s)
+    --- PASS: TestQueryCapacityEveryResidualDimensionIsIndependent/key (0.00s)
+    --- PASS: TestQueryCapacityEveryResidualDimensionIsIndependent/system-bytes (0.00s)
+    --- PASS: TestQueryCapacityEveryResidualDimensionIsIndependent/system-objects (0.00s)
+    --- PASS: TestQueryCapacityEveryResidualDimensionIsIndependent/physical-system (0.00s)
+=== RUN   TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile
+=== RUN   TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/history-rows
+=== RUN   TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/principal-overcommit
+=== RUN   TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/missing-worker-intent-audit
+=== RUN   TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/unfunded-backup
+=== RUN   TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/fractional-time
+=== RUN   TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/legacy-layout
+=== RUN   TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/root-target
+=== RUN   TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/workload-overcommit
+=== RUN   TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/missing-identity-wal
+--- PASS: TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile (0.01s)
+    --- PASS: TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/history-rows (0.00s)
+    --- PASS: TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/principal-overcommit (0.00s)
+    --- PASS: TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/missing-worker-intent-audit (0.00s)
+    --- PASS: TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/unfunded-backup (0.00s)
+    --- PASS: TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/fractional-time (0.00s)
+    --- PASS: TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/legacy-layout (0.00s)
+    --- PASS: TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/root-target (0.00s)
+    --- PASS: TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/workload-overcommit (0.00s)
+    --- PASS: TestQueryCapacityRejectsUnqualifiedOrUnfundedProfile/missing-identity-wal (0.00s)
+=== RUN   TestQueryCapacityOmittedExtensionPreservesOriginalBytes
+--- PASS: TestQueryCapacityOmittedExtensionPreservesOriginalBytes (0.00s)
+=== RUN   TestQueryCapacityHasNoSeparateObservationAllowance
+--- PASS: TestQueryCapacityHasNoSeparateObservationAllowance (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/capacity	1.066s
+=== RUN   TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim
+--- PASS: TestContextRuntimeActiveEnrollmentAvoidsUnusedOwnerClaim (0.00s)
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/revoked-before
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-removed
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-replaced
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-mutated
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/key-replaced
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/enrollment-removed
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/worker-replaced
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/busy
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/uncertain
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/metadata-started
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/deadline
+=== RUN   TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/cancelled
+--- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState (0.03s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/revoked-before (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-removed (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-replaced (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/peer-mutated (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/key-replaced (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/enrollment-removed (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/worker-replaced (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/busy (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/uncertain (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/metadata-started (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/deadline (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentDeniesChangedCurrentState/cancelled (0.00s)
+=== RUN   TestContextRuntimeIncompleteOrShortPeerReturnsPending
+=== RUN   TestContextRuntimeIncompleteOrShortPeerReturnsPending/no-enrollment
+=== RUN   TestContextRuntimeIncompleteOrShortPeerReturnsPending/no-peer
+=== RUN   TestContextRuntimeIncompleteOrShortPeerReturnsPending/short-peer
+--- PASS: TestContextRuntimeIncompleteOrShortPeerReturnsPending (0.01s)
+    --- PASS: TestContextRuntimeIncompleteOrShortPeerReturnsPending/no-enrollment (0.00s)
+    --- PASS: TestContextRuntimeIncompleteOrShortPeerReturnsPending/no-peer (0.00s)
+    --- PASS: TestContextRuntimeIncompleteOrShortPeerReturnsPending/short-peer (0.00s)
+=== RUN   TestActiveContextEnrollmentPreservesOriginalRenewalBoundary
+--- PASS: TestActiveContextEnrollmentPreservesOriginalRenewalBoundary (0.00s)
+=== RUN   TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation
+=== RUN   TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation/pod
+=== RUN   TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation/sql
+--- PASS: TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation (0.01s)
+    --- PASS: TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation/pod (0.00s)
+    --- PASS: TestContextRuntimeActiveEnrollmentReusesOneAuthorityObservation/sql (0.00s)
+=== RUN   TestContextRuntimeBoundWorkerAvoidsCompletedLaunchReplay
+--- PASS: TestContextRuntimeBoundWorkerAvoidsCompletedLaunchReplay (0.00s)
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/revoked-before
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/pod-replaced
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/job-replaced
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/multiple-pods
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/bound-pending
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/terminated
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/binding-removed
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/sql-worker-replaced
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/busy
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/uncertain
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/cancelled
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-pod
+=== RUN   TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-sql
+--- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations (0.02s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/revoked-before (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/pod-replaced (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/job-replaced (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/multiple-pods (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/bound-pending (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/terminated (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/binding-removed (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/sql-worker-replaced (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/busy (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/uncertain (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/cancelled (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-pod (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerRechecksNegativeObservations/expired-after-sql (0.00s)
+=== RUN   TestContextRuntimeBoundWorkerPreservesShorterParentDeadline
+=== RUN   TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/pod
+=== RUN   TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/sql
+--- PASS: TestContextRuntimeBoundWorkerPreservesShorterParentDeadline (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/pod (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerPreservesShorterParentDeadline/sql (0.00s)
+=== RUN   TestContextRuntimeUnboundWorkerStillUsesLaunchRecovery
+--- PASS: TestContextRuntimeUnboundWorkerStillUsesLaunchRecovery (0.00s)
+=== RUN   TestContextRuntimeNewEnrollmentReturnsPendingWithoutOwner
+--- PASS: TestContextRuntimeNewEnrollmentReturnsPendingWithoutOwner (0.00s)
+=== RUN   TestContextRuntimeBoundWorkerReusesOneAuthorityObservation
+=== RUN   TestContextRuntimeBoundWorkerReusesOneAuthorityObservation/pod
+=== RUN   TestContextRuntimeBoundWorkerReusesOneAuthorityObservation/sql
+--- PASS: TestContextRuntimeBoundWorkerReusesOneAuthorityObservation (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerReusesOneAuthorityObservation/pod (0.00s)
+    --- PASS: TestContextRuntimeBoundWorkerReusesOneAuthorityObservation/sql (0.00s)
+=== RUN   TestContextRuntimeOneAuthorityObservationReachesFirstReservation
+=== RUN   TestContextRuntimeOneAuthorityObservationReachesFirstReservation/0s
+=== RUN   TestContextRuntimeOneAuthorityObservationReachesFirstReservation/1.7s
+--- PASS: TestContextRuntimeOneAuthorityObservationReachesFirstReservation (0.00s)
+    --- PASS: TestContextRuntimeOneAuthorityObservationReachesFirstReservation/0s (0.00s)
+    --- PASS: TestContextRuntimeOneAuthorityObservationReachesFirstReservation/1.7s (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/caller
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/identity
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/authority
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/session
+=== RUN   TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/source
+--- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff (0.01s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/caller (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/identity (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/session (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityPreservesEveryOriginalCutoff/source (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/source-expired-during-authority
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/invalid-source
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/wrong-profile
+=== RUN   TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/authority-denied
+--- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead (0.01s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/source-expired-during-authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/invalid-source (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/wrong-profile (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityRejectsInvalidFirstRead/authority-denied (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/clock-rollback
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/proof-expired
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/caller-cancelled
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/scope-changed
+=== RUN   TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/current-path-missing
+--- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges (0.01s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/clock-rollback (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/proof-expired (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/caller-cancelled (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/scope-changed (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityHandoffRechecksLocalChanges/current-path-missing (0.00s)
+=== RUN   TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff
+=== RUN   TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/revoked
+=== RUN   TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/identity-changed
+=== RUN   TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/expired
+=== RUN   TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/cancelled
+--- PASS: TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff (0.01s)
+    --- PASS: TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/revoked (0.00s)
+    --- PASS: TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/identity-changed (0.00s)
+    --- PASS: TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/expired (0.00s)
+    --- PASS: TestContextRuntimeOriginalObservationSurvivesUntilItsCutoff/cancelled (0.00s)
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/authority
+=== RUN   TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/attachment
+--- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/authority (0.00s)
+    --- PASS: TestContextRuntimeInitialAuthorityCancellationJoinsBlockingRead/attachment (0.00s)
+=== RUN   TestContextRuntimeWarmPollStillChecksCurrentAuthorityAndSQL
+--- PASS: TestContextRuntimeWarmPollStillChecksCurrentAuthorityAndSQL (0.02s)
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/unjoined
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/expired-response
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/exhausted
+=== RUN   TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/active-stream
+--- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady (0.01s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/unjoined (0.00s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/expired-response (0.00s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/exhausted (0.00s)
+    --- PASS: TestContextRuntimeKnownUnjoinedOwnerDoesNotAdvertiseReady/active-stream (0.00s)
+=== RUN   TestContextRuntimeWarmFactsRespectCurrentRetentionAndPath
+--- PASS: TestContextRuntimeWarmFactsRespectCurrentRetentionAndPath (0.00s)
+=== RUN   TestProjectionWorkerExactClaimBeforeProtectedOpen
+--- PASS: TestProjectionWorkerExactClaimBeforeProtectedOpen (0.00s)
+=== RUN   TestProjectionWorkerCallerCancellationBoundsBlockingAuthority
+--- PASS: TestProjectionWorkerCallerCancellationBoundsBlockingAuthority (0.03s)
+=== RUN   TestProjectionWorkerUnknownOpenStillClosesKnownLocalHandle
+--- PASS: TestProjectionWorkerUnknownOpenStillClosesKnownLocalHandle (0.00s)
+=== RUN   TestProjectionWorkerThreeRolesAndTwoChargedBatches
+--- PASS: TestProjectionWorkerThreeRolesAndTwoChargedBatches (0.01s)
+=== RUN   TestProjectionWorkerOriginalProofBoundsBlockingSource
+--- PASS: TestProjectionWorkerOriginalProofBoundsBlockingSource (0.04s)
+=== RUN   TestProjectionWorkerUnknownCloseNeverReleasesLocalWorker
+--- PASS: TestProjectionWorkerUnknownCloseNeverReleasesLocalWorker (0.00s)
+=== RUN   TestProjectionWorkerCleanupKeepsOriginalHorizonAfterPublicExpiry
+--- PASS: TestProjectionWorkerCleanupKeepsOriginalHorizonAfterPublicExpiry (0.00s)
+=== RUN   TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot
+=== RUN   TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/foreign
+=== RUN   TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/repeat
+=== RUN   TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/unknown
+--- PASS: TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot (0.01s)
+    --- PASS: TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/foreign (0.00s)
+    --- PASS: TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/repeat (0.00s)
+    --- PASS: TestProjectionWorkerForeignOrRepeatedKeyNeverGetsAnotherSlot/unknown (0.00s)
+=== RUN   TestProjectionWorkerCloseJoinsInFlightCurrentChecks
+--- PASS: TestProjectionWorkerCloseJoinsInFlightCurrentChecks (0.02s)
+=== RUN   TestProjectionWorkerShortKeyCallerAndPostKeyRevocation
+=== RUN   TestProjectionWorkerShortKeyCallerAndPostKeyRevocation/caller
+=== RUN   TestProjectionWorkerShortKeyCallerAndPostKeyRevocation/revoked
+--- PASS: TestProjectionWorkerShortKeyCallerAndPostKeyRevocation (0.03s)
+    --- PASS: TestProjectionWorkerShortKeyCallerAndPostKeyRevocation/caller (0.03s)
+    --- PASS: TestProjectionWorkerShortKeyCallerAndPostKeyRevocation/revoked (0.00s)
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-capture
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-pod
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-action
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-limit
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/worker-process
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/worker-certificate
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-version
+=== RUN   TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-case
+--- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-capture (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-pod (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-action (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-limit (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/worker-process (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/worker-certificate (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-version (0.00s)
+    --- PASS: TestProjectionWorkerRejectsSourceAndWorkerReplacementBeforeKeys/source-case (0.00s)
+=== RUN   TestProjectionCleanupRequiresPersistedTerminationBeforeDelete
+=== RUN   TestProjectionCleanupRequiresPersistedTerminationBeforeDelete/#00
+=== RUN   TestProjectionCleanupRequiresPersistedTerminationBeforeDelete/observe
+=== RUN   TestProjectionCleanupRequiresPersistedTerminationBeforeDelete/persist
+=== RUN   TestProjectionCleanupRequiresPersistedTerminationBeforeDelete/delete-and-prove
+=== RUN   TestProjectionCleanupRequiresPersistedTerminationBeforeDelete/retire
+--- PASS: TestProjectionCleanupRequiresPersistedTerminationBeforeDelete (0.00s)
+    --- PASS: TestProjectionCleanupRequiresPersistedTerminationBeforeDelete/#00 (0.00s)
+    --- PASS: TestProjectionCleanupRequiresPersistedTerminationBeforeDelete/observe (0.00s)
+    --- PASS: TestProjectionCleanupRequiresPersistedTerminationBeforeDelete/persist (0.00s)
+    --- PASS: TestProjectionCleanupRequiresPersistedTerminationBeforeDelete/delete-and-prove (0.00s)
+    --- PASS: TestProjectionCleanupRequiresPersistedTerminationBeforeDelete/retire (0.00s)
+=== RUN   TestProjectionCleanupNeverClaimedAndAlreadyTerminated
+=== RUN   TestProjectionCleanupNeverClaimedAndAlreadyTerminated/never-claimed
+=== RUN   TestProjectionCleanupNeverClaimedAndAlreadyTerminated/termination-persisted
+=== RUN   TestProjectionCleanupNeverClaimedAndAlreadyTerminated/unexpired
+=== RUN   TestProjectionCleanupNeverClaimedAndAlreadyTerminated/too-many
+--- PASS: TestProjectionCleanupNeverClaimedAndAlreadyTerminated (0.00s)
+    --- PASS: TestProjectionCleanupNeverClaimedAndAlreadyTerminated/never-claimed (0.00s)
+    --- PASS: TestProjectionCleanupNeverClaimedAndAlreadyTerminated/termination-persisted (0.00s)
+    --- PASS: TestProjectionCleanupNeverClaimedAndAlreadyTerminated/unexpired (0.00s)
+    --- PASS: TestProjectionCleanupNeverClaimedAndAlreadyTerminated/too-many (0.00s)
+=== RUN   TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller
+=== RUN   TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller/list
+=== RUN   TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller/observe
+=== RUN   TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller/persist
+=== RUN   TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller/delete-and-prove
+=== RUN   TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller/retire
+--- PASS: TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller (0.00s)
+    --- PASS: TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller/list (0.00s)
+    --- PASS: TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller/observe (0.00s)
+    --- PASS: TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller/persist (0.00s)
+    --- PASS: TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller/delete-and-prove (0.00s)
+    --- PASS: TestProjectionCleanupJoinsBlockingPortsUnderOriginalCaller/retire (0.00s)
+=== RUN   TestProjectionCleanupRotatesAfterUncertainCandidate
+--- PASS: TestProjectionCleanupRotatesAfterUncertainCandidate (0.00s)
+PASS
+ok  	asservat.local/asservat/internal/application/evidence	1.331s
+=== RUN   TestAdmittedWorkerIdentityUsesAdmissionWithoutRenewingHumanAuthority
+--- PASS: TestAdmittedWorkerIdentityUsesAdmissionWithoutRenewingHumanAuthority (0.00s)
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/stopped-parent
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/expired-parent
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/recovery-blocked
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/recovery-expired-after-worker-lock
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/configuration-suspended
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/configuration-replaced
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/configuration-expired-after-worker-lock
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/wrong-issuer-epoch
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/terminated-worker
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/retired-worker
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/replacement-worker
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/missing-worker-audit
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/caller-cancelled-after-worker-lock
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/original-operation-expired-after-worker-lock
+=== RUN   TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/cutoff-after-effect
+--- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork (0.02s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/stopped-parent (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/expired-parent (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/recovery-blocked (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/recovery-expired-after-worker-lock (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/configuration-suspended (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/configuration-replaced (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/configuration-expired-after-worker-lock (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/wrong-issuer-epoch (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/terminated-worker (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/retired-worker (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/replacement-worker (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/missing-worker-audit (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/caller-cancelled-after-worker-lock (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/original-operation-expired-after-worker-lock (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityRefusesCurrentFencesAfterBlockingWork/cutoff-after-effect (0.00s)
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/valid
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/uncertain
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/wrong-worker
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/wrong-epoch
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/expired-query
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/mixed-parent
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/missing-audit
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/unclaimed
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/terminated
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/retired
+=== RUN   TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/expired-after-worker-lock
+--- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall (0.04s)
+    --- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/valid (0.01s)
+    --- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/uncertain (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/wrong-worker (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/wrong-epoch (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/expired-query (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/mixed-parent (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/missing-audit (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/unclaimed (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/terminated (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/retired (0.00s)
+    --- PASS: TestAdmittedWorkerIdentityUsesExactQueryParentWithoutPublicCall/expired-after-worker-lock (0.00s)
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/cancel
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/deadline
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/cancel
+=== RUN   TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/deadline
+--- PASS: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction (0.34s)
+    --- PASS: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/cancel (0.00s)
+    --- PASS: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tcp/deadline (0.15s)
+    --- PASS: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/cancel (0.02s)
+    --- PASS: TestSQLConnectionGovernorCanceledQueryReleasesSocketBeforeNextTransaction/tls/deadline (0.17s)
+=== RUN   TestContextQueryIntentRequiresExactHealthyCurrentInvocation
+=== RUN   TestContextQueryIntentRequiresExactHealthyCurrentInvocation/other-client
+=== RUN   TestContextQueryIntentRequiresExactHealthyCurrentInvocation/old-initial-tool
+=== RUN   TestContextQueryIntentRequiresExactHealthyCurrentInvocation/other-input
+=== RUN   TestContextQueryIntentRequiresExactHealthyCurrentInvocation/other-record-digest
+=== RUN   TestContextQueryIntentRequiresExactHealthyCurrentInvocation/retiring
+=== RUN   TestContextQueryIntentRequiresExactHealthyCurrentInvocation/other-principal-hmac
+=== RUN   TestContextQueryIntentRequiresExactHealthyCurrentInvocation/extended-request
+=== RUN   TestContextQueryIntentRequiresExactHealthyCurrentInvocation/receipt-without-closure
+=== RUN   TestContextQueryIntentRequiresExactHealthyCurrentInvocation/closure-without-ack
+=== RUN   TestContextQueryIntentRequiresExactHealthyCurrentInvocation/other-incarnation
+--- PASS: TestContextQueryIntentRequiresExactHealthyCurrentInvocation (0.02s)
+    --- PASS: TestContextQueryIntentRequiresExactHealthyCurrentInvocation/other-client (0.00s)
+    --- PASS: TestContextQueryIntentRequiresExactHealthyCurrentInvocation/old-initial-tool (0.00s)
+    --- PASS: TestContextQueryIntentRequiresExactHealthyCurrentInvocation/other-input (0.00s)
+    --- PASS: TestContextQueryIntentRequiresExactHealthyCurrentInvocation/other-record-digest (0.00s)
+    --- PASS: TestContextQueryIntentRequiresExactHealthyCurrentInvocation/retiring (0.00s)
+    --- PASS: TestContextQueryIntentRequiresExactHealthyCurrentInvocation/other-principal-hmac (0.00s)
+    --- PASS: TestContextQueryIntentRequiresExactHealthyCurrentInvocation/extended-request (0.00s)
+    --- PASS: TestContextQueryIntentRequiresExactHealthyCurrentInvocation/receipt-without-closure (0.00s)
+    --- PASS: TestContextQueryIntentRequiresExactHealthyCurrentInvocation/closure-without-ack (0.00s)
+    --- PASS: TestContextQueryIntentRequiresExactHealthyCurrentInvocation/other-incarnation (0.00s)
+=== RUN   TestContextQueryGuardRejectsMissingRepeatedAndSwallowedFailure
+=== RUN   TestContextQueryGuardRejectsMissingRepeatedAndSwallowedFailure/missing
+=== RUN   TestContextQueryGuardRejectsMissingRepeatedAndSwallowedFailure/repeated
+=== RUN   TestContextQueryGuardRejectsMissingRepeatedAndSwallowedFailure/swallowed-effect-error
+=== RUN   TestContextQueryGuardRejectsMissingRepeatedAndSwallowedFailure/postcommit-guard-error
+--- PASS: TestContextQueryGuardRejectsMissingRepeatedAndSwallowedFailure (0.00s)
+    --- PASS: TestContextQueryGuardRejectsMissingRepeatedAndSwallowedFailure/missing (0.00s)
+    --- PASS: TestContextQueryGuardRejectsMissingRepeatedAndSwallowedFailure/repeated (0.00s)
+    --- PASS: TestContextQueryGuardRejectsMissingRepeatedAndSwallowedFailure/swallowed-effect-error (0.00s)
+    --- PASS: TestContextQueryGuardRejectsMissingRepeatedAndSwallowedFailure/postcommit-guard-error (0.00s)
+=== RUN   TestContextQueryGuardSealsLateCallbackAndJoinsCancellation
+--- PASS: TestContextQueryGuardSealsLateCallbackAndJoinsCancellation (0.00s)
+=== RUN   TestContextQueryGuardPreservesOriginalCancellationAndDeadline
+--- PASS: TestContextQueryGuardPreservesOriginalCancellationAndDeadline (0.00s)
+=== RUN   TestContextQueryGuardPreservesEarlierGuardDeadline
+--- PASS: TestContextQueryGuardPreservesEarlierGuardDeadline (0.00s)
+=== RUN   TestContextQueryGuardRejectsChildExpiryBeforeGuardReturns
+--- PASS: TestContextQueryGuardRejectsChildExpiryBeforeGuardReturns (0.02s)
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/missing
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/lock
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/permission
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/query-cancel
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/context
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/deadline
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/driver
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/serialize
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/deadlock
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/missing
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/lock
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/permission
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/query-cancel
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/context
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/deadline
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/driver
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/serialize
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/deadlock
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/missing
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/lock
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/permission
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/query-cancel
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/context
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/deadline
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/driver
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/serialize
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/deadlock
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/missing
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/lock
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/permission
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/query-cancel
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/context
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/deadline
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/driver
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/serialize
+=== RUN   TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/deadlock
+--- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset (0.01s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/missing (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/lock (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/permission (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/query-cancel (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/context (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/deadline (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/driver (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/serialize (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareFleetTrust/deadlock (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/missing (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/lock (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/permission (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/query-cancel (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/context (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/deadline (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/driver (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/serialize (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ShareOwnerConfiguration/deadlock (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/missing (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/lock (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/permission (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/query-cancel (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/context (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/deadline (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/driver (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/serialize (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/ReadOwnerConfigurationRevision/deadlock (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/missing (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/lock (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/permission (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/query-cancel (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/context (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/deadline (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/driver (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/serialize (0.00s)
+    --- PASS: TestOwnerConfigurationReadDiagnosticQueryClassesAndRetryReset/CurrentTime/deadlock (0.00s)
+=== RUN   TestOwnerIdentitySQLPrerequisiteParityAndSingleQuery
+--- PASS: TestOwnerIdentitySQLPrerequisiteParityAndSingleQuery (0.00s)
+=== RUN   TestOwnerProjectionSQLDiagnosticKeepsClosedStagesAndOriginalCause
+--- PASS: TestOwnerProjectionSQLDiagnosticKeepsClosedStagesAndOriginalCause (0.00s)
+=== RUN   TestOwnerProjectionSQLDiagnosticActualEntryPreservesNormalization
+--- PASS: TestOwnerProjectionSQLDiagnosticActualEntryPreservesNormalization (0.00s)
+=== RUN   TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit
+=== RUN   TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/success
+=== RUN   TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/exact-boundary
+=== RUN   TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/after-boundary
+=== RUN   TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/current-before-cancel-and-clock
+=== RUN   TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/current-unknown
+=== RUN   TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/cancel-before-clock
+=== RUN   TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/context-deadline-before-clock
+=== RUN   TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/context-unknown-before-clock
+--- PASS: TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/success (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/exact-boundary (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/after-boundary (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/current-before-cancel-and-clock (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/current-unknown (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/cancel-before-clock (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/context-deadline-before-clock (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonPreservesShortCircuit/context-unknown-before-clock (0.00s)
+=== RUN   TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult
+=== RUN   TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/administrator
+=== RUN   TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/schema
+=== RUN   TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/activation
+=== RUN   TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/recovery
+=== RUN   TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/source-current
+=== RUN   TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/source-interval
+=== RUN   TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/cancelled
+=== RUN   TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/query
+=== RUN   TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/administrator-identity
+=== RUN   TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/query-result
+--- PASS: TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/administrator (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/schema (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/activation (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/recovery (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/source-current (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/source-interval (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/cancelled (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/query (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/administrator-identity (0.00s)
+    --- PASS: TestOwnerProjectionFinalCurrentReasonUsesActualSingleSQLResult/query-result (0.00s)
+=== RUN   TestOwnerProjectionFinalCurrentReasonRejectsUnknownAndPrivateText
+--- PASS: TestOwnerProjectionFinalCurrentReasonRejectsUnknownAndPrivateText (0.00s)
+=== RUN   TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants
+=== RUN   TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants/worker-config-audit
+=== RUN   TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants/key-acquisition
+=== RUN   TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants/worker-config-observe
+--- PASS: TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants (0.00s)
+    --- PASS: TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants/worker-config-audit (0.00s)
+    --- PASS: TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants/key-acquisition (0.00s)
+    --- PASS: TestDownloadAcceptanceAndAcquisitionRolesHaveExactPurposeGrants/worker-config-observe (0.00s)
+=== RUN   TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection
+--- PASS: TestPublicRuntimeRolePlanKeepsPurposeIdentityAndProjection (0.01s)
+PASS
+ok  	asservat.local/asservat/internal/adapters/postgres	1.540s
+=== RUN   TestSharedAcquisitionPreservesOriginalDownloadJobBytes
+--- PASS: TestSharedAcquisitionPreservesOriginalDownloadJobBytes (0.01s)
+=== RUN   TestSharedAcquisitionRejectsUnknownPurposeBeforeJobConstruction
+--- PASS: TestSharedAcquisitionRejectsUnknownPurposeBeforeJobConstruction (0.00s)
+=== RUN   TestCapacityProjectionOnlyDedicatedMaterialAndPublicDigest
+--- PASS: TestCapacityProjectionOnlyDedicatedMaterialAndPublicDigest (0.00s)
+=== RUN   TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup
+=== RUN   TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/missing-receipt
+=== RUN   TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/wrong-root
+=== RUN   TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/wrong-installation
+=== RUN   TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/changed-setup
+=== RUN   TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/changed-account-version
+=== RUN   TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/duplicate-capacity-role
+=== RUN   TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/missing-role
+=== RUN   TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/oversize-public
+--- PASS: TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup (0.01s)
+    --- PASS: TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/missing-receipt (0.00s)
+    --- PASS: TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/wrong-root (0.00s)
+    --- PASS: TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/wrong-installation (0.00s)
+    --- PASS: TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/changed-setup (0.00s)
+    --- PASS: TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/changed-account-version (0.00s)
+    --- PASS: TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/duplicate-capacity-role (0.00s)
+    --- PASS: TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/missing-role (0.00s)
+    --- PASS: TestCapacityProjectionMaterialRejectsIncompleteAndSubstitutedSetup/oversize-public (0.01s)
+=== RUN   TestCapacityProjectionWholeOwnerCarrierKeepsOriginalByteLimit
+    capacity_projection_material_test.go:111: synthetic complete carrier deployment bytes=4667 maximum=262144
+--- PASS: TestCapacityProjectionWholeOwnerCarrierKeepsOriginalByteLimit (0.06s)
+=== RUN   TestInstalledWorkerProjectionReaderOwnsCompleteOriginalInput
+--- PASS: TestInstalledWorkerProjectionReaderOwnsCompleteOriginalInput (0.15s)
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/ready
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/pending
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/secret-before-receipt
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/historical-complete
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/expired-pending
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-secret-uid
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-secret-rv
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/replaced-journal
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/changed-worker
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-account
+=== RUN   TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/late-read
+--- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt (1.44s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/ready (0.14s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/pending (0.14s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/secret-before-receipt (0.14s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/historical-complete (0.14s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/expired-pending (0.13s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-secret-uid (0.13s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-secret-rv (0.13s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/replaced-journal (0.12s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/changed-worker (0.12s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/wrong-account (0.12s)
+    --- PASS: TestCapacityProjectionCurrentReaderRequiresExactPositiveReceipt/late-read (0.12s)
+=== RUN   TestCapacityProjectionCurrentReaderCancellationDoesNotReturnReceipt
+--- PASS: TestCapacityProjectionCurrentReaderCancellationDoesNotReturnReceipt (0.12s)
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/exact
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/historical-complete
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/lookup-observed-after-create-interval
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/legacy
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/missing-object
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/reused-operation
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/wrong-secret-name
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/wrong-installation
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/moved-claim
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/late-receipt
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/before-setup
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/fractional-time
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/missing-sql-incarnation
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/zero-public-digest
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/zero-setup-digest
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/setup-operation-reused
+=== RUN   TestCapacityProjectionOriginalReceiptBoundary/role-root-used-as-projection
+--- PASS: TestCapacityProjectionOriginalReceiptBoundary (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/exact (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/historical-complete (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/lookup-observed-after-create-interval (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/legacy (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/missing-object (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/reused-operation (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/wrong-secret-name (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/wrong-installation (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/moved-claim (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/late-receipt (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/before-setup (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/fractional-time (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/missing-sql-incarnation (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/zero-public-digest (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/zero-setup-digest (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/setup-operation-reused (0.00s)
+    --- PASS: TestCapacityProjectionOriginalReceiptBoundary/role-root-used-as-projection (0.00s)
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/claim
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/complete
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/claim-with-receipt
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/same-pending
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/receipt-rewrite
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/change-interval
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/change-setup
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/drop-object
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/change-binding
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/add-cleanup
+=== RUN   TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/delete-claim
+--- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal (0.02s)
+    --- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/claim (0.00s)
+    --- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/complete (0.00s)
+    --- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/claim-with-receipt (0.00s)
+    --- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/same-pending (0.00s)
+    --- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/receipt-rewrite (0.00s)
+    --- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/change-interval (0.00s)
+    --- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/change-setup (0.00s)
+    --- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/drop-object (0.00s)
+    --- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/change-binding (0.00s)
+    --- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/add-cleanup (0.00s)
+    --- PASS: TestCapacityProjectionCASCannotRewriteSiblingOrOriginal/delete-claim (0.00s)
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/claim
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/receipt
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/lost-reply
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/sibling-change
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/claim-replacement
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/receipt-replacement
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/inventory-change
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/unchanged-resource-version
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/wrong-api-version
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/wrong-kind
+=== RUN   TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/close-during-CAS
+--- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt (0.92s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/claim (0.10s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/receipt (0.10s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/lost-reply (0.08s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/sibling-change (0.07s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/claim-replacement (0.07s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/receipt-replacement (0.08s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/inventory-change (0.07s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/unchanged-resource-version (0.10s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/wrong-api-version (0.08s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/wrong-kind (0.08s)
+    --- PASS: TestCaptureCleanupProjectionCASPreservesSiblingAndOriginalAttempt/close-during-CAS (0.08s)
+=== RUN   TestProvisionedHubWorkerKeepsSeparateCredentialProjections
+--- PASS: TestProvisionedHubWorkerKeepsSeparateCredentialProjections (0.00s)
+=== RUN   TestProvisionedHubWorkerRejectsSharedOrUnboundProjection
+--- PASS: TestProvisionedHubWorkerRejectsSharedOrUnboundProjection (0.00s)
+=== RUN   TestConfigurationWorkerDiagnosticCodesSurviveNormalizedProjection
+--- PASS: TestConfigurationWorkerDiagnosticCodesSurviveNormalizedProjection (0.00s)
+=== RUN   TestInstalledWorkerOriginalTemplateSeparatesPendingProjections
+--- PASS: TestInstalledWorkerOriginalTemplateSeparatesPendingProjections (0.03s)
+=== RUN   TestInitialBootstrapObserverProjectionCannotCarryPrivateMaterial
+--- PASS: TestInitialBootstrapObserverProjectionCannotCarryPrivateMaterial (0.00s)
+=== RUN   TestInitialBootstrapProjectionSurvivesSetupRetirementWithoutNewPins
+--- PASS: TestInitialBootstrapProjectionSurvivesSetupRetirementWithoutNewPins (0.00s)
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/mutable
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/owner
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/operation
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/extra-key
+=== RUN   TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/namespace
+--- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject (0.00s)
+    --- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/mutable (0.00s)
+    --- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/owner (0.00s)
+    --- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/operation (0.00s)
+    --- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/extra-key (0.00s)
+    --- PASS: TestInitialBootstrapProjectionReceiptChecksWholeImmutableObject/namespace (0.00s)
+=== RUN   TestInitialInstallerRunnerSharesProjectionWithoutSharingPhaseCredentials
+--- PASS: TestInitialInstallerRunnerSharesProjectionWithoutSharingPhaseCredentials (0.00s)
+=== RUN   TestInitialProviderPreparationOriginalClaimsAndProjection
+--- PASS: TestInitialProviderPreparationOriginalClaimsAndProjection (3.19s)
+=== RUN   TestInitialPreparationFinalProjectionRequiresCompletedSchemaBinding
+=== RUN   TestInitialPreparationFinalProjectionRequiresCompletedSchemaBinding/missing
+=== RUN   TestInitialPreparationFinalProjectionRequiresCompletedSchemaBinding/incomplete
+=== RUN   TestInitialPreparationFinalProjectionRequiresCompletedSchemaBinding/changed-manager
+=== RUN   TestInitialPreparationFinalProjectionRequiresCompletedSchemaBinding/legacy-adoption
+--- PASS: TestInitialPreparationFinalProjectionRequiresCompletedSchemaBinding (1.77s)
+    --- PASS: TestInitialPreparationFinalProjectionRequiresCompletedSchemaBinding/missing (0.00s)
+    --- PASS: TestInitialPreparationFinalProjectionRequiresCompletedSchemaBinding/incomplete (0.00s)
+    --- PASS: TestInitialPreparationFinalProjectionRequiresCompletedSchemaBinding/changed-manager (0.00s)
+    --- PASS: TestInitialPreparationFinalProjectionRequiresCompletedSchemaBinding/legacy-adoption (0.00s)
+=== RUN   TestInitialRegistryProjectionKeepsOriginalSevenMountedFiles
+--- PASS: TestInitialRegistryProjectionKeepsOriginalSevenMountedFiles (0.00s)
+=== RUN   TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim
+--- PASS: TestOwnerBootstrapProjectionRejectsCallerPermissionRootBeforeClaim (7.35s)
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/original
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/different-input-template
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/different-input-image
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/changed-native-template
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/replacement
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/guard-receipt
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/guard-generation
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/binding-version
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/expired-snapshot
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/blocked-original-deadline
+=== RUN   TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/blocked-snapshot-deadline
+--- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims (0.96s)
+    --- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/original (0.08s)
+    --- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/different-input-template (0.08s)
+    --- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/different-input-image (0.08s)
+    --- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/changed-native-template (0.08s)
+    --- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/replacement (0.08s)
+    --- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/guard-receipt (0.07s)
+    --- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/guard-generation (0.07s)
+    --- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/binding-version (0.07s)
+    --- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/expired-snapshot (0.07s)
+    --- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/blocked-original-deadline (0.12s)
+    --- PASS: TestOwnerIdentityProjectionReadsExactOriginalTemplateBeforeClaims/blocked-snapshot-deadline (0.12s)
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-roots
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-bucket
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-key
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/pki-role
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/history-uid
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-start-uid
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/template-zero
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-host
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/key-endpoint
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-policy
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/source-probe
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/lease
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/capacity-probe-uid
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-region
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/history
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-roots
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-endpoint
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-binding-version
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/protection-digest
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/peer-epoch
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/connection-bound
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-port
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-database
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-pool
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-generation
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/duplicate-peer
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-mount
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-binding
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/source-probe-account
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-start
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/concurrency-bound
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-endpoint
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/key-roots
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/administrator
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/peer-installation
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/missing-peer
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-roots
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/capacity-probe
+=== RUN   TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/image-zero
+--- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects (0.08s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-roots (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-bucket (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-key (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/pki-role (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/history-uid (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-start-uid (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/template-zero (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-host (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/key-endpoint (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-policy (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/source-probe (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/lease (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/capacity-probe-uid (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-region (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/history (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-roots (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-endpoint (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-binding-version (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/protection-digest (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/peer-epoch (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/connection-bound (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-port (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-database (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/sql-pool (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-generation (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/duplicate-peer (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-mount (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/guard-binding (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/source-probe-account (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-start (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/concurrency-bound (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/api-endpoint (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/key-roots (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/administrator (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/peer-installation (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/missing-peer (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/audit-roots (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/capacity-probe (0.00s)
+    --- PASS: TestOwnerIdentityProjectionRejectsChangedOriginalInputsBeforeEffects/image-zero (0.00s)
+=== RUN   TestOwnerIdentityProjectionCanAdvanceOnlyUntouchedSecondChild
+--- PASS: TestOwnerIdentityProjectionCanAdvanceOnlyUntouchedSecondChild (0.07s)
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/inventory
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/binding
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/end
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/parent-public-input
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/capacity
+=== RUN   TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/cleanup
+--- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState (0.09s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/inventory (0.00s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/binding (0.00s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/end (0.00s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/parent-public-input (0.00s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/capacity (0.00s)
+    --- PASS: TestOwnerIdentityProjectionAndLaunchKeepAllSiblingState/cleanup (0.00s)
+=== RUN   TestOwnerProjectionCurrentFailureRendersClosedCodes
+--- PASS: TestOwnerProjectionCurrentFailureRendersClosedCodes (0.00s)
+=== RUN   TestOwnerProjectionDiagnosticPreservesFirstExecuteAndOnlyFinalization
+--- PASS: TestOwnerProjectionDiagnosticPreservesFirstExecuteAndOnlyFinalization (9.64s)
+=== RUN   TestOwnerProjectionDiagnosticClosedCodesKeepOriginalErrorsIs
+--- PASS: TestOwnerProjectionDiagnosticClosedCodesKeepOriginalErrorsIs (0.00s)
+=== RUN   TestOwnerProjectionDiagnosticSlotRejectsCopiedAndLaterFailures
+--- PASS: TestOwnerProjectionDiagnosticSlotRejectsCopiedAndLaterFailures (0.00s)
+=== RUN   TestOwnerProjectionDiagnosticUnknownEnumsRemainFixed
+--- PASS: TestOwnerProjectionDiagnosticUnknownEnumsRemainFixed (0.00s)
+=== RUN   TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases
+=== RUN   TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/zero
+=== RUN   TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/copied
+=== RUN   TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/foreign-root
+=== RUN   TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/detached
+=== RUN   TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/cancelled
+=== RUN   TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/skipped-current
+=== RUN   TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/skipped-result
+=== RUN   TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/repeated-admission
+=== RUN   TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/version-before-admission
+--- PASS: TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases (0.69s)
+    --- PASS: TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/zero (0.08s)
+    --- PASS: TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/copied (0.08s)
+    --- PASS: TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/foreign-root (0.08s)
+    --- PASS: TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/detached (0.08s)
+    --- PASS: TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/cancelled (0.08s)
+    --- PASS: TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/skipped-current (0.08s)
+    --- PASS: TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/skipped-result (0.08s)
+    --- PASS: TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/repeated-admission (0.08s)
+    --- PASS: TestOwnerProjectionFinalizerRejectsCopiesDetachedSkippedAndRepeatedPhases/version-before-admission (0.08s)
+=== RUN   TestOwnerProjectionFinalizerRetainsShorterOriginalDeadline
+--- PASS: TestOwnerProjectionFinalizerRetainsShorterOriginalDeadline (0.08s)
+=== RUN   TestOwnerProjectionFinalizerRequiresExactSemanticVersionOnce
+--- PASS: TestOwnerProjectionFinalizerRequiresExactSemanticVersionOnce (0.07s)
+=== RUN   TestOwnerProjectionFinalizerCloseJoinsAdmittedWork
+--- PASS: TestOwnerProjectionFinalizerCloseJoinsAdmittedWork (0.08s)
+=== RUN   TestOwnerProjectionFinalizerResultIsOneUseAndCopiesState
+--- PASS: TestOwnerProjectionFinalizerResultIsOneUseAndCopiesState (0.08s)
+=== RUN   TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults
+=== RUN   TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/parent
+=== RUN   TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/credentials-create
+=== RUN   TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/credentials-receipt
+=== RUN   TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/configuration-create
+=== RUN   TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/configuration-receipt
+=== RUN   TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/joint
+=== RUN   TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/launch
+=== RUN   TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/launch-receipt
+--- PASS: TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults (14.62s)
+    --- PASS: TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/parent (0.86s)
+    --- PASS: TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/credentials-create (0.87s)
+    --- PASS: TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/credentials-receipt (0.87s)
+    --- PASS: TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/configuration-create (0.88s)
+    --- PASS: TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/configuration-receipt (0.88s)
+    --- PASS: TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/joint (0.88s)
+    --- PASS: TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/launch (0.90s)
+    --- PASS: TestOwnerProjectionFinalizationExactGraphsAndReadOnlyResults/launch-receipt (0.92s)
+=== RUN   TestOwnerProjectionFinalizationUnknownCreateNeverSelectsSameName
+=== RUN   TestOwnerProjectionFinalizationUnknownCreateNeverSelectsSameName/credentials
+=== RUN   TestOwnerProjectionFinalizationUnknownCreateNeverSelectsSameName/configuration
+--- PASS: TestOwnerProjectionFinalizationUnknownCreateNeverSelectsSameName (18.33s)
+    --- PASS: TestOwnerProjectionFinalizationUnknownCreateNeverSelectsSameName/credentials (8.41s)
+    --- PASS: TestOwnerProjectionFinalizationUnknownCreateNeverSelectsSameName/configuration (9.92s)
+=== RUN   TestOwnerProjectionFinalizationUnknownReceiptUsesOnlyExactCommittedCAS
+=== RUN   TestOwnerProjectionFinalizationUnknownReceiptUsesOnlyExactCommittedCAS/not-committed
+=== RUN   TestOwnerProjectionFinalizationUnknownReceiptUsesOnlyExactCommittedCAS/committed
+--- PASS: TestOwnerProjectionFinalizationUnknownReceiptUsesOnlyExactCommittedCAS (19.43s)
+    --- PASS: TestOwnerProjectionFinalizationUnknownReceiptUsesOnlyExactCommittedCAS/not-committed (9.70s)
+    --- PASS: TestOwnerProjectionFinalizationUnknownReceiptUsesOnlyExactCommittedCAS/committed (9.73s)
+=== RUN   TestOwnerProjectionFinalizationUnknownPreSQLClaimHasNoVersion
+--- PASS: TestOwnerProjectionFinalizationUnknownPreSQLClaimHasNoVersion (7.45s)
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/before-finalize/uid
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/before-finalize/resourceVersion
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/before-receipt/uid
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/before-receipt/resourceVersion
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/after-receipt/uid
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/after-receipt/resourceVersion
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/before-finalize/uid
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/before-finalize/resourceVersion
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/before-receipt/uid
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/before-receipt/resourceVersion
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/after-receipt/uid
+=== RUN   TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/after-receipt/resourceVersion
+--- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect (123.91s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/before-finalize/uid (8.78s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/before-finalize/resourceVersion (8.95s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/before-receipt/uid (9.44s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/before-receipt/resourceVersion (9.34s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/after-receipt/uid (10.12s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/credentials/after-receipt/resourceVersion (10.11s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/before-finalize/uid (10.48s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/before-finalize/resourceVersion (10.57s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/before-receipt/uid (11.21s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/before-receipt/resourceVersion (11.05s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/after-receipt/uid (11.95s)
+    --- PASS: TestOwnerProjectionFinalizationRejectsReplacementBeforeReceiptOrNextEffect/configuration/after-receipt/resourceVersion (11.92s)
+=== RUN   TestOwnerProjectionFinalizationRejectsCurrentChanges
+=== RUN   TestOwnerProjectionFinalizationRejectsCurrentChanges/before-first-read/administrator
+=== RUN   TestOwnerProjectionFinalizationRejectsCurrentChanges/before-first-read/accepted-configuration
+signal: interrupt
+FAIL	asservat.local/asservat/internal/adapters/kubernetes	225.873s

@@ -1,0 +1,14 @@
+=== RUN   TestContextAdmissionWithRealServices
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier/due-pages-pass-persistent-failures-and-wrap
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher
+=== RUN   TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher/due-pages-pass-persistent-failures-and-wrap
+--- PASS: TestContextAdmissionWithRealServices (7.59s)
+    --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication (7.15s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier (3.92s)
+            --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-verifier/due-pages-pass-persistent-failures-and-wrap (0.04s)
+        --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher (3.23s)
+            --- PASS: TestContextAdmissionWithRealServices/api-execution-one-preparation-exact-result-historical-publication/compiled-publisher/due-pages-pass-persistent-failures-and-wrap (0.04s)
+PASS
+ok  	asservat.local/asservat/test/integration	8.673s

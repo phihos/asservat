@@ -1,0 +1,22 @@
+{
+  "command": [
+    "go",
+    "test",
+    "-race",
+    "-count=1",
+    "./internal/application/capture",
+    "./internal/application/audit"
+  ],
+  "cwd": "/home/phil/Projekte/asservat-capture-phase-c62e02ac",
+  "environment": {
+    "TMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOTMPDIR": "/home/phil/.cache/asservat-build/tmp",
+    "GOMAXPROCS": "2",
+    "GOFLAGS": "-buildvcs=false -p=1"
+  },
+  "exit": 0,
+  "wallSeconds": 18.94858450704487,
+  "sourceCount": 2613,
+  "sourceUnchanged": true,
+  "log": "green-race.log"
+}

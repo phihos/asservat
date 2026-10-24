@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/x509"
 	"errors"
+	"os"
 	"strings"
 	"time"
 
@@ -11,8 +12,8 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
-	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
+	analysisapp "asservat.local/asservat/internal/application/analysis"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
@@ -41,18 +42,19 @@ type publicDownloads struct {
 	native      ContextNativeDownloadServices
 	downloads   *postgres.Downloads
 	gate        authapp.ContextDownloadAuthority
+	projection  *analysisapp.ContextProjectionService
 }
 
 func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe *kube.PermissionClient, catalog publicCatalog, a publicAuditStore, closers *[]func()) (*publicDownloads, error) {
 	in, pc := d.inputs, d.publicContext
 	c, p := in.config, in.config.Public
 	root, installation := c.PermissionRootID, c.InstallationID
-	if p == nil || pc == nil || d.publicID == nil || d.Runtime == nil || d.Router == nil || !authorization.UUID(p.AuditStoreID) || !identity.Text(p.ArtifactKeyID, 128) || p.DownloadPlan.OutputLimit < 1 || p.DownloadPlan.ReadLimit < 1 || p.DownloadPlan.RequestLimit < 1 || p.DownloadPlan.DurationSeconds < 1 || p.DownloadPlan.DurationSeconds > 3600 {
+	if p == nil || pc == nil || d.publicID == nil || d.Runtime == nil || d.workerIdentities == nil || !authorization.UUID(p.AuditStoreID) || !identity.Text(p.ArtifactKeyID, 128) || p.DownloadPlan.OutputLimit < 1 || p.DownloadPlan.ReadLimit < 1 || p.DownloadPlan.RequestLimit < 1 || p.DownloadPlan.DurationSeconds < 1 || p.DownloadPlan.DurationSeconds > 3600 {
 		return nil, mounts.ErrUnavailable
 	}
 	g := postgres.DownloadTransactionGuards{Retention: d.shared.guards.Retention, Recovery: d.shared.guards.Recovery}
 	sql := map[string]*pgxpool.Pool{}
-	for _, purpose := range []string{"download-session", "download-source", "download-audit", "download-plan", "worker-config-read", "download-worker", "download-worker-audit", "download-worker-identity", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "worker-owner", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "download-stop-writer", "download-stop-ack"} {
+	for _, purpose := range []string{"download-session", "download-source", "download-audit", "download-plan", "worker-config-read", "download-worker", "download-worker-audit", "worker-enrollment", "worker-enrollment-audit", "worker-enrollment-activate", "native-owner", "download-key-bind", "native-key-bind", "download-stop", "download-stop-writer", "download-stop-ack"} {
 		pool, err := d.public.open(ctx, purpose)
 		if err != nil {
 			return nil, err
@@ -77,7 +79,14 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	processing, err := d.public.open(ctx, "processing-read")
+	// Reuse one protected policy observation across download checks. The raw
+	// reader remains independently current for privacy administration; this
+	// download-only view does not cache recovery, processing or human authority.
+	policies, err := authapp.NewDownloadPolicyObservations(environment, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	processing, err := d.public.open(ctx, "hub-metadata-read")
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +95,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		return nil, mounts.ErrUnavailable
 	}
 	gate := authapp.ContextDownloadAuthority{RootID: root, Identities: d.publicID.download, Permissions: pc.permissions, Catalog: pc.catalog, Retention: pc.retention,
-		Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: environment, Recovery: pc.recovery, Processing: processingReads, Now: time.Now}, Now: time.Now}
+		Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: pc.recovery, Processing: processingReads, Now: time.Now}, Now: time.Now}
 
 	makeDownloads := func(purpose string) (*postgres.Downloads, error) {
 		return postgres.NewDownloads(ctx, sql[purpose], root, g)
@@ -119,22 +128,17 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	closedStops, err := objectstore.NewClosedDownloadStopObjects(a.store, p.AuditStoreID, a.seal, a.open)
+	legacyStops, closedStops, err := a.stopObjects(p.AuditStoreID)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	stopObjects, err := evidence.NewHealthyDownloadStopObjects(&objectstore.DownloadStopObjects{Store: a.store, Seal: a.seal, Open: a.open, StoreID: p.AuditStoreID}, closedStops, completions)
+	stopObjects, err := evidence.NewHealthyDownloadStopObjects(legacyStops, closedStops, completions)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	stop := evidence.ContextDownloadStopCoordinator{Ledger: publicStopLedger{stops, stopWriter}, Acknowledgements: stopAcks, Objects: stopObjects, Now: time.Now}
-	// ADR-200: a reservation refused for a stale binding re-arms the capacity
-	// refresh demand, with the download-session credentials.
-	refresh, err := postgres.NewCapacityRefreshDemands(ctx, sql["download-session"], root)
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: sources, Sources: sources, Authority: gate, Sessions: downloads, Refresh: refresh}
+	coordinator := evidence.ContextDownloadCoordinator{RootID: root, InstallationID: installation, Routes: sources, Sources: sources, Authority: gate, Sessions: downloads,
+		Refused: downloadRefusalReport(timedEventLog(os.Stderr, "download refused"), time.Now)}
 
 	wa, wp := capacityWorkerGuard(p.WorkerConfiguration.Guard)
 	sourceObserver, sourceProbe, sourceControl, err := d.workerSourceClients(observer, probe, control, closers)
@@ -190,14 +194,10 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	bindings, err := makeWorkers("download-worker-identity")
-	if err != nil {
-		return nil, mounts.ErrUnavailable
-	}
-	dispatch := &evidence.DownloadDispatcher{Ledger: workers, Jobs: jobs, Audit: &objectstore.DownloadWorkerAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}, Acknowledgements: workerAcks, Authority: gate, CurrentAuthority: gate, Profile: profile, Now: time.Now}
+	dispatch := &evidence.DownloadDispatcher{Ledger: workers, Jobs: jobs, Audit: a.workerObjects(), Acknowledgements: workerAcks, Authority: gate, CurrentAuthority: gate, Profile: profile, Now: time.Now}
 
 	enrollment := func(purpose string) (*postgres.WorkerEnrollments, error) {
-		return postgres.NewWorkerEnrollments(ctx, sql[purpose], root, profile, g, ownerRandomID)
+		return postgres.NewWorkerEnrollments(ctx, sql[purpose], root, profile, ownerRandomID)
 	}
 	ledger, err := enrollment("worker-enrollment")
 	if err != nil {
@@ -224,16 +224,27 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	} else if issuer, err = newPublicWorkerIssuer(ctx, d.publicFiles, in.config.KeyService.Endpoint, in.config.InstallationID, pki, roots, a); err != nil {
 		return nil, err
 	}
-	enroll := evidence.WorkerEnrollmentCoordinator{CSR: mtls.EnrollmentProof{}, Ledger: ledger, Activation: activation, Audit: &objectstore.WorkerEnrollmentAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}, Acknowledgements: enrollmentAcks, Issuer: issuer, Authority: gate, CurrentAuthority: gate, Now: time.Now}
+	enroll := evidence.WorkerEnrollmentCoordinator{CSR: mtls.EnrollmentProof{}, Ledger: ledger, Activation: activation, Audit: a.enrollmentObjects(), Acknowledgements: enrollmentAcks, Issuer: issuer, Now: time.Now}
 	proofs := func(token evidence.DownloadPeerToken) (evidence.WorkerEnrollmentProofReader, error) {
-		return kube.NewWorkerEnrollmentAttester(jobsClient, bindings, token)
+		return kube.NewWorkerEnrollmentAttester(jobsClient, d.workerIdentities, token)
 	}
-	owners, err := postgres.NewWorkerOwners(ctx, sql["worker-owner"], root, profile, g)
+	projectionLedger, err := postgres.NewProjectionEnrollments(ctx, sql["worker-enrollment"], root, profile, ownerRandomID)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	binding := d.Runtime.binding
-	requests := &evidence.WorkerRequestOwners{Router: d.Router, Store: owners, PodUID: binding.PodUID, ProcessEpoch: binding.ProcessEpoch, NewID: ownerRandomID}
+	projectionAcks, err := postgres.NewProjectionEnrollments(ctx, sql["worker-enrollment-audit"], root, profile, ownerRandomID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	projectionActivation, err := postgres.NewProjectionEnrollments(ctx, sql["worker-enrollment-activate"], root, profile, ownerRandomID)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	enrollmentExchange := &evidence.AdmittedWorkerEnrollment{InstallationID: installation, Bindings: d.workerIdentities, Download: enroll, DownloadProofs: proofs,
+		Projection: evidence.ProjectionEnrollmentCoordinator{CSR: mtls.EnrollmentProof{}, Ledger: projectionEnrollmentEffects{projectionLedger, projectionAcks, projectionActivation}, Audit: a.acquisitionObjects(), Issuer: issuer, Now: time.Now},
+		ProjectionProofs: func(token evidence.DownloadPeerToken) (evidence.AcquisitionEnrollmentProofReader, error) {
+			return kube.NewAcquisitionEnrollmentAttester(jobsClient, d.workerIdentities, token)
+		}, Now: time.Now}
 
 	native, err := postgres.NewNativeOwners(ctx, sql["native-owner"], root, profile, g)
 	if err != nil {
@@ -260,16 +271,22 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	windows, err := objectstore.NewDownloadWindowAuditObjects(a.store, p.AuditStoreID, a.seal, a.open)
+	windows, err := a.windowObjects(p.AuditStoreID)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	services, err := NewContextNativeDownloadRuntime(d.Runtime, workers, preparations, configuration, first, responses, evidence.ContextNativeRuntimeConfig{
-		Profile: profile, Dispatcher: dispatch, Enrollments: enroll, Proofs: proofs, Requests: requests, Sources: downloads, Authority: gate,
-		Audit: &objectstore.DownloadAuditObjects{Store: a.store, Seal: a.seal, Open: a.open}, Acknowledgements: audits,
+		Profile: profile, Dispatcher: dispatch, Sources: downloads, Authority: gate,
+		Audit: a.downloadObjects(), Acknowledgements: audits,
 		Native: evidence.NativeAttachmentConfig{KeyScope: scope, Fences: native, Origins: d.shared.origins, PreparationKeys: prepKeys, WindowKeys: windowKeys, Authority: gate, Now: time.Now, NewID: ownerRandomID},
 		Now:    time.Now, NewID: ownerRandomID},
-		evidence.DownloadResponseTransfer{Objects: windows, Audit: audits}, stop)
+		evidence.DownloadResponseTransfer{Objects: windows, Audit: audits, NewResponseAuthority: func(ctx context.Context, scope artifact.DownloadScope) (evidence.CurrentDownloadAuthority, func(), error) {
+			owned, err := gate.NewDownloadResponse(ctx, scope)
+			if err != nil {
+				return nil, nil, err
+			}
+			return owned, owned.Close, nil
+		}}, stop)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -280,6 +297,10 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	}
 	coordinator.Plans = plans
 	out := &publicDownloads{native: services, downloads: downloads, gate: gate, coordinator: coordinator}
+	out.projection, err = newPublicProjection(ctx, d, policies, processingReads, profile, jobs, dispatch, sql["download-worker"], scope, a)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
 	if ctx.Err() != nil {
 		return nil, mounts.ErrUnavailable
 	}
@@ -287,7 +308,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 	// their native path on the owner port. TLS client roots are the profile's
 	// current issuer roots from the trust catalog, resolved per handshake.
 	// It changes the runtime, so it is the last step that can fail.
-	if err = d.Runtime.ServeDownloadWorkers(func(now time.Time) (*x509.CertPool, error) { return d.trust.IssuerRoots(profile, now) }); err != nil {
+	if err = d.Runtime.ServeAcquisitionWorkers(func(now time.Time) (*x509.CertPool, error) { return d.trust.IssuerRoots(profile, now) }, enrollmentExchange); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
 	return out, nil

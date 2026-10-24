@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"asservat.local/asservat/internal/domain/privacy"
 	"context"
 	"crypto/sha256"
 	"encoding/json"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 func TestRetentionTopologyRequiresIndependentExactImmutablePin(t *testing.T) {
@@ -70,6 +72,7 @@ func TestRetentionTopologyRequiresIndependentExactImmutablePin(t *testing.T) {
 				uid = "replacement"
 			}
 			var clock *atomic.Int64
+			var unavailable atomic.Bool
 			requests := atomic.Int64{}
 			f := newPermissionFixture(t, func(w http.ResponseWriter, r *http.Request) bool {
 				requests.Add(1)
@@ -79,6 +82,10 @@ func TestRetentionTopologyRequiresIndependentExactImmutablePin(t *testing.T) {
 				}
 				if r.URL.Path != "/api/v1/namespaces/asservat-system/configmaps/topology" {
 					return false
+				}
+				if unavailable.Load() {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					return true
 				}
 				if mode == "missing-object" {
 					w.WriteHeader(http.StatusNotFound)
@@ -105,8 +112,13 @@ func TestRetentionTopologyRequiresIndependentExactImmutablePin(t *testing.T) {
 				if mode == "hub-only-explicit" {
 					want = 1
 				}
-				if err != nil || !out.Valid(time.Unix(0, clock.Load())) || out.Revision.Digest != pin || out.RootID != root || out.TargetClusterID != target || len(out.Sources) != want || !out.Sources[0].Hub || out.FreshUntil.Sub(out.ObservedAt) != 5*time.Second {
+				if err != nil || !out.Valid(time.Unix(0, clock.Load())) || out.Revision.Digest != pin || out.RootID != root || out.TargetClusterID != target || len(out.Sources) != want || !out.Sources[0].Hub || out.FreshUntil.Sub(out.ObservedAt) != privacy.PolicyTopologyInterval {
 					t.Fatal("valid topology", out, err)
+				}
+				// The pinned immutable read is reused within its interval.
+				before := requests.Load()
+				if again, err := reader.RetentionTopology(context.Background(), query); err != nil || again.Revision != out.Revision || requests.Load() != before {
+					t.Fatal("pinned topology reread inside its interval", err, requests.Load()-before)
 				}
 			} else if err == nil {
 				t.Fatal("unsafe topology accepted", mode)
@@ -115,6 +127,21 @@ func TestRetentionTopologyRequiresIndependentExactImmutablePin(t *testing.T) {
 				t.Fatal("caller selected a different configuration")
 			}
 			if mode == "hub-local" {
+				// Installed native86: the observation is re-read on demand
+				// once less than one evidence-read window remains, so a read
+				// is not cut by it; a failed early re-read keeps it.
+				clock.Store(out.FreshUntil.Add(-identity.EvidenceReadRequestWindow + time.Second).UnixNano())
+				unavailable.Store(true)
+				before := requests.Load()
+				kept, err := reader.RetentionTopology(context.Background(), query)
+				if err != nil || !kept.FreshUntil.Equal(out.FreshUntil) || requests.Load() == before {
+					t.Fatal("failed early re-read dropped the still-current topology", err)
+				}
+				unavailable.Store(false)
+				fresh, err := reader.RetentionTopology(context.Background(), query)
+				if err != nil || fresh.FreshUntil.Sub(time.Unix(0, clock.Load())) < identity.EvidenceReadRequestWindow {
+					t.Fatal("topology near its end was not re-read", err)
+				}
 				pins := []RetentionTopologyPin{{TargetClusterID: target, Name: "topology", UID: "topology-uid", ContentDigest: pin}}
 				router, err := NewRetentionTopologies(f.client, root, pins)
 				if err != nil {
@@ -125,7 +152,7 @@ func TestRetentionTopologyRequiresIndependentExactImmutablePin(t *testing.T) {
 				if got, err := router.RetentionTopology(context.Background(), target); err != nil || len(got.Sources) != 2 {
 					t.Fatal("route lost local policy source", err)
 				}
-				before := requests.Load()
+				before = requests.Load()
 				if _, err := router.RetentionTopology(context.Background(), root); err == nil || requests.Load() != before {
 					t.Fatal("unknown cluster fell back to another source")
 				}

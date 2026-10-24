@@ -4,6 +4,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"encoding/json"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,6 +24,9 @@ type CapacityReconciler struct {
 	// SourceReport, when set, receives each source observation's outcome
 	// (nil on success) from the single source loop. Diagnostics only.
 	SourceReport func(error)
+	// RootReport, when set, receives each root reconciliation's outcome from
+	// the single root loop. Diagnostics only.
+	RootReport func(error)
 	// Stalled, when set, is told once when one workload-loop step is still
 	// running two source intervals after it started: the loop is shared by
 	// all clusters, so one stuck step starves every other cluster. ADR-197
@@ -33,8 +37,11 @@ type CapacityReconciler struct {
 	// back, while the demand lasts. DemandReport sees each outcome, its
 	// elapsed time and the guarded read's freshness left when it returned.
 	Demands      CapacityRefreshDemandReader
-	DemandReport func(err error, elapsed, left time.Duration)
-	running      atomic.Bool
+	DemandReport func(err error, elapsed, left time.Duration, stages string)
+	// DemandContext optionally adds a diagnostic recorder to a demand
+	// refresh's context and returns its fixed stage marks.
+	DemandContext func(context.Context) (context.Context, func() string)
+	running       atomic.Bool
 }
 
 // CapacitySourceInvocation is only the existing source invocation boundary.
@@ -203,7 +210,10 @@ func (s *CapacityReconciler) run(ctx context.Context, source CapacitySourceInvoc
 				until, _ := call.Deadline()
 				live, end := context.WithDeadline(original, until)
 				defer end()
-				_ = s.Work.ReconcileRoot(live, v)
+				err := s.Work.ReconcileRoot(live, v)
+				if s.RootReport != nil {
+					s.RootReport(err)
+				}
 			}
 		})
 	}()
@@ -317,9 +327,27 @@ func (s *CapacityReconciler) runDemands(root context.Context, current *capacityC
 				continue
 			}
 			started := s.Work.Now()
-			left, err := s.reconcileCandidate(call, current, c, d.Namespace, d.Workload, func(string) {})
+			observed := func() string { return "" }
+			if s.DemandContext != nil {
+				call, observed = s.DemandContext(call)
+			}
+			// Fixed stage names with each stage's duration, for diagnostics.
+			var stages []string
+			stage, at := "", started
+			left, err := s.reconcileCandidate(call, current, c, d.Namespace, d.Workload, func(next string) {
+				if stage != "" {
+					stages = append(stages, stage+"="+s.Work.Now().Sub(at).Round(10*time.Millisecond).String())
+				}
+				stage, at = next, s.Work.Now()
+			})
+			if stage != "" {
+				stages = append(stages, stage+"="+s.Work.Now().Sub(at).Round(10*time.Millisecond).String())
+			}
+			if o := observed(); o != "" {
+				stages = append(stages, o)
+			}
 			if s.DemandReport != nil {
-				s.DemandReport(err, s.Work.Now().Sub(started), left)
+				s.DemandReport(err, s.Work.Now().Sub(started), left, strings.Join(stages, " "))
 			}
 			return
 		}

@@ -1,0 +1,201 @@
+2026-10-23T12:54:50.379111637Z I1023 12:54:50.379039       1 leaderelection.go:258] "Attempting to acquire leader lease..." lock="asservat configuration reconciliation"
+2026-10-23T12:54:50.385010039Z I1023 12:54:50.384969       1 leaderelection.go:272] "Successfully acquired lease" lock="asservat configuration reconciliation"
+2026-10-23T12:54:50.386260533Z capacity waiting: projection hint pending
+2026-10-23T12:57:38.485245910Z hub-worker context deletion: waiting for the capacity projection
+2026-10-23T12:57:38.499156341Z hub-worker retention: reconciler/store.begin/client (unavailable)
+2026-10-23T12:57:38.502502463Z hub-worker worker configuration: source (unavailable)
+2026-10-23T12:58:01.395998566Z hub-worker worker configuration: ok
+2026-10-23T12:58:09.545820797Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T12:58:41.036535683Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T12:59:06.147347599Z capacity waiting: projection mount pending
+2026-10-23T12:59:08.376695702Z capacity started with 0 regional clusters
+2026-10-23T12:59:09.652461946Z capacity local observation capacity-namespace-candidates: ok after 1.28s
+2026-10-23T12:59:09.652467746Z capacity local discovery: steps=1 candidates=0 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T12:59:11.552593749Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T12:59:13.967486681Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T12:59:28.652405726Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T12:59:30.552593395Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T12:59:30.552604745Z capacity local workload: compose/permission-scope (not-allocated) after 3.55s
+2026-10-23T12:59:32.452493803Z capacity local observation capacity-workload-candidates: ok after 1.4s
+2026-10-23T12:59:34.703293724Z capacity local observation capacity-namespace-guard: ok after 1.99s
+2026-10-23T12:59:36.602845232Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T12:59:38.502505832Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T12:59:40.402535483Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T12:59:40.653306189Z capacity local discovery: steps=18 candidates=4 namespace-index=3 namespace-count=10 kind-index=0 workload-index=3 workload-count=5
+2026-10-23T12:59:42.303233438Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T12:59:44.202110096Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T12:59:46.240602265Z capacity local observation capacity-namespace-guard: ok after 1.78s
+2026-10-23T12:59:46.698012537Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T12:59:48.293244217Z capacity local observation capacity-workload: ok after 2.05s
+2026-10-23T12:59:50.119391291Z capacity local observation capacity-namespace-guard: ok after 1.56s
+2026-10-23T12:59:52.019449196Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T12:59:53.919405471Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:00:11.369697764Z capacity local discovery: steps=33 candidates=6 namespace-index=6 namespace-count=10 kind-index=1 workload-index=0 workload-count=0
+2026-10-23T13:00:17.482446459Z capacity local observation capacity-namespace-guard: ok after 2.05s
+2026-10-23T13:00:18.511103463Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:00:19.156407574Z capacity local observation capacity-workload: unavailable after 1.67s
+2026-10-23T13:00:19.156413594Z capacity local workload: workload (unavailable) after 3.74s
+2026-10-23T13:00:21.056838199Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:00:27.107413804Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:00:29.007013068Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:00:29.007030858Z capacity local workload: compose/permission-scope (not-allocated) after 3.55s
+2026-10-23T13:00:30.907528166Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:00:36.696384831Z capacity local observation capacity-namespace-guard: ok after 1.73s
+2026-10-23T13:00:38.521659085Z capacity local observation capacity-workload: ok after 1.83s
+2026-10-23T13:00:40.422241146Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:00:42.322039734Z capacity local discovery: steps=49 candidates=9 namespace-index=9 namespace-count=10 kind-index=2 workload-index=0 workload-count=0
+2026-10-23T13:00:44.222343164Z capacity local observation capacity-namespace-candidates: ok after 1.4s
+2026-10-23T13:00:46.122472015Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:00:50.063778443Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:01:03.710190523Z capacity local observation capacity-namespace-guard: ok after 1.78s
+2026-10-23T13:01:05.535869476Z capacity local observation capacity-workload: ok after 1.83s
+2026-10-23T13:01:07.436337692Z capacity local observation capacity-workload-candidates: ok after 1.4s
+2026-10-23T13:01:09.335857816Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:01:11.235854483Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:01:13.141320060Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:01:15.386814414Z capacity local observation capacity-workload: ok after 2.25s
+2026-10-23T13:01:15.637055841Z capacity local discovery: steps=68 candidates=13 namespace-index=3 namespace-count=10 kind-index=0 workload-index=3 workload-count=5
+2026-10-23T13:01:17.479880170Z capacity local observation capacity-namespace-guard: ok after 1.83s
+2026-10-23T13:01:19.306412058Z capacity local observation capacity-workload: ok after 1.83s
+2026-10-23T13:01:21.206389887Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:01:22.641226550Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:01:23.107043009Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:01:25.006939078Z capacity local observation capacity-namespace-guard: ok after 1.63s
+2026-10-23T13:01:26.308540123Z capacity local observation capacity-workload: refused (unavailable) after 1.3s
+2026-10-23T13:01:26.308545803Z capacity local workload: workload (unavailable) after 2.95s
+2026-10-23T13:01:27.856746443Z capacity local observation capacity-workload-candidates: ok after 1.3s
+2026-10-23T13:01:47.206511896Z capacity local discovery: steps=84 candidates=15 namespace-index=6 namespace-count=10 kind-index=2 workload-index=0 workload-count=0
+2026-10-23T13:01:51.006187237Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:01:52.906952856Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:01:52.906957976Z capacity local workload: compose/permission-scope (not-allocated) after 3.55s
+2026-10-23T13:01:54.212649930Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:01:54.806375681Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:02:00.506880395Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:02:01.757779860Z capacity local observation capacity-workload: refused (unavailable) after 1.25s
+2026-10-23T13:02:01.757789300Z capacity local workload: workload (unavailable) after 2.9s
+2026-10-23T13:02:03.357147965Z capacity local observation capacity-workload-candidates: ok after 1.35s
+2026-10-23T13:02:09.406336037Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:02:11.307095370Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:02:11.307106130Z capacity local workload: compose/permission-scope (not-allocated) after 3.55s
+2026-10-23T13:02:13.206371598Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:02:17.006148940Z capacity local observation capacity-namespace-candidates: ok after 1.4s
+2026-10-23T13:02:18.906386673Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:02:18.906392374Z capacity local discovery: steps=102 candidates=18 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T13:02:26.551124981Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:02:36.357538514Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:02:38.256972038Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:02:40.156664094Z capacity local observation capacity-workload-candidates: ok after 1.4s
+2026-10-23T13:02:42.056453401Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:02:43.957181561Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:02:45.856886588Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:02:47.757405548Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:02:49.657028256Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:02:51.557136725Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:02:51.808090208Z capacity local discovery: steps=119 candidates=23 namespace-index=3 namespace-count=10 kind-index=0 workload-index=4 workload-count=5
+2026-10-23T13:02:53.457092795Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:02:55.605813520Z capacity local observation capacity-workload: unavailable after 2.15s
+2026-10-23T13:02:55.605819770Z capacity local workload: workload (unavailable) after 3.8s
+2026-10-23T13:02:57.506772104Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:02:58.052112070Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:02:59.356251339Z capacity local observation capacity-workload: unavailable after 1.85s
+2026-10-23T13:03:01.256336041Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:03:22.506464459Z capacity local discovery: steps=136 candidates=24 namespace-index=7 namespace-count=10 kind-index=0 workload-index=0 workload-count=1
+2026-10-23T13:03:24.406950756Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:03:26.306213630Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:03:26.306223860Z capacity local workload: compose/permission-scope (not-allocated) after 3.55s
+2026-10-23T13:03:28.205947615Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:03:30.828720204Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:03:33.907105722Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:03:35.756583276Z capacity local observation capacity-workload: unavailable after 1.85s
+2026-10-23T13:03:35.756589006Z capacity local workload: workload (unavailable) after 3.5s
+2026-10-23T13:03:37.656096868Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:03:43.356761117Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:03:45.607212128Z capacity local observation capacity-workload: ok after 2.25s
+2026-10-23T13:03:45.607222388Z capacity local workload: compose/permission-scope (not-allocated) after 3.9s
+2026-10-23T13:03:47.507035705Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:03:51.306805883Z capacity local observation capacity-namespace-candidates: ok after 1.4s
+2026-10-23T13:03:53.206627273Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:03:53.206632273Z capacity local discovery: steps=152 candidates=27 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T13:04:02.418312408Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:04:10.656634258Z capacity local observation capacity-namespace-guard: ok after 1.99s
+2026-10-23T13:04:12.306511763Z capacity local observation capacity-workload: unavailable after 1.65s
+2026-10-23T13:04:12.306517013Z capacity local workload: workload (unavailable) after 3.65s
+2026-10-23T13:04:14.206496352Z capacity local observation capacity-workload-candidates: ok after 1.4s
+2026-10-23T13:04:16.106447522Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:04:18.006245102Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:04:18.006274052Z capacity local workload: compose/permission-scope (not-allocated) after 3.55s
+2026-10-23T13:04:19.906229404Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:04:21.806137166Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:04:23.706976192Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:04:25.606581655Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:04:25.856923529Z capacity local discovery: steps=169 candidates=32 namespace-index=3 namespace-count=10 kind-index=0 workload-index=4 workload-count=5
+2026-10-23T13:04:27.596324184Z capacity local observation capacity-namespace-guard: ok after 1.73s
+2026-10-23T13:04:29.422414842Z capacity local observation capacity-workload: ok after 1.83s
+2026-10-23T13:04:31.322853340Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:04:33.222589476Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:04:34.489329954Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:04:35.472263407Z capacity local observation capacity-workload-candidates: ok after 2s
+2026-10-23T13:04:56.372150001Z capacity local discovery: steps=186 candidates=33 namespace-index=7 namespace-count=10 kind-index=0 workload-index=0 workload-count=1
+2026-10-23T13:04:58.272171277Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:05:00.521514079Z capacity local observation capacity-workload: ok after 2.25s
+2026-10-23T13:05:02.422281100Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:05:06.926200497Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:05:08.122804850Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:05:10.022842841Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:05:11.922447331Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:05:17.831153486Z capacity local observation capacity-namespace-guard: ok after 1.85s
+2026-10-23T13:05:19.657567603Z capacity local observation capacity-workload: ok after 1.83s
+2026-10-23T13:05:21.557456818Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:05:25.706987077Z capacity local observation capacity-namespace-candidates: ok after 1.75s
+2026-10-23T13:05:27.607775427Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:05:27.607781147Z capacity local discovery: steps=202 candidates=36 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T13:05:38.133794793Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:05:44.707369999Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:05:46.206878419Z capacity local observation capacity-workload: unavailable after 1.5s
+2026-10-23T13:05:46.206884490Z capacity local workload: workload (unavailable) after 3.15s
+2026-10-23T13:05:48.107430766Z capacity local observation capacity-workload-candidates: ok after 1.4s
+2026-10-23T13:05:50.007771312Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:05:52.257311686Z capacity local observation capacity-workload: ok after 2.25s
+2026-10-23T13:05:52.257338166Z capacity local workload: compose/permission-scope (not-allocated) after 3.9s
+2026-10-23T13:05:54.157630443Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:05:56.057767740Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:05:57.957660067Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:05:59.857287454Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:06:00.107500733Z capacity local discovery: steps=219 candidates=41 namespace-index=3 namespace-count=10 kind-index=0 workload-index=4 workload-count=5
+2026-10-23T13:06:01.844072538Z capacity local observation capacity-namespace-guard: ok after 1.73s
+2026-10-23T13:06:03.670384610Z capacity local observation capacity-workload: ok after 1.83s
+2026-10-23T13:06:05.570459080Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:06:07.471087993Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:06:09.370579202Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:06:10.347292770Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:06:30.620311698Z capacity local discovery: steps=236 candidates=42 namespace-index=7 namespace-count=10 kind-index=0 workload-index=0 workload-count=1
+2026-10-23T13:06:32.520771598Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:06:34.421079708Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:06:36.320321975Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:06:42.370115710Z capacity local observation capacity-namespace-guard: ok after 1.99s
+2026-10-23T13:06:42.769085192Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:06:44.270261043Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:06:46.170531017Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:06:51.870327528Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:06:53.770981445Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:06:55.671383542Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:06:59.471231584Z capacity local observation capacity-namespace-candidates: ok after 1.4s
+2026-10-23T13:07:01.370659779Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:07:01.370675960Z capacity local discovery: steps=252 candidates=45 namespace-index=0 namespace-count=10 kind-index=0 workload-index=0 workload-count=0
+2026-10-23T13:07:14.450113953Z hub-worker retention: reconciler/store.observe (unavailable)
+2026-10-23T13:07:18.820801386Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:07:20.720810028Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:07:22.620800652Z capacity local observation capacity-workload-candidates: ok after 1.4s
+2026-10-23T13:07:24.607578932Z capacity local observation capacity-namespace-guard: ok after 1.73s
+2026-10-23T13:07:26.434385700Z capacity local observation capacity-workload: ok after 1.83s
+2026-10-23T13:07:28.334375215Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:07:30.233922068Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:07:32.484054801Z capacity local observation capacity-namespace-guard: ok after 1.99s
+2026-10-23T13:07:34.384204768Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:07:34.634847972Z capacity local discovery: steps=269 candidates=50 namespace-index=3 namespace-count=10 kind-index=0 workload-index=4 workload-count=5
+2026-10-23T13:07:36.284484196Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:07:38.183768231Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:07:40.085007834Z capacity local observation capacity-namespace-guard: ok after 1.64s
+2026-10-23T13:07:41.983837159Z capacity local observation capacity-workload: ok after 1.9s
+2026-10-23T13:07:43.883946008Z capacity local observation capacity-workload-candidates: ok after 1.65s
+2026-10-23T13:07:46.049857708Z hub-worker retention: reconciler/store.observe (unavailable)

@@ -156,7 +156,7 @@ func TestConnectorLifecycleLegacyStandaloneNativeCounts(t *testing.T) {
 	if err != nil || !proof.Valid(time.Now()) {
 		t.Fatal("standalone concrete proof did not complete; nested-cost regression not reached")
 	}
-	if len(f.proofs) != 1 || f.proofs[0].observer != 54 || f.proofs[0].probe != 12 || f.api.reviews.Load() != 2 {
+	if len(f.proofs) != 1 || f.proofs[0].observer != 47 || f.proofs[0].probe != 9 || f.api.reviews.Load() != 2 {
 		t.Fatal("standalone actual native read count differs from source graph")
 	}
 }

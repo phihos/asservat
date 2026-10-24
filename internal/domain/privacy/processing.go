@@ -96,8 +96,12 @@ type ProcessingSnapshot struct {
 	ObservedAt, FreshUntil time.Time
 }
 
+// Allows admits a snapshot current for at most the evidence-read window:
+// approved-query reads observe processing over their 20 s evidence and
+// recovery observations (installed native81); download and capture producers
+// keep their five-second inputs.
 func (s ProcessingSnapshot) Allows(now time.Time) bool {
-	if !authorization.UUID(s.RootID) || !authorization.UUID(s.Epoch) || s.Sequence < 1 || s.Sequence > 1<<60 || !s.Complete || s.Subject.Validate() != nil || len(s.Nodes) < 1 || len(s.Nodes) > MaxProcessingAncestors || s.Rules == nil || len(s.Rules) > MaxProcessingRules || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second) {
+	if !authorization.UUID(s.RootID) || !authorization.UUID(s.Epoch) || s.Sequence < 1 || s.Sequence > 1<<60 || !s.Complete || s.Subject.Validate() != nil || len(s.Nodes) < 1 || len(s.Nodes) > MaxProcessingAncestors || s.Rules == nil || len(s.Rules) > MaxProcessingRules || !identity.Fresh(s.ObservedAt, s.FreshUntil, now, identity.EvidenceReadRequestWindow) {
 		return false
 	}
 	nodes := map[artifact.Location]ProcessingNode{}

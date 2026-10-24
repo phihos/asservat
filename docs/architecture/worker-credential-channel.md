@@ -1,5 +1,15 @@
 # Worker credential channel
 
+Current installed composition is revised by [ADR-219](../decisions/219-shared-approved-acquisition.md)
+and [ADR-221](../decisions/221-admitted-worker-identity-enrollment.md): one closed
+acquisition parent selects native download or approved pod-status. Certificate
+enrollment uses the exact admitted worker and its own bounded HTTP request,
+without a human certificate-owner registry/locator/relay. Native-operation
+ownership and each purpose's current key/evidence authority remain separate.
+The older certificate-routing components and their tests below are historical
+component evidence, not the installed certificate path. Shared composition
+qualification is still pending.
+
 [ADR-072](../decisions/072-worker-credential-channel.md) completes the process-key/transport components of [worker enrollment](worker-enrollment.md). C-14 owns the live control operation; C-20 owns the closed wire and handler; C-21 owns process cryptography, the TLS client and projected-token reader; C-24 owns the minimized credential target and common renewal arithmetic. These are acquisition and control responsibilities within I-13, not a new always-on service or a public API.
 
 ## Control binding
