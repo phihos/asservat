@@ -111,7 +111,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 		// ADR-185: synthetic browser identity settings exercise the public sources step.
 		Public: &contracts.InstallerPublicSettings{Origin: origin, Issuer: issuer, ClientID: "console",
 			MaxLifetimeSeconds: 3600, MaxLogins: 8, MaxSessions: 8, MaxLogoutEvents: 8, Clients: clients,
-			EligibleGroups: []string{"synthetic-group"}, GroupMaxAgeSeconds: 300,
+			EligibleGroups: []string{"synthetic-group", installedUnrelatedGroup}, GroupMaxAgeSeconds: 300,
 			// ADR-190: the operator's synthetic capacity profile and release operator.
 			Capacity: nativeCapacityProfile(),
 			// ADR-210: the synthetic group's console users are the processing
@@ -499,7 +499,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
-		installedJourney(t, ctx, identity, publicRoot, publicAddress, origin, diagnose,
+		installedJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose,
 			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))(cluster, namespace, workload, deny)
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)

@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	value "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 func TestContextProcessingCoverageFailurePreservesUnknownEarlierRequest(t *testing.T) {
@@ -33,5 +35,16 @@ func TestPreviewChangeIsRetryableButRequestChangeIsReviewChanged(t *testing.T) {
 	}
 	if f := publicCaptureFailure(value.ErrChanged, true); f.Code != "ReviewChanged" || f.Retryable {
 		t.Fatalf("request: %+v", f)
+	}
+}
+
+// A target read resolves the workload before authorizing it: a denied existing
+// target must project exactly like an absent or unreachable one.
+func TestTargetReadDenialIsNotAnExistenceOracle(t *testing.T) {
+	absent := publicCaptureFailure(targets.ErrChanged, false)
+	for _, err := range []error{value.ErrDenied, identity.ErrDenied, targets.ErrDenied, targets.ErrUnavailable, value.ErrChanged} {
+		if f := publicCaptureFailure(err, false); f != absent {
+			t.Fatalf("%v: %+v differs from absent target %+v", err, f, absent)
+		}
 	}
 }

@@ -92,7 +92,23 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	kc.json("PUT", prefix+"/groups/"+group, map[string]any{"name": "maintainers", "attributes": map[string]any{"asservat_group_id": []string{installedIdentityGroup}}})
 	user := created("/users", map[string]any{"username": "developer", "enabled": true, "email": "synthetic@example.invalid", "firstName": "Synthetic", "lastName": "Developer", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
 	kc.json("PUT", prefix+"/users/"+user+"/groups/"+group, nil)
+	// An organization member the installation accepts (eligible group) whom no
+	// AccessBinding names: the S-02 unrelated principal.
+	outsiders := created("/groups", map[string]any{"name": "outsiders"})
+	kc.json("PUT", prefix+"/groups/"+outsiders, map[string]any{"name": "outsiders", "attributes": map[string]any{"asservat_group_id": []string{installedUnrelatedGroup}}})
+	outsider := created("/users", map[string]any{"username": "outsider", "enabled": true, "email": "outsider@example.invalid", "firstName": "Synthetic", "lastName": "Outsider", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
+	kc.json("PUT", prefix+"/users/"+outsider+"/groups/"+outsiders, nil)
 	return &installedIdentity{kc: kc, Issuer: kc.Issuer, RootPEM: id.RootCA}
+}
+
+// installedUnrelatedGroup is eligible for sign-in but named by no AccessBinding.
+const installedUnrelatedGroup = "synthetic-unrelated-group"
+
+// unrelated returns the same realm's outsider user with its own HTTP client.
+func (i *installedIdentity) unrelated() *installedIdentity {
+	kc, client := *i.kc, *i.kc.http
+	kc.http, kc.username = &client, "outsider"
+	return &installedIdentity{kc: &kc, Issuer: i.Issuer, RootPEM: i.RootPEM}
 }
 
 const installedMCPScope, installedDownloadsScope = "resource-mcp", "resource-downloads"

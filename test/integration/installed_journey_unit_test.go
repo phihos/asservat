@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
 	"reflect"
 	"strings"
 	"testing"
@@ -615,5 +617,30 @@ func TestInstalledJourneyCaseLinkHonorsOriginalCancellation(t *testing.T) {
 				t.Fatal("the original passive deadline changed")
 			}
 		})
+	}
+}
+
+func TestInstalledJourneyPartialRequiresExactStrongRange(t *testing.T) {
+	partial := func(status int, contentRange, etag, body string) *http.Response {
+		h := http.Header{}
+		h.Set("Content-Range", contentRange)
+		if etag != "" {
+			h.Set("ETag", etag)
+		}
+		return &http.Response{StatusCode: status, Header: h, Body: io.NopCloser(strings.NewReader(body))}
+	}
+	if b, etag, err := installedJourneyPartial(partial(206, "bytes 2-4/10", `"v1-a"`, "cde"), 2, 3, 10); err != nil || string(b) != "cde" || etag != `"v1-a"` {
+		t.Fatal("exact partial refused", err)
+	}
+	for _, r := range []*http.Response{
+		partial(200, "bytes 2-4/10", `"v1-a"`, "cde"),
+		partial(206, "bytes 2-5/10", `"v1-a"`, "cde"),
+		partial(206, "bytes 2-4/10", `"v1-a"`, "cd"),
+		partial(206, "bytes 2-4/10", `W/"v1-a"`, "cde"),
+		partial(206, "bytes 2-4/10", "", "cde"),
+	} {
+		if _, _, err := installedJourneyPartial(r, 2, 3, 10); err == nil {
+			t.Fatal("inexact partial accepted", r.StatusCode, r.Header)
+		}
 	}
 }

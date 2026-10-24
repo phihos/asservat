@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/tls"
@@ -21,6 +22,7 @@ import (
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -65,7 +67,7 @@ type installedJourneyDownload struct {
 	ExpiresAt           time.Time `json:"expires_at"`
 }
 
-func installedJourney(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func(), projectionCheck installedProjectionCheck) func(cluster, namespace, workload string, deny func(bool)) {
+func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func(), projectionCheck installedProjectionCheck) func(cluster, namespace, workload string, deny func(bool)) {
 	return func(cluster, namespace, workload string, deny func(bool)) {
 		t.Helper()
 		if identity == nil {
@@ -255,6 +257,7 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			t.Fatal("installed capture lost its acknowledged original receipt")
 		}
 		t.Logf("installed journey: MCP preview, request and resolution of a regional pod-status capture as the Keycloak user")
+		installedJourneyIdempotency(t, ctx, admin, root, accepted.CaptureID, request, requestCapture)
 		// The regional executor collects; the publisher verifies and publishes
 		// (ADR-203). A successful capture may omit its independently authorized
 		// case link. Keep both passive waits inside one original phase deadline.
@@ -356,16 +359,9 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			diagnose()
 			t.Fatal("installed download was not prepared", download.State, download.ContentPath)
 		}
-		get, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimSuffix(origin, "/")+download.ContentPath, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		get.Header.Set("Authorization", "Bearer "+identity.downloadToken())
-		response, err := (&http.Client{Transport: transport, Timeout: 2 * time.Minute}).Do(get)
-		if err != nil {
-			diagnose()
-			t.Fatal("installed download content", err)
-		}
+		contentURL, contentClient := strings.TrimSuffix(origin, "/")+download.ContentPath, &http.Client{Transport: transport, Timeout: 2 * time.Minute}
+		head, tail := installedJourneyResume(t, ctx, contentClient, contentURL, identity.downloadToken(), *download.SizeBytes)
+		response := installedJourneyContent(t, ctx, contentClient, contentURL, identity.downloadToken(), nil)
 		native, err := io.ReadAll(io.LimitReader(response.Body, artifact.MaxContextBytes+1))
 		response.Body.Close()
 		digest := sha256.Sum256(native)
@@ -383,6 +379,12 @@ func installedJourney(t *testing.T, ctx context.Context, identity *installedIden
 			t.Fatal(err)
 		}
 		t.Logf("installed journey: the Keycloak user downloaded the native pod-status file (%d bytes) through the hub-local worker", size)
+		if !bytes.Equal(append(head, tail...), native) {
+			t.Fatal("installed resumed ranges differ from the full native download")
+		}
+		installedJourneyResumeSpent(t, ctx, admin, contentClient, root, originalDownload, contentURL, identity.downloadToken(), size)
+		installedJourneyCatalogMinimized(t, ctx, admin, root, investigation.Artifacts[0].ArtifactID, native)
+		installedJourneyUnrelated(t, ctx, wire, identity.unrelated(), transport, origin, target, preview.PreviewID, progress.CaseID, investigation.Artifacts[0].ArtifactID)
 		// Revocation: with the Deny binding the case is no longer available;
 		// without it, it is again. Expiry: once the artifact's access ends,
 		// the case no longer offers it and a new preparation is refused.

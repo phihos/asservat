@@ -33,6 +33,9 @@ type kcFixture struct {
 	t                                                                     *testing.T
 	http                                                                  *http.Client
 	admin, base                                                           string
+	// username selects the realm user loginScopes signs in; empty means the
+	// fixture's original "developer".
+	username string
 }
 type kcTokens struct {
 	Access  string `json:"access_token"`
@@ -134,7 +137,11 @@ func (f *kcFixture) loginScopes(client, scopes string, mode ...string) kcTokens 
 	if !strings.HasPrefix(action, f.Issuer+"/login-actions/authenticate?") {
 		f.t.Fatal("fixture login form escaped issuer")
 	}
-	credentials := url.Values{"username": {"developer"}, "password": {f.UserPassword}, "credentialId": {""}}
+	user := f.username
+	if user == "" {
+		user = "developer"
+	}
+	credentials := url.Values{"username": {user}, "password": {f.UserPassword}, "credentialId": {""}}
 	status, _, headers := f.request("POST", action, "", "application/x-www-form-urlencoded", []byte(credentials.Encode()))
 	if status != 302 {
 		f.t.Fatalf("fixture login status %d", status)
