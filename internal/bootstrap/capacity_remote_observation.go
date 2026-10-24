@@ -27,7 +27,8 @@ type capacityRemoteObservation struct {
 	rootID, clusterID string
 	now               func() time.Time
 	// diagnose logs one closed purpose and outcome per change, with its
-	// elapsed time, labelled "regional" or "local" (ADR-197); never remote text.
+	// elapsed time, labelled "local" or "regional <cluster ID>" (ADR-197);
+	// never remote text.
 	diagnose string
 	mu       sync.Mutex
 	last     string

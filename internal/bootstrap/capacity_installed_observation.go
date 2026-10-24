@@ -146,7 +146,9 @@ func (d *CapacityWorkerDeployment) installedClusterReaders(ctx context.Context, 
 			if e != nil {
 				return nil, nil, e
 			}
-			read.diagnose = "regional"
+			// Each joined region logs under its own configured cluster ID, so two
+			// regions' per-change outcomes are not read as one alternating line.
+			read.diagnose = "regional " + q.ClusterID
 			out = append(out, app.CapacityClusterReaders{ClusterID: q.ClusterID, Workloads: read, Guard: read, Guarded: read, Pace: 2 * time.Second, Report: read.reportWorkload, Progress: read.reportProgress})
 		}
 	}
