@@ -169,7 +169,8 @@ written.
 
 Adding a cluster becomes: install the region, copy the join record, run the
 join command. The hub-api restarts its process once. The first installed
-profile stays at one regional slot (ADR-185's probe cap). A capture becomes
+profile stayed at one regional slot (ADR-185's probe cap); the addendum
+below raises it to eight. A capture becomes
 possible only once ADR-197 and ADR-198 are also implemented.
 
 ## Implementation
@@ -296,3 +297,37 @@ possible only once ADR-197 and ADR-198 are also implemented.
   for missing capacity needs a public preview request. It moves to the
   capture run with ADR-197. The publisher's topology pins must also gain
   the regional pin before a regional capture is published.
+
+## Addendum (2026-10-24): eight regional slots
+
+Native run native99 failed at the second cluster's join (`installer-cluster-join
+permission source identity changed`): the join always used slot 1, and the
+installation had only one slot. The cause was the namespace workload guard's
+exact probe list (ADR-092, `MaxOwnerConfigurationProbes`), which had room for
+one slot's capability and work-trust probes. The S-02 exit needs a second
+workload cluster through the same hub.
+
+- **Eight slots** (`OwnerClusterCatalogSlots`). Slot names stay deterministic,
+  so the install pre-lists every slot's two owner probe pairs in the guard and
+  its source and guard names in the owner Role. An unused slot's names grant
+  nothing, because its sources and guards do not exist. Each slot keeps its
+  exact named dry-run pairs, administrator-only source guards and independent
+  denial proof. The provider-installed hub uses 9 + 2 per slot probe pairs
+  (25), and the bound is 26. Eight covers S-02 with headroom. It stays below
+  the context-start router's 16 clusters, and eight full entries fit the
+  128 KiB catalog bound.
+- **The join derives its slot** from the catalog: an exact rerun keeps the
+  cluster's position, and a new cluster takes the next free slot. A full
+  catalog refuses.
+- **The hub-api v2 capacity server holds every regional capacity cluster.**
+  It qualifies each one, keeps one registry per profile and picks the
+  profile from the standby's hello. The coordinator still requires the
+  authenticated peer to be that profile's exact binding. The ingress verifies
+  each peer against its own issuer roots, and the handshake pool only
+  pre-admits chains. The standby holder and the listener's standby slots are
+  shared: three per regional cluster, under the listener's 64 connections.
+- **Upgrade.** The guard expression, owner Role, hub-worker activation probe
+  list and owner input change with the slot count. An installation created
+  with one slot does not match the new expected guard and must be
+  reinstalled. This follows earlier pre-release practice: there is no
+  in-place migration.

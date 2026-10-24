@@ -60,8 +60,10 @@ type hubObservationOperationEntry struct {
 	conversationClose                 sync.Once
 }
 
+// maximum is shared by every region's standbys and matches the operation
+// listener's 64-connection ceiling.
 func NewHubObservationOperationHolder(ctx context.Context, maximum int, now func() time.Time) (*HubObservationOperationHolder, error) {
-	if ctx == nil || ctx.Err() != nil || maximum < 1 || maximum > 16 || now == nil {
+	if ctx == nil || ctx.Err() != nil || maximum < 1 || maximum > 64 || now == nil {
 		return nil, fleet.ErrInvalid
 	}
 	root, cancel := context.WithCancel(ctx)

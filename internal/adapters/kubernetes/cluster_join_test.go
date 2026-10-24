@@ -21,7 +21,8 @@ import (
 
 // ADR-196 step 5: the join creates the slot's guarded sources and topology
 // and appends the entry by CAS; a rerun is exact, and another entry for the
-// same cluster or a full catalog is refused.
+// same cluster, an explicitly named taken slot, a slot beyond the catalog
+// capacity or a full catalog is refused.
 func TestJoinRegionalClusterCreatesSlotAndAppendsExactly(t *testing.T) {
 	installation := ownerID(1)
 	catalogName := contracts.OwnerClusterCatalogName(installation)
@@ -65,7 +66,12 @@ func TestJoinRegionalClusterCreatesSlotAndAppendsExactly(t *testing.T) {
 	other := plan
 	other.Entry.ClusterID, other.Entry.Settings.ClusterID, other.Entry.Trust.ClusterID, other.Topology.TargetClusterID = ownerID(6), ownerID(6), ownerID(6), ownerID(6)
 	if _, err = JoinRegionalCluster(context.Background(), config, other); err == nil {
-		t.Fatal("a second cluster joined beyond the slot")
+		t.Fatal("a second cluster joined into the taken slot 1")
+	}
+	beyond := other
+	beyond.Slot = contracts.OwnerClusterCatalogSlots + 1
+	if _, err = JoinRegionalCluster(context.Background(), config, beyond); !errors.Is(err, cfg.ErrInvalid) {
+		t.Fatal("a slot beyond the catalog capacity accepted", err)
 	}
 	// Slot 0 derives the slot: the joined cluster reruns exactly in slot 1 and
 	// a second cluster takes slot 2.
@@ -81,6 +87,22 @@ func TestJoinRegionalClusterCreatesSlotAndAppendsExactly(t *testing.T) {
 	}
 	if c := read(); len(c.Clusters) != 2 || !equalJSON(c.Clusters[1], second) {
 		t.Fatal("second catalog entry not appended")
+	}
+	// The remaining slots fill in order; a cluster beyond them is refused
+	// without touching the catalog.
+	join := func(n int) (contracts.OwnerPublicCluster, error) {
+		next := other
+		id := ownerID(100 + n)
+		next.Entry.ClusterID, next.Entry.Settings.ClusterID, next.Entry.Trust.ClusterID, next.Topology.TargetClusterID = id, id, id, id
+		return JoinRegionalCluster(context.Background(), config, next)
+	}
+	for slot := 3; slot <= contracts.OwnerClusterCatalogSlots; slot++ {
+		if e, err := join(slot); err != nil || e.Capability.Source.Name != contracts.OwnerClusterSourceName(installation, slot, "capability") || e.WorkTrust.Source.Name != contracts.OwnerClusterSourceName(installation, slot, "work-trust") {
+			t.Fatal("cluster not joined in slot", slot, err)
+		}
+	}
+	if _, err = join(contracts.OwnerClusterCatalogSlots + 1); !errors.Is(err, cfg.ErrUnavailable) || len(read().Clusters) != contracts.OwnerClusterCatalogSlots {
+		t.Fatal("a cluster joined beyond the full catalog", err)
 	}
 }
 

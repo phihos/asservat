@@ -111,8 +111,10 @@ is final.
 
 The hub-api public composition changes from a startup-fixed cluster list to
 catalog entries resolved at start. A cluster addition needs one Pod
-replacement until live reload exists. The probe cap limits the first
-installed profile to one regional cluster.
+replacement until live reload exists. The probe cap limited the first
+installed profile to one regional cluster; the
+[ADR-196 addendum](196-regional-cluster-join.md#addendum-2026-10-24-eight-regional-slots)
+raises it to eight.
 
 ## Implementation
 

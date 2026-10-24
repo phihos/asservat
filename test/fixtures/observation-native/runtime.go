@@ -259,7 +259,7 @@ func (r *fixtureRuntime) startOwner(roots *x509.CertPool) (err error) {
 	if err != nil {
 		return err
 	}
-	handler, err := bootstrap.NewRegionalObservationOperationHandler(receiver.CommonAuthority(), r.holder, r.input.Regional, ingress, registry, time.Now)
+	handler, err := bootstrap.NewRegionalObservationOperationHandler(receiver.CommonAuthority(), r.holder, []bootstrap.RegionalObservationOperationCluster{{Pin: r.input.Regional, Registry: registry}}, ingress, time.Now)
 	if err != nil {
 		return err
 	}
