@@ -33,6 +33,9 @@ import (
 
 type fixture struct {
 	S3, KMS, Postgres string
+	// PostgresContainer names the owned PostgreSQL container (installed
+	// journey: lossless restart, ADR-226).
+	PostgresContainer string
 	WorkerImage       string
 	NativeProviders   struct {
 		S3, KMS, Postgres string

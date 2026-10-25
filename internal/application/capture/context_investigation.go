@@ -398,7 +398,8 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	target, err := s.Targets.ResolvePod(ctx, p.Target)
 	auditapp.MarkStep(ctx, "q-resolve", resolveStarted)
 	if err != nil {
-		return zero, err
+		// Reported with its closed class; the error still unwraps unchanged.
+		return zero, previewFailure("target/"+targetFailureClass(err), err)
 	}
 	if target.Request != p.Target || target.Pin != p.Pin || target.ExecutionClass != p.ExecutionClass {
 		return zero, s.requestChanged("target")
@@ -561,4 +562,18 @@ func (s ContextInvestigation) requestChanged(stage string) error {
 		s.ReportPreviewFailure("request/changed/" + stage)
 	}
 	return value.ErrChanged
+}
+
+// targetFailureClass names a target resolution failure for the operator
+// report only.
+func targetFailureClass(err error) string {
+	for _, c := range []struct {
+		name string
+		err  error
+	}{{"changed", targets.ErrChanged}, {"denied", targets.ErrDenied}, {"unscheduled", targets.ErrUnscheduled}, {"unavailable", targets.ErrUnavailable}} {
+		if errors.Is(err, c.err) {
+			return c.name
+		}
+	}
+	return "other"
 }

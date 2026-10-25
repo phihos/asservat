@@ -47,6 +47,12 @@ type providerInputs struct {
 	dir                string
 	kubernetesEndpoint contracts.OwnerProviderEndpoint
 	postgresEndpoint   contracts.OwnerPostgresEndpoint
+	// oneShot marks the installer's one-shot commands. Their sequential
+	// protection checks (about six reads per schema, role and resource step)
+	// were paced by the 20/20 client limiter; they ask for the ADR-208
+	// opening budget instead. Checks and deadlines are unchanged; long-running
+	// processes keep 20/20.
+	oneShot bool
 }
 
 // read reads one projected file, resolving dir on every call.
@@ -241,12 +247,16 @@ func (s *providerInputs) kubernetesToken(source kms.TokenSource) *rest.Config {
 	for _, der := range s.kubernetesEndpoint.Roots {
 		_ = pem.Encode(&ca, &pem.Block{Type: "CERTIFICATE", Bytes: der})
 	}
-	return &rest.Config{Host: s.kubernetesEndpoint.Endpoint, TLSClientConfig: rest.TLSClientConfig{CAData: ca.Bytes()}, WrapTransport: func(t http.RoundTripper) http.RoundTripper {
+	c := &rest.Config{Host: s.kubernetesEndpoint.Endpoint, TLSClientConfig: rest.TLSClientConfig{CAData: ca.Bytes()}, WrapTransport: func(t http.RoundTripper) http.RoundTripper {
 		s.mu.Lock()
 		s.transports = append(s.transports, t)
 		s.mu.Unlock()
 		return ownerBearerTransport{t, source}
 	}}
+	if s.oneShot {
+		c.QPS, c.Burst = kube.OpeningQPS, kube.OpeningBurst
+	}
+	return c
 }
 
 func (s *providerInputs) sqlCredential(ctx context.Context, name string) (contracts.OwnerSQLCredential, error) {

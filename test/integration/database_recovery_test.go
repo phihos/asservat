@@ -69,16 +69,8 @@ func TestDatabaseRecoveryAfterRestartAndRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = observer.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, observer), a); err != nil {
-		t.Fatal(err)
-	}
-	if phase == "initial" {
-		var unacceptedLegacy bool
-		if err = admin.QueryRow(ctx, `SELECT recovery_blocked AND suspended AND activated_postmaster_at IS NULL AND activated_database_oid IS NULL
-		 FROM fleet_trust WHERE installation_id=$1`, a.InstallationID).Scan(&unacceptedLegacy); err != nil || !unacceptedLegacy {
-			t.Fatal("migration did not block legacy stored-flag readers without activating the root", err)
-		}
-	}
+	// The restart/restore check reads the stored activation before any
+	// observation pass, which may re-activate a lossless restart (ADR-226).
 	if phase != "initial" {
 		var storedBlocked, sameProcess, sameDatabase bool
 		if err = admin.QueryRow(ctx, `SELECT recovery_blocked,
@@ -87,20 +79,42 @@ func TestDatabaseRecoveryAfterRestartAndRestore(t *testing.T) {
 		 FROM fleet_trust WHERE installation_id=$1`, a.InstallationID).Scan(&storedBlocked, &sameProcess, &sameDatabase); err != nil {
 			t.Fatal(err)
 		}
-		if storedBlocked || (phase == "restarted" && (sameProcess || !sameDatabase)) || (phase == "restored" && (!sameProcess || sameDatabase)) {
+		if storedBlocked || (phase == "restarted" && (sameProcess || !sameDatabase)) || (phase == "restored" && (sameProcess || sameDatabase)) {
 			t.Fatal("harness did not produce the expected real database change", phase, storedBlocked, sameProcess, sameDatabase)
+		}
+		// Re-activation appends the restart to the lineage and keeps the
+		// original activation start, so the restored copy (same server process,
+		// new database) still records the first start.
+		// Rows bound to the activation start (every per-subsystem incarnation
+		// check uses public.incarnation_current) are not current before
+		// re-activation.
+		if incarnationCurrent(t, ctx, admin, a.InstallationID) {
+			t.Fatal("activation-bound rows current before re-activation", phase)
 		}
 		// Even a separately cleared suspension flag cannot hide the mismatch.
 		if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", a.InstallationID); err != nil {
 			t.Fatal(err)
 		}
+		if _, err = reader.RecoveryState(ctx); err == nil {
+			t.Fatal("database served current authority before observation", phase)
+		}
 	}
-	if _, err = reader.RecoveryState(ctx); err == nil {
-		t.Fatal("unaccepted database served current authority", phase)
+	if err = observer.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, observer), a); err != nil && phase != "restored" {
+		t.Fatal(err)
 	}
-	if phase != "restored" {
-		// Explicit fixture-only stand-in for the future independent activation
-		// protocol. Its SQL must never be copied into a production startup hook.
+	switch phase {
+	case "initial":
+		var unacceptedLegacy bool
+		if err = admin.QueryRow(ctx, `SELECT recovery_blocked AND suspended AND activated_postmaster_at IS NULL AND activated_database_oid IS NULL
+		 FROM fleet_trust WHERE installation_id=$1`, a.InstallationID).Scan(&unacceptedLegacy); err != nil || !unacceptedLegacy {
+			t.Fatal("migration did not block legacy stored-flag readers without activating the root", err)
+		}
+		if _, err = reader.RecoveryState(ctx); err == nil {
+			t.Fatal("unaccepted database served current authority", phase)
+		}
+		// Explicit fixture-only stand-in for the first-installation activation,
+		// the trigger records the same incarnation facts. Never copy this SQL
+		// into a production startup hook.
 		if _, err = admin.Exec(ctx, `UPDATE fleet_trust SET suspended=false,recovery_blocked=false,
 		 activated_postmaster_at=pg_catalog.pg_postmaster_start_time(),
 		 activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database())
@@ -113,6 +127,39 @@ func TestDatabaseRecoveryAfterRestartAndRestore(t *testing.T) {
 		if _, err = reader.RecoveryState(ctx); err != nil {
 			t.Fatal("synthetic accepted incarnation unavailable", err)
 		}
+	case "restarted":
+		// ADR-226: the product observation pass re-activated the lossless
+		// restart; no fixture activation is involved.
+		if err = observer.ObserveAdministration(ctx, fleetBasisFixture(t, ctx, observer), a); err != nil {
+			t.Fatal("observation after re-activation", err)
+		}
+		if _, err = reader.RecoveryState(ctx); err != nil {
+			t.Fatal("lossless restart was not re-activated", err)
+		}
+		// Rows created before the restart stay valid without any rewrite.
+		if !incarnationCurrent(t, ctx, admin, a.InstallationID) {
+			t.Fatal("pre-restart rows not current after re-activation")
+		}
+	case "restored":
+		// A logical restore into a new database keeps the block.
+		if _, err = reader.RecoveryState(ctx); err == nil {
+			t.Fatal("restored database served current authority", phase)
+		}
+		if incarnationCurrent(t, ctx, admin, a.InstallationID) {
+			t.Fatal("restored database accepted pre-restore rows")
+		}
 	}
 	t.Log("verified database recovery phase:", phase)
+}
+
+// incarnationCurrent reports whether a row bound to the activation start
+// would pass the per-subsystem incarnation checks (ADR-226 lineage).
+func incarnationCurrent(t *testing.T, ctx context.Context, admin *pgxpool.Pool, installation string) bool {
+	t.Helper()
+	var current bool
+	if err := admin.QueryRow(ctx, `SELECT public.incarnation_current(activated_postmaster_at)
+	 FROM fleet_trust WHERE installation_id=$1`, installation).Scan(&current); err != nil {
+		t.Fatal(err)
+	}
+	return current
 }

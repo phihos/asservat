@@ -22,6 +22,11 @@ func (s *FleetObservation) ReadAdministrationBasis(ctx context.Context) (value.O
 	out.InstallationID, out.ObservedAt, out.FreshUntil = s.claims.installation, started, ownerTime(until)
 	var at time.Time
 	var primary bool
+	// ADR-226: a lossless PostgreSQL restart re-activates before the version is
+	// read. The function changes nothing on an ordinary pass.
+	if _, err := s.claims.ledger.pool.Exec(call, `SELECT public.reactivate_restarted_database($1)`, out.InstallationID); err != nil {
+		return value.ObservationBasis{}, value.ErrUnavailable
+	}
 	err := s.claims.ledger.pool.QueryRow(call, `SELECT COALESCE(t.semantic_version,0),
  pg_catalog.pg_postmaster_start_time(),
  (SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),

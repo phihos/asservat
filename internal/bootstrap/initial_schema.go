@@ -65,7 +65,7 @@ func newInitialSchemaDeployment(ctx context.Context, files, ddlFiles *os.Root, o
 			d.Close()
 		}
 	}()
-	in := &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Services.Postgres}
+	in := &providerInputs{oneShot: true, files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Services.Postgres}
 	d.inputs = in
 	control := cfg.NamespaceRef{Name: c.Plan.BootstrapNamespace.Name, UID: c.Plan.BootstrapNamespace.UID}
 	adminConfig, probeConfig := in.kubernetes("administrator-token"), in.kubernetes("probe-token")

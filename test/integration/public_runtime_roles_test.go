@@ -176,7 +176,7 @@ func qualifyPublicRuntimeRoles(t *testing.T, ctx context.Context, admin *pgxpool
 	// Match the production configuration observer's column-scoped recovery-lock
 	// permission. SELECT FOR UPDATE on the view requires this even though the
 	// observation never changes installation identity or recovery authority.
-	if _, e := admin.Exec(ctx, "CREATE ROLE "+qname+" LOGIN PASSWORD 'synthetic-observer'; GRANT USAGE ON SCHEMA public TO "+qname+"; GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust TO "+qname+"; GRANT UPDATE(installation_id) ON fleet_current_trust TO "+qname+"; GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz) TO "+qname); e != nil {
+	if _, e := admin.Exec(ctx, "CREATE ROLE "+qname+" LOGIN PASSWORD 'synthetic-observer'; GRANT USAGE ON SCHEMA public TO "+qname+"; GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust TO "+qname+"; GRANT UPDATE(installation_id) ON fleet_current_trust TO "+qname+"; GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz),reactivate_restarted_database(uuid) TO "+qname); e != nil {
 		t.Fatal(e)
 	}
 	observerConfig, e := pgxpool.ParseConfig("")

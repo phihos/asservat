@@ -120,7 +120,12 @@ CREATE OR REPLACE VIEW public.fleet_current_trust AS
  SELECT t.installation_id,t.issuer_epoch,t.source_uid,t.source_generation,
  t.source_digest,t.suspended,
  (t.recovery_blocked
-  OR t.activated_postmaster_at IS DISTINCT FROM pg_catalog.pg_postmaster_start_time()
+  OR NOT COALESCE(t.activated_postmaster_at=pg_catalog.pg_postmaster_start_time()
+   OR (EXISTS(SELECT 1 FROM public.database_restart r WHERE r.started_at=pg_catalog.pg_postmaster_start_time())
+    AND t.activated_postmaster_at<pg_catalog.pg_postmaster_start_time()
+    AND t.activated_system_identifier=(pg_catalog.pg_control_system()).system_identifier::text
+    AND t.activated_timeline=CASE WHEN pg_catalog.pg_is_in_recovery() THEN NULL ELSE
+     ('x'||pg_catalog.substr(pg_catalog.pg_walfile_name(pg_catalog.pg_current_wal_lsn()),1,8))::bit(32)::integer END),false)
   OR t.activated_database_oid IS DISTINCT FROM
     (SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database())
   OR pg_catalog.pg_is_in_recovery()
@@ -175,7 +180,8 @@ BEGIN
   RETURN 1;
  END IF;
  IF v=0 OR r.semantic_version<>v THEN RETURN 0; END IF;
- effective_block:=r.recovery_blocked OR r.activated_postmaster_at IS DISTINCT FROM pm
+ effective_block:=r.recovery_blocked
+   OR NOT (pm=pg_postmaster_start_time() AND public.incarnation_current(r.activated_postmaster_at))
    OR r.activated_database_oid IS DISTINCT FROM db;
  desired_suspended:=source_suspended OR effective_block;
  unchanged:=NOT effective_block AND r.source_generation=generation AND r.source_digest=digest
@@ -196,7 +202,8 @@ BEGIN
    OR r.semantic_version<>v OR r.issuer_epoch<>epoch OR r.source_uid<>uid
    OR generation<r.source_generation OR (generation=r.source_generation AND digest<>r.source_digest)
  THEN RETURN 0; END IF;
- effective_block:=r.recovery_blocked OR r.activated_postmaster_at IS DISTINCT FROM pm
+ effective_block:=r.recovery_blocked
+   OR NOT (pm=pg_postmaster_start_time() AND public.incarnation_current(r.activated_postmaster_at))
    OR r.activated_database_oid IS DISTINCT FROM db;
  desired_suspended:=source_suspended OR effective_block;
  -- Never upgrade SHARE after locking observation. A raced classification fails.

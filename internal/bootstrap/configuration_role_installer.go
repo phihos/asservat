@@ -116,7 +116,7 @@ func provisionConfigurationRoles(ctx context.Context, files *os.Root) (contracts
 	if e != nil {
 		return zero, e
 	}
-	in := &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}
+	in := &providerInputs{oneShot: true, files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}
 	defer in.closeHTTP()
 	admin, e := kube.NewPermissionClient(in.kubernetes("kube-administrator.token"), c.Roles.ClusterID, plan.ControlNamespace, time.Now)
 	if e != nil {

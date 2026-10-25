@@ -157,7 +157,7 @@ func qualifyOwnerIdentityRoles(t *testing.T, ctx context.Context, admin *pgxpool
 	c := publicRoleTLSConfig(t, admin, address, tlsConfig)
 	observerName := "owner_identity_observer_" + strings.ReplaceAll(custodyID(), "-", "")
 	qname := pgx.Identifier{observerName}.Sanitize()
-	if _, e := admin.Exec(ctx, "CREATE ROLE "+qname+" LOGIN PASSWORD 'synthetic-observer'; GRANT USAGE ON SCHEMA public TO "+qname+"; GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust TO "+qname+"; GRANT UPDATE(installation_id) ON fleet_current_trust TO "+qname+"; GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz) TO "+qname); e != nil {
+	if _, e := admin.Exec(ctx, "CREATE ROLE "+qname+" LOGIN PASSWORD 'synthetic-observer'; GRANT USAGE ON SCHEMA public TO "+qname+"; GRANT SELECT ON goose_db_version,fleet_trust,fleet_current_trust TO "+qname+"; GRANT UPDATE(installation_id) ON fleet_current_trust TO "+qname+"; GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz),reactivate_restarted_database(uuid) TO "+qname); e != nil {
 		t.Fatal(e)
 	}
 	observerConfig, e := pgxpool.ParseConfig("")

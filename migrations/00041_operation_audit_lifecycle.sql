@@ -133,7 +133,7 @@ BEGIN
   WHERE root_id=NEW.root_id AND lane=NEW.lane;
  END IF;
  INSERT INTO public.operation_audit_lifecycle(operation_id,root_id,lane,principal_digest,installation_id,issuer_epoch,postmaster_at,database_oid,binding,original_purge_at,certificate_purge_at,live_retire_by)
- VALUES(NEW.id,NEW.root_id,NEW.lane,NEW.principal_digest,t.installation_id,t.issuer_epoch,pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()),b,(b->>'OriginalPurgeAt')::timestamptz,(b->>'CertificatePurgeAt')::timestamptz,(b->>'LiveRetireBy')::timestamptz);
+ VALUES(NEW.id,NEW.root_id,NEW.lane,NEW.principal_digest,t.installation_id,t.issuer_epoch,(SELECT activated_postmaster_at FROM public.fleet_trust WHERE installation_id=t.installation_id),(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()),b,(b->>'OriginalPurgeAt')::timestamptz,(b->>'CertificatePurgeAt')::timestamptz,(b->>'LiveRetireBy')::timestamptz);
  RETURN NEW;
 END $$;
 
@@ -148,7 +148,7 @@ BEGIN
  SELECT * INTO STRICT a FROM public.operation_audit WHERE id=NEW.operation_id;
  SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=NEW.installation_id FOR SHARE;
  n:=clock_timestamp();
- IF t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR pg_postmaster_start_time()<>NEW.postmaster_at OR (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())<>NEW.database_oid OR NEW.root_id<>a.root_id OR NEW.lane<>a.lane OR NEW.principal_digest<>a.principal_digest OR NEW.issuer_epoch<>a.issuer_epoch OR NEW.binding IS DISTINCT FROM a.intent->'Lifecycle' THEN RAISE EXCEPTION 'audit lifecycle recovery unavailable' USING ERRCODE='23514'; END IF;
+ IF t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR NOT public.incarnation_current(NEW.postmaster_at) OR (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())<>NEW.database_oid OR NEW.root_id<>a.root_id OR NEW.lane<>a.lane OR NEW.principal_digest<>a.principal_digest OR NEW.issuer_epoch<>a.issuer_epoch OR NEW.binding IS DISTINCT FROM a.intent->'Lifecycle' THEN RAISE EXCEPTION 'audit lifecycle recovery unavailable' USING ERRCODE='23514'; END IF;
  IF TG_OP='INSERT' THEN
   IF pg_trigger_depth()<2 OR NEW.intent_completion IS NOT NULL OR NEW.outcome_completion IS NOT NULL OR NEW.lease IS NOT NULL OR NEW.retirement IS NOT NULL OR NEW.certificate_started OR NEW.certificate_completion IS NOT NULL OR NEW.certificate_receipt IS NOT NULL OR NEW.terminal_purge IS NOT NULL OR NEW.terminal_acknowledged_at IS NOT NULL OR NEW.finalization_xid IS NOT NULL THEN RAISE EXCEPTION 'audit lifecycle is source managed' USING ERRCODE='23514'; END IF;
   RETURN NEW;
@@ -221,7 +221,7 @@ BEGIN
  IF TG_OP='DELETE' THEN
   IF NOT EXISTS(SELECT 1 FROM public.operation_audit_lifecycle d JOIN public.fleet_current_trust t ON t.installation_id=d.installation_id
    WHERE d.operation_id=OLD.id AND d.root_id=OLD.root_id AND d.finalization_xid=pg_current_xact_id() AND d.terminal_acknowledged_at IS NOT NULL AND
-    NOT t.recovery_blocked AND NOT t.suspended AND clock_timestamp()<t.fresh_until AND t.issuer_epoch=d.issuer_epoch AND pg_postmaster_start_time()=d.postmaster_at AND (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())=d.database_oid AND clock_timestamp()<(d.lease->>'Until')::timestamptz)
+    NOT t.recovery_blocked AND NOT t.suspended AND clock_timestamp()<t.fresh_until AND t.issuer_epoch=d.issuer_epoch AND public.incarnation_current(d.postmaster_at) AND (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())=d.database_oid AND clock_timestamp()<(d.lease->>'Until')::timestamptz)
    THEN RAISE EXCEPTION 'audit retirement unavailable' USING ERRCODE='23514'; END IF;
   RETURN OLD;
  END IF;
@@ -345,7 +345,7 @@ BEGIN
  END IF;
  SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=NEW.installation_id FOR SHARE;
  n:=clock_timestamp();
- IF t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR pg_postmaster_start_time()<>NEW.postmaster_at OR (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())<>NEW.database_oid THEN RAISE EXCEPTION 'audit history recovery unavailable' USING ERRCODE='23514'; END IF;
+ IF t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR NOT public.incarnation_current(NEW.postmaster_at) OR (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())<>NEW.database_oid THEN RAISE EXCEPTION 'audit history recovery unavailable' USING ERRCODE='23514'; END IF;
  IF TG_OP='UPDATE' AND NEW.drain_xid IS DISTINCT FROM OLD.drain_xid THEN
   IF OLD.drain_xid IS NOT NULL OR NEW.drain_xid IS DISTINCT FROM pg_current_xact_id() OR n<OLD.eligible_at OR (to_jsonb(NEW)-'drain_xid') IS DISTINCT FROM (to_jsonb(OLD)-'drain_xid') THEN RAISE EXCEPTION 'audit history drain unavailable' USING ERRCODE='23514'; END IF;
   RETURN NEW;
@@ -398,7 +398,7 @@ BEGIN
  n:=clock_timestamp();
  IF n>=started+interval '5 seconds' OR n>=t.fresh_until OR t.observed_at>n OR t.suspended OR t.recovery_blocked THEN RAISE EXCEPTION 'audit history recovery unavailable' USING ERRCODE='23514'; END IF;
  IF NOT FOUND THEN RETURN QUERY SELECT 0::bigint,false; RETURN; END IF;
- IF h.installation_id<>installation OR t.issuer_epoch<>h.issuer_epoch OR pg_postmaster_start_time()<>h.postmaster_at OR (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())<>h.database_oid OR n<h.eligible_at OR h.drain_xid IS NOT NULL THEN RAISE EXCEPTION 'audit history release unavailable' USING ERRCODE='23514'; END IF;
+ IF h.installation_id<>installation OR t.issuer_epoch<>h.issuer_epoch OR NOT public.incarnation_current(h.postmaster_at) OR (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())<>h.database_oid OR n<h.eligible_at OR h.drain_xid IS NOT NULL THEN RAISE EXCEPTION 'audit history release unavailable' USING ERRCODE='23514'; END IF;
  UPDATE public.operation_audit_history SET drain_xid=pg_current_xact_id() WHERE root_id=r AND lane=l AND principal_digest=p AND release_at=releases AND delete_by=deletes;
  RETURN QUERY SELECT h.records,h.overdue OR n>=h.delete_by;
 END $$;
@@ -419,7 +419,7 @@ BEGIN
  SELECT * INTO STRICT a FROM public.operation_audit WHERE root_id=r AND id=i FOR UPDATE;
  SELECT * INTO STRICT d FROM public.operation_audit_lifecycle WHERE root_id=r AND operation_id=i AND installation_id=installation FOR UPDATE;
  n:=clock_timestamp();
- IF n>=started+interval '5 seconds' OR n>=t.fresh_until OR t.observed_at>n OR t.suspended OR t.recovery_blocked OR t.issuer_epoch<>d.issuer_epoch OR pg_postmaster_start_time()<>d.postmaster_at OR (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())<>d.database_oid OR
+ IF n>=started+interval '5 seconds' OR n>=t.fresh_until OR t.observed_at>n OR t.suspended OR t.recovery_blocked OR t.issuer_epoch<>d.issuer_epoch OR NOT public.incarnation_current(d.postmaster_at) OR (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())<>d.database_oid OR
   d.terminal_acknowledged_at IS NULL OR d.lease->>'Phase'<>'terminal' OR n>=(d.lease->>'Until')::timestamptz OR d.certificate_receipt IS NULL OR d.finalization_xid IS NOT NULL THEN RAISE EXCEPTION 'audit retirement unavailable' USING ERRCODE='23514'; END IF;
  UPDATE public.operation_audit_lifecycle SET finalization_xid=pg_current_xact_id() WHERE operation_id=i;
  DELETE FROM public.operation_audit WHERE root_id=r AND id=i;

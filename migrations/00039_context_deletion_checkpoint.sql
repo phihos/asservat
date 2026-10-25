@@ -57,7 +57,7 @@ BEGIN
  IF TG_WHEN<>'BEFORE' OR TG_LEVEL<>'ROW' OR TG_RELID<>'public.context_writer_completion'::regclass OR TG_OP<>'INSERT' THEN RAISE EXCEPTION 'immutable writer completion' USING ERRCODE='23514'; END IF;
  SELECT * INTO STRICT e FROM public.context_execution WHERE capture_id=NEW.capture_id AND root_id=NEW.root_id;
  SELECT * INTO STRICT a FROM public.custody_attempt WHERE id=NEW.attempt_id;
- IF e.writer_protocol IS DISTINCT FROM 'closed-small-context/v1' OR e.phase<>'stored' OR a.state IN ('deleting','deleted') OR e.attempt_id<>a.id OR e.expectation_digest<>NEW.expectation_digest OR e.copies_digest<>NEW.copies_digest OR a.request_digest<>NEW.registration_digest OR (convert_from(e.process_json,'UTF8')::jsonb)->>'InstallationID' IS DISTINCT FROM NEW.installation_id::text OR (convert_from(e.process_json,'UTF8')::jsonb)->>'IssuerEpoch' IS DISTINCT FROM NEW.issuer_epoch::text OR e.completed_at<>NEW.stored_at OR NEW.closed_at>clock_timestamp() OR NEW.recorded_at>clock_timestamp() OR NEW.stored_at>=a.write_until OR NEW.postmaster_at<>pg_postmaster_start_time() OR NEW.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR NOT EXISTS(SELECT 1 FROM public.fleet_current_trust WHERE installation_id=NEW.installation_id AND issuer_epoch=NEW.issuer_epoch AND NOT recovery_blocked AND NOT suspended AND fresh_until>clock_timestamp()) THEN
+ IF e.writer_protocol IS DISTINCT FROM 'closed-small-context/v1' OR e.phase<>'stored' OR a.state IN ('deleting','deleted') OR e.attempt_id<>a.id OR e.expectation_digest<>NEW.expectation_digest OR e.copies_digest<>NEW.copies_digest OR a.request_digest<>NEW.registration_digest OR (convert_from(e.process_json,'UTF8')::jsonb)->>'InstallationID' IS DISTINCT FROM NEW.installation_id::text OR (convert_from(e.process_json,'UTF8')::jsonb)->>'IssuerEpoch' IS DISTINCT FROM NEW.issuer_epoch::text OR e.completed_at<>NEW.stored_at OR NEW.closed_at>clock_timestamp() OR NEW.recorded_at>clock_timestamp() OR NEW.stored_at>=a.write_until OR NOT public.incarnation_current(NEW.postmaster_at) OR NEW.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR NOT EXISTS(SELECT 1 FROM public.fleet_current_trust WHERE installation_id=NEW.installation_id AND issuer_epoch=NEW.issuer_epoch AND NOT recovery_blocked AND NOT suspended AND fresh_until>clock_timestamp()) THEN
   RAISE EXCEPTION 'writer completion lacks exact positive execution' USING ERRCODE='23514';
  END IF;
  RETURN NEW;
@@ -91,7 +91,7 @@ BEGIN
   SELECT * INTO STRICT a FROM public.custody_attempt WHERE id=NEW.attempt_id;
   IF w.root_id<>NEW.root_id OR w.capture_id<>NEW.capture_id OR w.completion_digest<>NEW.writer_digest OR w.registration_digest<>NEW.registration_digest OR w.installation_id<>NEW.installation_id OR w.issuer_epoch<>NEW.issuer_epoch OR w.postmaster_at<>NEW.postmaster_at OR w.database_oid<>NEW.database_oid OR a.request_digest<>NEW.registration_digest OR a.state<>'deleting' OR a.deletion_fence<>NEW.purge_fence OR a.lease_until<=clock_timestamp() OR NEW.purged_at<a.effective_expires_at OR NEW.purged_at<w.closed_at OR NEW.purged_at>clock_timestamp() OR NEW.audit_acknowledged_at IS NOT NULL OR NEW.audit_receipt_json IS NOT NULL OR NEW.finalization_xid IS NOT NULL OR NOT EXISTS(SELECT 1 FROM public.custody_allocation ca JOIN public.custody_pool cp ON cp.id=ca.pool_id WHERE ca.id=a.allocation_id AND cp.store_id=NEW.store_id) THEN RAISE EXCEPTION 'deletion result lacks exact fenced purge' USING ERRCODE='23514'; END IF;
  END IF;
- IF NEW.postmaster_at<>pg_postmaster_start_time() OR NEW.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR NOT EXISTS(SELECT 1 FROM public.fleet_current_trust WHERE installation_id=NEW.installation_id AND issuer_epoch=NEW.issuer_epoch AND NOT recovery_blocked AND NOT suspended AND fresh_until>clock_timestamp()) THEN RAISE EXCEPTION 'deletion checkpoint incarnation unavailable' USING ERRCODE='23514'; END IF;
+ IF NOT public.incarnation_current(NEW.postmaster_at) OR NEW.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR NOT EXISTS(SELECT 1 FROM public.fleet_current_trust WHERE installation_id=NEW.installation_id AND issuer_epoch=NEW.issuer_epoch AND NOT recovery_blocked AND NOT suspended AND fresh_until>clock_timestamp()) THEN RAISE EXCEPTION 'deletion checkpoint incarnation unavailable' USING ERRCODE='23514'; END IF;
  RETURN NEW;
 END $$;
 -- +goose StatementEnd
@@ -111,7 +111,7 @@ BEGIN
  -- It holds recovery first; legacy/direct mutation fails above before acquiring
  -- a reverse-order lock. Recheck the exact already-held recovery row here.
  SELECT * INTO f FROM public.fleet_current_trust WHERE installation_id=d.installation_id FOR SHARE;
- IF NOT FOUND OR d.issuer_epoch<>f.issuer_epoch OR f.recovery_blocked OR f.suspended OR f.fresh_until<=clock_timestamp() OR d.postmaster_at<>pg_postmaster_start_time() OR d.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) THEN
+ IF NOT FOUND OR d.issuer_epoch<>f.issuer_epoch OR f.recovery_blocked OR f.suspended OR f.fresh_until<=clock_timestamp() OR NOT public.incarnation_current(d.postmaster_at) OR d.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) THEN
   RAISE EXCEPTION 'positive context deletion requires current incarnation' USING ERRCODE='23514';
  END IF;
  RETURN NEW;

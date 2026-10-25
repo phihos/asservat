@@ -1254,7 +1254,7 @@ BEGIN
   v->>'Format' IS DISTINCT FROM 'asservat-public-runtime-role/v1' OR v->>'InstallationID' IS DISTINCT FROM s.installation_id::text OR v->>'Purpose' IS DISTINCT FROM 'capacity-profile-read' OR
   NOT public.capacity_json_text(v->'LayoutDigest',64,64) OR v->>'LayoutDigest' !~ '^[0-9a-f]{64}$' OR v->>'LayoutDigest'=repeat('0',64) OR
   NOT public.capacity_json_integer(v->'DatabaseOID',1,4294967295) OR (v->>'DatabaseOID')::oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR
-  (v->>'PostmasterAt')::timestamptz<>pg_postmaster_start_time() OR NOT isfinite((v->>'ClaimedAt')::timestamptz) OR NOT isfinite((v->>'Until')::timestamptz) OR
+  NOT public.incarnation_current((v->>'PostmasterAt')::timestamptz) OR NOT isfinite((v->>'ClaimedAt')::timestamptz) OR NOT isfinite((v->>'Until')::timestamptz) OR
   (v->>'Until')::timestamptz<=(v->>'ClaimedAt')::timestamptz OR (v->>'Until')::timestamptz>(v->>'ClaimedAt')::timestamptz+interval '5 seconds' THEN RETURN false;END IF;
  FOREACH k IN ARRAY ARRAY['InitialClaimID','OwnerConfigurationUID','RootUID','SetupID','OperationID'] LOOP
   IF NOT public.capacity_json_uuid(v->k) THEN RETURN false;END IF;
@@ -2300,7 +2300,7 @@ BEGIN
   v->>'format' IS DISTINCT FROM 'asservat-capacity-root-setup/v1' OR i->'format' IS DISTINCT FROM v->'format' OR
   NOT public.capacity_json_text(v->'inputDigest',64,64) OR v->>'inputDigest' !~ '^[0-9a-f]{64}$' OR v->>'inputDigest'=repeat('0',64) OR
   NOT public.capacity_json_integer(v->'databaseOID',1,4294967295) OR (v->>'databaseOID')::oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR
-  NOT public.capacity_json_time(v->'postmasterAt') OR (v->>'postmasterAt')::timestamptz<>pg_postmaster_start_time() OR
+  NOT public.capacity_json_time(v->'postmasterAt') OR NOT public.incarnation_current((v->>'postmasterAt')::timestamptz) OR
   NOT public.capacity_json_time(v->'claimedAt') OR NOT public.capacity_json_time(v->'until') OR
   (v->>'postmasterAt')::timestamptz>(v->>'claimedAt')::timestamptz OR (v->>'until')::timestamptz<=(v->>'claimedAt')::timestamptz OR (v->>'until')::timestamptz>(v->>'claimedAt')::timestamptz+interval '5 seconds' OR
   jsonb_typeof(s.setup_roles) IS DISTINCT FROM 'array' OR jsonb_array_length(s.setup_roles)<>10 THEN RETURN false;END IF;

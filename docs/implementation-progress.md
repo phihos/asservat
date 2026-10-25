@@ -1,5 +1,29 @@
 # Sustained implementation progress
 
+## Faster local installed iterations (2026-10-25)
+
+`ASSERVAT_JOURNEY_FOCUS=restart` (local only) runs the installed chain through the first
+workload cluster's short journey, the PostgreSQL restart and a second short journey, then
+stops: no second cluster, browser, Stop/Deny, expiry, deletion or replay checks. The full
+journey stays the qualification. The context harness also writes
+`test/results/context-storage-timing.log`, each output line prefixed with its elapsed seconds.
+The one-shot installer commands (schema, preparer, installer, configuration roles, continuation)
+request the ADR-208 opening budget (50 QPS, burst 100) instead of 20/20; the focused run went
+from 1186 s to 884 s (native123; resources/advance 66 s to 26 s). The `produce` command keeps
+20/20: with the higher budget it failed within 8 s (native121/122), cause not yet found.
+
+## Incarnation lineage for per-subsystem checks (2026-10-25)
+
+Installed run native113 showed that re-activating only `fleet_trust` after a lossless restart left
+every per-subsystem row (operation audit, connector identity, capacity, context queries and
+deletion) bound to the old server start, so capture preview failed at operation-audit begin.
+[ADR-226](decisions/226-lossless-restart-reactivation.md) now binds rows to the activation
+incarnation: `database_restart` records re-activated restarts and `public.incarnation_current`
+replaces every stored `pg_postmaster_start_time()` comparison (migrations 00031–00080 edited in
+place; the view inlines the same logic). The database-recovery fixture now asserts that a
+pre-restart activation-bound row is current only after re-activation and never in the restored
+copy. Installed re-qualification is pending.
+
 ## Capture failure causes and faster local runs (2026-10-25)
 
 [ADR-225](decisions/225-context-capture-failure-causes.md) adds `targetGone`/`denied` capture

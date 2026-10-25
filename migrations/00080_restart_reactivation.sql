@@ -1,0 +1,85 @@
+-- +goose Up
+-- ADR-226: a lossless PostgreSQL restart re-activates the existing trust root
+-- automatically (ADR-096: "Lossless restarts should be reactivated
+-- automatically"). Activation now also records the cluster's system identifier
+-- and WAL timeline. A restart keeps the database OID, system identifier and
+-- timeline and changes only the server start time. Archive recovery (pgBackRest
+-- restore, point-in-time recovery, promotion) starts a new timeline, a logical
+-- restore creates a new database OID and another cluster has another system
+-- identifier; each of those stays blocked for the separate restore protocol.
+-- The columns and the lineage (database_restart, incarnation_current) are
+-- defined in migration 00031 so every per-subsystem check can use them.
+
+-- The incarnation facts come from PostgreSQL itself when activation is first
+-- recorded, never from a caller, and cannot change afterwards. Activation
+-- writers need no grant on these columns.
+-- +goose StatementBegin
+CREATE FUNCTION fleet_activation_incarnation() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+BEGIN
+ IF NEW.activated_postmaster_at IS NOT NULL AND (TG_OP='INSERT' OR OLD.activated_postmaster_at IS NULL) THEN
+  NEW.activated_system_identifier:=(pg_control_system()).system_identifier::text;
+  NEW.activated_timeline:=('x'||substr(pg_walfile_name(pg_current_wal_lsn()),1,8))::bit(32)::integer;
+ ELSIF TG_OP='UPDATE' AND ROW(NEW.activated_system_identifier,NEW.activated_timeline)
+   IS DISTINCT FROM ROW(OLD.activated_system_identifier,OLD.activated_timeline) THEN
+  RAISE EXCEPTION 'activation incarnation facts are immutable' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION fleet_activation_incarnation() FROM PUBLIC;
+CREATE TRIGGER fleet_activation_incarnation BEFORE INSERT OR UPDATE ON public.fleet_trust
+ FOR EACH ROW EXECUTE FUNCTION fleet_activation_incarnation();
+
+-- Appends the live server start to the incarnation lineage when every other
+-- recorded incarnation fact still matches, the stored flags are unblocked, the
+-- server is a durable primary and time moved forward. Rows bound to earlier
+-- lineage starts then stay valid through public.incarnation_current. Returns
+-- whether it re-activated; an ordinary pass takes no lock and writes nothing.
+-- +goose StatementBegin
+CREATE FUNCTION reactivate_restarted_database(i uuid) RETURNS boolean
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE r public.fleet_trust;started timestamptz:=pg_postmaster_start_time();
+BEGIN
+ IF i IS NULL OR pg_is_in_recovery() OR current_setting('fsync')<>'on'
+   OR current_setting('full_page_writes')<>'on' OR current_setting('synchronous_commit')='off'
+   OR EXISTS(SELECT 1 FROM public.database_restart WHERE started_at=started) THEN
+  RETURN false;
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.fleet_trust WHERE installation_id=i
+   AND activated_postmaster_at IS NOT NULL AND activated_postmaster_at<started) THEN
+  RETURN false;
+ END IF;
+ LOCK TABLE public.fleet_trust IN ROW EXCLUSIVE MODE;
+ SELECT * INTO r FROM public.fleet_trust WHERE installation_id=i FOR SHARE;
+ IF NOT FOUND OR r.recovery_blocked OR r.activated_postmaster_at IS NULL OR r.activated_postmaster_at>=started
+   OR r.activated_database_oid IS DISTINCT FROM (SELECT oid FROM pg_database WHERE datname=current_database())
+   OR r.activated_system_identifier IS DISTINCT FROM (pg_control_system()).system_identifier::text
+   OR r.activated_timeline IS DISTINCT FROM ('x'||substr(pg_walfile_name(pg_current_wal_lsn()),1,8))::bit(32)::integer
+   -- The accepted observation must still carry the same activation; a
+   -- diverging stored activation is never adopted as a restart.
+   OR NOT EXISTS(SELECT 1 FROM public.fleet_observation o WHERE o.installation_id=i
+     AND o.activated_postmaster_at=r.activated_postmaster_at AND o.activated_database_oid=r.activated_database_oid) THEN
+  RETURN false;
+ END IF;
+ INSERT INTO public.database_restart(started_at) VALUES(started) ON CONFLICT(started_at) DO NOTHING;
+ RETURN FOUND;
+END $$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION reactivate_restarted_database(uuid) FROM PUBLIC;
+
+-- +goose StatementBegin
+DO $$
+BEGIN
+ IF EXISTS (
+  SELECT 1 FROM pg_catalog.pg_proc p,
+   LATERAL pg_catalog.aclexplode(COALESCE(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
+  WHERE p.oid='public.reactivate_restarted_database(uuid)'::regprocedure
+    AND a.grantee<>p.proowner AND a.privilege_type='EXECUTE'
+ ) THEN
+  RAISE EXCEPTION 'restart reactivation migration rejects runtime authority from default privileges'
+   USING ERRCODE='55000';
+ END IF;
+END $$;
+-- +goose StatementEnd
+-- No destructive down: activation history may not reset.

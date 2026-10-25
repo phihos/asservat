@@ -1161,6 +1161,11 @@ type CustodyStream struct {
 	ReleasedAt       pgtype.Timestamptz
 }
 
+type DatabaseRestart struct {
+	StartedAt  pgtype.Timestamptz
+	RecordedAt pgtype.Timestamptz
+}
+
 type DownloadAllocation struct {
 	ID               pgtype.UUID
 	RootID           pgtype.UUID
@@ -1605,18 +1610,20 @@ type FleetPeerCertificate struct {
 }
 
 type FleetTrust struct {
-	InstallationID        pgtype.UUID
-	IssuerEpoch           pgtype.UUID
-	SourceUid             string
-	SourceGeneration      int64
-	SourceDigest          []byte
-	Suspended             bool
-	RecoveryBlocked       bool
-	ObservedAt            pgtype.Timestamptz
-	FreshUntil            pgtype.Timestamptz
-	ActivatedPostmasterAt pgtype.Timestamptz
-	ActivatedDatabaseOid  pgtype.Uint32
-	SemanticVersion       int64
+	InstallationID            pgtype.UUID
+	IssuerEpoch               pgtype.UUID
+	SourceUid                 string
+	SourceGeneration          int64
+	SourceDigest              []byte
+	Suspended                 bool
+	RecoveryBlocked           bool
+	ObservedAt                pgtype.Timestamptz
+	FreshUntil                pgtype.Timestamptz
+	ActivatedPostmasterAt     pgtype.Timestamptz
+	ActivatedDatabaseOid      pgtype.Uint32
+	ActivatedSystemIdentifier pgtype.Text
+	ActivatedTimeline         pgtype.Int4
+	SemanticVersion           int64
 }
 
 type HubOwnerCertificate struct {

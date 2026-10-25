@@ -1,5 +1,9 @@
 # Decision records
 
+[ADR-226 — Automatic re-activation after a lossless PostgreSQL restart](226-lossless-restart-reactivation.md)
+records the system identifier and WAL timeline at activation (migration 00080) so a restart
+re-activates by itself while restores, new databases and other clusters stay blocked.
+
 [ADR-225 — Context capture failure causes](225-context-capture-failure-causes.md)
 records `targetGone`/`denied` capture outcomes (migration 00079) shown as action
 phases TargetGone/Denied, and returns TargetGone for a request whose reviewed Pod

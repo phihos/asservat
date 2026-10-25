@@ -464,7 +464,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     except OSError: pass
                     time.sleep(.25)
                 else: raise RuntimeError("fixture did not become ready")
-            fixture = {"s3": "http://"+s3ip+":8333", "kms": "http://"+baoip+":8200", "postgres":dsn, "nativeProviders":native_providers, "clusters": []}
+            fixture = {"s3": "http://"+s3ip+":8333", "kms": "http://"+baoip+":8200", "postgres":dsn, "postgresContainer": pgname, "nativeProviders":native_providers, "clusters": []}
             if installer_continuation:
                 fixture["identity"] = start_keycloak(work, network, run_id, containers, report)
             if direct_observation:
@@ -595,9 +595,16 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             if aggregate_timeout:
                 command += ["-timeout", aggregate_timeout]
             command += [test_package]
-            with (ROOT/"test/results/context-storage.log").open("w") as log:
-                result = subprocess.run(command, cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT)
-            exit_code = result.returncode
+            report["journeyFocus"] = os.environ.get("ASSERVAT_JOURNEY_FOCUS", "")
+            # Each output line also goes, with its elapsed seconds, to a timing
+            # log, so slow phases are measured rather than guessed.
+            began = time.monotonic()
+            with (ROOT/"test/results/context-storage.log").open("wb") as log, (ROOT/"test/results/context-storage-timing.log").open("wb") as timing:
+                process = subprocess.Popen(command, cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                for line in process.stdout:
+                    log.write(line)
+                    timing.write(("%8.1f " % (time.monotonic() - began)).encode() + line)
+                exit_code = process.wait()
             raw_output = (ROOT/"test/results/context-storage.log").read_bytes()
             try:
                 output = raw_output.decode("utf-8")

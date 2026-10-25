@@ -73,7 +73,7 @@ BEGIN
  PERFORM 1 FROM public.permission_stream WHERE id=r FOR SHARE;
  SELECT * INTO STRICT a FROM public.context_query_capacity WHERE root_id=r AND acceptance_id=acceptance FOR SHARE;
  RETURN COALESCE(b.acceptance_id=acceptance AND a.capacity_id=(a.plan->'Qualification'->>'CapacityID')::uuid AND a.observations=0 AND a.issuer_epoch=t.issuer_epoch AND
-  a.postmaster_at=pg_postmaster_start_time() AND a.database_oid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND
+  public.incarnation_current(a.postmaster_at) AND a.database_oid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND
   (a.plan->>'RootID')::uuid=r AND (a.plan->>'HardUntil')::timestamptz=b.hard_until AND clock_timestamp()<b.hard_until,false);
 EXCEPTION WHEN data_exception OR no_data_found OR too_many_rows THEN RETURN false;
 END $$;
@@ -184,7 +184,7 @@ BEGIN
   public.capacity_setup_original_valid(s) AND expected IS NOT NULL AND a.plan=expected AND
   EXISTS(SELECT 1 FROM public.context_query_backing b WHERE b.root_id=r AND b.acceptance_id=acceptance) AND
   a.capacity_id=(expected->'Qualification'->>'CapacityID')::uuid AND a.observations=0 AND a.issuer_epoch=t.issuer_epoch AND
-  a.postmaster_at=pg_postmaster_start_time() AND a.database_oid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND
+  public.incarnation_current(a.postmaster_at) AND a.database_oid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND
   n<(a.plan->>'HardUntil')::timestamptz AND clock_timestamp()<until_at,false);
 EXCEPTION WHEN data_exception OR no_data_found OR too_many_rows THEN RETURN false;
 END $$;

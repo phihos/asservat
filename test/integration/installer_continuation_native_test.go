@@ -11,6 +11,8 @@ import (
 	"crypto/x509/pkix"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
+	"maps"
 	"math/big"
 	"net"
 	"net/http"
@@ -18,6 +20,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -499,16 +502,42 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
-		installedJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose,
-			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))(cluster, namespace, workload, deny, gone)
+		run := installedJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose,
+			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))
+		// The PostgreSQL restart (ADR-226) runs only in the focused restart
+		// mode, so each run stays within the 20-minute limit and the full
+		// journey's capacity budget is unchanged.
+		focused := installedJourneyFocus() == "restart" && deny != nil
+		if focused {
+			deny, gone = nil, nil
+		}
+		run(cluster, namespace, workload, deny, gone)
+		if focused {
+			// ADR-226: after a lossless PostgreSQL restart the installation
+			// re-activates by itself and a new capture and download work.
+			restarts := installedHubRestarts(t, ctx, api, desired.TargetNamespace)
+			installedPostgresRestart(t, ctx, admin, f.PostgresContainer, installation)
+			// Wait until every hub process has been Ready for 20 s without a
+			// restart; log which ones restarted (native110/111: none for hub-api
+			// within that window).
+			installedHubSettled(t, ctx, api, desired.TargetNamespace, restarts)
+			run(cluster, namespace, workload, nil, nil)
+			t.Log("installed journey: after a PostgreSQL restart the installation re-activated without operator action; a new capture was collected, published and downloaded")
+		}
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
+	if installedJourneyFocus() == "restart" {
+		t.Log("focused restart run complete: the second workload cluster, browser, Stop/Deny, expiry, deletion and replay checks were not run")
+		return
+	}
 	// S-02 exit: a second workload cluster through the same hub, product
 	// installer path and offer. Its short journey (no Deny closure) stops after
 	// the native download; the first cluster covers Stop, Deny, expiry and
 	// deletion.
-	short := func(cluster, namespace, workload string, _ func(bool), _ func(string)) { journey(cluster, namespace, workload, nil, nil) }
+	short := func(cluster, namespace, workload string, _ func(bool), _ func(string)) {
+		journey(cluster, namespace, workload, nil, nil)
+	}
 	qualifyRegionalInstall(t, ctx, f, 2, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, short, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
 	// After the guard bridge, the same five-command profile replays (as on
 	// upgrade), finds the installation complete and preserves guard/journal state.
@@ -916,7 +945,7 @@ func installedPodDiagnostics(t *testing.T, c context.Context, api kubernetes.Int
 			}
 			t.Logf("diagnostics: %s pod %s container %s ready %v restarts %d last %q exit %d", name, pod.Name, s.Name, s.Ready, s.RestartCount, reason, exit)
 			for _, previous := range []bool{true, false} {
-				logs, e := api.CoreV1().Pods(namespace).GetLogs(pod.Name, &core.PodLogOptions{Container: s.Name, Previous: previous, TailLines: ptr.To(int64(100)), LimitBytes: ptr.To(int64(16384))}).DoRaw(c)
+				logs, e := api.CoreV1().Pods(namespace).GetLogs(pod.Name, &core.PodLogOptions{Container: s.Name, Previous: previous, TailLines: ptr.To(int64(400)), LimitBytes: ptr.To(int64(65536))}).DoRaw(c)
 				if e == nil && len(logs) > 0 {
 					t.Logf("diagnostics: %s previous=%v log:\n%s", pod.Name, previous, logs)
 				}
@@ -1257,5 +1286,117 @@ func installerOwnerExposed(t *testing.T, ctx context.Context, api kubernetes.Int
 			t.Fatal("owner native port not reachable", e)
 		}
 		time.Sleep(2 * time.Second)
+	}
+}
+
+// installedPostgresRestart restarts the owned PostgreSQL container (data on
+// its volume, same address) and waits until the hub's own observation has
+// re-activated the trust root: no fixture SQL writes activation.
+func installedPostgresRestart(t *testing.T, ctx context.Context, admin *pgxpool.Pool, container, installation string) {
+	t.Helper()
+	ip := func() string {
+		out, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container).Output()
+		if err != nil {
+			t.Fatal("PostgreSQL container address", err)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	before := ip()
+	if container == "" || !strings.HasPrefix(container, "asservat-") || before == "" {
+		t.Fatal("owned PostgreSQL container unknown", container)
+	}
+	if out, err := exec.CommandContext(ctx, "docker", "restart", container).CombinedOutput(); err != nil {
+		t.Fatal("PostgreSQL restart", err, string(out))
+	}
+	if after := ip(); after != before {
+		t.Fatal("PostgreSQL address changed on restart", before, after)
+	}
+	// The fixture's own pooled connections died with the server.
+	admin.Reset()
+	started := time.Now()
+	for until := started.Add(3 * time.Minute); ; time.Sleep(2 * time.Second) {
+		var active bool
+		err := admin.QueryRow(ctx, `SELECT NOT recovery_blocked AND NOT suspended AND fresh_until>clock_timestamp() FROM fleet_current_trust WHERE installation_id=$1`, installation).Scan(&active)
+		if err == nil && active {
+			break
+		}
+		if time.Now().After(until) {
+			t.Fatal("installation did not re-activate after the PostgreSQL restart", err)
+		}
+	}
+	t.Logf("installed journey: PostgreSQL restarted; trust root re-activated after %s", time.Since(started).Round(time.Second))
+	// The permission reconciler's epoch fails with the restart and retries
+	// after its 30 s SQL controller lease; authority is stale until then.
+	for until := time.Now().Add(3 * time.Minute); ; time.Sleep(2 * time.Second) {
+		var current bool
+		err := admin.QueryRow(ctx, `SELECT COALESCE(bool_and(observed_at>pg_postmaster_start_time() AND fresh_until>clock_timestamp()),false) FROM permission_stream`).Scan(&current)
+		if err == nil && current {
+			break
+		}
+		if time.Now().After(until) {
+			t.Fatal("permission stream not current after the PostgreSQL restart", err)
+		}
+	}
+	t.Logf("installed journey: permission stream current again %s after the PostgreSQL restart", time.Since(started).Round(time.Second))
+}
+
+// installedHubRestarts returns each running hub container's restart count
+// and whether all of them are Ready.
+func installedHubContainers(ctx context.Context, api kubernetes.Interface, namespace string) (map[string]int32, bool, error) {
+	pods, err := api.CoreV1().Pods(namespace).List(ctx, meta.ListOptions{})
+	if err != nil {
+		return nil, false, err
+	}
+	out, ready := map[string]int32{}, true
+	for _, pod := range pods.Items {
+		if pod.Status.Phase == core.PodSucceeded || pod.Status.Phase == core.PodFailed {
+			continue
+		}
+		for _, c := range pod.Status.ContainerStatuses {
+			out[pod.Name+"/"+c.Name] = c.RestartCount
+			ready = ready && c.Ready
+		}
+	}
+	return out, ready && len(out) > 0, nil
+}
+
+func installedHubRestarts(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace string) map[string]int32 {
+	t.Helper()
+	before, _, err := installedHubContainers(ctx, api, namespace)
+	if err != nil {
+		t.Fatal("hub Pods", err)
+	}
+	return before
+}
+
+// installedHubSettled waits until every hub container has been Ready for
+// 20 s without another restart, and logs which ones restarted since before.
+func installedHubSettled(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace string, before map[string]int32) {
+	t.Helper()
+	var since time.Time
+	var last map[string]int32
+	start := time.Now()
+	for until := start.Add(5 * time.Minute); ; time.Sleep(2 * time.Second) {
+		current, ready, err := installedHubContainers(ctx, api, namespace)
+		if err != nil || !ready || !maps.Equal(current, last) {
+			since = time.Time{}
+		} else if since.IsZero() {
+			since = time.Now()
+		}
+		last = current
+		if !since.IsZero() && time.Since(since) >= 20*time.Second {
+			var restarted []string
+			for name, n := range current {
+				if n != before[name] {
+					restarted = append(restarted, fmt.Sprintf("%s +%d", name, n-before[name]))
+				}
+			}
+			sort.Strings(restarted)
+			t.Logf("installed journey: hub processes settled %s after re-activation (Ready for the last 20 s); restarted: %v", time.Since(start).Round(time.Second), restarted)
+			return
+		}
+		if time.Now().After(until) {
+			t.Fatal("hub processes did not settle after the PostgreSQL restart", err)
+		}
 	}
 }

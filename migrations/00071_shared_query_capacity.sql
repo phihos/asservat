@@ -124,7 +124,7 @@ BEGIN
   public.capacity_setup_original_valid(s) AND expected IS NOT NULL AND a.plan=expected AND
   EXISTS(SELECT 1 FROM public.context_query_backing b WHERE b.root_id=r AND b.acceptance_id=acceptance) AND
   a.capacity_id=(expected->'Qualification'->>'CapacityID')::uuid AND a.observations=0 AND a.issuer_epoch=t.issuer_epoch AND
-  a.postmaster_at=pg_postmaster_start_time() AND a.database_oid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND
+  public.incarnation_current(a.postmaster_at) AND a.database_oid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND
   n<(a.plan->>'HardUntil')::timestamptz AND clock_timestamp()<until_at,false);
 EXCEPTION WHEN data_exception OR no_data_found OR too_many_rows THEN RETURN false;
 END $$;
@@ -188,7 +188,7 @@ BEGIN
  RAISE EXCEPTION 'shared query original backing unavailable' USING ERRCODE='23514';END IF;
  SELECT * INTO c FROM public.context_query_capacity WHERE root_id=r FOR UPDATE;
  IF FOUND THEN
-  IF c.plan IS DISTINCT FROM expected OR c.issuer_epoch<>t.issuer_epoch OR c.postmaster_at<>pg_postmaster_start_time() OR c.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR c.observations<>0 THEN
+  IF c.plan IS DISTINCT FROM expected OR c.issuer_epoch<>t.issuer_epoch OR NOT public.incarnation_current(c.postmaster_at) OR c.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR c.observations<>0 THEN
    RAISE EXCEPTION 'shared query immutable backing differs' USING ERRCODE='23514';END IF;
  ELSE
   IF EXISTS(SELECT 1 FROM public.context_query_backing WHERE root_id=r) THEN RAISE EXCEPTION 'shared query cannot adopt backing' USING ERRCODE='23514';END IF;
@@ -284,7 +284,7 @@ BEGIN
   NEW.deadline>b.hard_until OR NEW.cleanup_until>b.cleanup_until OR n>=(NEW.query->'Plan'->>'ValidUntil')::timestamptz OR n<(NEW.query->'Plan'->>'ObservedAt')::timestamptz OR
   (NEW.query->>'WorkerUntil')::timestamptz>b.effects_until OR (NEW.query->>'CredentialUntil')::timestamptz>b.effects_until OR (NEW.query->>'ProviderUntil')::timestamptz>b.effects_until OR
   NEW.query->>'RecoveryIssuerEpoch' IS DISTINCT FROM NEW.issuer_epoch::text OR NEW.created_at>n OR NEW.created_at<(NEW.initial_request->'Call'->>'StartedAt')::timestamptz OR
-  NEW.postmaster_at<>pg_postmaster_start_time() OR NEW.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR n>=NEW.deadline THEN
+  NOT public.incarnation_current(NEW.postmaster_at) OR NEW.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR n>=NEW.deadline THEN
   RAISE EXCEPTION 'query accepted backing unavailable' USING ERRCODE='23514'; END IF;
  UPDATE public.context_query_backing SET allocated=allocated+1 WHERE root_id=NEW.root_id;
  UPDATE public.context_query_allocation SET allocated=allocated+1 WHERE id=NEW.allocation_id;
