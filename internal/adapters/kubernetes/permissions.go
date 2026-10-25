@@ -77,9 +77,12 @@ func newBoundedAPI(config *rest.Config) (rest.Interface, error) {
 		return nil, value.ErrInvalid
 	}
 	c := rest.CopyConfig(config)
-	// 20/20 unless the caller asks for more (the installer's one-shot commands
-	// use the ADR-208 opening budget); each client keeps its own limiter.
-	c.Timeout, c.QPS, c.Burst = 5*time.Second, max(c.QPS, 20), max(c.Burst, 20)
+	// Fixed 20/20, except the one explicit ADR-208 opening budget that the
+	// installer's one-shot commands request; each client keeps its own limiter.
+	if c.QPS != OpeningQPS || c.Burst != OpeningBurst {
+		c.QPS, c.Burst = 20, 20
+	}
+	c.Timeout = 5 * time.Second
 	c.WarningHandlerWithContext = rest.NoWarnings{}
 	c.Proxy = func(*http.Request) (*url.URL, error) { return nil, nil }
 	c.DisableCompression = true

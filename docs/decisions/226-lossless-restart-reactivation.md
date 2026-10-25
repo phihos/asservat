@@ -64,6 +64,11 @@ point-in-time recovery, promotion), which PostgreSQL ends on a new timeline; a l
 into a new database (new OID); another cluster (new system identifier); any server with
 weakened durability.
 
+Not detected either: durability is checked only when re-activating. A server that ran with
+`fsync=off` or `synchronous_commit=off`, crashed and came back with the settings corrected is
+re-activated as lossless. Durable settings are a deployment requirement; a qualified deployment
+must not weaken them while serving.
+
 Not detected, as ADR-096 already states for VM snapshots: copying an older data directory back
 and starting it as an ordinary restart. Supported restores use pgBackRest.
 
