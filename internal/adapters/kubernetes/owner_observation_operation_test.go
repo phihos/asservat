@@ -184,6 +184,10 @@ func (f *ownerOperationFixture) serve(w http.ResponseWriter, r *http.Request) {
 	case "/apis/apps/v1/namespaces/owners/replicasets/hub-rs":
 		permissionReply(w, v.rs)
 	default:
+		// No release record: an installation before ADR-227 phase 2.
+		if releaseRecordAbsent(w, r) {
+			return
+		}
 		f.t.Errorf("unexpected native path %s", r.URL.Path)
 		http.NotFound(w, r)
 	}
@@ -207,7 +211,8 @@ func TestOwnerObservationOperationRealBoundaries(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if f.observer.Load() != 14 || f.probe.Load() != 3 {
+	// Counts include one ADR-227 release record read per native boundary.
+	if f.observer.Load() != 15 || f.probe.Load() != 3 {
 		t.Fatalf("first native boundary requests: %d/%d", f.observer.Load(), f.probe.Load())
 	}
 	initial.Peers[0].Addresses[0] = "10.9.8.7"
@@ -226,7 +231,7 @@ func TestOwnerObservationOperationRealBoundaries(t *testing.T) {
 	if !final.Final || !final.ObservedAt.Equal(again.ObservedAt) || !final.FreshUntil.Equal(again.FreshUntil) || !sameOwnerNativePeers(final.Peers, again.Peers) {
 		t.Fatal("final renewed or changed original facts")
 	}
-	if f.observer.Load() != 28 || f.probe.Load() != 6 {
+	if f.observer.Load() != 30 || f.probe.Load() != 6 {
 		t.Fatalf("two native boundaries: %d/%d", f.observer.Load(), f.probe.Load())
 	}
 	calls := f.observer.Load()
@@ -397,9 +402,9 @@ func TestOwnerObservationOperationTwoExactProcesses(t *testing.T) {
 			f := newOwnerOperationFixture(t)
 			first, second := f.v.binding, f.v.binding
 			second.ProcessEpoch = ownerID(92)
-			want := int32(28)
+			want := int32(30)
 			if !samePod {
-				want = 34
+				want = 36
 				second.PodUID = ownerID(93)
 				f.other = f.v.pod.DeepCopy()
 				f.other.Name = "hub-rs-other"

@@ -1,5 +1,30 @@
 # Sustained implementation progress
 
+## Hub image upgrade and image-only rollback (ADR-227 phase 2, 2026-10-25)
+
+One release record ConfigMap (`asservat-release-<installation>`, `asservat-release/v1`) names the
+original revision-1 image, the current and previous image, the schema, per-Deployment launch and
+current generations and a bounded history. `installer-continue` creates revision 1;
+`releaseOriginal` maps a hub Deployment (and its ReplicaSet and Pod images) running a recorded
+image back to the original view, and the existing runtime checks run unchanged on it: the hub-api's
+own Deployment check, hub caller observations, the hub-worker's owner-operation check and its own
+Deployment/process checks. Install-time sites and every install-time digest are unchanged; the
+hub-api and hub-worker Roles gain `get` on the record (fresh installations only).
+`installer-upgrade --image` (runner account, Pod of the target image) migrates or checks the
+floor, advances the record, rolls hub-worker then hub-api out, waits until both are settled and
+unchanged for 20 s and settles the record; a rerun resumes. Each hub workload check costs one more
+API GET (e.g. 40 to 42 observer reads per configuration-provider operation pair).
+
+Verification: `ASSERVAT_JOURNEY_FOCUS=upgrade` (new `[continuation-upgrade]` CI suite) installs,
+captures, upgrades both hub Deployments to a second image (same build, another label), settles,
+captures and downloads again, then rolls back to the original image: passed in 827 s, each
+`installer-upgrade` 26 s, hub processes settled 22 s later with no restarts. The restart focus
+still passes (826 s). The custody upgrade-schema case now also checks head, floor and the planned
+floor. An earlier manual run on a kept fixture showed a replaced hub-api Pod cannot log in to
+OpenBao once the test's cleanup has removed the fixture's provider-reviewer binding; with the
+binding restored it ran on both images. Federation, publisher, key service, download workers and
+the connector stay on the original image (phase 3).
+
 ## CI-only time-zone failures and faster installed runs (2026-10-25)
 
 Two failures that occurred only on CI (TZ=UTC), also on `main`, are fixed. A fresh operation

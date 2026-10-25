@@ -511,11 +511,28 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		// The PostgreSQL restart (ADR-226) runs only in the focused restart
 		// mode, so each run stays within the 20-minute limit and the full
 		// journey's capacity budget is unchanged.
-		focused := installedJourneyFocus() == "restart" && deny != nil
+		focused := (installedJourneyFocus() == "restart" || installedJourneyFocus() == "upgrade") && deny != nil
 		if focused || installedJourneyFocus() == "clusters" {
 			deny, gone = nil, nil
 		}
 		run(cluster, namespace, workload, deny, gone)
+		if focused && installedJourneyFocus() == "upgrade" {
+			// ADR-227: upgrade hub-api and hub-worker to a second release image
+			// (the same build, another digest), capture again, then roll back.
+			if f.UpgradeImage == "" || f.UpgradeImage == desired.Image {
+				t.Fatal("upgrade run without a distinct second release image")
+			}
+			restarts := installedHubRestarts(t, ctx, api, desired.TargetNamespace)
+			installedReleaseChange(t, ctx, api, desired, installation, f.UpgradeImage, 2)
+			installedHubSettled(t, ctx, api, desired.TargetNamespace, restarts)
+			run(cluster, namespace, workload, nil, nil)
+			t.Log("installed journey: after the upgrade to a second release image a new capture was collected, published and downloaded")
+			restarts = installedHubRestarts(t, ctx, api, desired.TargetNamespace)
+			installedReleaseChange(t, ctx, api, desired, installation, desired.Image, 3)
+			installedHubSettled(t, ctx, api, desired.TargetNamespace, restarts)
+			t.Log("installed journey: image-only rollback settled both hub Deployments on the original image")
+			return
+		}
 		if focused {
 			// ADR-226: after a lossless PostgreSQL restart the installation
 			// re-activates by itself and a new capture and download work.
@@ -531,7 +548,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "upgrade" {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}

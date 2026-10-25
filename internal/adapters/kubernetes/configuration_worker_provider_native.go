@@ -150,7 +150,7 @@ func (s *ConfigurationWorkerProviderReader) readConfigurationProviderNative(ctx 
 	if err != nil {
 		return out, err
 	}
-	deployment, want, err := w.checkedWorkerDeployment(call, out.resources)
+	deployment, want, release, err := w.checkedWorkerDeployment(call, out.resources)
 	if err != nil {
 		return out, err
 	}
@@ -178,7 +178,7 @@ func (s *ConfigurationWorkerProviderReader) readConfigurationProviderNative(ctx 
 	if err = workerOriginalObject(&lease, wantLease, original(13, w.input.LeaderLease), w.input.Namespace.Name); err != nil {
 		return out, err
 	}
-	out.process, err = w.configurationProviderProcessDeployment(call, deployment, out.podName, s.podUID)
+	out.process, err = w.configurationProviderProcessDeployment(call, deployment, release, out.podName, s.podUID)
 	if err != nil {
 		return out, err
 	}

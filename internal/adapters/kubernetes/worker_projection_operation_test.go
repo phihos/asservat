@@ -71,8 +71,8 @@ func TestWorkerProjectionOperationCountsBothCurrentPassesAndOneDenial(t *testing
 			if err = op.Finish(op.Context()); err != nil {
 				t.Fatal(err)
 			}
-			if s, p := f.observer.Load()-beforeS, f.probe.Load()-beforeP; s != 21 || p != 3 {
-				t.Fatalf("actual native request count S=%d P=%d want21/3", s, p)
+			if s, p := f.observer.Load()-beforeS, f.probe.Load()-beforeP; s != 23 || p != 3 { // two passes, each with one ADR-227 release record read
+				t.Fatalf("actual native request count S=%d P=%d want23/3", s, p)
 			}
 			if f.denials[0].Load() != 1 || f.denials[1].Load() != 0 || f.denials[2].Load() != 0 {
 				t.Fatal("projection borrowed unrelated source denial or repeated final proof")

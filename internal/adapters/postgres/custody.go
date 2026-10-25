@@ -42,24 +42,13 @@ const schemaFloorComment = "asservat:oldest-binary-schema="
 func schemaCompatible(ctx context.Context, q interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }) string {
-	var head int64
-	var applied bool
-	var comment *string
-	if err := q.QueryRow(ctx, `SELECT version_id,is_applied,pg_catalog.obj_description('public.goose_db_version'::regclass,'pg_class') FROM goose_db_version ORDER BY id DESC LIMIT 1`).Scan(&head, &applied, &comment); err != nil || !applied {
+	head, floor, err := schemaState(ctx, q.QueryRow(ctx, schemaStateQuery))
+	switch {
+	case err != nil:
 		return "unreadable"
-	}
-	floor := head
-	if comment != nil && strings.HasPrefix(*comment, schemaFloorComment) {
-		n, err := strconv.ParseInt(strings.TrimPrefix(*comment, schemaFloorComment), 10, 64)
-		if err != nil || n < 1 || n > head {
-			return "unreadable"
-		}
-		floor = n
-	}
-	if head < currentSchemaVersion {
+	case head < currentSchemaVersion:
 		return "older than this binary (run installer-upgrade)"
-	}
-	if floor > currentSchemaVersion {
+	case floor > currentSchemaVersion:
 		return "newer than this binary tolerates (use a newer image or restore from backup)"
 	}
 	return ""
@@ -68,6 +57,27 @@ func schemaCompatible(ctx context.Context, q interface {
 // schemaRefusal keeps the caller's error class and names the reason.
 func schemaRefusal(class error, reason string) error {
 	return fmt.Errorf("%w: database schema %s", class, reason)
+}
+
+const schemaStateQuery = `SELECT version_id,is_applied,pg_catalog.obj_description('public.goose_db_version'::regclass,'pg_class') FROM goose_db_version ORDER BY id DESC LIMIT 1`
+
+// schemaState decodes the database head and floor. Without a recorded floor
+// the floor is the head.
+func schemaState(_ context.Context, row interface{ Scan(...any) error }) (head, floor int64, err error) {
+	var applied bool
+	var comment *string
+	if err = row.Scan(&head, &applied, &comment); err != nil || !applied || head < 1 {
+		return 0, 0, configuration.ErrUnavailable
+	}
+	floor = head
+	if comment != nil && strings.HasPrefix(*comment, schemaFloorComment) {
+		n, e := strconv.ParseInt(strings.TrimPrefix(*comment, schemaFloorComment), 10, 64)
+		if e != nil || n < 1 || n > head {
+			return 0, 0, configuration.ErrChanged
+		}
+		floor = n
+	}
+	return head, floor, nil
 }
 
 type Ledger struct{ pool *pgxpool.Pool }

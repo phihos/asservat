@@ -95,7 +95,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		// The focused restart run (ASSERVAT_JOURNEY_FOCUS=restart) starts with a
 		// short journey, which must initialize processing itself.
-		initialize := !short || (installedJourneyFocus() == "restart" || installedJourneyFocus() == "clusters") && runs == 1
+		initialize := !short || (installedJourneyFocus() == "restart" || installedJourneyFocus() == "clusters" || installedJourneyFocus() == "upgrade") && runs == 1
 		cert, err := x509.ParseCertificate(publicRoot)
 		if err != nil {
 			t.Fatal("public listener root", err)

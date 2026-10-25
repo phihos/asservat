@@ -113,7 +113,7 @@ func (s *ConnectorObservationOperationReader) nativeObjects(deployment apps.Depl
 		return zero, cfg.ErrChanged
 	}
 	parent, ok := ownerController(replica.OwnerReferences, "Deployment", "apps/v1")
-	if !ok || parent.Name != p.Deployment || string(parent.UID) != p.DeploymentUID || connectorAPITemplateMatch(&deployment, &replica, &pod, s.pin.TemplateDigest, s.pin.ImageDigest) != nil {
+	if !ok || parent.Name != p.Deployment || string(parent.UID) != p.DeploymentUID || connectorAPITemplateMatch(&deployment, &replica, &pod, s.pin.TemplateDigest, s.pin.ImageDigest, nil, 0) != nil {
 		return zero, cfg.ErrChanged
 	}
 	raw, err := json.Marshal(struct {

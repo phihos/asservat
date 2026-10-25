@@ -89,8 +89,9 @@ func TestOwnerObservationOperationWithRealKubernetes(t *testing.T) {
 			// Each of the two independent denial probes already permits at most
 			// two exact resource-version conflicts. Every such retry adds one
 			// actual observer GET and one failed probe PUT; nothing else retries.
-			retries := reads - 28
-			if retries < 0 || retries > 4 || probes != 6+retries || counts.Requests[0][9] != 0 || counts.Requests[1][9] != 0 || counts.TransportFailures != 0 || counts.HTTPFailures != 2+retries {
+			// Each boundary also reads the absent ADR-227 release record (404).
+			retries := reads - 30
+			if retries < 0 || retries > 4 || probes != 6+retries || counts.Requests[0][9] != 2 || counts.Requests[0][10] != 0 || counts.Requests[1][10] != 0 || counts.TransportFailures != 0 || counts.HTTPFailures != 4+retries {
 				t.Fatal("unexpected real native graph", counts)
 			}
 			t.Logf("native primitive elapsed=%s remaining=%s observer=%d probe=%d expected-denials=%d", time.Since(started), time.Until(last.FreshUntil), reads, probes, counts.HTTPFailures)

@@ -88,6 +88,8 @@ func BuildOwnerWorkload(p OwnerWorkloadPlan) (*OwnerWorkload, error) {
 		{APIGroups: []string{"apps"}, Resources: []string{"replicasets", "deployments"}, Verbs: []string{"get"}},
 		{APIGroups: []string{"apps"}, Resources: []string{"deployments"}, ResourceNames: []string{p.Name}, Verbs: []string{"update"}},
 		{APIGroups: []string{"discovery.k8s.io"}, Resources: []string{"endpointslices"}, Verbs: []string{"list"}},
+		// ADR-227: the release record; read only.
+		{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{contracts.ReleaseRecordName(p.InstallationID)}, Verbs: []string{"get"}},
 	}}
 	clusterName := "asservat." + p.Namespace + "." + p.Name
 	cluster := &rbac.ClusterRole{TypeMeta: meta.TypeMeta{APIVersion: rbac.SchemeGroupVersion.String(), Kind: "ClusterRole"}, ObjectMeta: meta.ObjectMeta{Name: clusterName}, Rules: []rbac.PolicyRule{

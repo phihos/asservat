@@ -37,7 +37,10 @@ type fixture struct {
 	// journey: lossless restart, ADR-226).
 	PostgresContainer string
 	WorkerImage       string
-	NativeProviders   struct {
+	// UpgradeImage is the focused upgrade run's second release image, loaded
+	// into the hub cluster only (ADR-227).
+	UpgradeImage    string
+	NativeProviders struct {
 		S3, KMS, Postgres string
 		Root              []byte
 	}

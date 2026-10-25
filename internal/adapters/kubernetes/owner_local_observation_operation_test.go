@@ -164,7 +164,8 @@ func TestOwnerLocalObservationActualBoundariesAndCounts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if f.base.observer.Load() != 21 || f.base.probe.Load() != 3 || f.reviews != 2 {
+	// Counts include one ADR-227 release record read per owner/caller workload check.
+	if f.base.observer.Load() != 22 || f.base.probe.Load() != 3 || f.reviews != 2 {
 		t.Fatal("initial real port count", f.base.observer.Load(), f.base.probe.Load(), f.reviews)
 	}
 	original := first.FreshUntil
@@ -172,14 +173,14 @@ func TestOwnerLocalObservationActualBoundariesAndCounts(t *testing.T) {
 	if err != nil || end.After(original) {
 		t.Fatal("claim original bound", err)
 	}
-	if f.base.observer.Load() != 30 || f.base.probe.Load() != 3 || f.reviews != 4 {
+	if f.base.observer.Load() != 31 || f.base.probe.Load() != 3 || f.reviews != 4 {
 		t.Fatal("claim refreshed native guard or omitted actual caller", f.base.observer.Load(), f.base.probe.Load(), f.reviews)
 	}
 	final, err := o.Final(ctx)
 	if err != nil || !final.Final || !final.ObservedAt.Equal(first.ObservedAt) || final.FreshUntil.After(original) {
 		t.Fatal("final original bracket", err)
 	}
-	if f.base.observer.Load() != 51 || f.base.probe.Load() != 6 || f.reviews != 6 {
+	if f.base.observer.Load() != 53 || f.base.probe.Load() != 6 || f.reviews != 6 {
 		t.Fatal("final real port count", f.base.observer.Load(), f.base.probe.Load(), f.reviews)
 	}
 	if _, err = o.Original(ctx); err == nil {

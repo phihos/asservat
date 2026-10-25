@@ -160,6 +160,10 @@ func newCapacityReaderFixture(t *testing.T) *capacityReaderFixture {
 		case r.Method == http.MethodGet && objects[r.URL.Path] != nil:
 			permissionReply(w, objects[r.URL.Path])
 		default:
+			// No release record: an installation before ADR-227 phase 2.
+			if releaseRecordAbsent(w, r) {
+				return
+			}
 			t.Error("unexpected API access; private role journals are forbidden", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}

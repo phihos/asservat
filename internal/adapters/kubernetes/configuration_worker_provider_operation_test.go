@@ -49,7 +49,8 @@ func TestConfigurationProviderRuntimeSharedLimiterFitsOriginalBound(t *testing.T
 		if err != nil {
 			t.Fatalf("pair%d failed original bound after%s observer%d probe%d: %v", i, time.Since(started), f.observer.Load()-beforeS, f.probe.Load()-beforeP, err)
 		}
-		if f.observer.Load()-beforeS != 40 || f.probe.Load()-beforeP != 9 {
+		// 40 reads plus one ADR-227 release record read per operation.
+		if f.observer.Load()-beforeS != 42 || f.probe.Load()-beforeP != 9 {
 			t.Fatal("native count changed", f.observer.Load()-beforeS, f.probe.Load()-beforeP)
 		}
 	}

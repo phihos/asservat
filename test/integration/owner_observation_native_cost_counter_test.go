@@ -17,7 +17,7 @@ import (
 // elapsed time. No URL, header, body, principal or error text is retained.
 // RoundTrip time ends at response headers; it is not body or server lock time.
 type ownerObservationCostCount struct {
-	Requests          [2][10]int64 `json:"requests"`
+	Requests          [2][11]int64 `json:"requests"`
 	HTTPFailures      int64        `json:"httpFailures"`
 	TransportFailures int64        `json:"transportFailures"`
 	RoundTripNanos    int64        `json:"roundTripNanos"`
@@ -72,7 +72,7 @@ func (c *ownerObservationCostCounter) wrap(probe bool) func(http.RoundTripper) h
 }
 func ownerObservationCostLabel(r *http.Request) int {
 	if r == nil || r.URL == nil {
-		return 9
+		return 10
 	}
 	p := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if r.Method == http.MethodGet {
@@ -97,6 +97,9 @@ func ownerObservationCostLabel(r *http.Request) int {
 			if p[4] == "services" {
 				return 5
 			}
+			if p[4] == "configmaps" {
+				return 9
+			}
 		}
 		if len(p) == 7 && p[0] == "apis" && p[1] == "apps" && p[2] == "v1" && p[3] == "namespaces" {
 			if p[5] == "deployments" {
@@ -117,7 +120,7 @@ func ownerObservationCostLabel(r *http.Request) int {
 	if r.Method == http.MethodPut && len(p) == 7 && p[0] == "apis" && p[1] == "apps" && p[2] == "v1" && p[3] == "namespaces" && p[5] == "deployments" && r.URL.Query().Get("dryRun") == "All" {
 		return 8
 	}
-	return 9
+	return 10
 }
 
 func TestOwnerObservationCostCounterClosedLabels(t *testing.T) {
@@ -137,11 +140,12 @@ func TestOwnerObservationCostCounterClosedLabels(t *testing.T) {
 		{http.MethodPost, "/apis/authentication.k8s.io/v1/selfsubjectreviews", 8},
 		{http.MethodPost, "/apis/authorization.k8s.io/v1/selfsubjectaccessreviews", 8},
 		{http.MethodPut, "/apis/apps/v1/namespaces/anything/deployments/anything?dryRun=All", 8},
-		{http.MethodPut, "/apis/apps/v1/namespaces/anything/deployments/anything", 9},
-		{http.MethodGet, "/api/v1/namespaces/anything/secrets/never-retain-this", 9},
-		{http.MethodGet, "/apis/unrecognized/v1/namespaces/anything/pods/anything", 9},
-		{http.MethodPost, "/apis/authentication.k8s.io/v1/tokenreviews", 9},
-		{http.MethodDelete, "/api/v1/namespaces/anything", 9},
+		{http.MethodGet, "/api/v1/namespaces/anything/configmaps/anything", 9},
+		{http.MethodPut, "/apis/apps/v1/namespaces/anything/deployments/anything", 10},
+		{http.MethodGet, "/api/v1/namespaces/anything/secrets/never-retain-this", 10},
+		{http.MethodGet, "/apis/unrecognized/v1/namespaces/anything/pods/anything", 10},
+		{http.MethodPost, "/apis/authentication.k8s.io/v1/tokenreviews", 10},
+		{http.MethodDelete, "/api/v1/namespaces/anything", 10},
 	} {
 		r, err := http.NewRequest(tc.method, "https://fixture.invalid"+tc.target, nil)
 		if err != nil {
@@ -152,7 +156,7 @@ func TestOwnerObservationCostCounterClosedLabels(t *testing.T) {
 		}
 	}
 	for _, r := range []*http.Request{nil, {}, {URL: &url.URL{Path: "/opaque"}}} {
-		if ownerObservationCostLabel(r) != 9 {
+		if ownerObservationCostLabel(r) != 10 {
 			t.Fatal("unknown request did not use fixed other label")
 		}
 	}

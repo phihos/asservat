@@ -221,6 +221,10 @@ func newConfigurationProviderRuntimeFixture(t *testing.T) *configurationProvider
 		case r.Method == http.MethodGet && f.objects[r.URL.Path] != nil:
 			permissionReply(w, f.objects[r.URL.Path])
 		default:
+			// No release record: an installation before ADR-227 phase 2.
+			if releaseRecordAbsent(w, r) {
+				return
+			}
 			t.Error("unexpected runtime API", r.Method, r.URL.Path)
 			http.NotFound(w, r)
 		}

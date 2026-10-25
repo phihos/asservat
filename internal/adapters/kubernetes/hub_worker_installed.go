@@ -81,6 +81,9 @@ func BuildInstalledHubWorkerWorkload(p HubWorkerWorkloadPlan, installationID str
 		// dry-run UPDATE. RBAC denial alone is never enforcement evidence; the
 		// same guard denies every persistent worker-origin Deployment edit.
 		rbac.PolicyRule{APIGroups: []string{"apps"}, Resources: []string{"deployments"}, ResourceNames: []string{names.Owner}, Verbs: []string{"get", "update"}},
+		// ADR-227: the release record that maps a hub Deployment's current or
+		// previous release image to the original one; read only.
+		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{contracts.ReleaseRecordName(installationID)}, Verbs: []string{"get"}},
 	)
 	w.ClusterRole.Rules[1].ResourceNames = append(w.ClusterRole.Rules[1].ResourceNames, names.WorkloadGuard)
 	augmentInstalledWorkerOwnerReads(w, installationID)
