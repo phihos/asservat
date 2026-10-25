@@ -622,6 +622,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     log.write(line)
                     timing.write(("%8.1f " % (time.monotonic() - began)).encode() + line)
                 exit_code = process.wait()
+            report["goTestExit"] = exit_code
             raw_output = (ROOT/"test/results/context-storage.log").read_bytes()
             try:
                 output = raw_output.decode("utf-8")
