@@ -301,7 +301,7 @@ func TestPublicJourneySQLPoolConstructorCompatibility(t *testing.T) {
 				if ledger != nil || err != artifact.ErrInvalid || calls.Load() != 0 {
 					t.Fatal("traced pool crossed production configuration boundary")
 				}
-			} else if ledger != nil || err != privacyapp.ErrUnavailable || calls.Load() != 1 {
+			} else if ledger != nil || !errors.Is(err, privacyapp.ErrUnavailable) || calls.Load() != 1 {
 				t.Fatal("original pool did not reach exactly one controlled schema connection")
 			}
 		})
