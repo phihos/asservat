@@ -35,7 +35,8 @@ jobs:
   native:
     needs: select
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    # Maintainer rule (2026-10-25): no test run may take longer than 20 minutes.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:

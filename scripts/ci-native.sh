@@ -18,6 +18,8 @@ declare -A suites=(
   [helm]="make helm-integration"
   [context]="make context-integration"
   [continuation]="$context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  # ADR-226: install, one cluster, PostgreSQL restart, capture again (focused).
+  [continuation-restart]="env ASSERVAT_JOURNEY_FOCUS=restart $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [direct-observation]="$context --run ^TestDirectHolderObservationWithRealKubernetes\$"
   [federation-regional]="$context --run ^TestFederationRegionalProductWithRealKubernetes\$"
   [initial-handover]="$context --initial-handover"
