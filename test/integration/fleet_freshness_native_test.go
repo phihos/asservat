@@ -150,7 +150,7 @@ func TestEnrollmentFleetFreshnessWithRealPostgres(t *testing.T) {
 		case "observe":
 			grant("GRANT SELECT ON fleet_trust,fleet_current_trust")
 			grant("GRANT UPDATE(installation_id) ON fleet_current_trust")
-			grant("GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz)")
+			grant("GRANT EXECUTE ON FUNCTION observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz),fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz),reactivate_restarted_database(uuid)")
 		}
 		c, e := pgxpool.ParseConfig("postgres://" + role + ":synthetic-fleet-freshness@" + address + "/" + name + "?sslmode=disable")
 		if e != nil {

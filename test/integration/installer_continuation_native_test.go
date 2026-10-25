@@ -499,8 +499,16 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
-		installedJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose,
-			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))(cluster, namespace, workload, deny, gone)
+		run := installedJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose,
+			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))
+		run(cluster, namespace, workload, deny, gone)
+		if deny != nil {
+			// ADR-226: after a lossless PostgreSQL restart the installation
+			// re-activates by itself and a new capture and download work.
+			installedPostgresRestart(t, ctx, admin, f.PostgresContainer, installation)
+			run(cluster, namespace, workload, nil, nil)
+			t.Log("installed journey: after a PostgreSQL restart the installation re-activated without operator action; a new capture was collected, published and downloaded")
+		}
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
@@ -1258,4 +1266,42 @@ func installerOwnerExposed(t *testing.T, ctx context.Context, api kubernetes.Int
 		}
 		time.Sleep(2 * time.Second)
 	}
+}
+
+// installedPostgresRestart restarts the owned PostgreSQL container (data on
+// its volume, same address) and waits until the hub's own observation has
+// re-activated the trust root: no fixture SQL writes activation.
+func installedPostgresRestart(t *testing.T, ctx context.Context, admin *pgxpool.Pool, container, installation string) {
+	t.Helper()
+	ip := func() string {
+		out, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container).Output()
+		if err != nil {
+			t.Fatal("PostgreSQL container address", err)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	before := ip()
+	if container == "" || !strings.HasPrefix(container, "asservat-") || before == "" {
+		t.Fatal("owned PostgreSQL container unknown", container)
+	}
+	if out, err := exec.CommandContext(ctx, "docker", "restart", container).CombinedOutput(); err != nil {
+		t.Fatal("PostgreSQL restart", err, string(out))
+	}
+	if after := ip(); after != before {
+		t.Fatal("PostgreSQL address changed on restart", before, after)
+	}
+	// The fixture's own pooled connections died with the server.
+	admin.Reset()
+	started := time.Now()
+	for until := started.Add(3 * time.Minute); ; time.Sleep(2 * time.Second) {
+		var active bool
+		err := admin.QueryRow(ctx, `SELECT NOT recovery_blocked AND NOT suspended AND fresh_until>clock_timestamp() FROM fleet_current_trust WHERE installation_id=$1`, installation).Scan(&active)
+		if err == nil && active {
+			break
+		}
+		if time.Now().After(until) {
+			t.Fatal("installation did not re-activate after the PostgreSQL restart", err)
+		}
+	}
+	t.Logf("installed journey: PostgreSQL restarted; trust root re-activated after %s", time.Since(started).Round(time.Second))
 }

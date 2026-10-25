@@ -43,7 +43,8 @@ func configurationRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool)
 		add("fleet_trust", "SELECT")
 		out = append(out,
 			publicRuntimeGrant{"function", "observe_fleet_administration(uuid,bigint,timestamptz,oid,timestamptz,uuid,text,bigint,bytea,boolean,timestamptz,timestamptz)", "", "EXECUTE"},
-			publicRuntimeGrant{"function", "fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz)", "", "EXECUTE"})
+			publicRuntimeGrant{"function", "fence_fleet_observation(uuid,bigint,timestamptz,oid,timestamptz)", "", "EXECUTE"},
+			publicRuntimeGrant{"function", "reactivate_restarted_database(uuid)", "", "EXECUTE"})
 	case "configuration-source", "configuration-audit":
 		add("hub_owner_configuration", "SELECT")
 		add("hub_owner_configuration_revision", "SELECT")

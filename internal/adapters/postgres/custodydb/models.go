@@ -1605,18 +1605,20 @@ type FleetPeerCertificate struct {
 }
 
 type FleetTrust struct {
-	InstallationID        pgtype.UUID
-	IssuerEpoch           pgtype.UUID
-	SourceUid             string
-	SourceGeneration      int64
-	SourceDigest          []byte
-	Suspended             bool
-	RecoveryBlocked       bool
-	ObservedAt            pgtype.Timestamptz
-	FreshUntil            pgtype.Timestamptz
-	ActivatedPostmasterAt pgtype.Timestamptz
-	ActivatedDatabaseOid  pgtype.Uint32
-	SemanticVersion       int64
+	InstallationID            pgtype.UUID
+	IssuerEpoch               pgtype.UUID
+	SourceUid                 string
+	SourceGeneration          int64
+	SourceDigest              []byte
+	Suspended                 bool
+	RecoveryBlocked           bool
+	ObservedAt                pgtype.Timestamptz
+	FreshUntil                pgtype.Timestamptz
+	ActivatedPostmasterAt     pgtype.Timestamptz
+	ActivatedDatabaseOid      pgtype.Uint32
+	SemanticVersion           int64
+	ActivatedSystemIdentifier pgtype.Text
+	ActivatedTimeline         pgtype.Int4
 }
 
 type HubOwnerCertificate struct {

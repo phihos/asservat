@@ -464,7 +464,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     except OSError: pass
                     time.sleep(.25)
                 else: raise RuntimeError("fixture did not become ready")
-            fixture = {"s3": "http://"+s3ip+":8333", "kms": "http://"+baoip+":8200", "postgres":dsn, "nativeProviders":native_providers, "clusters": []}
+            fixture = {"s3": "http://"+s3ip+":8333", "kms": "http://"+baoip+":8200", "postgres":dsn, "postgresContainer": pgname, "nativeProviders":native_providers, "clusters": []}
             if installer_continuation:
                 fixture["identity"] = start_keycloak(work, network, run_id, containers, report)
             if direct_observation:
