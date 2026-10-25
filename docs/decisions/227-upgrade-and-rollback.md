@@ -16,13 +16,18 @@ offer). Several of those are immutable, and none may be rewritten.
 ## Decision
 
 1. **Schema compatibility from the database, not a window guessed by the binary.** Migration 81
-   adds `schema_compatibility(oldest_binary_schema)`. An expand migration leaves it unchanged; a
-   contract migration (one that removes or reinterprets something an older binary uses) raises it to
-   its own version. A binary with compiled head `H` runs against a database with head `D` and floor
-   `F` when `D >= H` (everything it needs exists) and `F <= H` (nothing it needs was removed). So an
-   N+1 database runs both the N and the N+1 binary after an expand migration, which is image-only
-   rollback; an N database refuses the N+1 binary until migrated. Every exact `== currentSchemaVersion`
-   check uses this rule.
+   records the floor, the oldest binary schema the database still serves, as the comment of the
+   migration version table (`asservat:oldest-binary-schema=N`). Only the schema owner can set a
+   table comment, and every role reads it through `obj_description` without a grant, so no runtime
+   grant or role layout changes. (The version table is created by the migration runner, so the
+   migration sets the comment in a `DO` block the SQL code generator does not resolve.) An expand
+   migration leaves the floor; a contract migration (one that removes or reinterprets something an
+   older binary uses) raises it to its own version. A binary with compiled head `H` runs against a
+   database with head `D` and floor `F` when `D >= H` (everything it needs exists) and `F <= H`
+   (nothing it needs was removed); without a recorded floor `D` must equal `H`. So an N+1 database
+   runs both the N and the N+1 binary after an expand migration, which is image-only rollback; an N
+   database refuses the N+1 binary until migrated. Refusals name their reason (older, newer than
+   tolerated, unreadable).
 2. **Upgrade migrator.** A new one-shot `installer-upgrade` command, run by the installer's existing
    runner account with the operator's DDL credential (the DDL role keeps its login and owns the
    schema; [initial schema](../architecture/initial-schema.md)). It requires the completed

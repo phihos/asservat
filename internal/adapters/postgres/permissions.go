@@ -44,8 +44,8 @@ func NewPermissions(ctx context.Context, pool *pgxpool.Pool, root string) (*Perm
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	if !schemaCompatible(ctx, pool) {
-		return nil, cfg.ErrUnavailable
+	if why := schemaCompatible(ctx, pool); why != "" {
+		return nil, schemaRefusal(cfg.ErrUnavailable, why)
 	}
 	return &Permissions{l, root}, nil
 }

@@ -33,8 +33,8 @@ func NewPeerRegistry(ctx context.Context, pool *pgxpool.Pool, installation strin
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	if !schemaCompatible(ctx, pool) {
-		return nil, value.ErrUnavailable
+	if why := schemaCompatible(ctx, pool); why != "" {
+		return nil, schemaRefusal(value.ErrUnavailable, why)
 	}
 	return &PeerRegistry{pool: pool, installation: installation}, nil
 }

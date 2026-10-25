@@ -47,8 +47,8 @@ func NewContextAdmissions(ctx context.Context, pool *pgxpool.Pool, root string, 
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	if !schemaCompatible(ctx, pool) {
-		return nil, value.ErrUnavailable
+	if why := schemaCompatible(ctx, pool); why != "" {
+		return nil, schemaRefusal(value.ErrUnavailable, why)
 	}
 	guard, err := effectGuardsFor(root, guards)
 	if err != nil {

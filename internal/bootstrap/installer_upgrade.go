@@ -56,6 +56,8 @@ func RunInstallerUpgrade(ctx context.Context, args []string, out io.Writer) erro
 	defer upgrade.Close()
 	from, to, err := upgrade.Run(call)
 	if err != nil {
+		// A failed step leaves the earlier steps applied; a rerun resumes.
+		_, _ = fmt.Fprintf(out, "schema upgrade stopped at %d (started at %d); rerun to resume\n", to, from)
 		return err
 	}
 	if from == to {

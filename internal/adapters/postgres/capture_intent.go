@@ -82,8 +82,8 @@ func NewCaptureIntentAudits(ctx context.Context, pool *pgxpool.Pool, root string
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	if !schemaCompatible(ctx, pool) {
-		return nil, capture.ErrUnavailable
+	if why := schemaCompatible(ctx, pool); why != "" {
+		return nil, schemaRefusal(capture.ErrUnavailable, why)
 	}
 	return &CaptureIntentAudits{l, root}, nil
 }
