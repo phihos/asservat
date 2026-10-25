@@ -603,7 +603,10 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             if keep_on_failure:
                 env["ASSERVAT_KEEP_ON_FAILURE"] = "1"
 
-            command = ["go", "test", "-race", "-count=1", "-v"]
+            # The installed journey's test process is a client waiting on
+            # Kubernetes; the product runs in Pods built without -race. Race
+            # coverage stays with the component and unit suites.
+            command = ["go", "test", "-count=1", "-v"] if installer_continuation else ["go", "test", "-race", "-count=1", "-v"]
             if test_pattern:
                 command += ["-run", test_pattern]
             aggregate_timeout = qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation)
