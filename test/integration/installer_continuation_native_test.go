@@ -851,7 +851,9 @@ func installShippedPermissionCRDs(t *testing.T, ctx context.Context, api kuberne
 // Every MCP call, including status polls, charges one normal-lane record to the
 // same Keycloak MCP principal until its 10000 s retention; the second workload
 // cluster's short journey runs as that principal after the full journey, so
-// the normal lane holds 128 records rather than 64.
+// the normal lane holds 128 records rather than 64. Records is 5: the first
+// cluster's full journey uses three download sessions' reads (16 MiB each) and
+// the capture after the PostgreSQL restart (ADR-226) a fourth.
 func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	f := func(row, wal int64) contracts.InstallerCapacityFootprint {
 		return contracts.InstallerCapacityFootprint{RowBytes: row, TransitionWALBytes: wal}
@@ -859,7 +861,7 @@ func nativeCapacityProfile() *contracts.InstallerCapacitySettings {
 	lane := func(accounts, records int64) contracts.InstallerCapacityLane {
 		return contracts.InstallerCapacityLane{Accounts: accounts, Records: records, RetainedSeconds: 10000}
 	}
-	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 4, AdmissionSeconds: 86400,
+	return &contracts.InstallerCapacitySettings{Pool: "capacity", Policy: "applications", NamespaceKeys: []string{"team"}, Accounts: 16, Records: 5, AdmissionSeconds: 86400,
 		Lanes:               contracts.InstallerCapacityLanes{CaptureRetainedSeconds: 10000, Normal: lane(4, 128), Resolution: lane(4, 8), Processing: lane(2, 16)},
 		StopRetainedSeconds: 10000,
 		Backup:              contracts.InstallerCapacityBackup{HorizonSeconds: 3600, CleanupBudgetSeconds: 60, ProofWindowSeconds: 60, BackupCopies: 2, WALCopies: 3},

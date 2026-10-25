@@ -48,34 +48,40 @@ func (s *Downloads) ResolveContextDownload(ctx context.Context, request artifact
 			return err
 		}
 		if !request.Valid(first.Time) {
-			return artifact.ErrDownloadUnavailable
+			return sqlStep{"request", artifact.ErrDownloadUnavailable}
 		}
 		recovery, err := s.recovery.lock(ctx, q, s.root, request.Recovery)
 		if err != nil {
-			return err
+			return sqlStep{"recovery-lock", err}
 		}
 		row, err := q.ReadContextDownloadRoute(ctx, custodydb.ReadContextDownloadRouteParams{RootID: id(s.root), ArtifactID: id(request.ArtifactID)})
 		if err != nil || len(row.CopiesDigest) != 32 {
-			return artifact.ErrDownloadUnavailable
+			return sqlStep{"row", artifact.ErrDownloadUnavailable}
 		}
 		scope := artifact.DownloadScope{RootID: uid(row.RootID), ArtifactID: uid(row.ArtifactID), CaptureID: uid(row.CaptureID), ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, WorkloadUID: row.WorkloadUid, PodUID: row.PodUid, Principal: request.Identity.Principal, Version: artifact.Digest(row.CopiesDigest)}
 		out = artifact.DownloadRoute{Scope: scope, ObservedAt: first.Time, ValidUntil: downloadObservationDeadline(ctx, first.Time, request.Identity.ValidUntil, request.Recovery.FreshUntil)}
 		if scope.RootID != s.root || scope.ArtifactID != request.ArtifactID {
-			return artifact.ErrDownloadUnavailable
+			return sqlStep{"scope", artifact.ErrDownloadUnavailable}
 		}
 		if err = s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {
-			return err
+			return sqlStep{"recovery-check", err}
 		}
 		now, err := q.CurrentTime(ctx)
 		if err != nil {
 			return err
 		}
 		if !request.Valid(now.Time) || !out.Valid(now.Time) {
-			return artifact.ErrDownloadUnavailable
+			return sqlStep{"final", artifact.ErrDownloadUnavailable}
 		}
 		return ctx.Err()
 	})
 	if err != nil || ctx.Err() != nil {
+		// The closed stage, never the dependency error, is retained for the
+		// operator report.
+		var stage interface{ FixedStep() string }
+		if errors.As(err, &stage) {
+			return artifact.DownloadRoute{}, sqlStep{stage.FixedStep(), artifact.ErrDownloadUnavailable}
+		}
 		return artifact.DownloadRoute{}, artifact.ErrDownloadUnavailable
 	}
 	return out, nil
