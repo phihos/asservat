@@ -31,12 +31,18 @@ offer). Several of those are immutable, and none may be rewritten.
    InitialSchema. It never edits the completed InitialSchema record. Phase 1 migrations add no runtime
    grants, so the role layout digests and existing role receipts stay valid; grant changes need role
    re-production (later phase).
-3. **One release record (simplification).** The per-component image/template pins are replaced by
-   one installation release record: a Kubernetes Secret written only by the installer runner account
-   (the sole principal the hub workload guard admits), holding the release image and the workload
-   template digests, with a monotonic revision. Verifiers read it instead of their own copies. An
-   upgrade writes the next revision after the migrator succeeded; a rollback writes a revision naming
-   the previous image, allowed only while the schema floor permits it. Deployments then roll.
+3. **One release record (simplification).** One installation release record, a ConfigMap
+   `asservat-release-<installation>` in the hub namespace (it holds no secret data), written only by
+   the installer runner account (the sole principal the hub workload guard admits) with
+   resourceVersion preconditions. It holds the original revision-1 image, the current and previous
+   image, the target schema, the workload generations and a bounded history, with a monotonic
+   revision. Verifiers read it inside the existing guard bracket and map a live image that the record
+   names (current or previous) back to the original image before their existing checks, so the
+   immutable install-time digests (binding, owner deployment input, regional offer, running/inert
+   digests) stay valid unchanged. An upgrade writes the next revision after the migrator succeeded
+   and then updates the hub-worker and hub-api Deployments' images; a rollback names an image from
+   the history and is allowed only while the schema floor permits that image's schema. Fresh
+   installations only: the hub Roles gain read access to the record.
 4. **No downgrade of the schema.** Rollback is image-only. A database migrated past an older
    binary's floor stays on the newer image; operators restore from backup instead.
 
