@@ -68,6 +68,7 @@ var initialInstallationTables = []string{
 	"custody_event",
 	"custody_pool",
 	"custody_stream",
+	"database_restart",
 	"download_allocation",
 	"download_batch",
 	"download_control_allocation",

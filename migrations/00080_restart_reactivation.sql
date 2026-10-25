@@ -7,8 +7,8 @@
 -- restore, point-in-time recovery, promotion) starts a new timeline, a logical
 -- restore creates a new database OID and another cluster has another system
 -- identifier; each of those stays blocked for the separate restore protocol.
-ALTER TABLE fleet_trust ADD COLUMN activated_system_identifier text,
- ADD COLUMN activated_timeline integer;
+-- The columns and the lineage (database_restart, incarnation_current) are
+-- defined in migration 00031 so every per-subsystem check can use them.
 
 -- The incarnation facts come from PostgreSQL itself when activation is first
 -- recorded, never from a caller, and cannot change afterwards. Activation
@@ -31,45 +31,39 @@ REVOKE ALL ON FUNCTION fleet_activation_incarnation() FROM PUBLIC;
 CREATE TRIGGER fleet_activation_incarnation BEFORE INSERT OR UPDATE ON public.fleet_trust
  FOR EACH ROW EXECUTE FUNCTION fleet_activation_incarnation();
 
--- Re-records only the server start time, in both rows the effective view
--- joins, when every other recorded incarnation fact still matches, the stored
--- flags are unblocked, the server is a durable primary and time moved forward.
--- Returns whether it re-activated. The guard trigger advances the semantic
--- version, so proofs taken before the restart stay unusable.
+-- Appends the live server start to the incarnation lineage when every other
+-- recorded incarnation fact still matches, the stored flags are unblocked, the
+-- server is a durable primary and time moved forward. Rows bound to earlier
+-- lineage starts then stay valid through public.incarnation_current. Returns
+-- whether it re-activated; an ordinary pass takes no lock and writes nothing.
 -- +goose StatementBegin
 CREATE FUNCTION reactivate_restarted_database(i uuid) RETURNS boolean
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
-DECLARE r public.fleet_trust;o public.fleet_observation;started timestamptz:=pg_postmaster_start_time();
- db oid;timeline integer;
+DECLARE r public.fleet_trust;started timestamptz:=pg_postmaster_start_time();
 BEGIN
  IF i IS NULL OR pg_is_in_recovery() OR current_setting('fsync')<>'on'
-   OR current_setting('full_page_writes')<>'on' OR current_setting('synchronous_commit')='off' THEN
+   OR current_setting('full_page_writes')<>'on' OR current_setting('synchronous_commit')='off'
+   OR EXISTS(SELECT 1 FROM public.database_restart WHERE started_at=started) THEN
   RETURN false;
  END IF;
- -- Unlocked pre-check: an ordinary pass takes no lock.
  IF NOT EXISTS(SELECT 1 FROM public.fleet_trust WHERE installation_id=i
    AND activated_postmaster_at IS NOT NULL AND activated_postmaster_at<started) THEN
   RETURN false;
  END IF;
- db:=(SELECT oid FROM pg_database WHERE datname=current_database());
- timeline:=('x'||substr(pg_walfile_name(pg_current_wal_lsn()),1,8))::bit(32)::integer;
- LOCK TABLE public.fleet_trust,public.fleet_observation IN ROW EXCLUSIVE MODE;
- SELECT * INTO r FROM public.fleet_trust WHERE installation_id=i FOR UPDATE;
+ LOCK TABLE public.fleet_trust IN ROW EXCLUSIVE MODE;
+ SELECT * INTO r FROM public.fleet_trust WHERE installation_id=i FOR SHARE;
  IF NOT FOUND OR r.recovery_blocked OR r.activated_postmaster_at IS NULL OR r.activated_postmaster_at>=started
-   OR r.activated_database_oid IS DISTINCT FROM db
+   OR r.activated_database_oid IS DISTINCT FROM (SELECT oid FROM pg_database WHERE datname=current_database())
    OR r.activated_system_identifier IS DISTINCT FROM (pg_control_system()).system_identifier::text
-   OR r.activated_timeline IS DISTINCT FROM timeline THEN
+   OR r.activated_timeline IS DISTINCT FROM ('x'||substr(pg_walfile_name(pg_current_wal_lsn()),1,8))::bit(32)::integer
+   -- The accepted observation must still carry the same activation; a
+   -- diverging stored activation is never adopted as a restart.
+   OR NOT EXISTS(SELECT 1 FROM public.fleet_observation o WHERE o.installation_id=i
+     AND o.activated_postmaster_at=r.activated_postmaster_at AND o.activated_database_oid=r.activated_database_oid) THEN
   RETURN false;
  END IF;
- SELECT * INTO o FROM public.fleet_observation WHERE installation_id=i FOR UPDATE;
- IF NOT FOUND OR o.activated_postmaster_at IS DISTINCT FROM r.activated_postmaster_at
-   OR o.activated_database_oid IS DISTINCT FROM r.activated_database_oid THEN
-  RETURN false;
- END IF;
- UPDATE public.fleet_trust SET activated_postmaster_at=started WHERE installation_id=i RETURNING * INTO r;
- UPDATE public.fleet_observation SET activated_postmaster_at=started,semantic_version=r.semantic_version
-  WHERE installation_id=i;
- RETURN true;
+ INSERT INTO public.database_restart(started_at) VALUES(started) ON CONFLICT(started_at) DO NOTHING;
+ RETURN FOUND;
 END $$;
 -- +goose StatementEnd
 REVOKE ALL ON FUNCTION reactivate_restarted_database(uuid) FROM PUBLIC;

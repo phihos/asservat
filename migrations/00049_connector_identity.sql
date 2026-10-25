@@ -140,7 +140,7 @@ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $
 DECLARE p public.connector_identity_root; expected_oid oid; expected_name name; login record;
 BEGIN
  SELECT * INTO p FROM public.connector_identity_root WHERE root_id=r;
- IF NOT FOUND OR p.postmaster_at<>pg_postmaster_start_time() OR p.database_oid<>(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) THEN RETURN false;END IF;
+ IF NOT FOUND OR NOT public.incarnation_current(p.postmaster_at) OR p.database_oid<>(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) THEN RETURN false;END IF;
  CASE purpose WHEN 'source' THEN expected_oid:=p.source_oid;expected_name:=p.source_name;
  WHEN 'journal' THEN expected_oid:=p.journal_oid;expected_name:=p.journal_name;
  WHEN 'acknowledgement' THEN expected_oid:=p.acknowledgement_oid;expected_name:=p.acknowledgement_name;
@@ -177,7 +177,7 @@ BEGIN
  IF TG_RELID<>'public.connector_identity_root'::regclass OR TG_WHEN<>'BEFORE' OR TG_LEVEL<>'ROW' OR TG_OP='DELETE' THEN RAISE EXCEPTION 'connector backing retirement unavailable' USING ERRCODE='23514';END IF;
  SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=NEW.installation_id FOR SHARE;
  n:=clock_timestamp();
- IF t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR NEW.issuer_epoch<>t.issuer_epoch OR NEW.postmaster_at<>pg_postmaster_start_time() OR NEW.database_oid<>(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) THEN RAISE EXCEPTION 'connector backing recovery unavailable' USING ERRCODE='23514';END IF;
+ IF t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR NEW.issuer_epoch<>t.issuer_epoch OR NOT public.incarnation_current(NEW.postmaster_at) OR NEW.database_oid<>(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) THEN RAISE EXCEPTION 'connector backing recovery unavailable' USING ERRCODE='23514';END IF;
  IF TG_OP='INSERT' THEN
   IF NEW.profiles<>0 OR NEW.source_transitions<>0 OR NEW.source_name<>session_user OR NEW.valid_until<=n OR NEW.pending_id IS NOT NULL OR NEW.active_backing_id IS NOT NULL OR NEW.closed_candidate_id IS NOT NULL THEN RAISE EXCEPTION 'connector source role unavailable' USING ERRCODE='23514';END IF;
   FOR role_name,role_oid IN SELECT * FROM (VALUES(NEW.source_name,NEW.source_oid),(NEW.journal_name,NEW.journal_oid),(NEW.acknowledgement_name,NEW.acknowledgement_oid),(NEW.cleanup_name,NEW.cleanup_oid),(NEW.verifier_name,NEW.verifier_oid),(NEW.finalizer_name,NEW.finalizer_oid)) AS pin(role_name,role_oid) LOOP
@@ -379,7 +379,7 @@ BEGIN
   WHERE root_id=NEW.root_id AND lane=NEW.lane;
  END IF;
  INSERT INTO public.operation_audit_lifecycle(operation_id,root_id,lane,principal_digest,installation_id,issuer_epoch,postmaster_at,database_oid,binding,original_purge_at,certificate_purge_at,live_retire_by,certificate_verify_attempts)
- VALUES(NEW.id,NEW.root_id,NEW.lane,NEW.principal_digest,t.installation_id,t.issuer_epoch,pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()),b,(b->>'OriginalPurgeAt')::timestamptz,(b->>'CertificatePurgeAt')::timestamptz,(b->>'LiveRetireBy')::timestamptz,0);
+ VALUES(NEW.id,NEW.root_id,NEW.lane,NEW.principal_digest,t.installation_id,t.issuer_epoch,(SELECT activated_postmaster_at FROM public.fleet_trust WHERE installation_id=t.installation_id),(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()),b,(b->>'OriginalPurgeAt')::timestamptz,(b->>'CertificatePurgeAt')::timestamptz,(b->>'LiveRetireBy')::timestamptz,0);
  RETURN NEW;
 END $$;
 CREATE OR REPLACE FUNCTION guard_operation_audit_lifecycle() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
@@ -393,7 +393,7 @@ BEGIN
  SELECT * INTO STRICT a FROM public.operation_audit WHERE id=NEW.operation_id;
  SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=NEW.installation_id FOR SHARE;
  n:=clock_timestamp();
- IF t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR pg_postmaster_start_time()<>NEW.postmaster_at OR (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())<>NEW.database_oid OR NEW.root_id<>a.root_id OR NEW.lane<>a.lane OR NEW.principal_digest<>a.principal_digest OR NEW.issuer_epoch<>a.issuer_epoch OR NEW.binding IS DISTINCT FROM a.intent->'Lifecycle' THEN RAISE EXCEPTION 'audit lifecycle recovery unavailable' USING ERRCODE='23514'; END IF;
+ IF t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR t.issuer_epoch<>NEW.issuer_epoch OR NOT public.incarnation_current(NEW.postmaster_at) OR (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())<>NEW.database_oid OR NEW.root_id<>a.root_id OR NEW.lane<>a.lane OR NEW.principal_digest<>a.principal_digest OR NEW.issuer_epoch<>a.issuer_epoch OR NEW.binding IS DISTINCT FROM a.intent->'Lifecycle' THEN RAISE EXCEPTION 'audit lifecycle recovery unavailable' USING ERRCODE='23514'; END IF;
  IF TG_OP='INSERT' THEN
   IF pg_trigger_depth()<2 OR NEW.certificate_verify_attempts<>0 OR NOT public.operation_audit_history_verifier_backed(NEW.binding->'Policy'->'History'->>'Layout') OR NOT public.operation_audit_history_layout_valid(NEW.lane,NEW.binding->'Policy'->'History'->>'Layout') OR NEW.overdue_selected_at IS NOT NULL OR NEW.overdue_purge IS NOT NULL OR NEW.intent_completion IS NOT NULL OR NEW.outcome_completion IS NOT NULL OR NEW.lease IS NOT NULL OR NEW.retirement IS NOT NULL OR NEW.certificate_started OR NEW.certificate_completion IS NOT NULL OR NEW.certificate_receipt IS NOT NULL OR NEW.terminal_purge IS NOT NULL OR NEW.terminal_acknowledged_at IS NOT NULL OR NEW.finalization_xid IS NOT NULL THEN RAISE EXCEPTION 'audit lifecycle is source managed' USING ERRCODE='23514'; END IF;
   RETURN NEW;
@@ -495,7 +495,7 @@ BEGIN
  IF TG_OP='DELETE' THEN
   IF NOT EXISTS(SELECT 1 FROM public.operation_audit_lifecycle d JOIN public.fleet_current_trust t ON t.installation_id=d.installation_id
    WHERE d.operation_id=OLD.id AND d.root_id=OLD.root_id AND d.finalization_xid=pg_current_xact_id() AND d.terminal_acknowledged_at IS NOT NULL AND
-    NOT t.recovery_blocked AND NOT t.suspended AND clock_timestamp()<t.fresh_until AND t.issuer_epoch=d.issuer_epoch AND pg_postmaster_start_time()=d.postmaster_at AND (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())=d.database_oid AND clock_timestamp()<(d.lease->>'Until')::timestamptz)
+    NOT t.recovery_blocked AND NOT t.suspended AND clock_timestamp()<t.fresh_until AND t.issuer_epoch=d.issuer_epoch AND public.incarnation_current(d.postmaster_at) AND (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())=d.database_oid AND clock_timestamp()<(d.lease->>'Until')::timestamptz)
    THEN RAISE EXCEPTION 'audit retirement unavailable' USING ERRCODE='23514'; END IF;
   RETURN OLD;
  END IF;
@@ -1109,7 +1109,7 @@ BEGIN
  leaf:=matched.leaf;child:=matched.child;
  SELECT * INTO STRICT event FROM public.operation_audit WHERE id=leaf.id AND root_id=r AND lane='identity';
  n:=clock_timestamp();until_at:=least(started+interval '5 seconds',trust.fresh_until,backing.valid_until,(source_value->>'FreshUntil')::timestamptz,child.run_until,leaf.certificate_not_after);
- IF NOT COALESCE(NOT trust.recovery_blocked AND NOT trust.suspended AND trust.observed_at<=n AND trust.issuer_epoch=backing.issuer_epoch AND backing.postmaster_at=pg_postmaster_start_time() AND backing.database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) AND
+ IF NOT COALESCE(NOT trust.recovery_blocked AND NOT trust.suspended AND trust.observed_at<=n AND trust.issuer_epoch=backing.issuer_epoch AND public.incarnation_current(backing.postmaster_at) AND backing.database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) AND
   backing.source_transitions<backing.source_transition_limit AND NOT cfg.fenced AND NOT cfg.blocked AND NOT cfg.suspended AND cfg.accepted_id IS NOT NULL AND cfg.configuration=source_value->'Profile' AND public.connector_backing_observed(backing,cfg,source_value) AND (source_value->>'ObservedAt')::timestamptz<=n AND (source_value->>'FreshUntil')::timestamptz<=(source_value->>'ObservedAt')::timestamptz+interval '5 seconds' AND
   child.serving AND child.retired_at IS NULL AND child.accepted_at IS NOT NULL AND ROW(child.source_uid,child.source_generation,child.source_digest)=ROW(cfg.source_uid,cfg.source_generation,cfg.source_digest) AND
   ((usage_value='client' AND leaf.id IN(child.client_current_id,child.client_previous_id)) OR (usage_value='server' AND leaf.id IN(child.server_current_id,child.server_previous_id))) AND leaf.activated_at IS NOT NULL AND leaf.detached_at IS NULL AND n>=leaf.certificate_not_before AND n<until_at AND ROW(leaf.source_uid,leaf.source_generation,leaf.source_digest)=ROW(cfg.source_uid,cfg.source_generation,cfg.source_digest) AND

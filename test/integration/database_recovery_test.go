@@ -79,8 +79,17 @@ func TestDatabaseRecoveryAfterRestartAndRestore(t *testing.T) {
 		 FROM fleet_trust WHERE installation_id=$1`, a.InstallationID).Scan(&storedBlocked, &sameProcess, &sameDatabase); err != nil {
 			t.Fatal(err)
 		}
-		if storedBlocked || (phase == "restarted" && (sameProcess || !sameDatabase)) || (phase == "restored" && (!sameProcess || sameDatabase)) {
+		if storedBlocked || (phase == "restarted" && (sameProcess || !sameDatabase)) || (phase == "restored" && (sameProcess || sameDatabase)) {
 			t.Fatal("harness did not produce the expected real database change", phase, storedBlocked, sameProcess, sameDatabase)
+		}
+		// Re-activation appends the restart to the lineage and keeps the
+		// original activation start, so the restored copy (same server process,
+		// new database) still records the first start.
+		// Rows bound to the activation start (every per-subsystem incarnation
+		// check uses public.incarnation_current) are not current before
+		// re-activation.
+		if incarnationCurrent(t, ctx, admin, a.InstallationID) {
+			t.Fatal("activation-bound rows current before re-activation", phase)
 		}
 		// Even a separately cleared suspension flag cannot hide the mismatch.
 		if _, err = admin.Exec(ctx, "UPDATE fleet_trust SET suspended=false WHERE installation_id=$1", a.InstallationID); err != nil {
@@ -127,11 +136,30 @@ func TestDatabaseRecoveryAfterRestartAndRestore(t *testing.T) {
 		if _, err = reader.RecoveryState(ctx); err != nil {
 			t.Fatal("lossless restart was not re-activated", err)
 		}
+		// Rows created before the restart stay valid without any rewrite.
+		if !incarnationCurrent(t, ctx, admin, a.InstallationID) {
+			t.Fatal("pre-restart rows not current after re-activation")
+		}
 	case "restored":
 		// A logical restore into a new database keeps the block.
 		if _, err = reader.RecoveryState(ctx); err == nil {
 			t.Fatal("restored database served current authority", phase)
 		}
+		if incarnationCurrent(t, ctx, admin, a.InstallationID) {
+			t.Fatal("restored database accepted pre-restore rows")
+		}
 	}
 	t.Log("verified database recovery phase:", phase)
+}
+
+// incarnationCurrent reports whether a row bound to the activation start
+// would pass the per-subsystem incarnation checks (ADR-226 lineage).
+func incarnationCurrent(t *testing.T, ctx context.Context, admin *pgxpool.Pool, installation string) bool {
+	t.Helper()
+	var current bool
+	if err := admin.QueryRow(ctx, `SELECT public.incarnation_current(activated_postmaster_at)
+	 FROM fleet_trust WHERE installation_id=$1`, installation).Scan(&current); err != nil {
+		t.Fatal(err)
+	}
+	return current
 }

@@ -14,19 +14,40 @@ permanently. The database-recovery test hid this with a fixture-only SQL update.
 
 ## Decision
 
+Rows are bound to the installation's *activation incarnation*, not to the live server process.
+The incarnation lineage is the activation start (`fleet_trust.activated_postmaster_at`) plus every
+re-activated lossless restart start, recorded in the append-only table `database_restart`
+(update/delete/truncate refused). All of it is defined in migration 00031, so every later check
+can use it.
+
 1. Activation also records the cluster's system identifier (`pg_control_system()`) and the
-   current WAL timeline (from `pg_walfile_name(pg_current_wal_lsn())`). A trigger fills both
-   from PostgreSQL itself when the activation fields are first set and refuses any later change,
-   so no caller supplies them and activation writers need no new grant (migration 00080).
-2. `reactivate_restarted_database(installation)` (SECURITY DEFINER, owned by the migration
-   owner, EXECUTE for the configuration-fleet observer only) re-records the start time in
-   `fleet_trust` and `fleet_observation` only when: the server is a primary with `fsync`,
-   `full_page_writes` and a non-`off` `synchronous_commit`; the stored flags are unblocked; the
-   database OID, system identifier and timeline equal the recorded ones; and the new start is
-   later than the recorded one. The guard trigger advances the semantic version, so proofs from
-   before the restart stay unusable.
-3. The hub-worker's fleet observation calls it before reading each observation basis. An
-   ordinary pass takes no lock.
+   current WAL timeline (from `pg_walfile_name(pg_current_wal_lsn())`). A trigger (migration
+   00080) fills both from PostgreSQL itself when the activation fields are first set and refuses
+   any later change, so no caller supplies them and activation writers need no new grant.
+2. `public.incarnation_current(x)` (SECURITY DEFINER, owner-only, no runtime EXECUTE) is true
+   iff `x` is the live start, or the server is a primary whose live start is in
+   `database_restart`, `x` is the activation start or a recorded restart, and the activation's
+   database OID, system identifier and timeline equal the live ones.
+3. Every per-subsystem incarnation check (connector identity root/profile/process, credential
+   attempts, backing transitions, operation-audit lifecycle/history/retirement, context writer
+   completion and deletion checkpoints, context queries and their capacity, protected capacity
+   pins, capture audit, download stop, evidence read windows) now calls `incarnation_current`
+   instead of comparing with `pg_postmaster_start_time()`. Migrations 00039–00077 were edited in
+   place; there is no install base to upgrade. `fleet_current_trust` (00031, 00059) inlines the
+   same logic because function calls in a view run as the querying role and runtime roles may
+   not execute definer functions outside their allowlists. The fleet observer keeps its
+   transient live-start parameter check but computes the effective block through the lineage.
+4. Operation-audit lifecycles now store the activation start (as Go-written rows already did
+   through `ReadContextDatabaseIncarnation`), so Go comparisons with the activation start stay
+   valid for lifecycles created after a restart.
+5. `reactivate_restarted_database(installation)` (SECURITY DEFINER, EXECUTE for the
+   configuration-fleet observer only) appends the live start to `database_restart` only when:
+   the server is a primary with `fsync`, `full_page_writes` and a non-`off`
+   `synchronous_commit`; the stored flags are unblocked; the database OID, system identifier and
+   timeline equal the recorded ones; the accepted observation row still carries the same
+   activation; and the live start is later than the activation start. It
+   rewrites no activation field and no semantic version. The hub-worker's fleet observation
+   calls it before reading each observation basis; an ordinary pass takes no lock.
 
 Processes: hub-api and the publisher detect the database change and exit (fail closed); the
 kubelet restarts them and they come back Ready under the re-activated root. native110 measured
@@ -47,6 +68,6 @@ and starting it as an ordinary restart. Supported restores use pgBackRest.
 deployment; 4 databases use the timeline/system identifier for the same distinction; 5 one
 EXECUTE grant to the existing observer, no new credential; 6 none: re-activation either happens
 or the existing block stays; 7 no; 8 PostgreSQL control functions, documented and PUBLIC; 9 one
-cheap call per observation pass; 10 additive migration, old activations without the new
-columns stay blocked as before; 11 documenting the outage would leave the product unusable
+cheap call per observation pass; 10 migrations edited in place before any install base; activations
+without the recorded facts stay blocked; 11 documenting the outage would leave the product unusable
 after routine maintenance.

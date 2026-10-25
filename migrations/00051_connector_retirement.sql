@@ -492,7 +492,7 @@ BEGIN
  IF TG_RELID<>'public.connector_identity_root'::regclass OR TG_WHEN<>'BEFORE' OR TG_LEVEL<>'ROW' OR TG_OP='DELETE' THEN RAISE EXCEPTION 'connector backing retirement unavailable' USING ERRCODE='23514';END IF;
  SELECT * INTO STRICT t FROM public.fleet_current_trust WHERE installation_id=NEW.installation_id FOR SHARE;
  n:=clock_timestamp();
- IF t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR NEW.issuer_epoch<>t.issuer_epoch OR NEW.postmaster_at<>pg_postmaster_start_time() OR NEW.database_oid<>(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) THEN RAISE EXCEPTION 'connector backing recovery unavailable' USING ERRCODE='23514';END IF;
+ IF t.recovery_blocked OR t.suspended OR n>=t.fresh_until OR t.observed_at>n OR NEW.issuer_epoch<>t.issuer_epoch OR NOT public.incarnation_current(NEW.postmaster_at) OR NEW.database_oid<>(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) THEN RAISE EXCEPTION 'connector backing recovery unavailable' USING ERRCODE='23514';END IF;
  IF TG_OP='INSERT' THEN
   IF NEW.profiles<>0 OR NEW.source_transitions<>0 OR NEW.source_name<>session_user OR NEW.valid_until<=n OR NEW.pending_id IS NOT NULL OR NEW.active_backing_id IS NOT NULL OR NEW.closed_candidate_id IS NOT NULL THEN RAISE EXCEPTION 'connector source role unavailable' USING ERRCODE='23514';END IF;
   FOR role_name,role_oid IN SELECT * FROM (VALUES(NEW.source_name,NEW.source_oid),(NEW.journal_name,NEW.journal_oid),(NEW.acknowledgement_name,NEW.acknowledgement_oid),(NEW.cleanup_name,NEW.cleanup_oid),(NEW.verifier_name,NEW.verifier_oid),(NEW.finalizer_name,NEW.finalizer_oid)) AS pin(role_name,role_oid) LOOP
@@ -1006,7 +1006,7 @@ BEGIN
  IF TG_OP='DELETE' THEN
   IF NOT EXISTS(SELECT 1 FROM public.operation_audit_lifecycle d JOIN public.fleet_current_trust t ON t.installation_id=d.installation_id
    WHERE d.operation_id=OLD.id AND d.root_id=OLD.root_id AND d.finalization_xid=pg_current_xact_id() AND d.terminal_acknowledged_at IS NOT NULL AND
-    NOT t.recovery_blocked AND NOT t.suspended AND clock_timestamp()<t.fresh_until AND t.issuer_epoch=d.issuer_epoch AND pg_postmaster_start_time()=d.postmaster_at AND (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())=d.database_oid AND clock_timestamp()<(d.lease->>'Until')::timestamptz)
+    NOT t.recovery_blocked AND NOT t.suspended AND clock_timestamp()<t.fresh_until AND t.issuer_epoch=d.issuer_epoch AND public.incarnation_current(d.postmaster_at) AND (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())=d.database_oid AND clock_timestamp()<(d.lease->>'Until')::timestamptz)
    THEN RAISE EXCEPTION 'audit retirement unavailable' USING ERRCODE='23514'; END IF;
   RETURN OLD;
  END IF;
@@ -1104,7 +1104,7 @@ BEGIN
   WHERE root_id=NEW.root_id AND lane=NEW.lane;
  END IF;
  INSERT INTO public.operation_audit_lifecycle(operation_id,root_id,lane,principal_digest,installation_id,issuer_epoch,postmaster_at,database_oid,binding,original_purge_at,certificate_purge_at,live_retire_by,certificate_verify_attempts)
- VALUES(NEW.id,NEW.root_id,NEW.lane,NEW.principal_digest,t.installation_id,t.issuer_epoch,pg_postmaster_start_time(),(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()),b,(b->>'OriginalPurgeAt')::timestamptz,(b->>'CertificatePurgeAt')::timestamptz,(b->>'LiveRetireBy')::timestamptz,0);
+ VALUES(NEW.id,NEW.root_id,NEW.lane,NEW.principal_digest,t.installation_id,t.issuer_epoch,(SELECT activated_postmaster_at FROM public.fleet_trust WHERE installation_id=t.installation_id),(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()),b,(b->>'OriginalPurgeAt')::timestamptz,(b->>'CertificatePurgeAt')::timestamptz,(b->>'LiveRetireBy')::timestamptz,0);
  RETURN NEW;
 END $$;
 -- +goose StatementEnd

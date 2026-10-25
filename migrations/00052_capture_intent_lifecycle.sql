@@ -309,7 +309,7 @@ BEGIN
  SELECT * INTO STRICT a FROM public.operation_audit WHERE id=operation AND root_id=r AND lane='capture' FOR UPDATE;
  SELECT * INTO STRICT d FROM public.operation_audit_lifecycle WHERE operation_id=operation AND root_id=r FOR UPDATE;
  n:=clock_timestamp();
- IF NOT COALESCE(NOT trust.recovery_blocked AND NOT trust.suspended AND trust.observed_at<=n AND n<trust.fresh_until AND n<started+interval '5 seconds' AND n<a.write_until AND trust.issuer_epoch=a.issuer_epoch AND d.issuer_epoch=a.issuer_epoch AND d.postmaster_at=pg_postmaster_start_time() AND d.database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) AND d.installation_id=root.installation_id AND EXISTS(SELECT 1 FROM public.capture_audit_binding WHERE capture_id=operation AND root_id=r),false) THEN RAISE EXCEPTION 'capture audit original interval unavailable' USING ERRCODE='23514';END IF;
+ IF NOT COALESCE(NOT trust.recovery_blocked AND NOT trust.suspended AND trust.observed_at<=n AND n<trust.fresh_until AND n<started+interval '5 seconds' AND n<a.write_until AND trust.issuer_epoch=a.issuer_epoch AND d.issuer_epoch=a.issuer_epoch AND public.incarnation_current(d.postmaster_at) AND d.database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database()) AND d.installation_id=root.installation_id AND EXISTS(SELECT 1 FROM public.capture_audit_binding WHERE capture_id=operation AND root_id=r),false) THEN RAISE EXCEPTION 'capture audit original interval unavailable' USING ERRCODE='23514';END IF;
  RETURN a;
 END $$;
 CREATE FUNCTION capture_audit_original_until(r uuid,a public.operation_audit,started timestamptz) RETURNS timestamptz
@@ -393,7 +393,7 @@ BEGIN
  IF TG_OP='DELETE' THEN
   IF NOT EXISTS(SELECT 1 FROM public.operation_audit_lifecycle d JOIN public.fleet_current_trust t ON t.installation_id=d.installation_id
    WHERE d.operation_id=OLD.id AND d.root_id=OLD.root_id AND d.finalization_xid=pg_current_xact_id() AND d.terminal_acknowledged_at IS NOT NULL AND
-    NOT t.recovery_blocked AND NOT t.suspended AND clock_timestamp()<t.fresh_until AND t.issuer_epoch=d.issuer_epoch AND pg_postmaster_start_time()=d.postmaster_at AND (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())=d.database_oid AND clock_timestamp()<(d.lease->>'Until')::timestamptz)
+    NOT t.recovery_blocked AND NOT t.suspended AND clock_timestamp()<t.fresh_until AND t.issuer_epoch=d.issuer_epoch AND public.incarnation_current(d.postmaster_at) AND (SELECT oid FROM pg_catalog.pg_database WHERE datname=current_database())=d.database_oid AND clock_timestamp()<(d.lease->>'Until')::timestamptz)
    THEN RAISE EXCEPTION 'audit retirement unavailable' USING ERRCODE='23514'; END IF;
   RETURN OLD;
  END IF;

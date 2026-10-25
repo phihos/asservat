@@ -256,7 +256,7 @@ BEGIN
   public.capacity_setup_original_valid(s) AND expected IS NOT NULL AND a.plan=expected AND a.source_digest=s.accepted_digest AND
   EXISTS(SELECT 1 FROM public.context_query_backing b WHERE b.root_id=r AND b.acceptance_id=acceptance) AND
   a.capacity_id=(expected->'Qualification'->>'CapacityID')::uuid AND a.observations<=(expected->'Qualification'->>'SourceTransitionLimit')::bigint AND a.issuer_epoch=t.issuer_epoch AND
-  a.postmaster_at=pg_postmaster_start_time() AND a.database_oid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND
+  public.incarnation_current(a.postmaster_at) AND a.database_oid=(SELECT oid FROM pg_database WHERE datname=current_database()) AND
   n<(a.plan->>'HardUntil')::timestamptz AND clock_timestamp()<until_at,false);
 EXCEPTION WHEN data_exception OR no_data_found OR too_many_rows THEN RETURN false;
 END $$;
@@ -306,7 +306,7 @@ BEGIN
   RAISE EXCEPTION 'query capacity current original proof unavailable' USING ERRCODE='23514';END IF;
  SELECT * INTO a FROM public.context_query_capacity WHERE root_id=r FOR UPDATE;
  IF FOUND THEN
-  IF a.plan IS DISTINCT FROM expected OR a.source_digest IS DISTINCT FROM s.accepted_digest OR a.issuer_epoch<>t.issuer_epoch OR a.postmaster_at<>pg_postmaster_start_time() OR a.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) THEN
+  IF a.plan IS DISTINCT FROM expected OR a.source_digest IS DISTINCT FROM s.accepted_digest OR a.issuer_epoch<>t.issuer_epoch OR NOT public.incarnation_current(a.postmaster_at) OR a.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) THEN
    RAISE EXCEPTION 'query capacity immutable replay mismatch' USING ERRCODE='23514';END IF;
  ELSE
   IF prior<>0 OR EXISTS(SELECT 1 FROM public.context_query_backing WHERE root_id=r) THEN RAISE EXCEPTION 'query capacity cannot adopt backing' USING ERRCODE='23514';END IF;
@@ -341,7 +341,7 @@ BEGIN
   public.capacity_managed_root_until(r,n) IS NULL OR NOT COALESCE(observed<=n AND until_at>observed AND until_at<=observed+interval '5 seconds' AND n<until_at AND n<(expected->>'HardUntil')::timestamptz,false) THEN
   RAISE EXCEPTION 'query capacity current original proof unavailable' USING ERRCODE='23514';END IF;
  SELECT * INTO STRICT a FROM public.context_query_capacity WHERE root_id=r FOR UPDATE;
- IF a.plan IS DISTINCT FROM expected OR a.source_digest IS DISTINCT FROM s.accepted_digest OR a.issuer_epoch<>t.issuer_epoch OR a.postmaster_at<>pg_postmaster_start_time() OR a.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR
+ IF a.plan IS DISTINCT FROM expected OR a.source_digest IS DISTINCT FROM s.accepted_digest OR a.issuer_epoch<>t.issuer_epoch OR NOT public.incarnation_current(a.postmaster_at) OR a.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR
   a.observation_id IS DISTINCT FROM (claim->>'ID')::uuid OR a.acceptance_id IS DISTINCT FROM (claim->>'AcceptanceID')::uuid OR
   a.observations IS DISTINCT FROM (claim->>'Ordinal')::bigint OR a.observation_ordinal IS DISTINCT FROM a.observations OR a.observation_accepted OR a.observation_completed OR
   a.observation_started_at IS DISTINCT FROM (claim->>'ObservedAt')::timestamptz OR a.observation_until IS DISTINCT FROM (claim->>'ValidUntil')::timestamptz OR
@@ -379,7 +379,7 @@ BEGIN
  IF a.observation_completed OR a.observations IS DISTINCT FROM (claim->>'Ordinal')::bigint OR a.observation_ordinal IS DISTINCT FROM a.observations OR
   a.observation_id IS DISTINCT FROM (claim->>'ID')::uuid OR a.acceptance_id IS DISTINCT FROM (claim->>'AcceptanceID')::uuid OR
   a.observation_started_at IS DISTINCT FROM (claim->>'ObservedAt')::timestamptz OR a.observation_until IS DISTINCT FROM (claim->>'ValidUntil')::timestamptz OR
-  a.issuer_epoch<>t.issuer_epoch OR a.postmaster_at<>pg_postmaster_start_time() OR a.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR
+  a.issuer_epoch<>t.issuer_epoch OR NOT public.incarnation_current(a.postmaster_at) OR a.database_oid<>(SELECT oid FROM pg_database WHERE datname=current_database()) OR
   until_at>a.observation_until OR clock_timestamp()>=until_at THEN RAISE EXCEPTION 'query source completion mismatched or expired' USING ERRCODE='23514';END IF;
  UPDATE public.context_query_capacity SET observation_completed=true WHERE root_id=r;
  IF clock_timestamp()>=until_at THEN RAISE EXCEPTION 'query source completion expired' USING ERRCODE='23514';END IF;

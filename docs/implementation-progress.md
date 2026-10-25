@@ -1,5 +1,17 @@
 # Sustained implementation progress
 
+## Incarnation lineage for per-subsystem checks (2026-10-25)
+
+Installed run native113 showed that re-activating only `fleet_trust` after a lossless restart left
+every per-subsystem row (operation audit, connector identity, capacity, context queries and
+deletion) bound to the old server start, so capture preview failed at operation-audit begin.
+[ADR-226](decisions/226-lossless-restart-reactivation.md) now binds rows to the activation
+incarnation: `database_restart` records re-activated restarts and `public.incarnation_current`
+replaces every stored `pg_postmaster_start_time()` comparison (migrations 00031–00080 edited in
+place; the view inlines the same logic). The database-recovery fixture now asserts that a
+pre-restart activation-bound row is current only after re-activation and never in the restored
+copy. Installed re-qualification is pending.
+
 ## Capture failure causes and faster local runs (2026-10-25)
 
 [ADR-225](decisions/225-context-capture-failure-causes.md) adds `targetGone`/`denied` capture
