@@ -49,7 +49,7 @@ func newInitialBootstrapProcess(ctx context.Context, input, output *os.Root, cre
 	}
 	// This internal persisted capability is installer-selected. Operators do
 	// not author dynamic replay pins or choose a weaker completed path.
-	d.inputs = &providerInputs{oneShot: true, files: input, kubernetesEndpoint: desired.Kubernetes, postgresEndpoint: desired.Postgres}
+	d.inputs = &providerInputs{files: input, kubernetesEndpoint: desired.Kubernetes, postgresEndpoint: desired.Postgres}
 	d.producer, err = kube.OpenInitialBootstrap(root, d.inputs.kubernetes("administrator-token"), desired)
 	if err != nil {
 		return nil, err
