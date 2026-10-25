@@ -127,26 +127,47 @@ func UpdateReleaseRecord(ctx context.Context, config *rest.Config, namespace str
 	return out.ResourceVersion, nil
 }
 
+// ReleaseFollowerNames are the hub-namespace Deployments that follow the
+// release image without any runtime check of their own image (ADR-227 phase
+// 3): the key service, publisher and federation, in rollout order. Each exists
+// only when the installation enabled it.
+func ReleaseFollowerNames(installation string) []string {
+	return []string{contracts.KeyServiceName(installation), contracts.PublisherName(installation), FederationWorkloadName(installation)}
+}
+
 // ReadHubDeployment reads one hub Deployment as the installer runner.
 func ReadHubDeployment(ctx context.Context, config *rest.Config, namespace, name string) (apps.Deployment, error) {
+	d, found, err := ReadOptionalHubDeployment(ctx, config, namespace, name)
+	if err == nil && !found {
+		return apps.Deployment{}, cfg.ErrUnavailable
+	}
+	return d, err
+}
+
+// ReadOptionalHubDeployment is ReadHubDeployment that reports an absent
+// Deployment as not found instead of an error.
+func ReadOptionalHubDeployment(ctx context.Context, config *rest.Config, namespace, name string) (apps.Deployment, bool, error) {
 	if ctx == nil || config == nil || namespace == "" || name == "" {
-		return apps.Deployment{}, cfg.ErrInvalid
+		return apps.Deployment{}, false, cfg.ErrInvalid
 	}
 	api, err := installerAPI(config)
 	if err != nil {
-		return apps.Deployment{}, cfg.ErrInvalid
+		return apps.Deployment{}, false, cfg.ErrInvalid
 	}
 	call, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
 	raw, err := api.CoreV1().RESTClient().Get().AbsPath("/apis/apps/v1/namespaces/" + namespace + "/deployments/" + name).MaxRetries(0).DoRaw(call)
+	if apierrors.IsNotFound(err) {
+		return apps.Deployment{}, false, nil
+	}
 	if err != nil {
-		return apps.Deployment{}, cfg.ErrUnavailable
+		return apps.Deployment{}, false, cfg.ErrUnavailable
 	}
 	var d apps.Deployment
 	if json.Unmarshal(raw, &d) != nil || d.APIVersion != "apps/v1" || d.Kind != "Deployment" || d.Name != name || d.Namespace != namespace || len(d.Spec.Template.Spec.Containers) != 1 {
-		return apps.Deployment{}, cfg.ErrChanged
+		return apps.Deployment{}, false, cfg.ErrChanged
 	}
-	return d, nil
+	return d, true, nil
 }
 
 // ReleaseDeploymentMatches reports whether a hub Deployment runs an image the

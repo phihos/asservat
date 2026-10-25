@@ -1,5 +1,26 @@
 # Sustained implementation progress
 
+## Followers on the release record (ADR-227 phase 3, 2026-10-25)
+
+`installer-upgrade` now also moves the key service, publisher and federation Deployments (each
+only if present) to the target image, after hub-worker and hub-api, and waits until every
+present Deployment is settled. No runtime process checks their image, so this needs no
+mapping, record format change, Role rule or runtime API read. A follower on an image the
+record does not name is refused before any change. Download workers and the regional connector
+stay on the original image: they open no SQL connection, and following the record would need
+custody/attestation changes or a cross-cluster flow (gate failed; see the ADR). The chart hook
+does not apply (the chart renders no runtime workload). No pending migration adds grants, so
+role re-production is not built.
+
+Verification: `ASSERVAT_JOURNEY_FOCUS=upgrade` passed in 745 s (go test 737 s); it now also
+requires all three followers to be settled on each target image. `installer-upgrade` took 24 s
+to revision 2 and 26 s for the rollback to revision 3; hub processes settled 22 s later each
+time with no restarts; a capture was collected, published and downloaded after the upgrade.
+The restart focus passed in 735 s (go test 732 s). Both runs: source unchanged, no cleanup
+failures. Unit: `go test -race -run TestRelease ./internal/bootstrap ./internal/contracts` and
+`-run Release ./internal/adapters/kubernetes` pass; go build/vet, go-architecture-check,
+sql-check and spec-check pass.
+
 ## Hub image upgrade and image-only rollback (ADR-227 phase 2, 2026-10-25)
 
 One release record ConfigMap (`asservat-release-<installation>`, `asservat-release/v1`) names the

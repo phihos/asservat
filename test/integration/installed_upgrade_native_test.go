@@ -83,7 +83,7 @@ func installedReleaseChange(t *testing.T, ctx context.Context, api kubernetes.In
 			break
 		}
 		if e == nil && current.Status.Phase == core.PodFailed || time.Now().After(until) {
-			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, kube.HubDeploymentNamesList(installation)...)
+			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, append(kube.HubDeploymentNamesList(installation), kube.ReleaseFollowerNames(installation)...)...)
 			t.Fatal("installer-upgrade did not succeed", e, logs())
 		}
 	}
@@ -96,7 +96,9 @@ func installedReleaseChange(t *testing.T, ctx context.Context, api kubernetes.In
 	if err != nil || r.Revision != revision || r.Image != image || r.Previous != "" || r.Original != desired.Image {
 		t.Fatal("release record not settled on the image", err, record.Data[contracts.ReleaseRecordFile])
 	}
-	for _, name := range kube.HubDeploymentNamesList(installation) {
+	// Phase 3: the installed journey enables all three followers (key service,
+	// publisher, federation), so each must exist and follow the release too.
+	for _, name := range append(kube.HubDeploymentNamesList(installation), kube.ReleaseFollowerNames(installation)...) {
 		d, e := api.AppsV1().Deployments(desired.TargetNamespace).Get(ctx, name, meta.GetOptions{})
 		if e != nil || d.Spec.Template.Spec.Containers[0].Image != image || !kube.HubDeploymentSettled(*d) {
 			t.Fatal("hub Deployment not settled on the image", name, e)

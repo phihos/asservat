@@ -35,7 +35,8 @@ type releaseSchema interface {
 	Run(context.Context) (int64, int64, error)
 }
 
-// releaseChange is one ADR-227 image change of hub-worker and hub-api.
+// releaseChange is one ADR-227 image change of hub-worker and hub-api, and of
+// the present follower Deployments (key service, publisher, federation).
 type releaseChange struct {
 	config                  *rest.Config
 	namespace, installation string
@@ -55,6 +56,33 @@ func (c releaseChange) deployments(ctx context.Context) (hubAPI, hubWorker apps.
 	}
 	hubWorker, err = kube.ReadHubDeployment(ctx, c.config, c.namespace, workerName)
 	return
+}
+
+// followers reads the follower Deployments the installation has (phase 3).
+// Each must run the original image or one in the record's history: a
+// follower a phase-2 runner left behind is rolled forward, any other image
+// is refused.
+func (c releaseChange) followers(ctx context.Context, r contracts.ReleaseRecord) ([]apps.Deployment, error) {
+	var out []apps.Deployment
+	for _, name := range kube.ReleaseFollowerNames(c.installation) {
+		d, found, err := kube.ReadOptionalHubDeployment(ctx, c.config, c.namespace, name)
+		if err != nil {
+			return nil, err
+		}
+		if !found {
+			continue
+		}
+		if !releaseKnown(d.Spec.Template.Spec.Containers[0].Image, r) {
+			return nil, fmt.Errorf("%w: %s runs an image the release record does not name", cfg.ErrChanged, name)
+		}
+		out = append(out, d)
+	}
+	return out, nil
+}
+
+func releaseKnown(image string, r contracts.ReleaseRecord) bool {
+	_, ok := r.HistoryEntry(image)
+	return ok || image == r.Original
 }
 
 // run upgrades (an image not in the history: migrate first) or rolls back
@@ -78,10 +106,18 @@ func (c releaseChange) run(ctx context.Context) error {
 	if !kube.ReleaseDeploymentMatches(hubAPI, r, true) || !kube.ReleaseDeploymentMatches(hubWorker, r, false) {
 		return fmt.Errorf("%w: a hub Deployment does not run an image the release record names", cfg.ErrChanged)
 	}
+	followers, err := c.followers(ctx, r)
+	if err != nil {
+		return err
+	}
 	next, rv := r, current.ResourceVersion
 	switch {
 	case r.Image == c.image && r.Previous == "":
-		if !kube.HubDeploymentSettled(hubAPI) || !kube.HubDeploymentSettled(hubWorker) {
+		settled := kube.HubDeploymentSettled(hubAPI) && kube.HubDeploymentSettled(hubWorker)
+		for _, d := range followers {
+			settled = settled && d.Spec.Template.Spec.Containers[0].Image == c.image && kube.HubDeploymentSettled(d)
+		}
+		if !settled {
 			return fmt.Errorf("%w: release revision %d is recorded settled but a hub Deployment is not", cfg.ErrChanged, r.Revision)
 		}
 		_, err = fmt.Fprintf(c.out, "release already at revision %d (%s)\n", r.Revision, c.image)
@@ -173,16 +209,43 @@ func (c releaseChange) run(ctx context.Context) error {
 			return fmt.Errorf("%w: %s reached generation %d, not %d", cfg.ErrChanged, w.name, gen, w.gen)
 		}
 	}
+	// The followers carry no generation pins, since nothing verifies their
+	// image: only the image changes, from any image the record knows.
+	names := []string{workerName, apiName}
+	for _, f := range followers {
+		names = append(names, f.Name)
+		d, e := kube.ReadHubDeployment(ctx, c.config, c.namespace, f.Name)
+		if e != nil {
+			return e
+		}
+		image := d.Spec.Template.Spec.Containers[0].Image
+		if image == c.image {
+			continue
+		}
+		if !releaseKnown(image, r) {
+			return fmt.Errorf("%w: %s runs an image the release record does not name", cfg.ErrChanged, f.Name)
+		}
+		if _, e = kube.UpdateHubDeploymentImage(ctx, c.config, d, c.image); e != nil {
+			return e
+		}
+	}
 	// Settled means observed, updated and available, and unchanged (same
 	// resourceVersions, so no Ready drop from a crashing process) for stable.
 	deadline := time.Now().Add(c.settle)
 	var since time.Time
-	var seen [2]string
+	var seen string
 	for {
-		hubAPI, hubWorker, err = c.deployments(ctx)
+		current, ok := "", true
+		for _, name := range names {
+			d, e := kube.ReadHubDeployment(ctx, c.config, c.namespace, name)
+			if ok = e == nil && d.Spec.Template.Spec.Containers[0].Image == c.image && kube.HubDeploymentSettled(d); !ok {
+				break
+			}
+			current += d.ResourceVersion + "/"
+		}
 		now := time.Now()
-		if err == nil && hubAPI.Spec.Template.Spec.Containers[0].Image == c.image && hubWorker.Spec.Template.Spec.Containers[0].Image == c.image && kube.HubDeploymentSettled(hubAPI) && kube.HubDeploymentSettled(hubWorker) {
-			if current := [2]string{hubAPI.ResourceVersion, hubWorker.ResourceVersion}; since.IsZero() || current != seen {
+		if ok {
+			if since.IsZero() || current != seen {
 				since, seen = now, current
 			}
 			if now.Sub(since) >= c.stable {
@@ -192,7 +255,7 @@ func (c releaseChange) run(ctx context.Context) error {
 			since = time.Time{}
 		}
 		if now.After(deadline) {
-			return fmt.Errorf("%w: hub Deployments did not settle on %s within %s; rerun to resume", cfg.ErrUnavailable, c.image, c.settle)
+			return fmt.Errorf("%w: hub Deployments %v did not settle on %s within %s; rerun to resume", cfg.ErrUnavailable, names, c.image, c.settle)
 		}
 		select {
 		case <-ctx.Done():

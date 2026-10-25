@@ -1,7 +1,7 @@
 # ADR-227 — Supported upgrade and image-only rollback
 
 Date: 2026-10-25. Status: accepted (maintainer chose to build the upgrade path now); phases 1
-and 2 implemented, phase 3 pending. Implements the upgrade target in [operations](../operations.md#backup-recovery-and-upgrades)
+and 2 implemented; phase 3 implemented for the key service, publisher and federation (download workers, regional connector and the chart hook deliberately not built). Implements the upgrade target in [operations](../operations.md#backup-recovery-and-upgrades)
 and [persistence](../../specs/persistence.md) (N/N-1, separate DDL role, expand/contract).
 
 ## Problem
@@ -100,9 +100,56 @@ offer). Several of those are immutable, and none may be rewritten.
   with the same image resumes; another image is refused until then. The runner does not prove the
   workload guard itself; every runtime reader still does.
 
-Remaining for phase 3: federation, key service, publisher, download workers and the regional
-connector on the record (they stay on the original image); a chart `post-upgrade` hook;
-role re-production for migrations that add grants.
+## Phase 3 (implemented, with deliberate omissions)
+
+- **Followers: key service, publisher, federation.** These three hub-namespace Deployments
+  are the remaining SQL users. Nothing checks their image or generation while they run: no
+  runtime reader looks up their Deployments, Pods or ReplicaSets. Callers authenticate them by
+  mTLS and service-account identity, and a continuation replay compares only the
+  template-digest annotation, which an image change leaves alone. So they follow the record
+  without any mapping, generation pins, record format change, Role rule or API read in a runtime
+  process. `installer-upgrade` reads each one (`kube.ReleaseFollowerNames`; one is skipped
+  when the installation did not enable it), requires that it runs the original image or one
+  in the record's history, and then, after hub-worker and hub-api, changes the image of each
+  one not yet on the target: key service, then publisher, then federation. The settle wait (5
+  minutes, unchanged for 20 s) now covers all present Deployments. A follower on an image the
+  record does not name is refused before anything changes. A settled record whose follower runs
+  another image is refused too. A follower left on the original image by a phase-2 runner is
+  rolled forward by the next run. A rollback to a phase-2 image leaves the followers on the
+  newer image, because the phase-2 runner does not know them. Those followers still run against
+  the database: a rollback does not lower the head, and the floor admits the rollback target.
+  The next phase-3 run moves them. All three use the Recreate strategy, so each is briefly
+  unavailable during its rollout. With every SQL user now following the record, the phase-2
+  guard (a migration may not raise the floor past `history[0].schema`) keeps every runnable
+  release and every running process in range.
+- **Download workers: not built (gate failed).** They run the profile image, which is pinned
+  in the audited SQL worker configuration revision, the hub-api's download path template (its
+  revision UID, generation and digest), the key service's immutable input and every Job/Pod spec
+  digest. Dispatch and attestation compare those digests exactly. Following the record would
+  mean a per-intent image in SQL (a custody migration) and record mapping inside worker
+  attestation, an authorization path, for a process that lives at most an hour. Benefit is weak
+  (fixes in the download-worker code only), cost is real (schema, attestation, two more
+  readers). They stay on the original image. The download worker opens no SQL connection, so
+  the schema floor does not constrain it. A release must stay wire-compatible with the original
+  worker toward hub-api and the key service.
+- **Regional connector: not built (gate failed).** It runs on workload clusters that cannot
+  read the hub-namespace record. Its image comes from the hub-signed regional offer, which is
+  digest-bound and immutable, and is checked as `OwnerPublicExecutor.ImageDigest`. Following
+  the record would need a new upgrade flow per workload cluster, a changeable signed image
+  carrier and hub-side mapping for connector callers. It would also need a rollback order across
+  clusters against one hub history. That is several new failure states across trust domains.
+  It stays on the original image. The connector also opens no SQL connection; releases must
+  keep the federation and hub-api protocols compatible with the original connector.
+- **Chart `post-upgrade` hook: not applicable.** The chart renders no runtime workload
+  (`runtime.enabled: true` is rejected). Every runtime Deployment is created by the product
+  installer inside the existing bootstrap hook Pod, and its `post-upgrade` run replays that
+  installer, not a release change. A Helm hook would only wrap the same `installer-upgrade`
+  Pod. The operator runs `installer-upgrade` explicitly (runner account, DDL credential, Pod of
+  the target image).
+- **Role re-production: not needed yet.** No pending migration adds a runtime grant: head is
+  00081, which only sets the floor comment. A future migration that adds grants must add role
+  re-production with it; until then the migrator applies only grant-free migrations
+  (limitation).
 
 ## Complexity gate
 
@@ -113,3 +160,30 @@ revision), and migration failure leaves the previous release running; 7 no new c
 8 no; 9 one ConfigMap GET per hub workload check (measured: one per native boundary, e.g. 40 to 42 reads for a configuration-provider operation pair); 10 upgrade and image-only rollback
 are the point and are tested; 11 not doing it leaves every release requiring reinstallation, and the
 release record replaces eight independent pins, so the design removes more than it adds.
+
+Phase 3, per component (questions 1–11):
+
+- *Key service, publisher, federation (built):* 1 every release fix in them was otherwise
+  unreachable without reinstallation, and after 16 revisions the original drops out of the
+  history, so the floor guard no longer protects them; 2 no; 3 typical (the publisher and key
+  service exist whenever downloads are enabled; the federation whenever a regional cluster is);
+  4 rolling a Deployment's image is the standard mechanism; 5 none: the runner already holds
+  Deployment get/update; 6 no new state, the existing resume rule covers them; 7 no; 8 no;
+  9 runtime cost zero; `installer-upgrade` does up to 3 more GETs at the start, 3 GET+PUT in
+  the rollout and 3 more GETs per 2 s settle poll; 10 the same upgrade/rollback, tested natively;
+  11 doing nothing leaves SQL users on a schema the floor guard stops protecting.
+- *Download workers (not built):* 1 weak: a process of at most one hour with no SQL access;
+  4 –; 5–6 a per-intent image in SQL plus record mapping in worker attestation, an
+  authorization path; 9 a record read per dispatch and per attestation; 11 the documented
+  wire-compatibility limitation is enough.
+- *Regional connector (not built):* 1 moderate, but it opens no SQL connection; 3 every regional
+  cluster; 5 a new carrier, or new read access across the cluster boundary; 6 per-cluster partial states and
+  cross-cluster rollback ordering; 8 depends on operator runs in each workload cluster;
+  11 the documented limitation is enough until a connector fix requires a change.
+- *Chart hook (not applicable):* the chart deploys no runtime workload.
+
+Phase 3 verification: the installed `ASSERVAT_JOURNEY_FOCUS=upgrade` run passed in 745 s. It
+requires the key service, publisher and federation to be settled on the target image after both
+the upgrade (24 s) and the rollback (26 s). The capture, publication and download after the
+upgrade ran with the upgraded publisher, key service and federation, the original download
+worker and the original connector. The restart focus still passes (735 s).

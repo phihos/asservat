@@ -51,7 +51,9 @@ type fakeReleaseAPI struct {
 func newFakeReleaseAPI(t *testing.T) (*fakeReleaseAPI, *rest.Config) {
 	f := &fakeReleaseAPI{deployments: map[string]*apps.Deployment{}}
 	apiName, workerName := kube.HubDeploymentNames(releaseTestInstallation)
-	for name, gen := range map[string]int64{apiName: 2, workerName: 3} {
+	// Two of the three followers exist; the publisher is not enabled.
+	followers := kube.ReleaseFollowerNames(releaseTestInstallation)
+	for name, gen := range map[string]int64{apiName: 2, workerName: 3, followers[0]: 1, followers[2]: 1} {
 		f.rv++
 		f.deployments[name] = &apps.Deployment{TypeMeta: meta.TypeMeta{APIVersion: "apps/v1", Kind: "Deployment"}, ObjectMeta: meta.ObjectMeta{Name: name, Namespace: "hub", UID: types.UID("uid-" + name), Generation: gen, ResourceVersion: strconv.Itoa(f.rv)},
 			Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Template: core.PodTemplateSpec{Spec: core.PodSpec{Containers: []core.Container{{Name: "hub", Image: releaseTestImage(1)}}}}}}
@@ -224,19 +226,55 @@ func TestReleaseUpgradeAndRollback(t *testing.T) {
 		t.Fatalf("after upgrade: %+v", r)
 	}
 	apiName, workerName := kube.HubDeploymentNames(releaseTestInstallation)
-	if want := []string{"create record", "update record", "update " + workerName, "update " + apiName, "update record"}; !equalStrings(f.writes, want) {
+	followers := kube.ReleaseFollowerNames(releaseTestInstallation)
+	if want := []string{"create record", "update record", "update " + workerName, "update " + apiName, "update " + followers[0], "update " + followers[2], "update record"}; !equalStrings(f.writes, want) {
 		t.Fatal("order", f.writes)
 	}
+	for _, name := range []string{followers[0], followers[2]} {
+		if f.deployments[name].Spec.Template.Spec.Containers[0].Image != releaseTestImage(2) {
+			t.Fatal("follower not upgraded", name)
+		}
+	}
 	// Rerunning the same image is a no-op.
-	if err := releaseTestChange(config, 2, 82, schema).run(context.Background()); err != nil || len(f.writes) != 5 {
+	if err := releaseTestChange(config, 2, 82, schema).run(context.Background()); err != nil || len(f.writes) != 7 {
 		t.Fatal("rerun", err, f.writes)
 	}
 	// Rollback to the original image: no migration while the floor admits 81.
 	if err := releaseTestChange(config, 1, 81, schema).run(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if r = f.current(t); r.Revision != 3 || r.Image != releaseTestImage(1) || r.Schema != 81 || schema.migrated != 1 || f.deployments[apiName].Spec.Template.Spec.Containers[0].Image != releaseTestImage(1) {
+	if r = f.current(t); r.Revision != 3 || r.Image != releaseTestImage(1) || r.Schema != 81 || schema.migrated != 1 || f.deployments[apiName].Spec.Template.Spec.Containers[0].Image != releaseTestImage(1) ||
+		f.deployments[followers[2]].Spec.Template.Spec.Containers[0].Image != releaseTestImage(1) {
 		t.Fatalf("after rollback: %+v", r)
+	}
+}
+
+// Followers (phase 3): one left on the original image by a phase-2 runner is
+// rolled forward; one on an image the record does not name is refused before
+// anything changes, as is a settled record whose follower runs another image.
+func TestReleaseFollowers(t *testing.T) {
+	f, config := newFakeReleaseAPI(t)
+	createRevisionOne(t, config)
+	schema := &fakeReleaseSchema{state: postgres.SchemaState{Head: 81, Floor: 81}, planned: 81}
+	followers := kube.ReleaseFollowerNames(releaseTestInstallation)
+	// A phase-2 upgrade to image 2 moved only the hub Deployments.
+	if err := releaseTestChange(config, 2, 82, schema).run(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	f.deployments[followers[0]].Spec.Template.Spec.Containers[0].Image = releaseTestImage(1)
+	if err := releaseTestChange(config, 2, 82, schema).run(context.Background()); !errors.Is(err, cfg.ErrChanged) {
+		t.Fatal("settled record with a follower on another image accepted", err)
+	}
+	if err := releaseTestChange(config, 3, 82, schema).run(context.Background()); err != nil {
+		t.Fatal("follower left on the original image", err)
+	}
+	if f.deployments[followers[0]].Spec.Template.Spec.Containers[0].Image != releaseTestImage(3) {
+		t.Fatal("follower not rolled forward")
+	}
+	before := len(f.writes)
+	f.deployments[followers[2]].Spec.Template.Spec.Containers[0].Image = releaseTestImage(7)
+	if err := releaseTestChange(config, 4, 82, schema).run(context.Background()); !errors.Is(err, cfg.ErrChanged) || len(f.writes) != before || f.current(t).Revision != 3 {
+		t.Fatal("follower on a foreign image", err, f.writes)
 	}
 }
 
