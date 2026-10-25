@@ -76,7 +76,10 @@ type installedJourneyDownload struct {
 // processing. Its idempotency keys carry the cluster so they never collide
 // with the full journey's keys.
 func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func(), projectionCheck installedProjectionCheck) func(cluster, namespace, workload string, deny func(bool), gone func(podUID string)) {
+	// Each further run in the same installation gets its own idempotency keys.
+	runs := 0
 	return func(cluster, namespace, workload string, deny func(bool), gone func(podUID string)) {
+		runs++
 		t.Helper()
 		if identity == nil {
 			t.Fatal("installed journey requires the harness identity provider")
@@ -85,6 +88,12 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		if short {
 			keys += "-" + cluster
 		}
+		if runs > 1 {
+			keys += fmt.Sprintf("-run%d", runs)
+		}
+		// The focused restart run (ASSERVAT_JOURNEY_FOCUS=restart) starts with a
+		// short journey, which must initialize processing itself.
+		initialize := !short || installedJourneyFocus() == "restart" && runs == 1
 		cert, err := x509.ParseCertificate(publicRoot)
 		if err != nil {
 			t.Fatal("public listener root", err)
@@ -102,7 +111,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			t.Fatal("installed wire contracts", err)
 		}
 		// ADR-210: processing is initialized once, before any preview.
-		if !short {
+		if initialize {
 			identity.initializeProcessing(t, ctx, cert, address, origin, diagnose)
 		}
 		tokens := identity.mcpTokenSource(origin)
@@ -956,3 +965,8 @@ func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *c
 	}
 	fmt.Fprintf(out, "%s hold expired\n", time.Now().Format(time.TimeOnly))
 }
+
+// installedJourneyFocus is the local iteration mode: "restart" runs install,
+// one workload cluster's short journey, the PostgreSQL restart and another
+// short journey, and skips everything else. Empty runs the full journey.
+func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS") }
