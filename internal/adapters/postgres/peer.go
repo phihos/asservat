@@ -33,8 +33,7 @@ func NewPeerRegistry(ctx context.Context, pool *pgxpool.Pool, installation strin
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	var version int64
-	if err := pool.QueryRow(ctx, "SELECT version_id FROM goose_db_version ORDER BY id DESC LIMIT 1").Scan(&version); err != nil || version != currentSchemaVersion {
+	if !schemaCompatible(ctx, pool) {
 		return nil, value.ErrUnavailable
 	}
 	return &PeerRegistry{pool: pool, installation: installation}, nil

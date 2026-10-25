@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net"
+	"strconv"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -25,7 +27,36 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const currentSchemaVersion = 80
+const currentSchemaVersion = 81
+
+// schemaFloorComment prefixes the version table's comment that records the
+// oldest binary schema the database still serves (ADR-227). Only the schema
+// owner can set a comment; every role reads it without a grant.
+const schemaFloorComment = "asservat:oldest-binary-schema="
+
+// schemaCompatible reports whether this binary (compiled head
+// currentSchemaVersion) runs against the database: the database head is at
+// least the binary's and the recorded floor at most the binary's. Without a
+// recorded floor the head must match exactly.
+func schemaCompatible(ctx context.Context, q interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}) bool {
+	var head int64
+	var applied bool
+	var comment *string
+	if err := q.QueryRow(ctx, `SELECT version_id,is_applied,pg_catalog.obj_description('public.goose_db_version'::regclass,'pg_class') FROM goose_db_version ORDER BY id DESC LIMIT 1`).Scan(&head, &applied, &comment); err != nil || !applied {
+		return false
+	}
+	floor := head
+	if comment != nil && strings.HasPrefix(*comment, schemaFloorComment) {
+		n, err := strconv.ParseInt(strings.TrimPrefix(*comment, schemaFloorComment), 10, 64)
+		if err != nil || n < 1 || n > head {
+			return false
+		}
+		floor = n
+	}
+	return head >= currentSchemaVersion && floor <= currentSchemaVersion
+}
 
 type Ledger struct{ pool *pgxpool.Pool }
 
@@ -44,9 +75,8 @@ func New(ctx context.Context, pool *pgxpool.Pool) (*Ledger, error) {
 	}
 	check, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	var version int64
-	var applied, unsafeRole, replica bool
-	if err := pool.QueryRow(check, "SELECT version_id,is_applied FROM goose_db_version ORDER BY id DESC LIMIT 1").Scan(&version, &applied); err != nil || version != currentSchemaVersion || !applied {
+	var unsafeRole, replica bool
+	if !schemaCompatible(check, pool) {
 		return nil, privacy.ErrUnavailable
 	}
 	if err := pool.QueryRow(check, "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR has_schema_privilege(current_user,'public','CREATE'),pg_is_in_recovery() FROM pg_roles WHERE rolname=current_user").Scan(&unsafeRole, &replica); err != nil || unsafeRole || replica {

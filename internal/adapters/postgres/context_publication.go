@@ -46,8 +46,7 @@ func NewContextPublications(ctx context.Context, pool *pgxpool.Pool, root string
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	var version int64
-	if err = pool.QueryRow(ctx, "SELECT version_id FROM goose_db_version ORDER BY id DESC LIMIT 1").Scan(&version); err != nil || version != currentSchemaVersion {
+	if !schemaCompatible(ctx, pool) {
 		return nil, privacy.ErrUnavailable
 	}
 	guard, err := effectGuardsFor(root, guards)
