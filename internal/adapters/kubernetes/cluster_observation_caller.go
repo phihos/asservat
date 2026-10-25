@@ -10,6 +10,7 @@ import (
 	"time"
 
 	app "asservat.local/asservat/internal/application/fleet"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
@@ -140,7 +141,12 @@ func (s *ClusterObservationCallerAdmission) liveObjects(ctx context.Context, nam
 	// Reuse the existing exact API-defaulted template comparison, including all
 	// projections, command, image, labels and annotations. Its digest format is
 	// explicitly pinned by the installer; it grants no API-execution capability.
-	if connectorAPITemplateMatch(&d, &rs, &pod, p.TemplateDigest, p.ImageDigest) != nil {
+	// ADR-227: a hub caller's Deployment may run a release-record image.
+	release, workload, e := s.callerRelease(ctx)
+	if e != nil {
+		return zero, e
+	}
+	if connectorAPITemplateMatch(&d, &rs, &pod, p.TemplateDigest, p.ImageDigest, release, workload) != nil {
 		return zero, cfg.ErrChanged
 	}
 	if stabilize {
@@ -235,4 +241,25 @@ func (s *ClusterObservationCallerAdmission) ObserveClusterObservationCaller(ctx 
 		return zero, value.ErrUnavailable
 	}
 	return out, nil
+}
+
+// callerRelease reads the release record for the two hub Deployments; any
+// other caller (a connector) has none.
+func (s *ClusterObservationCallerAdmission) callerRelease(ctx context.Context) (*contracts.ReleaseRecord, releaseWorkload, error) {
+	p := s.pin
+	hubAPI, hubWorker := HubDeploymentNames(p.InstallationID)
+	var w releaseWorkload
+	switch p.Deployment {
+	case hubAPI:
+		w = releaseHubAPI
+	case hubWorker:
+		w = releaseHubWorker
+	default:
+		return nil, 0, nil
+	}
+	r, err := s.client.releaseRecord(ctx, p.Namespace.Name, p.InstallationID)
+	if err != nil {
+		return nil, 0, value.ErrUnavailable
+	}
+	return r, w, nil
 }

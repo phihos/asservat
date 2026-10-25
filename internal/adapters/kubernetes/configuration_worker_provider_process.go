@@ -65,16 +65,18 @@ type configurationProviderProcess struct {
 
 func (s *InstalledWorkerProjectionReader) configurationProviderProcess(ctx context.Context, state contracts.InitialRuntimeResourceState, name, uid string) (configurationProviderProcess, error) {
 	var zero configurationProviderProcess
-	d, _, err := s.checkedWorkerDeployment(ctx, state)
+	d, _, release, err := s.checkedWorkerDeployment(ctx, state)
 	if err != nil {
 		return zero, err
 	}
-	return s.configurationProviderProcessDeployment(ctx, d, name, uid)
+	return s.configurationProviderProcessDeployment(ctx, d, release, name, uid)
 }
 
 // Uses the actual Deployment already checked in this same named native bracket.
 // This is pure response reuse, not a second observation or retained readiness.
-func (s *InstalledWorkerProjectionReader) configurationProviderProcessDeployment(ctx context.Context, d *apps.Deployment, name, uid string) (configurationProviderProcess, error) {
+// d is the checked original-image view; release maps the live ReplicaSet and
+// Pod images the same way (ADR-227).
+func (s *InstalledWorkerProjectionReader) configurationProviderProcessDeployment(ctx context.Context, d *apps.Deployment, release *contracts.ReleaseRecord, name, uid string) (configurationProviderProcess, error) {
 	var zero configurationProviderProcess
 	if d == nil {
 		return zero, cfg.ErrInvalid
@@ -111,8 +113,9 @@ func (s *InstalledWorkerProjectionReader) configurationProviderProcessDeployment
 	if rs.APIVersion != "apps/v1" || rs.Kind != "ReplicaSet" || !ownerMetadata(rs.ObjectMeta, s.input.Namespace.Name, ref.Name, string(ref.UID)) || rs.Spec.Replicas == nil || *rs.Spec.Replicas < 1 || !ownerEnrollmentSelector(rs.Spec.Selector, pod.Labels) {
 		return zero, cfg.ErrChanged
 	}
+	mappedReplica, mappedPod := releaseOriginalReplicaSet(rs, release), releaseOriginalPod(pod, release)
 	owner, ok := ownerController(rs.OwnerReferences, "Deployment", "apps/v1")
-	if !ok || owner.Name != d.Name || string(owner.UID) != string(d.UID) || connectorAPITemplateMatch(d, &rs, &pod, template, image) != nil {
+	if !ok || owner.Name != d.Name || string(owner.UID) != string(d.UID) || connectorAPITemplateMatch(d, &mappedReplica, &mappedPod, template, image, nil, 0) != nil {
 		return zero, cfg.ErrChanged
 	}
 	// Deployment status/RV may change during normal startup. Complete original

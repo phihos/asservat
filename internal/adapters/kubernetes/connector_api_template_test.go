@@ -43,7 +43,7 @@ func TestConnectorAPITemplatePinsEverySecurityAndInputField(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if e = connectorAPITemplateMatch(&d, &r, &p, digest, image); e != nil {
+	if e = connectorAPITemplateMatch(&d, &r, &p, digest, image, nil, 0); e != nil {
 		t.Fatalf("closed scheduler/default differences: %v", e)
 	}
 	for name, change := range map[string]func(*apps.Deployment, *apps.ReplicaSet, *core.Pod){
@@ -108,7 +108,7 @@ func TestConnectorAPITemplatePinsEverySecurityAndInputField(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dc, rc, pc := d.DeepCopy(), r.DeepCopy(), p.DeepCopy()
 			change(dc, rc, pc)
-			if connectorAPITemplateMatch(dc, rc, pc, digest, image) == nil {
+			if connectorAPITemplateMatch(dc, rc, pc, digest, image, nil, 0) == nil {
 				t.Fatal("changed protected input accepted")
 			}
 		})

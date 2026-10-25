@@ -95,9 +95,22 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer upgrade.Close()
+	// ADR-227 phase 2: the state before (no floor recorded: floor = head) and
+	// the floor the pending migration declares.
+	state, e := upgrade.State(ctx)
+	if e != nil || state.Head != head-1 || state.Floor != head-1 || state.Compatible(head) {
+		t.Fatal("state before the upgrade", state, e)
+	}
+	planned, e := upgrade.PlannedFloor(state)
+	if e != nil || planned != head {
+		t.Fatal("planned floor", planned, e)
+	}
 	from, to, e := upgrade.Run(ctx)
 	if e != nil || from != head-1 || to != head {
 		t.Fatal("upgrade", from, to, e)
+	}
+	if state, e = upgrade.State(ctx); e != nil || state.Head != head || state.Floor != planned || !state.Compatible(postgres.CompiledSchemaVersion) || state.Compatible(head-1) {
+		t.Fatal("state after the upgrade", state, e)
 	}
 	var floor string
 	if e = conn.QueryRow(ctx, "SELECT obj_description('public.goose_db_version'::regclass,'pg_class')").Scan(&floor); e != nil || !strings.HasPrefix(floor, "asservat:oldest-binary-schema=") {

@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"strings"
 
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	apps "k8s.io/api/apps/v1"
@@ -92,9 +93,22 @@ func ConnectorAPITemplateDigest(t core.PodTemplateSpec) (artifact.Digest, error)
 	return d, nil
 }
 
-func connectorAPITemplateMatch(deployment *apps.Deployment, replica *apps.ReplicaSet, pod *core.Pod, expected, image artifact.Digest) error {
+// connectorAPITemplateMatch compares the live Deployment, ReplicaSet and Pod
+// with the installed template and image digests. For a hub Deployment the
+// caller passes the release record (ADR-227): each object is first mapped to
+// its original-image view, so a Pod of the current or previous release image
+// matches during and after a rollout. Connector callers pass nil (unchanged).
+func connectorAPITemplateMatch(deployment *apps.Deployment, replica *apps.ReplicaSet, pod *core.Pod, expected, image artifact.Digest, release *contracts.ReleaseRecord, workload releaseWorkload) error {
 	if deployment == nil || replica == nil || pod == nil || pod.Spec.NodeName == "" {
 		return cfg.ErrChanged
+	}
+	if release != nil {
+		d, e := releaseOriginal(*deployment, release, workload)
+		if e != nil {
+			return cfg.ErrChanged
+		}
+		r, p := releaseOriginalReplicaSet(*replica, release), releaseOriginalPod(*pod, release)
+		deployment, replica, pod = &d, &r, &p
 	}
 	d, e := ConnectorAPITemplateDigest(deployment.Spec.Template)
 	if e != nil || d != expected {

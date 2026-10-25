@@ -323,7 +323,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     # ADR-193 step 6: the Helm registry/chart infrastructure, another test.
     helm_bootstrap = helm_bootstrap or helm_cluster
     test_pattern, cluster_count = qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation)
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "upgrade"):
         cluster_count = 2  # these focused journeys use one workload cluster
     helm_test = "TestHelmClusterInstallWithRealServices" if helm_cluster else "TestHelmBootstrapWithRealServices"
     if helm_cluster:
@@ -344,6 +344,10 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         # network, whose host rules other projects' containers may depend on.
         kind_network, created_kind_network = network+"-kind", False
         worker_tag = None
+        # ADR-227 focused upgrade run: a second release image of the same
+        # build, differing only by a label, so its digest differs.
+        upgrade_tag = None
+        upgrade = installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "upgrade"
         registry = None
         registry_nodes = []
         build_scratch = None
@@ -393,6 +397,13 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             run(["docker", "build", "--network=none", "--label", "asservat.test="+run_id, "-t", worker_tag, str(image_dir)])
             worker_info = json.loads(run(["docker", "image", "inspect", worker_tag]))[0]
             report["workerBuild"] = {"binarySHA256": hashlib.sha256((image_dir/"asservat").read_bytes()).hexdigest(), "dockerImageID": worker_info["Id"], "tag": worker_tag}
+            if upgrade:
+                upgrade_tag = "asservat-context-worker:"+run_id+"-upgrade"
+                run(["docker", "build", "--network=none", "--label", "asservat.test="+run_id, "--label", "asservat.release=upgrade", "-t", upgrade_tag, str(image_dir)])
+                upgrade_info = json.loads(run(["docker", "image", "inspect", upgrade_tag]))[0]
+                if upgrade_info["Id"] == worker_info["Id"]:
+                    raise RuntimeError("upgrade image has the original image's digest")
+                report["upgradeBuild"] = {"dockerImageID": upgrade_info["Id"], "tag": upgrade_tag}
             run(["docker", "network", "create", "--internal", "--label", "asservat.test="+run_id, network])
             created_network = True
             run(["docker", "network", "create", "--label", "asservat.test="+run_id, kind_network])
@@ -556,6 +567,18 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                             raise RuntimeError("two owned nodes loaded different exact helper image identities")
                         fixture["workerImage"] = digest_ref
                         report["workerBuild"]["nodeImage"] = digest_ref
+                        if upgrade_tag and index == 0:
+                            # Only the hub cluster runs the upgraded hub workloads.
+                            run(["kind", "load", "docker-image", upgrade_tag, "--name", name])
+                            native_upgrade = "docker.io/library/"+upgrade_tag
+                            rows = run(["docker", "exec", node_name, "ctr", "-n", "k8s.io", "images", "ls"]).splitlines()
+                            matches = [row.split()[2] for row in rows if row.split()[0] == native_upgrade]
+                            if len(matches) != 1 or not matches[0].startswith("sha256:") or "asservat-context-worker@"+matches[0] == digest_ref.removeprefix("docker.io/library/"):
+                                raise RuntimeError("loaded upgrade image identity unavailable")
+                            upgrade_ref = "docker.io/library/asservat-context-worker@"+matches[0]
+                            run(["docker", "exec", node_name, "ctr", "-n", "k8s.io", "images", "tag", native_upgrade, upgrade_ref])
+                            fixture["upgradeImage"] = upgrade_ref
+                            report["upgradeBuild"]["nodeImage"] = upgrade_ref
                 pause = PAUSE
                 k = ["kubectl", "--kubeconfig", str(config), "--request-timeout=15s"]
                 resources = [
@@ -715,7 +738,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             # --cleanup-kept removes exactly these later with its own evidence.
             keep = keep_on_failure and exit_code != 0 and bool(clusters)
             if keep:
-                kept = {"runId": run_id, "clusters": clusters, "containers": containers, "volumes": ephemeral_volumes, "image": worker_tag,
+                kept = {"runId": run_id, "clusters": clusters, "containers": containers, "volumes": ephemeral_volumes, "image": worker_tag, "upgradeImage": upgrade_tag,
                         "networks": [n for n, made in ((network, created_network), (kind_network, created_kind_network)) if made]}
                 (cache/"kept").mkdir(exist_ok=True)
                 manifest = cache/"kept"/(run_id+".json")
@@ -741,12 +764,12 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                         assert info["Labels"]["asservat.test"] == run_id
                         run(["docker", "volume", "rm", name])
                     except Exception: failures.append(name)
-                if worker_tag:
+                for tag in [t for t in (worker_tag, upgrade_tag) if t]:
                     try:
-                        info = json.loads(run(["docker", "image", "inspect", worker_tag]))[0]
+                        info = json.loads(run(["docker", "image", "inspect", tag]))[0]
                         assert info["Config"]["Labels"]["asservat.test"] == run_id
-                        run(["docker", "image", "rm", worker_tag])
-                    except Exception: failures.append(worker_tag)
+                        run(["docker", "image", "rm", tag])
+                    except Exception: failures.append(tag)
                 if created_network:
                     try: run(["docker", "network", "rm", network])
                     except Exception: failures.append(network)
@@ -792,7 +815,7 @@ def cleanup_kept(path):
             assert run_id in name and info["Config"]["Labels"]["io.x-k8s.kind.cluster"] == name
             run(["kind", "delete", "cluster", "--name", name])
         except Exception: failures.append(name)
-    for kind, names in (("container", reversed(kept["containers"])), ("volume", kept["volumes"]), ("image", [kept["image"]] if kept["image"] else []), ("network", kept["networks"])):
+    for kind, names in (("container", reversed(kept["containers"])), ("volume", kept["volumes"]), ("image", [i for i in (kept["image"], kept.get("upgradeImage")) if i]), ("network", kept["networks"])):
         for name in names:
             try:
                 info = json.loads(run(["docker", kind, "inspect", name]))[0]

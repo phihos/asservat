@@ -244,7 +244,7 @@ func (g *ConnectorAPIExecutionProtection) workload(ctx context.Context, p fleet.
 	if digest != p.WorkloadDigest {
 		return connectorAPIStage("workload-digest", cfg.ErrChanged)
 	}
-	if e = connectorAPITemplateMatch(&d, &rs, &pod, g.template, g.image); e != nil {
+	if e = connectorAPITemplateMatch(&d, &rs, &pod, g.template, g.image, nil, 0); e != nil {
 		return connectorAPIStage("template", e)
 	}
 	return connectorAPIStage("inputs", g.inputs(ctx, pod.Spec))

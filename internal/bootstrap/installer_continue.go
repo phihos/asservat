@@ -1220,6 +1220,12 @@ func runInstallerContinue(ctx context.Context, step *string) error {
 		return err
 	}
 	defer resources.Close()
+	// ADR-227: revision 1 of the release record names the original image, from
+	// which every install-time pin is computed. Create-only; a replay finds it.
+	k.at("resources/release-record")
+	if err = k.releaseRecord(open); err != nil {
+		return err
+	}
 	// ADR-187: a rerun after the owner launch has nothing left to do. A phase-3
 	// inbox still holding a credential is removed.
 	if l := snapshot.State.OwnerLaunch; l != nil && l.Receipt != nil {

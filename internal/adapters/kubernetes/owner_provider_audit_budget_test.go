@@ -24,7 +24,8 @@ import (
 // ownerProviderColdProofCalls is the native API cost of one unreused proof
 // (guard plus identity, without the Secret GET). Before the 2026-10-23 reuse
 // revision every credential read cost 51 calls (102 per audited request).
-const ownerProviderColdProofCalls = 21
+// Includes the ADR-227 release record read of the owner Deployment check.
+const ownerProviderColdProofCalls = 22
 
 // Real C08 coordinator, S3 SDK signing, and independently limited native
 // observer/probe clients. SQL/audit key authority, ciphertext and API responses

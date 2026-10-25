@@ -95,11 +95,21 @@ func (s *InstalledOwnerIdentityReader) deployment(ctx context.Context, state con
 		return cfg.ErrUnavailable
 	}
 	check = ownerReadDeploymentRead
-	var d apps.Deployment
-	if e := s.get(ctx, "/apis/apps/v1/namespaces/"+in.Namespace.Name+"/deployments/"+in.Deployment.Name, &d); e != nil {
+	var live apps.Deployment
+	if e := s.get(ctx, "/apis/apps/v1/namespaces/"+in.Namespace.Name+"/deployments/"+in.Deployment.Name, &live); e != nil {
+		return e
+	}
+	// ADR-227: every check below runs on the original-image view of a
+	// Deployment that runs the release record's current or previous image.
+	release, e := s.client.releaseRecord(ctx, in.Namespace.Name, in.InstallationID)
+	if e != nil {
 		return e
 	}
 	check = ownerReadDeploymentMetadata
+	d, e := releaseOriginal(live, release, releaseHubAPI)
+	if e != nil {
+		return e
+	}
 	if d.APIVersion != "apps/v1" || d.Kind != "Deployment" || !ownerMetadata(d.ObjectMeta, in.Namespace.Name, in.Deployment.Name, in.Deployment.UID) || d.Generation != l.Receipt.Generation || d.ResourceVersion == l.InertResourceVersion || len(d.Spec.Template.Spec.Containers) != 1 || d.Spec.Replicas == nil || *d.Spec.Replicas != 1 || d.Annotations[initialRuntimeResourceMarker] != state.Objects[10].OperationID || d.Annotations[ownerIdentityLaunchMarker] != l.OperationID {
 		return cfg.ErrChanged
 	}

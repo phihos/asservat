@@ -12,58 +12,69 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (s *InstalledWorkerProjectionReader) checkedWorkerDeployment(ctx context.Context, state contracts.InitialRuntimeResourceState) (*apps.Deployment, *HubWorkerWorkload, error) {
+// checkedWorkerDeployment returns the hub-worker Deployment in its ADR-227
+// original-image view (see releaseOriginal) after every install-time check,
+// together with the release record that mapped it.
+func (s *InstalledWorkerProjectionReader) checkedWorkerDeployment(ctx context.Context, state contracts.InitialRuntimeResourceState) (*apps.Deployment, *HubWorkerWorkload, *contracts.ReleaseRecord, error) {
 	a := s.input.Activation
-	var d apps.Deployment
-	if e := s.get(ctx, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+a.Deployment.Name, &d); e != nil {
-		return nil, nil, e
+	var live apps.Deployment
+	if e := s.get(ctx, "/apis/apps/v1/namespaces/"+s.input.Namespace.Name+"/deployments/"+a.Deployment.Name, &live); e != nil {
+		return nil, nil, nil, e
+	}
+	release, e := s.client.releaseRecord(ctx, s.input.Namespace.Name, s.input.InstallationID)
+	if e != nil {
+		return nil, nil, nil, e
+	}
+	d, e := releaseOriginal(live, release, releaseHubWorker)
+	if e != nil {
+		return nil, nil, nil, e
 	}
 	if d.APIVersion != "apps/v1" || d.Kind != "Deployment" || !ownerMetadata(d.ObjectMeta, s.input.Namespace.Name, a.Deployment.Name, a.Deployment.UID) ||
 		len(d.Spec.Template.Spec.Containers) != 1 || d.Spec.Replicas == nil || *d.Spec.Replicas != 1 || d.Generation != state.Objects[11].Receipt.Generation+1 ||
 		d.Annotations[initialRuntimeResourceMarker] != state.Objects[11].OperationID || !authorization.UUID(d.Annotations[configurationLaunchAnnotation]) {
-		return nil, nil, cfg.ErrChanged
+		return nil, nil, nil, cfg.ErrChanged
 	}
 	count := 2
 	if revision, ok := d.Annotations["deployment.kubernetes.io/revision"]; ok {
 		if revision != "1" {
-			return nil, nil, cfg.ErrChanged
+			return nil, nil, nil, cfg.ErrChanged
 		}
 		count++
 	}
 	if len(d.Annotations) != count {
-		return nil, nil, cfg.ErrChanged
+		return nil, nil, nil, cfg.ErrChanged
 	}
 	n := runtimeResourceNames(s.input.InstallationID)
 	plan := HubWorkerWorkloadPlan{Namespace: s.input.Namespace.Name, Name: n.Worker, ServiceAccount: n.Worker, Configuration: n.WorkerInputs, Credentials: n.WorkerProviders, Image: d.Spec.Template.Spec.Containers[0].Image, FleetSource: s.input.FleetSource.Name, OwnerSource: n.OwnerSource, FleetGuard: s.input.FleetGuard.Name, OwnerGuard: n.OwnerSourceGuard, LeaderLease: n.Lease}
 	want, e := BuildInstalledHubWorkerWorkload(plan, s.input.InstallationID)
 	if a.WorkerLayout == contracts.HubWorkerProviderInstalledLayout {
 		if state.WorkerProvider == nil || s.input.ProviderAuthentication == nil {
-			return nil, nil, cfg.ErrChanged
+			return nil, nil, nil, cfg.ErrChanged
 		}
 		want, e = BuildProviderHubWorkerWorkload(plan, s.input.InstallationID, s.input.ClusterID, *state.WorkerProvider)
 		if e == nil {
 			e = s.currentProviderInput(ctx, state)
 		}
 	} else if state.WorkerProvider != nil || state.WorkerInputs != nil {
-		return nil, nil, cfg.ErrChanged
+		return nil, nil, nil, cfg.ErrChanged
 	}
 	if e != nil {
-		return nil, nil, e
+		return nil, nil, nil, e
 	}
 	if preparationDigest(want.Deployment) != state.Objects[11].TemplateDigest || preparationDigest(want.Account) != state.Objects[1].TemplateDigest {
-		return nil, nil, cfg.ErrChanged
+		return nil, nil, nil, cfg.ErrChanged
 	}
 	copy := d.DeepCopy()
 	*copy.Spec.Replicas = 0
 	copy.Annotations = nil
 	if normalizeInitialRuntimeObject(copy) != nil || normalizeInitialRuntimeObject(want.Deployment) != nil || !equalJSON(copy, want.Deployment) {
-		return nil, nil, cfg.ErrChanged
+		return nil, nil, nil, cfg.ErrChanged
 	}
-	return &d, want, nil
+	return &d, want, release, nil
 }
 
 func (s *InstalledWorkerProjectionReader) workload(ctx context.Context, state contracts.InitialRuntimeResourceState) error {
-	_, want, e := s.checkedWorkerDeployment(ctx, state)
+	_, want, _, e := s.checkedWorkerDeployment(ctx, state)
 	if e != nil {
 		return e
 	}
