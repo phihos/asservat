@@ -510,10 +510,10 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			// re-activates by itself and a new capture and download work.
 			restarts := installedHubRestarts(t, ctx, api, desired.TargetNamespace)
 			installedPostgresRestart(t, ctx, admin, f.PostgresContainer, installation)
-			// hub-api and the publisher exit on the database change (fail
-			// closed) and the kubelet restarts them; wait until every hub
-			// process has been Ready for 20 s.
-			installedHubSettled(t, ctx, api, desired.TargetNamespace, restarts)
+			// hub-api and the publisher exit on the re-activated root (fail
+			// closed) and the kubelet restarts them; wait for hub-api's restart,
+			// then until every hub process has been Ready for 20 s.
+			installedHubSettled(t, ctx, api, desired.TargetNamespace, restarts, prefix+"-owner-")
 			run(cluster, namespace, workload, nil, nil)
 			t.Log("installed journey: after a PostgreSQL restart the installation re-activated without operator action; a new capture was collected, published and downloaded")
 		}
@@ -1345,15 +1345,26 @@ func installedHubRestarts(t *testing.T, ctx context.Context, api kubernetes.Inte
 	return before
 }
 
-// installedHubSettled waits until every hub container has been Ready for
-// 20 s without another restart, and logs which ones restarted since before.
-func installedHubSettled(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace string, before map[string]int32) {
+// installedHubSettled waits until the container whose Pod name starts with
+// mustRestart has restarted since before (hub-api notices the re-activated
+// root on its next check and exits), then until every hub container has been
+// Ready for 20 s without another restart. It logs which ones restarted.
+func installedHubSettled(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace string, before map[string]int32, mustRestart string) {
 	t.Helper()
 	var since time.Time
 	var last map[string]int32
-	for until := time.Now().Add(4 * time.Minute); ; time.Sleep(2 * time.Second) {
+	restarted := func(current map[string]int32) bool {
+		for name, n := range current {
+			if strings.HasPrefix(name, mustRestart) && n > before[name] {
+				return true
+			}
+		}
+		return false
+	}
+	start := time.Now()
+	for until := start.Add(5 * time.Minute); ; time.Sleep(2 * time.Second) {
 		current, ready, err := installedHubContainers(ctx, api, namespace)
-		if err != nil || !ready || !maps.Equal(current, last) {
+		if err != nil || !ready || !maps.Equal(current, last) || !restarted(current) {
 			since = time.Time{}
 		} else if since.IsZero() {
 			since = time.Now()
@@ -1367,7 +1378,7 @@ func installedHubSettled(t *testing.T, ctx context.Context, api kubernetes.Inter
 				}
 			}
 			sort.Strings(restarted)
-			t.Logf("installed journey: hub processes Ready for 20 s after the PostgreSQL restart; restarted: %v", restarted)
+			t.Logf("installed journey: hub processes settled %s after re-activation (Ready for the last 20 s); restarted: %v", time.Since(start).Round(time.Second), restarted)
 			return
 		}
 		if time.Now().After(until) {
