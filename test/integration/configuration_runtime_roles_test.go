@@ -375,7 +375,12 @@ func qualifyConfigurationRuntimeRoles(t *testing.T, ctx context.Context, admin *
 	}
 	original, e := producer.Provision(ctx)
 	if e != nil {
-		t.Fatal("fixed configuration roles", e)
+		// The full cause chain (CI-only failure on main and branches).
+		chain := []string{}
+		for x := e; x != nil; x = errors.Unwrap(x) {
+			chain = append(chain, x.Error())
+		}
+		t.Fatal("fixed configuration roles", chain)
 	}
 
 	var observedAfter, freshAfter time.Time

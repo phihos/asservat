@@ -204,7 +204,7 @@ func qualifyOperationAuditOverdue(t *testing.T, ctx context.Context, admin *pgxp
 			}
 			wg.Wait()
 			if errs[0] != nil || errs[1] != nil || leases[0] != leases[1] {
-				t.Fatal("concurrent branch changed lease", errs)
+				t.Fatalf("concurrent branch changed lease: %v\n%+v\n%+v", errs, leases[0], leases[1])
 			}
 			l := leases[0]
 			// The cleanup role can request selection but cannot undo its durable fence.
