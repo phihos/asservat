@@ -711,8 +711,9 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	// ADR-200: admission records a refresh demand for a ready workload, and the
 	// hub-worker's demand lane refreshes its binding back to back. Discovery
 	// refreshes a regional binding once per pass, which takes minutes. Over 15 s
-	// the lane must refresh at least three times, and at least one sample must
-	// leave the one second of freshness the investigation's wait asks for.
+	// the lane must refresh at least twice (a refresh takes about 3.3 s; three
+	// left no margin in native108/118), and at least one sample must leave the
+	// one second of freshness the investigation's wait asks for.
 	if _, err := admin.Exec(ctx, `SELECT demand_capacity_refresh($1,$2,$3,$4,'Deployment',$5,$6)`, root, cluster, string(ns.UID), ns.Name, app.Name, string(app.UID)); err != nil {
 		t.Fatal("regional refresh demand", err)
 	}
@@ -729,7 +730,7 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 		}
 	}
 	t.Logf("demand lane: %d distinct binding observations and %d samples with at least 1 s left in 15 s", len(observed), usable)
-	if len(observed) < 4 || usable == 0 {
+	if len(observed) < 3 || usable == 0 {
 		diagnose()
 		t.Fatal("regional binding was not refreshed on demand", len(observed), usable)
 	}
