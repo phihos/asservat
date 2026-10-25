@@ -49,8 +49,8 @@ type providerInputs struct {
 	postgresEndpoint   contracts.OwnerPostgresEndpoint
 	// oneShot marks the installer's one-shot commands. Their sequential
 	// protection checks (about six reads per schema, role and resource step)
-	// were paced by the 20/20 client limiter; they use the ADR-208 opening
-	// limiter instead. Checks and deadlines are unchanged; long-running
+	// were paced by the 20/20 client limiter; they ask for the ADR-208
+	// opening budget instead. Checks and deadlines are unchanged; long-running
 	// processes keep 20/20.
 	oneShot bool
 }
@@ -254,7 +254,7 @@ func (s *providerInputs) kubernetesToken(source kms.TokenSource) *rest.Config {
 		return ownerBearerTransport{t, source}
 	}}
 	if s.oneShot {
-		return kube.WithOpeningBurst(c)
+		c.QPS, c.Burst = kube.OpeningQPS, kube.OpeningBurst
 	}
 	return c
 }
