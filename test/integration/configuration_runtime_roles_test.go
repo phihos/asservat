@@ -89,14 +89,16 @@ func (r *configurationRoleSQLRoot) ClaimConfigurationRuntimeRole(ctx context.Con
 		if r.value.State.Until.Before(until) {
 			until = r.value.State.Until
 		}
-		until = until.Truncate(time.Microsecond)
+		// UTC like the product root: the snapshot copy round-trips through JSON,
+		// and == on time.Time includes the location (fails under TZ=UTC).
+		until = until.UTC().Truncate(time.Microsecond)
 		if !n.Before(until) {
 			return contracts.ConfigurationRuntimeRoleSnapshot{}, false, cfg.ErrUnavailable
 		}
 		sources := r.snapshot(ctx).Sources
 		sources.ObservedAt, sources.Fleet.ObservedAt, sources.Owner.ObservedAt = n, n, n
 		sources.FreshUntil, sources.Fleet.FreshUntil, sources.Owner.FreshUntil = until, until, until
-		role.Claim = &contracts.ConfigurationRuntimeRoleClaim{OperationID: custodyID(), ClaimedAt: n, Until: until, DatabaseOID: db, PostmasterAt: postmaster, Sources: sources}
+		role.Claim = &contracts.ConfigurationRuntimeRoleClaim{OperationID: custodyID(), ClaimedAt: n, Until: until, DatabaseOID: db, PostmasterAt: postmaster.UTC(), Sources: sources}
 		r.claims++
 		if r.beforeClaim != nil {
 			r.beforeClaim()
