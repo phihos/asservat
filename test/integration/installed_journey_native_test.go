@@ -571,7 +571,13 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 				t.Fatal("installed preview before Pod deletion", gonePreview)
 			}
 			gone(gonePreview.SelectedPods[0].UID)
-			if code := requestCapture(map[string]any{"preview_id": gonePreview.PreviewID, "idempotency_key": keys + "-gone"}); code != "TargetGone" {
+			// OutcomeUnknown asks for a retry with the same preview and key.
+			goneRequest := map[string]any{"preview_id": gonePreview.PreviewID, "idempotency_key": keys + "-gone"}
+			code := requestCapture(goneRequest)
+			for attempt := 1; code == "OutcomeUnknown" && attempt < 4 && installedJourneyPause(ctx, 2*time.Second) == nil; attempt++ {
+				code = requestCapture(goneRequest)
+			}
+			if code != "TargetGone" {
 				diagnose()
 				t.Fatal("installed request for a deleted pinned Pod", code)
 			}
