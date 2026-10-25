@@ -7,6 +7,10 @@ workload cluster's short journey, the PostgreSQL restart and a second short jour
 stops: no second cluster, browser, Stop/Deny, expiry, deletion or replay checks. The full
 journey stays the qualification. The context harness also writes
 `test/results/context-storage-timing.log`, each output line prefixed with its elapsed seconds.
+The one-shot installer commands (schema, preparer, installer, configuration roles, continuation)
+request the ADR-208 opening budget (50 QPS, burst 100) instead of 20/20; the focused run went
+from 1186 s to 884 s (native123; resources/advance 66 s to 26 s). The `produce` command keeps
+20/20: with the higher budget it failed within 8 s (native121/122), cause not yet found.
 
 ## Incarnation lineage for per-subsystem checks (2026-10-25)
 
