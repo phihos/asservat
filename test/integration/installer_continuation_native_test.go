@@ -504,8 +504,12 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		run := installedJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose,
 			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))
+		focused := installedJourneyFocus() == "restart" && deny != nil
+		if focused {
+			deny, gone = nil, nil
+		}
 		run(cluster, namespace, workload, deny, gone)
-		if deny != nil {
+		if deny != nil || focused {
 			// ADR-226: after a lossless PostgreSQL restart the installation
 			// re-activates by itself and a new capture and download work.
 			restarts := installedHubRestarts(t, ctx, api, desired.TargetNamespace)
@@ -520,6 +524,10 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
+	if installedJourneyFocus() == "restart" {
+		t.Log("focused restart run complete: the second workload cluster, browser, Stop/Deny, expiry, deletion and replay checks were not run")
+		return
+	}
 	// S-02 exit: a second workload cluster through the same hub, product
 	// installer path and offer. Its short journey (no Deny closure) stops after
 	// the native download; the first cluster covers Stop, Deny, expiry and

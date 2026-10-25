@@ -1,5 +1,13 @@
 # Sustained implementation progress
 
+## Faster local installed iterations (2026-10-25)
+
+`ASSERVAT_JOURNEY_FOCUS=restart` (local only) runs the installed chain through the first
+workload cluster's short journey, the PostgreSQL restart and a second short journey, then
+stops: no second cluster, browser, Stop/Deny, expiry, deletion or replay checks. The full
+journey stays the qualification. The context harness also writes
+`test/results/context-storage-timing.log`, each output line prefixed with its elapsed seconds.
+
 ## Incarnation lineage for per-subsystem checks (2026-10-25)
 
 Installed run native113 showed that re-activating only `fleet_trust` after a lossless restart left
