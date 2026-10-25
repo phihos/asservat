@@ -107,7 +107,7 @@ func readInitialInputs(ctx context.Context, files *os.Root) (*initialInputs, err
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	return &initialInputs{&providerInputs{files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, c, scope, workload, artifact.Digest(sha256.Sum256(canonical))}, nil
+	return &initialInputs{&providerInputs{oneShot: true, files: files, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Postgres}, c, scope, workload, artifact.Digest(sha256.Sum256(canonical))}, nil
 }
 
 type protectedInitialWitness struct {

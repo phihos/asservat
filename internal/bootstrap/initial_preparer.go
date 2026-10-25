@@ -98,7 +98,7 @@ func newInitialPreparationDeployment(ctx context.Context, files *os.Root, observ
 	}
 	h.CloseIdleConnections()
 	root, cancel := context.WithCancel(ctx)
-	in := &providerInputs{files: files, kubernetesEndpoint: c.Kubernetes}
+	in := &providerInputs{oneShot: true, files: files, kubernetesEndpoint: c.Kubernetes}
 	d := &InitialPreparationDeployment{root: root, cancel: cancel, inputs: in, configuration: c}
 	complete := false
 	defer func() {

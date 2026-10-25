@@ -110,7 +110,7 @@ func initialBootstrapObservationTokens(ctx context.Context, files, tokens *os.Ro
 	if err != nil {
 		return zero, nil, nil, mounts.ErrUnavailable
 	}
-	in := &providerInputs{files: tokens, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Services.Postgres}
+	in := &providerInputs{oneShot: true, files: tokens, kubernetesEndpoint: c.Kubernetes, postgresEndpoint: c.Services.Postgres}
 	observer, err := kube.NewInitialBootstrapObserver(ctx, in.kubernetes("administrator-token"), v, c)
 	if err != nil {
 		in.closeHTTP()
