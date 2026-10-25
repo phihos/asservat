@@ -43,8 +43,9 @@ type releaseChange struct {
 	compiled                int64
 	schema                  releaseSchema
 	out                     io.Writer
-	// poll and settle bound the wait for both Deployments to roll out.
-	poll, settle time.Duration
+	// poll and settle bound the wait for both Deployments to roll out;
+	// stable is how long they must stay settled and unchanged.
+	poll, settle, stable time.Duration
 }
 
 func (c releaseChange) deployments(ctx context.Context) (hubAPI, hubWorker apps.Deployment, err error) {
@@ -172,13 +173,25 @@ func (c releaseChange) run(ctx context.Context) error {
 			return fmt.Errorf("%w: %s reached generation %d, not %d", cfg.ErrChanged, w.name, gen, w.gen)
 		}
 	}
+	// Settled means observed, updated and available, and unchanged (same
+	// resourceVersions, so no Ready drop from a crashing process) for stable.
 	deadline := time.Now().Add(c.settle)
+	var since time.Time
+	var seen [2]string
 	for {
 		hubAPI, hubWorker, err = c.deployments(ctx)
+		now := time.Now()
 		if err == nil && hubAPI.Spec.Template.Spec.Containers[0].Image == c.image && hubWorker.Spec.Template.Spec.Containers[0].Image == c.image && kube.HubDeploymentSettled(hubAPI) && kube.HubDeploymentSettled(hubWorker) {
-			break
+			if current := [2]string{hubAPI.ResourceVersion, hubWorker.ResourceVersion}; since.IsZero() || current != seen {
+				since, seen = now, current
+			}
+			if now.Sub(since) >= c.stable {
+				break
+			}
+		} else {
+			since = time.Time{}
 		}
-		if time.Now().After(deadline) {
+		if now.After(deadline) {
 			return fmt.Errorf("%w: hub Deployments did not settle on %s within %s; rerun to resume", cfg.ErrUnavailable, c.image, c.settle)
 		}
 		select {

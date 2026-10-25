@@ -27,15 +27,17 @@ func installedReleaseChange(t *testing.T, ctx context.Context, api kubernetes.In
 	namespace := desired.BootstrapNamespace
 	inputs := desired.Name + "-upgrade-input"
 	if _, err := api.CoreV1().Secrets(namespace).Get(ctx, inputs, meta.GetOptions{}); apierrors.IsNotFound(err) {
-		ddl, e := api.CoreV1().Secrets(namespace).Get(ctx, "operator-ddl", meta.GetOptions{})
-		if e != nil || len(ddl.Data["postgres-ddl.json"]) == 0 {
+		// The fixture removes operator-ddl after installation; its DDL role is
+		// the same synthetic schema owner as the retained producer credential.
+		ddl, e := api.CoreV1().Secrets(namespace).Get(ctx, "operator-producer", meta.GetOptions{})
+		if e != nil || len(ddl.Data["postgres-administrator.json"]) == 0 {
 			t.Fatal("operator DDL credential", e)
 		}
 		endpoint, e := json.Marshal(desired.Postgres)
 		if e != nil {
 			t.Fatal(e)
 		}
-		secret := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: inputs}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"postgres-endpoint.json": endpoint, "postgres-ddl.json": ddl.Data["postgres-ddl.json"]}}
+		secret := &core.Secret{ObjectMeta: meta.ObjectMeta{Name: inputs}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"postgres-endpoint.json": endpoint, "postgres-ddl.json": ddl.Data["postgres-administrator.json"]}}
 		if _, e = api.CoreV1().Secrets(namespace).Create(ctx, secret, meta.CreateOptions{}); e != nil {
 			t.Fatal("upgrade inputs", e)
 		}

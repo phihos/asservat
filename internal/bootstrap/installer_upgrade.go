@@ -81,7 +81,7 @@ func RunInstallerUpgrade(ctx context.Context, args []string, out io.Writer) erro
 	}
 	defer upgrade.Close()
 	if *image != "" {
-		return releaseChange{config: config, namespace: *namespace, installation: *installation, image: *image, compiled: postgres.CompiledSchemaVersion, schema: upgrade, out: out, poll: 2 * time.Second, settle: 5 * time.Minute}.run(call)
+		return releaseChange{config: config, namespace: *namespace, installation: *installation, image: *image, compiled: postgres.CompiledSchemaVersion, schema: upgrade, out: out, poll: 2 * time.Second, settle: 5 * time.Minute, stable: 20 * time.Second}.run(call)
 	}
 	from, to, err := upgrade.Run(call)
 	if err != nil {
