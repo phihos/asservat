@@ -93,7 +93,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		// The focused restart run (ASSERVAT_JOURNEY_FOCUS=restart) starts with a
 		// short journey, which must initialize processing itself.
-		initialize := !short || installedJourneyFocus() == "restart" && runs == 1
+		initialize := !short || (installedJourneyFocus() == "restart" || installedJourneyFocus() == "clusters") && runs == 1
 		cert, err := x509.ParseCertificate(publicRoot)
 		if err != nil {
 			t.Fatal("public listener root", err)
@@ -972,7 +972,9 @@ func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *c
 	fmt.Fprintf(out, "%s hold expired\n", time.Now().Format(time.TimeOnly))
 }
 
-// installedJourneyFocus is the local iteration mode: "restart" runs install,
-// one workload cluster's short journey, the PostgreSQL restart and another
-// short journey, and skips everything else. Empty runs the full journey.
+// installedJourneyFocus splits the installed journey into runs of at most 20
+// minutes. "journey": install and the first workload cluster's full journey.
+// "restart": install, a short journey, the PostgreSQL restart and another
+// short journey. "clusters": install and short journeys in both workload
+// clusters. Empty runs everything in one (longer) run.
 func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS") }

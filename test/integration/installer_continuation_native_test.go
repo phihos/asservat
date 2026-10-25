@@ -508,7 +508,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		// mode, so each run stays within the 20-minute limit and the full
 		// journey's capacity budget is unchanged.
 		focused := installedJourneyFocus() == "restart" && deny != nil
-		if focused {
+		if focused || installedJourneyFocus() == "clusters" {
 			deny, gone = nil, nil
 		}
 		run(cluster, namespace, workload, deny, gone)
@@ -527,8 +527,8 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if installedJourneyFocus() == "restart" {
-		t.Log("focused restart run complete: the second workload cluster, browser, Stop/Deny, expiry, deletion and replay checks were not run")
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" {
+		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}
 	// S-02 exit: a second workload cluster through the same hub, product
