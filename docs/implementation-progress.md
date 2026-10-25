@@ -1,5 +1,15 @@
 # Sustained implementation progress
 
+## Capture failure causes and faster local runs (2026-10-25)
+
+[ADR-225](decisions/225-context-capture-failure-causes.md) adds `targetGone`/`denied` capture
+outcomes (migration 00079, schema 79) and returns `TargetGone` for a request whose reviewed Pod
+is gone. Custody (468 PASS, including a rolled-back real-SQL check of the new phases and the
+unchanged five-second `not_after` bound) and [native109](../test/results/resumed-c62e02ac-native109/README.md)
+pass. native108 failed only the demand-lane rate check after the PR #48 bound let discovery step
+every 10 s under demand; the bound is now 30 s. Local runs: selected custody tests get 900 s, and
+the installed journey's retention is 330 s (it idled 7m11s of 600 s in native109; 330 s not yet run).
+
 ## S-02 installed exit in two workload clusters (2026-10-24)
 
 [native107](../test/results/resumed-c62e02ac-native107/README.md) passes the installed journey

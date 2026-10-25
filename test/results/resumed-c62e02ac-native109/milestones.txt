@@ -1,0 +1,32 @@
+demand lane: 6 distinct binding observations and 56 samples with at least 1 s left in 15 s
+installed journey: the processing operator initialized processing through the console
+installed browser journey: the console session submitted, resolved and saw publication of its own pod-status capture
+installed journey: MCP preview, request and resolution of a regional pod-status capture in cluster 433403d1-0bb1-4d98-b033-5b09ab0d0dcd as the Keycloak user
+installed journey: an exact duplicate request_capture replayed the original capture and a changed request under the same key was Conflict, with one admission row
+installed journey: the regional capture in cluster 433403d1-0bb1-4d98-b033-5b09ab0d0dcd was collected, verified and published
+installed approved query: one exact shared worker, 2 paid poll(s), 1 joined batch(es), three consumed key roles per batch; no native session
+installed journey: real read-only OAuth scope received approved pod-status content through shared acquisition; native-download scope was absent and preparation refused
+installed journey: the Keycloak user downloaded the native pod-status file (354 bytes) of cluster 433403d1-0bb1-4d98-b033-5b09ab0d0dcd through the hub-local worker
+installed journey: range plus If-Range resume matched the full native file; the Completed session refused another range and kept its charges (708 output, 16777216 read bytes)
+installed journey: the SQL catalog, verification, capture and custody rows of the published artifact contain no native evidence text
+installed browser journey: console and MCP previews agree on scope, selected Pod, impact/unknowns, blockers/warnings, data exposure and retention/deletion
+installed approved query: one exact shared worker, 2 paid poll(s), 1 joined batch(es), three consumed key roles per batch; no native session
+installed browser journey: console case and approved pod-status extract equal the MCP replies
+installed query worker: original lifetime ended, exact Job/Pod terminated, product demand cleanup retained positive retirement before Stop
+installed browser journey: the console session downloaded the native pod-status file (354 bytes, SHA-256 equal to the MCP download)
+installed journey: an unrelated eligible Keycloak user was refused on MCP diagnostics, preview, request, case and download preparation exactly as for absent objects
+installed query worker: original lifetime ended, exact Job/Pod terminated, product demand cleanup retained positive retirement before Stop
+installed Stop call 1: download 39f58792-87da-436c-977a-68bef02ee2ce request 53b8a266-49ad-4a8c-a6cd-ead1ee5fd665 state Cancelled audit recorded
+installed Stop call 2: download 39f58792-87da-436c-977a-68bef02ee2ce request 53b8a266-49ad-4a8c-a6cd-ead1ee5fd665 state Cancelled audit recorded
+installed journey: Stop after accepted Deny remained Cancelled on exact-key replay and restored access; original content route returned only a bounded problem response (no active-stream interruption tested)
+installed journey: accepted Deny accompanied refusal; removing it restored the original artifact
+installed journey: request for a deleted pinned Pod returned TargetGone and started no capture
+installed journey: 2m48s after acceptance, waiting 7m11s for the original expiry
+installed journey: an installed cleanup lease expired under the exact inventory denial; original evidence, receipts, deadlines and storage/control charges remain, with no purge checkpoint
+installed journey: all evidence objects, versions, markers and multipart uploads are absent; acknowledged audit receipt matches its immutable ciphertext version; evidence storage refunded while control charges remain
+installed journey: after original expiry, case and new preparation refused while current workload diagnostics succeeded; independent deletion verified
+demand lane: 4 distinct binding observations and 47 samples with at least 1 s left in 15 s
+installed journey: MCP preview, request and resolution of a regional pod-status capture in cluster 2d97e18e-733f-44ba-9074-96566c4efcae as the Keycloak user
+installed journey: the regional capture in cluster 2d97e18e-733f-44ba-9074-96566c4efcae was collected, verified and published
+installed journey: the Keycloak user downloaded the native pod-status file (354 bytes) of cluster 2d97e18e-733f-44ba-9074-96566c4efcae through the hub-local worker
+installed journey: short journey in cluster 2d97e18e-733f-44ba-9074-96566c4efcae complete; its native file names Pod 0c6530c7-9cc7-433f-826b-bde8a0ab5b1f in namespace 7ed9f740-2a9b-46e3-97c0-faeb6aff6f80

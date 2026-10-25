@@ -84,7 +84,14 @@ Still not installed-qualified, against the
 
 - hub disconnect/reconnect importing a committed result (documented limitation, ADR-223:
   a lost regional completion reply is not imported and the collection is never repeated);
-- user-visible Partial/Unavailable for lost target and object/KMS failure (component tests only).
+- object/KMS failure states in the installed run: object-store failure reports
+  `Indeterminate`/`StorageOutcomeUnconfirmed` and exhausted capacity `CapacityUnavailable`
+  (component tests); a key-service failure before the start stays Pending until the deadline
+  marks it Indeterminate.
+
+A lost target is installed-qualified in [native109](../test/results/resumed-c62e02ac-native109/README.md):
+a request for a deleted reviewed Pod returns `TargetGone`; a started capture records
+`TargetGone` or `Denied` ([ADR-225](decisions/225-context-capture-failure-causes.md)).
 
 Future forecasts must use bounded deliverables with explicit implementation,
 integration and qualification work; account for dependencies and shared foundations;

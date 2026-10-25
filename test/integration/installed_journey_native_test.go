@@ -54,8 +54,9 @@ func (b installedJourneyBearer) RoundTrip(r *http.Request) (*http.Response, erro
 // diagnose prints the hub processes' logs before a failure ends the test.
 // installedJourneyRetention is the requested evidence access lifetime in
 // seconds: long enough to collect, publish and download, short enough to
-// wait for expiry.
-const installedJourneyRetention = 600
+// wait for expiry. native109 reached the expiry wait 168 s after acceptance;
+// 330 s keeps about twice that.
+const installedJourneyRetention = 330
 
 type installedJourneyDownload struct {
 	DownloadID          string    `json:"download_id"`
