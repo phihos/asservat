@@ -484,11 +484,15 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		t.Fatal("administrator baseline edit", err)
 	}
 	sequence, _ = installerHubRetentionReady(t, ctx, api, admin, desired.TargetNamespace, installation, p.RootID, original.Plan.ClusterID, sequence+1)
-	installerCrashHubWorker(t, ctx, api, desired.TargetNamespace, prefix+"-worker")
-	if _, restarted := installerHubRetentionReadyEpoch(t, ctx, api, admin, desired.TargetNamespace, installation, p.RootID, original.Plan.ClusterID, sequence, epoch); restarted == epoch {
-		t.Fatal("restarted hub-worker kept the old retention epoch")
+	// The hub-worker crash costs about a minute; within the 20-minute split it
+	// runs in the restart run (and the unsplit run) only.
+	if focus := installedJourneyFocus(); focus == "" || focus == "restart" {
+		installerCrashHubWorker(t, ctx, api, desired.TargetNamespace, prefix+"-worker")
+		if _, restarted := installerHubRetentionReadyEpoch(t, ctx, api, admin, desired.TargetNamespace, installation, p.RootID, original.Plan.ClusterID, sequence, epoch); restarted == epoch {
+			t.Fatal("restarted hub-worker kept the old retention epoch")
+		}
+		t.Log("baseline edit accepted and hub-worker restart Ready under a new epoch")
 	}
-	t.Log("baseline edit accepted and hub-worker restart Ready under a new epoch")
 	t.Log("promoted owner Ready with download sources, operator public Secret and observation on 9444")
 	// ADR-193 step 5: a regional cluster installed by installer-cluster.
 	// The first installed S-02 slice runs once the regional workload holds a
