@@ -52,7 +52,7 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	}
 	var f fixture
 	raw, err := os.ReadFile(os.Getenv("ASSERVAT_CONTEXT_FIXTURES"))
-	if err != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 1 && (len(f.Clusters) != 3 || os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") != "1") || f.WorkerImage == "" || f.NativeProviders.Postgres == "" {
+	if err != nil || json.Unmarshal(raw, &f) != nil || len(f.Clusters) != 1 && (len(f.Clusters) != installedClusterCount() || os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") != "1") || f.WorkerImage == "" || f.NativeProviders.Postgres == "" {
 		t.Fatal("owned single-cluster/native services unavailable")
 	}
 	installedMode := os.Getenv("ASSERVAT_INSTALLER_CONTINUATION") == "1"
@@ -799,4 +799,13 @@ func initialBootstrapChainRemovedGuard(err error, d contracts.InitialBootstrap) 
 		}
 	}
 	return false
+}
+
+// installedClusterCount is the hub plus its workload clusters: two for the
+// focused runs that use one workload cluster, three otherwise.
+func installedClusterCount() int {
+	if f := installedJourneyFocus(); f == "restart" || f == "journey" {
+		return 2
+	}
+	return 3
 }

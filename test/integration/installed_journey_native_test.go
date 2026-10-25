@@ -54,9 +54,10 @@ func (b installedJourneyBearer) RoundTrip(r *http.Request) (*http.Response, erro
 // diagnose prints the hub processes' logs before a failure ends the test.
 // installedJourneyRetention is the requested evidence access lifetime in
 // seconds: long enough to collect, publish and download, short enough to
-// wait for expiry. native109 reached the expiry wait 168 s after acceptance;
-// 330 s keeps about twice that.
-const installedJourneyRetention = 330
+// wait for expiry. CI reached the expiry wait 155 s after acceptance (local
+// native109: 168 s); 240 s keeps about 50 % margin and lets the cluster's full
+// journey fit one 20-minute run.
+const installedJourneyRetention = 240
 
 type installedJourneyDownload struct {
 	DownloadID          string    `json:"download_id"`
@@ -76,10 +77,11 @@ type installedJourneyDownload struct {
 // processing. Its idempotency keys carry the cluster so they never collide
 // with the full journey's keys.
 func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, identity *installedIdentity, publicRoot []byte, address, origin string, diagnose func(), deletionCheck func(artifactID string) func(), projectionCheck installedProjectionCheck) func(cluster, namespace, workload string, deny func(bool), gone func(podUID string)) {
-	// Each further run in the same installation gets its own idempotency keys.
-	runs := 0
+	// Each further run in the same installation gets its own idempotency keys;
+	// the count spans every cluster's journey in this test process.
 	return func(cluster, namespace, workload string, deny func(bool), gone func(podUID string)) {
-		runs++
+		installedJourneyRuns++
+		runs := installedJourneyRuns
 		t.Helper()
 		if identity == nil {
 			t.Fatal("installed journey requires the harness identity provider")
@@ -93,7 +95,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		// The focused restart run (ASSERVAT_JOURNEY_FOCUS=restart) starts with a
 		// short journey, which must initialize processing itself.
-		initialize := !short || installedJourneyFocus() == "restart" && runs == 1
+		initialize := !short || (installedJourneyFocus() == "restart" || installedJourneyFocus() == "clusters") && runs == 1
 		cert, err := x509.ParseCertificate(publicRoot)
 		if err != nil {
 			t.Fatal("public listener root", err)
@@ -972,7 +974,13 @@ func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *c
 	fmt.Fprintf(out, "%s hold expired\n", time.Now().Format(time.TimeOnly))
 }
 
-// installedJourneyFocus is the local iteration mode: "restart" runs install,
-// one workload cluster's short journey, the PostgreSQL restart and another
-// short journey, and skips everything else. Empty runs the full journey.
+// installedJourneyFocus splits the installed journey into runs of at most 20
+// minutes. "journey": install and the first workload cluster's full journey.
+// "restart": install, a short journey, the PostgreSQL restart and another
+// short journey. "clusters": install and short journeys in both workload
+// clusters. Empty runs everything in one (longer) run.
 func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS") }
+
+// installedJourneyRuns counts journey runs in this installation; only the
+// first initializes processing.
+var installedJourneyRuns int

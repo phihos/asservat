@@ -22,8 +22,12 @@ declare -A suites=(
   [context-1]="$context --run ^TestI"
   [context-2]="$context --run ^Test[A-HJ-Z]"
   [continuation]="$context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
-  # ADR-226: install, one cluster, PostgreSQL restart, capture again (focused).
+  # The installed journey in three runs of at most 20 minutes (the unsplit
+  # continuation above takes about 25): the first cluster's full journey, the
+  # PostgreSQL restart (ADR-226) and both workload clusters.
+  [continuation-journey]="env ASSERVAT_JOURNEY_FOCUS=journey $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-restart]="env ASSERVAT_JOURNEY_FOCUS=restart $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  [continuation-clusters]="env ASSERVAT_JOURNEY_FOCUS=clusters $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [direct-observation]="$context --run ^TestDirectHolderObservationWithRealKubernetes\$"
   [federation-regional]="$context --run ^TestFederationRegionalProductWithRealKubernetes\$"
   [initial-handover]="$context --initial-handover"

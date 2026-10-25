@@ -1,5 +1,17 @@
 # Sustained implementation progress
 
+## CI-only time-zone failures and faster installed runs (2026-10-25)
+
+Two failures that occurred only on CI (TZ=UTC), also on `main`, are fixed. A fresh operation
+purge lease carried the driver's Local location while a replayed lease came back from JSON in
+UTC, so `==` failed (custody operation-audit-overdue; product fix). The configuration-role test
+fixture compared claims with `==` while keeping driver/deadline times in Local
+(initial-installation; test fix). Both pass locally under TZ=UTC and on CI.
+
+Focused installed runs create kind clusters concurrently, use two clusters, run without `-race`
+(the test process is a client; product Pods are built without it) and record the go test exit
+code: 884 s (native123) to 828 s (native127).
+
 ## Faster local installed iterations (2026-10-25)
 
 `ASSERVAT_JOURNEY_FOCUS=restart` (local only) runs the installed chain through the first

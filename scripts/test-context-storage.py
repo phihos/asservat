@@ -8,6 +8,7 @@ cluster; it contains no multi-cluster assertions. Ordinary selections retain two
 No host kernel configuration or privileged collector is installed.
 """
 import argparse
+import concurrent.futures
 import json
 import hashlib
 import os
@@ -322,6 +323,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     # ADR-193 step 6: the Helm registry/chart infrastructure, another test.
     helm_bootstrap = helm_bootstrap or helm_cluster
     test_pattern, cluster_count = qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation)
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey"):
+        cluster_count = 2  # these focused journeys use one workload cluster
     helm_test = "TestHelmClusterInstallWithRealServices" if helm_cluster else "TestHelmBootstrapWithRealServices"
     if helm_cluster:
         test_pattern = "^" + helm_test + "$"
@@ -473,11 +476,15 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             fixture["twoClusterPods"] = two_cluster_pods
             if helm_bootstrap:
                 fixture["helmBootstrap"] = {"registryConfig": registry.material(), "productBinary": str(image_dir/"asservat"), "chartArchive": str(chart_archive)}
+            # Create every owned cluster concurrently (each takes about 40 s);
+            # per-cluster setup below then runs in order as before.
+            creates = []
+            existing = run(["kind", "get", "clusters"]).splitlines()
             for index in range(cluster_count):
                 name = network+"-"+str(index)
                 config = work/("kube-"+str(index))
                 # Refuse collisions before recording ownership; never reuse a cluster.
-                if name in run(["kind", "get", "clusters"]).splitlines(): raise RuntimeError("cluster name collision")
+                if name in existing: raise RuntimeError("cluster name collision")
                 clusters.append(name)
                 print("Creating owned synthetic cluster", index+1, flush=True)
                 # Retain only until our finally cleanup so setup failures can be
@@ -493,7 +500,17 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     kind_config.write_text(json.dumps({"kind":"Cluster", "apiVersion":"kind.x-k8s.io/v1alpha4", "nodes":[{"role":"control-plane", "extraMounts":[mount]}]}))
                     create += ["--config", str(kind_config)]
                     report["ephemeralNodeState"] = {"volume":ephemeral_volumes[-1], "maxBytes":3*1024**3, "storage":"tmpfs", "scope":"Synthetic API node only; original startup/product deadlines, no persistence qualification"}
-                run(create)
+                creates.append(create)
+            # The first create alone sets up Kind's shared Docker network; the
+            # rest run concurrently.
+            if creates:
+                run(creates[0])
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(creates)-1)) as pool:
+                for future in [pool.submit(run, create) for create in creates[1:]]:
+                    future.result()
+            for index in range(cluster_count):
+                name = network+"-"+str(index)
+                config = work/("kube-"+str(index))
                 config.chmod(0o600)
                 run(["docker", "update", "--memory", "3g", "--memory-swap", "3g", "--cpus", "2", name+"-control-plane"])
                 if index == 0 or two_cluster_pods:
@@ -586,7 +603,10 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             if keep_on_failure:
                 env["ASSERVAT_KEEP_ON_FAILURE"] = "1"
 
-            command = ["go", "test", "-race", "-count=1", "-v"]
+            # The installed journey's test process is a client waiting on
+            # Kubernetes; the product runs in Pods built without -race. Race
+            # coverage stays with the component and unit suites.
+            command = ["go", "test", "-count=1", "-v"] if installer_continuation else ["go", "test", "-race", "-count=1", "-v"]
             if test_pattern:
                 command += ["-run", test_pattern]
             aggregate_timeout = qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation)
@@ -605,6 +625,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     log.write(line)
                     timing.write(("%8.1f " % (time.monotonic() - began)).encode() + line)
                 exit_code = process.wait()
+            report["goTestExit"] = exit_code
             raw_output = (ROOT/"test/results/context-storage.log").read_bytes()
             try:
                 output = raw_output.decode("utf-8")

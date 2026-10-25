@@ -317,7 +317,10 @@ func (s *OperationLifecycles) BeginOperationPurge(ctx context.Context, operation
 		if phase == "terminal" {
 			objects = append(objects, *state.CertificateReceipt)
 		}
-		out = value.OperationPurgeLease{RootID: state.Intent.RootID, OperationID: operation, StoreID: b.Policy.StoreID, InstallationID: b.Policy.InstallationID, IssuerEpoch: uid(d.IssuerEpoch), Phase: phase, PostmasterAt: d.PostmasterAt.Time, DatabaseOID: d.DatabaseOid.Uint32, ObjectsDigest: app.OperationLifecycleDigest(objects), WritersDigest: app.OperationLifecycleDigest([]value.OperationWriteCompletion{*state.IntentWriter, *state.OutcomeWriter}), Fence: d.LeaseFence + 1, StartedAt: now, Until: until}
+		out = value.OperationPurgeLease{RootID: state.Intent.RootID, OperationID: operation, StoreID: b.Policy.StoreID, InstallationID: b.Policy.InstallationID, IssuerEpoch: uid(d.IssuerEpoch), Phase: phase, PostmasterAt: d.PostmasterAt.Time, DatabaseOID: d.DatabaseOid.Uint32, ObjectsDigest: app.OperationLifecycleDigest(objects), WritersDigest: app.OperationLifecycleDigest([]value.OperationWriteCompletion{*state.IntentWriter, *state.OutcomeWriter}), Fence: d.LeaseFence + 1, StartedAt: now.UTC(), Until: until.UTC()}
+		// A replayed lease is decoded from JSON in UTC; a fresh one must compare
+		// equal to it (== on time.Time includes the location).
+		out.PostmasterAt = out.PostmasterAt.UTC()
 		if !out.Valid() {
 			return time.Time{}, app.ErrUnavailable
 		}

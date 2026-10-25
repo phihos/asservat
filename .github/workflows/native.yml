@@ -68,7 +68,7 @@ jobs:
           grep -ohE '[a-z0-9./-]+@sha256:[0-9a-f]{64}' scripts/test-*.py | sort -u > /tmp/images
           nohup sh -c 'while read -r i; do docker pull -q "$i" & done < /tmp/images; wait' > /tmp/pulls.log 2>&1 &
       - uses: ./.github/actions/setup
-        with: { console: "true", sql-tools: "true", kind: "true", helm: "true" }
+        with: { console: "true", sql-tools: "true", kind: "true", helm: "${{ startsWith(matrix.suite, 'helm') }}" }
       - name: Run ${{ matrix.suite }}
         env:
           SUITE: ${{ matrix.suite }}
