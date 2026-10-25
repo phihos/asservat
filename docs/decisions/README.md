@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-225 — Context capture failure causes](225-context-capture-failure-causes.md)
+records `targetGone`/`denied` capture outcomes (migration 00079) shown as action
+phases TargetGone/Denied, and returns TargetGone for a request whose reviewed Pod
+is gone.
+
 [ADR-224 — Remove download-owned browser refresh](224-remove-download-refresh-owners.md)
 supersedes ADR-114: browser prepare is the ordinary audited call, the content
 GET reads the current session and fails closed when it needs refreshing, and

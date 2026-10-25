@@ -105,6 +105,16 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 			out.ActionPhase = "Failed"
 			out.ReasonCode = "AcquisitionFailed"
 			return out, nil
+		case "targetGone":
+			out.Phase = "Failed"
+			out.ActionPhase = "TargetGone"
+			out.ReasonCode = "PinnedPodGone"
+			return out, nil
+		case "denied":
+			out.Phase = "Failed"
+			out.ActionPhase = "Denied"
+			out.ReasonCode = "PodStatusDenied"
+			return out, nil
 		case "storeUnconfirmed":
 			out.Phase = "Indeterminate"
 			out.ActionPhase = "Indeterminate"

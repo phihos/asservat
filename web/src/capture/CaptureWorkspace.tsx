@@ -53,6 +53,8 @@ function Assessment({ preview }: { preview: Preview }) {
   </>;
 }
 
+const actionLabels: Record<string, string> = { Finalizing: 'Verifying and publishing', TargetGone: 'The selected Pod no longer exists; nothing was collected', Denied: 'Kubernetes denied reading the Pod status; nothing was collected' };
+
 export function CaptureWorkspace({ session, scope, controller }: { session: Session; scope: AbortSignal; controller: Investigation }) {
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
   const [customRetention, setCustomRetention] = useState(false);
@@ -125,7 +127,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         <h2 aria-live="polite">{phases[state.progress.phase]}</h2>
         {state.progress.phase === 'Pending' && <p>Your request was accepted. Collection has not been confirmed.</p>}
         {state.progress.phase === 'Finalizing' && <p>Uploaded evidence still needs verification and publication before it is available.</p>}
-        <ul className="progress-actions">{state.progress.actions.map(action => <li key={action.action_id}><span>{action.action_id === 'pod-status' ? 'Pod status' : action.action_id}</span><span>{action.phase === 'Finalizing' ? 'Verifying and publishing' : action.phase}</span></li>)}</ul>
+        <ul className="progress-actions">{state.progress.actions.map(action => <li key={action.action_id}><span>{action.action_id === 'pod-status' ? 'Pod status' : action.action_id}</span><span>{actionLabels[action.phase] ?? action.phase}</span></li>)}</ul>
         {state.progress.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
         {state.progress.case_id && <p><a className="button" href={"/cases/" + state.progress.case_id}>View evidence</a></p>}
       </> : !state.error && <p role="status">Checking collection status…</p>}

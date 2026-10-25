@@ -167,19 +167,20 @@ func TestCapacityReconcilerDemandDefersDiscoveryOnlyBoundedly(t *testing.T) {
 	q.RootBacking.QualificationID, q.RootBacking.QualificationDigest = q.ID, q.Digest
 	demanded := &capacityGuardedRuntime{capacityRuntimeReader: &capacityRuntimeReader{recovery: f.recovery}}
 	start := time.Now()
-	// Twenty simulated seconds per real second: 1.2 s covers two deferrals.
-	now := func() time.Time { return f.now.Add(20 * time.Since(start)) }
+	// Thirty simulated seconds per real second: 1.6 s is 48 s, one bound,
+	// inside the one-minute demand, which stays valid for the whole run.
+	now := func() time.Time { return f.now.Add(30 * time.Since(start)) }
 	work := &CapacityWorkReconciler{Qualification: q, Recovery: demanded, Permissions: demanded, Processing: demanded, Root: &RootBackingCoordinator{}, Enrollment: &EnrollmentCoordinator{}, Bindings: demanded, Now: now}
 	cluster := q.NamespaceGuards[0].ClusterID
 	runner := CapacityReconciler{Source: source, Work: work, Clusters: []CapacityClusterReaders{
 		{ClusterID: cluster, Workloads: demanded, Guard: demanded, Guarded: demanded},
 	}, Demands: staticCapacityDemands{{ClusterID: cluster, Namespace: cfg.NamespaceRef{Name: "payments", UID: "ns-uid"}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: "api-uid"}, NotAfter: f.now.Add(time.Minute)}}}
-	ctx, cancel := context.WithTimeout(context.Background(), 1200*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 1600*time.Millisecond)
 	_ = runner.Run(ctx)
 	cancel()
-	// One step counts its LIST and its candidate read; only the first step
-	// would run without the bound.
-	if n := demanded.discovered.Load(); n < 3 || n > 6 {
+	// Each step is one LIST or one candidate read. Without the bound only the
+	// step before the demand is published runs; with it, one more at 30 s.
+	if n := demanded.discovered.Load(); n != 2 {
 		t.Fatal("demand did not defer discovery boundedly", n)
 	}
 }

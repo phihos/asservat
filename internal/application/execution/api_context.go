@@ -339,7 +339,7 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 				err = value.ErrUnavailable
 			}
 		default:
-			result.CompletedAt, result.Phase = acquired, "captureFailed"
+			result.CompletedAt, result.Phase = acquired, captureFailurePhase(err)
 			if acquired.IsZero() {
 				result.CompletedAt = s.Now().UTC().Truncate(time.Microsecond)
 			}
@@ -353,7 +353,7 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	end()
 	defer clear(native)
 	result.CompletedAt = acquired
-	result.Phase = "captureFailed"
+	result.Phase = captureFailurePhase(err)
 	if err == nil && captureErr == nil && acquired.Before(d.ValidUntil) && len(native) > 0 && len(native) <= artifact.MaxContextBytes {
 		result.AcquiredAt = acquired
 		result.Copies, err = prepared.StoreContext(ctx, native, r.StartedAt, acquired)
@@ -423,4 +423,16 @@ func (e executeStep) FixedStep() string {
 		return e.step + "/" + inner.FixedStep()
 	}
 	return e.step
+}
+
+// captureFailurePhase records why a started capture produced no output: the
+// pinned Pod is gone or Kubernetes denied the read; anything else is generic.
+func captureFailurePhase(err error) string {
+	switch {
+	case errors.Is(err, targets.ErrChanged):
+		return "targetGone"
+	case errors.Is(err, targets.ErrDenied):
+		return "denied"
+	}
+	return "captureFailed"
 }

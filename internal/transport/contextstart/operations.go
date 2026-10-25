@@ -41,6 +41,8 @@ var operationFailures = []struct {
 }{
 	{"preparation-uncertain", value.ErrPreparationUncertain},
 	{"store-unconfirmed", evidence.ErrContextStoreUnconfirmed},
+	{"target-changed", targets.ErrChanged},
+	{"target-denied", targets.ErrDenied},
 	{"denied", value.ErrDenied},
 	{"invalid", value.ErrInvalid},
 	{"expired", value.ErrExpired},

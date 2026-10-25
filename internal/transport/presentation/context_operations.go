@@ -231,6 +231,11 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 			return OperationFailure{"ProcessingCoverageUnavailable", "Evidence cannot currently be kept for the selected duration. Check the original request's status before trying again; an earlier attempt may have been accepted.", false}
 		}
 		return OperationFailure{"ProcessingCoverageUnavailable", "Evidence cannot currently be kept for the selected duration. Ask an administrator to review the retention limits and available capacity.", false}
+	case request && errors.Is(err, targets.ErrChanged):
+		// The requester already reviewed this Pod in its preview, so naming its
+		// disappearance discloses nothing new. Retrying the same preview cannot
+		// succeed; the workload must be reviewed again.
+		return OperationFailure{"TargetGone", "The reviewed Pod no longer exists or was replaced. This request started no capture. Preview the workload again to select its current Pod.", false}
 	case errors.Is(err, value.ErrCapacity):
 		return OperationFailure{"CapacityUnavailable", "Capacity is unavailable. Retry the same request after capacity becomes available.", true}
 	case !request && (errors.Is(err, value.ErrDenied) || errors.Is(err, identity.ErrDenied) || errors.Is(err, targets.ErrDenied)):

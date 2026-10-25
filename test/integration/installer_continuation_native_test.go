@@ -491,7 +491,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	// The first installed S-02 slice runs once the regional workload holds a
 	// fresh binding; it reads the public root generated during provider apply.
 	publicAddress := net.JoinHostPort(nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID), "31450")
-	journey := func(cluster, namespace, workload string, deny func(bool)) {
+	journey := func(cluster, namespace, workload string, deny func(bool), gone func(string)) {
 		diagnose := func() {
 			installedSQLActivityDiagnostics(ctx, admin.Query, installation, t.Logf)
 			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-owner", prefix+"-worker", contracts.PublisherName(installation))
@@ -500,7 +500,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
 		installedJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose,
-			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))(cluster, namespace, workload, deny)
+			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))(cluster, namespace, workload, deny, gone)
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
@@ -508,7 +508,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	// installer path and offer. Its short journey (no Deny closure) stops after
 	// the native download; the first cluster covers Stop, Deny, expiry and
 	// deletion.
-	short := func(cluster, namespace, workload string, _ func(bool)) { journey(cluster, namespace, workload, nil) }
+	short := func(cluster, namespace, workload string, _ func(bool), _ func(string)) { journey(cluster, namespace, workload, nil, nil) }
 	qualifyRegionalInstall(t, ctx, f, 2, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, short, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
 	// After the guard bridge, the same five-command profile replays (as on
 	// upgrade), finds the installation complete and preserves guard/journal state.

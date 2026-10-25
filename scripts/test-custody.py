@@ -219,11 +219,12 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
             # The expanded full suite reached the 600-second aggregate alarm
             # after context completed in 589.63 seconds and the next custody
             # case had run for only seven seconds (native-3, 2026-10-13).
-            # Actual retirement/backup waits remain unchanged. Give only this
-            # aggregate process 900 seconds (960 including harness cleanup).
-            # Selected, fleet, initial and recovery runs keep their 300-second
-            # limit. No individual authority/provider/retention deadline changes.
-            full_custody = not (test_pattern or fleet or initial_installation or database_recovery or connector_retirement or scoped_audit or owner_audit_inventory)
+            # Actual retirement/backup waits remain unchanged. Give the full
+            # suite, and a selected run (one selected test alone may take about
+            # 650 seconds), 900 seconds (960 including harness cleanup). Fleet,
+            # initial and recovery runs keep their 300-second limit. No
+            # individual authority/provider/retention deadline changes.
+            full_custody = not (fleet or initial_installation or database_recovery or connector_retirement or scoped_audit or owner_audit_inventory)
             test_timeout = 2400 if connector_retirement else (900 if full_custody else 300)
             report["connectorRetirementRealtime"] = connector_retirement
             report["goTestTimeoutSeconds"] = test_timeout

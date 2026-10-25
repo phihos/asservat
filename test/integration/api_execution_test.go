@@ -203,6 +203,26 @@ func qualifyAPIExecutionTransactions(t *testing.T, ctx context.Context, admin *p
 				if err != nil {
 					t.Fatal(err)
 				}
+				// Migration 79: a started capture may end targetGone or denied
+				// without an acquisition, never with one. Rolled back. The
+				// five-second not_after bound is untouched.
+				var notAfterBound string
+				if err = admin.QueryRow(ctx, `SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='context_execution'::regclass AND conname='context_execution_check'`).Scan(&notAfterBound); err != nil || !strings.Contains(notAfterBound, "not_after > not_before") || strings.Contains(notAfterBound, "phase") {
+					t.Fatal("not_after bound replaced", notAfterBound, err)
+				}
+				for _, cause := range []string{"targetGone", "denied"} {
+					for _, acquired := range []bool{false, true} {
+						tx, err := admin.Begin(ctx)
+						if err != nil {
+							t.Fatal(err)
+						}
+						_, err = tx.Exec(ctx, `UPDATE context_execution SET phase=$2,completed_at=clock_timestamp(),acquired_at=CASE WHEN $3 THEN started_at END WHERE capture_id=$1 AND phase='started'`, execution.Binding.CaptureID, cause, acquired)
+						_ = tx.Rollback(ctx)
+						if (err == nil) == acquired {
+							t.Fatal("capture failure cause", cause, acquired, err)
+						}
+					}
+				}
 				bound, err := store.ForCustody(accepted.Expectation.Registration.StoreID)
 				if err != nil {
 					t.Fatal(err)

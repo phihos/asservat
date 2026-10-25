@@ -6,12 +6,14 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/targets"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -26,9 +28,9 @@ const ContextFormat = artifact.ContextFormat
 // projectionDigest. It does not permit free text or arbitrary JSON pointers.
 const ProjectionDefinition = artifact.ContextProjectionDefinition
 
-var ErrTargetChanged = errors.New("pinned pod identity changed or unavailable")
+var ErrTargetChanged = fmt.Errorf("pinned pod identity changed or unavailable: %w", targets.ErrChanged)
 var ErrContextUnavailable = errors.New("bounded pod status unavailable")
-var ErrContextDenied = errors.New("Kubernetes denied pod status access")
+var ErrContextDenied = fmt.Errorf("Kubernetes denied pod status access: %w", targets.ErrDenied)
 
 func contextError(err error) error {
 	if apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err) {
