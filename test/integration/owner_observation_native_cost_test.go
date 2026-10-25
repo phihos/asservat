@@ -314,7 +314,7 @@ func TestOwnerObservationReceiverOriginalBudgetWithRealServices(t *testing.T) {
 		observerCount += n
 		firstCount += measured.FirstNative.Requests[0][i]
 	}
-	if firstCount < 94 || observerCount < firstCount || observerCount > 121 || measured.Native.Requests[0][9] != 0 || measured.Native.Requests[1][9] != 0 {
+	if firstCount < 94 || observerCount < firstCount || observerCount > 121 || measured.Native.Requests[0][10] != 0 || measured.Native.Requests[1][10] != 0 {
 		t.Fatal("unexpected concrete request graph", firstCount, observerCount, measured.Native.Requests)
 	}
 	if measured.TotalNanos < int64(3500*time.Millisecond) || measured.TotalNanos > int64(5500*time.Millisecond) {

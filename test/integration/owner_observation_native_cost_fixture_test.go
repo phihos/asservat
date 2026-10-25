@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"asservat.local/asservat/internal/contracts"
 	"context"
 	"encoding/hex"
 	"strings"
@@ -118,7 +119,7 @@ func newOwnerObservationNativeCostFixture(t *testing.T, ctx context.Context, f f
 	for _, account := range []string{"observer", "probe"} {
 		rules := []rbac.PolicyRule{{APIGroups: []string{"apps"}, Resources: []string{"deployments"}, ResourceNames: []string{"owner"}, Verbs: []string{"get", "update"}}}
 		if account == "observer" {
-			rules = []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"services", "serviceaccounts"}, ResourceNames: []string{"owner"}, Verbs: []string{"get"}}, {APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}}, {APIGroups: []string{"apps"}, Resources: []string{"replicasets"}, Verbs: []string{"get"}}, {APIGroups: []string{"apps"}, Resources: []string{"deployments"}, ResourceNames: []string{"owner"}, Verbs: []string{"get"}}, {APIGroups: []string{"discovery.k8s.io"}, Resources: []string{"endpointslices"}, Verbs: []string{"list"}}}
+			rules = []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"services", "serviceaccounts"}, ResourceNames: []string{"owner"}, Verbs: []string{"get"}}, {APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}}, {APIGroups: []string{"apps"}, Resources: []string{"replicasets"}, Verbs: []string{"get"}}, {APIGroups: []string{"apps"}, Resources: []string{"deployments"}, ResourceNames: []string{"owner"}, Verbs: []string{"get"}}, {APIGroups: []string{"discovery.k8s.io"}, Resources: []string{"endpointslices"}, Verbs: []string{"list"}}, {APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{contracts.ReleaseRecordName(x.pool.InstallationID)}, Verbs: []string{"get"}}}
 		}
 		if _, e = admin.RbacV1().Roles(name).Create(ctx, &rbac.Role{ObjectMeta: meta.ObjectMeta{Name: account}, Rules: rules}, meta.CreateOptions{}); e != nil {
 			t.Fatal(e)
