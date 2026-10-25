@@ -54,6 +54,11 @@ kubelet restarts them and they come back Ready under the re-activated root. nati
 re-activation 2 s after the restart; the installed journey waits until every hub process has
 been Ready for 20 s before capturing again.
 
+Availability after a restart: re-activation takes about 2 s. The permission reconciler's epoch
+fails with the restart and retries after its 30 s SQL controller lease, so authority-dependent
+operations are refused for roughly a minute (native117); the installed journey waits until the
+permission stream is current again before capturing.
+
 What stays blocked for the separate restore protocol: archive recovery (pgBackRest restore,
 point-in-time recovery, promotion), which PostgreSQL ends on a new timeline; a logical restore
 into a new database (new OID); another cluster (new system identifier); any server with

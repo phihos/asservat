@@ -1325,6 +1325,19 @@ func installedPostgresRestart(t *testing.T, ctx context.Context, admin *pgxpool.
 		}
 	}
 	t.Logf("installed journey: PostgreSQL restarted; trust root re-activated after %s", time.Since(started).Round(time.Second))
+	// The permission reconciler's epoch fails with the restart and retries
+	// after its 30 s SQL controller lease; authority is stale until then.
+	for until := time.Now().Add(3 * time.Minute); ; time.Sleep(2 * time.Second) {
+		var current bool
+		err := admin.QueryRow(ctx, `SELECT COALESCE(bool_and(observed_at>pg_postmaster_start_time() AND fresh_until>clock_timestamp()),false) FROM permission_stream`).Scan(&current)
+		if err == nil && current {
+			break
+		}
+		if time.Now().After(until) {
+			t.Fatal("permission stream not current after the PostgreSQL restart", err)
+		}
+	}
+	t.Logf("installed journey: permission stream current again %s after the PostgreSQL restart", time.Since(started).Round(time.Second))
 }
 
 // installedHubRestarts returns each running hub container's restart count
