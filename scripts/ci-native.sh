@@ -17,6 +17,10 @@ declare -A suites=(
   [identity]="make identity-integration"
   [helm]="make helm-integration"
   [context]="make context-integration"
+  # The context suite in two shards of about 8 min of tests each, so each run
+  # stays within the 20-minute limit (TestI* and everything else).
+  [context-1]="$context --run ^TestI"
+  [context-2]="$context --run ^Test[A-HJ-Z]"
   [continuation]="$context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   # ADR-226: install, one cluster, PostgreSQL restart, capture again (focused).
   [continuation-restart]="env ASSERVAT_JOURNEY_FOCUS=restart $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
