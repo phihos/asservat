@@ -28,6 +28,11 @@ permanently. The database-recovery test hid this with a fixture-only SQL update.
 3. The hub-worker's fleet observation calls it before reading each observation basis. An
    ordinary pass takes no lock.
 
+Processes: hub-api and the publisher detect the database change and exit (fail closed); the
+kubelet restarts them and they come back Ready under the re-activated root. native110 measured
+re-activation 2 s after the restart; the installed journey waits until every hub process has
+been Ready for 20 s before capturing again.
+
 What stays blocked for the separate restore protocol: archive recovery (pgBackRest restore,
 point-in-time recovery, promotion), which PostgreSQL ends on a new timeline; a logical restore
 into a new database (new OID); another cluster (new system identifier); any server with
