@@ -45,9 +45,8 @@ func NewDownloads(ctx context.Context, pool *pgxpool.Pool, root string, guards .
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	var version int64
-	if err = pool.QueryRow(ctx, "SELECT version_id FROM goose_db_version ORDER BY id DESC LIMIT 1").Scan(&version); err != nil || version != currentSchemaVersion {
-		return nil, privacy.ErrUnavailable
+	if why := schemaCompatible(ctx, pool); why != "" {
+		return nil, schemaRefusal(privacy.ErrUnavailable, why)
 	}
 	guard, err := effectGuardsFor(root, guards)
 	if err != nil {

@@ -8,7 +8,10 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
+	"strconv"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
@@ -25,7 +28,47 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const currentSchemaVersion = 80
+const currentSchemaVersion = 81
+
+// schemaFloorComment prefixes the version table's comment that records the
+// oldest binary schema the database still serves (ADR-227). Only the schema
+// owner can set a comment; every role reads it without a grant.
+const schemaFloorComment = "asservat:oldest-binary-schema="
+
+// schemaCompatible reports why this binary (compiled head
+// currentSchemaVersion) cannot run against the database, or "" when it can:
+// the database head must be at least the binary's and the recorded floor at
+// most the binary's. Without a recorded floor the head must match exactly.
+func schemaCompatible(ctx context.Context, q interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}) string {
+	var head int64
+	var applied bool
+	var comment *string
+	if err := q.QueryRow(ctx, `SELECT version_id,is_applied,pg_catalog.obj_description('public.goose_db_version'::regclass,'pg_class') FROM goose_db_version ORDER BY id DESC LIMIT 1`).Scan(&head, &applied, &comment); err != nil || !applied {
+		return "unreadable"
+	}
+	floor := head
+	if comment != nil && strings.HasPrefix(*comment, schemaFloorComment) {
+		n, err := strconv.ParseInt(strings.TrimPrefix(*comment, schemaFloorComment), 10, 64)
+		if err != nil || n < 1 || n > head {
+			return "unreadable"
+		}
+		floor = n
+	}
+	if head < currentSchemaVersion {
+		return "older than this binary (run installer-upgrade)"
+	}
+	if floor > currentSchemaVersion {
+		return "newer than this binary tolerates (use a newer image or restore from backup)"
+	}
+	return ""
+}
+
+// schemaRefusal keeps the caller's error class and names the reason.
+func schemaRefusal(class error, reason string) error {
+	return fmt.Errorf("%w: database schema %s", class, reason)
+}
 
 type Ledger struct{ pool *pgxpool.Pool }
 
@@ -44,10 +87,9 @@ func New(ctx context.Context, pool *pgxpool.Pool) (*Ledger, error) {
 	}
 	check, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	var version int64
-	var applied, unsafeRole, replica bool
-	if err := pool.QueryRow(check, "SELECT version_id,is_applied FROM goose_db_version ORDER BY id DESC LIMIT 1").Scan(&version, &applied); err != nil || version != currentSchemaVersion || !applied {
-		return nil, privacy.ErrUnavailable
+	var unsafeRole, replica bool
+	if why := schemaCompatible(check, pool); why != "" {
+		return nil, schemaRefusal(privacy.ErrUnavailable, why)
 	}
 	if err := pool.QueryRow(check, "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR has_schema_privilege(current_user,'public','CREATE'),pg_is_in_recovery() FROM pg_roles WHERE rolname=current_user").Scan(&unsafeRole, &replica); err != nil || unsafeRole || replica {
 		return nil, privacy.ErrUnavailable

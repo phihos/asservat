@@ -1,5 +1,9 @@
 # Decision records
 
+[ADR-227 — Supported upgrade and image-only rollback](227-upgrade-and-rollback.md) adds a
+database-declared schema compatibility floor, an `installer-upgrade` migrator and one installation
+release record that replaces the per-component image pins.
+
 [ADR-226 — Automatic re-activation after a lossless PostgreSQL restart](226-lossless-restart-reactivation.md)
 records the system identifier and WAL timeline at activation (migration 00080) so a restart
 re-activates by itself while restores, new databases and other clusters stay blocked.
