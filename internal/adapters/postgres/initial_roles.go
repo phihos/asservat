@@ -172,7 +172,7 @@ func initialRoleGrants(role int) []initialRoleGrant {
 	case 2:
 		add("fleet_current_trust", "SELECT")
 		add("fleet_initial_activation", "UPDATE", "activated_at")
-		add("fleet_trust", "UPDATE", "suspended", "recovery_blocked", "activated_postmaster_at", "activated_database_oid", "observed_at", "fresh_until", "activated_system_identifier", "activated_timeline")
+		add("fleet_trust", "UPDATE", "suspended", "recovery_blocked", "activated_postmaster_at", "activated_database_oid", "observed_at", "fresh_until")
 		add("fleet_observation", "INSERT", "installation_id", "semantic_version", "issuer_epoch", "source_uid", "source_generation", "source_digest", "activated_postmaster_at", "activated_database_oid", "observed_at", "fresh_until")
 	}
 	return out

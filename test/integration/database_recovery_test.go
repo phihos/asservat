@@ -104,13 +104,11 @@ func TestDatabaseRecoveryAfterRestartAndRestore(t *testing.T) {
 			t.Fatal("unaccepted database served current authority", phase)
 		}
 		// Explicit fixture-only stand-in for the first-installation activation,
-		// recording the same incarnation facts it does. Never copy this SQL
+		// the trigger records the same incarnation facts. Never copy this SQL
 		// into a production startup hook.
 		if _, err = admin.Exec(ctx, `UPDATE fleet_trust SET suspended=false,recovery_blocked=false,
 		 activated_postmaster_at=pg_catalog.pg_postmaster_start_time(),
-		 activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database()),
-		 activated_system_identifier=(pg_catalog.pg_control_system()).system_identifier::text,
-		 activated_timeline=('x'||substr(pg_catalog.pg_walfile_name(pg_catalog.pg_current_wal_lsn()),1,8))::bit(32)::integer
+		 activated_database_oid=(SELECT oid FROM pg_catalog.pg_database WHERE datname=pg_catalog.current_database())
 		 WHERE installation_id=$1`, a.InstallationID); err != nil {
 			t.Fatal(err)
 		}

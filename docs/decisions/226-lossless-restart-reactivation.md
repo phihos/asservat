@@ -15,8 +15,9 @@ permanently. The database-recovery test hid this with a fixture-only SQL update.
 ## Decision
 
 1. Activation also records the cluster's system identifier (`pg_control_system()`) and the
-   current WAL timeline (from `pg_walfile_name(pg_current_wal_lsn())`), computed inside the
-   activating transaction (migration 00080).
+   current WAL timeline (from `pg_walfile_name(pg_current_wal_lsn())`). A trigger fills both
+   from PostgreSQL itself when the activation fields are first set and refuses any later change,
+   so no caller supplies them and activation writers need no new grant (migration 00080).
 2. `reactivate_restarted_database(installation)` (SECURITY DEFINER, owned by the migration
    owner, EXECUTE for the configuration-fleet observer only) re-records the start time in
    `fleet_trust` and `fleet_observation` only when: the server is a primary with `fsync`,

@@ -10,6 +10,27 @@
 ALTER TABLE fleet_trust ADD COLUMN activated_system_identifier text,
  ADD COLUMN activated_timeline integer;
 
+-- The incarnation facts come from PostgreSQL itself when activation is first
+-- recorded, never from a caller, and cannot change afterwards. Activation
+-- writers need no grant on these columns.
+-- +goose StatementBegin
+CREATE FUNCTION fleet_activation_incarnation() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+BEGIN
+ IF NEW.activated_postmaster_at IS NOT NULL AND (TG_OP='INSERT' OR OLD.activated_postmaster_at IS NULL) THEN
+  NEW.activated_system_identifier:=(pg_control_system()).system_identifier::text;
+  NEW.activated_timeline:=('x'||substr(pg_walfile_name(pg_current_wal_lsn()),1,8))::bit(32)::integer;
+ ELSIF TG_OP='UPDATE' AND ROW(NEW.activated_system_identifier,NEW.activated_timeline)
+   IS DISTINCT FROM ROW(OLD.activated_system_identifier,OLD.activated_timeline) THEN
+  RAISE EXCEPTION 'activation incarnation facts are immutable' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION fleet_activation_incarnation() FROM PUBLIC;
+CREATE TRIGGER fleet_activation_incarnation BEFORE INSERT OR UPDATE ON public.fleet_trust
+ FOR EACH ROW EXECUTE FUNCTION fleet_activation_incarnation();
+
 -- Re-records only the server start time, in both rows the effective view
 -- joins, when every other recorded incarnation fact still matches, the stored
 -- flags are unblocked, the server is a durable primary and time moved forward.

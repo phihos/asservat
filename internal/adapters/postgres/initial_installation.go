@@ -391,12 +391,8 @@ func (s *InitialInstallations) ActivateInitialInstallation(ctx context.Context, 
 		if err = s.pristine(ctx, tx, a); err != nil {
 			return err
 		}
-		// ADR-226: the cluster identity and WAL timeline let a later lossless
-		// restart re-activate (reactivate_restarted_database).
 		tag, err := tx.Exec(ctx, `UPDATE public.fleet_trust SET suspended=false,recovery_blocked=false,
-   activated_postmaster_at=$2,activated_database_oid=$3,observed_at=$4,fresh_until=$5,
-   activated_system_identifier=(pg_catalog.pg_control_system()).system_identifier::text,
-   activated_timeline=('x'||pg_catalog.substr(pg_catalog.pg_walfile_name(pg_catalog.pg_current_wal_lsn()),1,8))::bit(32)::integer
+   activated_postmaster_at=$2,activated_database_oid=$3,observed_at=$4,fresh_until=$5
    WHERE installation_id=$1 AND recovery_blocked AND activated_postmaster_at IS NULL AND activated_database_oid IS NULL`, s.scope.InstallationID, r.Claim.Database.StartedAt, r.Claim.Database.DatabaseOID, ownerTime(a.ObservedAt), ownerTime(a.FreshUntil))
 		if err != nil {
 			return err
