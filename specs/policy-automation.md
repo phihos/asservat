@@ -20,6 +20,20 @@ The current authenticated submitter must have whole-pod collection entitlement a
 
 Changing executor, sponsorship, envelope definition, authority expiry or limits changes execution scope and requires authenticated acceptance and applicable independent review. Ordinary login, reapplied unchanged YAML, retries, restarts and grant-reference edits cannot reset counters or extend authority. Existing human-bound policy scopes require explicit migration/new acceptance; do not reinterpret historical digests or persisted grants.
 
+## Hub-held policies and in-process activation (ADR-228)
+
+The first implemented policies are hub-held: a DebugPolicy in the hub control namespace (like
+AccessBindings) names its workload cluster in `spec.target.cluster`. The policy object's own
+location (submission/source) and its target (accepted authority) therefore differ; the target is
+bound by the accepted authority alone. The authenticated human activates the current revision with
+the MCP/browser operation `activate_policy`; hub-api reads the source, compiles it, resolves the
+sole automation-bearing binding and the human's sponsoring assignments, takes the envelope's
+per-policy maxima as limits and accepts it in-process. Because hub-api authenticates the human
+itself, it builds the submission check in-process; the ADR-062 signed submission is required only
+for a separate GitOps or admission submitter. An unchanged source revision cannot be accepted
+twice, and a retry under the same idempotency key returns the original acceptance. Captures run
+under the policy executor; `get_policy_status` explains the policy without content.
+
 ## Continued execution and revocation
 
 Protected acceptance must atomically consume the authenticated submission nonce and freeze the exact scope. Replacing an accepted scope explicitly pins its predecessor; retries return the original receipt and cannot reset expiry or counters. Require durable encrypted acceptance audit before eligibility. Keep a current protected policy-source observation as well as current delegation. Source deletion, suspension or unavailable observation stops eligibility. Separate normalized collection intent from the control fields excluded by specs/execution.md: pause/resume and grant attachment never reset authority, while a collection-intent change cannot revive an earlier acceptance by reverting the YAML.

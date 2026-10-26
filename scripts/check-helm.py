@@ -268,7 +268,8 @@ def main():
     metadata = yaml.safe_load((CHART / "Chart.yaml").read_text())
     assert not metadata.get("dependencies"), "foundation must not install dependency charts"
     expected = {p.name: yaml.safe_load(p.read_text()) for p in (CHART / "crds").glob("*.yaml")}
-    assert len(expected) == 6, "review newly added installation resources"
+    # ADR-228 adds the hub-held DebugPolicy CRD (structural accepted subset).
+    assert len(expected) == 7, "review newly added installation resources"
     for mode in ["hub", "cluster", "combined"]:
         run(["lint", "--strict", str(CHART), "--set", "mode=" + mode])
         args = ["template", "asservat", str(CHART), "--namespace", "asservat-system", "--include-crds", "--kube-version", "1.35.0", "--set", "mode=" + mode]
@@ -304,7 +305,7 @@ def main():
                 assert yaml.safe_load(bundle.extractfile("asservat/crds/" + name).read()) == content
         run(["lint", "--strict", str(archive)])
         assert run(["template", "asservat", str(archive), "--include-crds"]) == run(["template", "asservat", str(CHART), "--include-crds"])
-    print("Helm schema/render/package checks passed: 3 foundation modes, 6 canonical CRDs, fixed bootstrap hook/compartments/revisions, the regional installer hook, invalid values and unavailable runtime rejected.")
+    print("Helm schema/render/package checks passed: 3 foundation modes, 7 canonical CRDs, fixed bootstrap hook/compartments/revisions, the regional installer hook, invalid values and unavailable runtime rejected.")
     print(run(["version", "--short"]).strip())
 
 

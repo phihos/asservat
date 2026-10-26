@@ -90,6 +90,40 @@ Schedules use five-field minute cron and explicit IANA timeZone (preset default 
 
 Given replica A logs an error while B is under memory pressure, when default pod-scoped all evaluates, then no combined trigger fires. A true condition at initial arming fires once after its hold; repeated samples do not increment an event count. Restarting at a missed schedule or during a repeated DST hour cannot queue duplicate dumps.
 
+## Restart counter triggers (ADR-228)
+
+The first implemented detector is the API-read restart counter of the exit detector, for a hub-held
+DebugPolicy (`spec.target.cluster`) that runs the pod-status context recipe on the triggering Pod
+(`maxPods: 1`, `selection: triggeringPod`). The hub polls every active policy every 15 seconds
+with one bounded regional Pod LIST of the named workload. Its semantics refine REQ-TRG-002/004/007
+for this counter only:
+
+- The first observation of a Pod UID is its baseline and never fires; activation never fires
+  (`evaluation.fireOnActivation: true` is rejected with its field path). A counter has no level, so
+  there is no re-arm interval.
+- One occurrence per (policy, Pod UID, restart count) whose latest termination matches the reasons
+  (OOMKilled, Error, CrashLoopBackOff) and optional exit codes. Restarts between two polls coalesce
+  into one occurrence and are counted as suppressed `coalesced`; their individual reasons are not
+  observed. Replay and duplicate polls are no-ops. Kubernetes reports exit codes, not signals.
+- A truncated, incomplete or unavailable observation is Unknown and fires nothing.
+- The shared workload budget (one occurrence per five minutes, burst two) holds for every policy
+  on the workload; a policy's own cooldown and hourly bound only tighten it. Executions are spent
+  at admission against the accepted ceiling and never refunded. Suppression is a saturating count
+  per policy and reason, never a durable record per restart; capacity shortfalls are suppressions,
+  never queued.
+- Not applicable to this counter trigger and not implemented: the 30-second correlation append
+  (REQ-TRG-004 MAY) and per-node budgets (no node agent runs). Every other detector, expression,
+  recipe or option is rejected at activation with its field path.
+
+### SC-TRG-008
+
+Given an activated restart policy on a three-replica Deployment, when one container is killed, then
+exactly one pod-status capture of that Pod runs under the policy executor and its team's audience
+can download it; when all three replicas crash repeatedly for 150 seconds, then at most the shared
+workload budget is admitted, every other observed restart is counted as suppressed, the ledger
+holds at most one watermark per Pod and one suppression row per reason, and no capture follows
+once the restarts stop.
+
 ## Trigger-to-action lifecycle
 
 A detector firing is an occurrence signal, not a request to restart every collector. [Action lifecycle](action-lifecycle.md) resolution produces already armed ongoing sources and onTrigger actions. After ordinary admission, preserve matching source windows and dispatch independent onTrigger work. Cooldowns/deduplication suppress saves and actions while admitted continuous observation can continue. A late event or pending dump approval never shifts an existing window forward. Source readiness/coverage is separate from detector freshness and per-incident selection; missing required source history is visible while permitted context proceeds.

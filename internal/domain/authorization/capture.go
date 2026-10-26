@@ -26,7 +26,20 @@ func ContextEligibility(i identity.Identity, p Projection, target Target, now ti
 	if !result.Eligible {
 		return CaptureEligibility{Result: result}
 	}
+	audience, until, reason := defaultAudience(p, now)
+	if reason != "" {
+		return CaptureEligibility{Result: Result{Reason: reason}}
+	}
+	result.ValidUntil = identity.Earlier(result.ValidUntil, until)
+	return CaptureEligibility{Result: result, Target: target, VerifiedIdentity: i, DefaultAudience: audience}
+}
+
+// defaultAudience is the complete default evidence audience of a new capture:
+// every current, non-denied assignment that may read approved evidence. It
+// never adds the requester or a policy executor merely for creating it.
+func defaultAudience(p Projection, now time.Time) ([]artifact.AudienceAssignment, time.Time, string) {
 	var audience []artifact.AudienceAssignment
+	var until time.Time
 	for _, a := range p.Allows {
 		if !identity.Fresh(a.ObservedAt, a.FreshUntil, now, 60*time.Second) || !permits(a.Audience.Role, ReadApproved) {
 			continue
@@ -45,14 +58,22 @@ func ContextEligibility(i identity.Identity, p Projection, target Target, now ti
 			continue
 		}
 		audience = append(audience, a.Audience)
-		result.ValidUntil = identity.Earlier(result.ValidUntil, a.FreshUntil)
+		if until.IsZero() {
+			until = a.FreshUntil
+		}
+		until = identity.Earlier(until, a.FreshUntil)
 	}
 	if len(audience) == 0 {
-		return CaptureEligibility{Result: Result{Reason: "NoEvidenceAudience"}}
+		return nil, time.Time{}, "NoEvidenceAudience"
 	}
 	if len(audience) > 32 {
-		return CaptureEligibility{Result: Result{Reason: "AudienceOverflow"}}
+		return nil, time.Time{}, "AudienceOverflow"
 	}
+	sortAssignments(audience)
+	return audience, until, ""
+}
+
+func sortAssignments(audience []artifact.AudienceAssignment) {
 	slices.SortFunc(audience, func(a, b artifact.AudienceAssignment) int {
 		if a.AssignmentID < b.AssignmentID {
 			return -1
@@ -62,5 +83,4 @@ func ContextEligibility(i identity.Identity, p Projection, target Target, now ti
 		}
 		return 0
 	})
-	return CaptureEligibility{Result: result, Target: target, VerifiedIdentity: i, DefaultAudience: audience}
 }

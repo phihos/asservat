@@ -26,11 +26,19 @@ declare -A suites=(
   # continuation above takes about 25): the first cluster's full journey, the
   # PostgreSQL restart (ADR-226) and both workload clusters.
   [continuation-journey]="env ASSERVAT_JOURNEY_FOCUS=journey $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  # The console checks of the first cluster's journey (browser submission,
+  # console/MCP preview, case, approved extract and native download agreement),
+  # and the approved read-only projection, split from the journey run so each
+  # stays within about 15 minutes.
+  [continuation-browser]="env ASSERVAT_JOURNEY_FOCUS=browser $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-restart]="env ASSERVAT_JOURNEY_FOCUS=restart $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-clusters]="env ASSERVAT_JOURNEY_FOCUS=clusters $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   # ADR-227: upgrade of hub-api and hub-worker to a second release image and
   # image-only rollback, with a capture on each side of the upgrade.
   [continuation-upgrade]="env ASSERVAT_JOURNEY_FOCUS=upgrade $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  # ADR-228: the restart-trigger policy journey (activation, one policy
+  # capture and download, a bounded three-replica crash storm).
+  [continuation-policy]="env ASSERVAT_JOURNEY_FOCUS=policy $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [direct-observation]="$context --run ^TestDirectHolderObservationWithRealKubernetes\$"
   [federation-regional]="$context --run ^TestFederationRegionalProductWithRealKubernetes\$"
   [initial-handover]="$context --initial-handover"

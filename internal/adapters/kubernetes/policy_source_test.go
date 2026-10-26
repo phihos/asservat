@@ -90,7 +90,7 @@ func TestPolicySourceBoundedObservationAndIntent(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if base.Suspended || base.Deleted || base.Revision.UID != "policy-uid" || base.FreshUntil.Sub(base.ObservedAt) != 5*time.Second {
+	if base.Suspended || base.Deleted || base.Revision.UID != "policy-uid" || base.FreshUntil.Sub(base.ObservedAt) != value.PolicySourceInterval {
 		t.Fatal("source identity/status handling")
 	}
 	for _, mode := range []string{"paused", "grant", "explicit-no-save"} {

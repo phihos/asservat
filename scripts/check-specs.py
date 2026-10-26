@@ -657,7 +657,9 @@ def semantic_checks(doc: dict) -> None:
             if a["kind"] in {"liveCore", "runtimeDiagnostic", "profile"}:
                 require(a["impact"] == "intrusive", "Diagnostic action needs impact classification")
     if kind in {"DebugPolicy", "DebugCapture"} and "presetRef" not in spec:
-        require(spec["target"]["namespace"] == doc["metadata"]["namespace"], "Cross-namespace request target")
+        # ADR-228: a hub-held DebugPolicy names its workload cluster; its target
+        # namespace is in that cluster, not the hub control namespace.
+        require(spec["target"]["namespace"] == doc["metadata"]["namespace"] or (kind == "DebugPolicy" and "cluster" in spec["target"]), "Cross-namespace request target")
         if kind == "DebugCapture":
             require(spec["target"]["selection"] != "triggeringPod", "Manual capture has no trigger pod")
     if kind == "DebugPolicy" and "presetRef" not in spec:
@@ -675,7 +677,7 @@ def semantic_checks(doc: dict) -> None:
             require(duration_seconds(spec["evaluation"]["rearmFor"]) <= 300, "Rearm exceeds bound")
         ids = [d["id"] for d in spec["detectors"]]
         require(len(ids) == len(set(ids)), "Duplicate detector ID")
-        require(spec["target"]["namespace"] == doc["metadata"]["namespace"], "Cross-namespace policy target")
+        require(spec["target"]["namespace"] == doc["metadata"]["namespace"] or "cluster" in spec["target"], "Cross-namespace policy target")
 
         def expression(value, depth=0):
             require(depth <= 8, "Expression too deep")

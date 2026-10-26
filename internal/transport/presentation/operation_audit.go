@@ -488,6 +488,13 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		}
 		return json.Marshal(in)
 	}
+	if name == "activate_policy" || name == "get_policy_status" {
+		var in PolicyOperationInput
+		if json.Unmarshal(raw, &in) != nil {
+			return nil, contracts.ErrInvestigationWire
+		}
+		return json.Marshal(in)
+	}
 	if name == "get_case" {
 		var in struct {
 			CaseID string `json:"case_id"`
@@ -508,7 +515,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 }
 func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationReply, callErr error, effectPossible bool) (audit.OperationOutcome, error) {
 	out := audit.OperationOutcome{Intent: in, Status: "unavailable", Reason: "authority_unavailable", Effect: "none", ClientReceipt: "unknown", MetadataUntil: in.RequestUntil, RecordedAt: s.config.Now().UTC().Truncate(time.Microsecond)}
-	if effectPossible && (in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download" || queryOperation(in.Name)) {
+	if effectPossible && (in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download" || in.Name == "activate_policy" || queryOperation(in.Name)) {
 		out.Effect = "unknown"
 	}
 	if queryOperation(in.Name) {
@@ -573,6 +580,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			var refs struct {
 				CaptureID  string             `json:"capture_id"`
 				ArtifactID string             `json:"artifact_id"`
+				Acceptance string             `json:"acceptance_id"`
 				DownloadID string             `json:"download_id"`
 				CaseID     string             `json:"case_id"`
 				State      string             `json:"state"`
@@ -594,6 +602,9 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			}
 			if refs.ArtifactID != "" {
 				out.ArtifactIDs = append(out.ArtifactIDs, refs.ArtifactID)
+			}
+			if in.Name == "activate_policy" && refs.Acceptance != "" {
+				out.Effect = "accepted"
 			}
 			if in.Name == "prepare_artifact_download" && refs.DownloadID != "" {
 				out.Effect = "accepted"

@@ -85,6 +85,13 @@ type publicContext struct {
 	// processingPolicy is the capacity processing source that processing
 	// decisions bind to (ADR-210); nil without Public.Processing.
 	processingPolicy *kube.DownloadEnvironmentSource
+	// ADR-228 restart-trigger policies: hub-held sources, acceptance and its
+	// audit, team delegation reads and the trigger ledger.
+	policies       *postgres.Policies
+	policyTriggers *postgres.PolicyTriggers
+	automation     *postgres.AutomationAuthorities
+	hubPolicies    *kube.HubPolicySources
+	policyAudit    auditapp.PolicyAcceptancePublisher
 }
 
 func decodeAuditPolicy(raw json.RawMessage, lane, root, installation string) (audit.OperationLifecyclePolicy, error) {
@@ -155,7 +162,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		return out, nil
 	}
-	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution")
+	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution", "policy-automation")
 	if err != nil {
 		return nil, err
 	}
@@ -269,7 +276,22 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	// ADR-179: no selector reader; selector policies refuse new collection.
 	accepted := privacyapp.AcceptedRetentionReader{Topology: shared.topologies, Sources: sources, Now: time.Now}
 	out.retention = privacyapp.RetentionResolver{Policies: accepted, RetainedPolicies: accepted, Now: time.Now}
-	eligibility := authapp.Evaluator{Permissions: out.permissions, Now: time.Now}
+	// ADR-228: policy captures share the investigation; the eligibility port
+	// evaluates a policy executor through its acceptance and team delegation.
+	if out.policies, err = postgres.NewPolicies(ctx, sql["policy-automation"], root, installation); err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	if out.policyTriggers, err = postgres.NewPolicyTriggers(ctx, sql["policy-automation"], root, installation); err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	if out.automation, err = postgres.NewAutomationAuthorities(ctx, sql["policy-automation"], root, installation); err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	if out.hubPolicies, err = kube.NewHubPolicySources(observer, installation, control); err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.policyAudit = auditapp.PolicyAcceptancePublisher{Ledger: out.policies, Objects: a.policyObjects()}
+	eligibility := authapp.CaptureEligibility{Human: authapp.Evaluator{Permissions: out.permissions, Now: time.Now}, Accepted: out.policies, Current: out.automation, Now: time.Now}
 	previews, err := postgres.NewContextPreviews(ctx, sql["capture-preview"], root)
 	if err != nil {
 		return nil, mounts.ErrUnavailable

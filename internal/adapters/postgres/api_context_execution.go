@@ -151,7 +151,7 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 		if err != nil {
 			return fail("time", err)
 		}
-		eligible := authorization.ContextEligibility(i, projection, projection.Target, now.Time)
+		eligible := contextEligibilityIn(ctx, q, stream, trust, s.root, s.guards.Recovery.installationID(), i, projection, projection.Target, now.Time)
 		if !eligible.Eligible {
 			return fail("eligibility", value.ErrDenied)
 		}
@@ -219,7 +219,7 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 		if err != nil {
 			return sqlStep{"time", err}
 		}
-		eligible := authorization.ContextEligibility(c.Eligibility.VerifiedIdentity, projection, c.Eligibility.Target, now.Time)
+		eligible := contextEligibilityIn(ctx, q, stream, trust, s.root, s.guards.Recovery.installationID(), c.Eligibility.VerifiedIdentity, projection, c.Eligibility.Target, now.Time)
 		if !c.Valid(now.Time) || !eligible.Eligible || eligible.Principal != w.Actor || eligible.PermissionRevision != c.Eligibility.PermissionRevision || eligible.IdentityRevision != c.Eligibility.IdentityRevision || !slices.Equal(eligible.DefaultAudience, e.Audience) {
 			return sqlStep{"eligibility", value.ErrDenied}
 		}

@@ -506,6 +506,12 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
+		if installedJourneyFocus() == "policy" {
+			// ADR-228: the restart-trigger policy journey replaces the manual
+			// journey in this focused run.
+			installedPolicyJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose)
+			return
+		}
 		run := installedJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose,
 			installedJourneyDeletion(t, ctx, admin, providers, evidenceBucket, p.RootID, diagnose), installedProjectionSQLCheck(t, ctx, admin, api, p.RootID))
 		// The PostgreSQL restart (ADR-226) runs only in the focused restart
@@ -548,7 +554,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "upgrade" {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}
@@ -590,6 +596,7 @@ func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidencestoragepools"}, Verbs: []string{"update"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"accessbindings", "permissionsources"}, Verbs: []string{"get", "list", "watch", "create"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"accessbindings"}, Verbs: []string{"delete"}},
+		{APIGroups: []string{"asservat.io"}, Resources: []string{"debugpolicies"}, Verbs: []string{"get", "create"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidenceretentionpolicies"}, Verbs: []string{"get", "list", "watch", "create", "update"}},
 		{APIGroups: []string{""}, Resources: []string{"namespaces", "pods"}, Verbs: []string{"get", "list"}},
 		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets"}, Verbs: []string{"get", "list"}},
@@ -824,7 +831,7 @@ func installerContinuationLogs(t *testing.T, api kubernetes.Interface, pod *core
 func installShippedPermissionCRDs(t *testing.T, ctx context.Context, api kubernetes.Interface) {
 	t.Helper()
 	client := api.CoreV1().RESTClient()
-	for _, file := range []string{"accessbindings.yaml", "permissionsources.yaml", "evidencestoragepools.yaml", "evidencebudgetpolicies.yaml", "evidenceretentionpolicies.yaml"} {
+	for _, file := range []string{"accessbindings.yaml", "permissionsources.yaml", "evidencestoragepools.yaml", "evidencebudgetpolicies.yaml", "evidenceretentionpolicies.yaml", "debugpolicies.yaml"} {
 		data, err := os.ReadFile("../../charts/asservat/crds/" + file)
 		if err != nil {
 			t.Fatal(err)

@@ -19,7 +19,15 @@ import (
 const (
 	queryResolveWorkload = "resolve-workload"
 	queryResolvePod      = "resolve-pod"
+	// ADR-228: one bounded Pod LIST of a named workload's restart counters.
+	queryObserveRestarts = "observe-workload-restarts"
 )
+
+// RestartTargets is the region's optional restart observation (ADR-228). A
+// region without it answers the query as unsupported.
+type RestartTargets interface {
+	ObserveWorkloadRestarts(context.Context, targets.WorkloadRequest) (targets.RestartObservation, error)
+}
 
 // QueryTargets is the region's own cluster target resolver.
 type QueryTargets interface {
@@ -251,7 +259,7 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	until, _ := call.Deadline()
 	bounded, stop := context.WithDeadline(call, identity.Earlier(until, owner.ValidUntil))
 	defer stop()
-	var out targets.PodResolution
+	var out any
 	resolved := time.Now()
 	switch q.Method {
 	case queryResolveWorkload:
@@ -266,6 +274,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 			return contracts.ErrAPIContextProtocol
 		}
 		out, e = s.targets.ResolvePod(bounded, r)
+	case queryObserveRestarts:
+		var r targets.WorkloadRequest
+		if decodeOperationBody(q.Body, &r) != nil {
+			return contracts.ErrAPIContextProtocol
+		}
+		if observer, ok := s.targets.(RestartTargets); ok {
+			out, e = observer.ObserveWorkloadRestarts(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
 	default:
 		return contracts.ErrAPIContextProtocol
 	}
@@ -273,7 +291,9 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 	reply := contracts.APIContextOperationReply{Format: contracts.APIContextExchangeFormat, Sequence: seq, Method: q.Method}
 	if e != nil {
 		reply.Failure = queryFailureLabel(e)
-	} else if reply.Body, e = json.Marshal(out); e != nil {
+	} else if reply.Body, e = json.Marshal(out); e != nil || len(reply.Body) > contracts.APIContextOperationBytes-1024 {
+		// An answer that cannot fit one frame is a closed failure, never a
+		// truncated answer or a broken exchange (ADR-228).
 		reply.Body, reply.Failure = nil, "unavailable"
 	}
 	encoded, e := contracts.EncodeAPIContextOperationReply(reply)

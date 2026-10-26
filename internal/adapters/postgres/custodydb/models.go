@@ -1837,18 +1837,41 @@ type PermissionStream struct {
 }
 
 type PolicyAcceptance struct {
-	ID             pgtype.UUID
-	RootID         pgtype.UUID
-	PolicyUid      string
-	Generation     int64
-	Nonce          pgtype.UUID
-	ScopeDigest    []byte
-	RequestDigest  []byte
-	RecordDigest   []byte
-	Record         []byte
-	AcceptedAt     pgtype.Timestamptz
-	AcknowledgedAt pgtype.Timestamptz
-	ReceiptJson    []byte
+	ID              pgtype.UUID
+	RootID          pgtype.UUID
+	PolicyUid       string
+	Generation      int64
+	Nonce           pgtype.UUID
+	ScopeDigest     []byte
+	RequestDigest   []byte
+	RecordDigest    []byte
+	Record          []byte
+	AcceptedAt      pgtype.Timestamptz
+	AcknowledgedAt  pgtype.Timestamptz
+	ReceiptJson     []byte
+	ExecutionsSpent int64
+}
+
+type PolicyOccurrence struct {
+	ID           pgtype.UUID
+	RootID       pgtype.UUID
+	PolicyUid    string
+	AcceptanceID pgtype.UUID
+	ClusterID    pgtype.UUID
+	WorkloadUid  string
+	PodUid       string
+	Restarts     int64
+	CreatedAt    pgtype.Timestamptz
+	CaptureID    pgtype.UUID
+	Outcome      pgtype.Text
+}
+
+type PolicyPodWatermark struct {
+	RootID    pgtype.UUID
+	PolicyUid string
+	PodUid    string
+	Restarts  int64
+	LastSeen  pgtype.Timestamptz
 }
 
 type PolicySource struct {
@@ -1869,6 +1892,23 @@ type PolicySource struct {
 	IntentVersion    int64
 	ActiveID         pgtype.UUID
 	CreatorJson      []byte
+}
+
+type PolicySuppression struct {
+	RootID    pgtype.UUID
+	PolicyUid string
+	Reason    string
+	FirstAt   pgtype.Timestamptz
+	LastAt    pgtype.Timestamptz
+	Count     int64
+}
+
+type PolicyWorkloadWindow struct {
+	RootID      pgtype.UUID
+	ClusterID   pgtype.UUID
+	WorkloadUid string
+	PolicyUid   string
+	Tat         pgtype.Timestamptz
 }
 
 type ProcessingDecision struct {

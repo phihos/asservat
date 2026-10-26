@@ -769,6 +769,8 @@ export interface components {
         }) & unknown;
         /** Asservat target v1 */
         Contract_target: ({
+            /** @description Workload cluster of a hub-held DebugPolicy (ADR-228); the namespace names a namespace in that cluster. */
+            cluster?: components["schemas"]["Contract_common_2224a31324a0c811"];
             namespace: string;
             workloadRef?: {
                 /** @enum {string} */

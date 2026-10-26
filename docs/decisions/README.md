@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-228 — Restart-triggered policy captures](228-restart-triggered-policy-captures.md) is the
+first S-03 increment: hub-held exit-detector DebugPolicies, MCP/browser activation, a 15-second
+regional restart poll and migration 00082's deduplicated, workload-budgeted trigger ledger; captures
+reuse the S-02 pipeline under the policy executor.
+
 [ADR-227 — Supported upgrade and image-only rollback](227-upgrade-and-rollback.md) adds a
 database-declared schema compatibility floor, an `installer-upgrade` migrator and one installation
 release record that replaces the per-component image pins; the key service, publisher and federation follow it too, while download workers and the regional connector stay on the original image.

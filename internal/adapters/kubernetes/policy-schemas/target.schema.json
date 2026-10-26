@@ -5,6 +5,10 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "cluster": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid",
+      "description": "Workload cluster of a hub-held DebugPolicy (ADR-228); the namespace names a namespace in that cluster."
+    },
     "namespace": {
       "type": "string",
       "minLength": 1,

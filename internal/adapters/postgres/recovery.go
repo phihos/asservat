@@ -94,6 +94,14 @@ func NewRecoveryTransactionGuard(root, installation string) (*RecoveryTransactio
 	}
 	return &RecoveryTransactionGuard{root, installation}, nil
 }
+
+// installationID is the guard's private installation, or "" without a guard.
+func (g *RecoveryTransactionGuard) installationID() string {
+	if g == nil {
+		return ""
+	}
+	return g.installation
+}
 func (g *RecoveryTransactionGuard) lock(ctx context.Context, q *custodydb.Queries, root string, a artifact.RecoveryProof) (custodydb.FleetCurrentTrust, error) {
 	if g == nil || root != g.root || a.InstallationID != g.installation {
 		return custodydb.FleetCurrentTrust{}, value.ErrUnavailable

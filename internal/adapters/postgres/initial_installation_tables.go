@@ -2,7 +2,8 @@ package postgres
 
 // Exact permanent-table inventory, including five SQL54 managed-capacity tables
 // migration 00065's two regional capacity tables (ADR-197) and migration
-// 00066's refresh demands (ADR-200), 00067 deletion and 00068 queries.
+// 00066's refresh demands (ADR-200), 00067 deletion, 00068 queries and
+// 00082's four restart-trigger tables (ADR-228).
 // Missing or unknown relations reject first activation.
 // initialTransientTables exist only part way through migration replay: 00043
 // creates them and 00078 drops them (ADR-224). They never belong to a
@@ -114,7 +115,11 @@ var initialInstallationTables = []string{
 	"permission_basis",
 	"permission_stream",
 	"policy_acceptance",
+	"policy_occurrence",
+	"policy_pod_watermark",
 	"policy_source",
+	"policy_suppression",
+	"policy_workload_window",
 	"processing_decision",
 	"processing_root",
 	"processing_rule",

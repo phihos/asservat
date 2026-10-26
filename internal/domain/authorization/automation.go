@@ -39,6 +39,13 @@ func PolicyPrincipal(installationID, policyUID string) identity.Principal {
 	return identity.Principal{Issuer: "urn:asservat:installation:" + installationID, Subject: "policy:" + policyUID, ClientID: "policy-executor", Kind: identity.Workload}
 }
 
+// PolicySourceInterval bounds one protected policy source observation and
+// the accepted-policy snapshot read from it. ADR-228 relaxed the
+// agent-authored five seconds: a policy-triggered capture's preview, admission
+// and regional start run on one observation and take longer than five seconds
+// end to end; the 15-second trigger poll refreshes it.
+const PolicySourceInterval = 30 * time.Second
+
 type AutomationLimits struct{ MaxExecutions, MaxBytes, MaxObservedBytes int64 }
 
 // AcceptedPolicyAuthority is loaded from protected accepted execution, never
@@ -62,6 +69,10 @@ type AcceptedPolicyAuthority struct {
 type AcceptedPolicySnapshot struct {
 	Authority              AcceptedPolicyAuthority
 	ObservedAt, FreshUntil time.Time
+	// SourceUntil is the policy's own bound (source observation and expiry)
+	// without the recovery read's interval, which every effect transaction
+	// checks independently (ADR-228). FreshUntil is never later.
+	SourceUntil time.Time
 }
 
 type AutomationProjection struct {

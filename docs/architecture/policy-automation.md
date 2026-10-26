@@ -26,6 +26,19 @@ Acceptance audit uses the existing encrypted immutable object format with a dist
 
 The accepted-policy reader requires current source availability, matching collection-intent version, an acknowledged exact acceptance, original expiry and current recovery trust/issuer epoch. It returns the original source deadline separately from long-lived policy authority. `AutomationEvaluator` rechecks and intersects that deadline after reading the current delegation, preventing a slow read from renewing a nearly expired observation. All these results remain preflight, not execution permits or evidence access.
 
+## Restart-trigger composition (ADR-228)
+
+[ADR-228](../decisions/228-restart-triggered-policy-captures.md) composes these components in
+hub-api for the first trigger: `HubPolicySources` reads hub-held DebugPolicies, `PolicyActivation`
+(MCP/browser `activate_policy`) accepts the compiled restart subset in-process and publishes the
+acceptance audit, and `PolicyTrigger` polls each active policy every 15 seconds through the
+`observe-workload-restarts` regional query and the migration 00082 trigger ledger
+(`PolicyTriggers`). Captures reuse the S-02 investigation with the policy executor; the shared
+eligibility port and every SQL re-check after locks evaluate the executor through its current
+acceptance and team delegation. Policy acceptance, source observation, audit acknowledgement and the
+trigger ledger share the ordinary hub credential's `policy-automation` duty (ADR-222). The
+remaining items below still apply to other detectors, intrusive actions and grants.
+
 ## Runtime composition still required
 
 C-09 still must supply authenticated ingress, the complete canonical policy compiler and protected supervision of the Kubernetes source journal. The [submission signature components](policy-submissions.md) now provide independently verified post-persistence human submissions and a matching short-lived proof inside SQL acceptance; their protected bootstrap and complete ingress/compiler composition remain pending. The current acceptance facet checks a concrete whole-pod target supplied by those private producers; it is not the finished all-replica policy authoring workflow. C-03 must bind the exact grant/independent reviewer; C-10/C-11 must acquire short signed permits through atomic cumulative capacity/grant/retention/recovery checks. Durable accepted limits are ceilings, not a spending implementation. Carry the acceptance/delegation/source revision into final transactions and local permit renewal. Worker certificates and purpose-specific channels authenticate dispatch; policy principal strings alone do not.

@@ -59,6 +59,18 @@ func (b installedJourneyBearer) RoundTrip(r *http.Request) (*http.Response, erro
 // journey fit one 20-minute run.
 const installedJourneyRetention = 240
 
+// installedJourneyRetentionSeconds is the journey's retention. The focused
+// journey run (ASSERVAT_JOURNEY_FOCUS=journey) moves the console checks and
+// the approved projection to the browser focus and reached the expiry wait
+// 25 s after acceptance locally, so 80 s keeps a margin of about a minute
+// and the run stays well under 15 minutes.
+func installedJourneyRetentionSeconds() int64 {
+	if installedJourneyFocus() == "journey" {
+		return 80
+	}
+	return installedJourneyRetention
+}
+
 type installedJourneyDownload struct {
 	DownloadID          string    `json:"download_id"`
 	ArtifactID          string    `json:"artifact_id"`
@@ -178,11 +190,15 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		target := map[string]string{"cluster_id": cluster, "namespace": namespace, "kind": "Deployment", "name": workload}
 		previewArguments := map[string]any{"target_ref": target,
-			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": installedJourneyRetention}
+			"preset_ref": map[string]string{"name": "pod-status", "version": "v1"}, "requested_retention_seconds": installedJourneyRetentionSeconds()}
 		if dir := os.Getenv("ASSERVAT_JOURNEY_HOLD"); dir != "" && !short {
 			installedJourneyHold(t, ctx, dir, wire, session, previewArguments, diagnose)
 		}
-		if !short {
+		// The console checks run in the unfocused run and in the browser focus;
+		// the journey focus covers the MCP, Stop, Deny, TargetGone, expiry and
+		// deletion checks (both within the 20-minute rule).
+		browserChecks := !short && installedJourneyFocus() != "journey"
+		if browserChecks {
 			qualifyInstalledBrowserSubmission(t, ctx, identity, cert, address, origin, previewArguments, diagnose)
 		}
 		var preview struct {
@@ -358,7 +374,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			t.Fatal("installed case lists more than the one pod-status artifact", investigation.Artifacts)
 		}
 		expires := investigation.Artifacts[0].ExpiresAt
-		if expires.IsZero() || !time.Now().Before(expires) || expires.After(accepted.AcceptedAt.Add(installedJourneyRetention*time.Second)) {
+		if expires.IsZero() || !time.Now().Before(expires) || expires.After(accepted.AcceptedAt.Add(time.Duration(installedJourneyRetentionSeconds())*time.Second)) {
 			t.Fatal("installed capture returned an invalid original retention deadline", expires)
 		}
 		// Operator readback: the published attempt is stored under this cluster.
@@ -378,7 +394,9 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		t.Logf("installed journey: the regional capture in cluster %s was collected, verified and published", cluster)
 		var approved query.ContextExcerpt
 		var checkQueryRetired func()
-		if !short {
+		// The approved read-only projection (and its retirement check) belongs
+		// to the console checks: the browser focus and the unfocused run.
+		if browserChecks {
 			approved, checkQueryRetired = installedApprovedProjection(t, ctx, identity, transport, origin, progress.CaseID, investigation.Artifacts[0].ArtifactID, preview.SelectedPods[0].UID, expires, projectionCheck)
 		}
 		// A hub-local download worker (ADR-204) prepares the native file; the
@@ -429,7 +447,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			diagnose()
 			t.Fatal("installed native download differs from its metadata or selected Pod", response.StatusCode, size, err)
 		}
-		if !short {
+		if browserChecks {
 			if err := installedProjectionMatchesNative(approved, native); err != nil {
 				t.Fatal(err)
 			}
@@ -444,8 +462,14 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		installedJourneyResumeSpent(t, ctx, admin, contentClient, root, originalDownload, contentURL, identity.downloadToken(), size)
 		installedJourneyCatalogMinimized(t, ctx, admin, root, investigation.Artifacts[0].ArtifactID, native)
-		qualifyInstalledBrowserJourney(t, ctx, identity, cert, address, origin, readReply, previewArguments,
-			progress.CaseID, investigation.Artifacts[0].ArtifactID, approved, native, projectionCheck, diagnose)
+		if browserChecks {
+			qualifyInstalledBrowserJourney(t, ctx, identity, cert, address, origin, readReply, previewArguments,
+				progress.CaseID, investigation.Artifacts[0].ArtifactID, approved, native, projectionCheck, diagnose)
+		}
+		if installedJourneyFocus() == "browser" {
+			t.Log("installed journey: browser focus complete; Stop, Deny, TargetGone, expiry and deletion run in the journey focus")
+			return
+		}
 		installedJourneyUnrelated(t, ctx, wire, identity.unrelated(), transport, origin, target, preview.PreviewID, progress.CaseID, investigation.Artifacts[0].ArtifactID)
 		// Revocation: with the Deny binding the case is no longer available;
 		// without it, it is again. Expiry: once the artifact's access ends,
@@ -508,7 +532,9 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			diagnose()
 			t.Fatal("installed Stop requires one acknowledged distinct nonterminal download", stopReply.RequestID, err)
 		}
-		checkQueryRetired()
+		if checkQueryRetired != nil {
+			checkQueryRetired()
+		}
 		// Preparing need not advertise a content link. Retain the public route
 		// for this acknowledged ID; no second readiness/worker wait is needed.
 		stopContentPath := "/api/v1/downloads/" + stopDownload.DownloadID + "/content"

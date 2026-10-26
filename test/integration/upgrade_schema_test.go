@@ -4,9 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"io/fs"
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -101,15 +104,28 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	if e != nil || state.Head != head-1 || state.Floor != head-1 || state.Compatible(head) {
 		t.Fatal("state before the upgrade", state, e)
 	}
+	// An expand migration leaves the floor; a contract migration declares its
+	// own version as the new floor (ADR-227). Compare with the head
+	// migration's own declaration, not with head.
+	declared := state.Floor
+	headSource, e := fs.ReadFile(migrations.Files(), filepath.Base(sources[len(sources)-1].Path))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if m := regexp.MustCompile(`asservat:oldest-binary-schema=([0-9]+)`).FindSubmatch(headSource); m != nil {
+		if declared, e = strconv.ParseInt(string(m[1]), 10, 64); e != nil {
+			t.Fatal(e)
+		}
+	}
 	planned, e := upgrade.PlannedFloor(state)
-	if e != nil || planned != head {
-		t.Fatal("planned floor", planned, e)
+	if e != nil || planned != declared {
+		t.Fatal("planned floor", planned, declared, e)
 	}
 	from, to, e := upgrade.Run(ctx)
 	if e != nil || from != head-1 || to != head {
 		t.Fatal("upgrade", from, to, e)
 	}
-	if state, e = upgrade.State(ctx); e != nil || state.Head != head || state.Floor != planned || !state.Compatible(postgres.CompiledSchemaVersion) || state.Compatible(head-1) {
+	if state, e = upgrade.State(ctx); e != nil || state.Head != head || state.Floor != planned || !state.Compatible(postgres.CompiledSchemaVersion) || state.Compatible(head-1) != (planned <= head-1) {
 		t.Fatal("state after the upgrade", state, e)
 	}
 	var floor string

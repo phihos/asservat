@@ -52,7 +52,9 @@ func ownerPublicSetup(in contracts.OwnerDeployment, profile contracts.OwnerProvi
 		// Shared acquisition workers (native download and approved inspection).
 		"acquisition-enrollment/v1/native-download/" + installation + "/", "acquisition-enrollment/v1/approved-pod-status/" + installation + "/",
 		"acquisition-certificate/v1/native-download/" + installation + "/", "acquisition-certificate/v1/approved-pod-status/" + installation + "/",
-		"context-query-worker/v1/" + root + "/"}
+		"context-query-worker/v1/" + root + "/",
+		// ADR-228: hub-api policy activation writes the encrypted acceptance audit.
+		"policy-acceptance/v1/" + root + "/"}
 	return requests, append(inspect, p.WorkerPKI.Mount+"/roles/"+p.WorkerPKI.Role), prefixes, nil
 }
 

@@ -17,7 +17,19 @@ import (
 
 func captureOperationFixture(t *testing.T) (value.OperationIntent, *OperationMAC) {
 	t.Helper()
+	in, mac, e := captureOperationFixtureFor(t, nil)
+	if e != nil || !in.Valid() {
+		t.Fatal("synthetic accepted intent", e)
+	}
+	return in, mac
+}
+
+func captureOperationFixtureFor(t *testing.T, actor *identity.Principal) (value.OperationIntent, *OperationMAC, error) {
+	t.Helper()
 	base := auditIntent()
+	if actor != nil {
+		base.Actor = *actor
+	}
 	base.CreatedAt = time.Now().UTC().Truncate(time.Microsecond)
 	base.Name = value.CaptureOperationName
 	c := value.CaptureIntent{RootID: base.RootID, CaptureID: base.ID, CaseID: base.RootID, OccurrenceID: base.ID, ArtifactID: base.RootID, AttemptID: base.ID, Actor: base.Actor, Target: authorization.Target{ClusterID: base.RootID, NamespaceUID: "namespace", WorkloadUID: "workload", PodUID: "pod"}, ScopeDigest: artifact.Digest{1}, SubmissionDigest: artifact.Digest{2}, ExpectationDigest: artifact.Digest{3}, PermissionEpoch: base.RootID, PermissionSequence: 1, IdentityRevision: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{4}}, CreatedAt: base.CreatedAt, Deadline: base.CreatedAt.Add(30 * time.Second), ExpiresAt: base.CreatedAt.Add(time.Minute), DeleteBy: base.CreatedAt.Add(2 * time.Minute), ReservedBytes: 4096}
@@ -38,10 +50,21 @@ func captureOperationFixture(t *testing.T) (value.OperationIntent, *OperationMAC
 	}
 	a := value.CaptureAuditAccount{RootID: c.RootID, AllocationID: c.RootID, AccountVersion: mac.AccountVersion(), AccountDigest: d, Revision: 1, Records: 10, RetainedSeconds: 3600, Policy: p}
 	in, e := PrepareCaptureOperation(c, a, mac, c.CreatedAt.Add(5*time.Second))
-	if e != nil || !in.Valid() {
-		t.Fatal("synthetic accepted intent", e)
+	return in, mac, e
+}
+
+// ADR-228: an accepted policy's exact executor is a capture actor; any other
+// workload identity is not.
+func TestCaptureOperationAcceptsOnlyTheExactPolicyExecutor(t *testing.T) {
+	executor := authorization.PolicyPrincipal("11111111-1111-4111-8111-111111111111", "policy-uid")
+	if in, _, e := captureOperationFixtureFor(t, &executor); e != nil || !in.Valid() || in.Capture.Actor != executor {
+		t.Fatal("policy executor capture intent refused", e)
 	}
-	return in, mac
+	other := executor
+	other.ClientID = "connector"
+	if in, _, e := captureOperationFixtureFor(t, &other); e == nil && in.Valid() {
+		t.Fatal("arbitrary workload accepted as capture actor")
+	}
 }
 func TestCaptureOperationClosedPrivatePayload(t *testing.T) {
 	in, _ := captureOperationFixture(t)

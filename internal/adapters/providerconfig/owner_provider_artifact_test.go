@@ -194,14 +194,14 @@ func TestOwnerProviderArtifactCarriesPromotedPublic(t *testing.T) {
 			Prefixes []string `json:"prefixes"`
 		} `json:"auditStorage"`
 	}
-	if json.Unmarshal(b, &out) != nil || len(out.Apply) != 21 || len(out.AuditStorage.Prefixes) != 15 || out.AuditStorage.Prefixes[2] != "operation-audit/v1/"+in.PermissionRootID+"/" {
+	if json.Unmarshal(b, &out) != nil || len(out.Apply) != 21 || len(out.AuditStorage.Prefixes) != 16 || out.AuditStorage.Prefixes[2] != "operation-audit/v1/"+in.PermissionRootID+"/" {
 		t.Fatal("promoted public setup", len(out.Apply), out.AuditStorage.Prefixes)
 	}
 	// native67: every acquisition-worker audit key must sit under a granted
 	// prefix, or the object store refuses the write (HTTP 403).
 	for _, key := range []string{"acquisition-enrollment/v1/native-download/" + in.InstallationID + "/w", "acquisition-enrollment/v1/approved-pod-status/" + in.InstallationID + "/w",
 		"acquisition-certificate/v1/native-download/" + in.InstallationID + "/a", "acquisition-certificate/v1/approved-pod-status/" + in.InstallationID + "/a",
-		"context-query-worker/v1/" + in.PermissionRootID + "/q/w/intent"} {
+		"context-query-worker/v1/" + in.PermissionRootID + "/q/w/intent", audit.PolicyAcceptanceKey(in.PermissionRootID, in.InstallationID)} {
 		if !slices.ContainsFunc(out.AuditStorage.Prefixes, func(p string) bool { return strings.HasPrefix(key, p) }) {
 			t.Fatal("audit key outside granted prefixes", key)
 		}
