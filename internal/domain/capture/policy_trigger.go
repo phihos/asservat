@@ -82,7 +82,8 @@ type RestartCandidate struct {
 
 // RestartDelta is the pure trigger evaluation of one complete observation.
 // previous maps Pod UID to its last restart count. The first observation of
-// a Pod is only its baseline; a vanished Pod drops out of next; a counter is
+// a Pod is only its baseline; next holds only the observed Pods (the store
+// keeps unobserved rows and prunes them after ten minutes); a counter is
 // monotonic per UID, so a replayed or older observation never fires.
 func RestartDelta(p RestartPolicy, previous map[string]int64, o targets.RestartObservation) (next map[string]int64, fired []RestartCandidate) {
 	next = make(map[string]int64, len(o.Pods))

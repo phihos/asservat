@@ -28,7 +28,7 @@ or an executor that could run a capture.
    first observation of a Pod is only its baseline; a later higher counter with a matching latest
    termination is one occurrence keyed (policy, Pod UID, restart count). A missed poll coalesces
    its restarts into that one occurrence (counted as `coalesced`); replay and concurrent duplicate
-   polls are no-ops; a vanished Pod's watermark goes. Kubernetes reports exit codes, not signals,
+   polls are no-ops; a Pod unseen for ten minutes is pruned. Kubernetes reports exit codes, not signals,
    so `signals` is rejected; intermediate restarts' reasons are not visible.
 4. **Hub-held DebugPolicy.** Policies live in the hub control namespace like AccessBindings, with a
    new `spec.target.cluster`. Their source observation names the policy object's own location; the
@@ -70,7 +70,11 @@ or an executor that could run a capture.
    policies per workload cluster. Watermarks only rise (a Pod missing from one poll keeps its
    count) and are pruned after ten minutes unseen. An occurrence still open two minutes after
    admission (hub-api stopped, or its record failed) is settled as refused with an `unavailable`
-   suppression at the next cycle; its execution stays spent and nothing resumes it.
+   suppression at the next cycle; its execution stays spent and nothing resumes it. If the stop fell
+   after the capture was admitted but before the occurrence was linked, that capture still exists
+   (it is an ordinary capture under the occurrence ID as idempotency key) but the occurrence reads
+   refused and the status counters under-report it by one. This needs a hub stop inside one
+   sub-second window and is accepted rather than adding a lookup.
 
 ## Agent-authored restrictions revised (recorded as such)
 

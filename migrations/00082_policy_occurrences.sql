@@ -21,8 +21,8 @@ ALTER TABLE policy_source ADD CONSTRAINT policy_source_fresh CHECK (fresh_until>
 ALTER TABLE policy_acceptance ADD COLUMN executions_spent bigint NOT NULL DEFAULT 0;
 ALTER TABLE policy_acceptance ADD CONSTRAINT policy_acceptance_executions CHECK (executions_spent>=0 AND executions_spent<=COALESCE((record#>>'{Authority,Limits,MaxExecutions}')::bigint,0));
 
--- The last observed whole-pod restart counter of each Pod a policy watches.
--- The first observation of a Pod is its baseline; a vanished Pod's row goes.
+-- The highest observed whole-pod restart counter of each Pod a policy watches.
+-- The first observation of a Pod is its baseline; a Pod unseen for ten minutes is pruned.
 CREATE TABLE policy_pod_watermark (
  root_id uuid NOT NULL,
  policy_uid text NOT NULL,
