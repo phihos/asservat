@@ -1,5 +1,12 @@
 # Decision records
 
+[ADR-234 — Caller-only access explanation](234-access-explanation.md) is S-06 increment 7:
+`explain_access(target_ref, operation)` over MCP and the browser route runs the real ordinary
+evaluator for the caller's own access and reports Allow/Deny/Indeterminate, the unmet condition and
+the caller's own contributing assignments; callers without an assignment on the target get one
+uniform answer. Console "Why?" link on capture errors and blockers. Migration 00087 adds the audit
+operation name.
+
 [ADR-233 — Recipient native download of a shared artifact](233-recipient-native-download.md) is
 S-06 increment 3: the download authorizer consults a recipient's share of exactly the scope's
 artifact and version only after ordinary eligibility refuses and before the catalog read, re-reads

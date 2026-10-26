@@ -295,8 +295,8 @@ operations:
   effect: read
   role: signed-in
   contract: docs/interfaces/browser-openapi.yaml
-- operation: explain_access
-  path: /api/v1/console/explain_access
+- operation: explain_principal_access
+  path: /api/v1/console/explain_principal_access
   transport:
   - browser
   effect: read
@@ -528,6 +528,13 @@ operations:
   contract: specs/contracts/mcp-tools.json
 - operation: get_policy_status
   path: /api/v1/operations/get_policy_status
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json
+- operation: explain_access
+  path: /api/v1/operations/explain_access
   transport:
   - browser
   - mcp

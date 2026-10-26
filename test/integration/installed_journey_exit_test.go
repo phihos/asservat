@@ -246,5 +246,29 @@ func installedJourneyUnrelated(t *testing.T, ctx context.Context, wire *contract
 			t.Fatalf("installed unrelated principal %s: %v", c.name, failure)
 		}
 	}
+	// ADR-234: the unrelated user's own explanation is the uniform Deny, the
+	// same for the real workload as for an absent one.
+	explain := func(ref map[string]string) (map[string]any, error) {
+		result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "explain_access", Arguments: map[string]any{"target_ref": ref, "operation": "capture"}})
+		if err != nil {
+			return nil, err
+		}
+		reply, code, err := installedJourneyReplyCode(wire, "explain_access", result)
+		if err != nil || code != "" {
+			return nil, fmt.Errorf("explain_access %s %v", code, err)
+		}
+		var data map[string]any
+		if json.Unmarshal(reply.Data, &data) != nil || data["decision"] != "Deny" || data["unmet"] != "NoMatchingAllow" || data["target"] != nil {
+			return nil, fmt.Errorf("explain_access disclosed %s", reply.Data)
+		}
+		return data, nil
+	}
+	real, err := explain(target)
+	if err != nil {
+		t.Fatal("installed unrelated explain_access", err)
+	}
+	if other, err := explain(absent); err != nil || !reflect.DeepEqual(real, other) {
+		t.Fatal("installed unrelated explain_access differs for an absent workload", real, other, err)
+	}
 	t.Log("installed journey: an unrelated eligible Keycloak user was refused on MCP diagnostics, preview, request, case and download preparation exactly as for absent objects")
 }

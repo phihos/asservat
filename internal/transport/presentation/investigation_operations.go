@@ -68,6 +68,14 @@ func NewInvestigationShareOperations(base *InvestigationOperations, shares *Shar
 	return withOperations(base, shares)
 }
 
+// NewInvestigationAccessOperations adds the ADR-234 explain_access operation the same way.
+func NewInvestigationAccessOperations(base *InvestigationOperations, access *AccessOperations) (*InvestigationOperations, error) {
+	if access == nil {
+		return nil, ErrOperationsConfiguration
+	}
+	return withOperations(base, access)
+}
+
 func withOperations(base *InvestigationOperations, policies Operations) (*InvestigationOperations, error) {
 	if base == nil || policies.PublicOrigin() != base.origin {
 		return nil, ErrOperationsConfiguration
@@ -193,6 +201,8 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 	case *PolicyOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *ShareOperations:
+		return p.CallWithContext(ctx, current, call, name, raw)
+	case *AccessOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	default:
 		return OperationReply{}, contracts.ErrInvestigationWire

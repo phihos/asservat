@@ -155,7 +155,22 @@ func ScopeEligibility(i identity.Identity, p Projection, op Operation, t Target,
 }
 
 func evaluate(i identity.Identity, p Projection, op Operation, t Target, e *Retained, now time.Time, requireRetained bool) Result {
-	deny := func(reason string) Result { return Result{Reason: reason} }
+	r, _ := evaluateDetail(i, p, op, t, e, now, requireRetained)
+	return r
+}
+
+// evaluationDetail records which of the evaluator's own conditions decided a
+// refusal, for the caller-only explanation (ADR-234). It never changes the
+// Result and grants nothing.
+type evaluationDetail struct {
+	missingScope string
+	matchedDeny  *artifact.AudienceAssignment
+	staleAllow   bool
+}
+
+func evaluateDetail(i identity.Identity, p Projection, op Operation, t Target, e *Retained, now time.Time, requireRetained bool) (Result, evaluationDetail) {
+	var detail evaluationDetail
+	deny := func(reason string) (Result, evaluationDetail) { return Result{Reason: reason}, detail }
 	if !op.Valid() || !t.Valid() {
 		return deny("InvalidRequest")
 	}
@@ -183,6 +198,8 @@ func evaluate(i identity.Identity, p Projection, op Operation, t Target, e *Reta
 		}
 		until = identity.Earlier(until, d.FreshUntil)
 		if matches(d.Audience, i) && permits(d.Audience.Role, op) {
+			matched := d.Audience
+			detail.matchedDeny = &matched
 			return deny("ExplicitDeny")
 		}
 	}
@@ -195,12 +212,17 @@ func evaluate(i identity.Identity, p Projection, op Operation, t Target, e *Reta
 	}
 	for _, scope := range required {
 		if !slices.Contains(i.Scopes, scope) {
+			detail.missingScope = scope
 			return deny("InsufficientScope")
 		}
 	}
 	var audience []artifact.AudienceAssignment
 	for _, a := range p.Allows {
-		if !identity.Fresh(a.ObservedAt, a.FreshUntil, now, 60*time.Second) || !matches(a.Audience, i) || !permits(a.Audience.Role, op) {
+		if !matches(a.Audience, i) || !permits(a.Audience.Role, op) {
+			continue
+		}
+		if !identity.Fresh(a.ObservedAt, a.FreshUntil, now, 60*time.Second) {
+			detail.staleAllow = true
 			continue
 		}
 		if e != nil && !slices.Contains(e.Audience, a.Audience) {
@@ -228,5 +250,5 @@ func evaluate(i identity.Identity, p Projection, op Operation, t Target, e *Reta
 		}
 		return 0
 	})
-	return Result{true, "Eligible", i.Principal, i.Policy, p.Revision, until, audience}
+	return Result{true, "Eligible", i.Principal, i.Policy, p.Revision, until, audience}, detail
 }
