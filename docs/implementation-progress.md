@@ -1,5 +1,52 @@
 # Sustained implementation progress
 
+## Installation-chain focus `continuation-chain` (2026-10-26)
+
+On PR #57's CI the two native jobs that still ran the full installation chain came within a
+minute of the 20-minute job cap: `continuation-journey` 19m04s (go test 861 s) and
+`continuation-clusters` 19m30s (go test 882 s). Each job spends about 4.5 min outside go test
+(runner setup, image build, cluster creation, cleanup). The chain alone took 591 s on CI from
+the test's start until the first regional workload was enrolled, so no suite that runs it plus
+a feature scenario fits within about 16 minutes.
+
+The full chain now runs in exactly one focus, `chain` (`ASSERVAT_JOURNEY_FOCUS=chain`, CI suite
+`continuation-chain`, one workload cluster): it runs the installation through every
+installation-process check, a short journey on the workload that was added after the join,
+and stops. `journey` and `clusters` use the fast fixture. No assertion was removed; the
+coverage moves:
+
+| Coverage | Before | Now |
+| --- | --- | --- |
+| interrupted unified runner, refused live resume, positive-terminal resume, unchanged journals and passive replay before the first provider apply | journey, clusters, unsplit | chain, unsplit |
+| administrator's retention-baseline edit (ADR-195 step 7) | journey, clusters, unsplit | chain, unsplit |
+| first workload cluster: workload, budget and binding added after the join, enrolled by discovery's second pass; demand lane (ADR-200); `installer-cluster` rerun exactness, restarted-connector readmission, source-write denial | journey, clusters, unsplit | chain, unsplit |
+| a short journey on that workload | clusters | chain |
+| first cluster's full journey (MCP, duplicate replay, download, range resume, refusals, Stop/Deny, TargetGone, expiry, deletion fault and recovery) | journey (full chain) | journey (fast fixture) |
+| second workload cluster: demand lane, rerun exactness, readmission, source-write denial, short journey; final five-command replay | clusters (full chain) | clusters (fast fixture; the second cluster keeps every regional installer check through `installedRegionalInstallerChecks`) |
+
+In the clusters focus both workloads now exist before their cluster joins (as in every fast
+focus); enrolling a workload added after the join stays in the chain focus and the unsplit run.
+
+Measured locally, one fixture at a time (seconds from go test start; harness wall includes
+image build, cluster creation and cleanup). All runs passed with source unchanged and no
+cleanup failures:
+
+| Focus | Fixture | Setup to scenario | go test | Harness wall |
+| --- | --- | --- | --- | --- |
+| chain | full chain | 559 s (workload enrolled) | 604 s | 721 s |
+| journey | fast | 444 s | 655 s | 759 s |
+| clusters | fast | 449 s | 622 s | 733 s |
+| journey (before, PR #57) | full chain | 520 s | 720 s | 821 s |
+
+Expected CI jobs, from the CI/local ratio of the PR #57 fast focuses (1.03–1.09) and their
+fixed 4.5 min outside go test: chain about 15.5 min, journey about 16.5 min, clusters about
+16 min. The journey stays the longest: its scenario (about 190 s) is the expiry wait and the
+deletion fault's two product cleanup leases, which this change does not shorten. These are
+estimates until the next native dispatch measures them. Fixed waits were not cut: the 35 s
+standby window and the 80 s journey retention verify behavior (see below and the retention
+comment in `installedJourneyRetentionSeconds`).
+
+
 ## Fast feature fixture and `make pre-push` (2026-10-26)
 
 Every installed focus ran the whole installation-process qualification before its scenario:
@@ -9,22 +56,23 @@ which the regional workload's enrollment alone took about 140 s (the workload wa
 its cluster joined, so discovery, about 100 s per pass at 2 s per step, enrolled it on its
 second pass) and the interrupted-and-resumed runner about 25 s.
 
-`installedFastFixture()` (focuses `policy`, `browser`, `restart`, `upgrade`) keeps every product
+`installedFastFixture()` (focuses `policy`, `browser`, `restart`, `upgrade`, and since the chain
+focus above also `journey` and `clusters`) keeps every product
 installation, enrollment and authority step but skips the checks that qualify the installation
 process itself:
 
 | Skipped in the fast fixture | Still covered by |
 | --- | --- |
-| interrupted unified runner, refused live resume, positive-terminal resume, unchanged journals and passive replay before the first provider apply | `continuation-journey`, `continuation-clusters`, unsplit `continuation` |
-| administrator's retention-baseline edit accepted at the next sequence (ADR-195 step 7) | journey, clusters, unsplit |
-| demand-lane sampling (ADR-200: three refreshes and a usable binding within 15 s) | journey, clusters, unsplit |
-| regional `installer-cluster` rerun exactness, restarted-connector readmission, non-administrator source-write denial | journey, clusters, unsplit |
+| interrupted unified runner, refused live resume, positive-terminal resume, unchanged journals and passive replay before the first provider apply | `continuation-chain`, unsplit `continuation` (formerly journey and clusters) |
+| administrator's retention-baseline edit accepted at the next sequence (ADR-195 step 7) | chain, unsplit |
+| demand-lane sampling (ADR-200: three refreshes and a usable binding within 15 s) | chain, unsplit; the second cluster in clusters |
+| regional `installer-cluster` rerun exactness, restarted-connector readmission, non-administrator source-write denial | chain, unsplit; the second cluster in clusters |
 
 In the fast fixture the regional workload (namespace `apps-regional`, sorting before the system
 namespaces) already runs when its cluster joins, and the operator's budget policy, pool slot and
 maintainer AccessBinding are created for the cluster named by the bootstrap record before the
 join; the test checks that it equals the join's cluster. Discovery's first pass then enrolls it
-within about 15 s. The journey and clusters runs keep the original order (budget and workload
+within about 15 s. The chain run (formerly journey and clusters) keeps the original order (budget and workload
 after the join), so enrolling a workload added later stays covered. Because enrollment now
 returns within seconds of the join's hub-api restart, the fast fixture waits until hub-api has
 run 35 s (the connector reopens a context standby refused at TLS 30 s later); without this wait
