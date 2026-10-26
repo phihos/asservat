@@ -107,7 +107,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		// The focused restart run (ASSERVAT_JOURNEY_FOCUS=restart) starts with a
 		// short journey, which must initialize processing itself.
-		initialize := !short || (installedJourneyFocus() == "restart" || installedJourneyFocus() == "clusters" || installedJourneyFocus() == "upgrade" || installedJourneyFocus() == "chain") && runs == 1
+		initialize := !short || (installedJourneyFocus() == "restart" || installedJourneyFocus() == "clusters" || installedJourneyFocus() == "upgrade" || installedJourneyFocus() == "chain" || installedJourneyFocus() == "share") && runs == 1
 		cert, err := x509.ParseCertificate(publicRoot)
 		if err != nil {
 			t.Fatal("public listener root", err)
@@ -454,6 +454,10 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		t.Logf("installed journey: the Keycloak user downloaded the native pod-status file (%d bytes) of cluster %s through the hub-local worker", size, cluster)
 		if short {
+			if installedJourneyFocus() == "share" {
+				// ADR-232: share the published artifact with the unrelated principal.
+				installedJourneyShare(t, ctx, wire, identity, transport, origin, progress.CaseID, investigation.Artifacts[0].ArtifactID, diagnose)
+			}
 			t.Logf("installed journey: short journey in cluster %s complete; its native file names Pod %s in namespace %s", cluster, projected.PodUID, projected.NamespaceUID)
 			return
 		}
@@ -1007,6 +1011,7 @@ func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *c
 // journey, the PostgreSQL restart and another short journey. "clusters":
 // install and short journeys in both workload clusters, then the replay.
 // "alert": install with an in-cluster Alertmanager and the alert policy phase.
+// "share": install, a short journey and the ADR-232 share/read/revoke checks.
 // Empty runs everything in one (longer) run.
 func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS") }
 
@@ -1021,7 +1026,7 @@ func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS")
 // 20-minute limit; docs/implementation-progress.md records the split.
 func installedFastFixture() bool {
 	switch installedJourneyFocus() {
-	case "policy", "alert", "browser", "restart", "upgrade", "journey", "clusters":
+	case "policy", "alert", "browser", "restart", "upgrade", "journey", "clusters", "share":
 		return true
 	}
 	return false

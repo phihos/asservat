@@ -45,7 +45,15 @@ func TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection(t *testing.T) {
 	if wire.ValidateOutput("get_case", good) != nil {
 		t.Fatal("qualified output rejected")
 	}
-	for _, which := range []string{"shared", "raw", "pcap", "native checksum", "native path", "title", "timeline", "preservation", "verified classification", "deletion complete", "omitted exposure", "partial", "missing notice", "extra provenance", "pending"} {
+	// ADR-232: a recipient's view of a shared pod-status artifact is the same
+	// metadata projection with access "shared".
+	summary["access"] = "shared"
+	shared, _ := json.Marshal(result)
+	summary["access"] = "ordinary"
+	if wire.ValidateOutput("get_case", shared) != nil {
+		t.Fatal("shared pod-status view rejected")
+	}
+	for _, which := range []string{"unknown access", "raw", "pcap", "native checksum", "native path", "title", "timeline", "preservation", "verified classification", "deletion complete", "omitted exposure", "partial", "missing notice", "extra provenance", "pending"} {
 		t.Run(which, func(t *testing.T) {
 			var v map[string]any
 			_ = json.Unmarshal(good, &v)
@@ -54,8 +62,8 @@ func TestCaseSchemaIsOnlyTheQualifiedOrdinaryPodStatusProjection(t *testing.T) {
 			a := d["artifacts"].([]any)[0].(map[string]any)
 			n := a["handling_notice"].(map[string]any)
 			switch which {
-			case "shared":
-				c["access"] = "shared"
+			case "unknown access":
+				c["access"] = "public"
 			case "raw":
 				a["data_class"] = "raw"
 			case "pcap":

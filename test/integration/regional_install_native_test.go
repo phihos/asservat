@@ -893,8 +893,14 @@ func (b *regionalBudget) addPolicy() {
 
 func (b *regionalBudget) addBinding(w regionalWorkload) {
 	b.t.Helper()
+	roles := []any{"workload-maintainer"}
+	if installedJourneyFocus() == "share" {
+		// ADR-232: the developer group also owns the workload's evidence, so
+		// its captures' retained audience includes the evidence-owner role.
+		roles = append(roles, "evidence-owner")
+	}
 	b.binding = map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": b.bindingName}, "spec": map[string]any{"effect": "Allow",
-		"subjects": []any{map[string]any{"kind": "Group", "issuer": b.issuer, "id": "synthetic-group"}}, "roles": []any{"workload-maintainer"},
+		"subjects": []any{map[string]any{"kind": "Group", "issuer": b.issuer, "id": "synthetic-group"}}, "roles": roles,
 		"scope":  map[string]any{"clusterID": b.cluster, "namespaceRef": map[string]any{"name": w.ns.Name, "uid": string(w.ns.UID)}, "workloads": []any{map[string]any{"kind": "Deployment", "name": w.app.Name, "uid": string(w.app.UID)}}},
 		"reason": "ADR-197 native regional capacity"}}
 	body, _ := json.Marshal(b.binding)

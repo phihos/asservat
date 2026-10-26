@@ -178,6 +178,13 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("policy_workload_window", "UPDATE", "tat")
 		add("policy_suppression", "INSERT")
 		add("policy_suppression", "UPDATE", "last_at", "count")
+	case "evidence-share":
+		// ADR-232: the share ledger. Shares bind to published case locators;
+		// only revocation may change a row (the table's trigger enforces it).
+		read("fleet_current_trust", "context_case_locator", "evidence_share")
+		add("fleet_current_trust", "UPDATE", "installation_id")
+		add("evidence_share", "INSERT")
+		add("evidence_share", "UPDATE", "revoked_at", "revoke_key", "revision")
 	case "capture-journal":
 		for _, signature := range []string{"read_capture_operation(uuid,uuid)", "capture_audit_journal(uuid,jsonb,text,jsonb)", "claim_capture_reconciliation(uuid,jsonb,text)"} {
 			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})

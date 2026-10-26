@@ -1,6 +1,6 @@
 {
   "name": "get_case",
-  "description": "Read a currently authorized ordinary case of verified pod-status artifacts and effective handling dates. Artifact digest is the verified ciphertext-copy version, not native file SHA-256. No native bytes, raw or shared access.",
+  "description": "Read a currently authorized case of verified pod-status artifacts and effective handling dates: ordinary access, or artifacts an evidence owner shared with you (access shared). Artifact digest is the verified ciphertext-copy version, not native file SHA-256. No native bytes or raw access; shared artifacts cannot be downloaded.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -107,7 +107,10 @@
                         "const": "Ready"
                       },
                       "access": {
-                        "const": "ordinary"
+                        "enum": [
+                          "ordinary",
+                          "shared"
+                        ]
                       }
                     },
                     "required": [

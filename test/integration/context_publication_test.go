@@ -263,6 +263,14 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		})
 	})
 
+	t.Run("evidence-share-recipient-read-revocation-expiry-and-deny", func(t *testing.T) {
+		f := setup(t)
+		if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err != nil {
+			t.Fatal(err)
+		}
+		qualifyEvidenceShare(t, ctx, admin, poolFor, f.scenario, f.e, f.reader)
+	})
+
 	t.Run("progress-revisions-follow-durable-verification-audit-and-publication", func(t *testing.T) {
 		f := setup(t)
 		pool := poolFor("context_progress_read_runtime", "synthetic-context-progress-read")
