@@ -250,6 +250,10 @@ func newHandler(c Config, resolver identities.Resolver, operations presentation.
 func registerContextTools(server *sdk.Server, operations presentation.Operations) {
 	for _, name := range operations.ToolNames() {
 		description, _ := operations.Tool(name)
+		// ADR-237: browser-only operations are neither listed nor callable here.
+		if !description.MCP() {
+			continue
+		}
 		var annotations sdk.ToolAnnotations
 		_ = json.Unmarshal(description.Annotations, &annotations)
 		server.AddTool(&sdk.Tool{Name: name, Description: description.Description, Annotations: &annotations, InputSchema: description.InputSchema, OutputSchema: description.OutputSchema}, func(ctx context.Context, request *sdk.CallToolRequest) (*sdk.CallToolResult, error) {

@@ -8,6 +8,13 @@ members; `get_capture_settings` returns the accepted target, recipe, pins and re
 `preview_capture(history_capture_id)` runs the ordinary preview with every current check. Console
 "Recent captures" with "Collect again". Snapshots, digests, eviction and lineage are increment 12.
 
+[ADR-237 — Permission impact preview](237-permission-impact-preview.md) is S-06 increment 10:
+the browser-only `preview_access_change` lets a current fleet operator submit proposed AccessBinding
+create/update/delete (and PermissionSource delete) objects and see, per workload scope of the
+enrolled clusters (at most 1,000), whose Allow/Deny/Indeterminate decisions would change, using the
+real evaluator over the current accepted projection. Unavailable data is Indeterminate, never Allow.
+Console `/access-preview`. Migration 00090 adds the audit operation name.
+
 [ADR-234 — Caller-only access explanation](234-access-explanation.md) is S-06 increment 7:
 `explain_access(target_ref, operation)` over MCP and the browser route runs the real ordinary
 evaluator for the caller's own access and reports Allow/Deny/Indeterminate, the unmet condition and

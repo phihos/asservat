@@ -11316,6 +11316,363 @@
           }
         ]
       }
+    },
+    {
+      "name": "preview_access_change",
+      "description": "Preview the effect of proposed AccessBinding changes before applying them through Kubernetes (ADR-237). For each workload scope of the affected namespaces (at most 1,000), reports which users, groups or workloads named by the added or removed assignments would change between Allow, Deny and Indeterminate for capture, read and download, evaluated by the same rules as the operations themselves over the current accepted permission data. Targets whose permission data is unavailable or outside the enrolled clusters are reported Indeterminate. Group members are never listed and no evidence is read. Only for fleet operators; it changes nothing: apply the change with kubectl or GitOps.",
+      "enabledByDefault": true,
+      "transports": [
+        "browser"
+      ],
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "const": "create"
+                    },
+                    "kind": {
+                      "const": "AccessBinding"
+                    },
+                    "spec": {
+                      "$ref": "https://asservat.io/spec/v1/access-binding.schema.json#/properties/spec"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "kind",
+                    "spec"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "const": "update"
+                    },
+                    "kind": {
+                      "const": "AccessBinding"
+                    },
+                    "uid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "spec": {
+                      "$ref": "https://asservat.io/spec/v1/access-binding.schema.json#/properties/spec"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "kind",
+                    "uid",
+                    "spec"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "const": "delete"
+                    },
+                    "kind": {
+                      "enum": [
+                        "AccessBinding",
+                        "PermissionSource"
+                      ]
+                    },
+                    "uid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "kind",
+                    "uid"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "changes"
+        ]
+      },
+      "outputSchema": {
+        "allOf": [
+          {
+            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
+          },
+          {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "ok"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "complete": {
+                        "type": "boolean"
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "targets_evaluated": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "deltas_total": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "deltas": {
+                        "type": "array",
+                        "maxItems": 64,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "cluster_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "namespace_uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "workload_uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "other_workloads": {
+                              "type": "boolean"
+                            },
+                            "subject": {
+                              "$ref": "https://asservat.io/spec/v1/permission-common.schema.json#/$defs/subject"
+                            },
+                            "operation": {
+                              "enum": [
+                                "capture",
+                                "read",
+                                "download"
+                              ]
+                            },
+                            "before": {
+                              "enum": [
+                                "Allow",
+                                "Deny",
+                                "Indeterminate"
+                              ]
+                            },
+                            "after": {
+                              "enum": [
+                                "Allow",
+                                "Deny",
+                                "Indeterminate"
+                              ]
+                            },
+                            "after_unmet": {
+                              "enum": [
+                                "NoMatchingAllow",
+                                "ExplicitDeny",
+                                "PermissionObservationStale",
+                                "AudienceOverflow",
+                                "ServiceUnavailable"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "cluster_id",
+                            "namespace_uid",
+                            "workload_uid",
+                            "other_workloads",
+                            "subject",
+                            "operation",
+                            "before",
+                            "after"
+                          ]
+                        }
+                      },
+                      "unavailable_total": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000
+                      },
+                      "unavailable": {
+                        "type": "array",
+                        "maxItems": 16,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "cluster_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "namespace_uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "workload_uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "other_workloads": {
+                              "type": "boolean"
+                            },
+                            "decision": {
+                              "const": "Indeterminate"
+                            },
+                            "unmet": {
+                              "enum": [
+                                "PermissionObservationStale",
+                                "ServiceUnavailable",
+                                "ClusterUnavailable"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "cluster_id",
+                            "namespace_uid",
+                            "workload_uid",
+                            "other_workloads",
+                            "decision",
+                            "unmet"
+                          ]
+                        }
+                      },
+                      "unmatched": {
+                        "type": "array",
+                        "maxItems": 16,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "AccessBinding",
+                                "PermissionSource"
+                              ]
+                            },
+                            "uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "uid"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "complete",
+                      "message",
+                      "targets_evaluated",
+                      "deltas_total",
+                      "deltas",
+                      "unavailable_total",
+                      "unavailable",
+                      "unmatched"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "error"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      },
+                      "navigation_uri": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 2048
+                      },
+                      "responsible_role": {
+                        "enum": [
+                          "maintainer",
+                          "approver",
+                          "administrator",
+                          "none"
+                        ]
+                      },
+                      "retry_after_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "message",
+                      "retryable"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

@@ -540,3 +540,10 @@ operations:
   - mcp
   effect: read
   contract: specs/contracts/mcp-tools.json
+- operation: preview_access_change
+  path: /api/v1/operations/preview_access_change
+  transport:
+  - browser
+  effect: read
+  role: fleet-operator
+  contract: specs/contracts/mcp-tools.json

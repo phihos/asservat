@@ -2,17 +2,18 @@ package bootstrap
 
 import (
 	"os"
-
-	analysisapp "asservat.local/asservat/internal/application/analysis"
-	executionapp "asservat.local/asservat/internal/application/execution"
-	planningapp "asservat.local/asservat/internal/application/planning"
+	"slices"
 	"time"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	analysisapp "asservat.local/asservat/internal/application/analysis"
 	auditapp "asservat.local/asservat/internal/application/audit"
 	authapp "asservat.local/asservat/internal/application/authorization"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	catalogapp "asservat.local/asservat/internal/application/catalog"
 	"asservat.local/asservat/internal/application/evidence"
+	executionapp "asservat.local/asservat/internal/application/execution"
+	planningapp "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/application/sharing"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/transport/presentation"
@@ -179,4 +180,24 @@ func composePublicAccess(c PublicContextOperationsConfig, s PublicContextOperati
 	}
 	service := authapp.AccessExplainer{InstallationID: c.InstallationID, Targets: v.submission.Targets, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
 	return presentation.NewAccessOperations(c.PublicOrigin, c.Now, c.NewID, service)
+}
+
+// composePublicAccessPreview composes the ADR-237 browser-only
+// preview_access_change operation: the protected fleet administration names
+// the administrators, and the same permission projection, recovery and clock
+// as explain_access feed the real evaluator. Nil without fleet administration.
+func composePublicAccessPreview(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.AccessPreviewOperations, error) {
+	if pc == nil || pc.fleet == nil {
+		return nil, nil
+	}
+	v, err := composePublicContextUseCases(c, s)
+	if err != nil || pc.permissions == nil || pc.fleet.Settings == nil || len(pc.clusterIDs) == 0 {
+		return nil, presentation.ErrOperationsConfiguration
+	}
+	decoder, err := kube.NewAccessBindingSpecDecoder()
+	if err != nil {
+		return nil, presentation.ErrOperationsConfiguration
+	}
+	service := authapp.AccessPreviewer{InstallationID: c.InstallationID, Administration: pc.fleet.Settings, Projections: pc.permissions, Decoder: decoder, Recovery: v.submission.Recovery, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
+	return presentation.NewAccessPreviewOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }

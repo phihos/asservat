@@ -80,6 +80,22 @@ parallel ADR-234/235 work were present locally only so the contiguous migration 
   four reviews like the journey. Run 40410603005: PASS (first preview NotAvailable, the retry
   1.2 s later ok, repeat collected), job 12m17s.
 
+## S-06 increment 10: permission impact preview (ADR-237, 2026-10-26)
+
+[ADR-237](decisions/237-permission-impact-preview.md) adds the browser-only
+`preview_access_change` operation (normal audit lane, migration 00090, schema head 90, floor 81)
+and the console page `/access-preview`. A current fleet operator submits 1–16 AccessBinding
+create/update/delete or PermissionSource delete changes; the service reads every workload scope cell
+of the affected namespaces from the accepted projection in one transaction (at most 1,000 cells),
+applies the changes with the observation's own candidate derivation and compares the ordinary
+evaluator's decisions before and after for each changed subject. Unavailable or non-enrolled cells
+are Indeterminate. MCP does not list or accept the operation. Narrowings are recorded in the ADR.
+
+Verification: unit tests (domain, application, presentation, Kubernetes decoder, console) and the
+real-PostgreSQL subtest `permission-impact-preview` (custody fixture, `--run
+'^TestPermissionAuthorityWithRealServices$'`) pass; see the ADR. Migration 00090 needs 00088/00089
+on main first (contiguous schema bundle). No installed qualification.
+
 ## S-06 increment 7: caller-only access explanation (ADR-234, 2026-10-26)
 
 [ADR-234](decisions/234-access-explanation.md) adds `explain_access(target_ref, operation)` on MCP

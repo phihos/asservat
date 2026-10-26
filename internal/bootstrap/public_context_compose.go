@@ -80,6 +80,9 @@ type publicContext struct {
 	// (ADR-196 decision 3): a later change restarts the process.
 	clusters       *kube.ClusterCatalogSource
 	clustersDigest [32]byte
+	// clusterIDs are the hub and the catalog's clusters: the installation's
+	// enrolled clusters for the ADR-237 permission impact preview.
+	clusterIDs []string
 	// fleet is the ADR-193 bootstrap issuance; nil without Public.Fleet.
 	fleet *fleetapp.FleetBootstrapIssuance
 	// processingPolicy is the capacity processing source that processing
@@ -210,6 +213,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		return nil, mounts.ErrUnavailable
 	}
 	out.clusters, out.clustersDigest = catalog.source, catalog.digest
+	out.clusterIDs = append([]string{c.ClusterID}, catalogTargets(catalog.catalog)...)
 	for _, v := range catalog.catalog.Clusters {
 		if _, dup := capabilities[v.ClusterID]; dup || !authorization.UUID(v.ClusterID) || v.Settings.ClusterID != v.ClusterID || v.Trust.ClusterID != v.ClusterID || v.Settings.RootID != root || v.Trust.RootID != root || v.Settings.InstallationID != installation || v.Trust.InstallationID != installation {
 			return nil, mounts.ErrUnavailable

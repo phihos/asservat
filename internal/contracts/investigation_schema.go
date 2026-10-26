@@ -7,6 +7,7 @@ import (
 	"encoding/json/jsontext"
 	"errors"
 	"io"
+	"slices"
 	"time"
 
 	jsonschema "github.com/santhosh-tekuri/jsonschema/v6"
@@ -29,6 +30,16 @@ type InvestigationTool struct {
 	Annotations  json.RawMessage `json:"annotations"`
 	InputSchema  json.RawMessage `json:"inputSchema"`
 	OutputSchema json.RawMessage `json:"outputSchema"`
+	// Transports restricts an operation to the listed transports; absent, it
+	// is served to both the browser and MCP. ADR-237: the administrator's
+	// impact preview is browser-only, since REQ-PER-002 adds no admin tool
+	// to evidence MCP.
+	Transports []string `json:"transports,omitempty"`
+}
+
+// MCP reports whether the operation may be listed and called over MCP.
+func (t InvestigationTool) MCP() bool {
+	return len(t.Transports) == 0 || slices.Contains(t.Transports, "mcp")
 }
 
 type investigationSchema struct {
@@ -45,7 +56,7 @@ func (investigationOfflineLoader) Load(string) (any, error) { return nil, ErrInv
 
 func NewInvestigationContracts() (*InvestigationContracts, error) {
 	v := &InvestigationContracts{tools: make(map[string]investigationSchema)}
-	for _, name := range []string{"list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings"} {
+	for _, name := range []string{"list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change"} {
 		b, err := investigationSchemas.ReadFile("investigation-schemas/" + name + ".json")
 		var d InvestigationTool
 		if err != nil || json.Unmarshal(b, &d) != nil || d.Name != name {
@@ -80,6 +91,7 @@ func (v *InvestigationContracts) Tool(name string) (InvestigationTool, bool) {
 	s, ok := v.tools[name]
 	d := s.description
 	d.InputSchema, d.OutputSchema, d.Annotations = bytes.Clone(d.InputSchema), bytes.Clone(d.OutputSchema), bytes.Clone(d.Annotations)
+	d.Transports = slices.Clone(d.Transports)
 	return d, ok
 }
 

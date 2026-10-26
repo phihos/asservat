@@ -79,7 +79,8 @@ func auditedReceivingMiddleware(ops presentation.Operations) sdk.Middleware {
 			if !ok || !typed || req.Params == nil {
 				return nil, &jsonrpc.Error{Code: -32602, Message: "Invalid investigation request"}
 			}
-			_, known := ops.Tool(req.Params.Name)
+			description, known := ops.Tool(req.Params.Name)
+			known = known && description.MCP()
 			if known && req.Params.RequestState == "" && len(req.Params.InputResponses) == 0 {
 				return next(ctx, method, request)
 			}
