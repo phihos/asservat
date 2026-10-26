@@ -280,21 +280,32 @@ func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []
 	}
 	unmatched, requested := slices.Clone(snap.Unmatched), changes
 	if envelopes != nil {
+		// For a delegated previewer an updated or deleted object counts as
+		// matched only when that is proven: every cell was read, at least
+		// one of its current assignments is visible, and all of them lie
+		// inside the envelope. Anything else (foreign, wider than the
+		// envelope, hidden by an unavailable cell, no visible assignment) is
+		// reported exactly like a nonexistent UID: Unmatched, nothing
+		// removed, and an update still adds its proposed rows.
+		available := !slices.ContainsFunc(snap.Cells, func(c PreviewCell) bool { return c.Unavailable != "" })
 		var effective []AccessChange
 		for _, c := range changes {
-			foreign := false
+			if c.UID == "" || c.sourceSpec() {
+				effective = append(effective, c)
+				continue
+			}
+			seen, admitted := false, true
 			for _, cell := range snap.Cells {
 				for _, rows := range [][]authorization.CurrentAssignment{cell.Projection.Allows, cell.Projection.Denies} {
 					for _, r := range rows {
-						if removedBy([]AccessChange{c}, r.Audience) && !slices.ContainsFunc(envelopes, func(e PreviewEnvelope) bool { return e.admitsRow(cell.Target, r.Audience) }) {
-							foreign = true
+						if removedBy([]AccessChange{c}, r.Audience) {
+							seen = true
+							admitted = admitted && slices.ContainsFunc(envelopes, func(e PreviewEnvelope) bool { return e.admitsRow(cell.Target, r.Audience) })
 						}
 					}
 				}
 			}
-			if foreign {
-				// Like a nonexistent object: nothing is removed, and an
-				// update still adds its proposed rows under the same UID.
+			if !available || !seen || !admitted {
 				if ref := (PreviewBasis{c.Kind, c.UID}); !slices.Contains(unmatched, ref) {
 					unmatched = append(unmatched, ref)
 				}

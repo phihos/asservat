@@ -44,9 +44,12 @@ only by reading every binding.
      otherwise the preview is refused (`DelegationExceeded`) before any projection read. That
      refusal concerns only the caller's own proposed scope and reveals nothing. Updated or deleted
      objects are matched only inside the caller's envelope namespaces (`PreviewRead.Allowed`), the
-     envelope namespaces are always read, and an object with any current assignment outside the
-     envelope is neither removed nor evaluated: it is reported in `unmatched` exactly like a UID
-     that does not exist (an update still adds its proposed rows, as for a nonexistent UID). A
+     envelope namespaces are always read, and an object counts as matched only when that is
+     proven: every cell was read (none unavailable), at least one of its current assignments is
+     visible, and all of them lie inside the envelope. Any other object (foreign, wider than the
+     envelope, hidden by an unavailable cell, without a visible assignment) is neither removed nor
+     evaluated: it is reported in `unmatched` exactly like a UID that does not exist (an update
+     still adds its proposed rows, as for a nonexistent UID). A
      previewer therefore cannot probe for objects beyond their envelope (Gitar review of PR #77).
      Only cells inside the caller's envelopes are reported.
 4. **Targets are workload scope cells of the current accepted projection, not a pod listing.** For
@@ -155,7 +158,7 @@ merge it after them or renumber.
   Indeterminate, delegated envelope: admitted change, cells outside the envelope omitted, refusals
   for namespace-wide/foreign-namespace/automation/foreign-role/foreign-issuer/source changes, and
   identical replies (`reflect.DeepEqual`) for deleting or updating a binding wider than the
-  envelope and for a nonexistent UID),
+  envelope, or one hidden by an unavailable out-of-envelope cell, and for a nonexistent UID),
   `internal/application/authorization/access_preview_test.go` and
   `access_preview_delegation_test.go` (fleet operator; delegation previewer inside/outside the
   envelope with no read on refusal; non-previewer refused; delegation without fleet
