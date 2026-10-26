@@ -114,6 +114,10 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		clear(credential)
 		args = append(args, "--evidence-credential", evidenceFile)
 	}
+	if executor && installedJourneyFocus() == "alert" && index == 1 {
+		// ADR-231: the operator's in-cluster Alertmanager, named at install.
+		args = append(args, "--alertmanager", installAlertmanager(t, ctx, region, f.AlertmanagerImage))
+	}
 	var first bytes.Buffer
 	if err := bootstrap.RunInstallerCluster(ctx, args, &first); err != nil {
 		t.Fatal("installer-cluster", err)

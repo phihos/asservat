@@ -135,8 +135,16 @@ rather than claimed for longer holds.
   real-TLS regional query (alert labels across the exchange, 128 Pods in one frame, unsupported
   error); status output against the schema; console vitest.
 - Custody (real PostgreSQL): new `alert-trigger-episode-rearm-and-detector-switch`.
-- Installed: not extended. The fast fixture has no Alertmanager image, the regional install would
-  need the new input, and the policy focus's shared workload burst is already spent by its probe
-  occurrence and first exit capture (ADR-230), so an alert phase on the same workload would change
-  the restart phases' expectations. This is an explicit gap: no installed run reads a real
-  Alertmanager. Results in [implementation progress](../implementation-progress.md).
+- Installed (`ASSERVAT_JOURNEY_FOCUS=alert`, new `[continuation-alert]` CI suite): the fast
+  fixture runs the official Alertmanager v0.28.1 (pinned by digest, default configuration, no
+  Prometheus) in the workload cluster and installs the region with `installer-cluster
+  --alertmanager http://alertmanager.monitoring.svc:9093`. A separate focus, because the policy
+  focus's shared workload burst is already spent by its probe and exit phases. Synthetic alerts
+  posted to Alertmanager's own `POST /api/v2/alerts` (`alertname=SyntheticAlert`, the workload's
+  namespace, one current Pod): no occurrence before the alert; one occurrence keyed by its
+  `startsAt` and one `policy:<uid>` capture pinned to exactly that Pod; still one occurrence and
+  the Pod disarmed on a later poll while firing, status `alert` with `failed_at` and no annotation
+  text; after resolution (`endsAt` now) the Pod re-arms and a re-post with a later `startsAt`
+  yields the second occurrence and capture. PASS: scenario 1m21s, go test 525 s, harness wall
+  10 m 31 s. Not covered: Alertmanager HA pairs, route prefixes and TLS.
+  Results in [implementation progress](../implementation-progress.md).

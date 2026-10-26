@@ -32,6 +32,10 @@ PAUSE = "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505
 POSTGRES = "postgres@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c"
 # The identity suite's pinned Keycloak (scripts/test-identity.py).
 KEYCLOAK = "quay.io/keycloak/keycloak@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc"
+# The alert focus's official Alertmanager v0.28.1 (ADR-231). Like PAUSE, the
+# owned node pulls it by digest: `kind load` of this multi-platform image fails
+# with Docker's containerd image store.
+ALERTMANAGER = "quay.io/prometheus/alertmanager@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba"
 
 
 def run(args, *, data=None):
@@ -323,7 +327,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     # ADR-193 step 6: the Helm registry/chart infrastructure, another test.
     helm_bootstrap = helm_bootstrap or helm_cluster
     test_pattern, cluster_count = qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation)
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "chain"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "chain"):
         cluster_count = 2  # these focused journeys use one workload cluster
     helm_test = "TestHelmClusterInstallWithRealServices" if helm_cluster else "TestHelmBootstrapWithRealServices"
     if helm_cluster:
@@ -348,6 +352,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         # build, differing only by a label, so its digest differs.
         upgrade_tag = None
         upgrade = installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "upgrade"
+        alert = installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "alert"
         registry = None
         registry_nodes = []
         build_scratch = None
@@ -481,6 +486,9 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             fixture = {"s3": "http://"+s3ip+":8333", "kms": "http://"+baoip+":8200", "postgres":dsn, "postgresContainer": pgname, "nativeProviders":native_providers, "clusters": []}
             if installer_continuation:
                 fixture["identity"] = start_keycloak(work, network, run_id, containers, report)
+            if alert:
+                fixture["alertmanagerImage"] = ALERTMANAGER
+                report["images"]["alertmanager"] = ALERTMANAGER
             if direct_observation:
                 fixture["directObservation"] = report["directObservation"]
             # Product Pods in the second cluster need the image loaded there too.

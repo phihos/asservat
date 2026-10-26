@@ -43,6 +43,9 @@ declare -A suites=(
   # ADR-228: the restart-trigger policy journey (activation, one policy
   # capture and download, a bounded three-replica crash storm).
   [continuation-policy]="env ASSERVAT_JOURNEY_FOCUS=policy $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  # ADR-231: the alert-trigger policy against a real in-cluster Alertmanager
+  # (occurrence, capture, dedup while firing, re-arm after resolution).
+  [continuation-alert]="env ASSERVAT_JOURNEY_FOCUS=alert $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [direct-observation]="$context --run ^TestDirectHolderObservationWithRealKubernetes\$"
   [federation-regional]="$context --run ^TestFederationRegionalProductWithRealKubernetes\$"
   [initial-handover]="$context --initial-handover"
