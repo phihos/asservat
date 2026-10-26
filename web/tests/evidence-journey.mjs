@@ -74,7 +74,7 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
     const preview = panel.getByRole('region', { name: 'What recipients will see' });
     await expect(preview).toBeVisible();
     await expect(preview.getByText('Approved metadata · complete', { exact: true })).toBeVisible();
-    await expect(preview.getByText(/Native download, other evidence in this case/)).toBeVisible();
+    await expect(preview.getByText(/Other evidence in this case, further sharing/)).toBeVisible();
     await panel.getByLabel('Recipient ID').fill('synthetic-recipient');
     await panel.getByRole('button', { name: 'Add recipient', exact: true }).click();
     await panel.getByLabel('Reason').fill('incident review');

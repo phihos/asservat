@@ -44,7 +44,7 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
     </section>}
     {state.details && <>
       {state.details.case.title && <h2>{state.details.case.title}</h2>}
-      {state.details.case.access === 'shared' && <p>You see the evidence explicitly shared with you. A share lets you read it; it does not include native download.</p>}
+      {state.details.case.access === 'shared' && <p>You see the evidence explicitly shared with you. A share lets you read and download it; it does not let you share it further.</p>}
       {state.details.artifacts.length === 0 && <p>No evidence is currently available in this case.</p>}
       {state.details.artifacts.map((artifact, index) => <section className="review-section" key={artifact.artifact_id} aria-labelledby={`artifact-${index}`}>
         <h2 id={`artifact-${index}`}>{kindName(artifact.kind)}</h2>
@@ -52,8 +52,8 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
         <Handling artifact={artifact}/>
         {Date.parse(artifact.expires_at) <= Date.now() ? <p>Evidence access has expired.</p> : <>
           {artifact.data_class === 'metadata' && ['context', 'pod-status'].includes(artifact.kind) && <SavedPodStatus session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id}/>}
+          <Button className="button" isDisabled={state.busy || pending} onPress={() => void controller.prepare(artifact)}>Download</Button>
           {state.details?.case.access !== 'shared' && <>
-            <Button className="button" isDisabled={state.busy || pending} onPress={() => void controller.prepare(artifact)}>Download</Button>
             <SharePanel session={session} scope={scope} caseID={caseID} artifact={artifact} preview={<>
               <p className="selected-name">{kindName(artifact.kind)}</p><p className="field-help">{classLine(artifact)}</p>
               <Handling artifact={artifact}/>

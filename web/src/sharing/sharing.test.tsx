@@ -64,7 +64,7 @@ function fill(recipient: string, kind = 'User') {
 it('shares one artifact with stable IDs of the own issuer, previews the recipient view and copies the case link', async () => {
   const { client } = await mountPanel();
   expect(screen.getByText('Preview body')).toBeTruthy();
-  expect(screen.getByText(/Native download, other evidence in this case/)).toBeTruthy();
+  expect(screen.getByText(/Other evidence in this case, further sharing/)).toBeTruthy();
   expect((screen.getByRole('button', { name: 'Share' }) as HTMLButtonElement).disabled).toBe(true);
   fill('user-7'); fill('team-9', 'Group'); fill('user-7');
   expect(within(screen.getByRole('list', { name: 'Recipients' })).getAllByRole('listitem')).toHaveLength(2);
@@ -105,7 +105,9 @@ it('retries an uncertain share only with the identical request and shows definit
   fill('user-7'); fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'r' } });
   fireEvent.click(screen.getByRole('button', { name: 'Share' }));
   const retry = await screen.findByRole('button', { name: 'Retry same share request' });
-  fill('user-8');
+  // The form is locked: what it shows is exactly what the retry sends.
+  expect(screen.getByLabelText('Recipient ID').matches(':disabled')).toBe(true);
+  expect(screen.getByLabelText('Reason').matches(':disabled')).toBe(true);
   client.fail = () => failure('NotAvailable', 'Sharing needs the evidence-owner role on the workload and the evidence:share scope.');
   fireEvent.click(retry);
   await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/evidence-owner role/));
@@ -114,6 +116,21 @@ it('retries an uncertain share only with the identical request and shows definit
   expect(creates[1].input).toEqual(creates[0].input);
   // The refusal is definite: the next attempt is a new request with a new key.
   expect(screen.getByRole('button', { name: 'Share' })).toBeTruthy();
+});
+
+it('discards an uncertain share so the form can build a new request', async () => {
+  const { client } = await mountPanel();
+  client.fail = () => { throw new Error('connection reset'); };
+  fill('user-7'); fireEvent.change(screen.getByLabelText('Reason'), { target: { value: 'r' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Discard and start over' }));
+  expect(screen.getByLabelText('Recipient ID').matches(':disabled')).toBe(false);
+  client.fail = undefined;
+  fill('user-8');
+  fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+  await waitFor(() => expect(client.calls.filter(c => c.name === 'create_share')).toHaveLength(2));
+  const [first, second] = client.calls.filter(c => c.name === 'create_share').map(c => c.input as { idempotency_key: string });
+  expect(second.idempotency_key).not.toBe(first.idempotency_key);
 });
 
 it('lists received and owned shares and revokes an active one', async () => {
@@ -151,13 +168,13 @@ it('sends the identical idempotency header for share commands and none for listi
   expect(fetcher.mock.calls[1][1]).toMatchObject({ method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': 'C'.repeat(43), 'Idempotency-Key': id(3) } });
 });
 
-it('offers neither download nor sharing on a case read through a share', async () => {
+it('offers download but not sharing on a case read through a share', async () => {
   const client = new SyntheticEvidence(); const value = caseResult(); if (value.status !== 'ok') throw new Error();
   value.data.case.access = 'shared'; client.responder = () => value;
   const controller = new Evidence(client); controllers.push(controller);
   render(<EvidenceWorkspace controller={controller} session={session} scope={new AbortController().signal} caseID={id(2)}/>);
-  expect(await screen.findByText(/it does not include native download/)).toBeTruthy();
-  expect(screen.queryByRole('button', { name: 'Download' })).toBeNull();
+  expect(await screen.findByText(/it does not let you share it further/)).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Download' })).toBeTruthy();
   expect(screen.queryByText('Share this artifact')).toBeNull();
   await act(async () => undefined);
 });

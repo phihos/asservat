@@ -39,7 +39,7 @@ adds the console Share panel on the case page (User/Group recipients, 1–168 h 
 `/shares` page (Shared with me, Shared by me with Revoke) over the existing browser operation
 route and canonical contracts (`web/src/sharing`, generated `sharing` bundle). No server operation,
 SQL or migration change; the Go console allowlist and public routes add `/shares`. A case read
-through a share hides Download and Share. Console sharing needs `evidence:share` as a default scope
+through a share offers Download (ADR-233) but not Share. Console sharing needs `evidence:share` as a default scope
 of the console client; the installed fixture's console client now has it.
 
 Verification:

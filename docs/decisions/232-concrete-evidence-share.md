@@ -188,10 +188,13 @@ validation, audited dispatch). No new server operation, list endpoint, SQL grant
    whole hours (1–168, default 24, sent as `expires_at`), the contract's required reason, and
    "What recipients will see": the artifact's kind, class/completeness and handling notice as
    the recipient's `get_case` shows them, the effective end `min(expiry, artifact access)` and
-   what is not included (native download, other evidence in the case, workload access, new
-   collections). The panel renders nothing until opened and requests nothing until Share. A
-   lost reply keeps the pending request: the only next action is "Retry same share request"
-   with the identical body and key; a canonical refusal or success clears it.
+   what is not included (other evidence in the case, further sharing, workload access, new
+   collections); native download is included (ADR-233). The panel renders nothing until opened
+   and requests nothing until Share. A lost reply keeps the pending request and locks the form,
+   so a retry sends exactly what the form shows: "Retry same share request" resends the
+   identical body and key; "Discard and start over" drops it (the next Share uses a new key; the
+   earlier request may still have created a share, which `/shares` lists). A canonical refusal or
+   success clears it.
 2. **Copyable case link** inside the panel (`/cases/<id>`); opening it checks the reader's own
    rights or share. Copying grants nothing.
 3. **`/shares` page** (`SharesWorkspace`): "Shared with me" (`view=received`, links to the

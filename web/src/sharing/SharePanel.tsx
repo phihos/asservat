@@ -51,6 +51,8 @@ export function SharePanel({ session, scope, caseID, artifact, preview, controll
     <summary>Share this artifact</summary>
     {open && <>
     <p>Recipients can read this artifact in this case until the share ends. Use the stable user or group IDs of your identity provider ({session.principal.issuer}), not display names.</p>
+    {/* While a request is uncertain the retry must match what the form shows. */}
+    <fieldset disabled={state.uncertain}>
     <form onSubmit={event => { event.preventDefault(); add(); }}>
       <div className="form-row">
         <label>Recipient type<select value={kind} onChange={event => setKind(event.target.value as Recipient['kind'])}><option value="User">User</option><option value="Group">Group</option></select></label>
@@ -67,19 +69,21 @@ export function SharePanel({ session, scope, caseID, artifact, preview, controll
       <label>Share for (hours)<input type="number" min={1} max={maxHours} step={1} value={Number.isNaN(hours) ? '' : hours} onChange={event => setHours(event.target.valueAsNumber)}/></label>
       <label>Reason<input value={reason} maxLength={512} onChange={event => setReason(event.target.value)}/></label>
     </div>
+    </fieldset>
     <p className="field-help">At most seven days. The share never outlasts the artifact's access.</p>
     <section className="review-section" aria-label="What recipients will see">
       <h3>What recipients will see</h3>
       {preview}
       <dl className="facts"><dt>Their access ends</dt><dd>{date(ends)}{ends < requested ? " (the artifact's access ends first)" : ''}</dd>
-        <dt>Not included</dt><dd>Native download, other evidence in this case, workload access and new collections</dd></dl>
+        <dt>Not included</dt><dd>Other evidence in this case, further sharing, workload access and new collections</dd></dl>
     </section>
     {state.message && <p role="alert" className="notice">{state.message}</p>}
     {state.created && <p role="status">Shared with {state.created.recipients} recipient{state.created.recipients === 1 ? '' : 's'} until {date(Math.min(Date.parse(state.created.expiresAt), Date.parse(artifact.expires_at)))}. Send them the case link.</p>}
     <div className="actions">
       <Button className="button" isDisabled={state.uncertain ? state.busy : !ready} onPress={() => void share()}>{state.uncertain ? 'Retry same share request' : 'Share'}</Button>
+      {state.uncertain && <Button className="button secondary" isDisabled={state.busy} onPress={controller.discardPending}>Discard and start over</Button>}
     </div>
-    {state.uncertain && <p className="field-help">The share may already exist. Retrying sends the identical request and cannot create a second share.</p>}
+    {state.uncertain && <p className="field-help">The share may already exist. Retrying sends the identical request and cannot create a second share. After discarding, check Your shares before sharing again.</p>}
     <CaseLink caseID={caseID}/>
     <p><a href="/shares">Your shares</a></p>
     </>}

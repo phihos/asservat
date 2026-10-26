@@ -91,6 +91,14 @@ export class Shares {
       created: reply.data && { shareID: reply.data.share_id, expiresAt: input.expires_at, recipients: input.recipients.length } });
   };
 
+  // Drops an uncertain request so the form can build a new one (new key).
+  // The earlier request may still have created a share; /shares lists it.
+  discardPending = () => {
+    if (this.state.busy) return;
+    this.pending = undefined;
+    this.publish({ uncertain: false, message: undefined });
+  };
+
   revoke = async (row: ShareRow) => {
     if (this.state.busy) return;
     const key = this.revokeKeys.get(row.share_id) ?? this.newID();
