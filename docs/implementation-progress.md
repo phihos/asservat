@@ -72,6 +72,13 @@ parallel ADR-234/235 work were present locally only so the contiguous migration 
   PASS (6 history and 3 capture-time-share subtests). Installed `share` focus (which now also
   runs the ADR-235 capture-time share before history): PASS, go test 474.0 s
   (`installer-continuation` 282.0 s), source unchanged, no cleanup failures.
+- CI (PR #76): `continuation-share` failed twice (runs 40406894497, 40410495985): the developer's
+  first `preview_capture(history_capture_id)` after the capture-time-share capture was the
+  retryable NotAvailable of an ordinary preview whose gathered facts lapsed (hub log `public
+  preview refused: facts/current`, the same refusal the journey's own first preview logs and
+  retries). Not history-specific and no authorization change: the history step now retries up to
+  four reviews like the journey. Run 40410603005: PASS (first preview NotAvailable, the retry
+  1.2 s later ok, repeat collected), job 12m17s.
 
 ## S-06 increment 7: caller-only access explanation (ADR-234, 2026-10-26)
 
