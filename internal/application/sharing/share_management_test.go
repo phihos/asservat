@@ -90,6 +90,15 @@ func TestShareTransfer(t *testing.T) {
 	if _, _, err := s.Transfer(ctx, f, TransferInput{ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "creator"}, IdempotencyKey: "t0"}); !errors.Is(err, ErrManagementNotHeld) {
 		t.Fatal("a member chose creator management", err)
 	}
+	// A projection outage is not a loss of management: the manager gets
+	// Unavailable (retry), never a definite refusal.
+	saved := f.p.Target
+	f.p.Target.WorkloadUID = "outage"
+	if _, _, err := s.Transfer(ctx, f, to("t0", 1, "owners-b")); !errors.Is(err, capture.ErrUnavailable) {
+		t.Fatal("unavailable projection reported as", err)
+	}
+	f.p.Target = saved
+	f.i = mate
 	// A non-manager (owner of another team) is refused before any catalog read.
 	outsider := mate
 	outsider.Principal.Subject, outsider.Groups = "outsider", []string{"owners-b"}

@@ -511,11 +511,13 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 	if err != nil || share.ID != in.ShareID || share.RootID != s.RootID {
 		return zero, false, capture.ErrUnavailable
 	}
-	p, perr := s.Permissions.Permissions(ctx, share.Target)
-	var held []artifact.AudienceAssignment
-	if perr == nil {
-		held, _ = share.ManagedBy(i, p, s.Now())
+	p, err := s.Permissions.Permissions(ctx, share.Target)
+	if err != nil {
+		// Management can be neither proven nor refused without the
+		// projection: a transient outage is not a loss of management.
+		return zero, false, capture.ErrUnavailable
 	}
+	held, _ := share.ManagedBy(i, p, s.Now())
 	// Authority precedes every further read: a current manager, otherwise
 	// an installation administrator (scoped management delegation).
 	administered := len(held) == 0
@@ -524,9 +526,6 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 	}
 	if !share.RevokedAt.IsZero() || !s.Now().Before(share.ExpiresAt) {
 		return zero, false, capture.ErrDenied
-	}
-	if perr != nil {
-		return zero, false, capture.ErrUnavailable
 	}
 	// Creator mode pins individual assignments, so only the creator (as a
 	// current manager) may choose it: management never names another person.
@@ -571,16 +570,19 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 	for _, a := range held {
 		t.Managers = append(t.Managers, a.AssignmentID)
 	}
+	// The final identity check precedes the write, as in Create: once the
+	// transfer commits, a definite refusal would misreport a change that
+	// happened.
+	final, err := current.ResolveIdentity(ctx)
+	if err != nil || !final.Valid(s.Now()) || final.Principal != i.Principal || ctx.Err() != nil {
+		return zero, false, capture.ErrDenied
+	}
 	out, replay, err := s.Store.TransferShare(ctx, t, recovery)
 	if err != nil {
 		return zero, false, err
 	}
 	if out.ID != in.ShareID || !out.RevokedAt.IsZero() || out.Revision < 2 || out.Creator != share.Creator || !out.ExpiresAt.Equal(share.ExpiresAt) || out.ArtifactID != share.ArtifactID {
 		return zero, false, capture.ErrUnavailable
-	}
-	final, err := current.ResolveIdentity(ctx)
-	if err != nil || !final.Valid(s.Now()) || final.Principal != i.Principal || ctx.Err() != nil {
-		return zero, false, capture.ErrDenied
 	}
 	return out, replay, nil
 }
