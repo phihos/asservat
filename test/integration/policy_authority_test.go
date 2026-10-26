@@ -750,6 +750,32 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		observe(t, &s)
 		return s, trigger(t, s)
 	}
+	// sibling accepts and audits another policy in s's root, installation,
+	// cluster and namespace on the given workload (s's own or a neighbour).
+	sibling := func(t *testing.T, s setup, workload, name string, digest byte) (setup, *postgres.PolicyTriggers) {
+		t.Helper()
+		second := s
+		second.input.Authority.WorkloadUID, second.input.Target.WorkloadUID = workload, workload
+		second.input.Authority.PolicyUID = custodyID()
+		second.input.Authority.Executor = authorization.PolicyPrincipal(s.input.Authority.InstallationID, second.input.Authority.PolicyUID)
+		second.input.Authority.ScopeDigest = artifact.Digest{digest}
+		second.input.Submission.ScopeDigest = second.input.Authority.ScopeDigest
+		second.input.Submission.Nonce = custodyID()
+		second.observation.Revision.UID = second.input.Authority.PolicyUID
+		second.observation.Name = name
+		second.input.Submission.Source = second.observation.Revision
+		second.input.Submission.Name = second.observation.Name
+		observe(t, &second)
+		second.input.Submission.IssuedAt = clock()
+		second.input.Submission.ExpiresAt = second.input.Submission.IssuedAt.Add(30 * time.Second)
+		second.input.Recovery.ObservedAt, second.input.Recovery.FreshUntil = clock(), clock().Add(5*time.Second)
+		second.input.Author.VerifiedAt, second.input.Author.ValidUntil = clock(), clock().Add(30*time.Second)
+		second.input.Verification = syntheticSubmissionCheck(second.input, clock())
+		accept(t, second)
+		flush(t, second)
+		observe(t, &second)
+		return second, trigger(t, second)
+	}
 	tick := func(t *testing.T, s setup, l *postgres.PolicyTriggers, o targets.RestartObservation) []capture.PolicyOccurrence {
 		t.Helper()
 		got, err := l.Tick(ctx, capture.PolicyTick{Policy: restartPolicy(s), Authority: s.input.Authority, Observation: o})
@@ -871,26 +897,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("window did not reopen", got)
 		}
 		// A second policy on the same workload shares the workload budget.
-		second := s
-		second.input.Authority.PolicyUID = custodyID()
-		second.input.Authority.Executor = authorization.PolicyPrincipal(s.input.Authority.InstallationID, second.input.Authority.PolicyUID)
-		second.input.Authority.ScopeDigest = artifact.Digest{77}
-		second.input.Submission.ScopeDigest = second.input.Authority.ScopeDigest
-		second.input.Submission.Nonce = custodyID()
-		second.observation.Revision.UID = second.input.Authority.PolicyUID
-		second.observation.Name = "second-policy"
-		second.input.Submission.Source = second.observation.Revision
-		second.input.Submission.Name = second.observation.Name
-		observe(t, &second)
-		second.input.Submission.IssuedAt = clock()
-		second.input.Submission.ExpiresAt = second.input.Submission.IssuedAt.Add(30 * time.Second)
-		second.input.Recovery.ObservedAt, second.input.Recovery.FreshUntil = clock(), clock().Add(5*time.Second)
-		second.input.Author.VerifiedAt, second.input.Author.ValidUntil = clock(), clock().Add(30*time.Second)
-		second.input.Verification = syntheticSubmissionCheck(second.input, clock())
-		accept(t, second)
-		flush(t, second)
-		observe(t, &second)
-		l2 := trigger(t, second)
+		second, l2 := sibling(t, s, s.input.Authority.WorkloadUID, "second-policy", 77)
 		tick(t, second, l2, observed(second, pod(a, 4)))
 		if got := tick(t, second, l2, observed(second, pod(a, 5))); len(got) != 1 {
 			t.Fatal("second policy within the shared burst", got)
@@ -898,12 +905,76 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		if got := tick(t, second, l2, observed(second, pod(a, 6))); len(got) != 0 {
 			t.Fatal("two policies multiplied the workload budget", got)
 		}
-		// A storm on this workload leaves another workload's budget untouched.
-		other, lo := activeTrigger(t)
-		d := custodyID()
-		tick(t, other, lo, observed(other, pod(d, 1)))
-		if got := tick(t, other, lo, observed(other, pod(d, 2))); len(got) != 1 {
-			t.Fatal("independent workload was throttled", got)
+	})
+	// S-03 fair capacity: a storming workload exhausts only its own budget.
+	// The neighbour shares the storm's root, installation, cluster and
+	// namespace (a separate root would prove nothing about shared keys); it
+	// is polled concurrently with the storm and still admits its occurrence,
+	// with no suppression, spend or watermark charged across workloads, and
+	// the storm leaves bounded rows rather than one per restart.
+	t.Run("restart-trigger-storm-leaves-neighbour-workload-unthrottled", func(t *testing.T) {
+		s, l := activeTrigger(t)
+		n, ln := sibling(t, s, custodyID(), "neighbour-policy", 78)
+		stormPods := []string{custodyID(), custodyID(), custodyID()}
+		storm := func(restarts int64) targets.RestartObservation {
+			pods := make([]targets.PodRestarts, len(stormPods))
+			for i, uid := range stormPods {
+				pods[i] = pod(uid, restarts)
+			}
+			return observed(s, pods...)
+		}
+		quiet := custodyID()
+		tick(t, s, l, storm(1))
+		tick(t, n, ln, observed(n, pod(quiet, 1)))
+		admitted := len(tick(t, s, l, storm(3)))
+		// Further storm polls run concurrently with the neighbour's restart.
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		var neighbour []capture.PolicyOccurrence
+		for i := range 8 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				got, err := l.Tick(ctx, capture.PolicyTick{Policy: restartPolicy(s), Authority: s.input.Authority, Observation: storm(int64(5 + 2*i))})
+				if err != nil {
+					t.Error("storm tick", err)
+				}
+				mu.Lock()
+				admitted += len(got)
+				mu.Unlock()
+			}()
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			got, err := ln.Tick(ctx, capture.PolicyTick{Policy: restartPolicy(n), Authority: n.input.Authority, Observation: observed(n, pod(quiet, 2))})
+			if err != nil {
+				t.Error("neighbour tick", err)
+			}
+			neighbour = got
+		}()
+		wg.Wait()
+		if admitted != 2 || suppressed(t, s, "cooldown") < 1 {
+			t.Fatal("storm not held to the workload burst", admitted, suppressed(t, s, "cooldown"))
+		}
+		if len(neighbour) != 1 || neighbour[0].PodUID != quiet {
+			t.Fatal("storm throttled the neighbour workload", neighbour)
+		}
+		counts := func(p setup) (occurrences, suppressionRows, watermarks, spent int64) {
+			t.Helper()
+			a := p.input.Authority
+			if err := admin.QueryRow(ctx, `SELECT (SELECT count(*) FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2), (SELECT count(*) FROM policy_suppression WHERE root_id=$1 AND policy_uid=$2), (SELECT count(*) FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2), (SELECT executions_spent FROM policy_acceptance WHERE root_id=$1 AND policy_uid=$2)`, p.input.RootID, a.PolicyUID).Scan(&occurrences, &suppressionRows, &watermarks, &spent); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		// Bounded storm state: occurrences = spend = burst, at most one row per
+		// suppression reason and one watermark per Pod, after 3 Pods x 9 polls.
+		if o, r, w, sp := counts(s); o != 2 || sp != 2 || r > 2 || w != int64(len(stormPods)) {
+			t.Fatal("storm rows", o, r, w, sp)
+		}
+		if o, r, w, sp := counts(n); o != 1 || sp != 1 || r != 0 || w != 1 {
+			t.Fatal("neighbour charged by the storm", o, r, w, sp)
 		}
 	})
 	// ADR-230: a probe detector's level with re-arm, detector switches as new

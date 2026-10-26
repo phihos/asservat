@@ -1,11 +1,57 @@
 # Sustained implementation progress
 
+## S-03 exit audit and cross-workload storm fairness test (2026-10-26)
+
+Audit of the S-03 row of [implementation slices](architecture/implementation-slices.md) after
+ADR-228–231. No slice or TASK checkbox is marked complete by it.
+
+| S-03 clause | Status | Evidence |
+| --- | --- | --- |
+| Policy activation | Met | ADR-228/229: `activate_policy`/`deactivate_policy` (MCP, browser route, console `/policies`); custody `restart-trigger-deactivation-stops-without-refund-and-never-revives`, `concurrent-nonce-replay-is-one-immutable-acceptance`; installed policy focus (activation 6–9 s after start). |
+| All-replica observation with separate incident cap | Met, bounded | Observation is `allAuthorized`, every owned Pod of the workload up to 128 (`observation.maxPods` may narrow; 128 instead of the spec's 1000 because the answer must fit one 32 KiB frame, ADR-228); the incident cap is `target.maxPods: 1, selection: triggeringPod` (compiler: `TestRestartPolicyRejectsUnsupportedFieldsWithPath`); installed storm kept 3 watermark rows for 3 replicas and captured only triggering Pods. Larger workloads are Unknown, not partially observed. |
+| Log/resource/probe triggers produce deduplicated occurrences | Partly | Probe: Met (custody `probe-trigger-rising-edge-rearm-detector-switch-and-shared-budget`; installed: one occurrence, Pod disarmed while failing). Log/resource: only through the alert detector (ADR-231; direct detectors paused by ADR-230): unit tests against a fake Alertmanager, real-TLS regional query and custody `alert-trigger-episode-rearm-and-detector-switch`; no installed run reads a real Alertmanager. |
+| Storm tests prove cooldown/coalescing | Met | Custody `restart-trigger-shared-window-cooldown-and-reopen` (burst 2, cooldown, coalesced, reopen, two policies share one workload budget); installed storm (11 kills, 2 occurrences, 8–10 suppressed, 1 suppression row, no capture after the storm). |
+| Storm tests prove fair capacity | Was Partly, now Met at the trigger ledger | Before: the only cross-workload check used a workload in a **separate root/installation/cluster**, so it could not detect budget keys shared across workloads; a mutation keying the workload window by namespace passed every existing subtest. Now: custody `restart-trigger-storm-leaves-neighbour-workload-unthrottled` (below). Capture admission isolation was already covered by `exhausted-workload-does-not-use-another-allocation` and `same-root-workload-retains-protected-capacity`. Not tested: contention for the per-cluster concurrent capture slots (`--captures`, default 1) between a storming and a quiet workload. A refused attach is retried through `Continue` (3 × 2 s), and a storming workload's demand is capped at 2 burst occurrences, then 1 per 5 min. |
+| No per-match acquisition queue explosion | Met | Suppression is a saturating count per (policy, reason); capacity shortfall is a suppression, never a queue; at most 1 capture goroutine per active policy (≤ 65), captures of one tick run sequentially; custody shared-window and the new storm test (3 Pods × 9 polls: 2 occurrences, ≤ 2 suppression rows, 3 watermarks); installed storm. |
+| Executor provenance | Met | The policy principal `policy:<uid>` is the capture's actor, scope executor and intent actor (ADR-228 decision 6): `TestPolicyExecutorPrincipalIsExact`, `TestPolicyExecutorCaptureEligibilityUsesTeamAuthority`, `TestCaptureOperationAcceptsOnlyTheExactPolicyExecutor`; installed capture ran under `policy:<uid>` and the team downloaded it. |
+| Policy grant controls exist before sensitive policy actions | Met as a gate; grants are S-08 | No sensitive policy action exists. The compiler accepts only the installed `builtin-pod-status-v1` recipe (`.recipeRef.name`/`.digest`), a nonintrusive kubernetesAPI snapshot, and eligibility denies actions outside the envelope's `allowedActions` (`OutsideDelegation`). The specification places the grants in later slices: S-08 "reviewed finite automatic grants"; [authorization](../specs/authorization.md) REQ-AUT-006 and its lifecycle paragraph require reviewed acquisition authority before arming HTTP/raw packet or syscall-argument recording (S-04); TASK-07 exit "Intrusive generic commands remain unavailable until this task passes". Building grants now would add a mechanism with no action to govern (gate item 1: hypothetical). Enabling any non-context recipe in a policy must add them first. |
+
+TASK checklist items relevant to S-03, all still unchecked: TASK-04 "all-authorized-replica
+observation … separate visible overflow" (Partly: Unknown above 128 Pods instead of overflow),
+"probe/exit watches and authenticated Alertmanager input" (Partly: polled API reads, not watches;
+CRI log/cgroup paused), "deduplication … quotas" and "workload-wide … budgets spanning
+replicas/policies, bounded suppression aggregation" (Met for pod-status occurrences); TASK-05
+"fair transfer/analysis scheduling" (Not met, S-04/S-05 scope: one pod-status snapshot needs no
+transfer scheduler); TASK-07 "executor provenance" items (Met as above), "sensitive observation
+approval before arming" (S-04/S-08); TASK-11 "EXP-19 storm/quota/fairness" (Partly: the component
+and installed storms above, no scale run).
+
+Implemented: the most important Partly item that needs no new mechanism. The new custody subtest
+`restart-trigger-storm-leaves-neighbour-workload-unthrottled` accepts a second policy on a
+**neighbour workload in the same root, installation, cluster and namespace** (shared `sibling`
+helper, also used by the existing same-workload second policy), saturates the storming workload
+(3 Pods, nine polls, eight of them concurrent with the neighbour's poll) and asserts: storm
+admits exactly the burst of 2 with cooldown counted; the neighbour admits its occurrence; storm
+rows are bounded (2 occurrences = 2 spent, ≤ 2 suppression rows, 3 watermarks); the neighbour has
+1 occurrence, 1 spent, no suppression row and 1 watermark. The weak separate-root check is
+removed. No production code, migration, configuration or ADR (no mechanism added).
+
+Verification (tracked test/results files restored after each run):
+- Custody `--run '^(TestPermissionAuthorityPoliciesWithRealServices|TestCustodyUpgradeSchemaWithRealPostgres)$'`:
+  43 PASS, 0 FAIL (go test 8.8 s, harness 63 s), source unchanged, no cleanup failures.
+- Mutation check: with the workload window keyed by namespace UID instead of workload UID in
+  `PolicyTriggers.window`/`UpdatePolicyWindow`, only the new subtest failed ("storm throttled the
+  neighbour workload []"); reverted.
+- Installed policy focus not rerun: the installed path is unchanged.
+
 ## Alert trigger from the in-cluster Alertmanager API (ADR-231, 2026-10-26)
 
 [ADR-231](decisions/231-alert-detector.md) implements the `alert` detector that ADR-230
 recommended, choosing the pull: an alert policy's 15-second `observe-workload-restarts` poll adds
-one `GET /api/v2/alerts?active=true&silenced=false&inhibited=false&filter=namespace="<ns>"` of the
-target cluster's in-cluster Alertmanager, made by the regional connector. The address is
+one `GET /api/v2/alerts?active=true&silenced=false&inhibited=false&filter=namespace="<ns>"&filter=pod=~"<sorted Pod names>"`
+of the target cluster's in-cluster Alertmanager, made by the regional connector after its Pod LIST
+(no observed Pod: no request); only alerts that match the workload's Pods are validated, so other
+workloads' alerts never reach the answer bounds or the malformed-alert check. The address is
 installation-owned regional configuration (`cluster.alertmanager` → `installer-cluster
 --alertmanager` → `RegionalAPIContext.alertmanager`, executor only, no credentials); a region
 without it answers `unsupported` and activation is refused (`DetectorUnavailable`). Alerts map to
