@@ -3396,11 +3396,34 @@ components:
                       created_at:
                         type: string
                         format: date-time
+                      detector:
+                        enum:
+                        - exit
+                        - probe
+                      failed_at:
+                        type: string
+                        format: date-time
                     required:
                     - occurrence_id
                     - outcome
-                    - restarts
+                    - detector
                     - created_at
+                    if:
+                      properties:
+                        detector:
+                          const: probe
+                    then:
+                      required:
+                      - failed_at
+                      not:
+                        required:
+                        - restarts
+                    else:
+                      required:
+                      - restarts
+                      not:
+                        required:
+                        - failed_at
                 suppressions:
                   type: array
                   maxItems: 6
@@ -3431,6 +3454,45 @@ components:
                     - count
                     - first_at
                     - last_at
+                detector:
+                  type: object
+                  additionalProperties: false
+                  description: The current DebugPolicy's detector configuration (no observed content).
+                  properties:
+                    kind:
+                      enum:
+                      - exit
+                      - probe
+                    reasons:
+                      type: array
+                      maxItems: 3
+                      items:
+                        enum:
+                        - CrashLoopBackOff
+                        - Error
+                        - OOMKilled
+                    exit_codes:
+                      type: array
+                      maxItems: 16
+                      items:
+                        type: integer
+                        minimum: 0
+                        maximum: 255
+                    probe_type:
+                      enum:
+                      - Liveness
+                      - Readiness
+                      - Startup
+                    minimum_failures:
+                      type: integer
+                      minimum: 1
+                      maximum: 1000
+                    window_seconds:
+                      type: integer
+                      minimum: 30
+                      maximum: 300
+                  required:
+                  - kind
               required:
               - policy_uid
               - acceptance_id

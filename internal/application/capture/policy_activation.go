@@ -27,7 +27,7 @@ type PolicyDocuments interface {
 
 // RestartObserver is the delegated regional restart observation.
 type RestartObserver interface {
-	ObserveWorkloadRestarts(context.Context, targets.WorkloadRequest) (targets.RestartObservation, error)
+	ObserveWorkloadRestarts(context.Context, targets.RestartRequest) (targets.RestartObservation, error)
 }
 
 // PolicyPermissions is the current accepted permission projection.
@@ -175,7 +175,9 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	if err != nil {
 		return zero, s.refused("compile", err)
 	}
-	observed, err := s.Observer.ObserveWorkloadRestarts(ctx, targets.WorkloadRequest{ClusterID: compiled.ClusterID, Namespace: compiled.Namespace, Kind: compiled.WorkloadKind, Name: compiled.WorkloadName})
+	// A probe policy observes its Events too, so a region that cannot read
+	// them refuses activation instead of leaving the policy Unknown.
+	observed, err := s.Observer.ObserveWorkloadRestarts(ctx, compiled.Request())
 	if err != nil {
 		return zero, s.refused("workload", err)
 	}

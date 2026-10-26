@@ -4,15 +4,21 @@
 SELECT * FROM policy_source WHERE root_id=$1 AND policy_uid=$2;
 
 -- name: ListPolicyWatermarks :many
-SELECT pod_uid, restarts FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=ANY($3::text[]);
+-- Only watermarks of the policy's current detector (ADR-230); another
+-- detector's row is a new baseline.
+SELECT pod_uid, restarts, armed FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=ANY($3::text[]) AND detector=$4;
 
 -- name: PrunePolicyWatermarks :exec
 DELETE FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND last_seen<$3;
 
 -- name: UpsertPolicyWatermarks :exec
-INSERT INTO policy_pod_watermark(root_id,policy_uid,pod_uid,restarts,last_seen)
-SELECT @root_id::uuid, @policy_uid::text, unnest(@pod_uids::text[]), unnest(@restarts::bigint[]), @seen::timestamptz
-ON CONFLICT(root_id,policy_uid,pod_uid) DO UPDATE SET restarts=GREATEST(policy_pod_watermark.restarts,EXCLUDED.restarts), last_seen=EXCLUDED.last_seen;
+-- A watermark of the same detector only rises; one of another detector is
+-- replaced (ADR-230).
+INSERT INTO policy_pod_watermark(root_id,policy_uid,pod_uid,restarts,last_seen,detector,armed)
+SELECT @root_id::uuid, @policy_uid::text, unnest(@pod_uids::text[]), unnest(@restarts::bigint[]), @seen::timestamptz, @detector::text, unnest(@armed::boolean[])
+ON CONFLICT(root_id,policy_uid,pod_uid) DO UPDATE SET
+ restarts=CASE WHEN policy_pod_watermark.detector=EXCLUDED.detector THEN GREATEST(policy_pod_watermark.restarts,EXCLUDED.restarts) ELSE EXCLUDED.restarts END,
+ last_seen=EXCLUDED.last_seen, detector=EXCLUDED.detector, armed=EXCLUDED.armed;
 
 -- name: LockPolicyWindow :one
 INSERT INTO policy_workload_window(root_id,cluster_id,workload_uid,policy_uid,tat) VALUES($1,$2,$3,$4,$5)
@@ -26,8 +32,8 @@ UPDATE policy_acceptance SET executions_spent=executions_spent+1
 WHERE root_id=$1 AND id=$2 AND executions_spent<(record#>>'{Authority,Limits,MaxExecutions}')::bigint;
 
 -- name: InsertPolicyOccurrence :execrows
-INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(root_id,policy_uid,pod_uid,restarts) DO NOTHING;
+INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts,detector)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(root_id,policy_uid,pod_uid,restarts) DO NOTHING;
 
 -- name: CountPolicySuppression :exec
 INSERT INTO policy_suppression(root_id,policy_uid,reason,first_at,last_at,count) VALUES($1,$2,$3,$4,$4,$5)

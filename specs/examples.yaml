@@ -11,6 +11,8 @@ examples:
   schema: https://asservat.io/spec/v1/policy.schema.json
 - file: examples/policy-restart.yaml
   schema: https://asservat.io/spec/v1/policy.schema.json
+- file: examples/policy-probe.yaml
+  schema: https://asservat.io/spec/v1/policy.schema.json
 - file: examples/policy-statefulset.yaml
   schema: https://asservat.io/spec/v1/policy.schema.json
 - file: examples/capture-manual.yaml

@@ -1,5 +1,11 @@
 # Decision records
 
+[ADR-230 — Probe-failure trigger; log and resource detectors paused](230-s03-detectors.md) gates
+every S-03 detector (AGENTS.md items 1–11): the probe detector reads kubelet Unhealthy Events in the
+existing regional poll (one Event LIST per probe policy, `list events` on the regional connector,
+migration 00084); log (`pods/log` polling) and resource (metrics-server) detectors are paused for a
+maintainer decision, with the alert detector as the recommended cheaper route.
+
 [ADR-228 — Restart-triggered policy captures](228-restart-triggered-policy-captures.md) is the
 first S-03 increment: hub-held exit-detector DebugPolicies, MCP/browser activation, a 15-second
 regional restart poll and migration 00082's deduplicated, workload-budgeted trigger ledger; captures

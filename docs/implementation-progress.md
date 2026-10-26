@@ -1,5 +1,63 @@
 # Sustained implementation progress
 
+## Probe-failure trigger; log and resource detectors paused (ADR-230, 2026-10-26)
+
+[ADR-230](decisions/230-s03-detectors.md) gates every detector of the trigger catalogue with the
+AGENTS.md complexity questions. Implemented: the `probe` detector (`source: events|auto`,
+Liveness/Readiness/Startup, `minimumFailures`, window 30 s–5 min). A probe policy's 15-second poll
+adds one field-selected namespace Event LIST (`involvedObject.kind=Pod,reason=Unhealthy`, limit
+512) to the existing `observe-workload-restarts` query; the region returns per Pod only the newest
+failure second and a proven lower bound of failures in the window, never Event text. The regional
+connector ClusterRole gains `list` on core `events` (also in the chart's cluster-installer role). The
+level fires once per rising edge (key: Pod UID, newest failure second) and re-arms after a poll with
+an empty window; a Pod failing at activation is a disarmed baseline. Migration 00084 (schema 84,
+floor 81) adds `detector` to watermarks and occurrences and `armed` to watermarks; a watermark of
+another detector re-baselines. Budgets, spend, suppression and the capture path are unchanged.
+`get_policy_status` adds the current detector (kind and options) and each occurrence's detector
+with a restart count or `failed_at`; the console `/policies` page shows both. Paused for a
+maintainer decision: `log` (`pods/log` polling: sensitive privilege, Pods × containers API load)
+and `resource` (metrics-server dependency, redefined metrics, no resource evidence in the pod-status
+recipe); both stay rejected at `spec.detectors[0].kind`. `alert` is recommended as the next
+increment; kubernetesCondition, schedule, crashArtifact, file and network are deferred.
+
+Verification (each run under 20 minutes; tracked test/results files restored after each run):
+- Unit: `go test` of domain, application/capture, transport, adapters/postgres and adapters/mtls,
+  Kubernetes adapter `-run 'Restart|Probe|Regional|PolicySource|Target'`: PASS. `-race` for
+  domain/capture, domain/targets, application/capture, transport/presentation,
+  transport/contextstart, adapters/mtls, adapters/postgres and the Kubernetes adapter
+  `-run 'Policy|WorkloadRestart|WorkloadProbe|Regional|PodTargets|NamedWorkload|HubHeld|WorkloadTarget'`: PASS.
+  (A single unsharded `go test` of the whole Kubernetes adapter hit the default 10-minute timeout,
+  as known; CI shards it.)
+- Custody (real PostgreSQL, compiled hub-runtime grants):
+  `--run '^(TestPermissionAuthorityPoliciesWithRealServices|TestCustodyUpgradeSchemaWithRealPostgres)$'`
+  41 PASS, 0 FAIL, including the new
+  `probe-trigger-rising-edge-rearm-detector-switch-and-shared-budget`; source unchanged, no cleanup
+  failures. `--initial-installation`: 85 PASS (136 s). Its first attempt also passed all 85 tests
+  but the harness reported exit 1 because a test file was edited during the run (source freeze);
+  the frozen rerun passed.
+- `make pre-push`: PASS (first attempt: gofmt-check on two files, reformatted). `make helm-check`:
+  PASS. Console `npm run check`: 13 files, 173 tests PASS.
+- Installed `ASSERVAT_JOURNEY_FOCUS=policy` (fast fixture), new probe phase before the restart
+  phases: a readiness-probe policy (two failures within 30 s) is activated, the workload template
+  gains a TCP readiness probe failing after 30 s (one surge Pod of a stuck rollout), and the
+  failures yield exactly one capture of that Pod by `policy:<uid>`; a later poll while still failing
+  leaves one occurrence and the Pod disarmed; status shows the probe detector, `failed_at` and no
+  Event text; the template is restored before the restart phases.
+  | Run | Change | Setup to scenario | Probe capture after start | go test | Result |
+  | --- | --- | --- | --- | --- | --- |
+  | 1 | probe phase added | 428 s | 1m28s (incl. a fixed 20 s pause) | 753 s | PASS |
+  | 2 | pause replaced by a wait for the next poll | 425 s | 1m29s | 752 s | PASS |
+  | 3 | template patched right after activation; storm 60 s (was 90 s) | 428 s | 57 s | 692 s | PASS |
+  Run 3: storm of 11 kills, 8 observed restarts, 8 suppressed, 1 suppression row, 3 watermark rows;
+  the exit policy's occurrences stayed at 1 because the probe occurrence and the first exit capture
+  already held the shared workload burst; deactivation 3m15s after start, a kill 51 s later changed
+  nothing. All three runs: source unchanged, no cleanup failures.
+- Not measured: probe detection under Kubernetes Event loss or aggregation beyond one series per
+  message, and Event LIST cost in a namespace with many Unhealthy Events (bounded at 512 → Unknown).
+- Observed, not changed: the chart's `cluster-installer` ClusterRole lacks rules the regional
+  executor and capacity roles grant (`pods list`, `statefulsets get`, `deployments/statefulsets
+  list`); creating those roles through the chart path would fail RBAC escalation checks. The native
+  harness installs regions with administrator credentials, so this path is untested.
 ## Installation-chain focus `continuation-chain` (2026-10-26)
 
 On PR #57's CI the two native jobs that still ran the full installation chain came within a

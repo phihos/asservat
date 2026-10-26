@@ -171,7 +171,7 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("policy_acceptance", "UPDATE", "acknowledged_at", "receipt_json", "executions_spent")
 		add("policy_pod_watermark", "INSERT")
 		add("policy_pod_watermark", "DELETE")
-		add("policy_pod_watermark", "UPDATE", "restarts", "last_seen")
+		add("policy_pod_watermark", "UPDATE", "restarts", "last_seen", "detector", "armed")
 		add("policy_occurrence", "INSERT")
 		add("policy_occurrence", "UPDATE", "capture_id", "outcome")
 		add("policy_workload_window", "INSERT")

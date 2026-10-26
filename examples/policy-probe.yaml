@@ -1,0 +1,46 @@
+apiVersion: asservat.io/v1alpha1
+kind: DebugPolicy
+metadata:
+  # Hub-held (ADR-228): in the hub control namespace, like AccessBindings.
+  name: checkout-readiness
+  namespace: asservat-system
+spec:
+  target:
+    cluster: 00000000-0000-4000-8000-000000000001
+    namespace: payments
+    workloadRef:
+      apiVersion: apps/v1
+      kind: Deployment
+      name: checkout
+    maxPods: 1
+    selection: triggeringPod
+    adoption: pinUID
+  detectors:
+  # ADR-230: kubelet readiness-probe failures from Kubernetes Events. Fires
+  # once when a Pod has at least two failures within one minute; re-arms after
+  # a minute without failure.
+  - id: unready
+    kind: probe
+    options:
+      probeType: Readiness
+      minimumFailures: 2
+      window: 1m
+      source: events
+  when:
+    detector: unready
+  recipeRef:
+    name: builtin-pod-status-v1
+    digest: 174a28447df11de92c374c60a44a3a5c03c8481e3f5c57943521ab5da3dce1c3
+  budgets:
+    cooldown: 5m
+    burst: 2
+    maxOccurrencesPerHour: 12
+    maxConcurrentActions: 1
+  retention: 72h
+  suspended: false
+  observation:
+    mode: allAuthorized
+  evaluation:
+    scope: pod
+    fireOnActivation: false
+    rearmFor: 10s

@@ -59,7 +59,10 @@ func regionalExecutorRBAC(namespace string) (cluster []rbac.PolicyRule, connecto
 		// ReplicaSet → Deployment chain (installed native 59: denied without).
 		{APIGroups: []string{""}, Resources: []string{"namespaces"}, Verbs: []string{"get"}},
 		{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get", "list"}},
-		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets", "replicasets"}, Verbs: []string{"get"}}}
+		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets", "replicasets"}, Verbs: []string{"get"}},
+		// ADR-230: a probe policy's poll lists the namespace's kubelet
+		// Unhealthy Pod Events (message text never leaves the region).
+		{APIGroups: []string{""}, Resources: []string{"events"}, Verbs: []string{"list"}}}
 	connector = []rbac.PolicyRule{
 		// get for the settings/trust reads; update only for their dry-run probes.
 		{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{RegionalSettings, RegionalWorkTrust}, Verbs: []string{"get", "update"}},

@@ -41,10 +41,51 @@ type RestartPolicy struct {
 	Burst            int
 	RetentionSeconds int64
 	ObservedPods     int
+	// Detector is empty for the ADR-228 exit detector or DetectorProbe
+	// (ADR-230). The probe fields are empty for an exit detector, so an exit
+	// policy's scope digest is unchanged by them.
+	Detector        string        `json:",omitempty"`
+	ProbeType       string        `json:",omitempty"`
+	MinimumFailures int           `json:",omitempty"`
+	ProbeWindow     time.Duration `json:",omitempty"`
+}
+
+// Detector kinds stored with watermarks and occurrences (migration 00084).
+const (
+	DetectorExit  = "exit"
+	DetectorProbe = "probe"
+)
+
+// Kind is the compiled detector kind: exit or probe.
+func (p RestartPolicy) Kind() string {
+	if p.Detector == "" {
+		return DetectorExit
+	}
+	return p.Detector
+}
+
+// Request is the regional observation this policy needs: the workload's Pod
+// LIST and, for a probe detector, its probe Events.
+func (p RestartPolicy) Request() targets.RestartRequest {
+	r := targets.RestartRequest{WorkloadRequest: targets.WorkloadRequest{ClusterID: p.ClusterID, Namespace: p.Namespace, Kind: p.WorkloadKind, Name: p.WorkloadName}}
+	if p.Detector == DetectorProbe {
+		r.Probe, r.ProbeWindowSeconds = p.ProbeType, int64(p.ProbeWindow/time.Second)
+	}
+	return r
 }
 
 func (p RestartPolicy) Valid() bool {
-	if !authorization.UUID(p.ClusterID) || !identity.Text(p.Namespace, 63) || (p.WorkloadKind != "Deployment" && p.WorkloadKind != "StatefulSet") || !identity.Text(p.WorkloadName, 253) || len(p.Reasons) < 1 || len(p.Reasons) > 3 || !slices.IsSorted(p.Reasons) || len(p.ExitCodes) > 16 || !slices.IsSorted(p.ExitCodes) || p.Interval < time.Second || p.Interval > 24*time.Hour || p.Burst < 1 || p.Burst > 10 || p.RetentionSeconds < 1 || p.RetentionSeconds > privacy.MaxAgeSeconds || p.ObservedPods < 1 || p.ObservedPods > targets.MaxRestartPods {
+	if !authorization.UUID(p.ClusterID) || !identity.Text(p.Namespace, 63) || (p.WorkloadKind != "Deployment" && p.WorkloadKind != "StatefulSet") || !identity.Text(p.WorkloadName, 253) || p.Interval < time.Second || p.Interval > 24*time.Hour || p.Burst < 1 || p.Burst > 10 || p.RetentionSeconds < 1 || p.RetentionSeconds > privacy.MaxAgeSeconds || p.ObservedPods < 1 || p.ObservedPods > targets.MaxRestartPods {
+		return false
+	}
+	switch p.Detector {
+	case DetectorProbe:
+		return len(p.Reasons) == 0 && len(p.ExitCodes) == 0 && targets.ProbeType(p.ProbeType) && p.MinimumFailures >= 1 && p.MinimumFailures <= 1000 && p.ProbeWindow%time.Second == 0 && p.ProbeWindow >= targets.MinProbeWindowSeconds*time.Second && p.ProbeWindow <= targets.MaxProbeWindowSeconds*time.Second
+	case "":
+	default:
+		return false
+	}
+	if p.ProbeType != "" || p.MinimumFailures != 0 || p.ProbeWindow != 0 || len(p.Reasons) < 1 || len(p.Reasons) > 3 || !slices.IsSorted(p.Reasons) || len(p.ExitCodes) > 16 || !slices.IsSorted(p.ExitCodes) {
 		return false
 	}
 	for i, r := range p.Reasons {
@@ -74,7 +115,8 @@ func (e PolicyFieldError) Unwrap() error { return ErrInvalid }
 
 // RestartCandidate is one Pod whose restart counter rose and whose latest
 // termination matches. Missed counts the restarts between two polls that
-// this one occurrence coalesces.
+// this one occurrence coalesces. For a probe detector Restarts is the newest
+// failure second (the occurrence key) and Missed is zero.
 type RestartCandidate struct {
 	PodUID           string
 	Restarts, Missed int64
@@ -94,6 +136,11 @@ func RestartDelta(p RestartPolicy, previous map[string]int64, o targets.RestartO
 			fired = append(fired, RestartCandidate{PodUID: pod.UID, Restarts: pod.Restarts, Missed: pod.Restarts - before - 1})
 		}
 	}
+	sortCandidates(fired)
+	return next, fired
+}
+
+func sortCandidates(fired []RestartCandidate) {
 	slices.SortFunc(fired, func(a, b RestartCandidate) int {
 		if a.PodUID < b.PodUID {
 			return -1
@@ -103,6 +150,60 @@ func RestartDelta(p RestartPolicy, previous map[string]int64, o targets.RestartO
 		}
 		return 0
 	})
+}
+
+// PodMark is one Pod's watermark: the restart count (exit) or the newest
+// probe failure second (probe), and for a probe whether its level re-armed.
+type PodMark struct {
+	Value int64
+	Armed bool
+}
+
+// TriggerDelta evaluates one complete observation for the policy's detector.
+// previous holds only watermarks of this detector kind; a watermark of
+// another kind is unknown, so the Pod is a new baseline.
+func TriggerDelta(p RestartPolicy, previous map[string]PodMark, o targets.RestartObservation) (next map[string]PodMark, fired []RestartCandidate) {
+	if p.Detector != DetectorProbe {
+		counts := make(map[string]int64, len(previous))
+		for pod, m := range previous {
+			counts[pod] = m.Value
+		}
+		values, fired := RestartDelta(p, counts, o)
+		next = make(map[string]PodMark, len(values))
+		for pod, v := range values {
+			next[pod] = PodMark{Value: v, Armed: true}
+		}
+		return next, fired
+	}
+	return ProbeDelta(p, previous, o)
+}
+
+// ProbeDelta is the probe detector's level evaluation (ADR-230). A Pod is
+// failing while at least MinimumFailures failures fall in the window. One
+// occurrence fires on a rising edge, keyed by the newest failure second; the
+// Pod then re-arms only at an observation with an empty window, which proves
+// a window without failure. The first observation of a Pod is its baseline,
+// armed only if its window is empty, so a probe already failing at activation
+// waits for a proven recovery.
+func ProbeDelta(p RestartPolicy, previous map[string]PodMark, o targets.RestartObservation) (next map[string]PodMark, fired []RestartCandidate) {
+	next = make(map[string]PodMark, len(o.Pods))
+	for _, pod := range o.Pods {
+		before, known := previous[pod.UID]
+		if !known {
+			next[pod.UID] = PodMark{Value: pod.ProbeLast, Armed: pod.ProbeFailures == 0}
+			continue
+		}
+		m := PodMark{Value: max(before.Value, pod.ProbeLast), Armed: before.Armed}
+		switch {
+		case pod.ProbeFailures == 0:
+			m.Armed = true
+		case before.Armed && pod.ProbeFailures >= int64(p.MinimumFailures) && pod.ProbeLast > before.Value:
+			fired = append(fired, RestartCandidate{PodUID: pod.UID, Restarts: pod.ProbeLast})
+			m.Armed = false
+		}
+		next[pod.UID] = m
+	}
+	sortCandidates(fired)
 	return next, fired
 }
 
@@ -144,11 +245,32 @@ type PolicyStatus struct {
 	ClusterID, NamespaceUID, WorkloadUID string
 	Authority                            authorization.AcceptedPolicyAuthority
 	SourceObservedAt, SourceFreshUntil   time.Time
+	// Detector describes the current DebugPolicy's detector, if it compiles.
+	Detector *PolicyDetector
 }
+
+// PolicyDetector is a compiled detector's configuration for status display
+// (ADR-230); it contains no observed content.
+type PolicyDetector struct {
+	Kind            string
+	Reasons         []string
+	ExitCodes       []int32
+	ProbeType       string
+	MinimumFailures int
+	WindowSeconds   int64
+}
+
+// Describe returns the policy's detector configuration.
+func (p RestartPolicy) Describe() PolicyDetector {
+	return PolicyDetector{Kind: p.Kind(), Reasons: slices.Clone(p.Reasons), ExitCodes: slices.Clone(p.ExitCodes), ProbeType: p.ProbeType, MinimumFailures: p.MinimumFailures, WindowSeconds: int64(p.ProbeWindow / time.Second)}
+}
+
+// PolicyOccurrenceStatus is one recent occurrence. Restarts is the restart
+// count of an exit occurrence or the failure second of a probe occurrence.
 type PolicyOccurrenceStatus struct {
-	ID, CaptureID, Outcome string
-	Restarts               int64
-	CreatedAt              time.Time
+	ID, CaptureID, Outcome, Detector string
+	Restarts                         int64
+	CreatedAt                        time.Time
 }
 type PolicySuppression struct {
 	Reason          string

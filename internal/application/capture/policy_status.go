@@ -47,7 +47,7 @@ func (s PolicyStatusService) Get(ctx context.Context, current identities.Current
 	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
 		return zero, time.Time{}, value.ErrUnavailable
 	}
-	source, _, err := s.Documents.ReadPolicy(ctx, name, "")
+	source, spec, err := s.Documents.ReadPolicy(ctx, name, "")
 	if err != nil {
 		return zero, time.Time{}, value.ErrUnavailable
 	}
@@ -60,6 +60,10 @@ func (s PolicyStatusService) Get(ctx context.Context, current identities.Current
 		// refreshed; report the current object's generation (a changed
 		// revision can be activated again).
 		status.Generation = source.Revision.Generation
+	}
+	// The current DebugPolicy's detector, for display (ADR-230).
+	if d, ok := DescribePolicyDetector(spec); ok {
+		status.Detector = &d
 	}
 	target := authorization.PolicyScope(status.Authority)
 	projection, err := s.Permissions.Permissions(ctx, target)

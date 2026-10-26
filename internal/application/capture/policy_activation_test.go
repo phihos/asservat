@@ -65,8 +65,8 @@ func (f *activationFixture) ObservePolicy(_ context.Context, s value.PolicySourc
 	f.observed = append(f.observed, s)
 	return nil
 }
-func (f *activationFixture) ObserveWorkloadRestarts(_ context.Context, r targets.WorkloadRequest) (targets.RestartObservation, error) {
-	return targets.RestartObservation{ClusterID: r.ClusterID, Namespace: configuration.NamespaceRef{Name: r.Namespace, UID: "ns-uid"}, Workload: configuration.WorkloadRef{Kind: r.Kind, Name: r.Name, UID: "workload-uid"}, Pods: []targets.PodRestarts{}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}, nil
+func (f *activationFixture) ObserveWorkloadRestarts(_ context.Context, r targets.RestartRequest) (targets.RestartObservation, error) {
+	return targets.RestartObservation{ClusterID: r.ClusterID, Namespace: configuration.NamespaceRef{Name: r.Namespace, UID: "ns-uid"}, Workload: configuration.WorkloadRef{Kind: r.Kind, Name: r.Name, UID: "workload-uid"}, Pods: []targets.PodRestarts{}, Probe: r.Probe, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}, nil
 }
 func (f *activationFixture) Delegation(context.Context, authorization.Target) (identity.Revision, error) {
 	if f.noDelegates {

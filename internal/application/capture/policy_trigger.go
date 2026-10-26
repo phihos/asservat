@@ -30,9 +30,10 @@ type PolicyTriggerLedger interface {
 // with margin.
 const occurrenceSettleAge = 2 * time.Minute
 
-// PolicyTrigger polls every active policy's workload for Pod restarts and
-// runs one ordinary pod-status capture per admitted occurrence (ADR-228).
-// It polls (no watch): each tick costs one regional Pod LIST per policy.
+// PolicyTrigger polls every active policy's workload for Pod restarts
+// (ADR-228) or probe failures (ADR-230) and runs one ordinary pod-status
+// capture per admitted occurrence. It polls (no watch): each tick costs one
+// regional Pod LIST per policy, plus one Event LIST for a probe policy.
 // The executor is the policy principal; every check a human capture passes
 // still runs, with team authority replacing the human's personal rights.
 type PolicyTrigger struct {
@@ -188,9 +189,12 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	if compiled.ClusterID != a.ClusterID {
 		return value.ErrChanged
 	}
-	observation, err := t.Observer.ObserveWorkloadRestarts(tick, targets.WorkloadRequest{ClusterID: compiled.ClusterID, Namespace: compiled.Namespace, Kind: compiled.WorkloadKind, Name: compiled.WorkloadName})
+	observation, err := t.Observer.ObserveWorkloadRestarts(tick, compiled.Request())
 	if err != nil {
 		return err
+	}
+	if observation.Probe != compiled.Request().Probe {
+		return value.ErrUnavailable
 	}
 	if observation.Namespace.UID != a.NamespaceUID || observation.Workload.UID != a.WorkloadUID {
 		// A replaced namespace or workload is outside the accepted scope.

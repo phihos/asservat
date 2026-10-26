@@ -1864,6 +1864,7 @@ type PolicyOccurrence struct {
 	CreatedAt    pgtype.Timestamptz
 	CaptureID    pgtype.UUID
 	Outcome      pgtype.Text
+	Detector     string
 }
 
 type PolicyPodWatermark struct {
@@ -1872,6 +1873,8 @@ type PolicyPodWatermark struct {
 	PodUid    string
 	Restarts  int64
 	LastSeen  pgtype.Timestamptz
+	Detector  string
+	Armed     bool
 }
 
 type PolicySource struct {

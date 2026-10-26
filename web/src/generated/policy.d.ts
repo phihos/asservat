@@ -118,9 +118,13 @@ export interface components {
                     capture_id?: string;
                     /** @enum {unknown} */
                     outcome: "captured" | "refused" | "pending";
-                    restarts: number;
+                    restarts?: number;
                     /** Format: date-time */
                     created_at: string;
+                    /** @enum {unknown} */
+                    detector: "exit" | "probe";
+                    /** Format: date-time */
+                    failed_at?: string;
                 }[];
                 suppressions: {
                     /** @enum {unknown} */
@@ -131,6 +135,17 @@ export interface components {
                     /** Format: date-time */
                     last_at: string;
                 }[];
+                /** @description The current DebugPolicy's detector configuration (no observed content). */
+                detector?: {
+                    /** @enum {unknown} */
+                    kind: "exit" | "probe";
+                    reasons?: ("CrashLoopBackOff" | "Error" | "OOMKilled")[];
+                    exit_codes?: number[];
+                    /** @enum {unknown} */
+                    probe_type?: "Liveness" | "Readiness" | "Startup";
+                    minimum_failures?: number;
+                    window_seconds?: number;
+                };
             };
         } | {
             /** @constant */

@@ -906,6 +906,108 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("independent workload was throttled", got)
 		}
 	})
+	// ADR-230: a probe detector's level with re-arm, detector switches as new
+	// baselines, and the same shared budget, spend and dedupe as restarts.
+	t.Run("probe-trigger-rising-edge-rearm-detector-switch-and-shared-budget", func(t *testing.T) {
+		s, l := activeTrigger(t)
+		probe := restartPolicy(s)
+		probe.Reasons = nil
+		probe.Detector, probe.ProbeType, probe.MinimumFailures, probe.ProbeWindow = capture.DetectorProbe, "Readiness", 2, time.Minute
+		probeTick := func(o targets.RestartObservation) []capture.PolicyOccurrence {
+			t.Helper()
+			o.Probe = "Readiness"
+			got, err := l.Tick(ctx, capture.PolicyTick{Policy: probe, Authority: s.input.Authority, Observation: o})
+			if err != nil {
+				t.Fatal("probe tick", err)
+			}
+			return got
+		}
+		failing := func(uid string, failures, last int64) targets.PodRestarts {
+			return targets.PodRestarts{Name: "app-" + uid[:8], UID: uid, ProbeFailures: failures, ProbeLast: last}
+		}
+		mark := func(uid string) (detector string, value int64, armed bool) {
+			t.Helper()
+			if err := admin.QueryRow(ctx, `SELECT detector,restarts,armed FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3`, s.input.RootID, s.input.Authority.PolicyUID, uid).Scan(&detector, &value, &armed); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		a, b := custodyID(), custodyID()
+		const t0 = 1792000000
+		// The policy's earlier exit watermark is not a probe baseline: the
+		// switch re-baselines (no fire), and a probe already failing waits.
+		tick(t, s, l, observed(s, pod(a, 3)))
+		if got := probeTick(observed(s, failing(a, 5, t0), failing(b, 0, 0))); len(got) != 0 {
+			t.Fatal("detector switch fired", got)
+		}
+		if d, v, armed := mark(a); d != "probe" || v != t0 || armed {
+			t.Fatal("probe baseline", d, v, armed)
+		}
+		if got := probeTick(observed(s, failing(a, 6, t0+10), failing(b, 0, 0))); len(got) != 0 {
+			t.Fatal("continuing failure fired without recovery", got)
+		}
+		// An empty window re-arms; the next rising edge fires once.
+		probeTick(observed(s, failing(a, 0, t0+10), failing(b, 0, 0)))
+		if _, _, armed := mark(a); !armed {
+			t.Fatal("empty window did not re-arm")
+		}
+		got := probeTick(observed(s, failing(a, 2, t0+100), failing(b, 0, 0)))
+		if len(got) != 1 || got[0].PodUID != a || got[0].Restarts != t0+100 {
+			t.Fatal("rising edge", got)
+		}
+		// Concurrent duplicate polls of b's rising edge: one occurrence.
+		var wg sync.WaitGroup
+		results := make(chan int, 4)
+		o := observed(s, failing(a, 3, t0+110), failing(b, 2, t0+105))
+		o.Probe = "Readiness"
+		for range 4 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				r, err := l.Tick(ctx, capture.PolicyTick{Policy: probe, Authority: s.input.Authority, Observation: o})
+				if err != nil {
+					t.Error(err)
+				}
+				results <- len(r)
+			}()
+		}
+		wg.Wait()
+		close(results)
+		total := 0
+		for n := range results {
+			total += n
+		}
+		var detectors string
+		var spent int64
+		if err := admin.QueryRow(ctx, `SELECT string_agg(detector,',' ORDER BY restarts),max(a.executions_spent) FROM policy_occurrence o JOIN policy_acceptance a ON a.id=o.acceptance_id WHERE o.root_id=$1 AND o.policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID).Scan(&detectors, &spent); err != nil {
+			t.Fatal(err)
+		}
+		if total != 1 || detectors != "probe,probe" || spent != 2 {
+			t.Fatal("concurrent probe polls", total, detectors, spent)
+		}
+		// The shared workload burst is spent: the next edge is a cooldown.
+		probeTick(observed(s, failing(a, 0, t0+110), failing(b, 0, t0+105)))
+		cooldown := suppressed(t, s, "cooldown")
+		if got := probeTick(observed(s, failing(a, 2, t0+200), failing(b, 0, t0+105))); len(got) != 0 || suppressed(t, s, "cooldown") != cooldown+1 {
+			t.Fatal("probe multiplied the workload budget", got)
+		}
+		// A probe occurrence key can never be a restart count.
+		if _, err := admin.Exec(ctx, `UPDATE policy_occurrence SET restarts=5 WHERE root_id=$1 AND detector='probe'`, s.input.RootID); err == nil {
+			t.Fatal("probe occurrence with a restart-count key stored")
+		}
+		status, err := l.Status(ctx, s.input.Authority.PolicyUID)
+		if err != nil || len(status.Recent) != 2 || status.Recent[0].Detector != "probe" || status.Recent[0].Restarts < t0 {
+			t.Fatal("probe status", status, err)
+		}
+		// Switching back to exit is again a baseline: no comparison of a
+		// failure second with a restart count.
+		if got := tick(t, s, l, observed(s, pod(a, 4), pod(b, 0))); len(got) != 0 {
+			t.Fatal("switch back to exit fired", got)
+		}
+		if d, v, armed := mark(a); d != "exit" || v != 4 || !armed {
+			t.Fatal("exit re-baseline", d, v, armed)
+		}
+	})
 	t.Run("restart-trigger-spend-cap-saturation-and-single-link", func(t *testing.T) {
 		s, l := activeTrigger(t)
 		a := custodyID()

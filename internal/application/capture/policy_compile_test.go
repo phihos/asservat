@@ -54,6 +54,37 @@ func TestRestartPolicyCompilesTheAcceptedSubset(t *testing.T) {
 	}
 }
 
+// probeOptions replaces the spec's detector with a valid probe detector and
+// returns its options for a test to change.
+func probeOptions(s map[string]any) map[string]any {
+	options := map[string]any{"probeType": "Readiness", "minimumFailures": 2, "window": "1m", "source": "auto"}
+	s["detectors"] = []any{map[string]any{"id": "crash", "kind": "probe", "options": options}}
+	return options
+}
+
+func TestProbePolicyCompiles(t *testing.T) {
+	s := restartSpec()
+	probeOptions(s)
+	p, err := compileSpec(t, s)
+	if err != nil || !p.Valid() || p.Kind() != value.DetectorProbe || p.ProbeType != "Readiness" || p.MinimumFailures != 2 || p.ProbeWindow != time.Minute || p.Reasons != nil || p.ExitCodes != nil {
+		t.Fatalf("compiled %+v %v", p, err)
+	}
+	// An exit policy's compiled JSON (its scope digest input) has no probe fields.
+	exit, err := compileSpec(t, restartSpec())
+	b, _ := json.Marshal(exit)
+	if err != nil || exit.Kind() != value.DetectorExit || strings.Contains(string(b), "Probe") || strings.Contains(string(b), "Detector") {
+		t.Fatal("exit policy JSON changed", string(b), err)
+	}
+	spec, _ := json.Marshal(s)
+	if d, ok := DescribePolicyDetector(spec); !ok || d.Kind != "probe" || d.ProbeType != "Readiness" || d.MinimumFailures != 2 || d.WindowSeconds != 60 {
+		t.Fatal("probe description", d, ok)
+	}
+	spec, _ = json.Marshal(restartSpec())
+	if d, ok := DescribePolicyDetector(spec); !ok || d.Kind != "exit" || strings.Join(d.Reasons, ",") != "Error,OOMKilled" {
+		t.Fatal("exit description", d, ok)
+	}
+}
+
 func TestRestartPolicyRejectsUnsupportedFieldsWithPath(t *testing.T) {
 	for _, c := range []struct {
 		path   string
@@ -66,7 +97,17 @@ func TestRestartPolicyRejectsUnsupportedFieldsWithPath(t *testing.T) {
 			s["detectors"] = []any{map[string]any{"id": "crash", "kind": "resource", "options": map[string]any{"metric": "memoryLimitRatio", "operator": "gte", "threshold": 0.9, "sampleInterval": "5s"}}}
 		}},
 		{"spec.detectors[0].kind", func(s map[string]any) {
-			s["detectors"] = []any{map[string]any{"id": "crash", "kind": "probe", "options": map[string]any{"probeType": "Liveness", "minimumFailures": 1, "window": "30s", "source": "auto"}}}
+			s["detectors"] = []any{map[string]any{"id": "crash", "kind": "schedule", "options": map[string]any{"cron": "* * * * *", "timeZone": "Etc/UTC", "jitter": "0s"}}}
+		}},
+		{"spec.detectors[0].options.source", func(s map[string]any) { probeOptions(s)["source"] = "kubeletMetrics" }},
+		{"spec.detectors[0].options.window", func(s map[string]any) { probeOptions(s)["window"] = "15s" }},
+		{"spec.detectors[0].options.window", func(s map[string]any) { probeOptions(s)["window"] = "10m" }},
+		{"spec.detectors[0].options.window", func(s map[string]any) { probeOptions(s)["window"] = "45500ms" }},
+		{"spec.detectors[0].options.minimumFailures", func(s map[string]any) { probeOptions(s)["minimumFailures"] = 0 }},
+		{"spec.detectors[0].options.probeType", func(s map[string]any) { probeOptions(s)["probeType"] = "readiness" }},
+		{"spec.evaluation.rearmFor", func(s map[string]any) {
+			probeOptions(s)
+			s["evaluation"].(map[string]any)["rearmFor"] = "2m"
 		}},
 		{"spec.detectors[1]", func(s map[string]any) {
 			s["detectors"] = append(s["detectors"].([]any), map[string]any{"id": "other", "kind": "exit", "options": map[string]any{}})

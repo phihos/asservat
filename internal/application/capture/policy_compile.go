@@ -65,13 +65,14 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 		return reject(".target.adoption", "must be pinUID")
 	}
 	out.ClusterID, out.Namespace, out.WorkloadKind, out.WorkloadName = target.Cluster, target.Namespace, target.WorkloadRef.Kind, target.WorkloadRef.Name
-	// Detector: exactly one exit detector, referenced directly by when.
+	// Detector: exactly one exit (ADR-228) or probe (ADR-230) detector,
+	// referenced directly by when.
 	var detectors []json.RawMessage
 	if strict(s["detectors"], &detectors) != nil || len(detectors) == 0 {
 		return reject(".detectors", "invalid")
 	}
 	if len(detectors) != 1 {
-		return reject(".detectors[1]", "exactly one exit detector is supported")
+		return reject(".detectors[1]", "exactly one exit or probe detector is supported")
 	}
 	var detector struct {
 		ID, Kind    string
@@ -81,40 +82,24 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 	if strict(detectors[0], &detector) != nil {
 		return reject(".detectors[0]", "invalid")
 	}
-	if detector.Kind != "exit" {
-		return reject(".detectors[0].kind", "only exit detectors are supported in this release")
-	}
-	if detector.EventWindow != nil {
-		return reject(".detectors[0].eventWindow", "restart counters need no event window")
-	}
-	var options struct {
-		ExitCodes []int32
-		Signals   []int
-		Reasons   []string
-	}
-	if strict(detector.Options, &options) != nil {
-		return reject(".detectors[0].options", "invalid")
-	}
-	if len(options.Signals) > 0 {
-		return reject(".detectors[0].options.signals", "Kubernetes reports exit codes, not signals")
-	}
-	out.Reasons = slices.Clone(options.Reasons)
-	if len(out.Reasons) == 0 {
-		out.Reasons = []string{"CrashLoopBackOff", "Error", "OOMKilled"}
-	}
-	for i, r := range out.Reasons {
-		if r != "CrashLoopBackOff" && r != "Error" && r != "OOMKilled" {
-			return reject(".detectors[0].options.reasons["+strconv.Itoa(i)+"]", "use OOMKilled, Error or CrashLoopBackOff")
+	switch detector.Kind {
+	case "exit":
+		if err := compileExit(&out, detector.Options, detector.EventWindow); err != nil {
+			return value.RestartPolicy{}, err
 		}
+	case "probe":
+		if err := compileProbe(&out, detector.Options); err != nil {
+			return value.RestartPolicy{}, err
+		}
+	case "log", "resource":
+		// Paused by the ADR-230 complexity gate: a maintainer decision.
+		return reject(".detectors[0].kind", "log and resource detectors are not available in this release (ADR-230); use exit or probe")
+	default:
+		return reject(".detectors[0].kind", "only exit and probe detectors are supported in this release")
 	}
-	slices.Sort(out.Reasons)
-	out.Reasons = slices.Compact(out.Reasons)
-	out.ExitCodes = slices.Clone(options.ExitCodes)
-	slices.Sort(out.ExitCodes)
-	out.ExitCodes = slices.Compact(out.ExitCodes)
 	var when struct{ Detector string }
 	if strict(s["when"], &when) != nil || when.Detector == "" {
-		return reject(".when", "must reference the exit detector directly")
+		return reject(".when", "must reference the detector directly")
 	}
 	if when.Detector != detector.ID {
 		return reject(".when.detector", "names no detector")
@@ -179,10 +164,21 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 			return reject(".evaluation", "invalid")
 		}
 		if evaluation.Scope != "pod" {
-			return reject(".evaluation.scope", "restart triggers are pod-scoped")
+			return reject(".evaluation.scope", "triggers are pod-scoped")
 		}
 		if evaluation.FireOnActivation {
-			return reject(".evaluation.fireOnActivation", "a restart counter only fires on a new restart after activation")
+			return reject(".evaluation.fireOnActivation", "activation only records a baseline; a trigger fires on a change after it")
+		}
+		if out.Detector == value.DetectorProbe && evaluation.RearmFor != "" {
+			// A probe re-arms at a poll whose window is empty, which proves a
+			// window without failure; a longer rearmFor cannot be proven.
+			rearm, ok := policyDuration(evaluation.RearmFor)
+			if !ok {
+				return reject(".evaluation.rearmFor", "invalid duration")
+			}
+			if rearm > out.ProbeWindow {
+				return reject(".evaluation.rearmFor", "must not exceed the probe window")
+			}
 		}
 	}
 	if raw, present := s["recordingSaves"]; present {
@@ -195,6 +191,108 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 		return reject("", "invalid")
 	}
 	return out, nil
+}
+
+// compileExit selects the ADR-228 exit detector options.
+func compileExit(out *value.RestartPolicy, raw, eventWindow json.RawMessage) error {
+	reject := func(path, reason string) error {
+		return value.PolicyFieldError{Path: "spec.detectors[0]" + path, Reason: reason}
+	}
+	if eventWindow != nil {
+		return reject(".eventWindow", "restart counters need no event window")
+	}
+	var options struct {
+		ExitCodes []int32
+		Signals   []int
+		Reasons   []string
+	}
+	if strict(raw, &options) != nil {
+		return reject(".options", "invalid")
+	}
+	if len(options.Signals) > 0 {
+		return reject(".options.signals", "Kubernetes reports exit codes, not signals")
+	}
+	out.Reasons = slices.Clone(options.Reasons)
+	if len(out.Reasons) == 0 {
+		out.Reasons = []string{"CrashLoopBackOff", "Error", "OOMKilled"}
+	}
+	for i, r := range out.Reasons {
+		if r != "CrashLoopBackOff" && r != "Error" && r != "OOMKilled" {
+			return reject(".options.reasons["+strconv.Itoa(i)+"]", "use OOMKilled, Error or CrashLoopBackOff")
+		}
+	}
+	slices.Sort(out.Reasons)
+	out.Reasons = slices.Compact(out.Reasons)
+	out.ExitCodes = slices.Clone(options.ExitCodes)
+	slices.Sort(out.ExitCodes)
+	out.ExitCodes = slices.Compact(out.ExitCodes)
+	return nil
+}
+
+// compileProbe selects the ADR-230 probe detector: failures of one probe
+// type from Kubernetes Events, a minimum count and a window of 30 s to 5 min.
+func compileProbe(out *value.RestartPolicy, raw json.RawMessage) error {
+	reject := func(path, reason string) error {
+		return value.PolicyFieldError{Path: "spec.detectors[0].options" + path, Reason: reason}
+	}
+	var options struct {
+		ProbeType       string
+		MinimumFailures int
+		Window, Source  string
+	}
+	if strict(raw, &options) != nil {
+		return reject("", "invalid")
+	}
+	if !targets.ProbeType(options.ProbeType) {
+		return reject(".probeType", "use Liveness, Readiness or Startup")
+	}
+	if options.MinimumFailures < 1 || options.MinimumFailures > 1000 {
+		return reject(".minimumFailures", "must be 1 to 1000")
+	}
+	window, ok := policyDuration(options.Window)
+	if !ok || window%time.Second != 0 || window < targets.MinProbeWindowSeconds*time.Second || window > targets.MaxProbeWindowSeconds*time.Second {
+		return reject(".window", "must be 30s to 5m in whole seconds: a shorter window could miss a failure between two polls")
+	}
+	switch options.Source {
+	case "auto", "events":
+	case "kubeletMetrics":
+		return reject(".source", "kubelet probe metrics need node access; use events")
+	default:
+		return reject(".source", "use auto or events")
+	}
+	out.Detector, out.ProbeType, out.MinimumFailures, out.ProbeWindow = value.DetectorProbe, options.ProbeType, options.MinimumFailures, window
+	return nil
+}
+
+// DescribePolicyDetector reads only the detector of a DebugPolicy spec for
+// status display; it is not a compilation and confers nothing.
+func DescribePolicyDetector(spec []byte) (value.PolicyDetector, bool) {
+	var s struct {
+		Detectors []struct {
+			Kind        string
+			Options     json.RawMessage
+			ID          string
+			EventWindow json.RawMessage
+		}
+	}
+	if json.Unmarshal(spec, &s) != nil || len(s.Detectors) != 1 {
+		return value.PolicyDetector{}, false
+	}
+	var p value.RestartPolicy
+	d := s.Detectors[0]
+	var err error
+	switch d.Kind {
+	case "exit":
+		err = compileExit(&p, d.Options, d.EventWindow)
+	case "probe":
+		err = compileProbe(&p, d.Options)
+	default:
+		return value.PolicyDetector{}, false
+	}
+	if err != nil {
+		return value.PolicyDetector{}, false
+	}
+	return p.Describe(), true
 }
 
 // strict decodes a known shape and rejects unknown fields; the canonical

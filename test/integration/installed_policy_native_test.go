@@ -9,9 +9,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"os/exec"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +26,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -43,9 +46,11 @@ var installedPolicyTarget *installedPolicyFixture
 
 const installedPolicyName = "regional-restarts"
 
-// installedPolicyJourney qualifies the first S-03 increment on the installed
-// product: an administrator adds an automation envelope, a maintainer applies a
-// hub-held restart DebugPolicy and activates it over MCP as the Keycloak user;
+// installedPolicyJourney qualifies the S-03 increments on the installed
+// product: an administrator adds an automation envelope; a readiness-probe
+// policy (ADR-230) captures the Pod whose probe starts failing, once; a
+// maintainer applies a hub-held restart DebugPolicy and activates it over MCP
+// as the Keycloak user;
 // one killed container yields one policy-executed pod-status capture that the
 // user downloads; a three-replica crash storm is bounded by the shared workload
 // budget, with content-free suppression counts and bounded rows.
@@ -163,6 +168,7 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		t.Fatal("administrator automation binding", err)
 	}
 	digest := planning.RecipeDigest()
+	installedProbePhase(t, ctx, admin, root, f, digest, read, wait, observe, runningPods, started)
 	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": installedPolicyName}, "spec": map[string]any{
 		"target":    map[string]any{"cluster": f.cluster, "namespace": f.namespace, "workloadRef": map[string]any{"apiVersion": "apps/v1", "kind": "Deployment", "name": f.workload}, "maxPods": 1, "selection": "triggeringPod", "adoption": "pinUID"},
 		"detectors": []any{map[string]any{"id": "crashed", "kind": "exit", "options": map[string]any{"reasons": []any{"Error", "OOMKilled"}}}},
@@ -313,7 +319,7 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	}
 	t.Logf("installed policy journey: the Keycloak user downloaded the policy capture (%d bytes) of the killed Pod, %s after start", len(native), time.Since(started).Round(time.Second))
 
-	// Phase B: all three replicas crash repeatedly for 90 s (cut from 150 s so the run fits the 20-minute rule with margin; three Pods still restart several times under the backoff).
+	// Phase B: all three replicas crash repeatedly for 60 s (150 s in ADR-228, 90 s in its CI fix; since ADR-230 the probe occurrence and the first exit capture already hold the shared workload burst, so every storm restart meets a saturated budget and three Pods still restart several times under the backoff).
 	baseline := scalar(`SELECT coalesce(sum(restarts),0) FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2`, root, activated.PolicyUID)
 	admittedBefore := occurrences()
 	suppressed := func() int64 {
@@ -321,7 +327,7 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	}
 	suppressedBefore := suppressed()
 	kills := 0
-	for storm := time.Now().Add(90 * time.Second); time.Now().Before(storm); {
+	for storm := time.Now().Add(60 * time.Second); time.Now().Before(storm); {
 		for _, p := range runningPods() {
 			if installedKillContainer(t, ctx, p) {
 				kills++
@@ -405,6 +411,147 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	}
 	t.Logf("installed policy journey: deactivated %s after start; %d kill(s) %s later changed no watermark, occurrence, suppression or spend", stoppedAt.Sub(started).Round(time.Second), killed, time.Since(stoppedAt).Round(time.Second))
 	t.Logf("installed policy journey complete %s after start", time.Since(started).Round(time.Second))
+}
+
+const installedProbePolicyName = "regional-readiness"
+
+// installedProbePhase qualifies the ADR-230 probe detector before the restart
+// phases: a hub-held readiness-probe DebugPolicy is activated, the workload's
+// template gains a readiness probe that fails after a 30-second delay (one
+// surge Pod of a stuck rollout), and the first failures yield exactly one
+// policy-executed pod-status capture of that Pod; the continuing failures
+// create no second occurrence and no Event text reaches status. The template
+// is then restored, so the restart phases see the original three replicas.
+func installedProbePhase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, f *installedPolicyFixture, digest artifact.Digest, read func(context.Context, string, any) (installedJourneyEnvelope, error), wait func(string, time.Duration, func(context.Context) bool), observe func(context.Context, string, any, any) bool, runningPods func() []core.Pod, started time.Time) {
+	t.Helper()
+	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": installedProbePolicyName}, "spec": map[string]any{
+		"target":    map[string]any{"cluster": f.cluster, "namespace": f.namespace, "workloadRef": map[string]any{"apiVersion": "apps/v1", "kind": "Deployment", "name": f.workload}, "maxPods": 1, "selection": "triggeringPod", "adoption": "pinUID"},
+		"detectors": []any{map[string]any{"id": "unready", "kind": "probe", "options": map[string]any{"probeType": "Readiness", "minimumFailures": 2, "window": "30s", "source": "events"}}},
+		"when":      map[string]any{"detector": "unready"},
+		"recipeRef": map[string]any{"name": planning.ContextRecipeName, "digest": hex.EncodeToString(digest[:])},
+		"budgets":   map[string]any{"cooldown": "5m", "burst": 2, "maxOccurrencesPerHour": 12, "maxConcurrentActions": 1},
+		"retention": fmt.Sprintf("%ds", installedJourneyRetention), "suspended": false,
+		"observation": map[string]any{"mode": "allAuthorized"},
+		"evaluation":  map[string]any{"scope": "pod", "fireOnActivation": false, "rearmFor": "10s"}}}
+	body, _ := json.Marshal(policy)
+	if err := f.hub.Post().AbsPath(f.base + "debugpolicies").Body(body).Do(ctx).Error(); err != nil {
+		t.Fatal("maintainer applies the hub-held probe DebugPolicy", err)
+	}
+	// The envelope reaches the accepted permission projection asynchronously,
+	// so DelegationRequired retries.
+	var activated struct {
+		PolicyUID string `json:"policy_uid"`
+		State     string `json:"state"`
+	}
+	activation := map[string]string{"policy_name": installedProbePolicyName, "idempotency_key": "installed-probe-activation"}
+	wait("an active probe policy", 3*time.Minute, func(poll context.Context) bool {
+		reply, err := read(poll, "activate_policy", activation)
+		if err != nil || reply.Status != "ok" {
+			if err == nil {
+				t.Logf("installed activate_policy (probe): %s", reply.Data)
+			}
+			return false
+		}
+		if installedJourneyDecode(reply.Data, &activated) != nil {
+			t.Fatal("probe activation data")
+		}
+		return activated.State == "active"
+	})
+	t.Logf("installed policy journey: probe policy %s activated %s after start", activated.PolicyUID, time.Since(started).Round(time.Second))
+	scalar := func(query string, args ...any) int64 {
+		t.Helper()
+		var n int64
+		if err := admin.QueryRow(ctx, query, args...).Scan(&n); err != nil {
+			t.Fatal(query, err)
+		}
+		return n
+	}
+	// A readiness probe that fails 30 s after the container starts: the
+	// rollout surges one Pod that the policy first sees healthy (armed), well
+	// within the 15-second poll.
+	original := map[string]bool{}
+	for _, p := range runningPods() {
+		original[string(p.UID)] = true
+	}
+	template := func(probe *core.Probe) {
+		t.Helper()
+		for attempt := 0; ; attempt++ {
+			d, err := f.region.AppsV1().Deployments(f.namespace).Get(ctx, f.workload, meta.GetOptions{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			d.Spec.Template.Spec.Containers[0].ReadinessProbe = probe
+			if _, err = f.region.AppsV1().Deployments(f.namespace).Update(ctx, d, meta.UpdateOptions{}); err == nil {
+				return
+			} else if attempt == 5 {
+				t.Fatal("regional workload template", err)
+			}
+		}
+	}
+	template(&core.Probe{ProbeHandler: core.ProbeHandler{TCPSocket: &core.TCPSocketAction{Port: intstr.FromInt32(1)}}, InitialDelaySeconds: 30, PeriodSeconds: 2, TimeoutSeconds: 1, FailureThreshold: 1})
+	wait("the armed probe baseline of the original Pods", time.Minute, func(context.Context) bool {
+		return scalar(`SELECT count(*) FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND detector='probe' AND armed AND pod_uid=ANY($3::text[])`, root, activated.PolicyUID, slices.Collect(maps.Keys(original))) == 3
+	})
+	var surge core.Pod
+	wait("the surge Pod with the failing readiness probe", time.Minute, func(context.Context) bool {
+		for _, p := range runningPods() {
+			if !original[string(p.UID)] {
+				surge = p
+				return true
+			}
+		}
+		return false
+	})
+	var captureID string
+	var failedAt int64
+	wait("a probe policy capture", 3*time.Minute, func(poll context.Context) bool {
+		err := admin.QueryRow(poll, `SELECT coalesce(capture_id::text,''),restarts FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND detector='probe'`, root, activated.PolicyUID, string(surge.UID)).Scan(&captureID, &failedAt)
+		return err == nil && captureID != ""
+	})
+	var executor string
+	if err := admin.QueryRow(ctx, `SELECT convert_from(scope_json,'UTF8')::jsonb#>>'{executor,subject}' FROM context_capture WHERE id=$1`, captureID).Scan(&executor); err != nil || executor != "policy:"+activated.PolicyUID || failedAt < 1000000000 {
+		t.Fatal("probe capture provenance", executor, failedAt, err)
+	}
+	// The probe keeps failing: a poll after the occurrence (usually already
+	// during the capture) leaves the level fired once and disarmed.
+	wait("a probe poll after the occurrence", time.Minute, func(poll context.Context) bool {
+		var later bool
+		err := admin.QueryRow(poll, `SELECT w.last_seen>o.created_at+interval '2 seconds' FROM policy_pod_watermark w JOIN policy_occurrence o ON o.root_id=w.root_id AND o.policy_uid=w.policy_uid AND o.pod_uid=w.pod_uid WHERE w.root_id=$1 AND w.policy_uid=$2 AND w.pod_uid=$3`, root, activated.PolicyUID, string(surge.UID)).Scan(&later)
+		return err == nil && later
+	})
+	failures := scalar(`SELECT count(*) FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2`, root, activated.PolicyUID)
+	disarmed := scalar(`SELECT count(*) FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND NOT armed`, root, activated.PolicyUID, string(surge.UID))
+	var status struct {
+		Detector struct {
+			Kind      string `json:"kind"`
+			ProbeType string `json:"probe_type"`
+		} `json:"detector"`
+		Recent []struct {
+			Detector  string `json:"detector"`
+			CaptureID string `json:"capture_id"`
+			FailedAt  string `json:"failed_at"`
+		} `json:"recent"`
+	}
+	reply, err := read(ctx, "get_policy_status", map[string]string{"policy_name": installedProbePolicyName})
+	if err != nil || reply.Status != "ok" || installedJourneyDecode(reply.Data, &status) != nil {
+		t.Fatal("probe policy status", err, reply.Status)
+	}
+	if failures != 1 || disarmed != 1 || status.Detector.Kind != "probe" || status.Detector.ProbeType != "Readiness" || len(status.Recent) != 1 || status.Recent[0].Detector != "probe" || status.Recent[0].CaptureID != captureID || status.Recent[0].FailedAt == "" ||
+		strings.Contains(string(reply.Data), "refused") || strings.Contains(string(reply.Data), "probe failed") {
+		t.Fatal("probe occurrence", failures, disarmed, string(reply.Data))
+	}
+	t.Logf("installed policy journey: the failing readiness probe yielded capture %s by policy:%s (one occurrence), %s after start", captureID, activated.PolicyUID, time.Since(started).Round(time.Second))
+	// Restore the template: the surge Pod goes, the original replicas remain.
+	template(nil)
+	wait("the original three replicas", 2*time.Minute, func(context.Context) bool {
+		pods := runningPods()
+		for _, p := range pods {
+			if !original[string(p.UID)] {
+				return false
+			}
+		}
+		return len(pods) == 3
+	})
 }
 
 // installedKillContainer SIGKILLs the regional app container of one Pod on
