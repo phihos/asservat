@@ -57,6 +57,11 @@ func (e initialPreparerLoadFailure) Error() string {
 	if provider := kms.InitialProviderCheckStage(e.cause); provider != "" {
 		stage += " (provider " + provider + ")"
 	}
+	// Only fixed step labels and a closed error class, never a cause string.
+	var named interface{ FixedStep() string }
+	if errors.As(e.cause, &named) {
+		stage += " (step " + named.FixedStep() + ", " + errorClass(e.cause) + ")"
+	}
 	return stage
 }
 func (e initialPreparerLoadFailure) Unwrap() error { return e.cause }
