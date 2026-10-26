@@ -64,6 +64,14 @@ parallel ADR-234/235 work were present locally only so the contiguous migration 
   LIST path: PASS, go test 478.7 s (`installer-continuation` 287.1 s), source unchanged, no
   cleanup failures, the same history, refusal and Collect again results. `make pre-push`: PASS.
   The installed workload keeps a running Pod; zero Pods is covered by the unit and custody cases.
+- Rebased onto `origin/main` with migration 00088 (ADR-235): 00089's view re-creation
+  (`SELECT c.*`) keeps 00088's `share_instruction` and appends the history columns;
+  `preview_capture(history_capture_id)` also accepts a new capture-time `sharing` instruction (the
+  original sharing is never restored). `make sql-check`, unit tests, `make pre-push`: PASS.
+  Custody `--run 'TestContextAdmissionWithRealServices/(capture-history|capture-time-share|progress-current|evidence-share)'`:
+  PASS (6 history and 3 capture-time-share subtests). Installed `share` focus (which now also
+  runs the ADR-235 capture-time share before history): PASS, go test 474.0 s
+  (`installer-continuation` 282.0 s), source unchanged, no cleanup failures.
 
 ## S-06 increment 7: caller-only access explanation (ADR-234, 2026-10-26)
 
