@@ -457,6 +457,7 @@ requirements:
   spec: specs/privacy.md
   scenarios:
   - SC-PRV-002
+  - SC-PRV-009
   tasks:
   - TASK-02
   - TASK-03

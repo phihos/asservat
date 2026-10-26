@@ -1,5 +1,52 @@
 # Sustained implementation progress
 
+## S-06 increment 11: retention impact preview (ADR-240, 2026-10-27)
+
+[ADR-240](decisions/240-retention-impact-preview.md): browser-only `preview_retention_change`
+for current fleet operators. Proposed EvidenceRetentionPolicy create/update/delete changes (hub or
+one cluster's local source, decoded with the observed policy schema) are applied to the changed
+source's latest accepted snapshot, and the catch-up's `HistoricalSourcePolicies` and
+`ApplyRetainedObligation` run over the current effective deadlines of at most 10,000 retained
+context artifacts not yet due for deletion (keyset pages of 1,000, lock-free, hub metadata reader
+tables only). Reply: affected/unreadable-now/deletion-due-now/Unknown counts per cluster and class,
+earliest new access end and deletion, incomplete clusters (source not ready), changes not evaluated
+(unknown UID, ambiguous source), scan limit and baseline warning. Console `/retention-preview`.
+Migration 00093 (schema 93, floor 81) redefines the two operation-name functions copied from
+00092 with `preview_retention_change` added (so `list_capture_history`, `get_capture_settings`,
+`preview_access_change`, `transfer_share` and `stop_future_sharing` are kept); the browser-only
+transport mechanism is ADR-237's. Storage-lock conflicts are not reported (no holds exist yet).
+
+Verification (rebased onto the ADR-239 branch with 00090–00092; tracked test/results files
+restored after each run):
+- Unit (`-race`): domain/privacy (shortening equals the catch-up's own result, an already past
+  limit closes access and makes deletion due, lengthening and baseline deletion move nothing, new
+  label selector Unknown while a bound UID is followed, undecodable rows Unknown, local source
+  without acceptance and non-ready hub incomplete, unknown UIDs not evaluated, scan limit, 17
+  changes and invalid proposals refused), application/privacy (fleet operator only, refused before
+  decoding or catalog read, role lost mid-request, recovery, local specs never baselines),
+  adapters/kubernetes (`TestRetentionPolicySpecDecoder`), transport/presentation (canonical reply,
+  largest reply 16,539 bytes within 24 KiB with totals, failure codes, invalid inputs,
+  browser-only), transport/mcp (absent from `tools/list`, `tools/call` never reaches the use case),
+  plus contracts, console, domain/audit, domain/fleet, adapters/postgres and bootstrap: PASS.
+  Console `npm run check`: PASS (17 files, 196 tests, including the retention preview page).
+  `make pre-push`: PASS. The full sharded `go-check` and `console-browser-check` were not run.
+- Custody (real PostgreSQL, `scripts/test-custody.py --run
+  'TestContextAdmissionWithRealServices/retention-preview'`): PASS, Go run 8.0 s.
+  `retention-preview-shorten-lengthen-unknown-incomplete` (a role with only the hub metadata
+  reader's tables cannot change deadlines; ten-minute shortening affects all three artifacts with
+  earliest deletion anchor + 10 min; a passed two-second limit counts them unreadable and due;
+  48 hours affects none; a new label selector is Unknown; scans of 2 and 3 report truncation
+  exactly; no deadline changes; after a real accepted one-hour shortening and catch-up the source
+  is not ready (unaudited lifecycle decisions), the cluster is incomplete, two hours moves no bound
+  date and ten minutes still affects all three; an unknown UID is not evaluated) and
+  `retention-preview-scan-cost` (171 artifacts under `-race`: 477 µs per artifact read, 12.6 µs
+  evaluated). One measurement run without `-race` (harness flag removed locally for that run only,
+  then restored): 335 artifacts, sources plus one artifact 5.9 ms, full read 15.4 ms (about 28 µs
+  per artifact beyond the sources), evaluation 2.9 µs per artifact. The 10,000-artifact bound is
+  extrapolated from these runs (about 0.3 s), not measured; the fixture's five-second synthetic
+  observations limit one root to a few hundred admissions. Rows average 9.5 KB as text, of which
+  the scan reads only the expectation, pod pin, digests and deadlines.
+- No installed qualification.
 ## S-06 increment 8: recurring-policy sharing (ADR-239, 2026-10-27)
 
 [ADR-239](decisions/239-recurring-policy-sharing.md): a hub-held DebugPolicy's `spec.sharing`

@@ -242,6 +242,12 @@ func retainedContextOrigins(ctx context.Context, q *custodydb.Queries, root stri
 	if err != nil {
 		return value.RetainedArtifact{}, err
 	}
+	return retainedDecisionOrigins(r, row)
+}
+
+// retainedDecisionOrigins carries the policy origins of the artifact's current
+// lifecycle decision (row, read at r.Sequence) into r.
+func retainedDecisionOrigins(r value.RetainedArtifact, row custodydb.RetentionDecision) (value.RetainedArtifact, error) {
 	d, err := decodeLifecycle(row)
 	if err != nil || d.Location != r.Registration.Location || d.RegistrationDigest != app.RegistrationDigest(r.Registration) {
 		return value.RetainedArtifact{}, app.ErrUnavailable

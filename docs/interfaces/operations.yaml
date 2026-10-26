@@ -546,4 +546,10 @@ operations:
   - browser
   effect: read
   role: fleet-operator-or-delegation-previewer
+- operation: preview_retention_change
+  path: /api/v1/operations/preview_retention_change
+  transport:
+  - browser
+  effect: read
+  role: fleet-operator
   contract: specs/contracts/mcp-tools.json

@@ -31,9 +31,15 @@ func (c *RetentionClient) RetentionSnapshot(ctx context.Context) (value.PolicySn
 	return l.Snapshot, err
 }
 func (c *RetentionClient) policy(o permissionObject, ref configvalue.Resource) (value.ScopedPolicy, error) {
+	return retentionPolicy(c.client.validator, c.hub, o, ref)
+}
+
+// retentionPolicy decodes one EvidenceRetentionPolicy spec with the embedded
+// schema; observed objects and ADR-240 proposals share it.
+func retentionPolicy(v *permissionValidator, hub bool, o permissionObject, ref configvalue.Resource) (value.ScopedPolicy, error) {
 	var out value.ScopedPolicy
 	var spec wire.RetentionPolicySpec
-	digest, err := decodePermissionSpec(o.Spec, c.client.validator.retentionSchema, &spec)
+	digest, err := decodePermissionSpec(o.Spec, v.retentionSchema, &spec)
 	if err != nil {
 		return out, value.ErrUnavailable
 	}
@@ -47,7 +53,7 @@ func (c *RetentionClient) policy(o permissionObject, ref configvalue.Resource) (
 	if !selectorValid(scope.NamespaceLabels) || !selectorValid(scope.WorkloadLabels) {
 		return out, value.ErrInvalid
 	}
-	policy := value.Policy{Revision: identity.Revision{UID: ref.UID, Generation: ref.Generation, Digest: digest}, Baseline: c.hub && scope.Empty(), PurposeRef: spec.PurposeRef, DefaultSeconds: spec.Defaults.EvidenceSeconds, MaximumSeconds: spec.Maxima.EvidenceSeconds, DeletionBudgetSeconds: spec.DeletionBudgetSeconds}
+	policy := value.Policy{Revision: identity.Revision{UID: ref.UID, Generation: ref.Generation, Digest: digest}, Baseline: hub && scope.Empty(), PurposeRef: spec.PurposeRef, DefaultSeconds: spec.Defaults.EvidenceSeconds, MaximumSeconds: spec.Maxima.EvidenceSeconds, DeletionBudgetSeconds: spec.DeletionBudgetSeconds}
 	for _, r := range spec.Rules {
 		policy.Rules = append(policy.Rules, value.Rule{Name: r.Name, PrivacyClasses: r.PrivacyClasses, EvidenceTypes: r.EvidenceTypes, MaxAgeSeconds: r.MaxAgeSeconds})
 	}
@@ -98,4 +104,31 @@ func (c *RetentionClient) RetentionPolicyList(ctx context.Context) (configuratio
 		return configuration.PolicyList{}, value.ErrUnavailable
 	}
 	return out, nil
+}
+
+// RetentionPolicySpecDecoder decodes a proposed EvidenceRetentionPolicy spec
+// with the same embedded schema and checks as observed policies (ADR-240
+// impact preview). The result carries the canonical spec digest; it is never
+// an observed or accepted policy.
+type RetentionPolicySpecDecoder struct{ validator *permissionValidator }
+
+func NewRetentionPolicySpecDecoder() (*RetentionPolicySpecDecoder, error) {
+	v, err := newPermissionValidator()
+	if err != nil {
+		return nil, err
+	}
+	return &RetentionPolicySpecDecoder{v}, nil
+}
+
+// DecodeRetentionPolicySpec decodes spec for the hub source (hub) or a local
+// source; an empty hub scope is the installation baseline.
+func (d *RetentionPolicySpecDecoder) DecodeRetentionPolicySpec(spec []byte, hub bool) (value.ScopedPolicy, error) {
+	if d == nil || d.validator == nil {
+		return value.ScopedPolicy{}, value.ErrUnavailable
+	}
+	p, err := retentionPolicy(d.validator, hub, permissionObject{Spec: spec}, configvalue.Resource{Kind: "EvidenceRetentionPolicy"})
+	if err != nil {
+		return value.ScopedPolicy{}, value.ErrInvalid
+	}
+	return p, nil
 }
