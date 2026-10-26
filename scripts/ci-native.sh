@@ -16,14 +16,13 @@ declare -A suites=(
   [permission]="make permission-integration"
   [identity]="make identity-integration"
   [helm]="make helm-integration"
-  [context]="make context-integration"
-  # The context suite in two shards of about 8 min of tests each, so each run
-  # stays within the 20-minute limit (TestI* and everything else).
+  # The context suite (make context-integration, too long for one run) in two
+  # shards of about 8 min of tests each, so each run stays within the
+  # 20-minute limit (TestI* and everything else).
   [context-1]="$context --run ^TestI"
   [context-2]="$context --run ^Test[A-HJ-Z]"
-  [continuation]="$context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   # The installed journey in runs of at most 20 minutes (the unsplit
-  # continuation above takes about 25). Only the chain run keeps the full
+  # continuation takes about 25 and is not a CI suite). Only the chain run keeps the full
   # installation-process checks (interrupted and resumed runner, baseline
   # edit, demand lane, regional installer rerun, connector readmission and
   # source-write denial, workload added after the join) and stops after one
