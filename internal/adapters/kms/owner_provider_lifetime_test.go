@@ -390,7 +390,9 @@ func TestOwnerProviderLifetimeNamesTheFailedRefreshStep(t *testing.T) {
 		proof ownerProviderCurrent
 		want  string
 	}{
-		{"proof", func(context.Context) (time.Time, error) { return time.Time{}, errors.New("synthetic proof unavailable") }, "proof"},
+		{"proof", func(context.Context) (time.Time, error) {
+			return time.Time{}, errors.New("synthetic proof unavailable")
+		}, "proof"},
 		{"final-proof", func() ownerProviderCurrent {
 			var checks atomic.Int32
 			return func(ctx context.Context) (time.Time, error) {

@@ -169,7 +169,12 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	servingCA := installerFederationServingSecret(t, ctx, runnerAPI, desired.TargetNamespace, installation, "federation.synthetic.invalid")
 	keyServingCA := installerServingSecret(t, ctx, runnerAPI, desired.TargetNamespace, contracts.KeyServiceServingSecretName(installation), setup.keyServiceHost)
 	var publicRoot []byte // DER of the public listener's synthetic CA
-	pod := unified.interruptAndResume(t, ctx, api, kc, kubeconfig, desired, original)
+	// The interruption/resume qualifies the installer itself; the fast feature
+	// fixture continues the original runner through its provider waits.
+	pod := unified.pod
+	if !installedFastFixture() {
+		pod = unified.interruptAndResume(t, ctx, api, kc, kubeconfig, desired, original)
+	}
 	defer installerContinuationLogs(t, api, pod)
 
 	// The operator's side: own OpenBao administration and scoped storage only.
@@ -464,26 +469,29 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	// baseline, and reads Ready through the product source reader.
 	sequence, epoch := installerHubRetentionReady(t, ctx, api, admin, desired.TargetNamespace, installation, p.RootID, original.Plan.ClusterID, 2)
 	// ADR-195 step 7: an administrator's baseline edit is accepted, and a
-	// hub-worker restart returns the source to Ready under a new epoch.
-	runner := rest.CopyConfig(kc)
-	runner.Impersonate = rest.ImpersonationConfig{UserName: "system:serviceaccount:" + namespace + ":" + desired.Name + "-bootstrap-runner", Groups: []string{"system:serviceaccounts", "system:serviceaccounts:" + namespace, "system:authenticated"}}
-	edit, err := kubernetes.NewForConfig(runner)
-	if err != nil {
-		t.Fatal(err)
+	// hub-worker restart returns the source to Ready under a new epoch. The
+	// edit qualifies retention administration; the fast fixture skips it.
+	if !installedFastFixture() {
+		runner := rest.CopyConfig(kc)
+		runner.Impersonate = rest.ImpersonationConfig{UserName: "system:serviceaccount:" + namespace + ":" + desired.Name + "-bootstrap-runner", Groups: []string{"system:serviceaccounts", "system:serviceaccounts:" + namespace, "system:authenticated"}}
+		edit, err := kubernetes.NewForConfig(runner)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// The runner holds update, never patch (chart rule); read, modify, update.
+		path := "/apis/asservat.io/v1alpha1/namespaces/" + desired.TargetNamespace + "/evidenceretentionpolicies/" + contracts.RetentionBaselineName(installation)
+		raw, err := edit.CoreV1().RESTClient().Get().AbsPath(path).DoRaw(ctx)
+		var policy map[string]any
+		if err != nil || json.Unmarshal(raw, &policy) != nil {
+			t.Fatal("baseline read", err)
+		}
+		policy["spec"].(map[string]any)["maxima"].(map[string]any)["auditMetadataSeconds"] = 1209600
+		body, _ := json.Marshal(policy)
+		if err = edit.CoreV1().RESTClient().Put().AbsPath(path).Body(body).Do(ctx).Error(); err != nil {
+			t.Fatal("administrator baseline edit", err)
+		}
+		sequence, _ = installerHubRetentionReady(t, ctx, api, admin, desired.TargetNamespace, installation, p.RootID, original.Plan.ClusterID, sequence+1)
 	}
-	// The runner holds update, never patch (chart rule); read, modify, update.
-	path := "/apis/asservat.io/v1alpha1/namespaces/" + desired.TargetNamespace + "/evidenceretentionpolicies/" + contracts.RetentionBaselineName(installation)
-	raw, err := edit.CoreV1().RESTClient().Get().AbsPath(path).DoRaw(ctx)
-	var policy map[string]any
-	if err != nil || json.Unmarshal(raw, &policy) != nil {
-		t.Fatal("baseline read", err)
-	}
-	policy["spec"].(map[string]any)["maxima"].(map[string]any)["auditMetadataSeconds"] = 1209600
-	body, _ := json.Marshal(policy)
-	if err = edit.CoreV1().RESTClient().Put().AbsPath(path).Body(body).Do(ctx).Error(); err != nil {
-		t.Fatal("administrator baseline edit", err)
-	}
-	sequence, _ = installerHubRetentionReady(t, ctx, api, admin, desired.TargetNamespace, installation, p.RootID, original.Plan.ClusterID, sequence+1)
 	// The hub-worker crash costs about a minute; within the 20-minute split it
 	// runs in the restart run (and the unsplit run) only.
 	if focus := installedJourneyFocus(); focus == "" || focus == "restart" {
@@ -491,7 +499,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		if _, restarted := installerHubRetentionReadyEpoch(t, ctx, api, admin, desired.TargetNamespace, installation, p.RootID, original.Plan.ClusterID, sequence, epoch); restarted == epoch {
 			t.Fatal("restarted hub-worker kept the old retention epoch")
 		}
-		t.Log("baseline edit accepted and hub-worker restart Ready under a new epoch")
+		t.Log("hub-worker restart Ready under a new retention epoch; baseline edit accepted:", !installedFastFixture())
 	}
 	t.Log("promoted owner Ready with download sources, operator public Secret and observation on 9444")
 	// ADR-193 step 5: a regional cluster installed by installer-cluster.
@@ -499,6 +507,10 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	// fresh binding; it reads the public root generated during provider apply.
 	publicAddress := net.JoinHostPort(nodeInternalIP(t, ctx, api, f.Clusters[0].NodeUID), "31450")
 	journey := func(cluster, namespace, workload string, deny func(bool), gone func(string)) {
+		if installedFastFixture() {
+			installedContextStandbyWindow(t, ctx, api, desired.TargetNamespace, prefix+"-owner")
+		}
+		t.Logf("installed focus %q starts (fast fixture %v)", installedJourneyFocus(), installedFastFixture())
 		diagnose := func() {
 			installedSQLActivityDiagnostics(ctx, admin.Query, installation, t.Logf)
 			installedProcessDiagnostics(t, ctx, api, desired.TargetNamespace, prefix+"-owner", prefix+"-worker", contracts.PublisherName(installation))
@@ -1386,6 +1398,36 @@ func installedHubContainers(ctx context.Context, api kubernetes.Interface, names
 		}
 	}
 	return out, ready && len(out) > 0, nil
+}
+
+// installedContextStandbyWindow waits until the hub-api container has run for
+// 35 s since its last start. A regional connector whose context standby was
+// refused at TLS by the replaced process reopens 30 s later (openingRetry), so
+// before that the hub has no idle standby to route a preview to. The full
+// chain's minutes of discovery cover this; the fast fixture's enrollment
+// returns within seconds of the join's hub-api restart.
+func installedContextStandbyWindow(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace, deployment string) {
+	t.Helper()
+	d, err := api.AppsV1().Deployments(namespace).Get(ctx, deployment, meta.GetOptions{})
+	if err != nil {
+		t.Fatal("hub-api deployment", err)
+	}
+	for until := time.Now().Add(2 * time.Minute); ; time.Sleep(time.Second) {
+		pods, err := api.CoreV1().Pods(namespace).List(ctx, meta.ListOptions{LabelSelector: meta.FormatLabelSelector(d.Spec.Selector)})
+		var started time.Time
+		if err == nil && len(pods.Items) == 1 && len(pods.Items[0].Status.ContainerStatuses) == 1 {
+			if r := pods.Items[0].Status.ContainerStatuses[0].State.Running; r != nil && pods.Items[0].Status.ContainerStatuses[0].Ready {
+				started = r.StartedAt.Time
+			}
+		}
+		if !started.IsZero() && time.Since(started) >= 35*time.Second {
+			t.Logf("hub-api running %s since its last start; the regional context standby had its reopening interval", time.Since(started).Round(time.Second))
+			return
+		}
+		if time.Now().After(until) {
+			t.Fatal("hub-api did not stay running for the context standby's reopening interval", err)
+		}
+	}
 }
 
 func installedHubRestarts(t *testing.T, ctx context.Context, api kubernetes.Interface, namespace string) map[string]int32 {

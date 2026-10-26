@@ -1007,6 +1007,22 @@ func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *c
 // clusters. Empty runs everything in one (longer) run.
 func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS") }
 
+// installedFastFixture selects the feature focuses that start from the shortest
+// path to a working installation. They run the same product installation,
+// enrollment and authority steps, but skip the checks that qualify the
+// installation process itself: the interrupted-and-resumed runner, the
+// administrator's baseline edit, the demand-lane sampling, the regional
+// installer rerun, connector restart and source-write denial. Their workload
+// exists before its cluster joins. The journey and clusters focuses (and the unsplit run) keep the full
+// chain; docs/implementation-progress.md records the split.
+func installedFastFixture() bool {
+	switch installedJourneyFocus() {
+	case "policy", "browser", "restart", "upgrade":
+		return true
+	}
+	return false
+}
+
 // installedJourneyRuns counts journey runs in this installation; only the
 // first initializes processing.
 var installedJourneyRuns int

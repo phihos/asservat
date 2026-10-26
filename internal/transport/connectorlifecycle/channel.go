@@ -87,9 +87,9 @@ type HubFrame struct {
 	Owner        *OwnerAuthentication              `json:",omitempty"`
 	// OwnerRegistration answers PurposeOwnerRegistration (ADR-197).
 	OwnerRegistration *value.OwnerRegistrationObservation `json:",omitempty"`
-	Recovery     *value.RecoveryState              `json:",omitempty"`
-	Bootstrap    *value.ClusterBootstrapResult     `json:",omitempty"`
-	Failure      string                            `json:",omitempty"`
+	Recovery          *value.RecoveryState                `json:",omitempty"`
+	Bootstrap         *value.ClusterBootstrapResult       `json:",omitempty"`
+	Failure           string                              `json:",omitempty"`
 }
 
 // RegionFrame answers one hub frame.

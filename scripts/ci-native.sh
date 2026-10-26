@@ -24,7 +24,11 @@ declare -A suites=(
   [continuation]="$context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   # The installed journey in three runs of at most 20 minutes (the unsplit
   # continuation above takes about 25): the first cluster's full journey, the
-  # PostgreSQL restart (ADR-226) and both workload clusters.
+  # PostgreSQL restart (ADR-226) and both workload clusters. The journey and
+  # clusters runs keep the full installation-process checks (interrupted and
+  # resumed runner, baseline edit, demand lane, regional installer rerun and
+  # replay); the browser, restart, upgrade and policy runs use the fast feature
+  # fixture that skips them (installedFastFixture, docs/implementation-progress.md).
   [continuation-journey]="env ASSERVAT_JOURNEY_FOCUS=journey $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   # The console checks of the first cluster's journey (browser submission,
   # console/MCP preview, case, approved extract and native download agreement),

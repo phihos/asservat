@@ -79,6 +79,7 @@ func (r *HubRouter) Attach(ctx context.Context, origin evidence.NativeOrigin, h 
 	}
 	return entry.attach(ctx, origin, h)
 }
+
 // attachBound is the latest Until an attached gate may report. An approved
 // projection gate spans its operation (each frame repeats its complete check);
 // the admission origin's five-second observations bound only that admission.
@@ -182,6 +183,7 @@ func (r *NativeRegistration) Close() {
 		r.router.mu.Unlock()
 	})
 }
+
 // awaitPublished blocks until this process's registration for the worker has
 // been published (its owner waits for attachment), the registration closes,
 // the router closes or ctx ends. True only for a published live registration.

@@ -45,7 +45,9 @@ func TestHubWorkerLatePublishedConversationOutlivesParkWindow(t *testing.T) {
 	}
 	serveCtx, stopServe := context.WithCancel(ctx)
 	served := make(chan error, 1)
-	go func() { served <- native.Serve(serveCtx, listener, roots, syntheticServingCertificate{cert}, handler, 1) }()
+	go func() {
+		served <- native.Serve(serveCtx, listener, roots, syntheticServingCertificate{cert}, handler, 1)
+	}()
 	defer func() { stopServe(); <-served }()
 	client, err := mtls.NewNativeClient("https://"+listener.Addr().String()+contracts.NativeWorkerPath, &tls.Config{RootCAs: roots, Certificates: []tls.Certificate{clientCert}})
 	if err != nil {
