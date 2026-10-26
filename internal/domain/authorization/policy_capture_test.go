@@ -108,3 +108,30 @@ func TestPolicyExecutorPrincipalIsExact(t *testing.T) {
 		}
 	}
 }
+
+func TestPolicyStopNeedsCurrentTeamMaintainerOfTheDelegation(t *testing.T) {
+	a, _, _, now := automationFixture()
+	human, q, _, _ := fixture()
+	q.Target = PolicyScope(a)
+	if r := PolicyStopEligibility(human, q, a, now); !r.Eligible {
+		t.Fatal("current team maintainer could not stop the policy", r)
+	}
+	other := a
+	other.Delegation.UID = "another-binding"
+	if PolicyStopEligibility(human, q, other, now).Eligible {
+		t.Fatal("a maintainer of another binding stopped the policy")
+	}
+	departed := human
+	departed.Groups = nil
+	if PolicyStopEligibility(departed, q, a, now).Eligible {
+		t.Fatal("a departed creator stopped the team policy")
+	}
+	denied := q
+	denied.Denies = []CurrentAssignment{q.Allows[0]}
+	if PolicyStopEligibility(human, denied, a, now).Eligible {
+		t.Fatal("an explicit deny was ignored")
+	}
+	if PolicyStopEligibility(PolicyExecutorIdentity(a, now, now.Add(time.Second)), q, a, now).Eligible {
+		t.Fatal("the executor stopped its own policy")
+	}
+}

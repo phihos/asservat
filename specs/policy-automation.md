@@ -34,6 +34,15 @@ for a separate GitOps or admission submitter. An unchanged source revision canno
 twice, and a retry under the same idempotency key returns the original acceptance. Captures run
 under the policy executor; `get_policy_status` explains the policy without content.
 
+`deactivate_policy` (ADR-229) stops an accepted hub-held policy. It requires the same team authority
+that sponsors activation — a current, undenied workload-maintainer group assignment of the
+delegating AccessBinding — not the creator identity; administrators stop policies through
+Kubernetes (suspend/delete the DebugPolicy or remove the envelope). Deactivation clears the current
+acceptance, so polling stops at the next cycle and every later capture eligibility check refuses
+the executor. It refunds no spend and deletes no occurrence, capture or evidence, is idempotent,
+and is recorded by the encrypted operation audit. Reactivation is a fresh acceptance of a changed
+scope: an unchanged revision is never accepted again.
+
 ## Continued execution and revocation
 
 Protected acceptance must atomically consume the authenticated submission nonce and freeze the exact scope. Replacing an accepted scope explicitly pins its predecessor; retries return the original receipt and cannot reset expiry or counters. Require durable encrypted acceptance audit before eligibility. Keep a current protected policy-source observation as well as current delegation. Source deletion, suspension or unavailable observation stops eligibility. Separate normalized collection intent from the control fields excluded by specs/execution.md: pause/resume and grant attachment never reset authority, while a collection-intent change cannot revive an earlier acceptance by reverting the YAML.

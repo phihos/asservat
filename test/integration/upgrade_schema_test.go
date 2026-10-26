@@ -98,10 +98,24 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer upgrade.Close()
-	// ADR-227 phase 2: the state before (no floor recorded: floor = head) and
-	// the floor the pending migration declares.
+	// ADR-227 phase 2: the state before (the latest floor an applied migration
+	// declared, or the head when none did) and the floor the pending
+	// migration declares.
+	floorMark := regexp.MustCompile(`asservat:oldest-binary-schema=([0-9]+)`)
+	priorFloor := head - 1
+	for _, source := range sources[:len(sources)-1] {
+		b, e := fs.ReadFile(migrations.Files(), filepath.Base(source.Path))
+		if e != nil {
+			t.Fatal(e)
+		}
+		if m := floorMark.FindSubmatch(b); m != nil {
+			if priorFloor, e = strconv.ParseInt(string(m[1]), 10, 64); e != nil {
+				t.Fatal(e)
+			}
+		}
+	}
 	state, e := upgrade.State(ctx)
-	if e != nil || state.Head != head-1 || state.Floor != head-1 || state.Compatible(head) {
+	if e != nil || state.Head != head-1 || state.Floor != priorFloor || state.Compatible(head) {
 		t.Fatal("state before the upgrade", state, e)
 	}
 	// An expand migration leaves the floor; a contract migration declares its
@@ -112,7 +126,7 @@ func TestCustodyUpgradeSchemaWithRealPostgres(t *testing.T) {
 	if e != nil {
 		t.Fatal(e)
 	}
-	if m := regexp.MustCompile(`asservat:oldest-binary-schema=([0-9]+)`).FindSubmatch(headSource); m != nil {
+	if m := floorMark.FindSubmatch(headSource); m != nil {
 		if declared, e = strconv.ParseInt(string(m[1]), 10, 64); e != nil {
 			t.Fatal(e)
 		}

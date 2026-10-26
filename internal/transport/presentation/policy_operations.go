@@ -23,28 +23,33 @@ type PolicyActivationUseCase interface {
 type PolicyStatusUseCase interface {
 	Get(context.Context, identities.CurrentIdentity, string) (value.PolicyStatus, time.Time, error)
 }
+type PolicyDeactivationUseCase interface {
+	Deactivate(context.Context, identities.CurrentIdentity, string) (app.PolicyDeactivationResult, error)
+}
 
-// PolicyOperations serves activate_policy and get_policy_status to MCP and
-// the browser through the same audited operation path.
+// PolicyOperations serves activate_policy, get_policy_status and
+// deactivate_policy to MCP and the browser through the same audited
+// operation path.
 type PolicyOperations struct {
 	origin     string
 	now        func() time.Time
 	newID      func() string
 	activation PolicyActivationUseCase
 	status     PolicyStatusUseCase
+	stop       PolicyDeactivationUseCase
 	contracts  *contracts.InvestigationContracts
 }
 
-func NewPolicyOperations(origin string, now func() time.Time, newID func() string, activation PolicyActivationUseCase, status PolicyStatusUseCase) (*PolicyOperations, error) {
+func NewPolicyOperations(origin string, now func() time.Time, newID func() string, activation PolicyActivationUseCase, status PolicyStatusUseCase, stop PolicyDeactivationUseCase) (*PolicyOperations, error) {
 	u, err := url.Parse(origin)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.Path != "" || activation == nil || status == nil || now == nil || newID == nil {
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.Path != "" || activation == nil || status == nil || stop == nil || now == nil || newID == nil {
 		return nil, ErrOperationsConfiguration
 	}
 	wire, err := contracts.NewInvestigationContracts()
 	if err != nil {
 		return nil, err
 	}
-	return &PolicyOperations{origin: origin, now: now, newID: newID, activation: activation, status: status, contracts: wire}, nil
+	return &PolicyOperations{origin: origin, now: now, newID: newID, activation: activation, status: status, stop: stop, contracts: wire}, nil
 }
 
 func (s *PolicyOperations) PublicOrigin() string {
@@ -54,7 +59,7 @@ func (s *PolicyOperations) PublicOrigin() string {
 	return s.origin
 }
 func (s *PolicyOperations) ToolNames() []string {
-	return []string{"activate_policy", "get_policy_status"}
+	return []string{"activate_policy", "deactivate_policy", "get_policy_status"}
 }
 func (s *PolicyOperations) Tool(name string) (contracts.InvestigationTool, bool) {
 	if s == nil || !slices.Contains(s.ToolNames(), name) {
@@ -63,7 +68,7 @@ func (s *PolicyOperations) Tool(name string) (contracts.InvestigationTool, bool)
 	return s.contracts.Tool(name)
 }
 
-// PolicyOperationInput is the closed input of both operations.
+// PolicyOperationInput is the closed input of the policy operations.
 type PolicyOperationInput struct {
 	PolicyName     string `json:"policy_name"`
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
@@ -76,6 +81,12 @@ type policyActivationData struct {
 	ExpiresAt     time.Time `json:"expires_at"`
 	MaxExecutions int64     `json:"max_executions"`
 	Replay        bool      `json:"replay"`
+}
+type policyDeactivationData struct {
+	PolicyUID    string `json:"policy_uid"`
+	AcceptanceID string `json:"acceptance_id"`
+	State        string `json:"state"`
+	Replay       bool   `json:"replay"`
 }
 type policyExecutor struct {
 	Kind      string `json:"kind"`
@@ -116,12 +127,14 @@ func publicPolicyFailure(err error) OperationFailure {
 	case errors.As(err, &field):
 		// Fixed reviewed reasons with a field path; never a user-authored value.
 		return OperationFailure{"PolicyRejected", "This release cannot activate the policy: " + field.Error() + ".", false}
+	case errors.Is(err, app.ErrPolicyDeactivated):
+		return OperationFailure{"PolicyDeactivated", "This policy revision was deactivated and cannot be activated again, so its spend and expiry are never reset. Change the DebugPolicy to activate a new revision.", false}
 	case errors.Is(err, app.ErrPolicyDelegation):
 		return OperationFailure{"DelegationRequired", "No sole automation AccessBinding covers this workload for one of your groups, or its envelope does not allow pod-status snapshots. Ask a permission administrator to add spec.automation to the team's AccessBinding.", false}
 	case errors.Is(err, value.ErrCapacity):
 		return OperationFailure{"CapacityUnavailable", "The workload cluster already has the maximum number of active policies.", false}
 	case errors.Is(err, value.ErrConflict):
-		return OperationFailure{"Conflict", "This activation conflicts with an earlier one. Use a new idempotency key for a changed policy.", false}
+		return OperationFailure{"Conflict", "This request conflicts with a newer activation of the policy. Check its status and retry.", false}
 	case errors.Is(err, value.ErrChanged):
 		return OperationFailure{"PolicySuspended", "The policy is suspended or being deleted and cannot be activated.", false}
 	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied):
@@ -176,13 +189,27 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 			}
 			out.Data = policyActivationData{PolicyUID: r.PolicyUID, AcceptanceID: r.AcceptanceID, State: state, ExpiresAt: r.NotAfter.UTC(), MaxExecutions: r.MaxExecutions, Replay: r.Replay}
 		}
+	case "deactivate_policy":
+		if !slices.Contains(i.Scopes, "evidence:capture") {
+			noDispatch, operationErr = true, value.ErrDenied
+			break
+		}
+		var r app.PolicyDeactivationResult
+		r, operationErr = s.stop.Deactivate(ctx, current, in.PolicyName)
+		if operationErr == nil {
+			out.Data = policyDeactivationData{PolicyUID: r.PolicyUID, AcceptanceID: r.AcceptanceID, State: "deactivated", Replay: r.Replay}
+		}
 	case "get_policy_status":
 		var st value.PolicyStatus
 		var valid time.Time
 		st, valid, operationErr = s.status.Get(ctx, current, in.PolicyName)
 		if operationErr == nil {
 			until = identity.Earlier(until, valid)
-			data := policyStatusData{PolicyUID: st.PolicyUID, AcceptanceID: st.ActiveID, State: policyState(st, s.now()), Generation: st.Generation, ExpiresAt: st.NotAfter.UTC(), Executor: policyExecutor{"policy", st.PolicyUID}, ExecutionsSpent: st.ExecutionsSpent, MaxExecutions: st.MaxExecutions, WatchedPods: st.WatchedPods, Occurrences: st.Occurrences, Captured: st.Captured, Recent: []policyOccurrenceData{}, Suppressions: []policySuppressionData{}}
+			acceptance := st.ActiveID
+			if acceptance == "" {
+				acceptance = st.DeactivatedID
+			}
+			data := policyStatusData{PolicyUID: st.PolicyUID, AcceptanceID: acceptance, State: policyState(st, s.now()), Generation: st.Generation, ExpiresAt: st.NotAfter.UTC(), Executor: policyExecutor{"policy", st.PolicyUID}, ExecutionsSpent: st.ExecutionsSpent, MaxExecutions: st.MaxExecutions, WatchedPods: st.WatchedPods, Occurrences: st.Occurrences, Captured: st.Captured, Recent: []policyOccurrenceData{}, Suppressions: []policySuppressionData{}}
 			for _, o := range st.Recent {
 				outcome := o.Outcome
 				if outcome == "" {
@@ -221,6 +248,11 @@ func policyState(st value.PolicyStatus, now time.Time) string {
 	switch {
 	case st.Deleted:
 		return "deleted"
+	case st.ActiveID == "" && st.Generation != st.AcceptedGeneration:
+		// Deactivated, but the DebugPolicy has a new revision to activate.
+		return "changed"
+	case st.ActiveID == "":
+		return "deactivated"
 	case st.Suspended:
 		return "suspended"
 	case st.AcceptedIntentVersion != st.IntentVersion:

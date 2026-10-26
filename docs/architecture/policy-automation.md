@@ -39,6 +39,12 @@ acceptance and team delegation. Policy acceptance, source observation, audit ack
 trigger ledger share the ordinary hub credential's `policy-automation` duty (ADR-222). The
 remaining items below still apply to other detectors, intrusive actions and grants.
 
+[ADR-229](../decisions/229-policy-deactivation-and-console.md) adds `PolicyDeactivation`
+(MCP/browser `deactivate_policy`, team-maintainer authority, `PolicyTriggers.DeactivatePolicy`
+clears `policy_source.active_id` under the row lock), the console page `/policies` over the three
+generic policy operations, and runs each tick's captures on one goroutine per policy that
+`PolicyTrigger.Run` joins.
+
 ## Runtime composition still required
 
 C-09 still must supply authenticated ingress, the complete canonical policy compiler and protected supervision of the Kubernetes source journal. The [submission signature components](policy-submissions.md) now provide independently verified post-persistence human submissions and a matching short-lived proof inside SQL acceptance; their protected bootstrap and complete ingress/compiler composition remain pending. The current acceptance facet checks a concrete whole-pod target supplied by those private producers; it is not the finished all-replica policy authoring workflow. C-03 must bind the exact grant/independent reviewer; C-10/C-11 must acquire short signed permits through atomic cumulative capacity/grant/retention/recovery checks. Durable accepted limits are ceilings, not a spending implementation. Carry the acceptance/delegation/source revision into final transactions and local permit renewal. Worker certificates and purpose-specific channels authenticate dispatch; policy principal strings alone do not.

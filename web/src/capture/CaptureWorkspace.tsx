@@ -66,7 +66,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
   useEffect(() => { heading.current?.focus(); }, [state.stage]);
   return <div className="capture-workspace">
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>{title}</h1>
-      {state.stage === 'target' && <p>Choose a production workload or pod, then review the available diagnostics before collecting.</p>}
+      {state.stage === 'target' && <p>Choose a production workload or pod, then review the available diagnostics before collecting. To collect automatically on restarts, use <a href="/policies">automatic policies</a>.</p>}
     </div>
     {state.error && <p role="alert" className="notice">{state.error}</p>}
     {state.stage === 'target' && <form onSubmit={event => { event.preventDefault(); void controller.discover(); }} aria-busy={state.busy}>

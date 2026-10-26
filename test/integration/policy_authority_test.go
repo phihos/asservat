@@ -991,6 +991,60 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("settlement repeated", err)
 		}
 	})
+	t.Run("restart-trigger-deactivation-stops-without-refund-and-never-revives", func(t *testing.T) {
+		s, l := activeTrigger(t)
+		a := custodyID()
+		tick(t, s, l, observed(s, pod(a, 1)))
+		if got := tick(t, s, l, observed(s, pod(a, 2))); len(got) != 1 {
+			t.Fatal("restart did not fire", got)
+		}
+		status, err := l.Status(ctx, s.input.Authority.PolicyUID)
+		if err != nil || status.ActiveID == "" {
+			t.Fatal("status before deactivation", status, err)
+		}
+		accepted := status.ActiveID
+		if _, err := l.DeactivatePolicy(ctx, s.input.Authority.PolicyUID, custodyID()); err == nil {
+			t.Fatal("another acceptance was deactivated")
+		}
+		replay, err := l.DeactivatePolicy(ctx, s.input.Authority.PolicyUID, accepted)
+		if err != nil || replay {
+			t.Fatal("deactivation", replay, err)
+		}
+		if replay, err = l.DeactivatePolicy(ctx, s.input.Authority.PolicyUID, accepted); err != nil || !replay {
+			t.Fatal("repeated deactivation is not a replay", replay, err)
+		}
+		active, err := l.ActivePolicies(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range active {
+			if p.PolicyUID == s.input.Authority.PolicyUID {
+				t.Fatal("deactivated policy still polled")
+			}
+		}
+		if _, err := s.read.AcceptedPolicyAuthority(ctx, s.input.Authority.PolicyUID); err == nil {
+			t.Fatal("deactivated policy kept executor authority")
+		}
+		// A tick that listed the policy before deactivation admits nothing.
+		if got, err := l.Tick(ctx, capture.PolicyTick{Policy: restartPolicy(s), Authority: s.input.Authority, Observation: observed(s, pod(a, 3))}); err == nil || len(got) != 0 {
+			t.Fatal("deactivated policy fired", got, err)
+		}
+		status, err = l.Status(ctx, s.input.Authority.PolicyUID)
+		if err != nil || status.ActiveID != "" || status.DeactivatedID != accepted || status.ExecutionsSpent != 1 || status.Occurrences != 1 {
+			t.Fatal("deactivated status", status, err)
+		}
+		// The unchanged scope is never accepted again, so spend cannot reset.
+		s.input.Submission.Nonce = custodyID()
+		s.input.Submission.ReplacesID = ""
+		s.input.Submission.IssuedAt = clock()
+		s.input.Submission.ExpiresAt = s.input.Submission.IssuedAt.Add(30 * time.Second)
+		s.input.Recovery.ObservedAt, s.input.Recovery.FreshUntil = clock(), clock().Add(5*time.Second)
+		s.input.Author.VerifiedAt, s.input.Author.ValidUntil = clock(), clock().Add(30*time.Second)
+		s.input.Verification = syntheticSubmissionCheck(s.input, clock())
+		if _, err := s.accept.AcceptPolicy(ctx, s.input); err == nil {
+			t.Fatal("deactivated scope accepted again")
+		}
+	})
 	t.Run("restart-trigger-refuses-stale-suspended-or-replaced-scope", func(t *testing.T) {
 		for _, mode := range []string{"suspended", "stale", "other-workload", "other-scope", "unaudited"} {
 			t.Run(mode, func(t *testing.T) {

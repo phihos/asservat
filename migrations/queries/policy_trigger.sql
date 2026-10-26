@@ -76,3 +76,9 @@ ORDER BY b.basis_key LIMIT 2;
 
 -- name: FindPolicyOccurrence :one
 SELECT id FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND restarts=$4;
+
+-- name: DeactivatePolicySource :execrows
+UPDATE policy_source SET active_id=NULL WHERE root_id=$1 AND policy_uid=$2 AND active_id=$3;
+
+-- name: LatestPolicyAcceptance :one
+SELECT * FROM policy_acceptance WHERE root_id=$1 AND policy_uid=$2 ORDER BY accepted_at DESC, id DESC LIMIT 1;

@@ -1,6 +1,6 @@
 {
   "name": "get_policy_status",
-  "description": "Explain an activated restart-trigger policy without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing.",
+  "description": "Explain an activated or deactivated restart-trigger policy without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -109,6 +109,7 @@
                   "state": {
                     "enum": [
                       "active",
+                      "deactivated",
                       "suspended",
                       "changed",
                       "expired",

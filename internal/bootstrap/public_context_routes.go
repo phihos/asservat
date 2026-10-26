@@ -89,7 +89,7 @@ func (h *publicContextRoutes) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		h.fleet.ServeHTTP(w, r)
 	case path == browser.ProcessingChangesPath && h.processing != nil:
 		h.processing.ServeHTTP(w, r)
-	case path == "/" || strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/captures/") || strings.HasPrefix(path, "/cases/"):
+	case path == "/" || path == "/policies" || strings.HasPrefix(path, "/assets/") || strings.HasPrefix(path, "/captures/") || strings.HasPrefix(path, "/cases/"):
 		// The bounded console handler validates its exact asset/UUID route set.
 		h.console.ServeHTTP(w, r)
 	default:

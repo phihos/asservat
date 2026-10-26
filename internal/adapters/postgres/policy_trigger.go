@@ -55,6 +55,10 @@ func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value
 		if err != nil {
 			return err
 		}
+		if !row.ActiveID.Valid {
+			// Deactivated (ADR-229) after this cycle listed the policy.
+			return value.ErrUnavailable
+		}
 		accepted, err := q.ReadPolicyAcceptance(ctx, custodydb.ReadPolicyAcceptanceParams{RootID: id(s.root), ID: row.ActiveID})
 		if err != nil {
 			return err
@@ -308,10 +312,17 @@ func (s *PolicyTriggers) Status(ctx context.Context, policy string) (value.Polic
 			}
 			out.Creator = &creator
 		}
-		if !row.ActiveID.Valid {
-			return nil
+		var accepted custodydb.PolicyAcceptance
+		if row.ActiveID.Valid {
+			accepted, err = q.ReadPolicyAcceptance(ctx, custodydb.ReadPolicyAcceptanceParams{RootID: id(s.root), ID: row.ActiveID})
+		} else {
+			// A cleared active_id with an earlier acceptance is a deactivated
+			// policy (ADR-229); without one it was never accepted.
+			accepted, err = q.LatestPolicyAcceptance(ctx, custodydb.LatestPolicyAcceptanceParams{RootID: id(s.root), PolicyUid: policy})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
 		}
-		accepted, err := q.ReadPolicyAcceptance(ctx, custodydb.ReadPolicyAcceptanceParams{RootID: id(s.root), ID: row.ActiveID})
 		if err != nil {
 			return err
 		}
@@ -320,7 +331,13 @@ func (s *PolicyTriggers) Status(ctx context.Context, policy string) (value.Polic
 			return err
 		}
 		a := record.Authority
-		out.ActiveID, out.Authority, out.ExecutionsSpent, out.MaxExecutions, out.NotAfter, out.AcceptedIntentVersion = record.ID, a, accepted.ExecutionsSpent, a.Limits.MaxExecutions, a.NotAfter.UTC(), record.IntentVersion
+		if !row.ActiveID.Valid {
+			out.DeactivatedID = record.ID
+		}
+		if row.ActiveID.Valid {
+			out.ActiveID = record.ID
+		}
+		out.Authority, out.ExecutionsSpent, out.MaxExecutions, out.NotAfter, out.AcceptedIntentVersion, out.AcceptedGeneration = a, accepted.ExecutionsSpent, a.Limits.MaxExecutions, a.NotAfter.UTC(), record.IntentVersion, record.Source.Revision.Generation
 		out.ClusterID, out.NamespaceUID, out.WorkloadUID = a.ClusterID, a.NamespaceUID, a.WorkloadUID
 		if out.WatchedPods, err = q.CountPolicyWatermarks(ctx, custodydb.CountPolicyWatermarksParams{RootID: id(s.root), PolicyUid: policy}); err != nil {
 			return err
@@ -357,6 +374,58 @@ func (s *PolicyTriggers) Status(ctx context.Context, policy string) (value.Polic
 		return value.PolicyStatus{}, captureError(err)
 	}
 	return out, nil
+}
+
+// DeactivatePolicy clears the policy's current acceptance (ADR-229) under the
+// policy-source row lock, so a tick after it admits nothing and every
+// capture eligibility check refuses the executor. It refunds no spend and
+// deletes no occurrence, capture or evidence. Repeating it for the same,
+// already deactivated acceptance is a replay; another current acceptance (a
+// concurrent replacement) is a conflict.
+func (s *PolicyTriggers) DeactivatePolicy(ctx context.Context, policy, acceptance string) (bool, error) {
+	replay := false
+	if s == nil || !identity.Text(policy, 64) || !authorization.UUID(acceptance) {
+		return false, value.ErrInvalid
+	}
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		replay = false
+		row, err := q.LockPolicySource(ctx, custodydb.LockPolicySourceParams{RootID: id(s.root), PolicyUid: policy})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return value.ErrUnavailable
+		}
+		if err != nil {
+			return err
+		}
+		if row.ActiveID.Valid {
+			if uid(row.ActiveID) != acceptance {
+				return value.ErrConflict
+			}
+			n, err := q.DeactivatePolicySource(ctx, custodydb.DeactivatePolicySourceParams{RootID: id(s.root), PolicyUid: policy, ActiveID: row.ActiveID})
+			if err != nil {
+				return err
+			}
+			if n != 1 {
+				return value.ErrConflict
+			}
+			return nil
+		}
+		latest, err := q.LatestPolicyAcceptance(ctx, custodydb.LatestPolicyAcceptanceParams{RootID: id(s.root), PolicyUid: policy})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return value.ErrUnavailable
+		}
+		if err != nil {
+			return err
+		}
+		if uid(latest.ID) != acceptance {
+			return value.ErrConflict
+		}
+		replay = true
+		return nil
+	})
+	if err != nil {
+		return false, captureError(err)
+	}
+	return replay, nil
 }
 
 // Delegation resolves the sole automation-bearing AccessBinding whose scope

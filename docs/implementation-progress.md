@@ -1,5 +1,47 @@
 # Sustained implementation progress
 
+## Policy deactivation, console policy page, off-loop captures (ADR-229, 2026-10-26)
+
+[ADR-229](decisions/229-policy-deactivation-and-console.md): new MCP/browser operation
+`deactivate_policy` (team-maintainer authority of the delegating AccessBinding plus
+`evidence:capture`; `PolicyStopEligibility`). It clears `policy_source.active_id` under the row
+lock, so polling stops at the next cycle, an in-flight tick is refused and every later capture
+eligibility check refuses the executor; no spend refund, no deletion, idempotent (replay), audited
+by the existing two-phase encrypted operation audit. `get_policy_status` reports `deactivated` from
+the latest acceptance; `activate_policy` refuses an unchanged deactivated revision as
+`PolicyDeactivated` (reactivation needs a changed DebugPolicy). Migration 00083 (schema 83, floor
+81) only adds the operation name to the two operation-audit SQL functions; older binaries already
+treat a cleared `active_id` as not accepted. Console: new `/policies` page (name lookup, status,
+Activate/Deactivate over the generic operation route with CSRF and one idempotency key per pending
+command; shared `postOperation` in `capture/http.ts`; no new dependency). The trigger now runs each
+tick's captures on one goroutine per policy, joined by `Run`; a busy policy is skipped for that
+cycle and its restarts coalesce. Limitations: no policy listing operation (the user names the
+policy; listing needs `list` on hub DebugPolicies); concurrent captures of several policies against
+one cluster's standby budget are not natively qualified (the installed run has one policy).
+
+Verification (each run under 20 minutes):
+- `ASSERVAT_JOURNEY_FOCUS=policy` (installer continuation): PASS, go test 813 s. Activation 6 s
+  after start, capture downloaded (354 bytes) 52 s after start; storm 11 kills, 11 observed
+  restarts, 2 occurrences, 10 suppressed, 1 suppression row, 3 watermark rows; deactivated 2m57s
+  after start; one further kill, 51 s later, changed no watermark, occurrence, suppression count or
+  spend; repeat was a replay; status `deactivated`. Source unchanged, no cleanup failures. The
+  first run (go test 781 s) failed only on the test's own `captured == 1` assertion after the
+  storm's second capture; deactivation behaved the same. Fixed to compare with the ledger.
+- `ASSERVAT_JOURNEY_FOCUS=browser` (the capture page and `capture/http.ts` changed): PASS, go test
+  748 s; console and MCP previews, case, extract and native download agree as before.
+- Custody (real PostgreSQL, compiled hub-runtime grants):
+  `--run '^(TestPermissionAuthorityPoliciesWithRealServices|TestCustodyUpgradeSchemaWithRealPostgres)$'`
+  35 PASS, including the new `restart-trigger-deactivation-stops-without-refund-and-never-revives`.
+  The upgrade test first failed: it assumed no floor was recorded before the head migration, which
+  stopped holding with two consecutive expand migrations; it now derives the prior floor from the
+  applied migrations' declarations.
+- `go test` of internal/transport, domain, application, contracts, bootstrap, console and
+  adapters/postgres: PASS; `-race` for application/capture, transport/presentation,
+  domain/authorization and domain/audit: PASS. `go vet ./...`, go-architecture-check, sql-check,
+  spec-check, architecture-check, design-check and console-check (13 files, 171 tests, native ESM
+  policy validators) PASS. `make console-browser-check`: PASS (19 journeys, 15 accessibility
+  scans; the existing journeys do not yet open `/policies`, which is covered by vitest only). Helm unchanged (no helm-check needed).
+
 ## Restart-triggered policy captures, first S-03 increment (ADR-228, 2026-10-26)
 
 [ADR-228](decisions/228-restart-triggered-policy-captures.md): a hub-held DebugPolicy with one

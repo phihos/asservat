@@ -124,6 +124,15 @@ workload budget is admitted, every other observed restart is counted as suppress
 holds at most one watermark per Pod and one suppression row per reason, and no capture follows
 once the restarts stop.
 
+### SC-TRG-009
+
+Given an activated restart policy that has already captured, when a current maintainer of its
+delegating team deactivates it (ADR-229), then the next poll cycle no longer observes the workload:
+a further container kill changes no watermark, occurrence, suppression count or execution spend;
+the existing capture and its evidence remain; repeating the deactivation is a replay; status
+reports `deactivated`; and activating the unchanged revision again is refused, so its spend and
+expiry cannot be reset.
+
 ## Trigger-to-action lifecycle
 
 A detector firing is an occurrence signal, not a request to restart every collector. [Action lifecycle](action-lifecycle.md) resolution produces already armed ongoing sources and onTrigger actions. After ordinary admission, preserve matching source windows and dispatch independent onTrigger work. Cooldowns/deduplication suppress saves and actions while admitted continuous observation can continue. A late event or pending dump approval never shifts an existing window forward. Source readiness/coverage is separate from detector freshness and per-incident selection; missing required source history is visible while permitted context proceeds.
