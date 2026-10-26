@@ -45,7 +45,7 @@ func NewPolicyTriggers(ctx context.Context, pool *pgxpool.Pool, root, installati
 // ceiling all hold before an occurrence exists.
 func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value.PolicyOccurrence, error) {
 	a, o := in.Authority, in.Observation
-	if s == nil || !in.Policy.Valid() || a.InstallationID != s.installation || o.ClusterID != a.ClusterID || o.Namespace.UID != a.NamespaceUID || o.Workload.UID != a.WorkloadUID || in.Policy.ClusterID != a.ClusterID || len(o.Pods) > in.Policy.ObservedPods || o.Probe != in.Policy.Request().Probe {
+	if s == nil || !in.Policy.Valid() || a.InstallationID != s.installation || o.ClusterID != a.ClusterID || o.Namespace.UID != a.NamespaceUID || o.Workload.UID != a.WorkloadUID || in.Policy.ClusterID != a.ClusterID || len(o.Pods) > in.Policy.ObservedPods || o.Probe != in.Policy.Request().Probe || o.Alert != in.Policy.Request().Alert {
 		return nil, value.ErrInvalid
 	}
 	detector := in.Policy.Kind()

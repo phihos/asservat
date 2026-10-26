@@ -122,7 +122,7 @@ export interface components {
                     /** Format: date-time */
                     created_at: string;
                     /** @enum {unknown} */
-                    detector: "exit" | "probe";
+                    detector: "exit" | "probe" | "alert";
                     /** Format: date-time */
                     failed_at?: string;
                 }[];
@@ -138,7 +138,7 @@ export interface components {
                 /** @description The current DebugPolicy's detector configuration (no observed content). */
                 detector?: {
                     /** @enum {unknown} */
-                    kind: "exit" | "probe";
+                    kind: "exit" | "probe" | "alert";
                     reasons?: ("CrashLoopBackOff" | "Error" | "OOMKilled")[];
                     exit_codes?: number[];
                     /** @enum {unknown} */

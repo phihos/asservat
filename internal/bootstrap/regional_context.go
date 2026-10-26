@@ -71,7 +71,7 @@ func validRegionalAPIContext(c contracts.RegionalDeployment) bool {
 	if !ownerEndpoint(s.Endpoint) || !identity.Text(s.Region, 128) || !identity.Text(s.Bucket, 63) || !authorization.UUID(s.StoreID) || !ownerEndpoint(k.Endpoint) || !(authorization.KeyScope{InstallationID: c.InstallationID, Purpose: "artifact", KeyID: k.KeyID}).Valid() {
 		return false
 	}
-	if !ownerDialAddress(a.Owners.Address) {
+	if !ownerDialAddress(a.Owners.Address) || a.Alertmanager != "" && !kube.AlertmanagerURL(a.Alertmanager) {
 		return false
 	}
 	_, err := regionalOwnerPool(c, a.Owners.Configuration)
@@ -170,6 +170,13 @@ func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in 
 	}
 	if out.targets, err = kube.NewAPIContextTargets(observer); err != nil {
 		return nil, closers, mounts.ErrUnavailable
+	}
+	if a.Alertmanager != "" {
+		alerts, err := kube.NewAlertmanager(a.Alertmanager)
+		if err != nil {
+			return nil, closers, mounts.ErrUnavailable
+		}
+		out.targets = out.targets.WithAlertmanager(alerts)
 	}
 	if out.collector, err = kube.NewAPIContextClient(in.kubernetes("kube-observer.token")); err != nil {
 		return nil, closers, mounts.ErrUnavailable

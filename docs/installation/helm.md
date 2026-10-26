@@ -256,6 +256,16 @@ that the API is served before creating installation resources and reports
 does not validate the CRD schema or confer runtime authority. The operator
 or Helm retains CRD ownership; the installer creates or adopts no CRDs.
 
+Alert DebugPolicies ([ADR-231](../decisions/231-alert-detector.md)) read the
+cluster's own Alertmanager. To enable them, add
+`--set cluster.alertmanager=http://alertmanager-operated.monitoring.svc:9093`
+(or `installer-cluster --alertmanager URL`) with an executor offer. The
+connector sends unauthenticated `GET /api/v2/alerts` requests to that address;
+it follows no redirect and sends no credential. Alert rules must label alerts
+with the Pod's `namespace` and `pod`. The address is a fixed regional input:
+choose it at installation. Without it, activating an alert policy on that
+cluster is refused with `DetectorUnavailable`.
+
 The regional cluster needs outbound HTTPS to the federation endpoint in the
 offer. The hub operator can pin the federation's node port with
 `federation.nodePort` so the endpoint is known before installation. If the

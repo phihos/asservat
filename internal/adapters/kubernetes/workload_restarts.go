@@ -53,12 +53,17 @@ type restartState struct {
 // reads the namespace, the workload, one bounded Pod LIST and the owning
 // ReplicaSets of a Deployment: no new privilege beyond workload resolution.
 // A probe request (ADR-230) adds one namespace Event LIST (Events `list`).
+// An alert request (ADR-231) adds one GET of the configured Alertmanager; a
+// region without one answers ErrUnsupported.
 // A truncated or partial LIST fails (ErrLimit/ErrUnavailable): the hub then
 // treats the poll as Unknown and fires nothing.
 func (c *PodTargets) ObserveWorkloadRestarts(ctx context.Context, r value.RestartRequest) (value.RestartObservation, error) {
 	var zero value.RestartObservation
 	if !r.Valid() || r.ClusterID != c.client.clusterID || len(validation.IsDNS1123Label(r.Namespace)) != 0 || len(validation.IsDNS1123Subdomain(r.Name)) != 0 {
 		return zero, value.ErrInvalid
+	}
+	if r.Alert && c.alerts == nil {
+		return zero, value.ErrUnsupported
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
@@ -175,6 +180,12 @@ func (c *PodTargets) ObserveWorkloadRestarts(ctx context.Context, r value.Restar
 			return zero, err
 		}
 		out.Probe = r.Probe
+	}
+	if r.Alert {
+		if err = c.alerts.firing(ctx, ns.Name, r.AlertLabels, start, out.Pods); err != nil {
+			return zero, err
+		}
+		out.Alert = true
 	}
 	out.ObservedAt = start
 	out.FreshUntil = start.Add(5 * time.Second)

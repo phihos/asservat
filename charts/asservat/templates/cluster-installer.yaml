@@ -9,6 +9,7 @@
 {{- $executor := and (hasKey $offer "owners") (hasKey $offer "keyService") (hasKey $offer "workKey") (hasKey $offer "evidenceStore") }}
 {{- if and $executor (eq ($c.evidenceSecret | default "") "") }}{{ fail "cluster.evidenceSecret is required when the offer names the regional executor" }}{{ end }}
 {{- if and (not $executor) (ne ($c.evidenceSecret | default "") "") }}{{ fail "cluster.evidenceSecret requires an offer naming the regional executor" }}{{ end }}
+{{- if and (not $executor) (ne ($c.alertmanager | default "") "") }}{{ fail "cluster.alertmanager requires an offer naming the regional executor" }}{{ end }}
 {{- $name := printf "%s-cluster-installer" .Release.Name }}
 {{- $role := printf "%s-%s" .Release.Namespace $name }}
 # The release-scoped installer account: the connector guards' explicit trusted
@@ -138,7 +139,7 @@ spec:
         - name: installer
           image: {{ $c.image }}
           imagePullPolicy: IfNotPresent
-          command: [/asservat, installer-cluster, --in-cluster, --offer, /run/asservat/cluster/regional-offer.json, --bootstrap, /run/asservat/cluster/bootstrap.json, --namespace, {{ $c.namespace }}{{ if $executor }}, --evidence-credential, /run/asservat/cluster/evidence-storage.json{{ end }}]
+          command: [/asservat, installer-cluster, --in-cluster, --offer, /run/asservat/cluster/regional-offer.json, --bootstrap, /run/asservat/cluster/bootstrap.json, --namespace, {{ $c.namespace }}{{ if $executor }}, --evidence-credential, /run/asservat/cluster/evidence-storage.json{{ end }}{{ if $c.alertmanager }}, --alertmanager, {{ $c.alertmanager | quote }}{{ end }}]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

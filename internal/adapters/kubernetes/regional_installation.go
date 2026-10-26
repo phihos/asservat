@@ -59,6 +59,9 @@ type RegionalInstallPlan struct {
 	// (OwnerStorageCredential JSON). It is required exactly when the offer
 	// names the regional executor (ADR-196 decision 7).
 	Evidence []byte
+	// Alertmanager is the optional in-cluster Alertmanager base URL that
+	// alert policies read (ADR-231); only an executor uses it.
+	Alertmanager string
 }
 
 // RegionalInstallation records the created objects by UID.
@@ -80,7 +83,7 @@ func (p RegionalInstallPlan) valid() bool {
 // executor offer, and a digest-pinned image for the executor's pins.
 func (p RegionalInstallPlan) executorValid() bool {
 	executor, err := p.Offer.RegionalExecutorOffered()
-	if err != nil || executor != (len(p.Evidence) > 0) {
+	if err != nil || executor != (len(p.Evidence) > 0) || p.Alertmanager != "" && (!executor || !AlertmanagerURL(p.Alertmanager)) {
 		return false
 	}
 	if !executor {
@@ -332,7 +335,7 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 		apiContext = &contracts.RegionalAPIContext{Settings: RegionalSettings, SettingsGuard: x.settingsGuard,
 			Starts:    contracts.OwnerDeploymentAPIContextStarts{CapacityAccount: ref(x.capacity.ObjectMeta), ExecutionAccount: out.Account, CapacityAudience: x.audience},
 			WorkTrust: x.trust, WorkTrustGuard: x.trustGuard, TrustSettings: x.trustSettings,
-			EvidenceStore: *p.Offer.EvidenceStore, KeyService: *p.Offer.KeyService, Owners: *p.Offer.Owners, Concurrency: RegionalExecutorConcurrency}
+			EvidenceStore: *p.Offer.EvidenceStore, KeyService: *p.Offer.KeyService, Owners: *p.Offer.Owners, Concurrency: RegionalExecutorConcurrency, Alertmanager: p.Alertmanager}
 	}
 	inputs, err := json.Marshal(contracts.RegionalDeployment{Format: contracts.RegionalDeploymentFormat, InstallationID: b.InstallationID, ClusterID: b.ClusterID, PermissionRootID: p.Offer.PermissionRootID, IssuerEpoch: b.IssuerEpoch, PeerID: b.PeerID,
 		Namespace: out.Namespace, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.default.svc", Roots: roots}, Deployment: out.Deployment, WorkloadGuard: out.WorkloadGuard, ConfigurationProbes: probes,

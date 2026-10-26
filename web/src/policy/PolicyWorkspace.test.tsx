@@ -7,14 +7,14 @@ import { validOutput_get_policy_status, validOutput_deactivate_policy, validOutp
 import { id, result, session } from '../capture/test-fixtures';
 
 // Synthetic, content-free policy fixtures for unit tests only.
-const status = (state: string, probe = false) => result<'get_capture'>({
+const status = (state: string, kind: 'exit' | 'probe' | 'alert' = 'exit') => result<'get_capture'>({
   policy_uid: 'policy-uid', acceptance_id: id(9), state, generation: 1, expires_at: new Date(Date.now() + 3_600_000).toISOString(),
   executor: { kind: 'policy', policy_uid: 'policy-uid' }, executions_spent: 2, max_executions: 10, watched_pods: 3, occurrences: 2, captured: 1,
-  recent: [probe
-    ? { occurrence_id: id(10), capture_id: id(8), outcome: 'captured', detector: 'probe', failed_at: '2026-10-26T12:00:00Z', created_at: new Date().toISOString() }
+  recent: [kind !== 'exit'
+    ? { occurrence_id: id(10), capture_id: id(8), outcome: 'captured', detector: kind, failed_at: '2026-10-26T12:00:00Z', created_at: new Date().toISOString() }
     : { occurrence_id: id(10), capture_id: id(8), outcome: 'captured', detector: 'exit', restarts: 1, created_at: new Date().toISOString() }],
   suppressions: [{ reason: 'cooldown', count: 10, first_at: new Date().toISOString(), last_at: new Date().toISOString() }],
-  detector: probe ? { kind: 'probe', probe_type: 'Readiness', minimum_failures: 2, window_seconds: 60 } : { kind: 'exit', reasons: ['Error', 'OOMKilled'] },
+  detector: kind === 'probe' ? { kind: 'probe', probe_type: 'Readiness', minimum_failures: 2, window_seconds: 60 } : kind === 'alert' ? { kind: 'alert' } : { kind: 'exit', reasons: ['Error', 'OOMKilled'] },
 }) as unknown as Output<'get_policy_status'>;
 const failure = (code: string, message: string) => ({ ...result<'get_capture'>({}), status: 'error', data: { code, message, retryable: false } }) as unknown as Output<Operation>;
 
@@ -22,12 +22,12 @@ class SyntheticPolicies implements Operations {
   calls: { name: Operation; input: unknown; csrf: string }[] = [];
   state = 'active';
   unknown = false;
-  probe = false;
+  kind: 'exit' | 'probe' | 'alert' = 'exit';
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), csrf });
     if (name === 'deactivate_policy') { this.state = 'deactivated'; return result({ policy_uid: 'policy-uid', acceptance_id: id(9), state: 'deactivated', replay: false }) as unknown as Output<N>; }
     if (name === 'activate_policy') return failure('PolicyDeactivated', 'This policy revision was deactivated and cannot be activated again.') as Output<N>;
-    return (this.unknown ? failure('NotAvailable', 'Not available.') : status(this.state, this.probe)) as Output<N>;
+    return (this.unknown ? failure('NotAvailable', 'Not available.') : status(this.state, this.kind)) as Output<N>;
   }
 }
 
@@ -41,7 +41,8 @@ function mount() {
 
 it('fixtures match the canonical policy contracts', () => {
   expect(validOutput_get_policy_status(status('deactivated'))).toBe(true);
-  expect(validOutput_get_policy_status(status('active', true))).toBe(true);
+  expect(validOutput_get_policy_status(status('active', 'probe'))).toBe(true);
+  expect(validOutput_get_policy_status(status('active', 'alert'))).toBe(true);
   expect(validOutput_deactivate_policy(result({ policy_uid: 'policy-uid', acceptance_id: id(9), state: 'deactivated', replay: true }))).toBe(true);
   expect(validOutput_activate_policy(failure('PolicyDeactivated', 'x'))).toBe(true);
 });
@@ -73,11 +74,21 @@ it('shows content-free status and deactivates with CSRF and one idempotency key'
 
 it('names the detector and shows a probe occurrence by its failure time', async () => {
   const { client } = mount();
-  client.probe = true;
+  client.kind = 'probe';
   fireEvent.change(screen.getByLabelText('Policy name'), { target: { value: 'regional-probes' } });
   fireEvent.click(screen.getByRole('button', { name: 'Show policy' }));
   expect(await screen.findByText('Readiness probe failures: 2 failures within 60 s (Kubernetes Events)')).toBeTruthy();
   expect(screen.getByText(/probe failure at/)).toBeTruthy();
+  expect(screen.queryByText(/\(restart /)).toBeNull();
+});
+
+it('names the alert detector and shows an alert occurrence by its start time', async () => {
+  const { client } = mount();
+  client.kind = 'alert';
+  fireEvent.change(screen.getByLabelText('Policy name'), { target: { value: 'regional-alerts' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Show policy' }));
+  expect(await screen.findByText('Firing Alertmanager alerts naming a pod of the workload')).toBeTruthy();
+  expect(screen.getByText(/alert started at/)).toBeTruthy();
   expect(screen.queryByText(/\(restart /)).toBeNull();
 });
 

@@ -3400,6 +3400,7 @@ components:
                         enum:
                         - exit
                         - probe
+                        - alert
                       failed_at:
                         type: string
                         format: date-time
@@ -3411,7 +3412,9 @@ components:
                     if:
                       properties:
                         detector:
-                          const: probe
+                          enum:
+                          - probe
+                          - alert
                     then:
                       required:
                       - failed_at
@@ -3463,6 +3466,7 @@ components:
                       enum:
                       - exit
                       - probe
+                      - alert
                     reasons:
                       type: array
                       maxItems: 3

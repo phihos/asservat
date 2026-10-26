@@ -1,5 +1,49 @@
 # Sustained implementation progress
 
+## Alert trigger from the in-cluster Alertmanager API (ADR-231, 2026-10-26)
+
+[ADR-231](decisions/231-alert-detector.md) implements the `alert` detector that ADR-230
+recommended, choosing the pull: an alert policy's 15-second `observe-workload-restarts` poll adds
+one `GET /api/v2/alerts?active=true&silenced=false&inhibited=false&filter=namespace="<ns>"` of the
+target cluster's in-cluster Alertmanager, made by the regional connector. The address is
+installation-owned regional configuration (`cluster.alertmanager` → `installer-cluster
+--alertmanager` → `RegionalAPIContext.alertmanager`, executor only, no credentials); a region
+without it answers `unsupported` and activation is refused (`DetectorUnavailable`). Alerts map to
+Pods by their `namespace` and `pod` labels plus optional `matchLabels`; alerts without a `pod`
+label are ignored. Only the per-Pod count of matching alerts and the newest `startsAt` second
+leave the region. The level reuses `ProbeDelta` (one occurrence per rising edge keyed by the
+newest `startsAt`, re-arm at a poll without a matching alert, disarmed baseline when firing at
+activation). Unreachable, non-200/redirect, > 1 MiB or > 1024 alerts, or malformed answers are
+the existing Unknown. `eventWindow`, `status: resolved`, other `receiverRef`s and `rearmFor`
+above 15 s are rejected with their field paths. Migration 00085 (schema 85, floor 81) widens the
+detector CHECKs. Status and the console report `alert` and the alert start as `failed_at`. No
+new Kubernetes privilege, hub endpoint, credential or degraded state.
+
+Verification (each run under 20 minutes; tracked test/results files restored after each run):
+- Unit: `go test` of domain, application/capture, transport and the Kubernetes adapter
+  `-run 'Alert|WorkloadRestart|WorkloadProbe|Regional'` (fake Alertmanager HTTP server: mapping,
+  label mismatch, foreign namespace/Pod, no pod label, suppressed, future startsAt, unconfigured,
+  unreachable, 503, redirect, > 1 MiB, > 1024 alerts, malformed; no alert text in the answer):
+  PASS. `-race` for domain/capture, domain/targets, application/capture, transport/presentation,
+  transport/contextstart, adapters/mtls, adapters/postgres, bootstrap (66 s) and the Kubernetes
+  adapter `-run 'Policy|WorkloadRestart|WorkloadProbe|WorkloadAlert|Alertmanager|Regional|PodTargets|NamedWorkload|HubHeld|WorkloadTarget'`: PASS.
+- `make pre-push`: PASS on the second attempt (17 s, cached Go). The first failed spec-check (the
+  canonical schema requires `rearmFor` whenever `evaluation` is present, so alerts now accept
+  `rearmFor` up to one 15 s poll instead of rejecting it) and go-architecture-check (`maps` is not a
+  permitted domain import). `make helm-check`: PASS. Console `npm run check`: 13 files, 174 tests.
+- Custody (real PostgreSQL, compiled hub-runtime grants):
+  `--run '^(TestPermissionAuthorityPoliciesWithRealServices|TestCustodyUpgradeSchemaWithRealPostgres)$'`
+  42 PASS, 0 FAIL (54 s), including the new `alert-trigger-episode-rearm-and-detector-switch`;
+  source unchanged, no cleanup failures. `--initial-installation`: 85 PASS (147 s).
+- Installed `ASSERVAT_JOURNEY_FOCUS=policy` (unchanged test, regression only): PASS, go test
+  706 s, harness wall 13 m 45 s; probe capture 58 s after start, restart capture and download,
+  storm of 11 kills with 8 suppressed, deactivation; source unchanged, no cleanup failures.
+- Not qualified: no installed run reads a real Alertmanager. Extending the policy focus would need
+  an Alertmanager stub image in the fast fixture, the new regional input in its regional install,
+  and a second workload, because the probe occurrence and first exit capture already spend the
+  shared workload burst. Alert detection against a live Alertmanager (HA pair, route prefix, TLS)
+  remains a gap.
+
 ## Probe-failure trigger; log and resource detectors paused (ADR-230, 2026-10-26)
 
 [ADR-230](decisions/230-s03-detectors.md) gates every detector of the trigger catalogue with the
