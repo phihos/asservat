@@ -115,6 +115,9 @@ export interface components {
                     phase: string;
                     /** Format: date-time */
                     expires_at: string;
+                    revision?: number;
+                    created_by?: components["schemas"]["Contract_common_0e44f1278c675a38"];
+                    managed_by?: components["schemas"]["Contract_common_0e44f1278c675a38"][];
                     origin?: {
                         sharingIntentID: components["schemas"]["Contract_common_2224a31324a0c811"];
                         captureUID: string;
