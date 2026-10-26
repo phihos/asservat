@@ -191,13 +191,13 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 	step = "rbac"
 	clusterRole, role := regionalRBAC(p.Namespace)
 	if executor {
-		cluster, connector, capacity := regionalExecutorRBAC(p.Namespace)
+		cluster, connector, capacityRole := regionalExecutorRBAC(p.Namespace)
 		clusterRole.Rules = append(clusterRole.Rules, cluster...)
 		role.Rules = append(role.Rules, connector...)
 		if capacity != nil {
 			clusterRole.Rules = append(clusterRole.Rules, regionalCapacityRBAC(p.Namespace)...)
 		}
-		if _, err = ensureRegional(call, api.RbacV1().Roles(p.Namespace), capacity, marker); err != nil {
+		if _, err = ensureRegional(call, api.RbacV1().Roles(p.Namespace), capacityRole, marker); err != nil {
 			return out, err
 		}
 		if _, err = ensureRegional(call, api.RbacV1().RoleBindings(p.Namespace), &rbac.RoleBinding{ObjectMeta: meta.ObjectMeta{Name: RegionalCapacityAccount}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: RegionalCapacityAccount}, Subjects: []rbac.Subject{{Kind: "ServiceAccount", Namespace: p.Namespace, Name: RegionalCapacityAccount}}}, marker); err != nil {
