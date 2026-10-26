@@ -57,7 +57,13 @@ if [[ ${1:-} == --list ]]; then
   printf '%s\n' "${!suites[@]}" | sort | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))'
   exit
 fi
-command=${suites[${1:?suite}]:?unknown suite $1}
+# context exists only for filtered dispatch (ci-native.sh context PATTERN): the
+# whole suite exceeds the 20-minute limit, so it is not in --list.
+if [[ ${1:-} == context && -z ${2:-} ]]; then
+  echo "context needs a --run filter; use context-1/context-2 for the whole suite" >&2; exit 2
+fi
+command=${suites[${1:?suite}]:-}
+[[ -n $command || $1 == context ]] || { echo "unknown suite $1" >&2; exit 2; }
 # A filter selects tests inside a suite's own fixture: custody/fleet and context only.
 if [[ -n ${2:-} ]]; then
   case $1 in
