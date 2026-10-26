@@ -1,8 +1,11 @@
 package integration
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,10 +19,11 @@ import (
 // unrelated principal is refused get_case; the developer, holding
 // evidence-owner through the installed AccessBinding and the evidence:share
 // scope, shares the artifact with that principal over MCP; the recipient then
-// reads the case (access "shared") and lists the share, but native download
-// preparation stays refused; after the developer revokes the share, get_case
-// is refused again. Every authority input is the installed product's own.
-func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.InvestigationContracts, owner *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID string, diagnose func()) {
+// reads the case (access "shared"), lists the share and (ADR-233) prepares
+// and Range-downloads the native file; after the developer revokes the share,
+// get_case, download preparation and the content route are refused. Every
+// authority input is the installed product's own.
+func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.InvestigationContracts, owner *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID string, native []byte, diagnose func()) {
 	t.Helper()
 	connect := func(name string, token func(context.Context) (string, error)) *sdk.ClientSession {
 		t.Helper()
@@ -110,9 +114,40 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 	if status, _ := call(recipient, "list_shares", map[string]string{"view": "received"}, &received); status != "ok" || len(received.Shares) != 1 || received.Shares[0].ShareID != created.ShareID || received.Shares[0].Phase != "Active" {
 		t.Fatal("installed received shares", received)
 	}
-	// Native download is increment 3: the share grants only get_case.
-	if status, _ := call(recipient, "prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-share-download"}, nil); status != "error" {
-		t.Fatal("installed recipient prepared a native download through a share")
+	// ADR-233: the recipient prepares the native download through the share and
+	// fetches a byte range with its own download-route token.
+	prepare := map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-share-download"}
+	var download installedJourneyDownload
+	if status, code := call(recipient, "prepare_artifact_download", prepare, &download); status != "ok" || download.DownloadID == "" {
+		diagnose()
+		t.Fatal("installed recipient could not prepare the shared download", status, code)
+	}
+	for deadline := time.Now().Add(3 * time.Minute); download.State == "Preparing"; {
+		if time.Now().After(deadline) {
+			diagnose()
+			t.Fatal("installed recipient download was not prepared in time")
+		}
+		time.Sleep(time.Second)
+		name, args := "get_artifact_download", map[string]string{"download_id": download.DownloadID}
+		if download.ContinuePreparation {
+			name, args = "prepare_artifact_download", prepare
+		}
+		if status, code := call(recipient, name, args, &download); status != "ok" {
+			diagnose()
+			t.Fatal("installed recipient download poll", name, code)
+		}
+	}
+	if download.State != "Ready" || download.ContentPath == "" || download.SizeBytes == nil || *download.SizeBytes != int64(len(native)) || len(native) < 2 {
+		diagnose()
+		t.Fatal("installed recipient download", download.State, download.ContentPath)
+	}
+	contentURL, contentClient := strings.TrimSuffix(origin, "/")+download.ContentPath, &http.Client{Transport: transport, Timeout: 2 * time.Minute}
+	recipientDownloads := owner.unrelated()
+	half := int64(len(native)) / 2
+	head, _, err := installedJourneyPartial(installedJourneyContent(t, ctx, contentClient, contentURL, recipientDownloads.downloadToken(), map[string]string{"Range": "bytes=0-" + strconv.FormatInt(half-1, 10)}), 0, half, int64(len(native)))
+	if err != nil || !bytes.Equal(head, native[:half]) {
+		diagnose()
+		t.Fatal("installed recipient range download", err)
 	}
 	// 4. Revocation ends the recipient's read at its next request.
 	var revoked struct {
@@ -125,6 +160,17 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 	if _, ok := getCase(recipient); ok {
 		t.Fatal("installed recipient read the case after revocation")
 	}
+	// The next download request re-reads the share: preparation and the
+	// remaining range of the existing session are refused.
+	if status, _ := call(recipient, "prepare_artifact_download", map[string]string{"artifact_id": artifactID, "idempotency_key": "installed-share-download-2"}, nil); status != "error" {
+		t.Fatal("installed recipient prepared a download after revocation")
+	}
+	rest := installedJourneyContent(t, ctx, contentClient, contentURL, recipientDownloads.downloadToken(), map[string]string{"Range": "bytes=" + strconv.FormatInt(half, 10) + "-"})
+	body, _ := io.ReadAll(io.LimitReader(rest.Body, int64(len(native))+1))
+	rest.Body.Close()
+	if rest.StatusCode == http.StatusOK || rest.StatusCode == http.StatusPartialContent || bytes.Contains(body, native[half:]) {
+		t.Fatal("installed recipient downloaded content after revocation", rest.StatusCode)
+	}
 	var mine struct {
 		Shares []struct {
 			ShareID string `json:"share_id"`
@@ -134,5 +180,5 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 	if status, _ := call(developer, "list_shares", map[string]string{"view": "owned"}, &mine); status != "ok" || len(mine.Shares) != 1 || mine.Shares[0].Phase != "Revoked" {
 		t.Fatal("installed owned shares", mine)
 	}
-	t.Logf("installed share: unrelated principal refused, shared get_case read, download refused, revocation refused the next read (share %s)", created.ShareID)
+	t.Logf("installed share: unrelated principal refused, shared get_case read, recipient range download (%d of %d bytes), revocation refused the next read, prepare and range (share %s, content status after revocation %d)", half, len(native), created.ShareID, rest.StatusCode)
 }

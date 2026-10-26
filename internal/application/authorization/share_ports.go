@@ -22,12 +22,22 @@ type ShareReader interface {
 // this verified artifact version), with its EvaluateShare result. A current
 // deny of the caller refuses every share.
 func RecipientShare(i identity.Identity, p value.Projection, t value.Target, e *value.Retained, rows []value.Share, root, caseID, artifactID string, version artifact.Digest, now time.Time) (*value.Share, value.Result) {
+	if caseID == "" {
+		return nil, value.Result{Reason: "InvalidRequest"}
+	}
+	return recipientShare(value.ReadApproved, i, p, t, e, rows, root, caseID, artifactID, version, now)
+}
+
+// recipientShare also serves the download authorizer (ADR-233), whose scope
+// names no case: an empty caseID there means the case is not yet known (before
+// the catalog read); the share's artifact still binds it to exactly one case.
+func recipientShare(op value.Operation, i identity.Identity, p value.Projection, t value.Target, e *value.Retained, rows []value.Share, root, caseID, artifactID string, version artifact.Digest, now time.Time) (*value.Share, value.Result) {
 	refused := value.Result{Reason: "NoEntitlement"}
 	for _, s := range rows {
-		if s.RootID != root || s.ArtifactID != artifactID || s.CaseID != caseID || s.Target != t || version != (artifact.Digest{}) && s.Version != version {
+		if s.RootID != root || s.ArtifactID != artifactID || caseID != "" && s.CaseID != caseID || s.Target != t || version != (artifact.Digest{}) && s.Version != version {
 			continue
 		}
-		r := value.EvaluateShare(i, p, t, e, s, now)
+		r := value.EvaluateShareFor(op, i, p, t, e, s, now)
 		if r.Eligible {
 			return &s, r
 		}

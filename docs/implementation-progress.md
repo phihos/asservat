@@ -1,5 +1,36 @@
 # Sustained implementation progress
 
+## S-06 increment 3: recipient native download (ADR-233, 2026-10-26)
+
+[ADR-233](decisions/233-recipient-native-download.md) adds the share branch to the download
+authorizer: a recipient of an Active ADR-232 share gets DownloadApproved for exactly the shared
+artifact version (with `evidence:download`). The share is read only after ordinary eligibility
+refuses and before the catalog read, must name the artifact's case after it, and is re-read at
+the final check; a share-admitted response entitlement uses the existing 30-second ADR-220
+reconstruction, never past the share's expiry. Sessions use the workload's existing download
+allocation. No migration, grant or capacity-gated read.
+
+Verification (tracked test/results files restored after each run):
+- Unit, `-race`: domain/authorization (`TestShareDownloadBranch`: scope, deny, no collection),
+  application/authorization (recipient admitted; refused before any catalog read for no share,
+  deny, missing `evidence:download`, other version, revoked, expired, suspended, other recipient;
+  revocation between first and final read; other case; response entitlement: revocation honored
+  at the 30-second reconstruction and share expiry at 20 s), application/catalog, sharing,
+  evidence, adapters/postgres, bootstrap: PASS. `make pre-push`: PASS.
+- Custody (real PostgreSQL, compiled hub-runtime grants), `--run
+  '^TestContextAdmissionWithRealServices$/^(evidence-share-recipient-read-revocation-expiry-and-deny|download-control-original-replay-and-current-metadata|download-response-window-accounting)$'`:
+  PASS, go test 26.5 s (harness 29.1 s), no cleanup failures. The share subtest now also runs the
+  actual download authorizer with the real share ledger plus the SQL download fence
+  (`ReadContextDownloadSource`) on the share-admitted decision: refused before a share, admitted
+  for the user and the group recipient, refused without `evidence:download`, for a stranger and
+  after revocation.
+- Installed `share` focus (`scripts/ci-native.sh continuation-share`, fast fixture): PASS, go test
+  451.1 s (`installer-continuation` 260.1 s), wall 556 s, no cleanup failures. The unrelated
+  Keycloak user, after `create_share`, prepared the native download over MCP and fetched
+  `bytes=0-176` of the 354-byte file (206, matching the owner's download); after `revoke_share`
+  its `get_case` and a new `prepare_artifact_download` were NotAvailable and the remaining range
+  of the existing session returned 503.
+
 ## S-06 increment 1: concrete evidence share (ADR-232, 2026-10-26)
 
 [ADR-232](decisions/232-concrete-evidence-share.md) implements the S-06 plan's increment 1 over

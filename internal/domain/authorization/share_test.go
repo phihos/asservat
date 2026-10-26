@@ -179,3 +179,25 @@ func TestShareValidity(t *testing.T) {
 		t.Fatal("fixture")
 	}
 }
+
+// ADR-233: DownloadApproved through a share needs evidence:download as the
+// ordinary facet does; denies win and CollectContext has no share branch.
+func TestShareDownloadBranch(t *testing.T) {
+	_, recipient, p, e, s, now := shareFixture()
+	if r := EvaluateShareFor(DownloadApproved, recipient, p, p.Target, &e, s, now); r.Eligible || r.Reason != "InsufficientScope" {
+		t.Fatal("download without evidence:download", r)
+	}
+	recipient.Scopes = append(recipient.Scopes, "evidence:download")
+	if r := EvaluateShareFor(DownloadApproved, recipient, p, p.Target, &e, s, now); !r.Eligible || r.Reason != "Shared" {
+		t.Fatal("recipient download refused", r)
+	}
+	if EvaluateShareFor(CollectContext, recipient, p, p.Target, nil, s, now).Eligible {
+		t.Fatal("share granted collection")
+	}
+	d := p.Allows[1]
+	d.Audience.Kind, d.Audience.SubjectID, d.Audience.AssignmentID = "User", recipient.Principal.Subject, "99999999-9999-9999-9999-999999999999"
+	p.Denies = []CurrentAssignment{d}
+	if r := EvaluateShareFor(DownloadApproved, recipient, p, p.Target, &e, s, now); r.Eligible || r.Reason != "ExplicitDeny" {
+		t.Fatal("deny did not win", r)
+	}
+}
