@@ -67,7 +67,10 @@ or an executor that could run a capture.
    `authority`, `unavailable`) with a saturating count, never a row per match. A capacity shortfall
    at admission is a suppression, never a queue. Existing per-workload capture slots, storage
    allocations and the hub-wide capture reservations still apply per cluster. At most 16 active
-   policies per workload cluster.
+   policies per workload cluster. Watermarks only rise (a Pod missing from one poll keeps its
+   count) and are pruned after ten minutes unseen. An occurrence still open two minutes after
+   admission (hub-api stopped, or its record failed) is settled as refused with an `unavailable`
+   suppression at the next cycle; its execution stays spent and nothing resumes it.
 
 ## Agent-authored restrictions revised (recorded as such)
 
