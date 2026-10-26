@@ -207,11 +207,12 @@ def main():
             output.pop("$id", None)
             output["properties"]["provenance"] = {"type": "array", "maxItems": 0}
             output["properties"]["truncated"] = {"const": False}
-            if name != "preview_access_change", "list_shares":
-                output["properties"]["next_cursor"] = {"type": "null"}
-            else:
+            if name == "preview_access_change":
                 # ADR-237: the preview pages its bounded result.
                 output["properties"]["next_cursor"] = {"anyOf": [{"type": "string", "pattern": "^[0-9]{1,7}:[0-9a-f]{32}$"}, {"type": "null"}]}
+            elif name != "list_shares":
+                # ADR-238: list_shares keeps the canonical cursor (administration view).
+                output["properties"]["next_cursor"] = {"type": "null"}
             output["properties"]["narrowing_hint"] = {"type": "null"}
             output["properties"]["data_class"] = {"const": "metadata"}
             if name == "list_capture_history":
