@@ -11,7 +11,7 @@
 | Probe failure | Kubelet probe metrics where allowed; Kubernetes Events/status fallback | Liveness/readiness/startup distinguished; Event aggregation/loss explicitly reported |
 | Exit/restart | Pod status and local runtime/kernel observation | Signal, exit code, OOMKilled, restart delta, CrashLoopBackOff; no inference that an exit code proves a core |
 | Crash artifact | Core agent or approved runtime-file watcher | Verified artifact/stream occurrence; merge with related exit rather than collecting twice |
-| External alert | Authenticated Alertmanager webhook | Fingerprint, firing/resolved status, explicit mapping to an enrolled target |
+| External alert | Authenticated Alertmanager webhook; implemented as an in-cluster Alertmanager API pull (ADR-231) | Fingerprint, firing/resolved status, explicit mapping to an enrolled target |
 | Manual | `DebugCapture` | Authorized bounded recipe execution |
 | Scheduled | Controller schedule | Periodic baseline snapshots with jitter, disabled unless configured |
 | File condition | Approved container file watcher/poll | Created/changed/size threshold on declared paths; poll reports missed intervals |
@@ -165,8 +165,9 @@ REQ-TRG-002/006/007 for this source:
   detector is never compared.
 
 Log and resource detectors remain rejected at activation (`spec.detectors[0].kind`): the
-[ADR-230](../docs/decisions/230-s03-detectors.md) complexity gate paused both for a maintainer
-decision.
+[ADR-230](../docs/decisions/230-s03-detectors.md) complexity gate paused both. Log and resource
+conditions trigger captures through the `alert` detector below, from the operator's existing
+Prometheus and log-stack alert rules.
 
 ### SC-TRG-010
 
@@ -176,6 +177,56 @@ seconds, then exactly one pod-status capture of that Pod runs under the policy e
 failures of the same failing period create no occurrence, and no Event text appears in status,
 occurrences, logs or the capture request. A Pod already failing when the policy is activated fires
 only after a minute without failure followed by a new failure.
+
+## Alert triggers (ADR-231)
+
+The third implemented detector is `alert`, on the same hub-held policy shape, recipe, budgets,
+suppression reasons and capture path. It pulls instead of receiving the webhook of the catalogue
+above: an alert policy's 15-second poll adds one `GET /api/v2/alerts` of the target cluster's
+in-cluster Alertmanager (`active=true`, `silenced=false`, `inhibited=false`,
+`filter=namespace="<namespace>"`), made by the regional connector. The Alertmanager base URL is
+installation-owned regional configuration (Helm `cluster.alertmanager`, installer
+`--alertmanager`); a policy cannot name an address. No hub endpoint, receiver credential or
+episode tombstone store exists. These semantics refine REQ-TRG-002/004/006/007 and the alert
+delivery section below for this source:
+
+- Options: `receiverRef: alertmanager` (the cluster's configured Alertmanager; any other value is
+  rejected), `status: firing` (`resolved` is rejected: Alertmanager's API does not return resolved
+  alerts), optional `matchLabels` (at most 16 exact label values; `namespace` and `pod` are
+  rejected because the mapping below sets them). `eventWindow` is rejected: the alert is a level.
+  `evaluation.rearmFor` may be at most 15 s: the Pod re-arms at a poll without a matching alert and
+  the next occurrence can follow one poll later; a longer hold belongs to the rule's `for` and
+  `keep_firing_for`.
+- Mapping: an alert counts for a Pod when its `namespace` label is the policy's namespace, its
+  `pod` label names a current Pod of the workload and every `matchLabels` value matches. Alerts
+  without a `pod` label (workload- or node-level rules) are ignored, since the policy captures the
+  triggering Pod only. An Alertmanager shared by several clusters needs a cluster label in
+  `matchLabels`.
+- Level: a Pod is failing while at least one matching alert is active. One occurrence fires on a
+  rising edge, keyed (policy, Pod UID, newest matching `startsAt` second); the occurrence ID is the
+  capture idempotency key, so retries, duplicate polls and Alertmanager HA copies (same `startsAt`)
+  never start another capture. The first observation of a Pod is its baseline, armed only without a
+  matching alert; an alert firing at activation waits for its resolution. After an occurrence the
+  Pod re-arms at the first poll with no matching alert. A new episode (later `startsAt`) after the
+  re-arm fires again, subject to budgets; an alert that resolves and fires again between two polls
+  is not observed as a new episode. A `startsAt` later than the region's clock counts as now.
+- Only the per-Pod count of matching alerts and the newest `startsAt` second leave the region.
+  Labels, annotations, fingerprints and `generatorURL` stay in the regional connector and are never
+  logged, stored or followed.
+- Unknown (fires nothing, never re-arms): Alertmanager unreachable, a non-200 or redirect answer,
+  more than 1 MiB or 1024 alerts of the namespace (the v2 API has no paging), or a malformed answer.
+  A region without a configured Alertmanager refuses activation (`DetectorUnavailable`).
+- Changing a policy's detector re-baselines every Pod, as for probe.
+
+### SC-TRG-011
+
+Given an activated alert policy (`alertname: HighErrorRate`) on a workload whose cluster names its
+Alertmanager, when Alertmanager starts reporting a matching alert labelled with one Pod's namespace
+and name, then exactly one pod-status capture of that Pod runs under the policy executor; further
+polls while the alert stays active, a second matching alert on the same Pod and alerts in another
+namespace, on another Pod or without a pod label create no occurrence; no alert label or annotation
+appears in status, occurrences, logs or the capture request; and while Alertmanager is unreachable
+no occurrence is created and the Pod does not re-arm.
 
 ## Trigger-to-action lifecycle
 

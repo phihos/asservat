@@ -73,6 +73,10 @@ type RegionalAPIContext struct {
 	KeyService     RegionalWrapService             `json:"keyService"`
 	Owners         RegionalContextOwners           `json:"owners"`
 	Concurrency    int                             `json:"concurrency"`
+	// Alertmanager is the cluster's in-cluster Alertmanager base URL for
+	// alert policies (ADR-231): installation-owned, optional, never policy
+	// input. Without it an alert policy on this cluster is refused.
+	Alertmanager string `json:"alertmanager,omitempty"`
 }
 
 type RegionalEvidenceStore struct {

@@ -10542,7 +10542,7 @@
     },
     {
       "name": "get_policy_status",
-      "description": "Explain an activated or deactivated restart- or probe-trigger policy (ADR-228/230) without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing.",
+      "description": "Explain an activated or deactivated restart-, probe- or alert-trigger policy (ADR-228/230/231) without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -10686,7 +10686,8 @@
                             "detector": {
                               "enum": [
                                 "exit",
-                                "probe"
+                                "probe",
+                                "alert"
                               ]
                             },
                             "failed_at": {
@@ -10703,7 +10704,10 @@
                           "if": {
                             "properties": {
                               "detector": {
-                                "const": "probe"
+                                "enum": [
+                                  "probe",
+                                  "alert"
+                                ]
                               }
                             }
                           },
@@ -10776,7 +10780,8 @@
                           "kind": {
                             "enum": [
                               "exit",
-                              "probe"
+                              "probe",
+                              "alert"
                             ]
                           },
                           "reasons": {

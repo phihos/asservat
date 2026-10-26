@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-231 — Alert trigger from the in-cluster Alertmanager API](231-alert-detector.md) lets existing
+Prometheus and log-stack alert rules trigger captures: the regional connector reads the cluster's
+configured Alertmanager v2 API on the existing 15-second poll (no hub endpoint or credential),
+maps alerts to Pods by `namespace`/`pod` labels and reuses the probe level (migration 00085).
+
 [ADR-230 — Probe-failure trigger; log and resource detectors paused](230-s03-detectors.md) gates
 every S-03 detector (AGENTS.md items 1–11): the probe detector reads kubelet Unhealthy Events in the
 existing regional poll (one Event LIST per probe policy, `list events` on the regional connector,

@@ -53,6 +53,13 @@ and `TriggerDelta`/`ProbeDelta` evaluate the level with re-arm against migration
 per-detector watermarks (`detector`, `armed`). Budgets, spend, suppression and the capture path are
 unchanged. Log and resource detectors are paused by the ADR-230 complexity gate.
 
+[ADR-231](../decisions/231-alert-detector.md) adds the `alert` detector: `RestartPolicy.Request()`
+carries `Alert` and the label matchers, the regional `PodTargets` (given the installation's
+`RegionalAPIContext.alertmanager` URL through `WithAlertmanager`) adds one Alertmanager
+`GET /api/v2/alerts` and reports per Pod the count of matching alerts and the newest `startsAt` in
+the probe fields, and `ProbeDelta` evaluates the same level. Migration 00085 widens the detector
+CHECKs. A region without an Alertmanager answers `unsupported`, so activation refuses the policy.
+
 ## Runtime composition still required
 
 C-09 still must supply authenticated ingress, the complete canonical policy compiler and protected supervision of the Kubernetes source journal. The [submission signature components](policy-submissions.md) now provide independently verified post-persistence human submissions and a matching short-lived proof inside SQL acceptance; their protected bootstrap and complete ingress/compiler composition remain pending. The current acceptance facet checks a concrete whole-pod target supplied by those private producers; it is not the finished all-replica policy authoring workflow. C-03 must bind the exact grant/independent reviewer; C-10/C-11 must acquire short signed permits through atomic cumulative capacity/grant/retention/recovery checks. Durable accepted limits are ceilings, not a spending implementation. Carry the acceptance/delegation/source revision into final transactions and local permit renewal. Worker certificates and purpose-specific channels authenticate dispatch; policy principal strings alone do not.

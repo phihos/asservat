@@ -122,7 +122,7 @@ func (t Targets) ObserveWorkloadRestarts(ctx context.Context, r targets.RestartR
 		return targets.RestartObservation{}, err
 	}
 	out.FreshUntil = identity.Earlier(out.FreshUntil, until)
-	if out.ClusterID != r.ClusterID || out.Namespace.Name != r.Namespace || out.Workload.Kind != r.Kind || out.Workload.Name != r.Name || out.Probe != r.Probe || !out.Valid(t.Now()) {
+	if out.ClusterID != r.ClusterID || out.Namespace.Name != r.Namespace || out.Workload.Kind != r.Kind || out.Workload.Name != r.Name || out.Probe != r.Probe || out.Alert != r.Alert || !out.Valid(t.Now()) {
 		t.report("restarts/result", "")
 		return targets.RestartObservation{}, targets.ErrUnavailable
 	}

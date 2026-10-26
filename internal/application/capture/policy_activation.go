@@ -176,7 +176,8 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 		return zero, s.refused("compile", err)
 	}
 	// A probe policy observes its Events too, so a region that cannot read
-	// them refuses activation instead of leaving the policy Unknown.
+	// them (or, for an alert policy, has no Alertmanager) refuses activation
+	// instead of leaving the policy Unknown.
 	observed, err := s.Observer.ObserveWorkloadRestarts(ctx, compiled.Request())
 	if err != nil {
 		return zero, s.refused("workload", err)

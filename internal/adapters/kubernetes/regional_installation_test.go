@@ -77,6 +77,21 @@ func TestRegionalInstallShape(t *testing.T) {
 	if stray.valid() {
 		t.Fatal("evidence credential accepted without an executor offer")
 	}
+	// ADR-231: the optional Alertmanager URL belongs to an executor and
+	// carries no credential.
+	alerts := executor
+	alerts.Alertmanager = "http://alertmanager-operated.monitoring.svc:9093"
+	if !alerts.valid() {
+		t.Fatal("executor plan with an Alertmanager refused")
+	}
+	alerts.Alertmanager = "http://user:secret@alertmanager:9093"
+	if alerts.valid() {
+		t.Fatal("Alertmanager URL with credentials accepted")
+	}
+	stray.Evidence, stray.Alertmanager = nil, "http://alertmanager-operated.monitoring.svc:9093"
+	if stray.valid() {
+		t.Fatal("Alertmanager accepted without an executor offer")
+	}
 	mounted := 0
 	for _, s := range RegionalWorkload(executor.Offer, true).Spec.Template.Spec.Volumes[0].Projected.Sources {
 		if s.Secret != nil {

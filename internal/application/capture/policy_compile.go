@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"maps"
 	"slices"
 	"strconv"
 	"time"
@@ -65,14 +66,14 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 		return reject(".target.adoption", "must be pinUID")
 	}
 	out.ClusterID, out.Namespace, out.WorkloadKind, out.WorkloadName = target.Cluster, target.Namespace, target.WorkloadRef.Kind, target.WorkloadRef.Name
-	// Detector: exactly one exit (ADR-228) or probe (ADR-230) detector,
-	// referenced directly by when.
+	// Detector: exactly one exit (ADR-228), probe (ADR-230) or alert
+	// (ADR-231) detector, referenced directly by when.
 	var detectors []json.RawMessage
 	if strict(s["detectors"], &detectors) != nil || len(detectors) == 0 {
 		return reject(".detectors", "invalid")
 	}
 	if len(detectors) != 1 {
-		return reject(".detectors[1]", "exactly one exit or probe detector is supported")
+		return reject(".detectors[1]", "exactly one exit, probe or alert detector is supported")
 	}
 	var detector struct {
 		ID, Kind    string
@@ -91,11 +92,16 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 		if err := compileProbe(&out, detector.Options); err != nil {
 			return value.RestartPolicy{}, err
 		}
+	case "alert":
+		if err := compileAlert(&out, detector.Options, detector.EventWindow); err != nil {
+			return value.RestartPolicy{}, err
+		}
 	case "log", "resource":
-		// Paused by the ADR-230 complexity gate: a maintainer decision.
-		return reject(".detectors[0].kind", "log and resource detectors are not available in this release (ADR-230); use exit or probe")
+		// Paused by the ADR-230 complexity gate; ADR-231's alert detector lets
+		// existing log and resource alert rules trigger captures instead.
+		return reject(".detectors[0].kind", "log and resource detectors are not available in this release (ADR-230); use an alert detector with your existing alert rules (ADR-231)")
 	default:
-		return reject(".detectors[0].kind", "only exit and probe detectors are supported in this release")
+		return reject(".detectors[0].kind", "only exit, probe and alert detectors are supported in this release")
 	}
 	var when struct{ Detector string }
 	if strict(s["when"], &when) != nil || when.Detector == "" {
@@ -178,6 +184,18 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 			}
 			if rearm > out.ProbeWindow {
 				return reject(".evaluation.rearmFor", "must not exceed the probe window")
+			}
+		}
+		if out.Detector == value.DetectorAlert && evaluation.RearmFor != "" {
+			// An alert re-arms at a poll on which Alertmanager reports no
+			// matching alert; the next occurrence can follow one poll later,
+			// so the poll interval bounds the re-arm interval (ADR-231).
+			rearm, ok := policyDuration(evaluation.RearmFor)
+			if !ok {
+				return reject(".evaluation.rearmFor", "invalid duration")
+			}
+			if rearm > value.TriggerPollInterval {
+				return reject(".evaluation.rearmFor", "an alert re-arms one poll (15s) after Alertmanager stops reporting it; use keep_firing_for in the alert rule for a longer hold")
 			}
 		}
 	}
@@ -264,6 +282,50 @@ func compileProbe(out *value.RestartPolicy, raw json.RawMessage) error {
 	return nil
 }
 
+// compileAlert selects the ADR-231 alert detector: active, unsilenced alerts
+// of the target cluster's configured Alertmanager whose namespace and pod
+// labels name a Pod of the workload and whose other labels equal
+// matchLabels.
+func compileAlert(out *value.RestartPolicy, raw, eventWindow json.RawMessage) error {
+	reject := func(path, reason string) error {
+		return value.PolicyFieldError{Path: "spec.detectors[0]" + path, Reason: reason}
+	}
+	if eventWindow != nil {
+		return reject(".eventWindow", "an alert is a level while Alertmanager reports it active; no event window applies")
+	}
+	var options struct {
+		ReceiverRef, Status string
+		MatchLabels         map[string]string
+	}
+	if strict(raw, &options) != nil {
+		return reject(".options", "invalid")
+	}
+	if options.ReceiverRef != value.AlertReceiver {
+		return reject(".options.receiverRef", "use "+value.AlertReceiver+": the target cluster's configured Alertmanager")
+	}
+	if options.Status != "firing" {
+		return reject(".options.status", "only firing alerts trigger a capture")
+	}
+	if len(options.MatchLabels) > targets.MaxAlertLabels {
+		return reject(".options.matchLabels", "at most 16 labels")
+	}
+	for _, k := range slices.Sorted(maps.Keys(options.MatchLabels)) {
+		switch v := options.MatchLabels[k]; {
+		case k == "namespace" || k == "pod":
+			return reject(".options.matchLabels."+k, "the policy's namespace and the alert's Pod are matched already")
+		case !targets.AlertLabelName(k):
+			return reject(".options.matchLabels", "label names must be Prometheus label names")
+		case v == "" || len(v) > 256:
+			return reject(".options.matchLabels."+k, "must be 1 to 256 characters")
+		}
+	}
+	out.Detector = value.DetectorAlert
+	if len(options.MatchLabels) > 0 {
+		out.AlertLabels = options.MatchLabels
+	}
+	return nil
+}
+
 // DescribePolicyDetector reads only the detector of a DebugPolicy spec for
 // status display; it is not a compilation and confers nothing.
 func DescribePolicyDetector(spec []byte) (value.PolicyDetector, bool) {
@@ -286,6 +348,8 @@ func DescribePolicyDetector(spec []byte) (value.PolicyDetector, bool) {
 		err = compileExit(&p, d.Options, d.EventWindow)
 	case "probe":
 		err = compileProbe(&p, d.Options)
+	case "alert":
+		err = compileAlert(&p, d.Options, d.EventWindow)
 	default:
 		return value.PolicyDetector{}, false
 	}

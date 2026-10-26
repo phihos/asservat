@@ -14,6 +14,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // PolicyActivationUseCase and PolicyStatusUseCase are the ADR-228 services.
@@ -94,7 +95,8 @@ type policyExecutor struct {
 }
 
 // policyOccurrenceData is one recent occurrence: an exit occurrence's restart
-// count, or a probe occurrence's newest failure time (ADR-230).
+// count, or a probe occurrence's newest failure time (ADR-230) or an alert
+// occurrence's newest alert start (ADR-231), both as failed_at.
 type policyOccurrenceData struct {
 	OccurrenceID string     `json:"occurrence_id"`
 	CaptureID    string     `json:"capture_id,omitempty"`
@@ -154,7 +156,9 @@ func publicPolicyFailure(err error) OperationFailure {
 	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied):
 		return OperationFailure{"NotAvailable", "This operation is not available with your current access.", false}
 	case errors.Is(err, value.ErrInvalid):
-		return OperationFailure{"UnsupportedRequest", "The named policy is not a valid restart- or probe-trigger DebugPolicy.", false}
+		return OperationFailure{"UnsupportedRequest", "The named policy is not a valid restart-, probe- or alert-trigger DebugPolicy.", false}
+	case errors.Is(err, targets.ErrUnsupported):
+		return OperationFailure{"DetectorUnavailable", "The workload cluster's connector cannot observe this detector. An alert policy needs the cluster's Alertmanager address (Helm value cluster.alertmanager).", false}
 	}
 	return OperationFailure{"NotAvailable", "The operation is unavailable. Check your access or retry when the service is available.", true}
 }
@@ -230,7 +234,7 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 					outcome = "pending"
 				}
 				item := policyOccurrenceData{OccurrenceID: o.ID, CaptureID: o.CaptureID, Outcome: outcome, Detector: o.Detector, Restarts: o.Restarts, CreatedAt: o.CreatedAt.UTC()}
-				if o.Detector == value.DetectorProbe {
+				if o.Detector == value.DetectorProbe || o.Detector == value.DetectorAlert {
 					failed := time.Unix(o.Restarts, 0).UTC()
 					item.Restarts, item.FailedAt = 0, &failed
 				}

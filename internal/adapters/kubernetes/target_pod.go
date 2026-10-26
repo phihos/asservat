@@ -21,6 +21,8 @@ import (
 type PodTargets struct {
 	client         *PermissionClient
 	executionClass artifact.ContextExecutionClass
+	// alerts is the cluster's configured Alertmanager (ADR-231), if any.
+	alerts *Alertmanager
 }
 
 var _ port.PodResolver = (*PodTargets)(nil)

@@ -100,3 +100,8 @@ cluster:
   # write-only regional evidence credential. Required exactly when the offer
   # names the regional executor.
   evidenceSecret: ""
+  # ADR-231: optional in-cluster Alertmanager base URL (http or https, no
+  # credentials) that alert DebugPolicies on this cluster read, for example
+  # http://alertmanager-operated.monitoring.svc:9093. Regional executor only.
+  # It is a fixed regional input: changing it needs a connector reinstall.
+  alertmanager: ""

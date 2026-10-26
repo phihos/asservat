@@ -1008,6 +1008,61 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("exit re-baseline", d, v, armed)
 		}
 	})
+	// ADR-231: the alert detector stores its level like a probe (migration
+	// 00085), re-baselines on a detector switch and fires once per episode.
+	t.Run("alert-trigger-episode-rearm-and-detector-switch", func(t *testing.T) {
+		s, l := activeTrigger(t)
+		alert := restartPolicy(s)
+		alert.Reasons, alert.ExitCodes = nil, nil
+		alert.Detector, alert.AlertLabels = capture.DetectorAlert, map[string]string{"alertname": "HighErrorRate"}
+		alertTick := func(pods ...targets.PodRestarts) []capture.PolicyOccurrence {
+			t.Helper()
+			o := observed(s, pods...)
+			o.Alert = true
+			got, err := l.Tick(ctx, capture.PolicyTick{Policy: alert, Authority: s.input.Authority, Observation: o})
+			if err != nil {
+				t.Fatal("alert tick", err)
+			}
+			return got
+		}
+		firing := func(uid string, alerts, started int64) targets.PodRestarts {
+			return targets.PodRestarts{Name: "app-" + uid[:8], UID: uid, ProbeFailures: alerts, ProbeLast: started}
+		}
+		a := custodyID()
+		const t0 = 1792000000
+		// An exit watermark is not an alert baseline; an alert already firing
+		// at the switch is a disarmed baseline.
+		tick(t, s, l, observed(s, pod(a, 3)))
+		if got := alertTick(firing(a, 1, t0)); len(got) != 0 {
+			t.Fatal("detector switch fired", got)
+		}
+		var detector string
+		var value int64
+		var armed bool
+		if err := admin.QueryRow(ctx, `SELECT detector,restarts,armed FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3`, s.input.RootID, s.input.Authority.PolicyUID, a).Scan(&detector, &value, &armed); err != nil || detector != "alert" || value != t0 || armed {
+			t.Fatal("alert baseline", detector, value, armed, err)
+		}
+		// Resolution re-arms; a new episode fires once; a duplicate poll does not.
+		alertTick(firing(a, 0, 0))
+		got := alertTick(firing(a, 1, t0+600))
+		if len(got) != 1 || got[0].PodUID != a || got[0].Restarts != t0+600 {
+			t.Fatal("new alert episode", got)
+		}
+		if again := alertTick(firing(a, 2, t0+620)); len(again) != 0 {
+			t.Fatal("alert level fired twice", again)
+		}
+		if err := admin.QueryRow(ctx, `SELECT detector FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID).Scan(&detector); err != nil || detector != "alert" {
+			t.Fatal("alert occurrence", detector, err)
+		}
+		// An alert occurrence key can never be a restart count.
+		if _, err := admin.Exec(ctx, `UPDATE policy_occurrence SET restarts=5 WHERE root_id=$1 AND detector='alert'`, s.input.RootID); err == nil {
+			t.Fatal("alert occurrence with a restart-count key stored")
+		}
+		// Switching back to exit re-baselines.
+		if got := tick(t, s, l, observed(s, pod(a, 4))); len(got) != 0 {
+			t.Fatal("switch back to exit fired", got)
+		}
+	})
 	t.Run("restart-trigger-spend-cap-saturation-and-single-link", func(t *testing.T) {
 		s, l := activeTrigger(t)
 		a := custodyID()

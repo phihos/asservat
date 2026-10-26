@@ -256,8 +256,18 @@ def check_cluster(directory):
     pod = next(r for r in render(executor) if r["kind"] == "Job")["spec"]["template"]["spec"]
     assert pod["containers"][0]["command"][-2:] == ["--evidence-credential", "/run/asservat/cluster/evidence-storage.json"]
     assert pod["volumes"][0]["projected"]["sources"][2]["secret"] == {"name": "operator-evidence", "items": [{"key": "evidence-storage.json", "path": "evidence-storage.json"}]}
+    # ADR-231: the optional Alertmanager URL is passed to an executor's
+    # installer only; without an executor offer it is refused.
+    executor["cluster"]["alertmanager"] = "http://alertmanager-operated.monitoring.svc:9093"
+    pod = next(r for r in render(executor) if r["kind"] == "Job")["spec"]["template"]["spec"]
+    assert pod["containers"][0]["command"][-2:] == ["--alertmanager", "http://alertmanager-operated.monitoring.svc:9093"]
+    executor["cluster"]["alertmanager"] = "http://user:secret@alertmanager:9093"
+    render(executor, ok=False)
     stray = json.loads(json.dumps(base))
     stray["cluster"]["evidenceSecret"] = "operator-evidence"
+    render(stray, ok=False)
+    stray = json.loads(json.dumps(base))
+    stray["cluster"]["alertmanager"] = "http://alertmanager-operated.monitoring.svc:9093"
     render(stray, ok=False)
 
 
