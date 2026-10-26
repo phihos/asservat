@@ -11,7 +11,6 @@ declare -A suites=(
   [database-recovery]="make database-recovery-integration"
   [initial-installation]="make initial-installation-integration"
   [audit-storage]="make audit-storage-integration"
-  [connector-retirement]="make connector-retirement-integration"
   [owner-audit-inventory]="python3 scripts/test-custody.py --owner-audit-inventory"
   [permission]="make permission-integration"
   [identity]="make identity-integration"

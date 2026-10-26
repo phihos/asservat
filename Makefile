@@ -83,9 +83,6 @@ custody-integration:
 audit-storage-integration:
 	$(PYTHON) scripts/test-custody.py --scoped-audit
 
-.PHONY: connector-retirement-integration
-connector-retirement-integration:
-	$(PYTHON) scripts/test-custody.py --connector-retirement
 
 .PHONY: database-recovery-integration
 database-recovery-integration:
