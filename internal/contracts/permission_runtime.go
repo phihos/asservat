@@ -145,6 +145,18 @@ type PermissionDelegation struct {
 	Workloads []PermissionWorkload   `json:"workloads"`
 	Roles     []string               `json:"roles"`
 	Issuers   []string               `json:"issuers"`
+	// Previewers are the browser identities that may preview permission
+	// changes within this envelope (ADR-237). They grant no Kubernetes write
+	// and are not part of the admission guard.
+	Previewers []PermissionPreviewer `json:"previewers,omitempty"`
+}
+
+// PermissionPreviewer is a user subject or stable group ID of the browser
+// identity issuer.
+type PermissionPreviewer struct {
+	Issuer string `json:"issuer"`
+	Kind   string `json:"kind"`
+	ID     string `json:"id"`
 }
 
 type PermissionWorkload struct {

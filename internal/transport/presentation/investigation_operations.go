@@ -76,6 +76,15 @@ func NewInvestigationAccessOperations(base *InvestigationOperations, access *Acc
 	return withOperations(base, access)
 }
 
+// NewInvestigationAccessPreviewOperations adds the ADR-237 browser-only
+// preview_access_change operation the same way.
+func NewInvestigationAccessPreviewOperations(base *InvestigationOperations, preview *AccessPreviewOperations) (*InvestigationOperations, error) {
+	if preview == nil {
+		return nil, ErrOperationsConfiguration
+	}
+	return withOperations(base, preview)
+}
+
 func withOperations(base *InvestigationOperations, policies Operations) (*InvestigationOperations, error) {
 	if base == nil || policies.PublicOrigin() != base.origin {
 		return nil, ErrOperationsConfiguration
@@ -203,6 +212,8 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 	case *ShareOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *AccessOperations:
+		return p.CallWithContext(ctx, current, call, name, raw)
+	case *AccessPreviewOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	default:
 		return OperationReply{}, contracts.ErrInvestigationWire

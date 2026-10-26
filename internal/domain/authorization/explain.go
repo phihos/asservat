@@ -87,33 +87,60 @@ func Explain(i identity.Identity, p Projection, op Operation, t Target, now time
 		}
 		return Undisclosed()
 	}
-	out := Explanation{Disclosed: true, Target: t}
+	out := detail(r, d, t)
+	out.Disclosed = true
+	return out
+}
+
+// Decide runs the ordinary target evaluator (ScopeEligibility) and reports the
+// decision, the condition that decided it, the contributing allow or matching
+// deny assignments and, on Allow, its validity, without Explain's
+// caller-visibility rule. It serves the administrator's configuration impact
+// preview (ADR-237) over synthetic single-subject identities and grants
+// nothing.
+func Decide(i identity.Identity, p Projection, op Operation, t Target, now time.Time) Explanation {
+	r, d := evaluateDetail(i, p, op, t, nil, now, false)
+	return detail(r, d, t)
+}
+
+func detail(r Result, d evaluationDetail, t Target) Explanation {
+	out := Explanation{Target: t}
+	out.Decision, out.Unmet, out.MissingScope = decide(r, d)
 	switch r.Reason {
 	case "Eligible":
-		out.Decision, out.ValidUntil = Allow, r.ValidUntil
+		out.ValidUntil = r.ValidUntil
 		for _, a := range r.ContributingAssignments {
 			out.Assignments = append(out.Assignments, ExplainedAssignment{"allow", a})
 		}
 	case "ExplicitDeny":
-		out.Decision, out.Unmet = Deny, UnmetExplicitDeny
 		if d.matchedDeny != nil {
 			out.Assignments = []ExplainedAssignment{{"deny", *d.matchedDeny}}
 		}
-	case "InsufficientScope":
-		out.Decision, out.Unmet, out.MissingScope = Deny, UnmetClientScope, d.missingScope
-	case "NoEntitlement":
-		out.Decision, out.Unmet = Deny, UnmetNoMatchingAllow
-		if d.staleAllow {
-			out.Decision, out.Unmet = Indeterminate, UnmetPermissionStale
-		}
-	case "AudienceOverflow":
-		out.Decision, out.Unmet = Deny, UnmetAudienceOverflow
-	case "PermissionUnavailable":
-		out.Decision, out.Unmet = Indeterminate, UnmetPermissionStale
-	case "IdentityUnavailable":
-		out.Decision, out.Unmet = Indeterminate, UnmetIdentity
-	default:
-		out.Decision, out.Unmet = Indeterminate, UnmetServiceUnavailable
 	}
 	return out
+}
+
+// decide maps the evaluator's reason to the explained decision; Explain and
+// Decide share it.
+func decide(r Result, d evaluationDetail) (Decision, string, string) {
+	switch r.Reason {
+	case "Eligible":
+		return Allow, "", ""
+	case "ExplicitDeny":
+		return Deny, UnmetExplicitDeny, ""
+	case "InsufficientScope":
+		return Deny, UnmetClientScope, d.missingScope
+	case "NoEntitlement":
+		if d.staleAllow {
+			return Indeterminate, UnmetPermissionStale, ""
+		}
+		return Deny, UnmetNoMatchingAllow, ""
+	case "AudienceOverflow":
+		return Deny, UnmetAudienceOverflow, ""
+	case "PermissionUnavailable":
+		return Indeterminate, UnmetPermissionStale, ""
+	case "IdentityUnavailable":
+		return Indeterminate, UnmetIdentity, ""
+	}
+	return Indeterminate, UnmetServiceUnavailable, ""
 }

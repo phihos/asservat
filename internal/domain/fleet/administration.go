@@ -34,6 +34,22 @@ func (a Administration) Valid(now time.Time) bool {
 	return true
 }
 
+// Operator reports whether the identity is one of the installation's fleet
+// operators: a configured subject or group of the configured issuer, signed in
+// with a configured client, while the administration is not suspended. Callers
+// check Valid for both values first. ADR-237 reuses it as the installation-wide
+// administrator check of the permission impact preview.
+func (a Administration) Operator(i identity.Identity) bool {
+	if a.Suspended || i.Principal.Issuer != a.Issuer || !slices.Contains(a.Clients, i.Principal.ClientID) {
+		return false
+	}
+	permitted := slices.Contains(a.Subjects, identity.Subject{ID: i.Principal.Subject, Kind: i.Principal.Kind})
+	for _, g := range i.Groups {
+		permitted = permitted || slices.Contains(a.Groups, g)
+	}
+	return permitted
+}
+
 type EnrollmentAuthority struct {
 	InstallationID, IssuerEpoch, DeliveryProfile          string
 	Actor                                                 identity.Principal
@@ -51,14 +67,7 @@ func AuthorizeEnrollment(i identity.Identity, a Administration, profile string, 
 	if !a.Valid(now) || !i.Valid(now) {
 		return out, ErrUnavailable
 	}
-	if a.Suspended || i.Principal.Issuer != a.Issuer || !slices.Contains(a.Clients, i.Principal.ClientID) || !slices.Contains(a.DeliveryProfiles, profile) {
-		return out, ErrDenied
-	}
-	permitted := slices.Contains(a.Subjects, identity.Subject{ID: i.Principal.Subject, Kind: i.Principal.Kind})
-	for _, g := range i.Groups {
-		permitted = permitted || slices.Contains(a.Groups, g)
-	}
-	if !permitted {
+	if !a.Operator(i) || !slices.Contains(a.DeliveryProfiles, profile) {
 		return out, ErrDenied
 	}
 	out = EnrollmentAuthority{InstallationID: a.InstallationID, IssuerEpoch: a.IssuerEpoch, DeliveryProfile: profile, Actor: i.Principal, IdentityRevision: i.Policy, AdministrationRevision: a.Revision, CheckedAt: now, ValidUntil: identity.Earlier(i.ValidUntil, a.FreshUntil), MaxActiveBootstraps: a.MaxActiveBootstraps, MaxBootstrapHistory: a.MaxBootstrapHistory, MaxClusters: a.MaxClusters}

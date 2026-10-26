@@ -365,6 +365,7 @@ requirements:
   scenarios:
   - SC-PER-002
   - SC-PER-009
+  - SC-PER-010
   tasks:
   - TASK-07
 - requirement: REQ-PER-003

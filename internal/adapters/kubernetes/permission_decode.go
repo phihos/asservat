@@ -268,6 +268,44 @@ func (v *permissionValidator) binding(object permissionObject, ref value.Resourc
 	return b, nil
 }
 
+// AccessBindingSpecDecoder decodes a proposed AccessBinding spec with the same
+// embedded schema and checks as observed bindings (ADR-237 impact preview).
+// The returned binding carries the canonical spec digest; it is never an
+// observed or accepted object.
+type AccessBindingSpecDecoder struct{ validator *permissionValidator }
+
+func NewAccessBindingSpecDecoder() (*AccessBindingSpecDecoder, error) {
+	v, err := newPermissionValidator()
+	if err != nil {
+		return nil, err
+	}
+	return &AccessBindingSpecDecoder{v}, nil
+}
+
+func (d *AccessBindingSpecDecoder) DecodeAccessBindingSpec(spec []byte) (value.Binding, error) {
+	if d == nil || d.validator == nil {
+		return value.Binding{}, value.ErrUnavailable
+	}
+	b, err := d.validator.binding(permissionObject{Spec: spec}, value.Resource{Kind: "AccessBinding"})
+	if err != nil {
+		return value.Binding{}, value.ErrInvalid
+	}
+	return b, nil
+}
+
+// DecodePermissionSourceSpec decodes a proposed PermissionSource spec with the
+// observed source schema and checks (ADR-237).
+func (d *AccessBindingSpecDecoder) DecodePermissionSourceSpec(spec []byte) (value.Source, error) {
+	if d == nil || d.validator == nil {
+		return value.Source{}, value.ErrUnavailable
+	}
+	s, err := d.validator.source(permissionObject{Spec: spec}, value.Resource{Kind: "PermissionSource"})
+	if err != nil {
+		return value.Source{}, value.ErrInvalid
+	}
+	return s, nil
+}
+
 func (v *permissionValidator) source(object permissionObject, ref value.Resource) (value.Source, error) {
 	var spec wire.PermissionSourceSpec
 	digest, err := decodePermissionSpec(object.Spec, v.sourceSchema, &spec)

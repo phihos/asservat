@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings"]
+NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change"]
 
 
 def history_subset(name, tool):
@@ -172,11 +172,12 @@ def main():
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
-        if name in ("activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings"):
+        if name in ("activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change"):
             # ADR-228: the runtime implements the whole canonical contract.
             # ADR-232: the share tools implement a bounded subset.
             # ADR-234: explain_access implements the whole canonical contract.
             # ADR-236: the two history tools implement a bounded subset.
+            # ADR-237: preview_access_change implements the whole contract (browser-only transport).
             description = copy.deepcopy(tool)
             description.pop("enabledByDefault", None)
             branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
@@ -188,7 +189,11 @@ def main():
             output.pop("$id", None)
             output["properties"]["provenance"] = {"type": "array", "maxItems": 0}
             output["properties"]["truncated"] = {"const": False}
-            output["properties"]["next_cursor"] = {"type": "null"}
+            if name != "preview_access_change":
+                output["properties"]["next_cursor"] = {"type": "null"}
+            else:
+                # ADR-237: the preview pages its bounded result.
+                output["properties"]["next_cursor"] = {"anyOf": [{"type": "string", "pattern": "^[0-9]{1,7}:[0-9a-f]{32}$"}, {"type": "null"}]}
             output["properties"]["narrowing_hint"] = {"type": "null"}
             output["properties"]["data_class"] = {"const": "metadata"}
             if name == "list_capture_history":

@@ -115,6 +115,17 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	if operations, err = presentation.NewInvestigationAccessOperations(operations, access); err != nil {
 		return nil, &fixedStepError{"access", mounts.ErrUnavailable}
 	}
+	// ADR-237: the fleet operators' browser-only preview_access_change.
+	preview, err := composePublicAccessPreview(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
+	if err != nil {
+		return nil, &fixedStepError{"access-preview", mounts.ErrUnavailable}
+	}
+	if preview != nil {
+		if operations, err = presentation.NewInvestigationAccessPreviewOperations(operations, preview); err != nil {
+			return nil, &fixedStepError{"access-preview", mounts.ErrUnavailable}
+		}
+	}
 	o := p.OperationAudit
 	services := PublicContextServices{Sessions: id.sessions, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
 	if pc.fleet != nil {

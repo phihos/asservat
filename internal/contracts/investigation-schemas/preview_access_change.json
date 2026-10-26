@@ -1,0 +1,1357 @@
+{
+  "name": "preview_access_change",
+  "description": "Preview the effect of proposed AccessBinding and PermissionSource changes before applying them through Kubernetes (ADR-237). For each workload scope of the affected namespaces (at most 1,000) within your administration, reports which users, groups or workloads named by the added or removed assignments would change between Allow, Deny and Indeterminate for capture, read and download, with the assignment revisions that decide each side, evaluated by the same rules as the operations themselves over the current accepted permission data. Targets whose permission data is unavailable or outside the enrolled clusters, and PermissionSource creations or edits (inheritance is not yet accepted by this installation), are Indeterminate. The result is bounded to 256 KiB and delivered in pages: repeat the same request with next_cursor. Group members are never listed and no evidence is read. For fleet operators and configured delegation previewers; it changes nothing: apply the change with kubectl or GitOps.",
+  "transports": [
+    "browser"
+  ],
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "changes": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 16,
+        "items": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "create"
+                },
+                "kind": {
+                  "const": "AccessBinding"
+                },
+                "spec": {
+                  "$ref": "#/$defs/d0"
+                }
+              },
+              "required": [
+                "action",
+                "kind",
+                "spec"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "update"
+                },
+                "kind": {
+                  "const": "AccessBinding"
+                },
+                "uid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "spec": {
+                  "$ref": "#/$defs/d0"
+                }
+              },
+              "required": [
+                "action",
+                "kind",
+                "uid",
+                "spec"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "create"
+                },
+                "kind": {
+                  "const": "PermissionSource"
+                },
+                "spec": {
+                  "$ref": "#/$defs/d7"
+                }
+              },
+              "required": [
+                "action",
+                "kind",
+                "spec"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "update"
+                },
+                "kind": {
+                  "const": "PermissionSource"
+                },
+                "uid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "spec": {
+                  "$ref": "#/$defs/d7"
+                }
+              },
+              "required": [
+                "action",
+                "kind",
+                "uid",
+                "spec"
+              ]
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "action": {
+                  "const": "delete"
+                },
+                "kind": {
+                  "enum": [
+                    "AccessBinding",
+                    "PermissionSource"
+                  ]
+                },
+                "uid": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "required": [
+                "action",
+                "kind",
+                "uid"
+              ]
+            }
+          ]
+        }
+      },
+      "cursor": {
+        "type": "string",
+        "pattern": "^[0-9]{1,7}:[0-9a-f]{32}$"
+      }
+    },
+    "required": [
+      "changes"
+    ],
+    "$defs": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "User",
+              "Group",
+              "Workload"
+            ]
+          },
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "kind",
+          "issuer",
+          "id"
+        ]
+      },
+      "d2": {
+        "type": "string",
+        "enum": [
+          "evidence-reader",
+          "workload-maintainer",
+          "evidence-owner",
+          "action-approver"
+        ]
+      },
+      "d4": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "name",
+          "uid"
+        ]
+      },
+      "d5": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "Deployment",
+              "StatefulSet"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "uid": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "kind",
+          "name",
+          "uid"
+        ]
+      },
+      "d3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "clusterID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "namespaceRef": {
+            "$ref": "#/$defs/d4"
+          },
+          "workloads": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d5"
+            },
+            "minItems": 1,
+            "maxItems": 64,
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "clusterID",
+          "namespaceRef"
+        ]
+      },
+      "d6": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "allowedActions": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "kubernetesSnapshot",
+                "logs",
+                "processSnapshot",
+                "fileRead",
+                "packetCapture",
+                "networkSnapshot",
+                "runtimeDiagnostic",
+                "kernelCore",
+                "liveCore",
+                "command",
+                "httpDiagnostic",
+                "artifactCollect",
+                "profile",
+                "syscallTrace"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "maxItems": 14,
+            "uniqueItems": true
+          },
+          "maxLifetimeSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31536000
+          },
+          "maxExecutions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "maxBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          },
+          "maxObservedBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          }
+        },
+        "required": [
+          "allowedActions",
+          "maxLifetimeSeconds",
+          "maxExecutions",
+          "maxBytes",
+          "maxObservedBytes"
+        ]
+      },
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "effect": {
+            "type": "string",
+            "enum": [
+              "Allow",
+              "Deny"
+            ]
+          },
+          "subjects": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 1,
+            "maxItems": 32,
+            "uniqueItems": true
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d2"
+            },
+            "minItems": 1,
+            "maxItems": 4,
+            "uniqueItems": true
+          },
+          "scope": {
+            "$ref": "#/$defs/d3"
+          },
+          "notAfter": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "automation": {
+            "$ref": "#/$defs/d6"
+          }
+        },
+        "required": [
+          "effect",
+          "subjects",
+          "roles",
+          "scope",
+          "reason"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "automation"
+              ]
+            },
+            "then": {
+              "properties": {
+                "effect": {
+                  "const": "Allow"
+                },
+                "subjects": {
+                  "items": {
+                    "properties": {
+                      "kind": {
+                        "const": "Group"
+                      }
+                    }
+                  }
+                },
+                "roles": {
+                  "contains": {
+                    "const": "workload-maintainer"
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d8": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "matchLabels": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "maxProperties": 16
+          }
+        },
+        "required": [
+          "matchLabels"
+        ]
+      },
+      "d9": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "administratorManaged",
+              "admissionEnforced"
+            ]
+          },
+          "reviewRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "guardRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "mode",
+          "reviewRef"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "admissionEnforced"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "guardRef"
+              ]
+            }
+          }
+        ]
+      },
+      "d10": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string",
+            "enum": [
+              "annotation",
+              "label"
+            ]
+          },
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "groupID",
+              "valueMap"
+            ]
+          },
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "values": {
+            "type": "object",
+            "maxProperties": 128,
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "minItems": 1,
+              "maxItems": 16,
+              "uniqueItems": true
+            }
+          }
+        },
+        "required": [
+          "field",
+          "key",
+          "mode",
+          "issuer"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "valueMap"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "values"
+              ],
+              "properties": {
+                "values": {
+                  "minProperties": 1
+                }
+              }
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "values"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "d7": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "clusterID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "namespaceMetadata",
+              "workloadMetadata",
+              "kubernetesExec",
+              "kubernetesAccessReview"
+            ]
+          },
+          "namespaceSelector": {
+            "$ref": "#/$defs/d8"
+          },
+          "excludedNamespaces": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 63
+            },
+            "maxItems": 64,
+            "uniqueItems": true
+          },
+          "role": {
+            "$ref": "#/$defs/d2"
+          },
+          "maxDecisionAgeSeconds": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          },
+          "maxNamespaces": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "protection": {
+            "$ref": "#/$defs/d9"
+          },
+          "metadataMapping": {
+            "$ref": "#/$defs/d10"
+          },
+          "workloadSelector": {
+            "$ref": "#/$defs/d8"
+          },
+          "identityMappingRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "admissionParity": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "noAdditionalRestrictions",
+                  "qualifiedAdapter"
+                ]
+              },
+              "reviewRef": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "adapterRef": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              }
+            },
+            "required": [
+              "mode",
+              "reviewRef"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "mode": {
+                      "const": "qualifiedAdapter"
+                    }
+                  }
+                },
+                "then": {
+                  "required": [
+                    "adapterRef"
+                  ]
+                },
+                "else": {
+                  "not": {
+                    "required": [
+                      "adapterRef"
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          "accessReview": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "check": {
+                "type": "string",
+                "enum": [
+                  "namespaceCaptureCreate",
+                  "workloadGet",
+                  "workloadPatch",
+                  "workloadUpdate"
+                ]
+              }
+            },
+            "required": [
+              "check"
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "clusterID",
+          "type",
+          "namespaceSelector",
+          "excludedNamespaces",
+          "role",
+          "maxDecisionAgeSeconds",
+          "maxNamespaces"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "enum": [
+                    "namespaceMetadata",
+                    "workloadMetadata"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "protection",
+                "metadataMapping"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "identityMappingRef"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "admissionParity"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "accessReview"
+                    ]
+                  }
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "identityMappingRef",
+                "admissionParity"
+              ],
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "evidence-reader",
+                    "workload-maintainer"
+                  ]
+                }
+              },
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "protection"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "metadataMapping"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "workloadSelector"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "workloadMetadata"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "workloadSelector"
+              ],
+              "properties": {
+                "protection": {
+                  "properties": {
+                    "mode": {
+                      "const": "admissionEnforced"
+                    }
+                  }
+                }
+              }
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "workloadSelector"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "kubernetesExec"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "role": {
+                  "const": "workload-maintainer"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "kubernetesAccessReview"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "accessReview"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "accessReview"
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "const": "metadata"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string",
+            "pattern": "^[0-9]{1,7}:[0-9a-f]{32}$"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "complete": {
+                    "type": "boolean"
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "targets_evaluated": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "fresh_until": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "deltas_total": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "unavailable_total": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000
+                  },
+                  "listed_rows": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "page_offset": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "unavailable": {
+                    "type": "array",
+                    "maxItems": 1000,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cluster_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "namespace_uid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "workload_uid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "other_workloads": {
+                          "type": "boolean"
+                        },
+                        "decision": {
+                          "const": "Indeterminate"
+                        },
+                        "unmet": {
+                          "enum": [
+                            "PermissionObservationStale",
+                            "ServiceUnavailable",
+                            "ClusterUnavailable"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "cluster_id",
+                        "namespace_uid",
+                        "workload_uid",
+                        "other_workloads",
+                        "decision",
+                        "unmet"
+                      ]
+                    }
+                  },
+                  "deltas": {
+                    "type": "array",
+                    "maxItems": 4096,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "cluster_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "namespace_uid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "workload_uid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "other_workloads": {
+                          "type": "boolean"
+                        },
+                        "subject": {
+                          "$ref": "#/$defs/d0"
+                        },
+                        "operation": {
+                          "enum": [
+                            "capture",
+                            "read",
+                            "download"
+                          ]
+                        },
+                        "before": {
+                          "enum": [
+                            "Allow",
+                            "Deny",
+                            "Indeterminate"
+                          ]
+                        },
+                        "after": {
+                          "enum": [
+                            "Allow",
+                            "Deny",
+                            "Indeterminate"
+                          ]
+                        },
+                        "before_unmet": {
+                          "enum": [
+                            "NoMatchingAllow",
+                            "ExplicitDeny",
+                            "PermissionObservationStale",
+                            "AudienceOverflow",
+                            "ServiceUnavailable"
+                          ]
+                        },
+                        "after_unmet": {
+                          "enum": [
+                            "NoMatchingAllow",
+                            "ExplicitDeny",
+                            "PermissionObservationStale",
+                            "AudienceOverflow",
+                            "ServiceUnavailable"
+                          ]
+                        },
+                        "before_basis": {
+                          "type": "array",
+                          "maxItems": 8,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "effect": {
+                                "enum": [
+                                  "allow",
+                                  "deny"
+                                ]
+                              },
+                              "role": {
+                                "$ref": "#/$defs/d1"
+                              },
+                              "subject_kind": {
+                                "enum": [
+                                  "User",
+                                  "Group",
+                                  "Workload"
+                                ]
+                              },
+                              "basis_kind": {
+                                "enum": [
+                                  "AccessBinding",
+                                  "PermissionSource"
+                                ]
+                              },
+                              "basis_uid": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "revision": {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{64}$"
+                              },
+                              "proposed": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "effect",
+                              "role",
+                              "subject_kind",
+                              "basis_kind",
+                              "basis_uid",
+                              "revision",
+                              "proposed"
+                            ]
+                          }
+                        },
+                        "after_basis": {
+                          "type": "array",
+                          "maxItems": 8,
+                          "items": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "properties": {
+                              "effect": {
+                                "enum": [
+                                  "allow",
+                                  "deny"
+                                ]
+                              },
+                              "role": {
+                                "$ref": "#/$defs/d1"
+                              },
+                              "subject_kind": {
+                                "enum": [
+                                  "User",
+                                  "Group",
+                                  "Workload"
+                                ]
+                              },
+                              "basis_kind": {
+                                "enum": [
+                                  "AccessBinding",
+                                  "PermissionSource"
+                                ]
+                              },
+                              "basis_uid": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              "revision": {
+                                "type": "string",
+                                "pattern": "^[0-9a-f]{64}$"
+                              },
+                              "proposed": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "effect",
+                              "role",
+                              "subject_kind",
+                              "basis_kind",
+                              "basis_uid",
+                              "revision",
+                              "proposed"
+                            ]
+                          }
+                        },
+                        "after_valid_until": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "cluster_id",
+                        "namespace_uid",
+                        "workload_uid",
+                        "other_workloads",
+                        "subject",
+                        "operation",
+                        "before",
+                        "after",
+                        "before_basis",
+                        "after_basis"
+                      ]
+                    }
+                  },
+                  "not_evaluated": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "action": {
+                          "enum": [
+                            "create",
+                            "update"
+                          ]
+                        },
+                        "kind": {
+                          "const": "PermissionSource"
+                        },
+                        "uid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        },
+                        "decision": {
+                          "const": "Indeterminate"
+                        },
+                        "reason": {
+                          "const": "InheritanceNotAccepted"
+                        }
+                      },
+                      "required": [
+                        "action",
+                        "kind",
+                        "decision",
+                        "reason"
+                      ]
+                    }
+                  },
+                  "unmatched": {
+                    "type": "array",
+                    "maxItems": 16,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "kind": {
+                          "enum": [
+                            "AccessBinding",
+                            "PermissionSource"
+                          ]
+                        },
+                        "uid": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 64
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "uid"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "complete",
+                  "message",
+                  "targets_evaluated",
+                  "deltas_total",
+                  "unavailable_total",
+                  "listed_rows",
+                  "page_offset",
+                  "unavailable",
+                  "deltas",
+                  "not_evaluated",
+                  "unmatched"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "User",
+              "Group",
+              "Workload"
+            ]
+          },
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "kind",
+          "issuer",
+          "id"
+        ]
+      },
+      "d1": {
+        "type": "string",
+        "enum": [
+          "evidence-reader",
+          "workload-maintainer",
+          "evidence-owner",
+          "action-approver"
+        ]
+      }
+    }
+  }
+}

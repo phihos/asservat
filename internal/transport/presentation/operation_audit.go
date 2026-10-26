@@ -509,6 +509,13 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		}
 		return json.Marshal(in)
 	}
+	if name == "preview_access_change" {
+		var in AccessPreviewInput
+		if json.Unmarshal(raw, &in) != nil {
+			return nil, contracts.ErrInvestigationWire
+		}
+		return json.Marshal(in)
+	}
 	if name == "get_case" {
 		var in struct {
 			CaseID string `json:"case_id"`

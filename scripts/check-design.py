@@ -32,7 +32,7 @@ assert len(apiops)==len(operations)==len({o['operation'] for o in operations})
 for op in operations:assert apiops[op['operation']][0]==op['path']
 for t in tools:
  n=t['name'];assert api['components']['schemas']['McpInput_'+n]==t['inputSchema'];assert api['components']['schemas']['McpOutput_'+n]==t['outputSchema']
- assert next(o for o in operations if o['operation']==n)['transport']==['browser','mcp']
+ assert next(o for o in operations if o['operation']==n)['transport']==t.get('transports',['browser','mcp'])
  assert apiops[n][2]['x-effect']==('read' if t['annotations'].get('readOnlyHint',False) else 'command')
 assert set(api['components']['schemas']['ConfigSubmitInput']['properties']['kind']['enum'])=={'DebugPolicy','EvidenceRecipe','CaptureProfile'}
 for name,(_,method,op) in apiops.items():

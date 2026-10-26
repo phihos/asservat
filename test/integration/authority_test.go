@@ -24,6 +24,7 @@ import (
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -251,6 +252,117 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 			})
 		}
 	}
+	// ADR-237: the impact preview reads every workload cell of the affected
+	// namespace from the same accepted projection, and the real evaluator
+	// turns a removed allow into Deny and a proposed deny into ExplicitDeny.
+	t.Run("permission-impact-preview", func(t *testing.T) {
+		s := create(t)
+		named := custodyID()
+		s.b.Bases[0].Scope.Workloads = []cfg.WorkloadRef{{Kind: "Deployment", Name: "api", UID: named}}
+		s.b.Bases[0].ScopeDigest = configapp.PermissionScopeDigest(s.b.Bases[0])
+		accept(t, &s)
+		flush(t, s.p)
+		next(&s)
+		wide := s.b.Bases[0]
+		wide.Resource.UID, wide.Scope.Workloads = custodyID(), nil
+		wide.ScopeDigest = configapp.PermissionScopeDigest(wide)
+		s.b.Bases = append(s.b.Bases, wide)
+		accept(t, &s)
+		flush(t, s.p)
+		ns := cfg.PreviewNamespace{ClusterID: s.target.ClusterID, NamespaceUID: wide.Scope.Namespace.UID}
+		proposed := custodyID()
+		snap, err := s.p.PreviewProjections(ctx, cfg.PreviewRead{Workloads: map[cfg.PreviewNamespace][]string{ns: {proposed}}, Bases: []cfg.PreviewBasis{{Kind: "AccessBinding", UID: wide.Resource.UID}, {Kind: "AccessBinding", UID: "absent"}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(snap.Cells) != 3 || len(snap.Unmatched) != 1 || snap.Unmatched[0].UID != "absent" {
+			t.Fatalf("cells %d unmatched %+v", len(snap.Cells), snap.Unmatched)
+		}
+		// A delegated previewer's read (Allowed = their envelope namespaces)
+		// does not match an object in another namespace: it is reported
+		// Unmatched like a nonexistent UID and its namespace is not read.
+		elsewhere := cfg.PreviewNamespace{ClusterID: s.target.ClusterID, NamespaceUID: "envelope-namespace"}
+		limited, err := s.p.PreviewProjections(ctx, cfg.PreviewRead{Namespaces: []cfg.PreviewNamespace{elsewhere}, Allowed: []cfg.PreviewNamespace{elsewhere}, Bases: []cfg.PreviewBasis{{Kind: "AccessBinding", UID: wide.Resource.UID}, {Kind: "AccessBinding", UID: "absent"}}})
+		if err != nil || len(limited.Unmatched) != 2 || len(limited.Cells) != 1 || limited.Cells[0].Target.NamespaceUID != elsewhere.NamespaceUID {
+			t.Fatalf("envelope read: %v %+v", err, limited)
+		}
+		allows := map[string]int{}
+		for _, c := range snap.Cells {
+			if c.Unavailable != "" || c.Projection.Target != c.Target {
+				t.Fatalf("cell %+v", c)
+			}
+			allows[c.Target.WorkloadUID] = len(c.Projection.Allows)
+		}
+		if allows[named] != 2 || allows[proposed] != 1 || allows[cfg.OtherWorkloads] != 1 {
+			t.Fatalf("allows per cell %v", allows)
+		}
+		changes, _, err := cfg.PreviewChanges([]cfg.AccessChange{{Action: "delete", Kind: "AccessBinding", UID: wide.Resource.UID}}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		policy := identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}
+		got, err := cfg.PreviewAccess(changes, snap, []string{s.target.ClusterID}, nil, policy, time.Now())
+		// Two cells (the proposal-named workload and all other workloads)
+		// lose all three operations; the workload the narrowed binding names
+		// keeps them.
+		if err != nil || !got.Complete() || got.DeltasTotal != 6 {
+			t.Fatalf("%v %+v", err, got)
+		}
+		for _, d := range got.Deltas {
+			if d.Target.WorkloadUID == named || d.Before != authorization.Allow || d.After != authorization.Deny || d.AfterUnmet != authorization.UnmetNoMatchingAllow {
+				t.Fatalf("only workloads without the narrowed binding lose access: %+v", d)
+			}
+		}
+	})
+	// ADR-237: a worst-case preview reads 1,000 cells (992 workloads named by
+	// 16 current bindings, 7 named only by the proposal, all other workloads)
+	// in one transaction and evaluates them within the five-second request.
+	t.Run("permission-impact-preview-1000-targets", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+		flush(t, s.p)
+		next(&s)
+		ns := s.b.Bases[0].Scope.Namespace
+		for range 16 {
+			b := s.b.Bases[0]
+			b.Resource.UID = custodyID()
+			b.Scope.Workloads = nil
+			for range 62 {
+				b.Scope.Workloads = append(b.Scope.Workloads, cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: custodyID()})
+			}
+			b.ScopeDigest = configapp.PermissionScopeDigest(b)
+			s.b.Bases = append(s.b.Bases, b)
+		}
+		accept(t, &s)
+		flush(t, s.p)
+		key := cfg.PreviewNamespace{ClusterID: s.target.ClusterID, NamespaceUID: ns.UID}
+		var proposed []cfg.WorkloadRef
+		for range 7 {
+			proposed = append(proposed, cfg.WorkloadRef{Kind: "Deployment", Name: "new", UID: custodyID()})
+		}
+		binding := cfg.Binding{Resource: cfg.Resource{SpecDigest: artifact.Digest{4}}, Effect: "Deny", Subjects: []cfg.Subject{{Kind: "Group", Issuer: "https://id.example.test", ID: "team-a"}}, Roles: []string{"workload-maintainer"},
+			Scope: cfg.Scope{ClusterID: s.target.ClusterID, Namespace: ns, Workloads: proposed}}
+		changes, read, err := cfg.PreviewChanges([]cfg.AccessChange{{Action: "create", Kind: "AccessBinding", Binding: binding}, {Action: "delete", Kind: "AccessBinding", UID: s.b.Bases[0].Resource.UID}}, nil)
+		if err != nil || read.Namespaces[0] != key {
+			t.Fatal(err)
+		}
+		started := time.Now()
+		snap, err := s.p.PreviewProjections(ctx, read)
+		readTime := time.Since(started)
+		if err != nil || len(snap.Cells) != cfg.MaxPreviewTargets {
+			t.Fatalf("%v cells=%d", err, len(snap.Cells))
+		}
+		policy := identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}
+		got, err := cfg.PreviewAccess(changes, snap, []string{s.target.ClusterID}, nil, policy, time.Now())
+		total := time.Since(started)
+		if err != nil || !got.Complete() || got.Targets != cfg.MaxPreviewTargets || got.DeltasTotal == 0 {
+			t.Fatalf("%v %+v", err, got.Targets)
+		}
+		t.Logf("ADR-237 worst case: %d cells read in %v, read+evaluate %v, %d decision changes", len(snap.Cells), readTime, total, got.DeltasTotal)
+		if total > 4*time.Second {
+			t.Fatalf("worst-case preview took %v; it must fit the five-second request", total)
+		}
+	})
 	t.Run("foreign-audit-root-disables-allow-without-hiding-deny", func(t *testing.T) {
 		s := create(t)
 		foreign := create(t)
