@@ -58,6 +58,9 @@ func progressFacts(f custodydb.ReadContextProgressFactsRow, executions ...execut
 		return out, value.ErrUnavailable
 	}
 	out = value.ContextProgressObservation{CaptureID: accepted.CaptureID, CandidateCaseID: accepted.Expectation.CaseID, CandidateArtifactID: accepted.Expectation.Registration.Location.ArtifactID, Target: intent.Target, Revision: c.ProgressRevision, CreatedAt: accepted.CreatedAt, Deadline: accepted.Deadline, Phase: "Pending", ActionPhase: "Pending", ReasonCode: "IntentAuditPending"}
+	if out.ShareID, err = captureShareID(c.ShareInstruction); err != nil {
+		return out, err
+	}
 	audited := c.State == value.IntentAudited
 	if audited {
 		if _, err = historicalPublication(c); err != nil {

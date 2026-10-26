@@ -64,3 +64,14 @@ coordinator in a dedicated asynchronous `asservat publisher` process.
   no ciphertext.
 - **Request path.** It still returns `StoredPendingVerification`; the case
   becomes visible once publication completes.
+
+## Capture-time share (ADR-235)
+
+When the accepted capture carries a sharing instruction (`context_capture.share_instruction`,
+migration 00088), the owner-privileged `materialize_capture_share` trigger on the case-locator
+INSERT — which the catalog INSERT causes exactly once per published artifact — inserts exactly one
+`evidence_share` row in the same publication transaction. Publishers gain no grant. The row binds
+the verified copy digest and the published locator's target; its expiry is bounded by the
+artifact's effective access end. An expired instruction or no unretired pinned management
+assignment skips the share without blocking publication (`get_capture` reports
+`SharingUnavailable`). See [ADR-235](../decisions/235-capture-time-sharing.md).

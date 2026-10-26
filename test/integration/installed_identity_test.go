@@ -157,11 +157,12 @@ func (i *installedIdentity) approvedTokenSource(origin string) *installedJourney
 }
 
 // shareTokenSource is the same principal's MCP session with the optional
-// evidence:share scope (ADR-232) and no download or capture scope.
+// evidence:share scope (ADR-232) and, for the ADR-235 capture-time share, the
+// evidence:capture scope; no download scope.
 func (i *installedIdentity) shareTokenSource(origin string) *installedJourneyTokenSource {
 	return &installedJourneyTokenSource{issuer: i.Issuer, resource: strings.TrimSuffix(origin, "/") + "/mcp", now: time.Now,
 		login: func() kcTokens {
-			return i.kc.loginScopes("mcp", "openid evidence:read evidence:share "+installedMCPScope)
+			return i.kc.loginScopes("mcp", "openid evidence:read evidence:share evidence:capture "+installedMCPScope)
 		},
 		refresh: func(token string) kcTokens { return i.kc.refresh("mcp", token, http.StatusOK) }}
 }

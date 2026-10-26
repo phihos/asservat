@@ -12,6 +12,12 @@ pins the creator's owner teams (creator-only without a team, more than eight ref
 current holder of a pinned assignment list and revoke the share, and returns `revision`,
 `created_by` and `managed_by` in `list_shares(view=owned)`. No migration or new grant.
 
+[ADR-235 — Capture-time sharing of the published result](235-capture-time-sharing.md) is S-06
+increment 5: `preview_capture` accepts `sharing` (≤ 8 recipients, optional `notAfter`); admission
+requires the requester's evidence-owner authority and stores one instruction on the accepted capture
+(migration 00088); the catalog publication transaction materializes exactly one ADR-232 share, and
+`get_capture` reports Pending/Shared/SharingUnavailable separately. Console "Share results with…".
+
 [ADR-233 — Recipient native download of a shared artifact](233-recipient-native-download.md) is
 S-06 increment 3: the download authorizer consults a recipient's share of exactly the scope's
 artifact and version only after ordinary eligibility refuses and before the catalog read, re-reads

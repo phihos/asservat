@@ -31,10 +31,13 @@ type ContextProgressObservation struct {
 	Phase, ActionPhase, ReasonCode                  string
 	CreatedAt, Deadline                             time.Time
 	ObservedAt, ValidUntil                          time.Time
+	// ShareID is the capture-time share's ID when the accepted capture
+	// carries a sharing instruction (ADR-235); empty otherwise.
+	ShareID string
 }
 
 func (p ContextProgressObservation) Valid(now time.Time) bool {
-	if !authorization.UUID(p.CaptureID) || !authorization.UUID(p.CandidateCaseID) || !authorization.UUID(p.CandidateArtifactID) || !p.Target.Valid() || p.Revision < 1 || p.Revision > MaxProgressRevision || !identity.Fresh(p.ObservedAt, p.ValidUntil, now, 5*time.Second) || p.CreatedAt.IsZero() || !p.Deadline.After(p.CreatedAt) {
+	if !authorization.UUID(p.CaptureID) || !authorization.UUID(p.CandidateCaseID) || !authorization.UUID(p.CandidateArtifactID) || !p.Target.Valid() || p.ShareID != "" && !authorization.UUID(p.ShareID) || p.Revision < 1 || p.Revision > MaxProgressRevision || !identity.Fresh(p.ObservedAt, p.ValidUntil, now, 5*time.Second) || p.CreatedAt.IsZero() || !p.Deadline.After(p.CreatedAt) {
 		return false
 	}
 	switch p.Phase {
@@ -63,6 +66,9 @@ type ContextProgress struct {
 	CanCancel                      bool
 	RetryAfterSeconds              int
 	CreatedAt, Deadline            time.Time
+	// Sharing is reported separately from capture progress (ADR-235); nil
+	// when the capture carries no sharing instruction.
+	Sharing *ContextSharingStatus
 	// ValidUntil is an internal delivery fence, never part of public JSON.
 	ValidUntil time.Time `json:"-"`
 }

@@ -9242,6 +9242,24 @@ components:
                   - recordingSave
                 result_access:
                   $ref: https://asservat.io/spec/v1/investigation-access.schema.json#/$defs/status
+                sharing:
+                  type: object
+                  additionalProperties: false
+                  description: Capture-time sharing status, reported separately from collection
+                    progress. Present only when the request included sharing. Shared names the
+                    concrete share; SharingUnavailable means the result was not shared (collection
+                    outcome is unaffected).
+                  properties:
+                    state:
+                      enum:
+                      - Pending
+                      - Shared
+                      - SharingUnavailable
+                    share_id:
+                      type: string
+                      format: uuid
+                  required:
+                  - state
               required:
               - capture_id
               - revision

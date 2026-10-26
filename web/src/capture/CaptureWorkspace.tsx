@@ -5,6 +5,7 @@ import { Investigation } from './investigation';
 import type { Preview, Progress, Target } from './http';
 import { captureIDFromPath } from '../routes';
 import { WhyAccess } from '../access/WhyAccess';
+import { RecipientsEditor } from '../sharing/SharePanel';
 
 const phases: Record<Progress['phase'], string> = {
   Pending: 'Waiting to start', Validating: 'Checking the request', AwaitingApproval: 'Waiting for approval',
@@ -54,6 +55,12 @@ function Assessment({ preview }: { preview: Preview }) {
   </>;
 }
 
+const sharingLabels: Record<NonNullable<Progress['sharing']>['state'], string> = {
+  Pending: 'The result will be shared with your recipients when it is published.',
+  Shared: 'The result is shared with your recipients. Send them the case link.',
+  SharingUnavailable: 'The result was not shared. You can still share it from the case page.',
+};
+
 const actionLabels: Record<string, string> = { Finalizing: 'Verifying and publishing', TargetGone: 'The selected Pod no longer exists; nothing was collected', Denied: 'Kubernetes denied reading the Pod status; nothing was collected' };
 
 export function CaptureWorkspace({ session, scope, controller }: { session: Session; scope: AbortSignal; controller: Investigation }) {
@@ -82,6 +89,12 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
           <div className="field"><label htmlFor="retention-duration">Requested access duration</label><select id="retention-duration" value={customRetention || !['', '900', '3600', '86400'].includes(draft.retention) ? 'custom' : draft.retention} onChange={event => { setCustomRetention(event.target.value === 'custom'); if (event.target.value !== 'custom') controller.setDraft({ ...draft, retention: event.target.value }); }}><option value="">Administrator default</option><option value="900">15 minutes</option><option value="3600">1 hour</option><option value="86400">1 day</option><option value="custom">Custom duration</option></select></div>
           {(customRetention || !['', '900', '3600', '86400'].includes(draft.retention)) && <label>Custom duration (seconds)<input name="retention" type="number" min="1" max="315360000" step="1" placeholder="Administrator default" value={draft.retention} onChange={event => controller.setDraft({ ...draft, retention: event.target.value })}/></label>}
           <p className="field-help">The review shows the effective access and deletion limits. Administrator policy can require a shorter duration.</p>
+        </details>
+        <details className="retention-edit"><summary>Share results with…</summary>
+          <p>When the capture is published, its result is shared with these users or groups of your identity provider ({session.principal.issuer}), using their stable IDs. Sharing needs the evidence-owner role on the workload; without it the request is refused before anything is collected.</p>
+          <RecipientsEditor recipients={draft.sharing ?? []} onChange={sharing => controller.setDraft({ ...draft, sharing })}/>
+          <label>Share for (hours)<input name="share-hours" type="number" min={1} max={168} step={1} placeholder="24 after publication" value={draft.shareHours ?? ''} onChange={event => controller.setDraft({ ...draft, shareHours: Number.isNaN(event.target.valueAsNumber) ? undefined : event.target.valueAsNumber })}/></label>
+          <p className="field-help">Empty: 24 hours after publication. At most seven days from now, and never past the evidence's access.</p>
         </details>
         <Button type="submit" className="button" isDisabled={state.busy}>{state.busy ? 'Checking diagnostics…' : 'Find diagnostics'}</Button>
       </fieldset>
@@ -132,6 +145,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         {state.progress.phase === 'Finalizing' && <p>Uploaded evidence still needs verification and publication before it is available.</p>}
         <ul className="progress-actions">{state.progress.actions.map(action => <li key={action.action_id}><span>{action.action_id === 'pod-status' ? 'Pod status' : action.action_id}</span><span>{actionLabels[action.phase] ?? action.phase}</span></li>)}</ul>
         {state.progress.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
+        {state.progress.sharing && <p role="status">{sharingLabels[state.progress.sharing.state]}</p>}
         {state.progress.case_id && <p><a className="button" href={"/cases/" + state.progress.case_id}>View evidence</a></p>}
       </> : !state.error && <p role="status">Checking collection status…</p>}
       {state.canContinue && <div className="actions"><Button className="button" isDisabled={state.busy} onPress={() => void controller.continueAcquisition()}>{state.continuing ? 'Continuing collection…' : 'Continue collection'}</Button><p>Continues the original capture and checks your current access.</p></div>}

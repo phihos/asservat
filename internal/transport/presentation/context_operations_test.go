@@ -31,6 +31,7 @@ type contextOperationFixture struct {
 	preview, key  string
 	metadataUntil time.Time
 	afterResolve  func()
+	sharing       *value.ContextSharingStatus
 }
 
 func (f *contextOperationFixture) ResolveIdentity(context.Context) (identity.Identity, error) {
@@ -47,7 +48,7 @@ func (f *contextOperationFixture) CheckDiagnostic(context.Context, identities.Cu
 }
 func (f *contextOperationFixture) Preview(_ context.Context, _ identities.CurrentIdentity, in value.ContextIntent) (app.ContextPreviewResult, error) {
 	f.input = in
-	p := value.ContextPreview{ID: "00000000-0000-4000-8000-000000000020", Deadline: f.i.VerifiedAt.Add(5 * time.Minute), ScopeDigest: artifact.Digest{1}, Target: targets.Request{ClusterID: in.Target.ClusterID, Namespace: configuration.NamespaceRef{Name: in.Target.Namespace, UID: "ns"}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: "api", UID: "workload"}, PodName: "api-a", PodUID: "pod"}}
+	p := value.ContextPreview{ID: "00000000-0000-4000-8000-000000000020", Intent: in, Deadline: f.i.VerifiedAt.Add(5 * time.Minute), ScopeDigest: artifact.Digest{1}, Target: targets.Request{ClusterID: in.Target.ClusterID, Namespace: configuration.NamespaceRef{Name: in.Target.Namespace, UID: "ns"}, Workload: configuration.WorkloadRef{Kind: "Deployment", Name: "api", UID: "workload"}, PodName: "api-a", PodUID: "pod"}}
 	return app.ContextPreviewResult{Preview: p, ValidUntil: f.metadataUntil, Assessment: assessmentFixture()}, f.err
 }
 func (f *contextOperationFixture) Request(_ context.Context, _ identities.CurrentIdentity, preview, key string) (value.Accepted, error) {
@@ -73,7 +74,7 @@ func (f *contextOperationFixture) ResolveContextRequest(_ context.Context, _ ide
 	return d, f.err
 }
 func (f *contextOperationFixture) Get(context.Context, identities.CurrentIdentity, string) (value.ContextProgress, error) {
-	return value.ContextProgress{ValidUntil: f.metadataUntil, CaptureID: "00000000-0000-4000-8000-000000000030", Revision: 3, Phase: "Finalizing", ActionPhase: "Finalizing", ReasonCode: "VerificationPending", RetryAfterSeconds: 2}, f.err
+	return value.ContextProgress{ValidUntil: f.metadataUntil, CaptureID: "00000000-0000-4000-8000-000000000030", Revision: 3, Phase: "Finalizing", ActionPhase: "Finalizing", ReasonCode: "VerificationPending", RetryAfterSeconds: 2, Sharing: f.sharing}, f.err
 }
 
 func operationFixture(t *testing.T, enabled bool) (*ContextOperations, *contextOperationFixture) {

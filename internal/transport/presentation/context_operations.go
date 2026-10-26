@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"slices"
 	"time"
@@ -110,7 +111,49 @@ type ContextOperationInput struct {
 	IdempotencyKey      string            `json:"idempotency_key"`
 	CaptureID           string            `json:"capture_id"`
 	ContinueAcquisition bool              `json:"continue_acquisition,omitempty"`
+	// Sharing is the optional capture-time share of the result (ADR-235).
+	Sharing *ContextSharingInput `json:"sharing,omitempty"`
 }
+
+// ContextSharingInput is the implemented subset of the canonical capture
+// sharing request: recipients and an optional absolute end.
+type ContextSharingInput struct {
+	Recipients []shareRecipientInput `json:"recipients"`
+	NotAfter   *time.Time            `json:"notAfter,omitempty"`
+}
+
+func (in *ContextSharingInput) intent() *value.ContextSharing {
+	if in == nil {
+		return nil
+	}
+	out := &value.ContextSharing{}
+	for _, r := range in.Recipients {
+		out.Recipients = append(out.Recipients, authorization.ShareRecipient{Kind: r.Kind, Issuer: r.Issuer, ID: r.ID})
+	}
+	if in.NotAfter != nil {
+		out.NotAfter = in.NotAfter.UTC().Truncate(time.Microsecond)
+	}
+	return out
+}
+
+// ContextSharingData is get_capture's sharing status, separate from capture
+// progress (ADR-235).
+type ContextSharingData struct {
+	State   string `json:"state"`
+	ShareID string `json:"share_id,omitempty"`
+}
+
+func sharingWarning(s *value.ContextSharing) []string {
+	if s == nil {
+		return []string{}
+	}
+	until := "24 hours after it is published"
+	if !s.NotAfter.IsZero() {
+		until = s.NotAfter.UTC().Format(time.RFC3339)
+	}
+	return []string{fmt.Sprintf("When this capture is published, its result will be shared with %d recipient(s) until %s (never past the evidence's access end). Recipients can read and download only that result.", len(s.Recipients), until)}
+}
+
 type OperationBlocker struct {
 	Code            string `json:"code"`
 	Message         string `json:"message"`
@@ -201,6 +244,7 @@ type ContextProgressData struct {
 	CanCancel         bool                `json:"can_cancel"`
 	Blockers          []OperationBlocker  `json:"blockers"`
 	Operation         string              `json:"operation"`
+	Sharing           *ContextSharingData `json:"sharing,omitempty"`
 }
 
 func collectionBlockers(enabled bool) []OperationBlocker {
@@ -211,6 +255,10 @@ func collectionBlockers(enabled bool) []OperationBlocker {
 }
 func publicCaptureFailure(err error, request bool) OperationFailure {
 	switch {
+	case errors.Is(err, value.ErrSharingDenied):
+		// Decided from the caller's own scope (preview) or after the
+		// caller's capture eligibility on the target (request): no oracle.
+		return OperationFailure{"SharingNotPermitted", "Sharing the result needs the evidence-owner role on this workload and the evidence:share scope. No capture was started. Remove the recipients, or ask an administrator for the role.", false}
 	case errors.Is(err, value.ErrPreparationUncertain):
 		return OperationFailure{"AcquisitionUncertain", "Collection may already be in progress, or this attempt may no longer be usable. Check its status before starting a new investigation. The original may still produce a result.", false}
 	case errors.Is(err, value.ErrAcquisitionClosed):
@@ -292,8 +340,8 @@ func captureAuditDecision(err error) operationAuditDecision {
 }
 
 // Call is shared by browser and MCP after their respective authentication. Its
-// inputs are strictly the implemented canonical subset. No optional unsupported
-// reason, sharing, history, raw-access or composition field is silently ignored.
+// inputs are strictly the implemented canonical subset (sharing: ADR-235). No
+// unsupported reason, history, raw-access or composition field is silently ignored.
 func (s *ContextOperations) Call(ctx context.Context, current identities.CurrentIdentity, name string, raw json.RawMessage) (OperationReply, error) {
 	if s == nil {
 		return OperationReply{}, ErrOperationsConfiguration
@@ -338,7 +386,7 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 		}
 	case "preview_capture":
 		var result app.ContextPreviewResult
-		result, operationErr = s.captures.Preview(ctx, current, value.ContextIntent{Target: in.Target.target(), Diagnostic: value.ContextDiagnosticName, RequestedSeconds: in.RequestedSeconds})
+		result, operationErr = s.captures.Preview(ctx, current, value.ContextIntent{Target: in.Target.target(), Diagnostic: value.ContextDiagnosticName, RequestedSeconds: in.RequestedSeconds, Sharing: in.Sharing.intent()})
 		if operationErr == nil {
 			until = identity.Earlier(until, identity.Earlier(result.ValidUntil, result.Assessment.ValidUntil))
 			p := result.Preview
@@ -346,7 +394,7 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 			if in.Target.Kind == "Pod" {
 				selection = "explicitPod"
 			}
-			out.Data = ContextPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: result.Assessment.OutputLimit, CaptureEnabled: s.config.CollectionEnabled, Blockers: collectionBlockers(s.config.CollectionEnabled), Warnings: []string{}, NavigationURI: s.config.PublicOrigin + "/captures/new", Lifecycle: ContextLifecycle(), Assessment: ContextAssessment(result.Assessment), Preset: PresetReference{"pod-status", "v1"}, Target: in.Target, SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}, PodSelection: selection}
+			out.Data = ContextPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: result.Assessment.OutputLimit, CaptureEnabled: s.config.CollectionEnabled, Blockers: collectionBlockers(s.config.CollectionEnabled), Warnings: sharingWarning(p.Intent.Sharing), NavigationURI: s.config.PublicOrigin + "/captures/new", Lifecycle: ContextLifecycle(), Assessment: ContextAssessment(result.Assessment), Preset: PresetReference{"pod-status", "v1"}, Target: in.Target, SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}, PodSelection: selection}
 		}
 	case "request_capture":
 		if !s.config.CollectionEnabled {
@@ -397,7 +445,11 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 		progress, operationErr = s.progress.Get(ctx, current, in.CaptureID)
 		if operationErr == nil {
 			until = identity.Earlier(until, progress.ValidUntil)
-			out.Data = ContextProgressData{CaptureID: progress.CaptureID, Revision: progress.Revision, Phase: progress.Phase, Actions: []ContextActionData{{ActionID: "pod-status", Phase: progress.ActionPhase, ReasonCode: progress.ReasonCode}}, CaseID: progress.CaseID, NavigationURI: s.config.PublicOrigin + "/captures/" + progress.CaptureID, RetryAfterSeconds: progress.RetryAfterSeconds, CanCancel: progress.CanCancel, Blockers: []OperationBlocker{}, Operation: "collect"}
+			data := ContextProgressData{CaptureID: progress.CaptureID, Revision: progress.Revision, Phase: progress.Phase, Actions: []ContextActionData{{ActionID: "pod-status", Phase: progress.ActionPhase, ReasonCode: progress.ReasonCode}}, CaseID: progress.CaseID, NavigationURI: s.config.PublicOrigin + "/captures/" + progress.CaptureID, RetryAfterSeconds: progress.RetryAfterSeconds, CanCancel: progress.CanCancel, Blockers: []OperationBlocker{}, Operation: "collect"}
+			if progress.Sharing != nil {
+				data.Sharing = &ContextSharingData{State: progress.Sharing.State, ShareID: progress.Sharing.ShareID}
+			}
+			out.Data = data
 		}
 	default:
 		return OperationReply{}, contracts.ErrInvestigationWire

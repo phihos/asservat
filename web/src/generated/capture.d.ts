@@ -941,6 +941,13 @@ export interface components {
                 /** @enum {unknown} */
                 operation?: "collect" | "recordingSave";
                 result_access?: components["schemas"]["Contract_investigation_access_0b2b78f874cf920d"];
+                /** @description Capture-time sharing status, reported separately from collection progress. Present only when the request included sharing. Shared names the concrete share; SharingUnavailable means the result was not shared (collection outcome is unaffected). */
+                sharing?: {
+                    /** @enum {unknown} */
+                    state: "Pending" | "Shared" | "SharingUnavailable";
+                    /** Format: uuid */
+                    share_id?: string;
+                };
             };
         } | {
             /** @constant */
