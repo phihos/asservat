@@ -108,9 +108,9 @@ func (t Targets) ResolvePod(ctx context.Context, r targets.Request) (targets.Pod
 // ObserveWorkloadRestarts asks the workload's region for one complete Pod
 // restart observation (ADR-228). The answer is delegated proof, capped at the
 // checked receiver validity; a truncated LIST arrives as a failure.
-func (t Targets) ObserveWorkloadRestarts(ctx context.Context, r targets.WorkloadRequest) (targets.RestartObservation, error) {
+func (t Targets) ObserveWorkloadRestarts(ctx context.Context, r targets.RestartRequest) (targets.RestartObservation, error) {
 	var out targets.RestartObservation
-	if !r.Valid() || r.Kind == "Pod" || t.Router == nil || t.Now == nil || ctx == nil || ctx.Err() != nil {
+	if !r.Valid() || t.Router == nil || t.Now == nil || ctx == nil || ctx.Err() != nil {
 		return out, targets.ErrInvalid
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -122,7 +122,7 @@ func (t Targets) ObserveWorkloadRestarts(ctx context.Context, r targets.Workload
 		return targets.RestartObservation{}, err
 	}
 	out.FreshUntil = identity.Earlier(out.FreshUntil, until)
-	if out.ClusterID != r.ClusterID || out.Namespace.Name != r.Namespace || out.Workload.Kind != r.Kind || out.Workload.Name != r.Name || !out.Valid(t.Now()) {
+	if out.ClusterID != r.ClusterID || out.Namespace.Name != r.Namespace || out.Workload.Kind != r.Kind || out.Workload.Name != r.Name || out.Probe != r.Probe || !out.Valid(t.Now()) {
 		t.report("restarts/result", "")
 		return targets.RestartObservation{}, targets.ErrUnavailable
 	}

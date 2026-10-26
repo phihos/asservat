@@ -45,9 +45,10 @@ func NewPolicyTriggers(ctx context.Context, pool *pgxpool.Pool, root, installati
 // ceiling all hold before an occurrence exists.
 func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value.PolicyOccurrence, error) {
 	a, o := in.Authority, in.Observation
-	if s == nil || !in.Policy.Valid() || a.InstallationID != s.installation || o.ClusterID != a.ClusterID || o.Namespace.UID != a.NamespaceUID || o.Workload.UID != a.WorkloadUID || in.Policy.ClusterID != a.ClusterID || len(o.Pods) > in.Policy.ObservedPods {
+	if s == nil || !in.Policy.Valid() || a.InstallationID != s.installation || o.ClusterID != a.ClusterID || o.Namespace.UID != a.NamespaceUID || o.Workload.UID != a.WorkloadUID || in.Policy.ClusterID != a.ClusterID || len(o.Pods) > in.Policy.ObservedPods || o.Probe != in.Policy.Request().Probe {
 		return nil, value.ErrInvalid
 	}
+	detector := in.Policy.Kind()
 	var out []value.PolicyOccurrence
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
 		out = nil
@@ -82,18 +83,18 @@ func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value
 		for _, p := range o.Pods {
 			observed = append(observed, p.UID)
 		}
-		marks, err := q.ListPolicyWatermarks(ctx, custodydb.ListPolicyWatermarksParams{RootID: id(s.root), PolicyUid: a.PolicyUID, Column3: observed})
+		marks, err := q.ListPolicyWatermarks(ctx, custodydb.ListPolicyWatermarksParams{RootID: id(s.root), PolicyUid: a.PolicyUID, Column3: observed, Detector: detector})
 		if err != nil {
 			return err
 		}
-		previous := make(map[string]int64, len(marks))
+		previous := make(map[string]value.PodMark, len(marks))
 		for _, m := range marks {
-			previous[m.PodUid] = m.Restarts
+			previous[m.PodUid] = value.PodMark{Value: m.Restarts, Armed: m.Armed}
 		}
-		next, fired := value.RestartDelta(in.Policy, previous, o)
-		pods, counts := make([]string, 0, len(next)), make([]int64, 0, len(next))
-		for pod, restarts := range next {
-			pods, counts = append(pods, pod), append(counts, restarts)
+		next, fired := value.TriggerDelta(in.Policy, previous, o)
+		pods, counts, armed := make([]string, 0, len(next)), make([]int64, 0, len(next)), make([]bool, 0, len(next))
+		for pod, m := range next {
+			pods, counts, armed = append(pods, pod), append(counts, m.Value), append(armed, m.Armed)
 		}
 		// Watermarks only rise: a Pod missing from one poll keeps its count, so
 		// its next restart still fires. Pods unseen for ten minutes are pruned.
@@ -101,7 +102,7 @@ func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value
 			return err
 		}
 		if len(pods) > 0 {
-			if err = q.UpsertPolicyWatermarks(ctx, custodydb.UpsertPolicyWatermarksParams{RootID: id(s.root), PolicyUid: a.PolicyUID, PodUids: pods, Restarts: counts, Seen: ts(n)}); err != nil {
+			if err = q.UpsertPolicyWatermarks(ctx, custodydb.UpsertPolicyWatermarksParams{RootID: id(s.root), PolicyUid: a.PolicyUID, PodUids: pods, Restarts: counts, Seen: ts(n), Detector: detector, Armed: armed}); err != nil {
 				return err
 			}
 		}
@@ -142,7 +143,7 @@ func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value
 				return err
 			}
 			occurrence := value.PolicyOccurrence{ID: uid(newID), PolicyUID: a.PolicyUID, PodUID: c.PodUID, Restarts: c.Restarts}
-			inserted, err := q.InsertPolicyOccurrence(ctx, custodydb.InsertPolicyOccurrenceParams{ID: newID, RootID: id(s.root), PolicyUid: a.PolicyUID, AcceptanceID: row.ActiveID, ClusterID: id(a.ClusterID), WorkloadUid: a.WorkloadUID, PodUid: c.PodUID, Restarts: c.Restarts})
+			inserted, err := q.InsertPolicyOccurrence(ctx, custodydb.InsertPolicyOccurrenceParams{ID: newID, RootID: id(s.root), PolicyUid: a.PolicyUID, AcceptanceID: row.ActiveID, ClusterID: id(a.ClusterID), WorkloadUid: a.WorkloadUID, PodUid: c.PodUID, Restarts: c.Restarts, Detector: detector})
 			if err != nil {
 				return err
 			}
@@ -352,7 +353,7 @@ func (s *PolicyTriggers) Status(ctx context.Context, policy string) (value.Polic
 			return err
 		}
 		for _, r := range recent {
-			o := value.PolicyOccurrenceStatus{ID: uid(r.ID), Restarts: r.Restarts, CreatedAt: r.CreatedAt.Time.UTC()}
+			o := value.PolicyOccurrenceStatus{ID: uid(r.ID), Detector: r.Detector, Restarts: r.Restarts, CreatedAt: r.CreatedAt.Time.UTC()}
 			if r.CaptureID.Valid {
 				o.CaptureID = uid(r.CaptureID)
 			}

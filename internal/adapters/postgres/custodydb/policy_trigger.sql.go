@@ -179,8 +179,8 @@ func (q *Queries) FindPolicyOccurrence(ctx context.Context, arg FindPolicyOccurr
 }
 
 const insertPolicyOccurrence = `-- name: InsertPolicyOccurrence :execrows
-INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(root_id,policy_uid,pod_uid,restarts) DO NOTHING
+INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts,detector)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(root_id,policy_uid,pod_uid,restarts) DO NOTHING
 `
 
 type InsertPolicyOccurrenceParams struct {
@@ -192,6 +192,7 @@ type InsertPolicyOccurrenceParams struct {
 	WorkloadUid  string
 	PodUid       string
 	Restarts     int64
+	Detector     string
 }
 
 func (q *Queries) InsertPolicyOccurrence(ctx context.Context, arg InsertPolicyOccurrenceParams) (int64, error) {
@@ -204,6 +205,7 @@ func (q *Queries) InsertPolicyOccurrence(ctx context.Context, arg InsertPolicyOc
 		arg.WorkloadUid,
 		arg.PodUid,
 		arg.Restarts,
+		arg.Detector,
 	)
 	if err != nil {
 		return 0, err
@@ -292,7 +294,7 @@ func (q *Queries) ListActivePolicies(ctx context.Context, rootID pgtype.UUID) ([
 }
 
 const listPolicyOccurrences = `-- name: ListPolicyOccurrences :many
-SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 ORDER BY created_at DESC, id LIMIT 8
+SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 ORDER BY created_at DESC, id LIMIT 8
 `
 
 type ListPolicyOccurrencesParams struct {
@@ -321,6 +323,7 @@ func (q *Queries) ListPolicyOccurrences(ctx context.Context, arg ListPolicyOccur
 			&i.CreatedAt,
 			&i.CaptureID,
 			&i.Outcome,
+			&i.Detector,
 		); err != nil {
 			return nil, err
 		}
@@ -369,22 +372,31 @@ func (q *Queries) ListPolicySuppressions(ctx context.Context, arg ListPolicySupp
 }
 
 const listPolicyWatermarks = `-- name: ListPolicyWatermarks :many
-SELECT pod_uid, restarts FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=ANY($3::text[])
+SELECT pod_uid, restarts, armed FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=ANY($3::text[]) AND detector=$4
 `
 
 type ListPolicyWatermarksParams struct {
 	RootID    pgtype.UUID
 	PolicyUid string
 	Column3   []string
+	Detector  string
 }
 
 type ListPolicyWatermarksRow struct {
 	PodUid   string
 	Restarts int64
+	Armed    bool
 }
 
+// Only watermarks of the policy's current detector (ADR-230); another
+// detector's row is a new baseline.
 func (q *Queries) ListPolicyWatermarks(ctx context.Context, arg ListPolicyWatermarksParams) ([]ListPolicyWatermarksRow, error) {
-	rows, err := q.db.Query(ctx, listPolicyWatermarks, arg.RootID, arg.PolicyUid, arg.Column3)
+	rows, err := q.db.Query(ctx, listPolicyWatermarks,
+		arg.RootID,
+		arg.PolicyUid,
+		arg.Column3,
+		arg.Detector,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -392,7 +404,7 @@ func (q *Queries) ListPolicyWatermarks(ctx context.Context, arg ListPolicyWaterm
 	items := []ListPolicyWatermarksRow{}
 	for rows.Next() {
 		var i ListPolicyWatermarksRow
-		if err := rows.Scan(&i.PodUid, &i.Restarts); err != nil {
+		if err := rows.Scan(&i.PodUid, &i.Restarts, &i.Armed); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -445,7 +457,7 @@ func (q *Queries) PrunePolicyWatermarks(ctx context.Context, arg PrunePolicyWate
 }
 
 const readPolicyOccurrence = `-- name: ReadPolicyOccurrence :one
-SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome FROM policy_occurrence WHERE root_id=$1 AND id=$2
+SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector FROM policy_occurrence WHERE root_id=$1 AND id=$2
 `
 
 type ReadPolicyOccurrenceParams struct {
@@ -468,6 +480,7 @@ func (q *Queries) ReadPolicyOccurrence(ctx context.Context, arg ReadPolicyOccurr
 		&i.CreatedAt,
 		&i.CaptureID,
 		&i.Outcome,
+		&i.Detector,
 	)
 	return i, err
 }
@@ -596,9 +609,11 @@ func (q *Queries) UpdatePolicyWindow(ctx context.Context, arg UpdatePolicyWindow
 }
 
 const upsertPolicyWatermarks = `-- name: UpsertPolicyWatermarks :exec
-INSERT INTO policy_pod_watermark(root_id,policy_uid,pod_uid,restarts,last_seen)
-SELECT $1::uuid, $2::text, unnest($3::text[]), unnest($4::bigint[]), $5::timestamptz
-ON CONFLICT(root_id,policy_uid,pod_uid) DO UPDATE SET restarts=GREATEST(policy_pod_watermark.restarts,EXCLUDED.restarts), last_seen=EXCLUDED.last_seen
+INSERT INTO policy_pod_watermark(root_id,policy_uid,pod_uid,restarts,last_seen,detector,armed)
+SELECT $1::uuid, $2::text, unnest($3::text[]), unnest($4::bigint[]), $5::timestamptz, $6::text, unnest($7::boolean[])
+ON CONFLICT(root_id,policy_uid,pod_uid) DO UPDATE SET
+ restarts=CASE WHEN policy_pod_watermark.detector=EXCLUDED.detector THEN GREATEST(policy_pod_watermark.restarts,EXCLUDED.restarts) ELSE EXCLUDED.restarts END,
+ last_seen=EXCLUDED.last_seen, detector=EXCLUDED.detector, armed=EXCLUDED.armed
 `
 
 type UpsertPolicyWatermarksParams struct {
@@ -607,8 +622,12 @@ type UpsertPolicyWatermarksParams struct {
 	PodUids   []string
 	Restarts  []int64
 	Seen      pgtype.Timestamptz
+	Detector  string
+	Armed     []bool
 }
 
+// A watermark of the same detector only rises; one of another detector is
+// replaced (ADR-230).
 func (q *Queries) UpsertPolicyWatermarks(ctx context.Context, arg UpsertPolicyWatermarksParams) error {
 	_, err := q.db.Exec(ctx, upsertPolicyWatermarks,
 		arg.RootID,
@@ -616,6 +635,8 @@ func (q *Queries) UpsertPolicyWatermarks(ctx context.Context, arg UpsertPolicyWa
 		arg.PodUids,
 		arg.Restarts,
 		arg.Seen,
+		arg.Detector,
+		arg.Armed,
 	)
 	return err
 }

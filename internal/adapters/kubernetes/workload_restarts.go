@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/domain/identity"
@@ -51,11 +52,12 @@ type restartState struct {
 // ObserveWorkloadRestarts lists one named workload's Pods once (ADR-228). It
 // reads the namespace, the workload, one bounded Pod LIST and the owning
 // ReplicaSets of a Deployment: no new privilege beyond workload resolution.
+// A probe request (ADR-230) adds one namespace Event LIST (Events `list`).
 // A truncated or partial LIST fails (ErrLimit/ErrUnavailable): the hub then
 // treats the poll as Unknown and fires nothing.
-func (c *PodTargets) ObserveWorkloadRestarts(ctx context.Context, r value.WorkloadRequest) (value.RestartObservation, error) {
+func (c *PodTargets) ObserveWorkloadRestarts(ctx context.Context, r value.RestartRequest) (value.RestartObservation, error) {
 	var zero value.RestartObservation
-	if !r.Valid() || r.Kind == "Pod" || r.ClusterID != c.client.clusterID || len(validation.IsDNS1123Label(r.Namespace)) != 0 || len(validation.IsDNS1123Subdomain(r.Name)) != 0 {
+	if !r.Valid() || r.ClusterID != c.client.clusterID || len(validation.IsDNS1123Label(r.Namespace)) != 0 || len(validation.IsDNS1123Subdomain(r.Name)) != 0 {
 		return zero, value.ErrInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -65,7 +67,7 @@ func (c *PodTargets) ObserveWorkloadRestarts(ctx context.Context, r value.Worklo
 	if err != nil {
 		return zero, err
 	}
-	workload, selector, err := c.namedWorkload(ctx, r)
+	workload, selector, err := c.namedWorkload(ctx, r.WorkloadRequest)
 	if err != nil {
 		return zero, err
 	}
@@ -168,6 +170,12 @@ func (c *PodTargets) ObserveWorkloadRestarts(ctx context.Context, r value.Worklo
 		}
 		out.Pods = append(out.Pods, pod)
 	}
+	if r.Probe != "" {
+		if err = c.probeFailures(ctx, ns.Name, r, start, out.Pods); err != nil {
+			return zero, err
+		}
+		out.Probe = r.Probe
+	}
 	out.ObservedAt = start
 	out.FreshUntil = start.Add(5 * time.Second)
 	if deadline, ok := ctx.Deadline(); ok {
@@ -190,4 +198,105 @@ func restartReason(reason string) string {
 	default:
 		return "Other"
 	}
+}
+
+// probeEventLimit bounds the one Event LIST of a probe observation; a
+// namespace with more Unhealthy Pod Events is not observed (Unknown).
+const probeEventLimit = 512
+
+type probeEventTime struct{ time.Time }
+
+func (t *probeEventTime) UnmarshalJSON(b []byte) error {
+	if string(b) == "null" {
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(b, &s); err != nil {
+		return err
+	}
+	if s == "" {
+		return nil
+	}
+	v, err := time.Parse(time.RFC3339Nano, s)
+	t.Time = v
+	return err
+}
+
+// probeFailures adds the ADR-230 probe data to the observed Pods from one
+// namespace Event LIST of kubelet Unhealthy Pod Events. Only the involved
+// Pod UID, the probe-type prefix of the message, counts and timestamps are
+// read; message text is never returned or kept. For each Pod it reports the
+// newest matching failure second and a proven lower bound of failures in
+// the window: an Event series that started inside the window counts all its
+// failures, one that started earlier counts only its latest. A continued,
+// truncated or malformed LIST fails, so the poll is Unknown.
+func (c *PodTargets) probeFailures(ctx context.Context, namespace string, r value.RestartRequest, now time.Time, pods []value.PodRestarts) error {
+	raw, err := c.client.raw(ctx, "/api/v1/namespaces/"+namespace+"/events", map[string]string{"fieldSelector": "involvedObject.kind=Pod,reason=Unhealthy", "limit": strconv.Itoa(probeEventLimit)})
+	if err != nil {
+		return targetReadError(err)
+	}
+	var list struct {
+		APIVersion, Kind string
+		Metadata         struct {
+			Continue           string
+			RemainingItemCount *int64
+		}
+		Items []struct {
+			InvolvedObject struct{ Kind, UID string }
+			Reason         string
+			Message        string
+			Count          int64
+			FirstTimestamp probeEventTime
+			LastTimestamp  probeEventTime
+			EventTime      probeEventTime
+			Series         *struct {
+				Count            int64
+				LastObservedTime probeEventTime
+			}
+		}
+	}
+	if json.Unmarshal(raw, &list) != nil || list.APIVersion != "v1" || list.Kind != "EventList" || list.Items == nil {
+		return value.ErrUnavailable
+	}
+	if list.Metadata.Continue != "" || len(list.Items) > probeEventLimit || list.Metadata.RemainingItemCount != nil && *list.Metadata.RemainingItemCount != 0 {
+		return value.ErrLimit
+	}
+	index := make(map[string]int, len(pods))
+	for i, p := range pods {
+		index[p.UID] = i
+	}
+	failed, errored := r.Probe+" probe failed", r.Probe+" probe errored"
+	windowStart := now.Unix() - r.ProbeWindowSeconds
+	for _, e := range list.Items {
+		i, owned := index[e.InvolvedObject.UID]
+		if !owned || e.InvolvedObject.Kind != "Pod" || e.Reason != "Unhealthy" || !strings.HasPrefix(e.Message, failed) && !strings.HasPrefix(e.Message, errored) {
+			continue
+		}
+		count, last, first := e.Count, e.LastTimestamp.Time, e.FirstTimestamp.Time
+		if e.Series != nil {
+			count = max(count, e.Series.Count)
+			if e.Series.LastObservedTime.After(last) {
+				last = e.Series.LastObservedTime.Time
+			}
+		}
+		if e.EventTime.After(last) {
+			last = e.EventTime.Time
+		}
+		if first.IsZero() {
+			first = e.EventTime.Time
+		}
+		if last.Unix() < value.MinProbeLast || last.Unix() >= 1<<31 || count < 0 || count > 1<<31 {
+			return value.ErrUnavailable
+		}
+		count = max(count, 1)
+		p := &pods[i]
+		p.ProbeLast = max(p.ProbeLast, last.Unix())
+		if last.Unix() > windowStart {
+			if first.IsZero() || first.Unix() <= windowStart {
+				count = 1
+			}
+			p.ProbeFailures = min(p.ProbeFailures+count, 1<<31)
+		}
+	}
+	return nil
 }

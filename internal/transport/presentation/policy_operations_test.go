@@ -82,3 +82,34 @@ func TestPolicyDeactivationOperationContract(t *testing.T) {
 		t.Fatal("deactivation without evidence:capture", out, f.stopped)
 	}
 }
+
+// ADR-230: status names the detector and reports an exit occurrence's restart
+// count or a probe occurrence's failure time; the output schema accepts both.
+func TestPolicyStatusReportsDetectorAndOccurrenceKinds(t *testing.T) {
+	f := &policyOperationsFixture{scopes: []string{"evidence:read"}}
+	s, err := NewPolicyOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f, f, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created := time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC)
+	f.status = value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, MaxExecutions: 10, NotAfter: time.Now().Add(time.Hour),
+		Detector: &value.PolicyDetector{Kind: "probe", ProbeType: "Readiness", MinimumFailures: 2, WindowSeconds: 60},
+		Recent: []value.PolicyOccurrenceStatus{
+			{ID: "11111111-1111-4111-8111-111111111111", Outcome: "captured", CaptureID: "22222222-2222-4222-8222-222222222222", Detector: "probe", Restarts: created.Add(-time.Minute).Unix(), CreatedAt: created},
+			{ID: "33333333-3333-4333-8333-333333333333", Outcome: "refused", Detector: "exit", Restarts: 3, CreatedAt: created},
+		}}
+	out := policyCall(t, s, f, "get_policy_status", `{"policy_name":"probes"}`)
+	data, _ := out["data"].(map[string]any)
+	if out["status"] != "ok" {
+		t.Fatal("status", out)
+	}
+	detector, _ := data["detector"].(map[string]any)
+	recent, _ := data["recent"].([]any)
+	if detector["kind"] != "probe" || detector["probe_type"] != "Readiness" || detector["window_seconds"] != float64(60) || len(recent) != 2 {
+		t.Fatal("detector", data)
+	}
+	probe, exit := recent[0].(map[string]any), recent[1].(map[string]any)
+	if probe["detector"] != "probe" || probe["failed_at"] != "2026-10-26T11:59:00Z" || probe["restarts"] != nil || exit["detector"] != "exit" || exit["restarts"] != float64(3) || exit["failed_at"] != nil {
+		t.Fatal("occurrence kinds", recent)
+	}
+}

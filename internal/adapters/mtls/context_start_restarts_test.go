@@ -21,17 +21,24 @@ type restartRegion struct {
 	calls int
 }
 
-func (f *restartRegion) ObserveWorkloadRestarts(_ context.Context, r targets.WorkloadRequest) (targets.RestartObservation, error) {
+func (f *restartRegion) ObserveWorkloadRestarts(_ context.Context, r targets.RestartRequest) (targets.RestartObservation, error) {
 	f.calls++
 	w := f.work.Target
 	now := time.Now().UTC().Truncate(time.Microsecond)
-	o := targets.RestartObservation{ClusterID: r.ClusterID, Namespace: configuration.NamespaceRef{Name: r.Namespace, UID: w.NamespaceUID}, Workload: configuration.WorkloadRef{Kind: r.Kind, Name: r.Name, UID: w.WorkloadUID}, Pods: []targets.PodRestarts{}, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	o := targets.RestartObservation{ClusterID: r.ClusterID, Namespace: configuration.NamespaceRef{Name: r.Namespace, UID: w.NamespaceUID}, Workload: configuration.WorkloadRef{Kind: r.Kind, Name: r.Name, UID: w.WorkloadUID}, Pods: []targets.PodRestarts{}, Probe: r.Probe, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
 	for n := range f.pods {
 		name := fmt.Sprintf("app-%d", n)
 		if f.long {
 			name += "-" + strings.Repeat("x", 240)
 		}
-		o.Pods = append(o.Pods, targets.PodRestarts{Name: name, UID: fmt.Sprintf("00000000-0000-4000-8000-%012d", n), Restarts: int64(n), Reason: "Error", ExitCode: 137})
+		pod := targets.PodRestarts{Name: name, UID: fmt.Sprintf("00000000-0000-4000-8000-%012d", n), Restarts: int64(n), Reason: "Error", ExitCode: 137}
+		if r.Probe != "" {
+			// ADR-230: a Deployment Pod name of the maximal 63 characters and
+			// four-digit failure counts.
+			pod.Name = (name + "-" + strings.Repeat("p", 63))[:63]
+			pod.ProbeFailures, pod.ProbeLast = 1000, 1792000000+int64(n)
+		}
+		o.Pods = append(o.Pods, pod)
 	}
 	return o, nil
 }
@@ -54,19 +61,25 @@ func TestContextStartActualHTTP2RestartObservationQuery(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 	hub := contextstart.Targets{Router: f.router, Now: time.Now}
-	request := targets.WorkloadRequest{ClusterID: work.Target.ClusterID, Namespace: "app", Kind: "Deployment", Name: "app"}
+	request := targets.RestartRequest{WorkloadRequest: targets.WorkloadRequest{ClusterID: work.Target.ClusterID, Namespace: "app", Kind: "Deployment", Name: "app"}}
 	o, err := hub.ObserveWorkloadRestarts(ctx, request)
 	if err != nil || len(o.Pods) != targets.MaxRestartPods || o.Workload.UID != work.Target.WorkloadUID || o.FreshUntil.After(exchange.Receiver().ValidUntil.Add(time.Second)) {
 		t.Fatal("restart observation", err, len(o.Pods))
+	}
+	// A probe observation of 128 Pods still fits one answer frame.
+	probe := request
+	probe.Probe, probe.ProbeWindowSeconds = "Readiness", 60
+	if o, err = hub.ObserveWorkloadRestarts(ctx, probe); err != nil || len(o.Pods) != targets.MaxRestartPods || o.Probe != "Readiness" || o.Pods[1].ProbeFailures != 1000 {
+		t.Fatal("probe observation", err, len(o.Pods))
 	}
 	region.long = true
 	if _, err = hub.ObserveWorkloadRestarts(ctx, request); !errors.Is(err, targets.ErrUnavailable) {
 		t.Fatal("oversized answer was not a closed failure", err)
 	}
-	if _, err = hub.ResolveWorkload(ctx, request); err != nil {
+	if _, err = hub.ResolveWorkload(ctx, request.WorkloadRequest); err != nil {
 		t.Fatal("standby lost after a closed restart failure", err)
 	}
-	if region.calls != 2 {
+	if region.calls != 3 {
 		t.Fatal("region observed", region.calls)
 	}
 }

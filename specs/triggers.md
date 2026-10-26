@@ -133,6 +133,50 @@ the existing capture and its evidence remain; repeating the deactivation is a re
 reports `deactivated`; and activating the unchanged revision again is refused, so its spend and
 expiry cannot be reset.
 
+## Probe-failure triggers (ADR-230)
+
+The second implemented detector is `probe` with `source: events` (`auto` selects events), on the
+same hub-held policy shape, recipe, budgets, suppression reasons and capture path as the restart
+counter. `kubeletMetrics` is rejected with its field path (it needs node access). A probe policy's
+poll adds one namespace core/v1 Event LIST (`involvedObject.kind=Pod,reason=Unhealthy`, at most 512
+items) to the Pod LIST. The region matches the message prefix `<probeType> probe failed` or
+`<probeType> probe errored` and returns, per owned Pod, only the newest failure second and a proven
+lower bound of failures within `window`; no Event text leaves the region. Its semantics refine
+REQ-TRG-002/006/007 for this source:
+
+- `window` is 30 s to 5 min (two polls to the correlation ceiling) in whole seconds;
+  `minimumFailures` 1–1000; `evaluation.rearmFor` must not exceed `window`.
+- Failures within the window are a lower bound from Kubernetes Event series: a series (one Event
+  object with `count`, or `series.count`) that started inside the window counts all its failures; one
+  that started earlier counts only its latest. A burst inside a long-running identical-message
+  series is therefore undercounted, never overcounted. `minimumFailures: 1` fires on any failure.
+- The detector is a level: a Pod fails while at least `minimumFailures` failures fall in the
+  window. One occurrence fires on a rising edge only, keyed (policy, Pod UID, newest failure
+  second). The first observation of a Pod is its baseline and is armed only if its window is
+  empty; a Pod already failing at activation waits for a proven recovery. After an occurrence,
+  admitted or suppressed, the Pod re-arms at the first poll with an empty window, which proves
+  `window` seconds without a recorded failure. An Unknown poll (denied, continued, truncated or
+  malformed Event LIST) neither fires nor re-arms.
+- Kubernetes Events are best-effort (REQ-TRG-006): the kubelet may aggregate, rate-limit or drop
+  them and they expire (default one hour). Readiness can also change without an Event; the
+  detector reports only recorded probe failures. A liveness or startup failure that restarts the
+  container is also visible to an exit detector.
+- Changing a policy's detector (exit ↔ probe) re-baselines every Pod: a watermark of another
+  detector is never compared.
+
+Log and resource detectors remain rejected at activation (`spec.detectors[0].kind`): the
+[ADR-230](../docs/decisions/230-s03-detectors.md) complexity gate paused both for a maintainer
+decision.
+
+### SC-TRG-010
+
+Given an activated probe policy (Readiness, two failures within one minute) on a workload whose
+replicas pass their readiness probe, when one Pod's readiness probe starts failing every few
+seconds, then exactly one pod-status capture of that Pod runs under the policy executor, further
+failures of the same failing period create no occurrence, and no Event text appears in status,
+occurrences, logs or the capture request. A Pod already failing when the policy is activated fires
+only after a minute without failure followed by a new failure.
+
 ## Trigger-to-action lifecycle
 
 A detector firing is an occurrence signal, not a request to restart every collector. [Action lifecycle](action-lifecycle.md) resolution produces already armed ongoing sources and onTrigger actions. After ordinary admission, preserve matching source windows and dispatch independent onTrigger work. Cooldowns/deduplication suppress saves and actions while admitted continuous observation can continue. A late event or pending dump approval never shifts an existing window forward. Source readiness/coverage is separate from detector freshness and per-incident selection; missing required source history is visible while permitted context proceeds.

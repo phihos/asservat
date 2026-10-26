@@ -38,6 +38,10 @@ rules:
   - apiGroups: [""]
     resources: [pods]
     verbs: [get]
+  # ADR-230: the connector lists kubelet Unhealthy Events for probe policies.
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [list]
   - apiGroups: [apps]
     resources: [deployments, deployments/scale]
     verbs: [get, create, update]

@@ -5974,7 +5974,7 @@
     },
     {
       "name": "preview_capture",
-      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human\u2019s selected result inspection/download; never an issued grant.",
+      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human’s selected result inspection/download; never an issued grant.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -10098,7 +10098,7 @@
     },
     {
       "name": "cancel_artifact_download",
-      "description": "Stop this caller and client\u2019s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
+      "description": "Stop this caller and client’s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,
@@ -10542,7 +10542,7 @@
     },
     {
       "name": "get_policy_status",
-      "description": "Explain an activated or deactivated restart-trigger policy without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing.",
+      "description": "Explain an activated or deactivated restart- or probe-trigger policy (ADR-228/230) without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -10682,14 +10682,51 @@
                             "created_at": {
                               "type": "string",
                               "format": "date-time"
+                            },
+                            "detector": {
+                              "enum": [
+                                "exit",
+                                "probe"
+                              ]
+                            },
+                            "failed_at": {
+                              "type": "string",
+                              "format": "date-time"
                             }
                           },
                           "required": [
                             "occurrence_id",
                             "outcome",
-                            "restarts",
+                            "detector",
                             "created_at"
-                          ]
+                          ],
+                          "if": {
+                            "properties": {
+                              "detector": {
+                                "const": "probe"
+                              }
+                            }
+                          },
+                          "then": {
+                            "required": [
+                              "failed_at"
+                            ],
+                            "not": {
+                              "required": [
+                                "restarts"
+                              ]
+                            }
+                          },
+                          "else": {
+                            "required": [
+                              "restarts"
+                            ],
+                            "not": {
+                              "required": [
+                                "failed_at"
+                              ]
+                            }
+                          }
                         }
                       },
                       "suppressions": {
@@ -10730,6 +10767,59 @@
                             "last_at"
                           ]
                         }
+                      },
+                      "detector": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "description": "The current DebugPolicy's detector configuration (no observed content).",
+                        "properties": {
+                          "kind": {
+                            "enum": [
+                              "exit",
+                              "probe"
+                            ]
+                          },
+                          "reasons": {
+                            "type": "array",
+                            "maxItems": 3,
+                            "items": {
+                              "enum": [
+                                "CrashLoopBackOff",
+                                "Error",
+                                "OOMKilled"
+                              ]
+                            }
+                          },
+                          "exit_codes": {
+                            "type": "array",
+                            "maxItems": 16,
+                            "items": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            }
+                          },
+                          "probe_type": {
+                            "enum": [
+                              "Liveness",
+                              "Readiness",
+                              "Startup"
+                            ]
+                          },
+                          "minimum_failures": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 1000
+                          },
+                          "window_seconds": {
+                            "type": "integer",
+                            "minimum": 30,
+                            "maximum": 300
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ]
                       }
                     },
                     "required": [

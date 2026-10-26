@@ -92,12 +92,25 @@ type policyExecutor struct {
 	Kind      string `json:"kind"`
 	PolicyUID string `json:"policy_uid"`
 }
+
+// policyOccurrenceData is one recent occurrence: an exit occurrence's restart
+// count, or a probe occurrence's newest failure time (ADR-230).
 type policyOccurrenceData struct {
-	OccurrenceID string    `json:"occurrence_id"`
-	CaptureID    string    `json:"capture_id,omitempty"`
-	Outcome      string    `json:"outcome"`
-	Restarts     int64     `json:"restarts"`
-	CreatedAt    time.Time `json:"created_at"`
+	OccurrenceID string     `json:"occurrence_id"`
+	CaptureID    string     `json:"capture_id,omitempty"`
+	Outcome      string     `json:"outcome"`
+	Detector     string     `json:"detector"`
+	Restarts     int64      `json:"restarts,omitempty"`
+	FailedAt     *time.Time `json:"failed_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+}
+type policyDetectorData struct {
+	Kind            string   `json:"kind"`
+	Reasons         []string `json:"reasons,omitempty"`
+	ExitCodes       []int32  `json:"exit_codes,omitempty"`
+	ProbeType       string   `json:"probe_type,omitempty"`
+	MinimumFailures int      `json:"minimum_failures,omitempty"`
+	WindowSeconds   int64    `json:"window_seconds,omitempty"`
 }
 type policySuppressionData struct {
 	Reason  string    `json:"reason"`
@@ -119,6 +132,7 @@ type policyStatusData struct {
 	Captured        int64                   `json:"captured"`
 	Recent          []policyOccurrenceData  `json:"recent"`
 	Suppressions    []policySuppressionData `json:"suppressions"`
+	Detector        *policyDetectorData     `json:"detector,omitempty"`
 }
 
 func publicPolicyFailure(err error) OperationFailure {
@@ -140,7 +154,7 @@ func publicPolicyFailure(err error) OperationFailure {
 	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied):
 		return OperationFailure{"NotAvailable", "This operation is not available with your current access.", false}
 	case errors.Is(err, value.ErrInvalid):
-		return OperationFailure{"UnsupportedRequest", "The named policy is not a valid restart-trigger DebugPolicy.", false}
+		return OperationFailure{"UnsupportedRequest", "The named policy is not a valid restart- or probe-trigger DebugPolicy.", false}
 	}
 	return OperationFailure{"NotAvailable", "The operation is unavailable. Check your access or retry when the service is available.", true}
 }
@@ -215,7 +229,15 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 				if outcome == "" {
 					outcome = "pending"
 				}
-				data.Recent = append(data.Recent, policyOccurrenceData{OccurrenceID: o.ID, CaptureID: o.CaptureID, Outcome: outcome, Restarts: o.Restarts, CreatedAt: o.CreatedAt.UTC()})
+				item := policyOccurrenceData{OccurrenceID: o.ID, CaptureID: o.CaptureID, Outcome: outcome, Detector: o.Detector, Restarts: o.Restarts, CreatedAt: o.CreatedAt.UTC()}
+				if o.Detector == value.DetectorProbe {
+					failed := time.Unix(o.Restarts, 0).UTC()
+					item.Restarts, item.FailedAt = 0, &failed
+				}
+				data.Recent = append(data.Recent, item)
+			}
+			if d := st.Detector; d != nil {
+				data.Detector = &policyDetectorData{Kind: d.Kind, Reasons: d.Reasons, ExitCodes: d.ExitCodes, ProbeType: d.ProbeType, MinimumFailures: d.MinimumFailures, WindowSeconds: d.WindowSeconds}
 			}
 			for _, x := range st.Suppressions {
 				data.Suppressions = append(data.Suppressions, policySuppressionData{Reason: x.Reason, Count: x.Count, FirstAt: x.FirstAt.UTC(), LastAt: x.LastAt.UTC()})

@@ -12,6 +12,22 @@ const reasons: Record<string, string> = {
   capacity: 'collection capacity', authority: 'access no longer sufficient', unavailable: 'target or service unavailable',
 };
 
+type Status = NonNullable<Entry['status']>;
+
+// The current DebugPolicy's detector (ADR-228/230), configuration only.
+function detector(d: NonNullable<Status['detector']>): string {
+  if (d.kind === 'probe') {
+    const n = d.minimum_failures ?? 1;
+    return `${d.probe_type ?? ''} probe failures: ${n} ${n === 1 ? 'failure' : 'failures'} within ${d.window_seconds ?? 0} s (Kubernetes Events)`;
+  }
+  const codes = d.exit_codes?.length ? `, exit codes ${d.exit_codes.join(', ')}` : '';
+  return `Container restarts: ${(d.reasons ?? []).join(', ')}${codes}`;
+}
+
+function occurrence(o: Status['recent'][number]): string {
+  return o.detector === 'probe' && o.failed_at ? `probe failure at ${new Date(o.failed_at).toLocaleString()}` : `restart ${o.restarts ?? ''}`;
+}
+
 function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies }) {
   const s = entry.status;
   const active = s?.state === 'active';
@@ -20,6 +36,7 @@ function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies
     {s ? <>
       <p role="status">{states[s.state] ?? s.state}</p>
       <dl className="facts">
+        {s.detector && <><dt>Trigger</dt><dd>{detector(s.detector)}</dd></>}
         <dt>Executions</dt><dd>{s.executions_spent} of {s.max_executions} used</dd>
         <dt>Expires</dt><dd>{new Date(s.expires_at).toLocaleString()}</dd>
         <dt>Watched pods</dt><dd>{s.watched_pods}</dd>
@@ -27,7 +44,7 @@ function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies
         {s.suppressions.length > 0 && <><dt>Suppressed</dt><dd>{s.suppressions.map(x => `${x.count} × ${reasons[x.reason] ?? x.reason}`).join('; ')}</dd></>}
       </dl>
       {s.recent.length > 0 && <ul className="progress-actions" aria-label="Recent occurrences">{s.recent.map(o => <li key={o.occurrence_id}>
-        <span>{new Date(o.created_at).toLocaleString()} (restart {o.restarts})</span>
+        <span>{new Date(o.created_at).toLocaleString()} ({occurrence(o)})</span>
         <span>{o.capture_id ? <a href={'/captures/' + o.capture_id}>View capture</a> : o.outcome}</span>
       </li>)}</ul>}
       {s.state === 'deactivated' && <p>Existing captures and evidence are kept. This revision cannot be activated again; change the DebugPolicy to activate a new revision.</p>}
@@ -41,7 +58,7 @@ function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies
   </article>;
 }
 
-// Hub-held restart-trigger DebugPolicies (ADR-228/229). Activation, status and
+// Hub-held restart- and probe-trigger DebugPolicies (ADR-228/229/230). Activation, status and
 // deactivation are the shared browser/MCP operations; nothing is decided here.
 export function PolicyWorkspace({ session, scope, controller }: { session: Session; scope: AbortSignal; controller: Policies }) {
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
@@ -51,7 +68,7 @@ export function PolicyWorkspace({ session, scope, controller }: { session: Sessi
   useEffect(() => { heading.current?.focus(); }, []);
   return <div className="capture-workspace">
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>Automatic policies</h1>
-      <p>Activate a hub-held restart policy for your team, check what it captured and stop it. A permission administrator can also stop a policy by suspending it in Kubernetes. <a href="/captures/new">Collect evidence manually</a>.</p>
+      <p>Activate a hub-held restart or probe-failure policy for your team, check what it captured and stop it. A permission administrator can also stop a policy by suspending it in Kubernetes. <a href="/captures/new">Collect evidence manually</a>.</p>
     </div>
     <form onSubmit={event => { event.preventDefault(); void controller.lookup(name); }}>
       <label>Policy name<input name="policy" value={name} required maxLength={253} pattern="[a-z0-9]([\-a-z0-9.]*[a-z0-9])?" onChange={event => setName(event.target.value)} autoComplete="off" spellCheck={false}/></label>

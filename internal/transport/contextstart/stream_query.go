@@ -19,14 +19,15 @@ import (
 const (
 	queryResolveWorkload = "resolve-workload"
 	queryResolvePod      = "resolve-pod"
-	// ADR-228: one bounded Pod LIST of a named workload's restart counters.
+	// ADR-228: one bounded Pod LIST of a named workload's restart counters,
+	// plus one Event LIST of its namespace for a probe detector (ADR-230).
 	queryObserveRestarts = "observe-workload-restarts"
 )
 
 // RestartTargets is the region's optional restart observation (ADR-228). A
 // region without it answers the query as unsupported.
 type RestartTargets interface {
-	ObserveWorkloadRestarts(context.Context, targets.WorkloadRequest) (targets.RestartObservation, error)
+	ObserveWorkloadRestarts(context.Context, targets.RestartRequest) (targets.RestartObservation, error)
 }
 
 // QueryTargets is the region's own cluster target resolver.
@@ -275,7 +276,7 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		out, e = s.targets.ResolvePod(bounded, r)
 	case queryObserveRestarts:
-		var r targets.WorkloadRequest
+		var r targets.RestartRequest
 		if decodeOperationBody(q.Body, &r) != nil {
 			return contracts.ErrAPIContextProtocol
 		}
