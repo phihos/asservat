@@ -52,7 +52,7 @@ func (s PolicyStatusService) Get(ctx context.Context, current identities.Current
 		return zero, time.Time{}, value.ErrUnavailable
 	}
 	status, err := s.Ledger.Status(ctx, source.Revision.UID)
-	if err != nil || status.ActiveID == "" {
+	if err != nil || status.ActiveID == "" && status.DeactivatedID == "" {
 		return zero, time.Time{}, value.ErrUnavailable
 	}
 	target := authorization.PolicyScope(status.Authority)

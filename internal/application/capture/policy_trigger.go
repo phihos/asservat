@@ -3,6 +3,7 @@ package capture
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -66,15 +67,22 @@ func (t PolicyTrigger) reportTimed(label, timing string) {
 }
 
 // Run polls until ctx ends. A failed tick is reported and retried on the
-// next period; it never queues work or retries a capture.
+// next period; it never queues work or retries a capture. Admitted
+// occurrences run off the poll loop (ADR-229): at most one capture goroutine
+// per policy, so one policy's capture (up to 45 s) never delays the other
+// policies' polls. A policy whose previous occurrences are still running is
+// not polled this cycle; its next poll coalesces the restarts in between.
+// Run returns only after every capture goroutine has finished.
 func (t PolicyTrigger) Run(ctx context.Context) error {
 	if !t.configured() || ctx == nil {
 		return value.ErrUnavailable
 	}
+	r := &triggerRunner{busy: map[string]bool{}}
+	defer r.wg.Wait()
 	ticker := time.NewTicker(value.TriggerPollInterval)
 	defer ticker.Stop()
 	for {
-		t.Cycle(ctx)
+		t.cycle(ctx, r)
 		select {
 		case <-ctx.Done():
 			return nil
@@ -83,9 +91,43 @@ func (t PolicyTrigger) Run(ctx context.Context) error {
 	}
 }
 
+// triggerRunner bounds capture goroutines to one per policy and joins them.
+type triggerRunner struct {
+	wg   sync.WaitGroup
+	mu   sync.Mutex
+	busy map[string]bool
+}
+
+func (r *triggerRunner) running(policy string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.busy[policy]
+}
+
+func (r *triggerRunner) start(policy string, work func()) {
+	r.mu.Lock()
+	r.busy[policy] = true
+	r.mu.Unlock()
+	r.wg.Add(1)
+	go func() {
+		defer r.wg.Done()
+		defer func() {
+			r.mu.Lock()
+			delete(r.busy, policy)
+			r.mu.Unlock()
+		}()
+		work()
+	}()
+}
+
 // Cycle runs one poll of every active policy, sequentially: the policies of
-// one cluster share its regional standby query budget.
+// one cluster share its regional standby query budget. Its captures run
+// inline, before it returns.
 func (t PolicyTrigger) Cycle(ctx context.Context) {
+	t.cycle(ctx, nil)
+}
+
+func (t PolicyTrigger) cycle(ctx context.Context, r *triggerRunner) {
 	if !t.configured() || ctx.Err() != nil {
 		return
 	}
@@ -104,7 +146,11 @@ func (t PolicyTrigger) Cycle(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		if err := t.Tick(ctx, p); err != nil {
+		if r != nil && r.running(p.PolicyUID) {
+			t.report("tick/busy")
+			continue
+		}
+		if err := t.tick(ctx, p, r); err != nil {
 			t.report("tick/" + failureClass(err))
 		}
 	}
@@ -113,6 +159,11 @@ func (t PolicyTrigger) Cycle(ctx context.Context) {
 // Tick observes the policy source and its workload once and runs the
 // admitted occurrences. An incomplete observation fires nothing (Unknown).
 func (t PolicyTrigger) Tick(ctx context.Context, p value.ActivePolicy) error {
+	return t.tick(ctx, p, nil)
+}
+
+// tick runs the admitted occurrences inline, or on r's policy goroutine.
+func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *triggerRunner) error {
 	tick, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	source, spec, err := t.Documents.ReadPolicy(tick, p.Name, p.PolicyUID)
@@ -149,6 +200,19 @@ func (t PolicyTrigger) Tick(ctx context.Context, p value.ActivePolicy) error {
 	if err != nil {
 		return err
 	}
+	if len(occurrences) == 0 {
+		return nil
+	}
+	if r == nil {
+		t.run(ctx, a, compiled, observation, occurrences)
+	} else {
+		r.start(p.PolicyUID, func() { t.run(ctx, a, compiled, observation, occurrences) })
+	}
+	return nil
+}
+
+// run captures each admitted occurrence once, in order, and records it.
+func (t PolicyTrigger) run(ctx context.Context, a authorization.AcceptedPolicyAuthority, compiled value.RestartPolicy, observation targets.RestartObservation, occurrences []value.PolicyOccurrence) {
 	for _, o := range occurrences {
 		var name string
 		for _, pod := range observation.Pods {
@@ -164,7 +228,6 @@ func (t PolicyTrigger) Tick(ctx context.Context, p value.ActivePolicy) error {
 		}
 		t.reportTimed("occurrence/"+map[bool]string{true: "captured", false: refusal}[captureID != ""], "in "+time.Since(started).Round(10*time.Millisecond).String()+" ["+times.String()+"]")
 	}
-	return nil
 }
 
 // capture runs the ordinary preview and request of the triggering Pod under

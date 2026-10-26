@@ -45,7 +45,7 @@ func (investigationOfflineLoader) Load(string) (any, error) { return nil, ErrInv
 
 func NewInvestigationContracts() (*InvestigationContracts, error) {
 	v := &InvestigationContracts{tools: make(map[string]investigationSchema)}
-	for _, name := range []string{"list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status"} {
+	for _, name := range []string{"list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy"} {
 		b, err := investigationSchemas.ReadFile("investigation-schemas/" + name + ".json")
 		var d InvestigationTool
 		if err != nil || json.Unmarshal(b, &d) != nil || d.Name != name {

@@ -10405,8 +10405,144 @@
       }
     },
     {
+      "name": "deactivate_policy",
+      "description": "Deactivate an accepted hub-held restart-trigger DebugPolicy (ADR-229). Requires whole-pod collection rights and membership in a workload-maintainer group of the policy's delegating AccessBinding. No further occurrence is admitted from the next poll cycle; spend is not refunded and existing captures and evidence are kept. Repeating it is harmless. A deactivated revision cannot be activated again; change the DebugPolicy to activate a new revision.",
+      "enabledByDefault": true,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "policy_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253,
+            "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "policy_name",
+          "idempotency_key"
+        ]
+      },
+      "outputSchema": {
+        "allOf": [
+          {
+            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
+          },
+          {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "ok"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "policy_uid": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "acceptance_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "state": {
+                        "const": "deactivated"
+                      },
+                      "replay": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "policy_uid",
+                      "acceptance_id",
+                      "state",
+                      "replay"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "error"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      },
+                      "navigation_uri": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 2048
+                      },
+                      "responsible_role": {
+                        "enum": [
+                          "maintainer",
+                          "approver",
+                          "administrator",
+                          "none"
+                        ]
+                      },
+                      "retry_after_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "message",
+                      "retryable"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "get_policy_status",
-      "description": "Explain an activated restart-trigger policy without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing.",
+      "description": "Explain an activated or deactivated restart-trigger policy without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -10457,6 +10593,7 @@
                       "state": {
                         "enum": [
                           "active",
+                          "deactivated",
                           "suspended",
                           "changed",
                           "expired",

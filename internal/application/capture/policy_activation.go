@@ -96,6 +96,10 @@ func (s PolicyActivation) delegationRefused(stage string) error {
 	return ErrPolicyDelegation
 }
 
+// ErrPolicyDeactivated means this exact revision and delegation was
+// deactivated; only a changed DebugPolicy (or delegation) can be activated.
+var ErrPolicyDeactivated = errors.New("policy revision deactivated")
+
 // ErrPolicyDelegation means no sole automation-bearing AccessBinding, or the
 // submitter is in none of its sponsoring groups (DelegationRequired).
 var ErrPolicyDelegation = errors.New("policy delegation required")
@@ -149,6 +153,16 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 		return zero, s.refused("nonce", err)
 	} else if found {
 		if previous.Submitter != author.Principal || previous.Authority.PolicyUID != source.Revision.UID {
+			return zero, value.ErrConflict
+		}
+		// The original receipt is returned only while it is still the current
+		// acceptance: a deactivated or replaced one is never reported active.
+		if current, err := s.Ledger.Status(ctx, source.Revision.UID); err != nil {
+			return zero, s.refused("status", err)
+		} else if current.ActiveID != previous.ID {
+			if current.DeactivatedID == previous.ID {
+				return zero, ErrPolicyDeactivated
+			}
 			return zero, value.ErrConflict
 		}
 		audited := s.Audit.PublishPolicyAcceptances(ctx) == nil
@@ -234,6 +248,12 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 		// source can never be accepted again to reset its spend or expiry.
 		audited := s.Audit.PublishPolicyAcceptances(ctx) == nil
 		return PolicyActivationResult{PolicyUID: authority.PolicyUID, AcceptanceID: status.ActiveID, NotAfter: status.NotAfter, MaxExecutions: status.MaxExecutions, Replay: true, Audited: audited}, nil
+	}
+	if status.DeactivatedID != "" && status.Authority.ScopeDigest == authority.ScopeDigest {
+		// Reactivation is a fresh acceptance of a changed scope (ADR-229): a
+		// deactivated revision is never accepted again, so its spend and
+		// expiry cannot be reset by stopping and starting it.
+		return zero, ErrPolicyDeactivated
 	}
 	use := authorization.PolicyUse{PolicyUID: authority.PolicyUID, ScopeDigest: authority.ScopeDigest, Target: target, Purpose: authorization.PolicyIncident}
 	if check := authorization.ValidatePolicyAcceptance(author, authority, envelope, use, s.Now()); !check.Eligible {

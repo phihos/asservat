@@ -86,3 +86,23 @@ func PolicyContextEligibility(i identity.Identity, a AcceptedPolicyAuthority, p 
 func PolicyScope(a AcceptedPolicyAuthority) Target {
 	return Target{ClusterID: a.ClusterID, NamespaceUID: a.NamespaceUID, WorkloadUID: a.WorkloadUID, PodUID: a.WorkloadUID}
 }
+
+// PolicyStopEligibility is the right to deactivate an accepted policy
+// (ADR-229): the current human holds a current, undenied workload-maintainer
+// group assignment of the policy's delegating AccessBinding, the same team
+// authority that sponsors activation. Stopping collects and discloses nothing.
+func PolicyStopEligibility(i identity.Identity, p Projection, a AcceptedPolicyAuthority, now time.Time) Result {
+	if i.Principal.Kind != identity.Human {
+		return Result{Reason: "IdentityUnavailable"}
+	}
+	r := ScopeEligibility(i, p, ReadApproved, PolicyScope(a), now)
+	if !r.Eligible {
+		return r
+	}
+	for _, o := range r.ContributingAssignments {
+		if o.Kind == "Group" && o.Role == "workload-maintainer" && o.BasisKind == "AccessBinding" && o.BasisUID == a.Delegation.UID {
+			return r
+		}
+	}
+	return Result{Reason: "DelegationRequired"}
+}

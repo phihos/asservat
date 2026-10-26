@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { validCSRF, validSession } from '../src/generated/validate-auth.js';
 import * as capture from '../src/generated/validate-capture.js';
 import * as projection from '../src/generated/validate-projection.js';
+import * as policy from '../src/generated/validate-policy.js';
 
 assert.equal(validCSRF({ csrf_token: 'C'.repeat(43) }), true);
 assert.equal(validCSRF({ csrf_token: '😀'.repeat(257) }), false);
@@ -110,3 +111,10 @@ for (const [file, validator] of [
 }
 assert.equal(projection.validInput_get_query_result({ query_handle: 'original', idempotency_key: 'extra' }), false);
 console.log('Native ESM approved projection and pending query validators passed canonical examples and invalid timing checks.');
+const policyReply = { schema_version: 'mcp-result/v1', request_id: '00000000-0000-4000-8000-000000000001', data_class: 'metadata', status: 'ok', truncated: false, next_cursor: null, narrowing_hint: null, warnings: [], provenance: [],
+  data: { policy_uid: 'policy-uid', acceptance_id: '00000000-0000-4000-8000-000000000002', state: 'deactivated', replay: false } };
+assert.equal(policy.validOutput_deactivate_policy(policyReply), true);
+assert.equal(policy.validOutput_deactivate_policy({ ...policyReply, data: { ...policyReply.data, state: 'active' } }), false);
+assert.equal(policy.validInput_deactivate_policy({ policy_name: 'regional-restarts', idempotency_key: 'k' }), true);
+assert.equal(policy.validInput_deactivate_policy({ policy_name: 'Bad_Name', idempotency_key: 'k' }), false);
+console.log('Native ESM policy validators passed positive and negative checks.');

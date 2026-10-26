@@ -92,6 +92,24 @@ func (q *Queries) CountPolicyWatermarks(ctx context.Context, arg CountPolicyWate
 	return column_1, err
 }
 
+const deactivatePolicySource = `-- name: DeactivatePolicySource :execrows
+UPDATE policy_source SET active_id=NULL WHERE root_id=$1 AND policy_uid=$2 AND active_id=$3
+`
+
+type DeactivatePolicySourceParams struct {
+	RootID    pgtype.UUID
+	PolicyUid string
+	ActiveID  pgtype.UUID
+}
+
+func (q *Queries) DeactivatePolicySource(ctx context.Context, arg DeactivatePolicySourceParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deactivatePolicySource, arg.RootID, arg.PolicyUid, arg.ActiveID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const findAutomationBases = `-- name: FindAutomationBases :many
 SELECT b.uid, b.generation, b.spec_digest FROM permission_basis b
 WHERE b.stream_id=$1 AND b.kind='AccessBinding' AND b.effect='Allow' AND b.automation_json IS NOT NULL
@@ -191,6 +209,36 @@ func (q *Queries) InsertPolicyOccurrence(ctx context.Context, arg InsertPolicyOc
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const latestPolicyAcceptance = `-- name: LatestPolicyAcceptance :one
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent FROM policy_acceptance WHERE root_id=$1 AND policy_uid=$2 ORDER BY accepted_at DESC, id DESC LIMIT 1
+`
+
+type LatestPolicyAcceptanceParams struct {
+	RootID    pgtype.UUID
+	PolicyUid string
+}
+
+func (q *Queries) LatestPolicyAcceptance(ctx context.Context, arg LatestPolicyAcceptanceParams) (PolicyAcceptance, error) {
+	row := q.db.QueryRow(ctx, latestPolicyAcceptance, arg.RootID, arg.PolicyUid)
+	var i PolicyAcceptance
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.PolicyUid,
+		&i.Generation,
+		&i.Nonce,
+		&i.ScopeDigest,
+		&i.RequestDigest,
+		&i.RecordDigest,
+		&i.Record,
+		&i.AcceptedAt,
+		&i.AcknowledgedAt,
+		&i.ReceiptJson,
+		&i.ExecutionsSpent,
+	)
+	return i, err
 }
 
 const linkPolicyOccurrence = `-- name: LinkPolicyOccurrence :execrows

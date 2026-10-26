@@ -488,7 +488,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		}
 		return json.Marshal(in)
 	}
-	if name == "activate_policy" || name == "get_policy_status" {
+	if name == "activate_policy" || name == "get_policy_status" || name == "deactivate_policy" {
 		var in PolicyOperationInput
 		if json.Unmarshal(raw, &in) != nil {
 			return nil, contracts.ErrInvestigationWire
@@ -515,7 +515,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 }
 func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationReply, callErr error, effectPossible bool) (audit.OperationOutcome, error) {
 	out := audit.OperationOutcome{Intent: in, Status: "unavailable", Reason: "authority_unavailable", Effect: "none", ClientReceipt: "unknown", MetadataUntil: in.RequestUntil, RecordedAt: s.config.Now().UTC().Truncate(time.Microsecond)}
-	if effectPossible && (in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download" || in.Name == "activate_policy" || queryOperation(in.Name)) {
+	if effectPossible && (in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download" || in.Name == "activate_policy" || in.Name == "deactivate_policy" || queryOperation(in.Name)) {
 		out.Effect = "unknown"
 	}
 	if queryOperation(in.Name) {
@@ -603,7 +603,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			if refs.ArtifactID != "" {
 				out.ArtifactIDs = append(out.ArtifactIDs, refs.ArtifactID)
 			}
-			if in.Name == "activate_policy" && refs.Acceptance != "" {
+			if (in.Name == "activate_policy" || in.Name == "deactivate_policy") && refs.Acceptance != "" {
 				out.Effect = "accepted"
 			}
 			if in.Name == "prepare_artifact_download" && refs.DownloadID != "" {

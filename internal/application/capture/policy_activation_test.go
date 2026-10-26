@@ -143,6 +143,7 @@ func TestPolicyActivationAcceptsTheTeamScopeWithEnvelopeLimits(t *testing.T) {
 	}
 	// The same key retries into the original acceptance without accepting again.
 	f.previous = &value.PolicyAcceptance{ID: r.AcceptanceID, Authority: a, Submitter: f.author.Principal}
+	f.status = value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: r.AcceptanceID, Authority: a, NotAfter: a.NotAfter, MaxExecutions: 10}
 	again, err := f.activation().Activate(context.Background(), f, "restarts", "key-1")
 	if err != nil || !again.Replay || again.AcceptanceID != r.AcceptanceID || len(f.accepted) != 1 {
 		t.Fatal("retry was not the original acceptance", again, err)
@@ -178,5 +179,63 @@ func TestPolicyActivationRefusesWithoutTeamDelegation(t *testing.T) {
 				t.Fatal("activation not refused", err)
 			}
 		})
+	}
+}
+
+// DeactivatePolicy applies the SQL transaction's own rules.
+func (f *activationFixture) DeactivatePolicy(_ context.Context, policy, acceptance string) (bool, error) {
+	switch {
+	case f.status.ActiveID == acceptance:
+		f.status.ActiveID, f.status.DeactivatedID = "", acceptance
+		return false, nil
+	case f.status.ActiveID == "" && f.status.DeactivatedID == acceptance:
+		return true, nil
+	}
+	return false, value.ErrConflict
+}
+
+func (f *activationFixture) deactivation() PolicyDeactivation {
+	return PolicyDeactivation{RootID: activationRoot, InstallationID: activationInstallation, Documents: f, Ledger: f, Permissions: f, Recovery: f, Now: time.Now}
+}
+
+func TestPolicyDeactivationIsIdempotentAndBlocksReactivationOfTheSameScope(t *testing.T) {
+	f := newActivationFixture(t)
+	r, err := f.activation().Activate(context.Background(), f, "restarts", "key-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a := f.accepted[0].Authority
+	f.status = value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: r.AcceptanceID, Authority: a, NotAfter: a.NotAfter, MaxExecutions: 10, ExecutionsSpent: 3}
+	// A maintainer of another binding cannot stop the team's policy.
+	stranger := *f
+	stranger.author.Groups = []string{"team-b"}
+	if _, err := stranger.deactivation().Deactivate(context.Background(), &stranger, "restarts"); !errors.Is(err, ErrPolicyDelegation) || stranger.status.ActiveID == "" {
+		t.Fatal("a non-sponsor deactivated the policy", err)
+	}
+	d, err := f.deactivation().Deactivate(context.Background(), f, "restarts")
+	if err != nil || d.Replay || d.AcceptanceID != r.AcceptanceID || f.status.ActiveID != "" || f.status.ExecutionsSpent != 3 {
+		t.Fatal("deactivation", d, err)
+	}
+	again, err := f.deactivation().Deactivate(context.Background(), f, "restarts")
+	if err != nil || !again.Replay || again.AcceptanceID != r.AcceptanceID {
+		t.Fatal("repeated deactivation is not a replay", again, err)
+	}
+	// Neither a retried activation nor a new key revives the deactivated scope.
+	f.previous = &value.PolicyAcceptance{ID: r.AcceptanceID, Authority: a, Submitter: f.author.Principal}
+	if _, err := f.activation().Activate(context.Background(), f, "restarts", "key-1"); !errors.Is(err, ErrPolicyDeactivated) {
+		t.Fatal("retried activation reported a deactivated acceptance", err)
+	}
+	f.previous = nil
+	if _, err := f.activation().Activate(context.Background(), f, "restarts", "key-2"); !errors.Is(err, ErrPolicyDeactivated) || len(f.accepted) != 1 {
+		t.Fatal("deactivated scope accepted again", err)
+	}
+	// A workload identity, or a never-accepted policy, cannot be deactivated.
+	f.author.Principal.Kind = identity.Workload
+	if _, err := f.deactivation().Deactivate(context.Background(), f, "restarts"); !errors.Is(err, value.ErrDenied) {
+		t.Fatal("workload identity deactivated", err)
+	}
+	g := newActivationFixture(t)
+	if _, err := g.deactivation().Deactivate(context.Background(), g, "restarts"); !errors.Is(err, value.ErrUnavailable) {
+		t.Fatal("never-accepted policy deactivated", err)
 	}
 }

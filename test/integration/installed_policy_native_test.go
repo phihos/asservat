@@ -19,6 +19,7 @@ import (
 	"asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	domaincapture "asservat.local/asservat/internal/domain/capture"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	core "k8s.io/api/core/v1"
@@ -346,6 +347,63 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	if scalar(`SELECT count(*) FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND outcome IS NULL`, root, activated.PolicyUID) != 0 {
 		t.Fatal("an occurrence has no recorded outcome")
 	}
+
+	// Phase C (ADR-229): the user deactivates the policy. A deactivated policy
+	// is no longer polled, so a further kill changes no watermark, occurrence
+	// or suppression count (an active policy would at least count a cooldown);
+	// spend and the existing capture stay.
+	deactivation := map[string]string{"policy_name": installedPolicyName, "idempotency_key": "installed-policy-deactivation"}
+	var stopped struct {
+		AcceptanceID string `json:"acceptance_id"`
+		State        string `json:"state"`
+		Replay       bool   `json:"replay"`
+	}
+	wait("a deactivated policy", time.Minute, func(poll context.Context) bool {
+		return observe(poll, "deactivate_policy", deactivation, &stopped)
+	})
+	if stopped.State != "deactivated" || stopped.AcceptanceID != activated.AcceptanceID {
+		t.Fatal("deactivation", stopped)
+	}
+	stoppedAt := time.Now()
+	spent := scalar(`SELECT executions_spent FROM policy_acceptance WHERE id=$1`, activated.AcceptanceID)
+	// A cycle that listed the policy just before deactivation may still be in
+	// its tick; the next cycle no longer lists it.
+	if installedJourneyPause(ctx, domaincapture.TriggerPollInterval) != nil {
+		t.Fatal(ctx.Err())
+	}
+	marksBefore, occurrencesBefore, suppressedAt := scalar(`SELECT coalesce(sum(restarts),0) FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2`, root, activated.PolicyUID), occurrences(), suppressed()
+	killed := 0
+	wait("a running replica to kill", 2*time.Minute, func(context.Context) bool {
+		for _, p := range runningPods() {
+			if installedKillContainer(t, ctx, p) {
+				killed++
+				return true
+			}
+		}
+		return false
+	})
+	// Two full poll periods after the kill.
+	if installedJourneyPause(ctx, 2*domaincapture.TriggerPollInterval+5*time.Second) != nil {
+		t.Fatal(ctx.Err())
+	}
+	marksAfter := scalar(`SELECT coalesce(sum(restarts),0) FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2`, root, activated.PolicyUID)
+	if marksAfter != marksBefore || occurrences() != occurrencesBefore || suppressed() != suppressedAt || scalar(`SELECT executions_spent FROM policy_acceptance WHERE id=$1`, activated.AcceptanceID) != spent ||
+		scalar(`SELECT count(*) FROM policy_source WHERE root_id=$1 AND policy_uid=$2 AND active_id IS NULL`, root, activated.PolicyUID) != 1 || scalar(`SELECT count(*) FROM context_capture WHERE id=$1`, captureID) != 1 {
+		diagnose()
+		t.Fatal("deactivated policy still observed or spent", marksBefore, marksAfter, occurrencesBefore, occurrences(), suppressedAt, suppressed(), spent)
+	}
+	var again struct {
+		State  string `json:"state"`
+		Replay bool   `json:"replay"`
+	}
+	if !observe(ctx, "deactivate_policy", deactivation, &again) || !again.Replay || again.State != "deactivated" {
+		t.Fatal("repeated deactivation", again)
+	}
+	status.State = ""
+	if !observe(ctx, "get_policy_status", map[string]string{"policy_name": installedPolicyName}, &status) || status.State != "deactivated" || status.Captured != 1 {
+		t.Fatal("deactivated policy status", status)
+	}
+	t.Logf("installed policy journey: deactivated %s after start; %d kill(s) %s later changed no watermark, occurrence, suppression or spend", stoppedAt.Sub(started).Round(time.Second), killed, time.Since(stoppedAt).Round(time.Second))
 	t.Logf("installed policy journey complete %s after start", time.Since(started).Round(time.Second))
 }
 
