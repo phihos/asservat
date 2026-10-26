@@ -39,6 +39,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		return grants
 	})
 	pool := poolFor(role, "synthetic-share-hub")
+	t.Cleanup(pool.Close) // later subtests share the fixture's connection limit
 	routes, err := postgres.NewContextCaseReads(ctx, pool, s.a.RootID, s.recovery.guard)
 	if err != nil {
 		t.Fatal(err)
