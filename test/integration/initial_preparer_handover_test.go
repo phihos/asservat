@@ -15,9 +15,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	auth "k8s.io/api/authentication/v1"
@@ -249,6 +251,12 @@ func initialPreparationHandoverWithRealServices(t *testing.T, initializeSchema b
 		if _, e = s3client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &bucket}); e != nil {
 			t.Fatal(e)
 		}
+		// The activation writes its audit through the versioned audit store,
+		// which refuses a receipt without an immutable version (as in the
+		// chain and Helm fixtures).
+		if _, e = s3client.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); e != nil {
+			t.Fatal(e)
+		}
 		// Native helper's exact cleanup owner remains separate from the projected SA.
 		t.Cleanup(func() {
 			clean, done := context.WithTimeout(context.Background(), 15*time.Second)
@@ -346,9 +354,50 @@ func initialPreparationHandoverWithRealServices(t *testing.T, initializeSchema b
 			defer deployment.Close()
 			out, err := deployment.Run()
 			if err != nil {
+				// Diagnostics only: the original Pod's own last output, read
+				// after the product already returned its verdict.
+				logs, le := api.CoreV1().Pods(c.Plan.Workload.Namespace).GetLogs(c.Plan.Workload.Name, &core.PodLogOptions{TailLines: ptr.To(int64(40))}).DoRaw(context.Background())
+				t.Logf("original activation Pod logs (err=%v):\n%s", le, logs)
 				t.Fatal("actual handover Run", err)
 			}
 			return out
+		}
+		// The continuity guard was created moments ago; type-checked status does
+		// not mean every admission cache enforces it, and the loader's guard
+		// proof refuses until its exact denial is observed (seen on CI as
+		// handover-protection/source.probe-denial-status). Like the declaration
+		// path's bounded Open wait, wait until the same probe account's dry-run
+		// UPDATE of the continuity marker is denied by exactly this guard. A
+		// dry-run persists nothing; no other policy's denial is accepted.
+		probeConfig := rest.CopyConfig(kc)
+		probeConfig.BearerToken, probeConfig.BearerTokenFile = probe.Status.Token, ""
+		probeConfig.CertData, probeConfig.KeyData, probeConfig.CertFile, probeConfig.KeyFile = nil, nil, "", ""
+		probeAPI, e := kubernetes.NewForConfig(probeConfig)
+		if e != nil {
+			t.Fatal(e)
+		}
+		continuityDenial := "ValidatingAdmissionPolicy '" + c.Plan.ContinuityName + "' with binding '" + c.Plan.ContinuityName + "' denied request: "
+		ready := time.Now().Add(15 * time.Second)
+		for {
+			marker, e := probeAPI.CoreV1().ConfigMaps(c.Plan.BootstrapNamespace.Name).Get(ctx, c.Plan.ProbeName, meta.GetOptions{})
+			if e != nil {
+				t.Fatal("continuity marker", e)
+			}
+			_, e = probeAPI.CoreV1().ConfigMaps(marker.Namespace).Update(ctx, marker, meta.UpdateOptions{DryRun: []string{meta.DryRunAll}})
+			var status apierrors.APIStatus
+			enforced := false
+			if errors.As(e, &status) && status.Status().Details != nil {
+				for _, cause := range status.Status().Details.Causes {
+					enforced = enforced || strings.HasPrefix(cause.Message, continuityDenial)
+				}
+			}
+			if enforced {
+				break
+			}
+			if time.Now().After(ready) {
+				t.Fatal("native continuity guard not enforced", e)
+			}
+			time.Sleep(50 * time.Millisecond)
 		}
 		out := run(t)
 		if initializeSchema && (out.Schema == nil || !initialSchemaHandoverSame(*out.Schema, originalSchema)) {

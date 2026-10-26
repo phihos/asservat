@@ -27,27 +27,30 @@ func (s *InitialPreparer) ReadHandover(ctx context.Context) (contracts.InitialPr
 	}
 	ctx, end := context.WithDeadline(ctx, until)
 	defer end()
+	// Fixed step labels name the refusing check for the loader diagnostic;
+	// every cause is preserved for errors.Is.
+	step := func(name string, e error) error { return &observationStep{"handover-" + name, e} }
 	if e := s.creator.administrator(ctx); e != nil {
-		return zero, false, e
+		return zero, false, step("administrator", e)
 	}
 	_, bound, e := s.protection.current(ctx)
 	until = identity.Earlier(until, bound)
 	if e != nil {
-		return zero, false, e
+		return zero, false, step("protection", e)
 	}
 	_, w, e := s.read(ctx)
 	if apierrors.IsNotFound(e) {
 		if e = initialHandoverDeadline(ctx, s.protection.observer.now, until); e != nil {
-			return zero, false, e
+			return zero, false, step("absent-deadline", e)
 		}
 		return zero, false, nil
 	}
 	if e != nil {
-		return zero, false, e
+		return zero, false, step("root", e)
 	}
 	if w.Activation == nil || w.Activation.Handover == nil {
 		if e = initialHandoverDeadline(ctx, s.protection.observer.now, until); e != nil {
-			return zero, false, e
+			return zero, false, step("active-deadline", e)
 		}
 		return w, false, nil
 	}
@@ -55,10 +58,10 @@ func (s *InitialPreparer) ReadHandover(ctx context.Context) (contracts.InitialPr
 	_, w, _, bound, e = s.passiveHandover(ctx)
 	until = identity.Earlier(until, bound)
 	if e != nil {
-		return zero, false, e
+		return zero, false, step("passive", e)
 	}
 	if e = initialHandoverDeadline(ctx, s.protection.observer.now, until); e != nil {
-		return zero, false, e
+		return zero, false, step("passive-deadline", e)
 	}
 	return w, true, nil
 }

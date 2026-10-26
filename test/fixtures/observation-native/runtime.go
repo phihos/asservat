@@ -406,6 +406,9 @@ func (r *fixtureRuntime) command(ctx context.Context, q controlRequest) controlR
 	}
 	out.OK = err == nil
 	out.Category = errorCategory(err)
+	if err != nil && q.Command == "observe" {
+		out.Detail = err.Error()
+	}
 	out.ElapsedNanos = time.Since(start).Nanoseconds()
 	out.CompletedAt = time.Now().UTC()
 	if q.Command != "status" {

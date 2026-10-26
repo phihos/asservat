@@ -78,21 +78,32 @@ func qualifyRetentionTopology(t *testing.T, ctx context.Context, native kubernet
 		if _, err = native.CoreV1().ConfigMaps(namespace).Patch(ctx, name, types.MergePatchType, []byte(`{"metadata":{"annotations":{"test.asservat.io/note":"unchanged-data"}}}`), meta.PatchOptions{}); err != nil {
 			t.Fatal(err)
 		}
-		after, err := reader.RetentionTopology(ctx, hub.ClusterID)
+		// A reader serves its observation from cache for most of the authorized
+		// 30 s PolicyTopologyInterval (ADR-200 revision 2026-10-23), so every
+		// check below uses a reader without a cached observation: it must
+		// re-read the pinned object, not merely reuse an earlier result.
+		reread := func() (privacy.PolicyTopology, error) {
+			r, err := kube.NewRetentionTopologyClient(client, name, string(cm.UID), root, hub.ClusterID, pin)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return r.RetentionTopology(ctx, hub.ClusterID)
+		}
+		after, err := reread()
 		if err != nil || after.Revision != out.Revision {
 			t.Fatal("metadata churn changed topology", err)
 		}
 		if err = native.CoreV1().ConfigMaps(namespace).Delete(ctx, name, meta.DeleteOptions{}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = reader.RetentionTopology(ctx, hub.ClusterID); err == nil {
+		if _, err = reread(); err == nil {
 			t.Fatal("missing topology silently reduced sources")
 		}
 		replacement := &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: name}, Immutable: &immutable, Data: map[string]string{"topology.json": string(b)}}
 		if _, err = native.CoreV1().ConfigMaps(namespace).Create(ctx, replacement, meta.CreateOptions{}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = reader.RetentionTopology(ctx, hub.ClusterID); err == nil {
+		if _, err = reread(); err == nil {
 			t.Fatal("same-name replacement accepted without requalification")
 		}
 	}

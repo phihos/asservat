@@ -311,7 +311,7 @@ func TestDirectHolderObservationWithRealKubernetes(t *testing.T) {
 			encoded, _ := json.Marshal(report)
 			t.Logf("native direct metrics %s", encoded)
 			if err != nil || !result.OK || result.Result == nil {
-				t.Fatal("native original direct request", err, result.Category)
+				t.Fatal("native original direct request", err, result.Category, result.Detail)
 			}
 			digest, de := app.ClusterObservationRequestDigest(request)
 			// Preserve both actual helper completion and host receipt instants before

@@ -18,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/contracts"
@@ -268,7 +269,16 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 	}
 	state.Passwords.Manager = ""
 	originalSeed.State.Passwords.Manager = ""
-	finalSeed := initialBootstrapVerifyCopyClosure(t, ctx, api, kc, desired, originalSeed)
+	// The compiled chart input names the runner account as the only trusted
+	// bootstrap administrator, so closure checks act as that runner (as the
+	// chain's unified path does). The cluster administrator matches neither
+	// the guard's administrator CREATE nor its probe-token exception.
+	closureConfig := installedUnifiedRunnerConfig(kc, desired)
+	closureAPI, err := kubernetes.NewForConfig(closureConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	finalSeed := initialBootstrapVerifyCopyClosure(t, ctx, closureAPI, closureConfig, desired, originalSeed)
 	// Remove only operator fixture inputs. Product copies must already have
 	// positively closed; a fresh runner receives no setup SQL/provider inputs.
 	for _, name := range []string{"operator-producer", "operator-ddl", "operator-retirement"} {
@@ -287,7 +297,7 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 			t.Fatal("replay reused old runner result")
 		}
 		after, configAfter, rootAfter := initialBootstrapChainState(t, ctx, api, desired, originalSeed)
-		afterSeed := initialBootstrapVerifyCopyClosure(t, ctx, api, kc, desired, originalSeed)
+		afterSeed := initialBootstrapVerifyCopyClosure(t, ctx, closureAPI, closureConfig, desired, originalSeed)
 		if afterSeed.UID != finalSeed.UID || afterSeed.ResourceVersion != finalSeed.ResourceVersion || !equalJSONForBootstrap(finalSeed.Annotations, afterSeed.Annotations) {
 			t.Fatal("completed replay changed original copy closure")
 		}
@@ -358,9 +368,40 @@ func TestHelmBootstrapWithRealServices(t *testing.T) {
 		if after.InstallationID != state.InstallationID || !equalJSONForBootstrap(afterRoot, root) {
 			t.Fatal("Helm erased original product progress")
 		}
-		seed := initialBootstrapVerifyCopyClosure(t, ctx, api, kc, desired, originalSeed)
-		if seed.UID != finalSeed.UID || seed.ResourceVersion != finalSeed.ResourceVersion {
-			t.Fatal("Helm changed original sanitized seed")
+		// Uninstall removes the chart's runner account and its RBAC, so no
+		// identity remains that the guard accepts as administrator; the full
+		// closure check (runner-only probe token) ran before uninstall. Here
+		// the cluster administrator confirms that the sanitized seed and the
+		// product-created permanent tombstone survived unchanged.
+		seed, e := api.CoreV1().Secrets(desired.BootstrapNamespace).Get(ctx, desired.Name+"-bootstrap-state", meta.GetOptions{})
+		if e != nil || seed.UID != finalSeed.UID || seed.ResourceVersion != finalSeed.ResourceVersion {
+			t.Fatal("Helm changed original sanitized seed", e)
+		}
+		claim, e := contracts.DecodeInitialBootstrapCopyClaim(strings.NewReader(seed.Annotations["asservat.io/bootstrap-copy-claim"]))
+		if e != nil {
+			t.Fatal("copy claim unavailable", e)
+		}
+		tombstone := desired
+		tombstone.Format = contracts.InitialBootstrapVersionedAuditFormat
+		want, wantBinding, e := kube.InitialBootstrapCopyAdmission(tombstone, claim)
+		if e != nil {
+			t.Fatal(e)
+		}
+		policyReceipt, e := contracts.DecodeInitialBootstrapCopyReceipt(strings.NewReader(seed.Annotations["asservat.io/bootstrap-copy-policy"]))
+		if e != nil {
+			t.Fatal(e)
+		}
+		bindingReceipt, e := contracts.DecodeInitialBootstrapCopyReceipt(strings.NewReader(seed.Annotations["asservat.io/bootstrap-copy-binding"]))
+		if e != nil {
+			t.Fatal(e)
+		}
+		p, e := api.AdmissionregistrationV1().ValidatingAdmissionPolicies().Get(ctx, want.Name, meta.GetOptions{})
+		if e != nil || string(p.UID) != policyReceipt.UID || p.Generation != 1 {
+			t.Fatal("Helm uninstall removed or changed the copy tombstone policy", e)
+		}
+		b, e := api.AdmissionregistrationV1().ValidatingAdmissionPolicyBindings().Get(ctx, wantBinding.Name, meta.GetOptions{})
+		if e != nil || string(b.UID) != bindingReceipt.UID || b.ResourceVersion != bindingReceipt.ResourceVersion {
+			t.Fatal("Helm uninstall removed or changed the copy tombstone binding", e)
 		}
 	})
 	t.Log("actual Helm package, authenticated cold exact-image pulls on two owned nodes, original manager/schema/activation/audit/retirement, positive v3 copy closure, setup-free hook replay, bounded terminal CLI resume and retained public revision inputs; no public runtime/restore/backup claim")
