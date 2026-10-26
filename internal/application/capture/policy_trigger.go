@@ -163,45 +163,83 @@ func (t PolicyTrigger) capture(ctx context.Context, a authorization.AcceptedPoli
 	if pod == "" {
 		return "", "unavailable"
 	}
-	call, cancel := context.WithTimeout(ctx, 30*time.Second)
+	call, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
-	current := newPolicyIdentity(call, t.Accepted, a, t.Now().Add(30*time.Second), t.Now)
+	current := newPolicyIdentity(call, t.Accepted, a, t.Now().Add(45*time.Second), t.Now)
 	intent := value.ContextIntent{Diagnostic: value.ContextDiagnosticName, Target: targets.WorkloadRequest{ClusterID: o.ClusterID, Namespace: o.Namespace.Name, Kind: "Pod", Name: pod}, RequestedSeconds: p.RetentionSeconds}
+	// A review that admitted nothing (a lost regional exchange, a replaced
+	// standby) is reviewed again, at most three times, two seconds apart, as a
+	// human retries a preview. Every review repeats all checks; the occurrence
+	// key keeps admission to at most one capture (a second preview under the
+	// same key conflicts instead of admitting).
+	var err error
+	for review := 0; review < 3; review++ {
+		if review > 0 && pause(call, 2*time.Second) != nil {
+			break
+		}
+		var id string
+		id, err = t.review(call, current, a, intent, occurrence)
+		if id != "" {
+			return id, ""
+		}
+		if !retryableReview(err) {
+			break
+		}
+		t.reportTimed("review/"+failureClass(err), "")
+	}
+	return "", refusalFor(err)
+}
+
+// review is one preview and request of the triggering Pod; it returns the
+// admitted capture, continuing a start refused before any effect.
+func (t PolicyTrigger) review(call context.Context, current policyIdentity, a authorization.AcceptedPolicyAuthority, intent value.ContextIntent, occurrence value.PolicyOccurrence) (string, error) {
 	mark := time.Now()
 	preview, err := t.Capture.Preview(call, current, intent)
 	auditapp.MarkStep(call, "policy-preview", mark)
 	if err != nil {
-		return "", refusalFor(err)
+		return "", err
 	}
 	// The named Pod must still be the triggering Pod of the accepted workload:
 	// a replacement under the same name is never captured instead.
 	if preview.Preview.Target.PodUID != occurrence.PodUID || preview.Preview.Target.Workload.UID != a.WorkloadUID || preview.Preview.Target.Namespace.UID != a.NamespaceUID {
-		return "", "unavailable"
+		return "", targets.ErrChanged
 	}
 	mark = time.Now()
 	accepted, err := t.Capture.Request(call, current, preview.Preview.ID, occurrence.ID)
 	auditapp.MarkStep(call, "policy-request", mark)
-	if authorization.UUID(accepted.CaptureID) {
-		// Admitted: the capture exists even if a later phase failed. A start
-		// refused before any effect (ADR-212 headroom, a busy standby) is
-		// continued once through the explicit accepted-only path; durable
-		// execution state refuses it after any possible start (ADR-223).
-		for attempt := 0; attempt < 3 && err != nil && !errors.Is(err, value.ErrPreparationUncertain) && !errors.Is(err, value.ErrAcquisitionClosed); attempt++ {
-			// The refused exchange closes first; the region opens the next
-			// standby within about two seconds, as for a human continuation.
-			if pause(call, 2*time.Second) != nil {
-				break
-			}
-			mark = time.Now()
-			_, err = t.Capture.Continue(call, current, preview.Preview.ID, occurrence.ID)
-			auditapp.MarkStep(call, "policy-continue", mark)
-			if err != nil {
-				t.reportTimed("continue/"+failureClass(err), "")
-			}
-		}
-		return accepted.CaptureID, ""
+	if !authorization.UUID(accepted.CaptureID) {
+		return "", err
 	}
-	return "", refusalFor(err)
+	// Admitted: the capture exists even if a later phase failed. A start
+	// refused before any effect (ADR-212 headroom, a busy standby) is
+	// continued through the explicit accepted-only path; durable execution
+	// state refuses it after any possible start (ADR-223).
+	for attempt := 0; attempt < 3 && err != nil && !errors.Is(err, value.ErrPreparationUncertain) && !errors.Is(err, value.ErrAcquisitionClosed); attempt++ {
+		// The refused exchange closes first; the region opens the next
+		// standby within about two seconds, as for a human continuation.
+		if pause(call, 2*time.Second) != nil {
+			break
+		}
+		mark = time.Now()
+		_, err = t.Capture.Continue(call, current, preview.Preview.ID, occurrence.ID)
+		auditapp.MarkStep(call, "policy-continue", mark)
+		if err != nil {
+			t.reportTimed("continue/"+failureClass(err), "")
+		}
+	}
+	return accepted.CaptureID, nil
+}
+
+// retryableReview is true for a review that may succeed on a fresh exchange;
+// refusals of authority, capacity, input, a conflicting earlier admission or
+// a replaced Pod are final.
+func retryableReview(err error) bool {
+	for _, final := range []error{value.ErrDenied, value.ErrCapacity, value.ErrProcessingCoverage, value.ErrInvalid, value.ErrConflict, targets.ErrChanged, targets.ErrDenied} {
+		if errors.Is(err, final) {
+			return false
+		}
+	}
+	return err != nil
 }
 
 func pause(ctx context.Context, d time.Duration) error {

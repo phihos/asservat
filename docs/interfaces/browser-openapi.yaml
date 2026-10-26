@@ -2978,6 +2978,84 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /api/v1/operations/activate_policy:
+    post:
+      operationId: activate_policy
+      summary: Activate the current revision of a hub-held restart-trigger DebugPolicy for your team (ADR-228). Requires whole-pod collection rights and membership in a sponsoring group of the workload's automation AccessBinding. The policy then captures pod status automatically on Pod restarts within the team's finite envelope. Retry an uncertain result with the same idempotency key.
+      tags:
+      - Shared browser and MCP
+      x-domain-contract: activate_policy
+      x-effect: command
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpInput_activate_policy'
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: Required on session-authenticated POST; validate origin and session-bound token.
+        schema:
+          type: string
+          maxLength: 256
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: Must equal body.idempotency_key exactly. Use the original key when retrying this activation.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      responses:
+        '200':
+          description: Existing bounded MCP domain-result envelope; domain errors remain status=error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpOutput_activate_policy'
+        default:
+          description: Transport/session/validation failure; no evidence in error details.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/operations/get_policy_status:
+    post:
+      operationId: get_policy_status
+      summary: 'Explain an activated restart-trigger policy without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing.'
+      tags:
+      - Shared browser and MCP
+      x-domain-contract: get_policy_status
+      x-effect: read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpInput_get_policy_status'
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: Required on session-authenticated POST; validate origin and session-bound token.
+        schema:
+          type: string
+          maxLength: 256
+      responses:
+        '200':
+          description: Existing bounded MCP domain-result envelope; domain errors remain status=error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpOutput_get_policy_status'
+        default:
+          description: Transport/session/validation failure; no evidence in error details.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
 components:
   securitySchemes:
     BrowserSession:
@@ -2989,6 +3067,296 @@ components:
       scheme: bearer
       bearerFormat: OAuth access token; audience/client and evidence:download checked
   schemas:
+    McpInput_activate_policy:
+      type: object
+      additionalProperties: false
+      properties:
+        policy_name:
+          type: string
+          minLength: 1
+          maxLength: 253
+          pattern: ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 128
+      required:
+      - policy_name
+      - idempotency_key
+    McpOutput_activate_policy:
+      allOf:
+      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
+      - oneOf:
+        - type: object
+          properties:
+            status:
+              const: ok
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                policy_uid:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                acceptance_id:
+                  type: string
+                  format: uuid
+                state:
+                  enum:
+                  - active
+                  - pendingAudit
+                expires_at:
+                  type: string
+                  format: date-time
+                max_executions:
+                  type: integer
+                  minimum: 1
+                  maximum: 10000
+                replay:
+                  type: boolean
+              required:
+              - policy_uid
+              - acceptance_id
+              - state
+              - expires_at
+              - max_executions
+              - replay
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: error
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                retryable:
+                  type: boolean
+                navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                responsible_role:
+                  enum:
+                  - maintainer
+                  - approver
+                  - administrator
+                  - none
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - code
+              - message
+              - retryable
+          required:
+          - status
+          - data
+    McpInput_get_policy_status:
+      type: object
+      additionalProperties: false
+      properties:
+        policy_name:
+          type: string
+          minLength: 1
+          maxLength: 253
+          pattern: ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$
+      required:
+      - policy_name
+    McpOutput_get_policy_status:
+      allOf:
+      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
+      - oneOf:
+        - type: object
+          properties:
+            status:
+              const: ok
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                policy_uid:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                acceptance_id:
+                  type: string
+                  format: uuid
+                state:
+                  enum:
+                  - active
+                  - suspended
+                  - changed
+                  - expired
+                  - deleted
+                generation:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+                expires_at:
+                  type: string
+                  format: date-time
+                executor:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    kind:
+                      const: policy
+                    policy_uid:
+                      type: string
+                      minLength: 1
+                      maxLength: 64
+                  required:
+                  - kind
+                  - policy_uid
+                executions_spent:
+                  type: integer
+                  minimum: 0
+                  maximum: 2147483647
+                max_executions:
+                  type: integer
+                  minimum: 1
+                  maximum: 10000
+                watched_pods:
+                  type: integer
+                  minimum: 0
+                  maximum: 2147483647
+                occurrences:
+                  type: integer
+                  minimum: 0
+                  maximum: 2147483647
+                captured:
+                  type: integer
+                  minimum: 0
+                  maximum: 2147483647
+                recent:
+                  type: array
+                  maxItems: 8
+                  items:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      occurrence_id:
+                        type: string
+                        format: uuid
+                      capture_id:
+                        type: string
+                        format: uuid
+                      outcome:
+                        enum:
+                        - captured
+                        - refused
+                        - pending
+                      restarts:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483648
+                      created_at:
+                        type: string
+                        format: date-time
+                    required:
+                    - occurrence_id
+                    - outcome
+                    - restarts
+                    - created_at
+                suppressions:
+                  type: array
+                  maxItems: 6
+                  items:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      reason:
+                        enum:
+                        - cooldown
+                        - budget
+                        - coalesced
+                        - capacity
+                        - authority
+                        - unavailable
+                      count:
+                        type: integer
+                        minimum: 1
+                        maximum: 2147483647
+                      first_at:
+                        type: string
+                        format: date-time
+                      last_at:
+                        type: string
+                        format: date-time
+                    required:
+                    - reason
+                    - count
+                    - first_at
+                    - last_at
+              required:
+              - policy_uid
+              - acceptance_id
+              - state
+              - generation
+              - expires_at
+              - executor
+              - executions_spent
+              - max_executions
+              - watched_pods
+              - occurrences
+              - captured
+              - recent
+              - suppressions
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: error
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                retryable:
+                  type: boolean
+                navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                responsible_role:
+                  enum:
+                  - maintainer
+                  - approver
+                  - administrator
+                  - none
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - code
+              - message
+              - retryable
+          required:
+          - status
+          - data
     Problem:
       type: object
       additionalProperties: false

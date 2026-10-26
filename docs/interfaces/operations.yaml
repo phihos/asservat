@@ -512,3 +512,17 @@ operations:
   - mcp
   effect: command
   contract: specs/contracts/mcp-tools.json
+- operation: activate_policy
+  path: /api/v1/operations/activate_policy
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
+- operation: get_policy_status
+  path: /api/v1/operations/get_policy_status
+  transport:
+  - browser
+  - mcp
+  effect: read
+  contract: specs/contracts/mcp-tools.json

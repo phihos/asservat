@@ -63,7 +63,9 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	roots.AddCert(cert)
 	dial := &net.Dialer{Timeout: 5 * time.Second}
 	transport := &http.Transport{Proxy: nil, ForceAttemptHTTP2: true, TLSClientConfig: &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS13},
-		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) { return dial.DialContext(ctx, network, address) }}
+		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
+			return dial.DialContext(ctx, network, address)
+		}}
 	defer transport.CloseIdleConnections()
 	wire, err := contracts.NewInvestigationContracts()
 	if err != nil {
@@ -310,7 +312,7 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	}
 	t.Logf("installed policy journey: the Keycloak user downloaded the policy capture (%d bytes) of the killed Pod, %s after start", len(native), time.Since(started).Round(time.Second))
 
-	// Phase B: all three replicas crash repeatedly for 150 s.
+	// Phase B: all three replicas crash repeatedly for 90 s (cut from 150 s so the run fits the 20-minute rule with margin; three Pods still restart several times under the backoff).
 	baseline := scalar(`SELECT coalesce(sum(restarts),0) FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2`, root, activated.PolicyUID)
 	admittedBefore := occurrences()
 	suppressed := func() int64 {
@@ -318,7 +320,7 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	}
 	suppressedBefore := suppressed()
 	kills := 0
-	for storm := time.Now().Add(150 * time.Second); time.Now().Before(storm); {
+	for storm := time.Now().Add(90 * time.Second); time.Now().Before(storm); {
 		for _, p := range runningPods() {
 			if installedKillContainer(t, ctx, p) {
 				kills++
