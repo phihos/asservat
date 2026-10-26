@@ -165,6 +165,34 @@ func (s *EvidenceShares) OwnedShares(ctx context.Context, caller identity.Identi
 	return out, nil
 }
 
+// AdministeredShares returns one keyset page of all shares of this root,
+// newest first (ADR-238); the service checked the administrator authority.
+func (s *EvidenceShares) AdministeredShares(ctx context.Context, after sharing.ShareCursor, limit int) ([]authorization.Share, error) {
+	paged := after != (sharing.ShareCursor{})
+	if s == nil || ctx == nil || ctx.Err() != nil || limit < 1 || limit > 101 || paged && (!authorization.UUID(after.ID) || after.CreatedAt.IsZero()) {
+		return nil, value.ErrUnavailable
+	}
+	params := custodydb.ListAdministeredSharesParams{RootID: id(s.root), Paged: paged, RowLimit: int32(limit)}
+	if paged {
+		params.AfterCreatedAt, params.AfterID = ts(after.CreatedAt), id(after.ID)
+	} else {
+		params.AfterCreatedAt, params.AfterID = ts(time.Unix(0, 0)), id(s.root)
+	}
+	var out []authorization.Share
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		rows, err := q.ListAdministeredShares(ctx, params)
+		if err != nil {
+			return err
+		}
+		out, err = s.observed(ctx, q, rows)
+		return err
+	})
+	if err != nil {
+		return nil, value.ErrUnavailable
+	}
+	return out, nil
+}
+
 // Share reads one share of this root; a missing share is Denied.
 func (s *EvidenceShares) Share(ctx context.Context, shareID string) (authorization.Share, error) {
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(shareID) {
@@ -359,7 +387,7 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, 
 // managed share is Denied.
 func (s *EvidenceShares) TransferShare(ctx context.Context, r sharing.Transfer, recovery artifact.RecoveryProof) (authorization.Share, bool, error) {
 	var zero authorization.Share
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !r.Actor.Valid() || len(r.Managers) < 1 || len(r.Managers) > authorization.ShareMaxManagers ||
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !r.Actor.Valid() || len(r.Managers) < 1 && !r.Administrator || len(r.Managers) > authorization.ShareMaxManagers ||
 		len(r.Management) < 1 || len(r.Management) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) || r.ExpectedRevision < 1 {
 		return zero, false, value.ErrInvalid
 	}
@@ -382,7 +410,7 @@ func (s *EvidenceShares) TransferShare(ctx context.Context, r sharing.Transfer, 
 		if err != nil {
 			return err
 		}
-		if !pinsAll(row.Management, r.Managers) {
+		if !r.Administrator && !pinsAll(row.Management, r.Managers) {
 			return value.ErrDenied
 		}
 		switch {

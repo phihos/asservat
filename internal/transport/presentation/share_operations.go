@@ -24,6 +24,7 @@ type ShareUseCase interface {
 	List(context.Context, identities.CurrentIdentity, string, int) ([]sharing.View, time.Time, error)
 	Revoke(context.Context, identities.CurrentIdentity, string, int64, string) (authorization.Share, bool, error)
 	Transfer(context.Context, identities.CurrentIdentity, sharing.TransferInput) (authorization.Share, bool, error)
+	ListAdministered(context.Context, identities.CurrentIdentity, string, int) ([]sharing.View, string, time.Time, error)
 }
 
 // ShareOperations serves create_share, list_shares and revoke_share to MCP
@@ -109,6 +110,7 @@ type ShareOperationInput struct {
 	Reason           string                `json:"reason,omitempty"`
 	View             string                `json:"view,omitempty"`
 	Limit            int                   `json:"limit,omitempty"`
+	Cursor           string                `json:"cursor,omitempty"`
 	ShareID          string                `json:"share_id,omitempty"`
 	ExpectedRevision int64                 `json:"expected_revision,omitempty"`
 	IdempotencyKey   string                `json:"idempotency_key,omitempty"`
@@ -123,13 +125,14 @@ type shareCreateData struct {
 // "Created by" and "Managed by" separately (REQ-SHR-008); the received view
 // stays minimal.
 type shareListItem struct {
-	ShareID   string                `json:"share_id"`
-	CaseID    string                `json:"case_id"`
-	Phase     string                `json:"phase"`
-	ExpiresAt time.Time             `json:"expires_at"`
-	Revision  int64                 `json:"revision,omitempty"`
-	CreatedBy *shareRecipientInput  `json:"created_by,omitempty"`
-	ManagedBy []shareRecipientInput `json:"managed_by,omitempty"`
+	ShareID    string                `json:"share_id"`
+	CaseID     string                `json:"case_id"`
+	ArtifactID string                `json:"artifact_id,omitempty"`
+	Phase      string                `json:"phase"`
+	ExpiresAt  time.Time             `json:"expires_at"`
+	Revision   int64                 `json:"revision,omitempty"`
+	CreatedBy  *shareRecipientInput  `json:"created_by,omitempty"`
+	ManagedBy  []shareRecipientInput `json:"managed_by,omitempty"`
 }
 type shareListData struct {
 	Shares []shareListItem `json:"shares"`
@@ -163,7 +166,7 @@ func publicShareFailure(err error) OperationFailure {
 	case errors.Is(err, sharing.ErrManagementTooBroad):
 		return OperationFailure{"ManagementTooBroad", "You hold evidence-owner on this workload through more than eight team assignments, and sharing never picks a subset. Name at most eight of your owner teams in management, or ask an administrator to combine the owner bindings.", false}
 	case errors.Is(err, sharing.ErrManagementNotHeld):
-		return OperationFailure{"ManagementNotHeld", "Management can only name owner teams you belong to that currently hold evidence-owner for this artifact (or, as its creator, only you). Ask a member of the other team to take over instead.", false}
+		return OperationFailure{"ManagementNotHeld", "Management can only name owner teams you belong to that currently hold evidence-owner for this artifact (or, as its creator, only you). Assigning an owner team you do not belong to requires an installation administrator; the team must currently hold evidence-owner for this artifact.", false}
 	case errors.Is(err, value.ErrInvalid):
 		return OperationFailure{"InvalidShare", "Recipients must be stable user or group IDs of your identity provider (at most eight), and the expiry must be in the future and at most seven days away.", false}
 	case errors.Is(err, value.ErrChanged):
@@ -209,7 +212,7 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 	noDispatch := false
 	// Creating and revoking need the evidence:share scope before dispatch;
 	// listing received shares needs only evidence:read.
-	if (name == "create_share" || name == "revoke_share" || name == "transfer_share" || name == "list_shares" && in.View == "owned") && !slices.Contains(i.Scopes, authorization.ShareScope) {
+	if (name == "create_share" || name == "revoke_share" || name == "transfer_share" || name == "list_shares" && in.View != "received") && !slices.Contains(i.Scopes, authorization.ShareScope) {
 		noDispatch, operationErr = true, value.ErrDenied
 	} else {
 		switch name {
@@ -241,13 +244,27 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 			}
 			var views []sharing.View
 			var valid time.Time
-			views, valid, operationErr = s.shares.List(ctx, current, in.View, limit)
+			var next string
+			if in.View == "administration" {
+				// ADR-238: management-only rows; recipients are never listed.
+				views, next, valid, operationErr = s.shares.ListAdministered(ctx, current, in.Cursor, limit)
+			} else if in.Cursor != "" {
+				operationErr = value.ErrInvalid
+			} else {
+				views, valid, operationErr = s.shares.List(ctx, current, in.View, limit)
+			}
 			if operationErr == nil {
 				until = identity.Earlier(until, valid)
+				if next != "" {
+					out.NextCursor = &next
+				}
 				data := shareListData{Shares: []shareListItem{}}
 				for _, v := range views {
 					item := shareListItem{ShareID: v.Share.ID, CaseID: v.Share.CaseID, Phase: string(v.Phase), ExpiresAt: v.Share.ExpiresAt.UTC()}
-					if in.View == "owned" {
+					if in.View == "administration" {
+						item.ArtifactID = v.Share.ArtifactID
+					}
+					if in.View == "owned" || in.View == "administration" {
 						item.Revision = v.Share.Revision
 						item.CreatedBy = &shareRecipientInput{Kind: "User", Issuer: v.Share.Creator.Issuer, ID: v.Share.Creator.Subject}
 						item.ManagedBy = managedBy(v.Share)

@@ -100,7 +100,7 @@ export function SharePanel({ session, scope, caseID, artifact, preview, controll
     </div>
     <details>
       <summary>Managed by (optional)</summary>
-      <p className="field-help">By default every owner team you belong to manages this share: its members can see and revoke it, even after you leave. To narrow that, name some of your owner teams here. Managing grants no access to the evidence.</p>
+      <p className="field-help">By default every owner team you belong to manages this share: its members can see and revoke it, even after you leave. To narrow that, name some of your owner teams here; naming an owner team you do not belong to requires an installation administrator. Managing grants no access to the evidence.</p>
       <TeamsEditor teams={teams} onChange={setTeams} label="Managing team ID"/>
     </details>
     </fieldset>

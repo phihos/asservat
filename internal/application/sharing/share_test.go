@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -157,6 +158,28 @@ func (s *memoryStore) RevokeShare(_ context.Context, r Revocation, _ artifact.Re
 	return value.Share{}, false, capture.ErrDenied
 }
 
+// AdministeredShares mirrors the SQL keyset page: newest first, strictly
+// after the cursor.
+func (s *memoryStore) AdministeredShares(_ context.Context, after ShareCursor, limit int) ([]value.Share, error) {
+	rows := slices.Clone(s.rows)
+	slices.SortFunc(rows, func(a, b value.Share) int {
+		if c := b.CreatedAt.Compare(a.CreatedAt); c != 0 {
+			return c
+		}
+		return strings.Compare(b.ID, a.ID)
+	})
+	var out []value.Share
+	for _, r := range rows {
+		if after != (ShareCursor{}) && (r.CreatedAt.After(after.CreatedAt) || r.CreatedAt.Equal(after.CreatedAt) && r.ID >= after.ID) {
+			continue
+		}
+		if len(out) < limit {
+			out = append(out, s.stamp(r))
+		}
+	}
+	return out, nil
+}
+
 // TransferShare mirrors the SQL adapter: pinned current managers only, the
 // latest transfer key replays, a stale revision conflicts.
 func (s *memoryStore) TransferShare(_ context.Context, t Transfer, _ artifact.RecoveryProof) (value.Share, bool, error) {
@@ -169,7 +192,7 @@ func (s *memoryStore) TransferShare(_ context.Context, t Transfer, _ artifact.Re
 			pinned = pinned && slices.ContainsFunc(s.rows[i].Management, func(a artifact.AudienceAssignment) bool { return a.AssignmentID == id })
 		}
 		switch {
-		case !pinned:
+		case !pinned && !t.Administrator:
 			return value.Share{}, false, capture.ErrDenied
 		case s.transfers[t.ShareID].IdempotencyKey == t.IdempotencyKey:
 			if s.transfers[t.ShareID].RequestDigest != t.RequestDigest {

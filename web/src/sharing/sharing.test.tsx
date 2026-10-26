@@ -184,18 +184,34 @@ it('transfers management with the listed revision and revokes with it (ADR-238)'
   expect((client.calls.find(c => c.name === 'revoke_share')!.input as Input<'revoke_share'>).expected_revision).toBe(2);
 });
 
-it('lets an administrator revoke any share by ID (ADR-238)', async () => {
+it('lists every share management-only for administrators, pages with the cursor, revokes and recovers (ADR-238)', async () => {
   const client = new SyntheticShares(); let n = 60;
+  const admin = (k: number, phase: string) => ({ ...row(k, phase), artifact_id: id(3), revision: 2, created_by: { kind: 'User', issuer: session.principal.issuer, id: 'creator' }, managed_by: [{ kind: 'Group', issuer: session.principal.issuer, id: 'team-a' }] });
+  const pages = [{ ...result({ shares: [admin(70, 'Suspended')] }), next_cursor: 's1.1.' + id(70) }, result({ shares: [admin(71, 'Revoked')] })];
+  expect(pages.every(p => validOutput_list_shares(p))).toBe(true);
+  const call = client.call.bind(client);
+  client.call = (async (name: Operation, input: unknown, csrf: string, signal: AbortSignal) => {
+    if (name === 'list_shares' && (input as { view: string }).view === 'administration') { client.calls.push({ name, input: structuredClone(input), csrf }); return (input as { cursor?: string }).cursor ? pages[1] : pages[0]; }
+    return call(name as never, input as never, csrf);
+  }) as typeof client.call;
   const shares = new Shares(client, () => id(n++)); controllers.push(shares);
   render(<SharesWorkspace session={session} scope={new AbortController().signal} controller={shares}/>);
   await screen.findByRole('link', { name: 'Open shared case' });
-  const button = screen.getByRole('button', { name: 'Revoke share' }) as HTMLButtonElement;
-  expect(button.disabled).toBe(true);
-  fireEvent.change(screen.getByLabelText('Share ID'), { target: { value: id(77) } });
-  fireEvent.change(screen.getByLabelText('Revision'), { target: { value: '3' } });
-  fireEvent.click(button);
+  fireEvent.click(screen.getByRole('button', { name: 'Load all shares' }));
+  const all = within(await screen.findByRole('list', { name: 'All shares' }));
+  expect(all.getByText(/Managed by team team-a/)).toBeTruthy();
+  fireEvent.click(screen.getByRole('button', { name: 'More shares' }));
+  await waitFor(() => expect(all.getAllByRole('listitem')).toHaveLength(2));
+  expect(client.calls.filter(c => c.name === 'list_shares' && (c.input as { view: string }).view === 'administration').map(c => c.input)).toEqual([{ view: 'administration', limit: 50 }, { view: 'administration', limit: 50, cursor: 's1.1.' + id(70) }]);
+  // Recovery of the Suspended share assigns current owner teams.
+  fireEvent.change(all.getByLabelText('New managing team ID'), { target: { value: 'team-b' } });
+  fireEvent.click(all.getByRole('button', { name: 'Add team' }));
+  fireEvent.click(all.getByRole('button', { name: 'Transfer' }));
+  await waitFor(() => expect(client.calls.find(c => c.name === 'transfer_share')).toBeTruthy());
+  expect((client.calls.find(c => c.name === 'transfer_share')!.input as Input<'transfer_share'>).expected_revision).toBe(2);
+  fireEvent.click(await screen.findByRole('button', { name: 'Revoke ' + id(70) }));
   await waitFor(() => expect(client.calls.find(c => c.name === 'revoke_share')).toBeTruthy());
-  expect(client.calls.find(c => c.name === 'revoke_share')!.input).toEqual({ share_id: id(77), expected_revision: 3, idempotency_key: id(60) });
+  expect(client.calls.find(c => c.name === 'revoke_share')!.input).toEqual({ share_id: id(70), expected_revision: 2, idempotency_key: id(61) });
 });
 
 it('shows an owned-list refusal without hiding received shares', async () => {

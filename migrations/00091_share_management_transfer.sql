@@ -22,6 +22,8 @@ BEGIN
  EXECUTE format('ALTER TABLE evidence_share DROP CONSTRAINT %I', c);
 END $$;
 -- +goose StatementEnd
+-- The administrator's management-only listing pages all shares newest first.
+CREATE INDEX evidence_share_administered ON evidence_share(root_id,created_at DESC,id DESC);
 ALTER TABLE evidence_share ADD CONSTRAINT evidence_share_revision CHECK (revision BETWEEN 1 AND 1000000000 AND (revoked_at IS NULL OR revision>=2));
 
 -- Two changes remain possible on a live share, each adding exactly one

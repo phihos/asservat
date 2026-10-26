@@ -112,6 +112,73 @@ func (q *Queries) InsertShare(ctx context.Context, arg InsertShareParams) (Evide
 	return i, err
 }
 
+const listAdministeredShares = `-- name: ListAdministeredShares :many
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest FROM evidence_share WHERE root_id=$1::uuid
+ AND (NOT $2::boolean OR (created_at,id)<($3::timestamptz,$4::uuid))
+ORDER BY created_at DESC, id DESC LIMIT $5
+`
+
+type ListAdministeredSharesParams struct {
+	RootID         pgtype.UUID
+	Paged          bool
+	AfterCreatedAt pgtype.Timestamptz
+	AfterID        pgtype.UUID
+	RowLimit       int32
+}
+
+// ADR-238: the installation administrator's management-only listing, newest
+// first, keyset-paged on (created_at, id) (index evidence_share_administered).
+func (q *Queries) ListAdministeredShares(ctx context.Context, arg ListAdministeredSharesParams) ([]EvidenceShare, error) {
+	rows, err := q.db.Query(ctx, listAdministeredShares,
+		arg.RootID,
+		arg.Paged,
+		arg.AfterCreatedAt,
+		arg.AfterID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []EvidenceShare{}
+	for rows.Next() {
+		var i EvidenceShare
+		if err := rows.Scan(
+			&i.ID,
+			&i.RootID,
+			&i.ArtifactID,
+			&i.CaseID,
+			&i.ClusterID,
+			&i.NamespaceUid,
+			&i.WorkloadUid,
+			&i.PodUid,
+			&i.Version,
+			&i.CreatorIssuer,
+			&i.CreatorSubject,
+			&i.CreatorClient,
+			&i.Management,
+			&i.Recipients,
+			&i.RecipientKeys,
+			&i.IdempotencyKey,
+			&i.RequestDigest,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+			&i.RevokedAt,
+			&i.RevokeKey,
+			&i.Revision,
+			&i.TransferKey,
+			&i.TransferDigest,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOwnedShares = `-- name: ListOwnedShares :many
 SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision, transfer_key, transfer_digest FROM evidence_share WHERE root_id=$1
  AND ((creator_issuer=$2 AND creator_subject=$3)

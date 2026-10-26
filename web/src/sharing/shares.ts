@@ -6,6 +6,8 @@ export type Recipient = { kind: 'User' | 'Group'; id: string };
 export type State = {
   busy: boolean;
   owned?: ShareRow[]; received?: ShareRow[];
+  // ADR-238: the administrator's management-only pages (loaded on demand).
+  administered?: ShareRow[]; administeredCursor?: string; administeredMessage?: string;
   ownedMessage?: string; receivedMessage?: string;
   created?: { shareID: string; expiresAt: string; recipients: number };
   message?: string;
@@ -49,13 +51,13 @@ export class Shares {
 
   // Returns the data, or the user-visible message and whether the outcome is
   // definite (a canonical domain reply) rather than unknown.
-  private async run<N extends Operation>(name: N, input: Input<N>): Promise<{ data?: Data<N>; message?: string; definite: boolean } | undefined> {
+  private async run<N extends Operation>(name: N, input: Input<N>): Promise<{ data?: Data<N>; next?: string; message?: string; definite: boolean } | undefined> {
     const session = this.session, scope = this.scope;
     if (!session || !scope || scope.aborted) return;
     try {
       const result: Output<N> = await this.client.call(name, input, session.csrf_token, scope);
       if (scope.aborted) return;
-      if (result.status === 'ok') return { data: result.data as Data<N>, definite: true };
+      if (result.status === 'ok') return { data: result.data as Data<N>, next: (result as { next_cursor?: string | null }).next_cursor ?? undefined, definite: true };
       if (result.status === 'error') return { message: result.data.message, definite: true };
       return { message: 'The request is still pending. Retry the same request shortly.', definite: false };
     } catch (error) {
@@ -63,6 +65,27 @@ export class Shares {
       return { message: operationMessage(error), definite: error instanceof OperationFailure && !!error.detail };
     }
   }
+
+  // ADR-238: one management-only page of every share for installation
+  // administrators; next appends the following page. The server refuses
+  // everyone else.
+  loadAdministration = async (next = false) => {
+    if (this.state.busy) return;
+    const cursor = next ? this.state.administeredCursor : undefined;
+    if (next && !cursor) return;
+    this.publish({ busy: true });
+    const reply = await this.run('list_shares', { view: 'administration', limit: 50, ...(cursor ? { cursor } : {}) } as Input<'list_shares'>);
+    if (!reply) { this.publish({ busy: false }); return; }
+    const rows = reply.data?.shares;
+    this.publish({ busy: false, administeredMessage: reply.message, administeredCursor: reply.next,
+      administered: rows && (next ? [...(this.state.administered ?? []), ...rows] : rows) });
+  };
+
+  // After a change: the user's lists, and the administrator page if shown.
+  private refresh = async () => {
+    await this.load();
+    if (this.state.administered) await this.loadAdministration();
+  };
 
   load = async () => {
     if (this.state.busy) return;
@@ -114,7 +137,7 @@ export class Shares {
     if (!reply) { this.publish({ busy: false }); return; }
     if (reply.definite) this.revokeKeys.delete(row.share_id);
     this.publish({ busy: false, message: reply.message ?? (reply.data ? 'Share revoked.' : undefined) });
-    if (reply.data) await this.load();
+    if (reply.data) await this.refresh();
   };
 
   // ADR-238: a current manager hands management to owner teams they belong
@@ -133,6 +156,6 @@ export class Shares {
     if (!reply) { this.publish({ busy: false }); return; }
     if (reply.definite) this.transferKeys.delete(row.share_id);
     this.publish({ busy: false, message: reply.message ?? (reply.data ? 'Management transferred.' : undefined) });
-    if (reply.data) await this.load();
+    if (reply.data) await this.refresh();
   };
 }

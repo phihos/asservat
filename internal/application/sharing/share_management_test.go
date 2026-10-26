@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -145,7 +146,7 @@ func TestShareTransfer(t *testing.T) {
 
 // ADR-238: an installation administrator revokes another team's share
 // without any evidence right; a non-admin non-manager is refused; an
-// administrator cannot transfer.
+// administrator cannot assign a group that is not a current owner team.
 func TestShareAdministratorRevoke(t *testing.T) {
 	ctx := context.Background()
 	f, s := newFixture()
@@ -172,8 +173,8 @@ func TestShareAdministratorRevoke(t *testing.T) {
 		t.Fatal("non-admin non-manager revoked", err)
 	}
 	f.i = admin
-	if _, _, err := s.Transfer(ctx, f, TransferInput{ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "teams", Teams: []string{"platform"}}, IdempotencyKey: "t"}); !errors.Is(err, capture.ErrDenied) {
-		t.Fatal("administrator transferred management", err)
+	if _, _, err := s.Transfer(ctx, f, TransferInput{ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "teams", Teams: []string{"platform"}}, IdempotencyKey: "t"}); !errors.Is(err, ErrManagementNotHeld) {
+		t.Fatal("administrator assigned a group that is not an owner team", err)
 	}
 	// No projection for the target: an administrator's revocation still
 	// restricts.
@@ -200,5 +201,157 @@ func TestShareAdministratorRevoke(t *testing.T) {
 	f.i = owner
 	if _, _, err := s.Revoke(ctx, f, second.ID, 1, "r3"); err != nil || f.store.revokers[1].Administrator {
 		t.Fatal("creator revoke", err)
+	}
+}
+
+// ADR-238 scoped delegation: an administrator who is also an owner may name
+// current owner teams they do not belong to (inside the retained audience);
+// a non-admin may not; nothing outside the audience is ever pinned.
+func TestShareAdministratorAssignsManagement(t *testing.T) {
+	ctx := context.Background()
+	f, s := newFixture()
+	c := f.addOwnerTeam("owners-c", 16) // the creator is not a member
+	s.Administration = f.fleetOperators()
+	in := f.input("k1")
+	in.Management = value.ManagementRequest{Mode: "teams", Teams: []string{"owners-c"}}
+	if _, _, err := s.Create(ctx, f, in); !errors.Is(err, ErrManagementNotHeld) {
+		t.Fatal("non-admin assigned a team they do not hold", err)
+	}
+	f.i.Groups = append(f.i.Groups, "platform")
+	share, _, err := s.Create(ctx, f, in)
+	if err != nil || len(share.Management) != 1 || share.Management[0] != c {
+		t.Fatal("administrator delegation at creation", err, share.Management)
+	}
+	// A current owner team outside the artifact's retained audience (added
+	// after the capture) cannot be assigned, not even by an administrator.
+	late := f.record.Audience[1]
+	late.SubjectID, late.AssignmentID = "owners-late", testID(17)
+	f.p.Allows = append(f.p.Allows, value.CurrentAssignment{Audience: late, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second)})
+	in = f.input("k2")
+	in.Management = value.ManagementRequest{Mode: "teams", Teams: []string{"owners-late"}}
+	if _, _, err := s.Create(ctx, f, in); !errors.Is(err, ErrManagementNotHeld) {
+		t.Fatal("administrator widened the artifact audience", err)
+	}
+	// An administrator without any owner right cannot share at all.
+	admin := f.i
+	admin.Principal.Subject, admin.Groups = "admin", []string{"platform"}
+	f.i = admin
+	in = f.input("k3")
+	in.Management = value.ManagementRequest{Mode: "teams", Teams: []string{"owners-c"}}
+	if _, _, err := s.Create(ctx, f, in); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("administrator without owner rights created a share", err)
+	}
+}
+
+// ADR-238 authority recovery: once every manager is lost the share is
+// Suspended; an administrator re-pins current owner teams (new revision,
+// creator and expiry unchanged) and the recipient reads again. A non-admin
+// cannot; a revoked share cannot be recovered.
+func TestShareAdministratorRecovery(t *testing.T) {
+	ctx := context.Background()
+	f, s := newFixture()
+	b := f.addOwnerTeam("owners-b", 13)
+	s.Administration = f.fleetOperators()
+	creator := f.i
+	share, _, err := s.Create(ctx, f, f.input("k1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.dropAllow(share.Management[0].AssignmentID)
+	recipient := creator
+	recipient.Principal.Subject, recipient.Groups = "reader", []string{"outsiders"}
+	f.i = recipient
+	if got, _, _ := s.List(ctx, f, "received", 20); len(got) != 0 {
+		t.Fatal("suspended share received", got)
+	}
+	recover := TransferInput{ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "teams", Teams: []string{"owners-b"}}, IdempotencyKey: "recover"}
+	member := creator
+	member.Principal.Subject, member.Groups = "b-member", []string{"owners-b"}
+	f.i = member
+	if _, _, err := s.Transfer(ctx, f, recover); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("non-admin recovered a suspended share", err)
+	}
+	admin := creator
+	admin.Principal.Subject, admin.Groups = "admin", []string{"platform"}
+	f.i = admin
+	reads := f.catalogReads
+	if _, _, err := s.Transfer(ctx, f, TransferInput{ShareID: share.ID, ExpectedRevision: 1, Management: value.ManagementRequest{Mode: "creator"}, IdempotencyKey: "c"}); !errors.Is(err, ErrManagementNotHeld) {
+		t.Fatal("administrator chose creator management", err)
+	}
+	recovered, _, err := s.Transfer(ctx, f, recover)
+	if err != nil || recovered.Revision != 2 || len(recovered.Management) != 1 || recovered.Management[0] != b || recovered.Creator != share.Creator || !recovered.ExpiresAt.Equal(share.ExpiresAt) || f.catalogReads == reads {
+		t.Fatal("administrator recovery", err, recovered)
+	}
+	if t2 := f.store.transfers[share.ID]; !t2.Administrator || t2.Actor.Subject != "admin" {
+		t.Fatal("recovery not recorded as administrative", t2)
+	}
+	f.i = recipient
+	if got, _, _ := s.List(ctx, f, "received", 20); len(got) != 1 {
+		t.Fatal("recovered share not received", got)
+	}
+	f.i = member
+	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 1 || owned[0].Phase != value.ShareActive {
+		t.Fatal("new team does not manage the recovered share", owned)
+	}
+	f.i = admin
+	if _, _, err := s.Revoke(ctx, f, share.ID, 2, "r"); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.Transfer(ctx, f, TransferInput{ShareID: share.ID, ExpectedRevision: 3, Management: recover.Management, IdempotencyKey: "again"}); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("revoked share recovered", err)
+	}
+}
+
+// ADR-238 management-only administrator listing: administrators only,
+// bounded keyset pages with a cursor, derived phases.
+func TestShareAdministeredListing(t *testing.T) {
+	ctx := context.Background()
+	f, s := newFixture()
+	var ids []string
+	for n := 0; n < 5; n++ {
+		share, _, err := s.Create(ctx, f, f.input(fmt.Sprint("k", n)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, share.ID)
+		f.now = f.now.Add(time.Microsecond)
+	}
+	if _, _, _, err := s.ListAdministered(ctx, f, "", 2); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("listing without an administration", err)
+	}
+	s.Administration = f.fleetOperators()
+	if _, _, _, err := s.ListAdministered(ctx, f, "", 2); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("non-admin listed all shares", err)
+	}
+	f.i.Principal.Subject, f.i.Groups = "admin", []string{"platform"}
+	var seen []string
+	cursor := ""
+	for page := 0; page < 4; page++ {
+		rows, next, until, err := s.ListAdministered(ctx, f, cursor, 2)
+		if err != nil || !until.After(f.now) {
+			t.Fatal(err)
+		}
+		for _, r := range rows {
+			seen = append(seen, r.Share.ID)
+			if r.Phase != value.ShareActive {
+				t.Fatal("phase", r.Phase)
+			}
+		}
+		if next == "" {
+			break
+		}
+		cursor = next
+	}
+	slices.Reverse(ids)
+	if !slices.Equal(seen, ids) {
+		t.Fatal("pages", seen, ids)
+	}
+	for _, bad := range []string{"s1.x." + ids[0], "s2.1." + ids[0], "garbage"} {
+		if _, _, _, err := s.ListAdministered(ctx, f, bad, 2); !errors.Is(err, capture.ErrInvalid) {
+			t.Fatal("bad cursor", bad, err)
+		}
+	}
+	if _, _, _, err := s.ListAdministered(ctx, f, "", 101); !errors.Is(err, capture.ErrInvalid) {
+		t.Fatal("page above 100", err)
 	}
 }

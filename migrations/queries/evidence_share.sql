@@ -58,3 +58,10 @@ WHERE root_id=$1 AND id=$2 AND revoked_at IS NULL RETURNING *;
 -- ADR-238: replaces the pinned management of a live share; one revision.
 UPDATE evidence_share SET management=sqlc.arg(management)::jsonb, transfer_key=sqlc.arg(transfer_key)::text, transfer_digest=sqlc.arg(transfer_digest)::bytea, revision=revision+1
 WHERE root_id=sqlc.arg(root_id)::uuid AND id=sqlc.arg(id)::uuid AND revoked_at IS NULL AND expires_at>clock_timestamp() AND revision<1000000000 RETURNING *;
+
+-- name: ListAdministeredShares :many
+-- ADR-238: the installation administrator's management-only listing, newest
+-- first, keyset-paged on (created_at, id) (index evidence_share_administered).
+SELECT * FROM evidence_share WHERE root_id=sqlc.arg(root_id)::uuid
+ AND (NOT sqlc.arg(paged)::boolean OR (created_at,id)<(sqlc.arg(after_created_at)::timestamptz,sqlc.arg(after_id)::uuid))
+ORDER BY created_at DESC, id DESC LIMIT sqlc.arg(row_limit);

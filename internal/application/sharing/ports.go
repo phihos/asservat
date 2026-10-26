@@ -2,6 +2,7 @@ package sharing
 
 import (
 	"context"
+	"time"
 
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/domain/artifact"
@@ -40,9 +41,13 @@ type Revocation struct {
 // complete new set, all held by the actor now. Creator, recipients, artifact
 // and expiry never change.
 type Transfer struct {
-	ShareID          string
-	Actor            identity.Principal
-	Managers         []string
+	ShareID  string
+	Actor    identity.Principal
+	Managers []string
+	// Administrator marks an installation administrator's assignment or
+	// recovery (the service checked the fleet administration); the store
+	// then requires no pinned manager.
+	Administrator    bool
 	Management       []artifact.AudienceAssignment
 	ExpectedRevision int64
 	IdempotencyKey   string
@@ -62,6 +67,17 @@ type Store interface {
 	ReceivedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error)
 	RevokeShare(context.Context, Revocation, artifact.RecoveryProof) (authorization.Share, bool, error)
 	TransferShare(context.Context, Transfer, artifact.RecoveryProof) (authorization.Share, bool, error)
+	// AdministeredShares is the administrator's management-only page of all
+	// shares, newest first, strictly after the keyset position (zero: the
+	// first page).
+	AdministeredShares(ctx context.Context, after ShareCursor, limit int) ([]authorization.Share, error)
+}
+
+// ShareCursor is a keyset position (created_at, id) of the administrator
+// listing; the zero value starts at the newest share.
+type ShareCursor struct {
+	CreatedAt time.Time
+	ID        string
 }
 
 // Administrators reads the protected fleet administration whose operators

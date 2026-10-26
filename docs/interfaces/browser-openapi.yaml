@@ -750,9 +750,7 @@ paths:
   /api/v1/operations/list_shares:
     post:
       operationId: list_shares
-      summary: List shares managed personally or through current owner-team membership
-        (view owned), or received concrete shares; optionally include managed sharing
-        instructions.
+      summary: "List shares managed personally or through current owner-team membership (view owned), or received concrete shares; optionally include managed sharing instructions. Installation administrators may list every share management-only (view administration: opaque IDs, phase, expiry, revision, creator and managers; never recipients or evidence)."
       tags:
       - Shared browser and MCP
       x-domain-contract: list_shares
@@ -873,7 +871,7 @@ paths:
   /api/v1/operations/transfer_share:
     post:
       operationId: transfer_share
-      summary: Replace the managing owner teams of one share or an owned SharingIntent (an audited transfer). Only a current manager may transfer, to teams they currently hold; creator, recipients, artifacts, counts and expiry are unchanged.
+      summary: "Replace the managing owner teams of one share or an owned SharingIntent (an audited transfer). A current manager may name teams they currently hold; an installation administrator (scoped management delegation) may name any current owner teams covering the target, also to recover a Suspended share. Creator, recipients, artifacts, counts and expiry are unchanged."
       tags:
       - Shared browser and MCP
       x-domain-contract: transfer_share
@@ -7973,6 +7971,7 @@ components:
           enum:
           - owned
           - received
+          - administration
         include_intents:
           type: boolean
           default: false
@@ -7982,7 +7981,9 @@ components:
       - if:
           properties:
             view:
-              const: received
+              enum:
+              - received
+              - administration
         then:
           properties:
             include_intents:
@@ -8009,6 +8010,9 @@ components:
                         type: string
                         format: uuid
                       case_id:
+                        type: string
+                        format: uuid
+                      artifact_id:
                         type: string
                         format: uuid
                       phase:

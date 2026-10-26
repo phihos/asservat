@@ -164,6 +164,10 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 	if status, code := call(developer, "create_share", foreign, nil); status != "error" || code != "ManagementNotHeld" {
 		t.Fatal("installed share named a team the owner does not hold", status, code)
 	}
+	// The management-only administrator listing is refused to a recipient.
+	if status, code := call(recipient, "list_shares", map[string]any{"view": "administration", "limit": 10}, nil); status != "error" || code != "NotAvailable" {
+		t.Fatal("installed recipient listed every share", status, code)
+	}
 	// 4. Revocation ends the recipient's read at its next request.
 	var revoked struct {
 		Phase    string `json:"phase"`

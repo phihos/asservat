@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -171,6 +172,15 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 	}
 	retained := value.Retained{ArtifactID: route.ArtifactID, Target: route.Target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
 	eligible, owners := value.SelectShareManagement(i, p, route.Target, &retained, in.Management, s.Now())
+	if eligible.Reason == "ManagementNotHeld" && in.Management.Mode == "teams" && s.administrator(ctx, i) {
+		// The creator may share (ordinary rights, evidence:share and an own
+		// owner assignment; the default selection proves it), and an
+		// administrator's scoped delegation may name owner teams the creator
+		// does not belong to (ADR-238).
+		if creator, _ := value.ShareManagement(i, p, route.Target, &retained, s.Now()); creator.Eligible || creator.Reason == "ManagementTooBroad" {
+			eligible, owners = value.AdministeredShareManagement(i.Principal.Issuer, p, route.Target, &retained, in.Management.Teams, s.Now())
+		}
+	}
 	if err := managementError(eligible); err != nil {
 		return zero, false, err
 	}
@@ -367,6 +377,96 @@ func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity,
 	return out, replay, nil
 }
 
+// ListAdministered is the installation administrator's management-only
+// listing of all shares (ADR-238; REQ-SHR-008 "a management-only view exposes
+// opaque IDs, expiry and revoke/stop controls"): newest first, at most limit
+// (≤100) rows after the opaque cursor, each with its derived phase. Rows are
+// returned whole to the transport, which projects only IDs, phase, expiry,
+// revision, creator and managing subjects — never recipients or evidence.
+// The second result is the next page's cursor ("" on the last page).
+func (s Service) ListAdministered(ctx context.Context, current identities.CurrentIdentity, cursor string, limit int) ([]View, string, time.Time, error) {
+	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() || limit < 1 || limit > 100 {
+		return nil, "", time.Time{}, capture.ErrInvalid
+	}
+	after, ok := decodeShareCursor(cursor)
+	if !ok {
+		return nil, "", time.Time{}, capture.ErrInvalid
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	i, err := s.caller(ctx, current)
+	if err != nil {
+		return nil, "", time.Time{}, err
+	}
+	if !s.administrator(ctx, i) {
+		return nil, "", time.Time{}, capture.ErrDenied
+	}
+	rows, err := s.Store.AdministeredShares(ctx, after, limit+1)
+	if err != nil {
+		return nil, "", time.Time{}, capture.ErrUnavailable
+	}
+	next := ""
+	if len(rows) > limit {
+		rows = rows[:limit]
+		last := rows[limit-1]
+		next = encodeShareCursor(ShareCursor{CreatedAt: last.CreatedAt, ID: last.ID})
+	}
+	until := i.ValidUntil
+	projections := map[value.Target]value.Projection{}
+	out := make([]View, 0, len(rows))
+	for _, row := range rows {
+		if row.RootID != s.RootID {
+			return nil, "", time.Time{}, capture.ErrUnavailable
+		}
+		until = identity.Earlier(until, row.ValidUntil)
+		if !row.RevokedAt.IsZero() || !s.Now().Before(row.ExpiresAt) {
+			out = append(out, View{row, row.Phase(value.Projection{}, s.Now())})
+			continue
+		}
+		p, ok := projections[row.Target]
+		if !ok {
+			if p, err = s.Permissions.Permissions(ctx, row.Target); err != nil {
+				p = value.Projection{}
+			}
+			projections[row.Target] = p
+		}
+		// Without a current projection the managers cannot be proven: shown
+		// Suspended (recovery and revocation stay reachable).
+		if !projectionCurrentFor(p, row.Target, s.Now()) {
+			out = append(out, View{row, value.ShareSuspended})
+			continue
+		}
+		until = identity.Earlier(until, identity.Earlier(p.FreshUntil, p.DeniesFreshUntil))
+		out = append(out, View{row, row.Phase(p, s.Now())})
+	}
+	final, err := current.ResolveIdentity(ctx)
+	if err != nil || !final.Valid(s.Now()) || final.Principal != i.Principal || ctx.Err() != nil || !s.administrator(ctx, final) {
+		return nil, "", time.Time{}, capture.ErrDenied
+	}
+	return out, next, identity.Earlier(until, final.ValidUntil), nil
+}
+
+// The administrator cursor is an opaque keyset position:
+// "s1.<created_at unix microseconds>.<share id>".
+func encodeShareCursor(c ShareCursor) string {
+	return "s1." + strconv.FormatInt(c.CreatedAt.UnixMicro(), 10) + "." + c.ID
+}
+
+func decodeShareCursor(s string) (ShareCursor, bool) {
+	if s == "" {
+		return ShareCursor{}, true
+	}
+	parts := strings.Split(s, ".")
+	if len(parts) != 3 || parts[0] != "s1" || !value.UUID(parts[2]) {
+		return ShareCursor{}, false
+	}
+	micros, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil || micros <= 0 {
+		return ShareCursor{}, false
+	}
+	return ShareCursor{CreatedAt: time.UnixMicro(micros).UTC(), ID: parts[2]}, true
+}
+
 // administrator reports whether i is an operator of the current protected
 // fleet administration of this installation.
 func (s Service) administrator(ctx context.Context, i identity.Identity) bool {
@@ -377,13 +477,15 @@ func (s Service) administrator(ctx context.Context, i identity.Identity) bool {
 	return err == nil && a.InstallationID == s.InstallationID && a.Valid(s.Now()) && i.Valid(s.Now()) && a.Operator(i)
 }
 
-// Transfer replaces the management of one active share (ADR-238,
-// REQ-SHR-008): the caller must be a current manager, and the new set is the
-// caller's own current evidence-owner assignments of the named teams (or,
-// for the creator, their individual ones) inside the artifact's retained
-// audience. Creator, recipients, artifact and expiry are unchanged, so a
-// transfer never extends access; the share is Suspended as soon as no new
-// assignment is current. The operation audit records the decision.
+// Transfer replaces the management of one live share (ADR-238,
+// REQ-SHR-008). A current manager names owner teams they hold now (or, as the
+// creator, only themselves) inside the artifact's retained audience. An
+// installation administrator holds the scoped delegation to assign
+// management: any current evidence-owner teams covering the target inside
+// that audience, also for a Suspended share (authority recovery, the explicit
+// resume). Creator, recipients, artifact and expiry are unchanged, so a
+// transfer never extends access; the share is Suspended as soon as no pinned
+// assignment is current. The operation audit records the acting principal.
 func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentity, in TransferInput) (value.Share, bool, error) {
 	var zero value.Share
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() {
@@ -409,24 +511,31 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 	if err != nil || share.ID != in.ShareID || share.RootID != s.RootID {
 		return zero, false, capture.ErrUnavailable
 	}
+	p, perr := s.Permissions.Permissions(ctx, share.Target)
+	var held []artifact.AudienceAssignment
+	if perr == nil {
+		held, _ = share.ManagedBy(i, p, s.Now())
+	}
+	// Authority precedes every further read: a current manager, otherwise
+	// an installation administrator (scoped management delegation).
+	administered := len(held) == 0
+	if administered && !s.administrator(ctx, i) {
+		return zero, false, capture.ErrDenied
+	}
 	if !share.RevokedAt.IsZero() || !s.Now().Before(share.ExpiresAt) {
 		return zero, false, capture.ErrDenied
 	}
-	p, err := s.Permissions.Permissions(ctx, share.Target)
-	if err != nil {
-		return zero, false, capture.ErrDenied
+	if perr != nil {
+		return zero, false, capture.ErrUnavailable
 	}
-	held, _ := share.ManagedBy(i, p, s.Now())
-	if len(held) == 0 {
-		return zero, false, capture.ErrDenied
-	}
-	// Creator mode pins individual assignments, so only the creator may
-	// choose it: management never names another person.
-	if in.Management.Mode == "creator" && !createdBy(share, i.Principal) {
+	// Creator mode pins individual assignments, so only the creator (as a
+	// current manager) may choose it: management never names another person.
+	if in.Management.Mode == "creator" && (administered || !createdBy(share, i.Principal)) {
 		return zero, false, ErrManagementNotHeld
 	}
-	// No catalog read without current ordinary target eligibility.
-	if !value.ScopeEligibility(i, p, value.ReadApproved, share.Target, s.Now()).Eligible {
+	// No catalog read without current ordinary target eligibility or the
+	// administrator authority checked above.
+	if !administered && !value.ScopeEligibility(i, p, value.ReadApproved, share.Target, s.Now()).Eligible {
 		return zero, false, capture.ErrDenied
 	}
 	record, err := s.Catalog.ContextDownloadEvidence(ctx, share.ArtifactID)
@@ -438,7 +547,14 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 		return zero, false, capture.ErrUnavailable
 	}
 	retained := value.Retained{ArtifactID: share.ArtifactID, Target: share.Target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
-	eligible, owners := value.SelectShareManagement(i, p, share.Target, &retained, in.Management, s.Now())
+	var eligible value.Result
+	var owners []artifact.AudienceAssignment
+	if !administered {
+		eligible, owners = value.SelectShareManagement(i, p, share.Target, &retained, in.Management, s.Now())
+	}
+	if administered || eligible.Reason == "ManagementNotHeld" && in.Management.Mode == "teams" && s.administrator(ctx, i) {
+		eligible, owners = value.AdministeredShareManagement(i.Principal.Issuer, p, share.Target, &retained, in.Management.Teams, s.Now())
+	}
 	if err := managementError(eligible); err != nil {
 		return zero, false, err
 	}
@@ -451,7 +567,7 @@ func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentit
 	if err != nil {
 		return zero, false, capture.ErrUnavailable
 	}
-	t := Transfer{ShareID: in.ShareID, Actor: i.Principal, Management: owners, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey, RequestDigest: sha256.Sum256(digest)}
+	t := Transfer{ShareID: in.ShareID, Actor: i.Principal, Administrator: administered, Management: owners, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey, RequestDigest: sha256.Sum256(digest)}
 	for _, a := range held {
 		t.Managers = append(t.Managers, a.AssignmentID)
 	}

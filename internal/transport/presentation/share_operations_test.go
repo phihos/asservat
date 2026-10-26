@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -49,6 +50,42 @@ func (f *shareOperationsFixture) Transfer(_ context.Context, _ identities.Curren
 	f.calls, f.transfer = append(f.calls, "transfer"), in
 	team := artifact.AudienceAssignment{Kind: "Group", Issuer: "https://id.example.invalid", SubjectID: in.Management.Teams[0], Role: "evidence-owner", AssignmentID: "33333333-3333-4333-8333-333333333333"}
 	return authorization.Share{ID: in.ShareID, Revision: in.ExpectedRevision + 1, Management: []artifact.AudienceAssignment{team}}, false, nil
+}
+
+func (f *shareOperationsFixture) ListAdministered(_ context.Context, _ identities.CurrentIdentity, cursor string, limit int) ([]sharing.View, string, time.Time, error) {
+	f.calls = append(f.calls, "list-administration:"+cursor)
+	issuer := "https://id.example.invalid"
+	team := artifact.AudienceAssignment{Kind: "Group", Issuer: issuer, SubjectID: "owners", Role: "evidence-owner", AssignmentID: "33333333-3333-4333-8333-333333333333"}
+	s := authorization.Share{ID: "11111111-1111-4111-8111-111111111111", CaseID: "22222222-2222-4222-8222-222222222222", ArtifactID: "55555555-5555-4555-8555-555555555555", ExpiresAt: time.Now().Add(time.Hour), Revision: 3,
+		Creator: identity.Principal{Issuer: issuer, Subject: "creator", ClientID: "mcp", Kind: identity.Human}, Management: []artifact.AudienceAssignment{team},
+		Recipients: []authorization.ShareRecipient{{Kind: "User", Issuer: issuer, ID: "secret-recipient"}}}
+	return []sharing.View{{Share: s, Phase: authorization.ShareSuspended}}, "s1.1700000000000000.11111111-1111-4111-8111-111111111111", time.Now().Add(5 * time.Second), nil
+}
+
+// ADR-238: the administrator view is management-only (no recipients) with a
+// cursor; other views reject a cursor.
+func TestShareOperationsAdministration(t *testing.T) {
+	f := &shareOperationsFixture{scopes: []string{"evidence:read", "evidence:share"}}
+	s, err := NewShareOperations("https://asservat.example.invalid", time.Now, func() string { return "88888888-8888-4888-8888-888888888888" }, f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := shareCall(t, s, f, "list_shares", `{"view":"administration","limit":1,"cursor":"s1.1.11111111-1111-4111-8111-111111111111"}`)
+	row := out["data"].(map[string]any)["shares"].([]any)[0].(map[string]any)
+	if out["status"] != "ok" || out["next_cursor"] != "s1.1700000000000000.11111111-1111-4111-8111-111111111111" || row["artifact_id"] != "55555555-5555-4555-8555-555555555555" || row["revision"] != float64(3) || row["phase"] != "Suspended" ||
+		row["created_by"].(map[string]any)["id"] != "creator" || row["managed_by"].([]any)[0].(map[string]any)["id"] != "owners" || f.calls[0] != "list-administration:s1.1.11111111-1111-4111-8111-111111111111" {
+		t.Fatal("administration row", out)
+	}
+	if b, _ := json.Marshal(out); strings.Contains(string(b), "secret-recipient") {
+		t.Fatal("administration view lists recipients")
+	}
+	if out := shareCall(t, s, f, "list_shares", `{"view":"owned","cursor":"s1.1.11111111-1111-4111-8111-111111111111"}`); out["status"] != "error" {
+		t.Fatal("cursor accepted for the owned view", out)
+	}
+	f.scopes, f.calls = []string{"evidence:read"}, nil
+	if out := shareCall(t, s, f, "list_shares", `{"view":"administration"}`); out["data"].(map[string]any)["code"] != "NotAvailable" || len(f.calls) != 0 {
+		t.Fatal("administration view without evidence:share", out)
+	}
 }
 
 // ADR-238: create_share accepts the canonical management selection;

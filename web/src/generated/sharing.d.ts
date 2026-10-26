@@ -95,7 +95,7 @@ export interface components {
             cursor?: string;
             limit?: number;
             /** @enum {string} */
-            view: "owned" | "received";
+            view: "owned" | "received" | "administration";
             /** @default false */
             include_intents: boolean;
         } & unknown;
@@ -112,6 +112,8 @@ export interface components {
                     share_id: string;
                     /** Format: uuid */
                     case_id: string;
+                    /** Format: uuid */
+                    artifact_id?: string;
                     phase: string;
                     /** Format: date-time */
                     expires_at: string;

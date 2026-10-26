@@ -358,6 +358,51 @@ func SelectShareManagement(i identity.Identity, p Projection, t Target, e *Retai
 	return r, owners
 }
 
+// AdministeredShareManagement is the scoped management delegation of an
+// installation administrator (ADR-238): it pins the current evidence-owner
+// Group assignments of the named teams (stable IDs of issuer) that cover the
+// target and are inside the artifact's retained audience, whether or not the
+// administrator belongs to them. Each team needs at least one such current,
+// undenied assignment (else ManagementNotHeld); more than eight assignments
+// are refused. It never adds an assignment outside the retained audience, so
+// it cannot widen who may read the artifact, and it grants the administrator
+// nothing. The caller checks the administrator authority first.
+func AdministeredShareManagement(issuer string, p Projection, t Target, e *Retained, teams []string, now time.Time) (Result, []artifact.AudienceAssignment) {
+	m := ManagementRequest{Mode: "teams", Teams: teams}
+	if e == nil || !m.Valid() || !identity.Text(issuer, 2048) || !t.Valid() || e.Target != t || !e.valid() {
+		return Result{Reason: "InvalidRequest"}, nil
+	}
+	if !projectionCurrent(p, t, now) {
+		return Result{Reason: "PermissionUnavailable"}, nil
+	}
+	until := identity.Earlier(p.FreshUntil, p.DeniesFreshUntil)
+	var owners []artifact.AudienceAssignment
+	for _, g := range teams {
+		n := len(owners)
+		for _, a := range p.Allows {
+			x := a.Audience
+			if x.Kind != "Group" || x.Issuer != issuer || x.SubjectID != g || x.Role != "evidence-owner" || !slices.Contains(e.Audience, x) || !identity.Fresh(a.ObservedAt, a.FreshUntil, now, 60*time.Second) {
+				continue
+			}
+			denied := false
+			for _, d := range p.Denies {
+				denied = denied || d.Audience.Kind == "Group" && d.Audience.Issuer == issuer && d.Audience.SubjectID == g && permits(d.Audience.Role, ReadApproved)
+			}
+			if !denied {
+				owners = append(owners, x)
+				until = identity.Earlier(until, a.FreshUntil)
+			}
+		}
+		if len(owners) == n {
+			return Result{Reason: "ManagementNotHeld"}, nil
+		}
+	}
+	if len(owners) > ShareMaxManagers {
+		return Result{Reason: "ManagementTooBroad"}, nil
+	}
+	return Result{Eligible: true, Reason: "Administered", PermissionRevision: p.Revision, ValidUntil: until, ContributingAssignments: owners}, owners
+}
+
 // ManagedBy returns the pinned management assignments that i holds now
 // (ADR-232 increment 4). i must be a human with evidence:share, the target's
 // projection current, no current deny may name i, and the assignment must

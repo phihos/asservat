@@ -4262,7 +4262,7 @@
     },
     {
       "name": "list_shares",
-      "description": "List shares managed personally or through current owner-team membership (view owned), or received concrete shares; optionally include managed sharing instructions.",
+      "description": "List shares managed personally or through current owner-team membership (view owned), or received concrete shares; optionally include managed sharing instructions. Installation administrators may list every share management-only (view administration: opaque IDs, phase, expiry, revision, creator and managers; never recipients or evidence).",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -4287,7 +4287,8 @@
             "type": "string",
             "enum": [
               "owned",
-              "received"
+              "received",
+              "administration"
             ]
           },
           "include_intents": {
@@ -4303,7 +4304,10 @@
             "if": {
               "properties": {
                 "view": {
-                  "const": "received"
+                  "enum": [
+                    "received",
+                    "administration"
+                  ]
                 }
               }
             },
@@ -4345,6 +4349,10 @@
                               "format": "uuid"
                             },
                             "case_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "artifact_id": {
                               "type": "string",
                               "format": "uuid"
                             },
@@ -4979,7 +4987,7 @@
     },
     {
       "name": "transfer_share",
-      "description": "Replace the managing owner teams of one share or an owned SharingIntent (an audited transfer). Only a current manager may transfer, to teams they currently hold; creator, recipients, artifacts, counts and expiry are unchanged.",
+      "description": "Replace the managing owner teams of one share or an owned SharingIntent (an audited transfer). A current manager may name teams they currently hold; an installation administrator (scoped management delegation) may name any current owner teams covering the target, also to recover a Suspended share. Creator, recipients, artifacts, counts and expiry are unchanged.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,

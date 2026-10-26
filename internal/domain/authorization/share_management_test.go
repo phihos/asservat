@@ -34,6 +34,31 @@ func TestSelectShareManagement(t *testing.T) {
 			t.Fatal("invalid selection", m, r.Reason)
 		}
 	}
+	// The administrator delegation pins any current owner team inside the
+	// retained audience, never one outside it or named by a current deny.
+	e.Audience = append(e.Audience, team.Audience, foreign.Audience)
+	issuer := creator.Principal.Issuer
+	if r, owners := AdministeredShareManagement(issuer, p, p.Target, &e, []string{"team-c"}, now); !r.Eligible || len(owners) != 1 || owners[0] != foreign.Audience {
+		t.Fatal("administered team", r.Reason, owners)
+	}
+	if r, _ := AdministeredShareManagement(issuer, p, p.Target, &e, []string{"maintainers-not-owner"}, now); r.Reason != "ManagementNotHeld" {
+		t.Fatal("non-owner group administered", r.Reason)
+	}
+	outside := e
+	outside.Audience = outside.Audience[:len(outside.Audience)-1]
+	if r, _ := AdministeredShareManagement(issuer, p, p.Target, &outside, []string{"team-c"}, now); r.Reason != "ManagementNotHeld" {
+		t.Fatal("team outside the retained audience administered", r.Reason)
+	}
+	denied := p
+	d := foreign
+	d.Audience.AssignmentID = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+	denied.Denies = []CurrentAssignment{d}
+	if r, _ := AdministeredShareManagement(issuer, denied, p.Target, &e, []string{"team-c"}, now); r.Reason != "ManagementNotHeld" {
+		t.Fatal("denied team administered", r.Reason)
+	}
+	if r, _ := AdministeredShareManagement("https://other.example.invalid", p, p.Target, &e, []string{"team-c"}, now); r.Reason != "ManagementNotHeld" {
+		t.Fatal("team of another issuer administered", r.Reason)
+	}
 	// A transferred share (revision above 2) is valid while live and after
 	// revocation.
 	s.Revision = 3

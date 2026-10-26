@@ -69,16 +69,18 @@ def share_subset(name, tool):
         props["operations"] = {"const": ["get_case"]}
         description["description"] = ("Share one stored pod-status artifact (its exact digest from get_case) with up to eight users or groups of your identity provider until expires_at "
                                       "(at most seven days, never past the artifact's retention). Recipients can read it with get_case; download, inspection of other artifacts and capture rights are not shared. "
-                                      "Needs the evidence-owner role on the workload and the evidence:share scope. By default your owner teams manage the share; "
+                                      "Needs the evidence-owner role on the workload and the evidence:share scope. By default your owner teams manage the share; an installation administrator may also name owner teams they do not belong to; "
                                       "management may instead name some of the owner teams you belong to (mode teams) or only you (mode creator). Repeat an uncertain request with the same idempotency key.")
         data["properties"] = {k: v for k, v in data["properties"].items() if k in ("share_id", "phase")}
         data["properties"]["phase"] = {"const": "Active"}
     elif name == "list_shares":
-        props.pop("cursor")
+        # ADR-238: the cursor pages only the administrator view.
         props.pop("include_intents")
         schema.pop("allOf")
         description["description"] = ("List the shares you created (view owned, every phase) or currently manage through a pinned owner team (unrevoked, unexpired), "
                                       "with revision, created_by and managed_by; or the shares you can currently read (view received, Active only). "
+                                      "Installation administrators may page through every share management-only with view administration and cursor "
+                                      "(IDs, phase, expiry, revision, created_by, managed_by; never recipients or evidence). "
                                       "Most recent first, at most limit (default 20, maximum 100).")
         data["properties"] = {k: v for k, v in data["properties"].items() if k == "shares"}
         row = data["properties"]["shares"]["items"]
@@ -102,8 +104,9 @@ def share_subset(name, tool):
         schema.pop("oneOf")
         schema["required"] = ["share_id", "expected_revision", "idempotency_key", "management"]
         description["description"] = ("Replace the owner teams managing a share you currently manage (an audited transfer). Name owner teams you belong to now (mode teams), "
-                                      "or, as the share's creator, only yourself (mode creator). Creator, recipients, artifact and expiry stay unchanged; the share is suspended "
-                                      "when no new manager keeps the evidence-owner role. Managing grants no read. Repeating with the same idempotency key is harmless.")
+                                      "or, as the share's creator, only yourself (mode creator). Installation administrators may assign any owner teams that currently hold "
+                                      "evidence-owner for the artifact (mode teams), also to recover a Suspended share. Creator, recipients, artifact and expiry stay unchanged; "
+                                      "the share is suspended when no new manager keeps the evidence-owner role. Managing grants no read. Repeating with the same idempotency key is harmless.")
         data["properties"].pop("sharing_intent_id")
         data.pop("oneOf")
         data["required"] = ["share_id", "phase", "revision", "managed_by"]
@@ -204,7 +207,7 @@ def main():
             output.pop("$id", None)
             output["properties"]["provenance"] = {"type": "array", "maxItems": 0}
             output["properties"]["truncated"] = {"const": False}
-            if name != "preview_access_change":
+            if name != "preview_access_change", "list_shares":
                 output["properties"]["next_cursor"] = {"type": "null"}
             else:
                 # ADR-237: the preview pages its bounded result.

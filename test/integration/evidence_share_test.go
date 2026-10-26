@@ -347,14 +347,60 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if reads(operator) {
 		t.Fatal("administrator read evidence")
 	}
-	if revoked, _, err := administrators.Revoke(ctx, operator, pinned.ID, 2, "admin-revoke"); err != nil || revoked.Revision != 3 || revoked.RevokedAt.IsZero() {
+	// The administrator's scoped delegation assigns a current owner team it
+	// does not belong to (no pinned manager needed in SQL); a non-admin
+	// stranger cannot, and a group that is not an owner team is refused.
+	if _, _, err := shares.Transfer(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), to("stranger-assign", 2, "other-owners")); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("non-admin assigned management", err)
+	}
+	if _, _, err := administrators.Transfer(ctx, operator, to("admin-assign-maintainers", 2, "maintainers")); !errors.Is(err, sharing.ErrManagementNotHeld) {
+		t.Fatal("administrator assigned a group without evidence-owner", err)
+	}
+	assigned, _, err := administrators.Transfer(ctx, operator, to("admin-assign", 2, "other-owners"))
+	if err != nil || assigned.Revision != 3 || assigned.Creator.Subject != "synthetic-share-owner" || !assigned.ExpiresAt.Equal(pinned.ExpiresAt) {
+		t.Fatal("administrator assignment", err, assigned)
+	}
+	// The management-only administrator listing pages every share on the
+	// real keyset query, newest first, and is refused to non-administrators.
+	if _, _, _, err := administrators.ListAdministered(ctx, mate(), "", 2); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("non-administrator listed all shares", err)
+	}
+	var listed []authorization.Share
+	for cursor, page := "", 0; page < 20; page++ {
+		rows, next, _, err := administrators.ListAdministered(ctx, operator, cursor, 2)
+		if err != nil || len(rows) > 2 {
+			t.Fatal("administrator listing", err, len(rows))
+		}
+		for _, r := range rows {
+			listed = append(listed, r.Share)
+		}
+		if next == "" {
+			break
+		}
+		cursor = next
+	}
+	found := false
+	for n, r := range listed {
+		found = found || r.ID == pinned.ID && r.Revision == 3
+		if n > 0 && (r.CreatedAt.After(listed[n-1].CreatedAt) || r.ID == listed[n-1].ID) {
+			t.Fatal("administrator listing order or duplicate", n)
+		}
+	}
+	// Four shares exist so far (share-1, share-short, share-team and this one).
+	if !found || len(listed) != 4 {
+		t.Fatal("administrator listing misses shares", len(listed), found)
+	}
+	if revoked, _, err := administrators.Revoke(ctx, operator, pinned.ID, 3, "admin-revoke"); err != nil || revoked.Revision != 4 || revoked.RevokedAt.IsZero() {
 		t.Fatal("administrator revocation", err, revoked.Revision)
 	}
 	if reads(recipient()) {
 		t.Fatal("administrator-revoked share still readable")
 	}
-	if _, _, err := shares.Transfer(ctx, mate(), to("transfer-revoked", 3, "other-owners")); !errors.Is(err, capture.ErrDenied) {
+	if _, _, err := shares.Transfer(ctx, mate(), to("transfer-revoked", 4, "other-owners")); !errors.Is(err, capture.ErrDenied) {
 		t.Fatal("revoked share transferred", err)
+	}
+	if _, _, err := administrators.Transfer(ctx, operator, to("admin-revoked", 4, "other-owners")); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("administrator recovered a revoked share", err)
 	}
 
 	// A group share and a user share; then one accepted batch denies the user
@@ -433,6 +479,12 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		// to another (for example a re-added) owner assignment.
 		if _, _, err := shares.Transfer(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), sharing.TransferInput{ShareID: group.ID, ExpectedRevision: group.Revision, Management: authorization.ManagementRequest{Mode: "teams", Teams: []string{"other-owners"}}, IdempotencyKey: "lost-team-transfer"}); !errors.Is(err, capture.ErrDenied) {
 			t.Fatal(when, "suspended share transferred", err)
+		}
+		// An administrator's recovery can only pin a current owner team
+		// inside the artifact's retained audience: neither the retired nor
+		// the re-added assignment qualifies, so nothing is widened.
+		if _, _, err := administrators.Transfer(ctx, sharer("synthetic-administrator", []string{"platform"}), sharing.TransferInput{ShareID: group.ID, ExpectedRevision: group.Revision, Management: authorization.ManagementRequest{Mode: "teams", Teams: []string{"other-owners"}}, IdempotencyKey: "recover-outside-audience"}); !errors.Is(err, sharing.ErrManagementNotHeld) {
+			t.Fatal(when, "administrator recovery pinned an assignment outside the retained audience", err)
 		}
 	}
 	suspended("owner assignment retired:")
