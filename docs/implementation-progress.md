@@ -1,5 +1,13 @@
 # Sustained implementation progress
 
+## Real-time connector retirement removed as a gate (2026-10-26)
+
+`connector-retirement` was removed from the native CI matrix and the Makefile: its single test waits
+through the thirty-minute connector certificate period (≈35 minutes per run), which the maintainer's
+20-minute test-run rule forbids, and it never completed in CI. The fast prepaid cases stay in
+`custody`. The real-time post-expiry cleanup chain is an explicit unqualified gap; see
+[validation](validation.md).
+
 ## S-06 increment 7: caller-only access explanation (ADR-234, 2026-10-26)
 
 [ADR-234](decisions/234-access-explanation.md) adds `explain_access(target_ref, operation)` on MCP
