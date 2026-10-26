@@ -530,7 +530,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		// mode, so each run stays within the 20-minute limit and the full
 		// journey's capacity budget is unchanged.
 		focused := (installedJourneyFocus() == "restart" || installedJourneyFocus() == "upgrade") && deny != nil
-		if focused || installedJourneyFocus() == "clusters" {
+		if focused || installedJourneyFocus() == "clusters" || installedJourneyFocus() == "chain" {
 			deny, gone = nil, nil
 		}
 		run(cluster, namespace, workload, deny, gone)
@@ -566,7 +566,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "chain" {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}
@@ -590,6 +590,10 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	again, e := api.CoreV1().Secrets(desired.TargetNamespace).Get(ctx, journal.Name, meta.GetOptions{})
 	if err != nil || e != nil || after.UID != guard.UID || after.Generation != guard.Generation || again.ResourceVersion != journal.ResourceVersion {
 		t.Fatal("replay after the bridge changed the guard or the journal", err, e)
+	}
+	if installedFastFixture() {
+		t.Log("actual fresh five-command runner (fast fixture: no interruption/resume), two actual provider waits and completed five-command replay; installed journey results are reported separately")
+		return
 	}
 	t.Log("actual fresh five-command runner, positive-terminal interruption/resume of the same original journals, two actual provider waits and completed five-command replay; installed journey results are reported separately")
 }

@@ -147,9 +147,9 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 			qualifyRegionalCapacity(t, ctx, admin, hub, hubObserver, region, namespace, issuer, journey, installation, offer, installed, index, existing)
 		}
 	}
-	if installedFastFixture() {
+	if !installedRegionalInstallerChecks(index) {
 		// The rerun, restarted-connector readmission and source-write denial
-		// qualify the regional installer; the journey and clusters runs keep them.
+		// qualify the regional installer; the chain run keeps them.
 		return
 	}
 	// A rerun reopens every object unchanged.
@@ -681,8 +681,8 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 	// the lane must refresh at least twice (a refresh takes about 3.3 s; three
 	// left no margin in native108/118), and at least one sample must leave the
 	// one second of freshness the investigation's wait asks for. The fast
-	// feature fixture leaves the demand lane to the journey and clusters runs.
-	demanded := !installedFastFixture()
+	// feature fixture leaves the first cluster's demand lane to the chain run.
+	demanded := installedRegionalInstallerChecks(index)
 	if demanded {
 		if _, err := admin.Exec(ctx, `SELECT demand_capacity_refresh($1,$2,$3,$4,'Deployment',$5,$6)`, root, cluster, string(ns.UID), ns.Name, app.Name, string(app.UID)); err != nil {
 			t.Fatal("regional refresh demand", err)

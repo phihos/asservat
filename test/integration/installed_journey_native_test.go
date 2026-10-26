@@ -107,7 +107,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		}
 		// The focused restart run (ASSERVAT_JOURNEY_FOCUS=restart) starts with a
 		// short journey, which must initialize processing itself.
-		initialize := !short || (installedJourneyFocus() == "restart" || installedJourneyFocus() == "clusters" || installedJourneyFocus() == "upgrade") && runs == 1
+		initialize := !short || (installedJourneyFocus() == "restart" || installedJourneyFocus() == "clusters" || installedJourneyFocus() == "upgrade" || installedJourneyFocus() == "chain") && runs == 1
 		cert, err := x509.ParseCertificate(publicRoot)
 		if err != nil {
 			t.Fatal("public listener root", err)
@@ -1001,10 +1001,12 @@ func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *c
 }
 
 // installedJourneyFocus splits the installed journey into runs of at most 20
-// minutes. "journey": install and the first workload cluster's full journey.
-// "restart": install, a short journey, the PostgreSQL restart and another
-// short journey. "clusters": install and short journeys in both workload
-// clusters. Empty runs everything in one (longer) run.
+// minutes. "chain": install through the full installation-process checks and
+// a short journey in one workload cluster, nothing else. "journey": install
+// and the first workload cluster's full journey. "restart": install, a short
+// journey, the PostgreSQL restart and another short journey. "clusters":
+// install and short journeys in both workload clusters, then the replay.
+// Empty runs everything in one (longer) run.
 func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS") }
 
 // installedFastFixture selects the feature focuses that start from the shortest
@@ -1013,14 +1015,25 @@ func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS")
 // installation process itself: the interrupted-and-resumed runner, the
 // administrator's baseline edit, the demand-lane sampling, the regional
 // installer rerun, connector restart and source-write denial. Their workload
-// exists before its cluster joins. The journey and clusters focuses (and the unsplit run) keep the full
-// chain; docs/implementation-progress.md records the split.
+// exists before its cluster joins. Only the chain focus (and the unsplit run)
+// keeps the full chain, so the feature focuses keep a margin under the
+// 20-minute limit; docs/implementation-progress.md records the split.
 func installedFastFixture() bool {
 	switch installedJourneyFocus() {
-	case "policy", "browser", "restart", "upgrade":
+	case "policy", "browser", "restart", "upgrade", "journey", "clusters":
 		return true
 	}
 	return false
+}
+
+// installedRegionalInstallerChecks reports whether workload cluster index
+// runs the regional installer's own checks (rerun exactness, connector
+// readmission, source-write denial and the demand lane). The fast fixture
+// skips them in the first workload cluster, which the chain focus covers;
+// the second workload cluster, installed only by the clusters focus and the
+// unsplit run, always runs them.
+func installedRegionalInstallerChecks(index int) bool {
+	return !installedFastFixture() || index > 1
 }
 
 // installedJourneyRuns counts journey runs in this installation; only the
