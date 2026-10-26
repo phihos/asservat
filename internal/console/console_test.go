@@ -85,7 +85,7 @@ func TestStaticSnapshotAndCacheBoundaries(t *testing.T) {
 	files[strings.TrimPrefix(testJS, "/")].Data[0] = 'x'
 	files["assets/new-01234567.js"] = &fstest.MapFile{Data: []byte("new")}
 
-	for _, target := range []string{"/", "/captures/new", "/policies", "/captures/00000000-0000-4000-8000-000000000008", "/cases/00000000-0000-4000-8000-000000000007", testJS, testCSS} {
+	for _, target := range []string{"/", "/captures/new", "/policies", "/shares", "/captures/00000000-0000-4000-8000-000000000008", "/cases/00000000-0000-4000-8000-000000000007", testJS, testCSS} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, request("GET", target))
 		if w.Code != 200 {
@@ -144,7 +144,7 @@ func TestNoFallbackOrRequestAuthority(t *testing.T) {
 			}
 		})
 	}
-	for _, target := range []string{"/cases", "/cases/", "/cases/not-a-uuid", "/cases/00000000-0000-4000-8000-000000000007/raw", "/cases/00000000-0000-4000-8000-000000000007?token=secret", "/cases/%30%30%30%30%30%30%30%30-0000-4000-8000-000000000007", "/captures", "/captures/", "/captures/new/", "/captures/new?preview_id=secret", "/captures/00000000-0000-4000-8000-000000000008/raw", "/captures/%30%30%30%30%30%30%30%30-0000-4000-8000-000000000008", "/policies/", "/policies?name=secret"} {
+	for _, target := range []string{"/cases", "/cases/", "/cases/not-a-uuid", "/cases/00000000-0000-4000-8000-000000000007/raw", "/cases/00000000-0000-4000-8000-000000000007?token=secret", "/cases/%30%30%30%30%30%30%30%30-0000-4000-8000-000000000007", "/captures", "/captures/", "/captures/new/", "/captures/new?preview_id=secret", "/captures/00000000-0000-4000-8000-000000000008/raw", "/captures/%30%30%30%30%30%30%30%30-0000-4000-8000-000000000008", "/policies/", "/policies?name=secret", "/shares/", "/shares?view=owned"} {
 		w := httptest.NewRecorder()
 		h.ServeHTTP(w, request("GET", target))
 		if w.Code != http.StatusNotFound || w.Body.String() != "Not found\n" {

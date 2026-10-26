@@ -66,6 +66,46 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
     await page.screenshot({ path: output + '/case-evidence-mobile.png', fullPage: true });
     checks.push('authorized capture case link; separate lazy bundle; actual C16 wire and user-data/deletion notices; verified artifact version never labeled as native SHA');
 
+    // ADR-232 console sharing through the actual browser route, CSRF,
+    // identical Idempotency-Key header and canonical contracts (synthetic service).
+    const summary = page.getByText('Share this artifact', { exact: true });
+    await summary.click();
+    const panel = page.locator('details', { has: summary });
+    const preview = panel.getByRole('region', { name: 'What recipients will see' });
+    await expect(preview).toBeVisible();
+    await expect(preview.getByText('Approved metadata · complete', { exact: true })).toBeVisible();
+    await expect(preview.getByText(/Other evidence in this case, further sharing/)).toBeVisible();
+    await panel.getByLabel('Recipient ID').fill('synthetic-recipient');
+    await panel.getByRole('button', { name: 'Add recipient', exact: true }).click();
+    await panel.getByLabel('Reason').fill('incident review');
+    const createReply = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/create_share');
+    await panel.getByRole('button', { name: 'Share', exact: true }).click();
+    const created = await createReply;
+    assert.equal(created.status(), 200);
+    const createBody = JSON.parse(created.request().postData());
+    assert.equal(created.request().headers()['idempotency-key'], createBody.idempotency_key);
+    assert.equal(created.request().headers()['x-csrf-token'].length, 43);
+    assert.deepEqual(createBody.artifacts, [{ artifactID: wire.data.artifacts[0].artifact_id, digest: wire.data.artifacts[0].digest }]);
+    await expect(panel.getByText(/Shared with 1 recipient until/)).toBeVisible();
+    await expect(panel.getByLabel('Case link')).toHaveValue(origin + casePath);
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await scan('case-share-panel');
+    await summary.click();
+    await page.goto(origin + '/shares');
+    await expect(page.getByRole('heading', { name: 'Shared evidence', exact: true })).toBeVisible();
+    const owned = page.getByRole('region', { name: 'Shared by me' });
+    await expect(owned.getByText(/Active · until/)).toBeVisible();
+    await expect(page.getByText('Nothing is shared with you right now.', { exact: true })).toBeVisible();
+    await scan('shares-page');
+    const revokeReply = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/revoke_share');
+    await owned.getByRole('button', { name: 'Revoke', exact: true }).click();
+    assert.equal((await revokeReply).status(), 200);
+    await expect(owned.getByText(/Revoked · until/)).toBeVisible();
+    await expect(owned.getByRole('button', { name: 'Revoke', exact: true })).toHaveCount(0);
+    await page.goto(origin + casePath);
+    await expect(page.getByRole('heading', { name: 'Pod status', exact: true })).toBeVisible();
+    checks.push('share panel previews the recipient view and creates one share with CSRF and identical Idempotency-Key; Shares page lists and revokes it');
+
     await evidenceControl('ready', { expires_in_ms: 2000 });
     const shortExpiryReply = page.waitForResponse(r => r.url() === origin + '/api/v1/operations/get_case');
     await page.getByRole('button', { name: 'Refresh evidence details', exact: true }).click();

@@ -424,6 +424,66 @@ func qualifyInstalledBrowserJourney(t *testing.T, ctx context.Context, identity 
 		t.Fatal("browser native download differs from its metadata or the MCP-downloaded bytes", response.StatusCode, len(bytesRead), err)
 	}
 	t.Logf("installed browser journey: the console session downloaded the native pod-status file (%d bytes, SHA-256 equal to the MCP download)", len(bytesRead))
+
+	// (d) ADR-232 console sharing, browser focus only (its binding adds
+	// evidence-owner): the console session, with evidence:share as a default
+	// scope of the console client, shares the exact artifact version, lists
+	// it as its own and revokes it. Recipient reads run in the MCP share
+	// focus; recipient IDs are not looked up.
+	if installedJourneyFocus() != "browser" {
+		return
+	}
+	var digest struct {
+		Artifacts []struct {
+			Digest string `json:"digest"`
+		} `json:"artifacts"`
+	}
+	if json.Unmarshal(browserCase, &digest) != nil || len(digest.Artifacts) != 1 || digest.Artifacts[0].Digest == "" {
+		t.Fatal("browser case lacks the verified artifact version")
+	}
+	share := map[string]any{"case_id": caseID, "artifacts": []map[string]string{{"artifactID": artifactID, "digest": digest.Artifacts[0].Digest}},
+		"recipients":   []map[string]string{{"kind": "User", "issuer": identity.Issuer, "id": "installed-browser-recipient"}},
+		"data_classes": []string{"metadata"}, "operations": []string{"get_case"}, "expires_at": time.Now().Add(10 * time.Minute).UTC().Format(time.RFC3339),
+		"reason": "installed browser share", "idempotency_key": "installed-browser-share"}
+	var created struct {
+		ShareID string `json:"share_id"`
+		Phase   string `json:"phase"`
+	}
+	reply, status, err := b.operation(ctx, "create_share", share, "installed-browser-share")
+	if err != nil || reply.Status != "ok" || installedJourneyDecode(reply.Data, &created) != nil || created.ShareID == "" || created.Phase != "Active" {
+		diagnose()
+		t.Fatal("browser create_share", status, reply.Status, reply.RequestID, err)
+	}
+	type ownedShares struct {
+		Shares []struct {
+			ShareID string `json:"share_id"`
+			CaseID  string `json:"case_id"`
+			Phase   string `json:"phase"`
+		} `json:"shares"`
+	}
+	phase := func() string {
+		t.Helper()
+		var mine ownedShares
+		b.read(ctx, "list_shares", map[string]any{"view": "owned", "limit": 100}, &mine)
+		for _, s := range mine.Shares {
+			if s.ShareID == created.ShareID && s.CaseID == caseID {
+				return s.Phase
+			}
+		}
+		return ""
+	}
+	if got := phase(); got != "Active" {
+		t.Fatal("browser owned shares lack the new share", got)
+	}
+	reply, status, err = b.operation(ctx, "revoke_share", map[string]any{"share_id": created.ShareID, "expected_revision": 1, "idempotency_key": "installed-browser-revoke"}, "installed-browser-revoke")
+	if err != nil || reply.Status != "ok" {
+		diagnose()
+		t.Fatal("browser revoke_share", status, reply.Status, reply.RequestID, err)
+	}
+	if got := phase(); got != "Revoked" {
+		t.Fatal("browser owned share was not revoked", got)
+	}
+	t.Logf("installed browser journey: the console session created, listed and revoked share %s", created.ShareID)
 }
 
 // installedBrowserExcerpt runs the console's approved inspection: one

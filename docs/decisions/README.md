@@ -10,7 +10,9 @@ workload's existing download allocation. No migration or new grant.
 increment 1: `create_share`/`list_shares`/`revoke_share` over MCP, one `evidence_share` row per
 share with derived Active/Expired/Revoked/Suspended state (migration 00086), pinned owner
 assignments, and a recipient branch consulted only after ordinary eligibility refuses and before
-any evidence lookup. Recipients read `get_case`; native download stays refused.
+any evidence lookup. Recipients read `get_case`; native download stays refused. Increment 2 adds
+the console Share panel (recipient preview, copyable case link) and the `/shares` page over the same
+browser operation route.
 
 [ADR-231 — Alert trigger from the in-cluster Alertmanager API](231-alert-detector.md) lets existing
 Prometheus and log-stack alert rules trigger captures: the regional connector reads the cluster's

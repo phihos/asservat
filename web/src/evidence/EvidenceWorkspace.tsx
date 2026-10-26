@@ -5,6 +5,7 @@ import { Evidence } from './evidence';
 import type { Artifact, Download } from './http';
 import { ContextProjectionView } from '../projection/ContextProjectionView';
 import { ContextProjection } from '../projection/projection';
+import { SharePanel } from '../sharing/SharePanel';
 
 export const evidenceController = new Evidence();
 const date = (value: string) => new Date(value).toLocaleString();
@@ -12,6 +13,8 @@ const bytes = (value: number) => new Intl.NumberFormat().format(value) + ' bytes
 const states: Record<Download['state'], string> = { Preparing: 'Preparing the native file', Ready: 'Ready to download', Streaming: 'Sending the file', Completed: 'Transfer recorded', Interrupted: 'Download interrupted', Cancelled: 'Download cancelled', Expired: 'Download expired', Denied: 'Download access unavailable', Failed: 'Download failed' };
 const contentNames: Record<string, string> = { userContent: 'user content', credentials: 'credentials', personalIdentifiers: 'personal identifiers', networkAddresses: 'network addresses', paths: 'paths', profileLabels: 'profile labels', unknownApplicationData: 'other application data' };
 const terminal = new Set(['Completed', 'Cancelled', 'Expired', 'Denied', 'Failed']);
+const kindName = (kind: string) => ['context', 'pod-status'].includes(kind) ? 'Pod status' : kind;
+const classLine = (artifact: Artifact) => `${artifact.data_class === 'raw' ? 'Raw evidence' : artifact.data_class === 'extract' ? 'Approved extract' : 'Approved metadata'} · ${artifact.completeness}`;
 function SavedPodStatus({ session, scope, caseID, artifactID }: { session: Session; scope: AbortSignal; caseID: string; artifactID: string }) {
   // Each visible artifact owns its view. Mounting reads nothing; the existing
   // view aborts its request and clears its result on unmount or session loss.
@@ -41,15 +44,22 @@ export default function EvidenceWorkspace({ session, scope, caseID, controller =
     </section>}
     {state.details && <>
       {state.details.case.title && <h2>{state.details.case.title}</h2>}
-      {state.details.case.access === 'shared' && <p>You see the evidence explicitly shared with you.</p>}
+      {state.details.case.access === 'shared' && <p>You see the evidence explicitly shared with you. A share lets you read and download it; it does not let you share it further.</p>}
       {state.details.artifacts.length === 0 && <p>No evidence is currently available in this case.</p>}
       {state.details.artifacts.map((artifact, index) => <section className="review-section" key={artifact.artifact_id} aria-labelledby={`artifact-${index}`}>
-        <h2 id={`artifact-${index}`}>{['context', 'pod-status'].includes(artifact.kind) ? 'Pod status' : artifact.kind}</h2>
-        <p className="field-help">{artifact.data_class === 'raw' ? 'Raw evidence' : artifact.data_class === 'extract' ? 'Approved extract' : 'Approved metadata'} · {artifact.completeness}</p>
+        <h2 id={`artifact-${index}`}>{kindName(artifact.kind)}</h2>
+        <p className="field-help">{classLine(artifact)}</p>
         <Handling artifact={artifact}/>
         {Date.parse(artifact.expires_at) <= Date.now() ? <p>Evidence access has expired.</p> : <>
           {artifact.data_class === 'metadata' && ['context', 'pod-status'].includes(artifact.kind) && <SavedPodStatus session={session} scope={scope} caseID={caseID} artifactID={artifact.artifact_id}/>}
           <Button className="button" isDisabled={state.busy || pending} onPress={() => void controller.prepare(artifact)}>Download</Button>
+          {state.details?.case.access !== 'shared' && <>
+            <SharePanel session={session} scope={scope} caseID={caseID} artifact={artifact} preview={<>
+              <p className="selected-name">{kindName(artifact.kind)}</p><p className="field-help">{classLine(artifact)}</p>
+              <Handling artifact={artifact}/>
+              {artifact.data_class === 'metadata' && ['context', 'pod-status'].includes(artifact.kind) && <p>The saved pod-status details, as shown above.</p>}
+            </>}/>
+          </>}
         </>}
         {pending && state.preparingArtifact !== artifact.artifact_id && <p className="field-help">Finish the current download request before preparing another file.</p>}
       </section>)}

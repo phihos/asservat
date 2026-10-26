@@ -94,6 +94,7 @@ await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture',
 await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
 await operationBundle(['get_file_excerpt', 'get_query_result'], 'projection');
 await operationBundle(['activate_policy', 'deactivate_policy', 'get_policy_status'], 'policy');
+await operationBundle(['create_share', 'list_shares', 'revoke_share'], 'sharing');
 
 // AJV's standalone ESM source references a small fixed set of CommonJS helpers.
 // Explicit ESM imports let Vite bundle them; no browser require/eval is allowed.
@@ -119,6 +120,7 @@ outputs['validate-capture.js'] = browserModules(outputs['validate-capture.js']);
 outputs['validate-evidence.js'] = browserModules(outputs['validate-evidence.js']);
 outputs['validate-projection.js'] = browserModules(outputs['validate-projection.js']);
 outputs['validate-policy.js'] = browserModules(outputs['validate-policy.js']);
+outputs['validate-sharing.js'] = browserModules(outputs['validate-sharing.js']);
 const output = resolve(root, 'web/src/generated');
 await mkdir(output, { recursive: true });
 for (const [name, body] of Object.entries(outputs)) {
