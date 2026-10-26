@@ -74,7 +74,11 @@ func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value
 		if !row.ActiveID.Valid || !accepted.AcknowledgedAt.Valid || source.Deleted || source.Suspended || !source.Valid(n) || record.IntentVersion != row.IntentVersion || record.Authority.ScopeDigest != a.ScopeDigest || !record.Authority.Valid(n) || !o.Valid(n) {
 			return value.ErrUnavailable
 		}
-		marks, err := q.ListPolicyWatermarks(ctx, custodydb.ListPolicyWatermarksParams{RootID: id(s.root), PolicyUid: a.PolicyUID})
+		observed := make([]string, 0, len(o.Pods))
+		for _, p := range o.Pods {
+			observed = append(observed, p.UID)
+		}
+		marks, err := q.ListPolicyWatermarks(ctx, custodydb.ListPolicyWatermarksParams{RootID: id(s.root), PolicyUid: a.PolicyUID, Column3: observed})
 		if err != nil {
 			return err
 		}
@@ -87,11 +91,13 @@ func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value
 		for pod, restarts := range next {
 			pods, counts = append(pods, pod), append(counts, restarts)
 		}
-		if err = q.DeletePolicyWatermarks(ctx, custodydb.DeletePolicyWatermarksParams{RootID: id(s.root), PolicyUid: a.PolicyUID}); err != nil {
+		// Watermarks only rise: a Pod missing from one poll keeps its count, so
+		// its next restart still fires. Pods unseen for ten minutes are pruned.
+		if err = q.PrunePolicyWatermarks(ctx, custodydb.PrunePolicyWatermarksParams{RootID: id(s.root), PolicyUid: a.PolicyUID, LastSeen: ts(n.Add(-policyWatermarkRetention))}); err != nil {
 			return err
 		}
 		if len(pods) > 0 {
-			if err = q.InsertPolicyWatermarks(ctx, custodydb.InsertPolicyWatermarksParams{RootID: id(s.root), PolicyUid: a.PolicyUID, PodUids: pods, Restarts: counts}); err != nil {
+			if err = q.UpsertPolicyWatermarks(ctx, custodydb.UpsertPolicyWatermarksParams{RootID: id(s.root), PolicyUid: a.PolicyUID, PodUids: pods, Restarts: counts, Seen: ts(n)}); err != nil {
 				return err
 			}
 		}
@@ -189,6 +195,39 @@ func later(a, b time.Time) time.Time {
 
 func (s *PolicyTriggers) suppress(ctx context.Context, q *custodydb.Queries, policy, reason string, at time.Time, count int64) error {
 	return q.CountPolicySuppression(ctx, custodydb.CountPolicySuppressionParams{RootID: id(s.root), PolicyUid: policy, Reason: reason, FirstAt: ts(at), Count: min(count, 2147483647)})
+}
+
+// policyWatermarkRetention is how long an unseen Pod keeps its watermark.
+const policyWatermarkRetention = 10 * time.Minute
+
+// SettleOccurrences refuses, as unavailable, every occurrence still open
+// after age: its capture attempt ended without a record (a hub-api restart,
+// a failed RecordOccurrence). The execution stays spent (ADR-223); nothing
+// is resumed or retried.
+func (s *PolicyTriggers) SettleOccurrences(ctx context.Context, age time.Duration) error {
+	if s == nil || age <= 0 {
+		return value.ErrInvalid
+	}
+	return captureError(s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		now, err := q.CurrentTime(ctx)
+		if err != nil {
+			return err
+		}
+		policies, err := q.SettleOpenPolicyOccurrences(ctx, custodydb.SettleOpenPolicyOccurrencesParams{RootID: id(s.root), CreatedAt: ts(now.Time.Add(-age))})
+		if err != nil {
+			return err
+		}
+		counts := map[string]int64{}
+		for _, p := range policies {
+			counts[p]++
+		}
+		for p, n := range counts {
+			if err = s.suppress(ctx, q, p, "unavailable", now.Time, n); err != nil {
+				return err
+			}
+		}
+		return nil
+	}))
 }
 
 // RecordOccurrence links the occurrence's one capture, or records why none

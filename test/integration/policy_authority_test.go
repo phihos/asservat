@@ -810,14 +810,40 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		if total != 1 || rows != 2 || spent != 2 {
 			t.Fatal("concurrent duplicate polls", total, rows, spent)
 		}
-		// A vanished Pod's watermark goes; its replacement is a new baseline.
+		// A Pod missing from one poll keeps its watermark (its next restart is
+		// still a candidate); a new Pod is a baseline.
 		b := custodyID()
 		if got := tick(t, s, l, observed(s, pod(b, 7))); len(got) != 0 {
-			t.Fatal("replacement Pod fired on first sight")
+			t.Fatal("new Pod fired on first sight")
 		}
-		var marks int64
-		if err := admin.QueryRow(ctx, `SELECT count(*) FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID).Scan(&marks); err != nil || marks != 1 {
-			t.Fatal("vanished Pod watermark kept", marks, err)
+		marks := func() (n, restarts int64) {
+			t.Helper()
+			if err := admin.QueryRow(ctx, `SELECT count(*), coalesce(max(restarts) FILTER (WHERE pod_uid=$3),-1) FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID, a).Scan(&n, &restarts); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		if n, r := marks(); n != 2 || r != 3 {
+			t.Fatal("skipped Pod watermark not kept", n, r)
+		}
+		// The shared burst is spent, so a's next restart is a cooldown, not a
+		// silent re-baseline; a lower count never lowers the watermark.
+		cooldown := suppressed(t, s, "cooldown")
+		tick(t, s, l, observed(s, pod(a, 4), pod(b, 7)))
+		if suppressed(t, s, "cooldown") != cooldown+1 {
+			t.Fatal("restart after a skipped poll was not a candidate")
+		}
+		tick(t, s, l, observed(s, pod(a, 1), pod(b, 7)))
+		if _, r := marks(); r != 4 {
+			t.Fatal("watermark lowered", r)
+		}
+		// Rows unseen for ten minutes are pruned.
+		if _, err := admin.Exec(ctx, `UPDATE policy_pod_watermark SET last_seen=last_seen-interval '11 minutes' WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3`, s.input.RootID, s.input.Authority.PolicyUID, a); err != nil {
+			t.Fatal(err)
+		}
+		tick(t, s, l, observed(s, pod(b, 7)))
+		if n, r := marks(); n != 1 || r != -1 {
+			t.Fatal("unseen Pod watermark kept", n, r)
 		}
 	})
 	t.Run("restart-trigger-shared-window-cooldown-and-reopen", func(t *testing.T) {
@@ -927,6 +953,42 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		status, err := l.Status(ctx, s.input.Authority.PolicyUID)
 		if err != nil || status.ExecutionsSpent != max || status.Occurrences != 1 || status.WatchedPods != 1 || len(status.Suppressions) < 2 {
 			t.Fatal("status", status, err)
+		}
+	})
+	t.Run("restart-trigger-settles-abandoned-occurrences-without-refund", func(t *testing.T) {
+		s, l := activeTrigger(t)
+		a := custodyID()
+		tick(t, s, l, observed(s, pod(a, 1)))
+		got := tick(t, s, l, observed(s, pod(a, 2)))
+		if len(got) != 1 {
+			t.Fatal("restart did not fire", got)
+		}
+		open := func() (n int64) {
+			t.Helper()
+			if err := admin.QueryRow(ctx, `SELECT count(*) FROM policy_occurrence WHERE root_id=$1 AND outcome IS NULL`, s.input.RootID).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		// A recent open occurrence may still be capturing: it is left alone.
+		if err := l.SettleOccurrences(ctx, 2*time.Minute); err != nil || open() != 1 {
+			t.Fatal("recent occurrence settled", err)
+		}
+		if _, err := admin.Exec(ctx, `UPDATE policy_occurrence SET created_at=created_at-interval '3 minutes' WHERE root_id=$1`, s.input.RootID); err != nil {
+			t.Fatal(err)
+		}
+		var spent int64
+		if err := l.SettleOccurrences(ctx, 2*time.Minute); err != nil || open() != 0 || suppressed(t, s, "unavailable") != 1 {
+			t.Fatal("abandoned occurrence not settled", err)
+		}
+		if err := admin.QueryRow(ctx, `SELECT executions_spent FROM policy_acceptance WHERE root_id=$1 AND policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID).Scan(&spent); err != nil || spent != 1 {
+			t.Fatal("settlement refunded spend", spent, err)
+		}
+		if err := l.RecordOccurrence(ctx, got[0], "", "unavailable"); err == nil {
+			t.Fatal("settled occurrence recorded again")
+		}
+		if err := l.SettleOccurrences(ctx, 2*time.Minute); err != nil || suppressed(t, s, "unavailable") != 1 {
+			t.Fatal("settlement repeated", err)
 		}
 	})
 	t.Run("restart-trigger-refuses-stale-suspended-or-replaced-scope", func(t *testing.T) {

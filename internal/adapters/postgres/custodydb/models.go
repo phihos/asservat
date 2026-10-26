@@ -1871,6 +1871,7 @@ type PolicyPodWatermark struct {
 	PolicyUid string
 	PodUid    string
 	Restarts  int64
+	LastSeen  pgtype.Timestamptz
 }
 
 type PolicySource struct {

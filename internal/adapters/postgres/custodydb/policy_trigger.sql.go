@@ -92,20 +92,6 @@ func (q *Queries) CountPolicyWatermarks(ctx context.Context, arg CountPolicyWate
 	return column_1, err
 }
 
-const deletePolicyWatermarks = `-- name: DeletePolicyWatermarks :exec
-DELETE FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2
-`
-
-type DeletePolicyWatermarksParams struct {
-	RootID    pgtype.UUID
-	PolicyUid string
-}
-
-func (q *Queries) DeletePolicyWatermarks(ctx context.Context, arg DeletePolicyWatermarksParams) error {
-	_, err := q.db.Exec(ctx, deletePolicyWatermarks, arg.RootID, arg.PolicyUid)
-	return err
-}
-
 const findAutomationBases = `-- name: FindAutomationBases :many
 SELECT b.uid, b.generation, b.spec_digest FROM permission_basis b
 WHERE b.stream_id=$1 AND b.kind='AccessBinding' AND b.effect='Allow' AND b.automation_json IS NOT NULL
@@ -205,28 +191,6 @@ func (q *Queries) InsertPolicyOccurrence(ctx context.Context, arg InsertPolicyOc
 		return 0, err
 	}
 	return result.RowsAffected(), nil
-}
-
-const insertPolicyWatermarks = `-- name: InsertPolicyWatermarks :exec
-INSERT INTO policy_pod_watermark(root_id,policy_uid,pod_uid,restarts)
-SELECT $1::uuid, $2::text, unnest($3::text[]), unnest($4::bigint[])
-`
-
-type InsertPolicyWatermarksParams struct {
-	RootID    pgtype.UUID
-	PolicyUid string
-	PodUids   []string
-	Restarts  []int64
-}
-
-func (q *Queries) InsertPolicyWatermarks(ctx context.Context, arg InsertPolicyWatermarksParams) error {
-	_, err := q.db.Exec(ctx, insertPolicyWatermarks,
-		arg.RootID,
-		arg.PolicyUid,
-		arg.PodUids,
-		arg.Restarts,
-	)
-	return err
 }
 
 const linkPolicyOccurrence = `-- name: LinkPolicyOccurrence :execrows
@@ -357,12 +321,13 @@ func (q *Queries) ListPolicySuppressions(ctx context.Context, arg ListPolicySupp
 }
 
 const listPolicyWatermarks = `-- name: ListPolicyWatermarks :many
-SELECT pod_uid, restarts FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 ORDER BY pod_uid LIMIT 257
+SELECT pod_uid, restarts FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=ANY($3::text[])
 `
 
 type ListPolicyWatermarksParams struct {
 	RootID    pgtype.UUID
 	PolicyUid string
+	Column3   []string
 }
 
 type ListPolicyWatermarksRow struct {
@@ -371,7 +336,7 @@ type ListPolicyWatermarksRow struct {
 }
 
 func (q *Queries) ListPolicyWatermarks(ctx context.Context, arg ListPolicyWatermarksParams) ([]ListPolicyWatermarksRow, error) {
-	rows, err := q.db.Query(ctx, listPolicyWatermarks, arg.RootID, arg.PolicyUid)
+	rows, err := q.db.Query(ctx, listPolicyWatermarks, arg.RootID, arg.PolicyUid, arg.Column3)
 	if err != nil {
 		return nil, err
 	}
@@ -414,6 +379,21 @@ func (q *Queries) LockPolicyWindow(ctx context.Context, arg LockPolicyWindowPara
 	var tat pgtype.Timestamptz
 	err := row.Scan(&tat)
 	return tat, err
+}
+
+const prunePolicyWatermarks = `-- name: PrunePolicyWatermarks :exec
+DELETE FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND last_seen<$3
+`
+
+type PrunePolicyWatermarksParams struct {
+	RootID    pgtype.UUID
+	PolicyUid string
+	LastSeen  pgtype.Timestamptz
+}
+
+func (q *Queries) PrunePolicyWatermarks(ctx context.Context, arg PrunePolicyWatermarksParams) error {
+	_, err := q.db.Exec(ctx, prunePolicyWatermarks, arg.RootID, arg.PolicyUid, arg.LastSeen)
+	return err
 }
 
 const readPolicyOccurrence = `-- name: ReadPolicyOccurrence :one
@@ -497,6 +477,35 @@ func (q *Queries) RefusePolicyOccurrence(ctx context.Context, arg RefusePolicyOc
 	return result.RowsAffected(), nil
 }
 
+const settleOpenPolicyOccurrences = `-- name: SettleOpenPolicyOccurrences :many
+UPDATE policy_occurrence SET outcome='refused' WHERE root_id=$1 AND outcome IS NULL AND created_at<$2 RETURNING policy_uid
+`
+
+type SettleOpenPolicyOccurrencesParams struct {
+	RootID    pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+}
+
+func (q *Queries) SettleOpenPolicyOccurrences(ctx context.Context, arg SettleOpenPolicyOccurrencesParams) ([]string, error) {
+	rows, err := q.db.Query(ctx, settleOpenPolicyOccurrences, arg.RootID, arg.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var policy_uid string
+		if err := rows.Scan(&policy_uid); err != nil {
+			return nil, err
+		}
+		items = append(items, policy_uid)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const spendPolicyExecution = `-- name: SpendPolicyExecution :execrows
 UPDATE policy_acceptance SET executions_spent=executions_spent+1
 WHERE root_id=$1 AND id=$2 AND executions_spent<(record#>>'{Authority,Limits,MaxExecutions}')::bigint
@@ -534,6 +543,31 @@ func (q *Queries) UpdatePolicyWindow(ctx context.Context, arg UpdatePolicyWindow
 		arg.WorkloadUid,
 		arg.PolicyUid,
 		arg.Tat,
+	)
+	return err
+}
+
+const upsertPolicyWatermarks = `-- name: UpsertPolicyWatermarks :exec
+INSERT INTO policy_pod_watermark(root_id,policy_uid,pod_uid,restarts,last_seen)
+SELECT $1::uuid, $2::text, unnest($3::text[]), unnest($4::bigint[]), $5::timestamptz
+ON CONFLICT(root_id,policy_uid,pod_uid) DO UPDATE SET restarts=GREATEST(policy_pod_watermark.restarts,EXCLUDED.restarts), last_seen=EXCLUDED.last_seen
+`
+
+type UpsertPolicyWatermarksParams struct {
+	RootID    pgtype.UUID
+	PolicyUid string
+	PodUids   []string
+	Restarts  []int64
+	Seen      pgtype.Timestamptz
+}
+
+func (q *Queries) UpsertPolicyWatermarks(ctx context.Context, arg UpsertPolicyWatermarksParams) error {
+	_, err := q.db.Exec(ctx, upsertPolicyWatermarks,
+		arg.RootID,
+		arg.PolicyUid,
+		arg.PodUids,
+		arg.Restarts,
+		arg.Seen,
 	)
 	return err
 }

@@ -28,6 +28,9 @@ CREATE TABLE policy_pod_watermark (
  policy_uid text NOT NULL,
  pod_uid text NOT NULL CHECK (octet_length(pod_uid) BETWEEN 1 AND 64),
  restarts bigint NOT NULL CHECK (restarts BETWEEN 0 AND 2147483648),
+ -- A Pod missing from one poll keeps its watermark; rows unseen for ten
+ -- minutes are pruned.
+ last_seen timestamptz NOT NULL,
  PRIMARY KEY(root_id,policy_uid,pod_uid),
  FOREIGN KEY(root_id,policy_uid) REFERENCES policy_source(root_id,policy_uid)
 );
@@ -51,6 +54,7 @@ CREATE TABLE policy_occurrence (
  CHECK (capture_id IS NULL OR outcome='captured')
 );
 CREATE INDEX policy_occurrence_recent ON policy_occurrence(root_id,policy_uid,created_at DESC);
+CREATE INDEX policy_occurrence_open ON policy_occurrence(root_id,created_at) WHERE outcome IS NULL;
 
 -- Trigger budgets as a generic cell rate: tat is the theoretical arrival
 -- time; an occurrence is admitted while tat-(burst-1)*interval<=now, then

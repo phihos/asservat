@@ -138,7 +138,9 @@ func (c *PodTargets) ObserveWorkloadRestarts(ctx context.Context, r value.Worklo
 			continue
 		}
 		pod := value.PodRestarts{Name: m.Name, UID: m.UID}
-		var finished string
+		// Attribution is the most recent termination across the Pod's
+		// containers (whole-pod scope); container identity is not a filter.
+		var finished time.Time
 		for _, s := range append(item.Status.InitContainerStatuses, item.Status.ContainerStatuses...) {
 			if s.RestartCount < 0 || s.RestartCount > 1<<20 {
 				return zero, value.ErrUnavailable
@@ -148,11 +150,14 @@ func (c *PodTargets) ObserveWorkloadRestarts(ctx context.Context, r value.Worklo
 				pod.Waiting = true
 			}
 			for _, t := range []restartState{s.LastState, s.State} {
-				if t.Terminated == nil {
+				if t.Terminated == nil || t.Terminated.FinishedAt == "" {
 					continue
 				}
-				// RFC 3339 UTC timestamps order lexically; the latest wins.
-				if at := t.Terminated.FinishedAt; at >= finished {
+				at, err := time.Parse(time.RFC3339, t.Terminated.FinishedAt)
+				if err != nil {
+					return zero, value.ErrUnavailable
+				}
+				if finished.IsZero() || at.After(finished) {
 					finished = at
 					pod.Reason, pod.ExitCode = restartReason(t.Terminated.Reason), t.Terminated.ExitCode
 				}

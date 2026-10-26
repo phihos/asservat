@@ -25,7 +25,9 @@ func restartFixturePod(name, rs string, restarts int, reason string, exit int, w
 		status["lastState"] = map[string]any{"terminated": map[string]any{"reason": reason, "exitCode": exit, "finishedAt": "2026-10-25T12:00:00Z", "message": "MUST-NOT-LEAK"}}
 	}
 	pod["spec"] = map[string]any{"containers": []any{map[string]any{"name": "app", "env": []any{map[string]any{"name": "secret", "value": "MUST-NOT-LEAK"}}}}}
-	pod["status"] = map[string]any{"containerStatuses": []any{status, map[string]any{"restartCount": 1}}}
+	// The second container's termination has no finishedAt: it is never the
+	// attributed (most recent) termination.
+	pod["status"] = map[string]any{"containerStatuses": []any{status, map[string]any{"restartCount": 1, "lastState": map[string]any{"terminated": map[string]any{"reason": "Error", "exitCode": 1}}}}}
 	return pod
 }
 

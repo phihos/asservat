@@ -19,7 +19,15 @@ type PolicyTriggerLedger interface {
 	ActivePolicies(context.Context) ([]value.ActivePolicy, error)
 	Tick(context.Context, value.PolicyTick) ([]value.PolicyOccurrence, error)
 	RecordOccurrence(ctx context.Context, o value.PolicyOccurrence, captureID, refusal string) error
+	// SettleOccurrences refuses occurrences still open after age as
+	// unavailable, without refunding their spend.
+	SettleOccurrences(ctx context.Context, age time.Duration) error
 }
+
+// occurrenceSettleAge is past any capture attempt: the attempt is bounded at
+// 45 s (reviews and continuation pauses included), plus the tick and record,
+// with margin.
+const occurrenceSettleAge = 2 * time.Minute
 
 // PolicyTrigger polls every active policy's workload for Pod restarts and
 // runs one ordinary pod-status capture per admitted occurrence (ADR-228).
@@ -80,6 +88,9 @@ func (t PolicyTrigger) Run(ctx context.Context) error {
 func (t PolicyTrigger) Cycle(ctx context.Context) {
 	if !t.configured() || ctx.Err() != nil {
 		return
+	}
+	if err := t.Ledger.SettleOccurrences(ctx, occurrenceSettleAge); err != nil {
+		t.report("settle/" + failureClass(err))
 	}
 	if err := t.Audit.PublishPolicyAcceptances(ctx); err != nil {
 		t.report("audit/" + failureClass(err))

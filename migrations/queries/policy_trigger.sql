@@ -4,14 +4,15 @@
 SELECT * FROM policy_source WHERE root_id=$1 AND policy_uid=$2;
 
 -- name: ListPolicyWatermarks :many
-SELECT pod_uid, restarts FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 ORDER BY pod_uid LIMIT 257;
+SELECT pod_uid, restarts FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=ANY($3::text[]);
 
--- name: DeletePolicyWatermarks :exec
-DELETE FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2;
+-- name: PrunePolicyWatermarks :exec
+DELETE FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND last_seen<$3;
 
--- name: InsertPolicyWatermarks :exec
-INSERT INTO policy_pod_watermark(root_id,policy_uid,pod_uid,restarts)
-SELECT @root_id::uuid, @policy_uid::text, unnest(@pod_uids::text[]), unnest(@restarts::bigint[]);
+-- name: UpsertPolicyWatermarks :exec
+INSERT INTO policy_pod_watermark(root_id,policy_uid,pod_uid,restarts,last_seen)
+SELECT @root_id::uuid, @policy_uid::text, unnest(@pod_uids::text[]), unnest(@restarts::bigint[]), @seen::timestamptz
+ON CONFLICT(root_id,policy_uid,pod_uid) DO UPDATE SET restarts=GREATEST(policy_pod_watermark.restarts,EXCLUDED.restarts), last_seen=EXCLUDED.last_seen;
 
 -- name: LockPolicyWindow :one
 INSERT INTO policy_workload_window(root_id,cluster_id,workload_uid,policy_uid,tat) VALUES($1,$2,$3,$4,$5)
@@ -35,6 +36,9 @@ ON CONFLICT(root_id,policy_uid,reason) DO UPDATE SET last_at=GREATEST(policy_sup
 
 -- name: LinkPolicyOccurrence :execrows
 UPDATE policy_occurrence SET capture_id=$3, outcome='captured' WHERE root_id=$1 AND id=$2 AND outcome IS NULL;
+
+-- name: SettleOpenPolicyOccurrences :many
+UPDATE policy_occurrence SET outcome='refused' WHERE root_id=$1 AND outcome IS NULL AND created_at<$2 RETURNING policy_uid;
 
 -- name: RefusePolicyOccurrence :execrows
 UPDATE policy_occurrence SET outcome='refused' WHERE root_id=$1 AND id=$2 AND outcome IS NULL;
