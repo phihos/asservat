@@ -1,5 +1,67 @@
 # Sustained implementation progress
 
+## Fast feature fixture and `make pre-push` (2026-10-26)
+
+Every installed focus ran the whole installation-process qualification before its scenario:
+about 530 s from the start of `TestInitialBootstrapChainWithRealServices` to the scenario
+(local origin/main policy run: 529 s; CI run 40254721938: 517 s; CI journey run: 586 s), of
+which the regional workload's enrollment alone took about 140 s (the workload was created after
+its cluster joined, so discovery, about 100 s per pass at 2 s per step, enrolled it on its
+second pass) and the interrupted-and-resumed runner about 25 s.
+
+`installedFastFixture()` (focuses `policy`, `browser`, `restart`, `upgrade`) keeps every product
+installation, enrollment and authority step but skips the checks that qualify the installation
+process itself:
+
+| Skipped in the fast fixture | Still covered by |
+| --- | --- |
+| interrupted unified runner, refused live resume, positive-terminal resume, unchanged journals and passive replay before the first provider apply | `continuation-journey`, `continuation-clusters`, unsplit `continuation` |
+| administrator's retention-baseline edit accepted at the next sequence (ADR-195 step 7) | journey, clusters, unsplit |
+| demand-lane sampling (ADR-200: three refreshes and a usable binding within 15 s) | journey, clusters, unsplit |
+| regional `installer-cluster` rerun exactness, restarted-connector readmission, non-administrator source-write denial | journey, clusters, unsplit |
+
+In the fast fixture the regional workload (namespace `apps-regional`, sorting before the system
+namespaces) already runs when its cluster joins, and the operator's budget policy, pool slot and
+maintainer AccessBinding are created for the cluster named by the bootstrap record before the
+join; the test checks that it equals the join's cluster. Discovery's first pass then enrolls it
+within about 15 s. The journey and clusters runs keep the original order (budget and workload
+after the join), so enrolling a workload added later stays covered. Because enrollment now
+returns within seconds of the join's hub-api restart, the fast fixture waits until hub-api has
+run 35 s (the connector reopens a context standby refused at TLS 30 s later); without this wait
+a restart run failed its first preview four times in 17 s (`context target query refused:
+router`). The hub-worker crash/new-retention-epoch check stays in the restart focus. The
+administrator-removal subtest and all journey assertions are unchanged.
+
+Measured locally (one fixture at a time; seconds from the test's start to the scenario, and go
+test total):
+
+| Run | Code | Setup to scenario | go test | Harness wall | Result |
+| --- | --- | --- | --- | --- | --- |
+| policy | origin/main | 529 s | 747 s | 876 s | PASS |
+| policy | fast fixture | 396 s | 595 s | 697 s | PASS |
+| browser | fast fixture | 444 s | 635 s | 736 s | PASS |
+| restart | fast fixture | 446 s | 567 s | 665 s | PASS |
+| journey | full chain, this branch | 520 s | 720 s | 821 s | PASS |
+
+The fast setup includes the 18 s standby window; browser includes one 52 s hub-worker
+mount-wait restart (below) and restart includes its own hub-worker crash (about 50 s). Earlier
+fast runs with temporary diagnostics: policy 410 s, browser 420 s; an earlier full journey 532 s.
+All runs: source unchanged, no cleanup failures. The first restart attempt without the standby
+window failed as described above.
+The 150–250 s target is not reached: the remaining setup is product time. The unified runner's
+produce/schema/prepare/retire take about 158 s, the continuation to its first provider wait
+37 s, between the provider waits 90–100 s (public/roles-provision 26 s, capacity/initialize
+27–43 s, owner/installation 22 s), and the hub-worker's capacity start 13–52 s. In three of five
+runs the hub-worker stopped at `capacity/mount-wait`: the capacity projection's kubelet volume
+update took longer than its fixed 30 s, so the process restarted and waited about 16 s for its
+own Lease (about 38 s extra). Product candidates, not changed here: a mount wait covering the
+kubelet sync period, and releasing the scheduling Lease on shutdown.
+
+`make pre-push PYTHON=<spec-venv>/bin/python` runs the checks job's gates and self-tests,
+`sql-check`, `console-check`, `go vet`, `go-architecture-check` and a new `gofmt-check` in
+parallel (13 files were reformatted, whitespace only); it passed in 16 s with a warm Go build
+cache and 44 s with an empty one. It is listed in [validation](validation.md).
+
 ## Policy deactivation, console policy page, off-loop captures (ADR-229, 2026-10-26)
 
 [ADR-229](decisions/229-policy-deactivation-and-console.md): new MCP/browser operation

@@ -220,6 +220,7 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	if installedMode {
 		setup := prepareInstallerContinuationNative(t, ctx, api, f, desired)
 		unified = newInstalledUnifiedRunner(t, ctx, api, publicInput, setup, f.Clusters[0].Pod.NodeName)
+		t.Log("operator prerequisites prepared: providers, CRDs, PKI mounts, identity and runner inputs")
 	} else {
 		public, e := json.Marshal(desired)
 		if e != nil {
@@ -267,6 +268,7 @@ func TestInitialBootstrapChainWithRealServices(t *testing.T) {
 	if unified != nil {
 		first = unified.start(t, ctx, api)
 		unified.waitRetired(t, ctx, api, first)
+		t.Log("unified runner completed produce, schema, prepare and retire")
 	} else {
 		first = initialBootstrapChainRun(t, ctx, api, desired, "bootstrap-first", false)
 	}
