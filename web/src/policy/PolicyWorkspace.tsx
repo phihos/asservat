@@ -34,7 +34,7 @@ function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies
     </> : !entry.busy && !entry.message && <p role="status">No status yet.</p>}
     {entry.message && <p role="alert" className="notice">{entry.message}</p>}
     <div className="actions">
-      {!active && <Button className="button" isDisabled={entry.busy} onPress={() => void controller.activate(entry.name)}>Activate</Button>}
+      {!active && s?.state !== 'deactivated' && <Button className="button" isDisabled={entry.busy} onPress={() => void controller.activate(entry.name)}>Activate</Button>}
       {s && s.state !== 'deactivated' && <Button className={active ? 'button' : 'button secondary'} isDisabled={entry.busy} onPress={() => void controller.deactivate(entry.name)}>Deactivate</Button>}
       <Button className="button secondary" isDisabled={entry.busy} onPress={() => void controller.refresh(entry.name)}>Check status</Button>
     </div>

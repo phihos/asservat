@@ -223,7 +223,12 @@ func (t PolicyTrigger) run(ctx context.Context, a authorization.AcceptedPolicyAu
 		timed, times := auditapp.WithStepTimes(ctx)
 		started := time.Now()
 		captureID, refusal := t.capture(timed, a, compiled, observation, name, o)
-		if err := t.Ledger.RecordOccurrence(ctx, o, captureID, refusal); err != nil {
+		// The outcome is recorded even when Run is shutting down, so a started
+		// capture's occurrence is not left open and later settled unavailable.
+		record, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		err := t.Ledger.RecordOccurrence(record, o, captureID, refusal)
+		cancel()
+		if err != nil {
 			t.report("record/" + failureClass(err))
 		}
 		t.reportTimed("occurrence/"+map[bool]string{true: "captured", false: refusal}[captureID != ""], "in "+time.Since(started).Round(10*time.Millisecond).String()+" ["+times.String()+"]")

@@ -18,11 +18,12 @@ const failure = (code: string, message: string) => ({ ...result<'get_capture'>({
 class SyntheticPolicies implements Operations {
   calls: { name: Operation; input: unknown; csrf: string }[] = [];
   state = 'active';
+  unknown = false;
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), csrf });
     if (name === 'deactivate_policy') { this.state = 'deactivated'; return result({ policy_uid: 'policy-uid', acceptance_id: id(9), state: 'deactivated', replay: false }) as unknown as Output<N>; }
     if (name === 'activate_policy') return failure('PolicyDeactivated', 'This policy revision was deactivated and cannot be activated again.') as Output<N>;
-    return status(this.state) as Output<N>;
+    return (this.unknown ? failure('NotAvailable', 'Not available.') : status(this.state)) as Output<N>;
   }
 }
 
@@ -55,9 +56,17 @@ it('shows content-free status and deactivates with CSRF and one idempotency key'
   expect(stop.csrf).toBe(session.csrf_token);
   expect(stop.input).toEqual({ policy_name: 'regional-restarts', idempotency_key: id(20) });
   expect(screen.queryByRole('button', { name: 'Deactivate' })).toBeNull();
-  // Reactivating the same revision is refused with the server's explanation.
-  fireEvent.click(screen.getByRole('button', { name: 'Activate' }));
-  expect(await screen.findByRole('alert')).toBeTruthy();
+  // An unchanged deactivated revision cannot be activated again: no button, only the hint.
+  expect(screen.queryByRole('button', { name: 'Activate' })).toBeNull();
+  expect(screen.getByText(/change the DebugPolicy to activate a new revision/)).toBeTruthy();
+});
+
+it('offers activation of a policy without status and shows the server refusal', async () => {
+  const { client } = mount();
+  client.unknown = true;
+  fireEvent.change(screen.getByLabelText('Policy name'), { target: { value: 'regional-restarts' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Show policy' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Activate' }));
   await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/cannot be activated again/));
 });
 
