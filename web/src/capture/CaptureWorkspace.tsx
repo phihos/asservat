@@ -4,6 +4,7 @@ import type { Session } from '../auth/session';
 import { Investigation } from './investigation';
 import type { Preview, Progress, Target } from './http';
 import { captureIDFromPath } from '../routes';
+import { WhyAccess } from '../access/WhyAccess';
 
 const phases: Record<Progress['phase'], string> = {
   Pending: 'Waiting to start', Validating: 'Checking the request', AwaitingApproval: 'Waiting for approval',
@@ -69,6 +70,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
       {state.stage === 'target' && <p>Choose a production workload or pod, then review the available diagnostics before collecting. To collect automatically on restarts, use <a href="/policies">automatic policies</a>. See <a href="/shares">shared evidence</a>.</p>}
     </div>
     {state.error && <p role="alert" className="notice">{state.error}</p>}
+    {state.error && (state.stage === 'target' || state.stage === 'diagnostics' || state.stage === 'review') && draft.target.name && <WhyAccess key={JSON.stringify(draft.target)} session={session} scope={scope} target={draft.target} operation="capture"/>}
     {state.stage === 'target' && <form onSubmit={event => { event.preventDefault(); void controller.discover(); }} aria-busy={state.busy}>
       <fieldset disabled={state.busy}><legend>Target</legend>
         <label>Cluster ID<input name="cluster" value={draft.target.cluster_id} required maxLength={36} pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}" placeholder="Registered cluster UUID" onChange={event => setTarget('cluster_id', event.target.value)} autoComplete="off" spellCheck={false}/></label>
@@ -97,6 +99,7 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
     {state.stage === 'review' && state.preview && <section aria-label="Collection review" aria-busy={state.busy}>
       <Assessment preview={state.preview}/>
       {state.preview.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
+      {state.preview.blockers.length > 0 && <WhyAccess key={JSON.stringify(draft.target)} session={session} scope={scope} target={draft.target} operation="capture"/>}
       {!state.preview.capture_enabled && state.preview.blockers.length === 0 && <p className="notice">Collection is not enabled for this client. An administrator can check the installation settings.</p>}
       {state.preview.approval_required && <p className="notice">This collection needs approval. Approval requests are not available in this console yet.</p>}
       {state.preview.warnings.map((warning, index) => <p key={index}>{warning}</p>)}

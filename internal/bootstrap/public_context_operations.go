@@ -9,6 +9,7 @@ import (
 	"time"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
+	authapp "asservat.local/asservat/internal/application/authorization"
 	captureapp "asservat.local/asservat/internal/application/capture"
 	catalogapp "asservat.local/asservat/internal/application/catalog"
 	"asservat.local/asservat/internal/application/evidence"
@@ -158,4 +159,16 @@ func composePublicShares(c PublicContextOperationsConfig, s PublicContextOperati
 	}
 	service := sharing.Service{RootID: c.RootID, InstallationID: c.InstallationID, Routes: pc.caseRoutes, Permissions: pc.permissions, Catalog: pc.catalog, Store: pc.shares, Recovery: v.submission.Recovery, NewID: c.NewID, Now: c.Now}
 	return presentation.NewShareOperations(c.PublicOrigin, c.Now, c.NewID, service)
+}
+
+// composePublicAccess composes the ADR-234 caller-only explain_access
+// operation on the same target resolution, permission projection, recovery
+// and clock as preview_capture and get_case.
+func composePublicAccess(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.AccessOperations, error) {
+	v, err := composePublicContextUseCases(c, s)
+	if err != nil || pc == nil || pc.permissions == nil {
+		return nil, presentation.ErrOperationsConfiguration
+	}
+	service := authapp.AccessExplainer{InstallationID: c.InstallationID, Targets: v.submission.Targets, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
+	return presentation.NewAccessOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }

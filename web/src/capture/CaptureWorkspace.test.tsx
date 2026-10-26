@@ -78,6 +78,8 @@ it('keeps an unavailable backend explicit without inventing catalog entries', as
   await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('service is unavailable'));
   expect(screen.queryByRole('button', { name: 'Review collection' })).toBeNull();
   expect(screen.queryByText(/secret target/)).toBeNull();
+  // ADR-234: the unavailable answer offers the caller's own explanation.
+  expect(screen.getByRole('button', { name: 'Why?' })).toBeTruthy();
 });
 it('does not enable collection from a disabled preview', async () => {
   const { controller, client } = await review();

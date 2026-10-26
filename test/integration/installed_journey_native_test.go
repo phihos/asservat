@@ -474,6 +474,19 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			t.Log("installed journey: browser focus complete; Stop, Deny, TargetGone, expiry and deletion run in the journey focus")
 			return
 		}
+		// ADR-234: the developer's own access explanation names the installed
+		// binding that lets them read this workload.
+		var explained struct {
+			Decision    string `json:"decision"`
+			Assignments []struct {
+				Effect string `json:"effect"`
+			} `json:"assignments"`
+		}
+		call(ctx, "explain_access", map[string]any{"target_ref": target, "operation": "read"}, &explained)
+		if explained.Decision != "Allow" || len(explained.Assignments) == 0 || explained.Assignments[0].Effect != "allow" {
+			diagnose()
+			t.Fatal("installed explain_access for the developer", explained)
+		}
 		installedJourneyUnrelated(t, ctx, wire, identity.unrelated(), transport, origin, target, preview.PreviewID, progress.CaseID, investigation.Artifacts[0].ArtifactID)
 		// Revocation: with the Deny binding the case is no longer available;
 		// without it, it is again. Expiry: once the artifact's access ends,

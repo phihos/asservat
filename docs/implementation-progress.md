@@ -1,5 +1,20 @@
 # Sustained implementation progress
 
+## S-06 increment 7: caller-only access explanation (ADR-234, 2026-10-26)
+
+[ADR-234](decisions/234-access-explanation.md) adds `explain_access(target_ref, operation)` on MCP
+and the browser operation route (normal audit lane, migration 00087, schema head 87, floor 81). It
+resolves the workload like `preview_capture`, reads the same permission projection and runs the
+ordinary evaluator, which now also records the condition that refused. Callers without an
+assignment on the target, and unresolvable targets, get one uniform `Deny`/`NoMatchingAllow`.
+Console: "Why?" link next to capture errors and preview blockers. The design-only console
+operation for explaining another principal is renamed `explain_principal_access` (unimplemented).
+
+Verification: see the ADR's qualification section for the commands and results of this change.
+Not run locally: custody/SQL fixture for migration 00087 and the installed journey, which now
+asserts the developer's `Allow` and the unrelated user's uniform reply for a real and an absent
+workload (`installedJourneyUnrelated`).
+
 ## S-06 increment 3: recipient native download (ADR-233, 2026-10-26)
 
 [ADR-233](decisions/233-recipient-native-download.md) adds the share branch to the download

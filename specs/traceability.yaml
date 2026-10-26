@@ -362,6 +362,7 @@ requirements:
   spec: specs/permissions.md
   scenarios:
   - SC-PER-002
+  - SC-PER-009
   tasks:
   - TASK-07
 - requirement: REQ-PER-003

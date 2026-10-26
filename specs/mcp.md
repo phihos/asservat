@@ -44,6 +44,7 @@ The machine-readable catalog is [mcp-tools.json](contracts/mcp-tools.json). A UI
 | `list_shares` | View owned/received concrete shares; optionally owned SharingIntents | Current personal/team-manager-only pending intents; bounded origins and combined pagination |
 | `create_share` | Request an explicit user/group evidence share | Sharing authority; raw-sharing may be pending approval |
 | `revoke_share` | Revoke one share or an owned/admin-managed SharingIntent and its dependent shares | Exactly one target ID; expected revision and idempotency required |
+| `explain_access` | Explain the caller's own Allow/Deny/Indeterminate decision for one workload and operation | Caller only; real evaluator; uniform reply without own assignment; no evidence lookup |
 | `list_capture_history` | Previous accepted captures for one workload/selector | Default manual origin; retained/current history rights; bounded pages |
 | `get_capture_settings` | Retained collection parameters for review/editing | Protected immutable projection; no credentials, grants or sharing; ordinary byte limit |
 | `list_targets` | Discover authorized pods/workloads | Whole-pod collection eligibility; no share-based inventory |

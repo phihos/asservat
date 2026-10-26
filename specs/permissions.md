@@ -37,9 +37,17 @@ The existing authenticated browser/query service provides read-only effective-ac
 
 Configure Kubernetes audit for these resources, keep payload/secret values out of audit, and retain service reconciliation/activation audit. Report whether API audit coverage is configured rather than claiming that CRDs enable it automatically. Source trust qualification is reusable per cluster/protection profile, not a review ticket for every namespace. Initial bulk validation and subsequent trusted writes establish the provenance described below.
 
+### Implementation refinement (ADR-234)
+
+The first implemented part of this query is the caller-only `explain_access` operation (MCP and the shared browser operation route, [ADR-234](../docs/decisions/234-access-explanation.md)). Input is a named workload (as for `preview_capture`) and one operation: `capture`, `read` or `download`. The service resolves the workload to the same whole-pod target as the preview, reads the current permission projection and runs the ordinary evaluator unchanged; the answer is `Allow`, `Deny` or `Indeterminate`, the unmet condition (`NoMatchingAllow`, `ExplicitDeny`, `ClientScopeMissing` with the scope, `PermissionObservationStale`, `IdentityUnavailable`, `AudienceOverflow`, `ServiceUnavailable`), the roles that permit the operation, the target UIDs, the caller's own contributing allow assignments or matching deny (assignment ID, role, subject kind, basis kind/UID, basis digest as revision) and, on Allow, the decision's validity. Details are returned only when the projection lists at least one assignment that matches the caller; otherwise, and for a workload that does not resolve, the reply is uniformly `Deny`/`NoMatchingAllow` with no target or assignments. It evaluates the target scope only: retained artifact audiences, shares and approval grants are not explained. Explaining another principal and the configuration impact preview remain separate, unimplemented parts of this requirement.
+
 ### SC-PER-002
 
 Given two clients replacing one resourceVersion, when both write, then one succeeds and the other receives Conflict. An apply field conflict requires explicit resolution. Dry-run starts nothing; a persisted source remains Pending until the current generation is verified. A developer without hub Kubernetes access can use the browser's own-access explanation without discovering another team's inventory.
+
+### SC-PER-009
+
+Given a maintainer whose group holds `evidence-reader` on a workload, when they call `explain_access` for `read`, then the result is `Allow` with that group assignment; for `capture` it is `Deny` with `ClientScopeMissing` or `NoMatchingAllow` and the required role `workload-maintainer`. When a deny naming their group is added, `read` is `Deny`/`ExplicitDeny` naming that deny. A user with no assignment on the workload receives the same `Deny`/`NoMatchingAllow` reply as for a workload that does not exist, without target UIDs or any other principal's assignment.
 
 ## REQ-PER-003 — Namespace metadata inheritance
 

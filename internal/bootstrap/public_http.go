@@ -106,6 +106,15 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	if operations, err = presentation.NewInvestigationShareOperations(operations, shares); err != nil {
 		return nil, &fixedStepError{"shares", mounts.ErrUnavailable}
 	}
+	// ADR-234: caller-only explain_access on the same routes.
+	access, err := composePublicAccess(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
+	if err != nil {
+		return nil, &fixedStepError{"access", mounts.ErrUnavailable}
+	}
+	if operations, err = presentation.NewInvestigationAccessOperations(operations, access); err != nil {
+		return nil, &fixedStepError{"access", mounts.ErrUnavailable}
+	}
 	o := p.OperationAudit
 	services := PublicContextServices{Sessions: id.sessions, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
 	if pc.fleet != nil {
