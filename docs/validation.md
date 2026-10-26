@@ -4,6 +4,13 @@
 
 ## Phase-0 investigations
 
+Before pushing, run `make pre-push PYTHON=<spec-venv>/bin/python`. It runs, in
+parallel, the fast gates of CI's `checks`, `go` and `console` jobs: the
+specification/architecture/design/schema/CRD/Helm gates and harness self-tests,
+`sql-check`, `console-check` (including generated-contract drift), `go vet`,
+`go-architecture-check` and a `gofmt` check. It starts no fixture and runs no
+race or browser test, so it does not replace the `test` shards or native suites.
+
 Implemented console component gates are `make console-install`,
 `make console-check`, `make console-build` and `make console-browser-check`.
 The browser gate uses actual packaged React and Go HTTPS handlers with an

@@ -30,10 +30,10 @@ type ClusterJoinPlan struct {
 	Installation string
 	// Slot 0 derives it from the catalog: the cluster's existing position on
 	// an exact rerun, otherwise the next free slot.
-	Slot int
-	Admins       []cfg.KubernetesActor
-	Catalog      contracts.WorkerObjectReference
-	Topology     contracts.RetentionTopologySettings
+	Slot     int
+	Admins   []cfg.KubernetesActor
+	Catalog  contracts.WorkerObjectReference
+	Topology contracts.RetentionTopologySettings
 	// Entry carries the cluster, connector, executor, limits, capability
 	// settings and trust; the join fills its source references and pin.
 	Entry contracts.OwnerPublicCluster

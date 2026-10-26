@@ -307,7 +307,7 @@ func newCapacityWorkerDeployment(ctx context.Context, files *os.Root, installed 
 	d.reconciler = &app.CapacityReconciler{Source: &app.CapacitySourceObserver{RootID: c.PermissionRootID, InstallationID: c.InstallationID, QualificationID: q.ID, QualificationDigest: q.Digest, Source: source, Protection: guard, Recovery: journal, Journal: journal, Now: time.Now},
 		Work: &app.CapacityWorkReconciler{Qualification: q, Recovery: journal, Permissions: permissions, Processing: processing, Root: &app.RootBackingCoordinator{Store: general, Capture: capture, Now: time.Now}, Enrollment: &app.EnrollmentCoordinator{Store: enroll, Capture: captureEnroll, Accounts: accounts, Now: time.Now}, Bindings: enroll, Now: time.Now, Regional: regional}, Clusters: clusters,
 		SourceReport: capacitySourceReporter("capacity source: "), RootReport: capacitySourceReporter("capacity root: "),
-		Demands:      demands, DemandReport: capacityDemandReporter(),
+		Demands: demands, DemandReport: capacityDemandReporter(),
 		DemandContext: func(ctx context.Context) (context.Context, func() string) {
 			ctx, marks := auditapp.WithStepTimes(ctx)
 			return ctx, marks.String

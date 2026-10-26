@@ -20,6 +20,7 @@ type WorkerConfiguration struct {
 	MaxRuntimeSeconds int64                   `json:"maxRuntimeSeconds"`
 	StoreCredentials  *WorkerObjectReference  `json:"storeCredentials,omitempty"`
 }
+
 // UnconfiguredWorkerConfiguration is the exact worker-profile.json document of
 // an installed source before an administrator configures a worker (ADR-194 D1).
 func UnconfiguredWorkerConfiguration(installationID string) string {

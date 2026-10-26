@@ -47,10 +47,12 @@ func workerNativeStep(stage string, cause error) error {
 	return &fixedStepError{stage, artifact.ErrDownloadUnavailable}
 }
 
-type nativeLoopCause struct{ inner interface{ FixedStep() string } }
+type nativeLoopCause struct {
+	inner interface{ FixedStep() string }
+}
 
-func (e *nativeLoopCause) Error() string { return artifact.ErrDownloadUnavailable.Error() }
-func (e *nativeLoopCause) Unwrap() error { return artifact.ErrDownloadUnavailable }
+func (e *nativeLoopCause) Error() string     { return artifact.ErrDownloadUnavailable.Error() }
+func (e *nativeLoopCause) Unwrap() error     { return artifact.ErrDownloadUnavailable }
 func (e *nativeLoopCause) FixedStep() string { return e.inner.FixedStep() }
 
 func workerNativeNonce() string {

@@ -20,6 +20,6 @@ type OwnerConfiguration struct {
 	NativeBootstrap      string                `json:"nativeBootstrap,omitempty"`
 	NativeCandidateLimit int                   `json:"nativeCandidateLimit,omitzero"`
 	// OperationPort is the v2 operation listener's own port (ADR-197).
-	OperationPort int `json:"operationPort,omitzero"`
-	IssuerRoots          [][]byte              `json:"issuerRoots"`
+	OperationPort int      `json:"operationPort,omitzero"`
+	IssuerRoots   [][]byte `json:"issuerRoots"`
 }

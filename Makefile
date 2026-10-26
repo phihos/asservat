@@ -157,3 +157,24 @@ initial-handover-integration:
 .PHONY: initial-schema-handover-integration
 initial-schema-handover-integration:
 	$(PYTHON) scripts/test-context-storage.py --initial-schema-handover
+
+# Fast local gates before a push: the checks job's gates and self-tests, the
+# go job's vet and sql-check, the console job's console-check (including
+# generated-contract drift) and gofmt. No fixtures, race tests or browser.
+# Use the spec virtual environment: make pre-push PYTHON=<spec-venv>/bin/python
+PRE_PUSH_GATES := spec-check architecture-check design-check openapi-check live-check download-check investigation-check \
+	go-architecture-check manifest-schema-check investigation-schema-check permission-schema-check policy-schema-check \
+	permission-crd-check control-schema-check start-crd-check retention-crd-check capacity-crd-check helm-check \
+	gate-self-tests sql-check console-check gofmt-check go-vet
+.PHONY: pre-push gate-self-tests gofmt-check go-vet
+pre-push:
+	$(MAKE) -k -j4 -O $(PRE_PUSH_GATES)
+
+gate-self-tests:
+	for f in scripts/test-ci-changes.py scripts/test-go-shards.py scripts/test-kept-cleanup.py scripts/test-*-selection.py scripts/test-direct-helper-regression.py; do $(PYTHON) "$$f" || exit 1; done
+
+gofmt-check:
+	@unformatted=$$(gofmt -l api cmd internal migrations test); if [ -n "$$unformatted" ]; then echo "gofmt needed:"; echo "$$unformatted"; exit 1; fi
+
+go-vet:
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go vet ./...

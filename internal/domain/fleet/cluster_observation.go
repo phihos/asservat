@@ -13,14 +13,14 @@ import (
 type ClusterObservationPurpose string
 
 const (
-	ObserveCapacityNamespaceGuard   ClusterObservationPurpose = "capacity-namespace-guard"
-	ObserveCapacityNamespaces       ClusterObservationPurpose = "capacity-namespace-candidates"
-	ObserveCapacityWorkloads        ClusterObservationPurpose = "capacity-workload-candidates"
-	ObserveCapacityWorkload         ClusterObservationPurpose = "capacity-workload"
+	ObserveCapacityNamespaceGuard ClusterObservationPurpose = "capacity-namespace-guard"
+	ObserveCapacityNamespaces     ClusterObservationPurpose = "capacity-namespace-candidates"
+	ObserveCapacityWorkloads      ClusterObservationPurpose = "capacity-workload-candidates"
+	ObserveCapacityWorkload       ClusterObservationPurpose = "capacity-workload"
 	// ObserveCapacityGuardedWorkload observes the namespace guard and then
 	// the workload under the request's keys, which must be the guard's
 	// (ADR-197): two observations do not fit one five-second window.
-	ObserveCapacityGuardedWorkload ClusterObservationPurpose = "capacity-guarded-workload"
+	ObserveCapacityGuardedWorkload  ClusterObservationPurpose = "capacity-guarded-workload"
 	ClusterObservationMaximumKeys                             = 256
 	ClusterObservationMaximumItems                            = 64
 	ClusterObservationMaximumCursor                           = 8192
