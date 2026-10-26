@@ -121,7 +121,11 @@ def main():
             exit_code = result.returncode
             report["observationExit"] = exit_code
             if exit_code == 0:
-                run(k+["apply", "--server-side", "--force-conflicts", "--field-manager=asservat-owned-fixture", "-f", str(ROOT/"charts/asservat/crds")])
+                # The policy-source test installs its own permissive DebugPolicy
+                # CRD so malformed specs reach the product reader; the chart's
+                # structural one (ADR-228) would make that create collide.
+                chart_crds = sorted(p for p in (ROOT/"charts/asservat/crds").glob("*.yaml") if p.name != "debugpolicies.yaml")
+                run(k+["apply", "--server-side", "--force-conflicts", "--field-manager=asservat-owned-fixture"]+[a for p in chart_crds for a in ("-f", str(p))])
                 run(k+["wait", "--for=condition=Established", "--timeout=30s", "crd/evidenceretentionpolicies.asservat.io"])
                 with (results/"permission-admission.log").open("w") as log:
                     result = subprocess.run(["go", "test", "-race", "-v", "-count=1", "-run", "TestPermissionAdmissionWithRealKubernetes|TestLocalStartWithRealKubernetes|TestRetentionWithRealKubernetes", "./test/integration"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=180)

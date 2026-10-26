@@ -178,7 +178,7 @@ func newDirectNativeCluster(t *testing.T, ctx context.Context, f fixture, index 
 			x.plan.CredentialSecrets = []cfg.OwnerCredentialSecret{{Secret: "cluster-credential", ServiceAccount: "regional"}}
 		}
 	}
-	x.installAccess(t, ctx, modes)
+	x.installAccess(t, ctx, modes, installation)
 	policy, binding, e := kube.OwnerWorkloadAdmission(x.plan)
 	if e != nil {
 		t.Fatal("native namespace guard plan", e)

@@ -239,7 +239,7 @@ func initialBootstrapCopyObserver(t *testing.T, ctx context.Context, api kuberne
 	}
 	token, err := api.CoreV1().ServiceAccounts(d.BootstrapNamespace).CreateToken(ctx, account.Name, &auth.TokenRequest{Spec: auth.TokenRequestSpec{Audiences: []string{d.ProbeAudience}, ExpirationSeconds: ptr.To(int64(600)), BoundObjectRef: &auth.BoundObjectReference{APIVersion: "v1", Kind: "Secret", Name: anchor.Name, UID: bound.UID}}}, meta.CreateOptions{})
 	if err != nil || token.Status.Token == "" {
-		t.Fatal("original observation token unavailable")
+		t.Fatal("original observation token unavailable", err)
 	}
 	probe, err := kubernetes.NewForConfig(&rest.Config{Host: connection.Host, BearerToken: token.Status.Token, TLSClientConfig: rest.TLSClientConfig{CAData: connection.CAData, CAFile: connection.CAFile, ServerName: connection.ServerName}})
 	if err != nil {

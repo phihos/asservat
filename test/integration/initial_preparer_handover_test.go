@@ -18,6 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"io"
 	auth "k8s.io/api/authentication/v1"
@@ -249,6 +250,12 @@ func initialPreparationHandoverWithRealServices(t *testing.T, initializeSchema b
 		if _, e = s3client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: &bucket}); e != nil {
 			t.Fatal(e)
 		}
+		// The activation writes its audit through the versioned audit store,
+		// which refuses a receipt without an immutable version (as in the
+		// chain and Helm fixtures).
+		if _, e = s3client.PutBucketVersioning(ctx, &s3.PutBucketVersioningInput{Bucket: &bucket, VersioningConfiguration: &s3types.VersioningConfiguration{Status: s3types.BucketVersioningStatusEnabled}}); e != nil {
+			t.Fatal(e)
+		}
 		// Native helper's exact cleanup owner remains separate from the projected SA.
 		t.Cleanup(func() {
 			clean, done := context.WithTimeout(context.Background(), 15*time.Second)
@@ -346,6 +353,10 @@ func initialPreparationHandoverWithRealServices(t *testing.T, initializeSchema b
 			defer deployment.Close()
 			out, err := deployment.Run()
 			if err != nil {
+				// Diagnostics only: the original Pod's own last output, read
+				// after the product already returned its verdict.
+				logs, le := api.CoreV1().Pods(c.Plan.Workload.Namespace).GetLogs(c.Plan.Workload.Name, &core.PodLogOptions{TailLines: ptr.To(int64(40))}).DoRaw(context.Background())
+				t.Logf("original activation Pod logs (err=%v):\n%s", le, logs)
 				t.Fatal("actual handover Run", err)
 			}
 			return out

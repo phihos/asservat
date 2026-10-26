@@ -6,6 +6,7 @@ import (
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	"asservat.local/asservat/internal/contracts"
 	auth "k8s.io/api/authentication/v1"
 	rbac "k8s.io/api/rbac/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -14,13 +15,18 @@ import (
 	"k8s.io/utils/ptr"
 )
 
-func (x *directNativeCluster) installAccess(t *testing.T, ctx context.Context, modes []string) {
+func (x *directNativeCluster) installAccess(t *testing.T, ctx context.Context, modes []string, installation string) {
 	t.Helper()
 	ns := x.namespace.Name
 	for _, mode := range append(append([]string{}, modes...), "setup-observer", "probe") {
 		name := ns + "-" + mode
 		clusterRules := []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{ns}, Verbs: []string{"get"}}, {APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{ns, ns + "-source", ns + "-capacity"}, Verbs: []string{"get"}}}
 		rules := []rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"services", "serviceaccounts", "configmaps"}, ResourceNames: []string{"owner", "hwork", "regional", "probe", "setup-observer", "connector-identity"}, Verbs: []string{"get"}}, {APIGroups: []string{"apps"}, Resources: []string{"deployments"}, ResourceNames: []string{"owner", "hwork", "regional"}, Verbs: []string{"get"}}, {APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}}, {APIGroups: []string{"apps"}, Resources: []string{"replicasets"}, Verbs: []string{"get"}}, {APIGroups: []string{"discovery.k8s.io"}, Resources: []string{"endpointslices"}, Verbs: []string{"list"}}}
+		if mode == "owner" || mode == "hwork" {
+			// ADR-227: the owner observation boundary reads the release record
+			// by exact name, as the product owner/hub-worker RBAC grants.
+			rules = append(rules, rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{contracts.ReleaseRecordName(installation)}, Verbs: []string{"get"}})
+		}
 		if mode == "owner" || mode == "regional" {
 			clusterRules = append(clusterRules, rbac.PolicyRule{APIGroups: []string{"authentication.k8s.io"}, Resources: []string{"tokenreviews"}, Verbs: []string{"create"}})
 		}

@@ -80,8 +80,10 @@ type ControlRequest struct {
 	DelayNanos int64
 }
 type ControlResult struct {
-	OK                      bool
-	Phase, Category         string
+	OK              bool
+	Phase, Category string
+	// Detail is the failed command's error text (diagnostics only).
+	Detail                  string `json:",omitempty"`
 	Available               bool
 	ElapsedNanos            int64
 	RemainingNanos          int64
