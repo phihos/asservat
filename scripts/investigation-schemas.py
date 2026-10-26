@@ -20,7 +20,9 @@ NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capt
 def share_subset(name, tool):
     """ADR-232 increment 1: one concrete pod-status artifact per share, the
     get_case read only, no sharing intents, management selection, cursors or
-    pending replies. Every runtime input/output is valid canonically."""
+    pending replies; increment 4 adds default team management (owned rows
+    carry revision, created_by and managed_by). Every runtime input/output is
+    valid canonically."""
     description = copy.deepcopy(tool)
     description.pop("enabledByDefault", None)
     schema = description["inputSchema"]
@@ -44,17 +46,19 @@ def share_subset(name, tool):
         props.pop("cursor")
         props.pop("include_intents")
         schema.pop("allOf")
-        description["description"] = ("List your own shares (view owned, every phase) or the shares you can currently read (view received, Active only). "
+        description["description"] = ("List the shares you created (view owned, every phase) or currently manage through a pinned owner team (unrevoked, unexpired), "
+                                      "with revision, created_by and managed_by; or the shares you can currently read (view received, Active only). "
                                       "Most recent first, at most limit (default 20, maximum 100).")
         data["properties"] = {k: v for k, v in data["properties"].items() if k == "shares"}
         row = data["properties"]["shares"]["items"]
         row["properties"].pop("origin")
         row["properties"]["phase"] = {"enum": ["Active", "Expired", "Revoked", "Suspended"]}
+        row["properties"]["revision"] = {"enum": [1, 2]}
     else:
         props.pop("sharing_intent_id")
         schema.pop("oneOf")
         schema["required"] = ["share_id", "expected_revision", "idempotency_key"]
-        description["description"] = ("Revoke one of your shares. A share has revision 1 until it is revoked (revision 2). Recipients lose access at their next read; "
+        description["description"] = ("Revoke a share you created or currently manage through a pinned owner team. A share has revision 1 until it is revoked (revision 2). Recipients lose access at their next read; "
                                       "independent rights are unchanged. Repeating with the same idempotency key is harmless.")
         data["properties"].pop("sharing_intent_id")
         data.pop("oneOf")

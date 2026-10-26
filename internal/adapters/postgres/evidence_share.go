@@ -127,13 +127,32 @@ func (s *EvidenceShares) RecipientShares(ctx context.Context, artifactID string,
 	return out, nil
 }
 
-func (s *EvidenceShares) OwnedShares(ctx context.Context, creator identity.Principal, limit int) ([]authorization.Share, error) {
-	if s == nil || ctx == nil || ctx.Err() != nil || !creator.Valid() || limit < 1 || limit > 100 {
+// OwnedShares returns the caller's own shares and the unrevoked, unexpired
+// shares pinning a management assignment of the caller's user subject or one
+// of its groups (ADR-232 increment 4). The second set is candidates only.
+func (s *EvidenceShares) OwnedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error) {
+	if s == nil || ctx == nil || ctx.Err() != nil || !caller.Principal.Valid() || len(caller.Groups) > 256 || limit < 1 || limit > 100 {
 		return nil, value.ErrUnavailable
 	}
+	// One containment pattern per subject: [{"Kind","Issuer","SubjectID"}].
+	pattern := func(kind, subject string) ([]byte, error) {
+		return json.Marshal([]map[string]string{{"Kind": kind, "Issuer": caller.Principal.Issuer, "SubjectID": subject}})
+	}
+	user, err := pattern("User", caller.Principal.Subject)
+	if err != nil {
+		return nil, value.ErrUnavailable
+	}
+	managers := [][]byte{user}
+	for _, g := range caller.Groups {
+		b, err := pattern("Group", g)
+		if err != nil {
+			return nil, value.ErrUnavailable
+		}
+		managers = append(managers, b)
+	}
 	var out []authorization.Share
-	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		rows, err := q.ListOwnedShares(ctx, custodydb.ListOwnedSharesParams{RootID: id(s.root), CreatorIssuer: creator.Issuer, CreatorSubject: creator.Subject, Limit: int32(limit)})
+	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		rows, err := q.ListOwnedShares(ctx, custodydb.ListOwnedSharesParams{RootID: id(s.root), CreatorIssuer: caller.Principal.Issuer, CreatorSubject: caller.Principal.Subject, Managers: managers, RowLimit: int32(limit)})
 		if err != nil {
 			return err
 		}
@@ -144,6 +163,29 @@ func (s *EvidenceShares) OwnedShares(ctx context.Context, creator identity.Princ
 		return nil, value.ErrUnavailable
 	}
 	return out, nil
+}
+
+// Share reads one share of this root; a missing share is Denied.
+func (s *EvidenceShares) Share(ctx context.Context, shareID string) (authorization.Share, error) {
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(shareID) {
+		return authorization.Share{}, value.ErrUnavailable
+	}
+	var out []authorization.Share
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		row, err := q.ReadShare(ctx, custodydb.ReadShareParams{RootID: id(s.root), ID: id(shareID)})
+		if err != nil {
+			return err
+		}
+		out, err = s.observed(ctx, q, []custodydb.EvidenceShare{row})
+		return err
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return authorization.Share{}, value.ErrDenied
+	}
+	if err != nil || len(out) != 1 || out[0].ID != shareID {
+		return authorization.Share{}, value.ErrUnavailable
+	}
+	return out[0], nil
 }
 
 func (s *EvidenceShares) ReceivedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error) {
@@ -254,12 +296,15 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request, rec
 	return out, replay, nil
 }
 
-// RevokeShare revokes the creator's share once. The same key after success is
-// a replay; another key or a stale expected revision is Conflict; a share of
-// another creator (or none) is Denied without saying which.
+// RevokeShare revokes a share once for its creator or, with r.Managers, for a
+// manager the service found holding those pinned assignments now (ADR-232
+// increment 4); every named assignment must be pinned by the row, which is
+// immutable. The same key after success is a replay; another key or a stale
+// expected revision is Conflict; any other share (or none) is Denied without
+// saying which.
 func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, recovery artifact.RecoveryProof) (authorization.Share, bool, error) {
 	var zero authorization.Share
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !r.Creator.Valid() || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !r.Actor.Valid() || len(r.Managers) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
 		return zero, false, value.ErrInvalid
 	}
 	var out authorization.Share
@@ -277,7 +322,7 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, 
 		if err != nil {
 			return err
 		}
-		if row.CreatorIssuer != r.Creator.Issuer || row.CreatorSubject != r.Creator.Subject {
+		if (row.CreatorIssuer != r.Actor.Issuer || row.CreatorSubject != r.Actor.Subject) && !pinsAll(row.Management, r.Managers) {
 			return value.ErrDenied
 		}
 		switch {
@@ -304,6 +349,21 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, 
 		return zero, false, shareError(err)
 	}
 	return out, replay, nil
+}
+
+// pinsAll reports whether the stored management pins every named assignment
+// (at least one).
+func pinsAll(management []byte, ids []string) bool {
+	var pinned []artifact.AudienceAssignment
+	if len(ids) == 0 || json.Unmarshal(management, &pinned) != nil {
+		return false
+	}
+	for _, x := range ids {
+		if !slices.ContainsFunc(pinned, func(a artifact.AudienceAssignment) bool { return a.AssignmentID == x }) {
+			return false
+		}
+	}
+	return true
 }
 
 func shareError(err error) error {

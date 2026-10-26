@@ -94,11 +94,18 @@ type shareCreateData struct {
 	ShareID string `json:"share_id"`
 	Phase   string `json:"phase"`
 }
+
+// shareListItem: the owned view also names the revision (for revoke_share),
+// "Created by" and "Managed by" separately (REQ-SHR-008); the received view
+// stays minimal.
 type shareListItem struct {
-	ShareID   string    `json:"share_id"`
-	CaseID    string    `json:"case_id"`
-	Phase     string    `json:"phase"`
-	ExpiresAt time.Time `json:"expires_at"`
+	ShareID   string                `json:"share_id"`
+	CaseID    string                `json:"case_id"`
+	Phase     string                `json:"phase"`
+	ExpiresAt time.Time             `json:"expires_at"`
+	Revision  int64                 `json:"revision,omitempty"`
+	CreatedBy *shareRecipientInput  `json:"created_by,omitempty"`
+	ManagedBy []shareRecipientInput `json:"managed_by,omitempty"`
 }
 type shareListData struct {
 	Shares []shareListItem `json:"shares"`
@@ -111,6 +118,8 @@ type shareRevokeData struct {
 
 func publicShareFailure(err error) OperationFailure {
 	switch {
+	case errors.Is(err, sharing.ErrManagementTooBroad):
+		return OperationFailure{"ManagementTooBroad", "You hold evidence-owner on this workload through more than eight team assignments, and sharing never picks a subset. Ask an administrator to combine the owner bindings.", false}
 	case errors.Is(err, value.ErrInvalid):
 		return OperationFailure{"InvalidShare", "Recipients must be stable user or group IDs of your identity provider (at most eight), and the expiry must be in the future and at most seven days away.", false}
 	case errors.Is(err, value.ErrChanged):
@@ -191,7 +200,18 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 				until = identity.Earlier(until, valid)
 				data := shareListData{Shares: []shareListItem{}}
 				for _, v := range views {
-					data.Shares = append(data.Shares, shareListItem{ShareID: v.Share.ID, CaseID: v.Share.CaseID, Phase: string(v.Phase), ExpiresAt: v.Share.ExpiresAt.UTC()})
+					item := shareListItem{ShareID: v.Share.ID, CaseID: v.Share.CaseID, Phase: string(v.Phase), ExpiresAt: v.Share.ExpiresAt.UTC()}
+					if in.View == "owned" {
+						item.Revision = v.Share.Revision
+						item.CreatedBy = &shareRecipientInput{Kind: "User", Issuer: v.Share.Creator.Issuer, ID: v.Share.Creator.Subject}
+						for _, a := range v.Share.Management {
+							m := shareRecipientInput{Kind: a.Kind, Issuer: a.Issuer, ID: a.SubjectID}
+							if !slices.Contains(item.ManagedBy, m) {
+								item.ManagedBy = append(item.ManagedBy, m)
+							}
+						}
+					}
+					data.Shares = append(data.Shares, item)
 				}
 				out.Data = data
 			}

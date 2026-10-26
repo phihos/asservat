@@ -29,7 +29,7 @@ func (q *Queries) CountActiveShares(ctx context.Context, arg CountActiveSharesPa
 
 const insertShare = `-- name: InsertShare :one
 INSERT INTO evidence_share(id,root_id,artifact_id,case_id,cluster_id,namespace_uid,workload_uid,pod_uid,version,creator_issuer,creator_subject,creator_client,management,recipients,recipient_keys,idempotency_key,request_digest,expires_at)
-SELECT $1::uuid, r.root_id, r.artifact_id, r.case_id, r.cluster_id, r.namespace_uid, r.workload_uid, r.pod_uid, $2::bytea, $3::text, $4::text, $5::text,
+SELECT $1::uuid, r.root_id, r.artifact_id, r.case_id, r.cluster_id, r.namespace_uid, r.workload_uid, r.pod_uid, $2::bytea, $3, $4, $5::text,
  $6::jsonb, $7::jsonb, $8::text[], $9::text, $10::bytea, $11::timestamptz
 FROM context_case_locator r
 WHERE r.root_id=$12::uuid AND r.artifact_id=$13::uuid AND r.case_id=$14::uuid AND r.cluster_id=$15::uuid
@@ -111,22 +111,34 @@ func (q *Queries) InsertShare(ctx context.Context, arg InsertShareParams) (Evide
 }
 
 const listOwnedShares = `-- name: ListOwnedShares :many
-SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision FROM evidence_share WHERE root_id=$1 AND creator_issuer=$2 AND creator_subject=$3 ORDER BY created_at DESC, id LIMIT $4
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision FROM evidence_share WHERE root_id=$1
+ AND ((creator_issuer=$2 AND creator_subject=$3)
+  OR (revoked_at IS NULL AND expires_at>clock_timestamp() AND management @> ANY($4::jsonb[])))
+ORDER BY (revoked_at IS NULL AND expires_at>clock_timestamp()) DESC, created_at DESC, id LIMIT $5
 `
 
 type ListOwnedSharesParams struct {
 	RootID         pgtype.UUID
 	CreatorIssuer  string
 	CreatorSubject string
-	Limit          int32
+	Managers       [][]byte
+	RowLimit       int32
 }
 
+// Shares the caller created, in every phase, plus unrevoked, unexpired shares
+// pinning a management assignment of a user or group subject of the caller
+// (ADR-232 increment 4; each pattern is a one-element array
+// [{"Kind","Issuer","SubjectID"}]). Candidates only: the service lists a team
+// share only while the caller holds a pinned assignment that is still current.
+// Active rows first, so old revoked/expired own shares never push a share the
+// caller can still revoke out of the bounded page.
 func (q *Queries) ListOwnedShares(ctx context.Context, arg ListOwnedSharesParams) ([]EvidenceShare, error) {
 	rows, err := q.db.Query(ctx, listOwnedShares,
 		arg.RootID,
 		arg.CreatorIssuer,
 		arg.CreatorSubject,
-		arg.Limit,
+		arg.Managers,
+		arg.RowLimit,
 	)
 	if err != nil {
 		return nil, err
@@ -288,6 +300,45 @@ func (q *Queries) ReadRecipientShares(ctx context.Context, arg ReadRecipientShar
 		return nil, err
 	}
 	return items, nil
+}
+
+const readShare = `-- name: ReadShare :one
+SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision FROM evidence_share WHERE root_id=$1 AND id=$2
+`
+
+type ReadShareParams struct {
+	RootID pgtype.UUID
+	ID     pgtype.UUID
+}
+
+func (q *Queries) ReadShare(ctx context.Context, arg ReadShareParams) (EvidenceShare, error) {
+	row := q.db.QueryRow(ctx, readShare, arg.RootID, arg.ID)
+	var i EvidenceShare
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.ArtifactID,
+		&i.CaseID,
+		&i.ClusterID,
+		&i.NamespaceUid,
+		&i.WorkloadUid,
+		&i.PodUid,
+		&i.Version,
+		&i.CreatorIssuer,
+		&i.CreatorSubject,
+		&i.CreatorClient,
+		&i.Management,
+		&i.Recipients,
+		&i.RecipientKeys,
+		&i.IdempotencyKey,
+		&i.RequestDigest,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+		&i.RevokeKey,
+		&i.Revision,
+	)
+	return i, err
 }
 
 const readShareByKey = `-- name: ReadShareByKey :one

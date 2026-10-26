@@ -201,3 +201,65 @@ func TestShareDownloadBranch(t *testing.T) {
 		t.Fatal("deny did not win", r)
 	}
 }
+
+// ADR-232 increment 4: a member of a pinned owner team manages the share
+// while that exact assignment is current and no deny names the member.
+func TestShareManagedBy(t *testing.T) {
+	creator, recipient, p, _, s, now := shareFixture()
+	mate := creator
+	mate.Principal.Subject = "team-mate"
+	if held, until := s.ManagedBy(mate, p, now); len(held) != 1 || held[0] != s.Management[0] || !until.After(now) {
+		t.Fatal("team member does not manage", held)
+	}
+	if held, _ := s.ManagedBy(recipient, p, now); held != nil {
+		t.Fatal("recipient manages")
+	}
+	noScope := mate
+	noScope.Scopes = []string{"evidence:read"}
+	if held, _ := s.ManagedBy(noScope, p, now); held != nil {
+		t.Fatal("manager without evidence:share")
+	}
+	denied := p
+	d := p.Allows[0]
+	d.Audience.Kind, d.Audience.SubjectID, d.Audience.AssignmentID = "User", "team-mate", "99999999-9999-9999-9999-999999999999"
+	denied.Denies = []CurrentAssignment{d}
+	if held, _ := s.ManagedBy(mate, denied, now); held != nil {
+		t.Fatal("denied member manages")
+	}
+	// A re-granted owner binding is a new assignment ID: nobody manages.
+	regranted := p
+	regranted.Allows = append([]CurrentAssignment{}, p.Allows...)
+	regranted.Allows[1].Audience.AssignmentID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	if held, _ := s.ManagedBy(mate, regranted, now); held != nil || s.Phase(regranted, now) != ShareSuspended {
+		t.Fatal("re-granted assignment manages an old share")
+	}
+}
+
+// Default management pins the owner teams; the personal assignment only
+// without any team; more than eight is refused, not truncated.
+func TestShareManagementPrefersTeams(t *testing.T) {
+	creator, _, p, e, _, now := shareFixture()
+	personal := p.Allows[1]
+	personal.Audience.Kind, personal.Audience.SubjectID, personal.Audience.AssignmentID = "User", creator.Principal.Subject, "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+	p.Allows = append(p.Allows, personal)
+	e.Audience = append(e.Audience, personal.Audience)
+	if r, owners := ShareManagement(creator, p, p.Target, &e, now); !r.Eligible || len(owners) != 1 || owners[0].Kind != "Group" {
+		t.Fatal("teams not preferred", r.Reason, owners)
+	}
+	alone := creator
+	alone.Groups = nil
+	if r, owners := ShareManagement(alone, p, p.Target, &e, now); !r.Eligible || len(owners) != 1 || owners[0].Kind != "User" {
+		t.Fatal("individual owner", r.Reason, owners)
+	}
+	for n := 0; n < ShareMaxManagers; n++ {
+		team := p.Allows[1]
+		team.Audience.SubjectID = "team-" + string(rune('b'+n))
+		team.Audience.AssignmentID = "cccccccc-cccc-cccc-cccc-cccccccccc0" + string(rune('0'+n))
+		p.Allows = append(p.Allows, team)
+		e.Audience = append(e.Audience, team.Audience)
+		creator.Groups = append(creator.Groups, team.Audience.SubjectID)
+	}
+	if r, owners := ShareManagement(creator, p, p.Target, &e, now); r.Eligible || r.Reason != "ManagementTooBroad" || owners != nil {
+		t.Fatal("nine owner teams", r.Reason, len(owners))
+	}
+}

@@ -1,6 +1,6 @@
 {
   "name": "revoke_share",
-  "description": "Revoke one of your shares. A share has revision 1 until it is revoked (revision 2). Recipients lose access at their next read; independent rights are unchanged. Repeating with the same idempotency key is harmless.",
+  "description": "Revoke a share you created or currently manage through a pinned owner team. A share has revision 1 until it is revoked (revision 2). Recipients lose access at their next read; independent rights are unchanged. Repeating with the same idempotency key is harmless.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": true,

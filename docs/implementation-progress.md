@@ -15,6 +15,40 @@ Not run locally: custody/SQL fixture for migration 00087 and the installed journ
 asserts the developer's `Allow` and the unrelated user's uniform reply for a real and an absent
 workload (`installedJourneyUnrelated`).
 
+## S-06 increment 4: team management (ADR-232, 2026-10-26)
+
+[ADR-232 increment 4](decisions/232-concrete-evidence-share.md#increment-4-team-management)
+implements default share management. A share pins the creator's `evidence-owner` Group
+assignments (the owner teams; the individual User assignment only without any team; more than
+eight is refused as `ManagementTooBroad` instead of truncated). Any human with `evidence:share`
+who holds a pinned assignment that is still exactly a current allow, and whom no current deny
+names, manages the share: `list_shares(view=owned)` lists it (with `revision`, `created_by`,
+`managed_by`) while it is unrevoked and unexpired, and `revoke_share` revokes it; the creator keeps
+revoking their own shares. A re-added owner binding is a new assignment and manages nothing older.
+No migration, grant or schema change; the canonical `list_shares` row gains three optional fields.
+
+- Unit (`go test -race`): domain/authorization (`ManagedBy`: member, recipient, no scope,
+  denied member, re-granted assignment; teams preferred over the personal assignment, creator-only
+  without a team, nine teams refused), application/sharing (two teams: member lists and revokes
+  after the creator leaves both; one team lost keeps the share Active through the other while that
+  team's member is refused; both lost → Suspended; re-granted assignment ID neither restores nor
+  manages; creator still revokes; personal-only share not manageable by another user; denied
+  member refused), transport/presentation (owned rows carry revision/created_by/managed_by, one
+  per group; received rows do not), adapters/postgres, application/authorization,
+  application/catalog: PASS.
+- Custody (real PostgreSQL, compiled hub-runtime grants), `--run
+  '^TestContextAdmissionWithRealServices$/^evidence-share-recipient-read-revocation-expiry-and-deny$'`:
+  PASS, go test 7.2 s, no cleanup failures. New in the subtest: the creator leaves the owner
+  group, the share stays Active and readable, a team member who did not create it lists it
+  (creator recorded) and revokes it, a non-member is refused; after the owner assignment is
+  retired the share is Suspended for the creator and no member lists or revokes it; after a new
+  owner binding for the same group is accepted and its authority audit published (a new current
+  assignment ID, asserted from the projection) the share stays Suspended, members still cannot
+  manage it and the recipient is still refused. The fixture has one owner team; two-team
+  behavior is covered by the unit tests.
+- Not run: installed share focus (no installed-path change; the console in PR #70 does not yet
+  show `created_by`/`managed_by`).
+
 ## S-06 increment 3: recipient native download (ADR-233, 2026-10-26)
 
 [ADR-233](decisions/233-recipient-native-download.md) adds the share branch to the download

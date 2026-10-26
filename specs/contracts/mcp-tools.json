@@ -4357,6 +4357,22 @@
                               "type": "string",
                               "format": "date-time"
                             },
+                            "revision": {
+                              "type": "integer",
+                              "minimum": 1
+                            },
+                            "created_by": {
+                              "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
+                            },
+                            "managed_by": {
+                              "type": "array",
+                              "items": {
+                                "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
+                              },
+                              "minItems": 1,
+                              "maxItems": 8,
+                              "uniqueItems": true
+                            },
                             "origin": {
                               "type": "object",
                               "additionalProperties": false,

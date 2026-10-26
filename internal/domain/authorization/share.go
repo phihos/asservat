@@ -263,16 +263,63 @@ func ShareManagement(i identity.Identity, p Projection, t Target, e *Retained, n
 	if !slices.Contains(i.Scopes, ShareScope) {
 		return Result{Reason: "InsufficientScope"}, nil
 	}
-	var owners []artifact.AudienceAssignment
+	// Default management (REQ-SHR-008, ADR-232 increment 4): the creator's
+	// contributing evidence-owner Group assignments (the owner teams); only
+	// without any team, the creator's individual User assignments. More than
+	// eight is refused rather than silently truncated.
+	var teams, personal []artifact.AudienceAssignment
 	for _, a := range r.ContributingAssignments {
-		if a.Role == "evidence-owner" && len(owners) < ShareMaxManagers {
-			owners = append(owners, a)
+		switch {
+		case a.Role != "evidence-owner":
+		case a.Kind == "Group":
+			teams = append(teams, a)
+		case a.Kind == "User":
+			personal = append(personal, a)
 		}
+	}
+	owners := teams
+	if len(owners) == 0 {
+		owners = personal
 	}
 	if len(owners) == 0 {
 		return Result{Reason: "NoOwnerAuthority"}, nil
 	}
+	if len(owners) > ShareMaxManagers {
+		return Result{Reason: "ManagementTooBroad"}, nil
+	}
 	return r, owners
+}
+
+// ManagedBy returns the pinned management assignments that i holds now
+// (ADR-232 increment 4). i must be a human with evidence:share, the target's
+// projection current, no current deny may name i, and the assignment must
+// still be exactly a current allow (Share.managers). Holding one makes i a
+// current manager of s, who may list and revoke it. Group membership changes
+// within the same assignment keep a team member managing; a newly added owner
+// binding is a new assignment ID and manages no older share. The second
+// result bounds the answer's validity.
+func (s Share) ManagedBy(i identity.Identity, p Projection, now time.Time) ([]artifact.AudienceAssignment, time.Time) {
+	if !s.Valid() || !i.Valid(now) || i.Principal.Kind != identity.Human || !slices.Contains(i.Scopes, ShareScope) || !projectionCurrent(p, s.Target, now) {
+		return nil, time.Time{}
+	}
+	until := identity.Earlier(i.ValidUntil, identity.Earlier(p.FreshUntil, p.DeniesFreshUntil))
+	for _, d := range p.Denies {
+		if !identity.Fresh(d.ObservedAt, d.FreshUntil, now, PermissionObservationInterval) || matches(d.Audience, i) && permits(d.Audience.Role, ReadApproved) {
+			return nil, time.Time{}
+		}
+		until = identity.Earlier(until, d.FreshUntil)
+	}
+	var held []artifact.AudienceAssignment
+	for _, a := range s.managers(p, now) {
+		if matches(a.Audience, i) {
+			held = append(held, a.Audience)
+			until = identity.Earlier(until, a.FreshUntil)
+		}
+	}
+	if len(held) == 0 {
+		return nil, time.Time{}
+	}
+	return held, until
 }
 
 // projectionCurrent is the ordinary evaluator's projection precondition.
