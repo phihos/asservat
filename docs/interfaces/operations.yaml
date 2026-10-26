@@ -545,5 +545,5 @@ operations:
   transport:
   - browser
   effect: read
-  role: fleet-operator
+  role: fleet-operator-or-delegation-previewer
   contract: specs/contracts/mcp-tools.json

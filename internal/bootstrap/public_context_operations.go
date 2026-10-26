@@ -15,7 +15,10 @@ import (
 	executionapp "asservat.local/asservat/internal/application/execution"
 	planningapp "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/application/sharing"
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/transport/presentation"
 )
 
@@ -184,20 +187,56 @@ func composePublicAccess(c PublicContextOperationsConfig, s PublicContextOperati
 
 // composePublicAccessPreview composes the ADR-237 browser-only
 // preview_access_change operation: the protected fleet administration names
-// the administrators, and the same permission projection, recovery and clock
-// as explain_access feed the real evaluator. Nil without fleet administration.
+// the installation-wide administrators and the installed delegation envelopes
+// name their browser previewers; the same permission projection, recovery and
+// clock as explain_access feed the real evaluator. Nil without either.
 func composePublicAccessPreview(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.AccessPreviewOperations, error) {
-	if pc == nil || pc.fleet == nil {
+	if pc == nil || pc.fleet == nil && len(pc.previewDelegations) == 0 {
 		return nil, nil
 	}
 	v, err := composePublicContextUseCases(c, s)
-	if err != nil || pc.permissions == nil || pc.fleet.Settings == nil || len(pc.clusterIDs) == 0 {
+	if err != nil || pc.permissions == nil || pc.fleet != nil && pc.fleet.Settings == nil || len(pc.clusterIDs) == 0 {
+		return nil, presentation.ErrOperationsConfiguration
+	}
+	delegations, err := previewDelegations(pc.previewDelegations)
+	if err != nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	decoder, err := kube.NewAccessBindingSpecDecoder()
 	if err != nil {
 		return nil, presentation.ErrOperationsConfiguration
 	}
-	service := authapp.AccessPreviewer{InstallationID: c.InstallationID, Administration: pc.fleet.Settings, Projections: pc.permissions, Decoder: decoder, Recovery: v.submission.Recovery, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
+	service := authapp.AccessPreviewer{InstallationID: c.InstallationID, Delegations: delegations, Projections: pc.permissions, Decoder: decoder, Recovery: v.submission.Recovery, Clusters: slices.Clone(pc.clusterIDs), Now: c.Now}
+	if pc.fleet != nil {
+		service.Administration = pc.fleet.Settings
+	}
 	return presentation.NewAccessPreviewOperations(c.PublicOrigin, c.Now, c.NewID, service)
+}
+
+// previewDelegations converts the installed delegation envelopes with
+// previewers into the preview's authority; any invalid entry stops the
+// composition rather than widening or dropping a previewer.
+func previewDelegations(in []contracts.PermissionDelegation) ([]authapp.PreviewDelegation, error) {
+	if len(in) > 64 {
+		return nil, presentation.ErrOperationsConfiguration
+	}
+	out := make([]authapp.PreviewDelegation, 0, len(in))
+	for _, d := range in {
+		e := cfg.PreviewEnvelope{Scope: cfg.Scope{ClusterID: d.ClusterID, Namespace: cfg.NamespaceRef{Name: d.Namespace.Name, UID: d.Namespace.UID}}, Roles: slices.Clone(d.Roles), Issuers: slices.Clone(d.Issuers)}
+		for _, w := range d.Workloads {
+			e.Scope.Workloads = append(e.Scope.Workloads, cfg.WorkloadRef{Kind: w.Kind, Name: w.Name, UID: w.UID})
+		}
+		if !authorization.UUID(e.Scope.ClusterID) || !identity.Text(e.Scope.Namespace.UID, 64) || !identity.Text(e.Scope.Namespace.Name, 63) || len(e.Roles) == 0 || len(e.Issuers) == 0 || len(d.Previewers) == 0 || len(d.Previewers) > 64 {
+			return nil, presentation.ErrOperationsConfiguration
+		}
+		x := authapp.PreviewDelegation{Envelope: e}
+		for _, p := range d.Previewers {
+			if (p.Kind != "User" && p.Kind != "Group") || !identity.Text(p.Issuer, 2048) || !identity.Text(p.ID, 256) {
+				return nil, presentation.ErrOperationsConfiguration
+			}
+			x.Previewers = append(x.Previewers, authapp.PreviewPrincipal{Issuer: p.Issuer, Kind: p.Kind, ID: p.ID})
+		}
+		out = append(out, x)
+	}
+	return out, nil
 }

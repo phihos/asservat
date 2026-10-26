@@ -84,17 +84,22 @@ parallel ADR-234/235 work were present locally only so the contiguous migration 
 
 [ADR-237](decisions/237-permission-impact-preview.md) adds the browser-only
 `preview_access_change` operation (normal audit lane, migration 00090, schema head 90, floor 81)
-and the console page `/access-preview`. A current fleet operator submits 1–16 AccessBinding
-create/update/delete or PermissionSource delete changes; the service reads every workload scope cell
-of the affected namespaces from the accepted projection in one transaction (at most 1,000 cells),
-applies the changes with the observation's own candidate derivation and compares the ordinary
-evaluator's decisions before and after for each changed subject. Unavailable or non-enrolled cells
-are Indeterminate. MCP does not list or accept the operation. Narrowings are recorded in the ADR.
+and the console page `/access-preview`. A current fleet operator, or a browser `previewer` of an
+installed permission delegation within that envelope, submits 1–16 AccessBinding/PermissionSource
+create/update/delete changes; the service reads every workload scope cell of the affected
+namespaces from the accepted projection in one transaction (at most 1,000 cells), applies the
+changes with the observation's own candidate derivation and compares the ordinary evaluator's
+decisions before and after for each changed subject, with the deciding assignment revisions and
+the projection freshness. Unavailable or non-enrolled cells and PermissionSource creations/edits
+(inheritance not yet accepted) are Indeterminate. The listed result is bounded to 256 KiB and
+paged within the shared 24 KiB reply. MCP does not list or accept the operation.
 
-Verification: unit tests (domain, application, presentation, Kubernetes decoder, console) and the
-real-PostgreSQL subtest `permission-impact-preview` (custody fixture, `--run
-'^TestPermissionAuthorityWithRealServices$'`) pass; see the ADR. Migration 00090 needs 00088/00089
-on main first (contiguous schema bundle). No installed qualification.
+Verification: unit tests (domain, application, presentation, MCP, Kubernetes decoder, console) and
+the real-PostgreSQL subtests `permission-impact-preview` and
+`permission-impact-preview-1000-targets` (custody fixture, `--run
+'^TestPermissionAuthorityWithRealServices$'`; 1,000 cells read in 1.27 s, read+evaluate 1.31 s
+under `-race`) pass; see the ADR. Migration 00090 needs 00088/00089 on main first (contiguous
+schema bundle). No installed qualification.
 
 ## S-06 increment 7: caller-only access explanation (ADR-234, 2026-10-26)
 

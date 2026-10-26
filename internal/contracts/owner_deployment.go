@@ -123,6 +123,10 @@ type OwnerPublicDeployment struct {
 	OperationAudit       OwnerPublicOperationAudit `json:"operationAudit"`
 	// Fleet enables the ADR-193 fleet-operator bootstrap issuance route.
 	Fleet *OwnerFleetIssuance `json:"fleet,omitempty"`
+	// PermissionDelegations are the permission guard's delegation envelopes
+	// with browser previewers (ADR-237): those previewers may use the
+	// permission impact preview within their envelope.
+	PermissionDelegations []PermissionDelegation `json:"permissionDelegations,omitempty"`
 	// RuntimeProjection names the immutable public runtime projection Secret
 	// (ADR-184 decision 6, ADR-194). The provider-installed layout requires it;
 	// the owner compares it with the mounted public root at startup.

@@ -9,6 +9,7 @@ import (
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/identity"
 )
 
 // PreviewProjections reads, in one transaction under the shared permission
@@ -25,6 +26,8 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 		if err != nil {
 			return err
 		}
+		out.Revision = identity.Revision{UID: uid(s.Epoch), Generation: s.Sequence}
+		copy(out.Revision.Digest[:], s.ProjectionDigest)
 		bases, err := q.ListPermissionBases(ctx, s.ID)
 		if err != nil {
 			return err

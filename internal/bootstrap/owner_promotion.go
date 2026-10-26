@@ -96,6 +96,13 @@ func derivePromotedOwner(in contracts.OwnerDeployment, x promotedOwnerParts, now
 		OperationConcurrency: 8, MCPPerIdentity: 2, DownloadConcurrency: 4, DownloadsPerIdentity: 2, DownloadMaxSeconds: 3600,
 		OperationAudit:    contracts.OwnerPublicOperationAudit{RetentionSeconds: int(retention), NormalConcurrency: 8, ResolutionConcurrency: 2, PerPrincipalConcurrency: 2, NormalPerSecond: 50, ResolutionPerSecond: 10},
 		RuntimeProjection: x.Projection, Processing: x.Processing}
+	// ADR-237: the delegation envelopes whose previewers may preview
+	// permission changes in the browser.
+	for _, d := range x.Settings.PermissionDelegations {
+		if len(d.Previewers) > 0 {
+			out.Public.PermissionDelegations = append(out.Public.PermissionDelegations, d)
+		}
+	}
 	if d := x.Downloads; d != nil {
 		// ADR-204 decisions 2 and 4: the one pinned worker API owns the
 		// profile source's namespace, and one path template per installation.

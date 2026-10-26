@@ -46,6 +46,55 @@ export interface components {
             maxBytes: number;
             maxObservedBytes: number;
         };
+        Contract_permission_source_ad816c81a7733f89: {
+            enabled: boolean;
+            /** Format: uuid */
+            clusterID: string;
+            /** @enum {string} */
+            type: "namespaceMetadata" | "workloadMetadata" | "kubernetesExec" | "kubernetesAccessReview";
+            namespaceSelector: components["schemas"]["Contract_permission_common_f38038cf755001e7"];
+            excludedNamespaces: string[];
+            role: components["schemas"]["Contract_permission_common_4158ef06eeec0fc1"];
+            maxDecisionAgeSeconds: number;
+            maxNamespaces: number;
+            protection?: components["schemas"]["Contract_permission_common_75520915533164b6"];
+            metadataMapping?: components["schemas"]["Contract_permission_common_f75e769ddd84f0e8"];
+            workloadSelector?: components["schemas"]["Contract_permission_common_f38038cf755001e7"];
+            identityMappingRef?: string;
+            admissionParity?: {
+                /** @enum {string} */
+                mode: "noAdditionalRestrictions" | "qualifiedAdapter";
+                reviewRef: string;
+                adapterRef?: string;
+            } & unknown;
+            accessReview?: {
+                /** @enum {string} */
+                check: "namespaceCaptureCreate" | "workloadGet" | "workloadPatch" | "workloadUpdate";
+            };
+        } & (unknown & unknown & unknown & unknown);
+        Contract_permission_common_f38038cf755001e7: {
+            matchLabels: {
+                [key: string]: string;
+            };
+        };
+        Contract_permission_common_75520915533164b6: {
+            /** @enum {string} */
+            mode: "administratorManaged" | "admissionEnforced";
+            reviewRef: string;
+            guardRef?: string;
+        } & unknown;
+        Contract_permission_common_f75e769ddd84f0e8: {
+            /** @enum {string} */
+            field: "annotation" | "label";
+            key: string;
+            /** @enum {string} */
+            mode: "groupID" | "valueMap";
+            /** Format: uri */
+            issuer: string;
+            values?: {
+                [key: string]: string[];
+            };
+        } & unknown;
         McpInput_preview_access_change: {
             changes: ({
                 /** @constant */
@@ -62,11 +111,25 @@ export interface components {
                 spec: components["schemas"]["Contract_access_binding_ad816c81a7733f89"];
             } | {
                 /** @constant */
+                action: "create";
+                /** @constant */
+                kind: "PermissionSource";
+                spec: components["schemas"]["Contract_permission_source_ad816c81a7733f89"];
+            } | {
+                /** @constant */
+                action: "update";
+                /** @constant */
+                kind: "PermissionSource";
+                uid: string;
+                spec: components["schemas"]["Contract_permission_source_ad816c81a7733f89"];
+            } | {
+                /** @constant */
                 action: "delete";
                 /** @enum {unknown} */
                 kind: "AccessBinding" | "PermissionSource";
                 uid: string;
             })[];
+            cursor?: string;
         };
         /** Asservat mcp-result v1 */
         Contract_mcp_result: {
@@ -97,7 +160,23 @@ export interface components {
                 complete: boolean;
                 message: string;
                 targets_evaluated: number;
+                /** Format: date-time */
+                fresh_until?: string;
                 deltas_total: number;
+                unavailable_total: number;
+                listed_rows: number;
+                page_offset: number;
+                unavailable: {
+                    /** Format: uuid */
+                    cluster_id: string;
+                    namespace_uid: string;
+                    workload_uid: string;
+                    other_workloads: boolean;
+                    /** @constant */
+                    decision: "Indeterminate";
+                    /** @enum {unknown} */
+                    unmet: "PermissionObservationStale" | "ServiceUnavailable" | "ClusterUnavailable";
+                }[];
                 deltas: {
                     /** Format: uuid */
                     cluster_id: string;
@@ -112,19 +191,46 @@ export interface components {
                     /** @enum {unknown} */
                     after: "Allow" | "Deny" | "Indeterminate";
                     /** @enum {unknown} */
+                    before_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "PermissionObservationStale" | "AudienceOverflow" | "ServiceUnavailable";
+                    /** @enum {unknown} */
                     after_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "PermissionObservationStale" | "AudienceOverflow" | "ServiceUnavailable";
+                    before_basis: {
+                        /** @enum {unknown} */
+                        effect: "allow" | "deny";
+                        role: components["schemas"]["Contract_permission_common_4158ef06eeec0fc1"];
+                        /** @enum {unknown} */
+                        subject_kind: "User" | "Group" | "Workload";
+                        /** @enum {unknown} */
+                        basis_kind: "AccessBinding" | "PermissionSource";
+                        basis_uid: string;
+                        revision: string;
+                        proposed: boolean;
+                    }[];
+                    after_basis: {
+                        /** @enum {unknown} */
+                        effect: "allow" | "deny";
+                        role: components["schemas"]["Contract_permission_common_4158ef06eeec0fc1"];
+                        /** @enum {unknown} */
+                        subject_kind: "User" | "Group" | "Workload";
+                        /** @enum {unknown} */
+                        basis_kind: "AccessBinding" | "PermissionSource";
+                        basis_uid: string;
+                        revision: string;
+                        proposed: boolean;
+                    }[];
+                    /** Format: date-time */
+                    after_valid_until?: string;
                 }[];
-                unavailable_total: number;
-                unavailable: {
-                    /** Format: uuid */
-                    cluster_id: string;
-                    namespace_uid: string;
-                    workload_uid: string;
-                    other_workloads: boolean;
+                not_evaluated: {
+                    /** @enum {unknown} */
+                    action: "create" | "update";
+                    /** @constant */
+                    kind: "PermissionSource";
+                    uid?: string;
                     /** @constant */
                     decision: "Indeterminate";
-                    /** @enum {unknown} */
-                    unmet: "PermissionObservationStale" | "ServiceUnavailable" | "ClusterUnavailable";
+                    /** @constant */
+                    reason: "InheritanceNotAccepted";
                 }[];
                 unmatched: {
                     /** @enum {unknown} */

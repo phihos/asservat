@@ -3,6 +3,7 @@ package authorization
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	identities "asservat.local/asservat/internal/application/identity"
@@ -24,26 +25,58 @@ type PreviewAdministration interface {
 	FleetAdministration(context.Context) (fleet.Administration, error)
 }
 
-// BindingSpecDecoder applies the observed AccessBinding schema and checks.
+// BindingSpecDecoder applies the observed AccessBinding and PermissionSource
+// schemas and checks.
 type BindingSpecDecoder interface {
 	DecodeAccessBindingSpec([]byte) (cfg.Binding, error)
+	DecodePermissionSourceSpec([]byte) (cfg.Source, error)
 }
 
 // ProposedChange is one administrator-supplied change; Spec is the raw
-// AccessBinding spec for create and update.
+// AccessBinding or PermissionSource spec for create and update.
 type ProposedChange struct {
 	Action, Kind, UID string
 	Spec              []byte
 }
 
+// PreviewPrincipal is one browser identity (a user subject or a stable group
+// ID of the configured issuer).
+type PreviewPrincipal struct{ Issuer, Kind, ID string }
+
+func (p PreviewPrincipal) matches(i identity.Identity) bool {
+	if p.Issuer != i.Principal.Issuer {
+		return false
+	}
+	switch p.Kind {
+	case "User":
+		return i.Principal.Kind == identity.Human && i.Principal.Subject == p.ID
+	case "Group":
+		return slices.Contains(i.Groups, p.ID)
+	}
+	return false
+}
+
+// PreviewDelegation is one installation-configured delegation envelope of the
+// permission guard (ADR-189) and the browser principals that may preview
+// changes within it.
+type PreviewDelegation struct {
+	Previewers []PreviewPrincipal
+	Envelope   cfg.PreviewEnvelope
+}
+
 // AccessPreviewer answers preview_access_change (ADR-237): the delta of the
-// ordinary evaluator's decisions that a proposed AccessBinding configuration
-// would cause, over the current accepted projections. Only a current fleet
-// operator (the installation-wide administrator) may call it; it reads no
-// catalog or evidence, writes nothing and returns no authority.
+// ordinary evaluator's decisions that a proposed permission configuration
+// would cause, over the current accepted projections. A current fleet
+// operator (the installation-wide administrator) previews any change; a
+// configured delegation previewer previews within their delegation
+// envelopes. It reads no catalog or evidence, writes nothing and returns no
+// authority.
 type AccessPreviewer struct {
 	InstallationID string
+	// Administration is nil without fleet administration; then only
+	// delegation previewers exist.
 	Administration PreviewAdministration
+	Delegations    []PreviewDelegation
 	Projections    PreviewProjections
 	Decoder        BindingSpecDecoder
 	Recovery       ExplainRecovery
@@ -53,11 +86,43 @@ type AccessPreviewer struct {
 	Now      func() time.Time
 }
 
+// administration reads the protected fleet administration once per request;
+// ok is false when it is unavailable or absent.
+func (s AccessPreviewer) administration(ctx context.Context) (fleet.Administration, bool) {
+	if s.Administration == nil {
+		return fleet.Administration{}, false
+	}
+	admin, err := s.Administration.FleetAdministration(ctx)
+	return admin, err == nil && admin.Valid(s.Now()) && admin.InstallationID == s.InstallationID
+}
+
+// authority returns nil envelopes for a fleet operator, the caller's
+// delegation envelopes otherwise, or an error.
+func (s AccessPreviewer) authority(i identity.Identity, admin fleet.Administration, adminValid bool) ([]cfg.PreviewEnvelope, time.Time, error) {
+	if adminValid && admin.Operator(i) {
+		return nil, identity.Earlier(i.ValidUntil, admin.FreshUntil), nil
+	}
+	var envelopes []cfg.PreviewEnvelope
+	for _, d := range s.Delegations {
+		if slices.ContainsFunc(d.Previewers, func(p PreviewPrincipal) bool { return p.matches(i) }) {
+			envelopes = append(envelopes, d.Envelope)
+		}
+	}
+	if len(envelopes) > 0 {
+		return envelopes, i.ValidUntil, nil
+	}
+	if s.Administration != nil && !adminValid {
+		return nil, time.Time{}, identity.ErrUnavailable
+	}
+	return nil, time.Time{}, identity.ErrDenied
+}
+
 // Preview returns the preview and the reply's metadata deadline. cfg.ErrInvalid
-// marks an invalid proposal, cfg.ErrLimit one beyond the preview bounds.
+// marks an invalid proposal, cfg.ErrLimit one beyond the preview bounds and
+// cfg.ErrDenied one outside the caller's delegation envelopes.
 func (s AccessPreviewer) Preview(ctx context.Context, current identities.CurrentIdentity, proposed []ProposedChange) (cfg.AccessPreview, time.Time, error) {
 	var zero cfg.AccessPreview
-	if ctx == nil || current == nil || s.Administration == nil || s.Projections == nil || s.Decoder == nil || s.Recovery == nil || s.Now == nil || !value.UUID(s.InstallationID) {
+	if ctx == nil || current == nil || s.Administration == nil && len(s.Delegations) == 0 || s.Projections == nil || s.Decoder == nil || s.Recovery == nil || s.Now == nil || !value.UUID(s.InstallationID) {
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -66,33 +131,35 @@ func (s AccessPreviewer) Preview(ctx context.Context, current identities.Current
 	if err != nil || !i.Valid(s.Now()) {
 		return zero, time.Time{}, identity.ErrDenied
 	}
-	// Authority precedes decoding, so a non-administrator learns nothing,
+	// Authority precedes decoding, so a caller without it learns nothing,
 	// not even whether a proposal is well formed.
-	admin, err := s.Administration.FleetAdministration(ctx)
-	if err != nil || !admin.Valid(s.Now()) || admin.InstallationID != s.InstallationID {
-		return zero, time.Time{}, identity.ErrUnavailable
+	admin, adminValid := s.administration(ctx)
+	envelopes, until, err := s.authority(i, admin, adminValid)
+	if err != nil {
+		return zero, time.Time{}, err
 	}
-	if !admin.Operator(i) {
-		return zero, time.Time{}, identity.ErrDenied
-	}
-	until := identity.Earlier(i.ValidUntil, admin.FreshUntil)
 	if len(proposed) < 1 || len(proposed) > cfg.MaxPreviewChanges {
 		return zero, time.Time{}, cfg.ErrLimit
 	}
 	changes := make([]cfg.AccessChange, len(proposed))
 	for n, p := range proposed {
 		changes[n] = cfg.AccessChange{Action: p.Action, Kind: p.Kind, UID: p.UID}
-		if p.Action == "delete" {
+		switch {
+		case p.Action == "delete":
 			if len(p.Spec) != 0 {
 				return zero, time.Time{}, cfg.ErrInvalid
 			}
-			continue
-		}
-		if changes[n].Binding, err = s.Decoder.DecodeAccessBindingSpec(p.Spec); err != nil {
-			return zero, time.Time{}, cfg.ErrInvalid
+		case p.Kind == "PermissionSource":
+			if changes[n].Source, err = s.Decoder.DecodePermissionSourceSpec(p.Spec); err != nil {
+				return zero, time.Time{}, cfg.ErrInvalid
+			}
+		default:
+			if changes[n].Binding, err = s.Decoder.DecodeAccessBindingSpec(p.Spec); err != nil {
+				return zero, time.Time{}, cfg.ErrInvalid
+			}
 		}
 	}
-	changes, read, err := cfg.PreviewChanges(changes)
+	changes, read, err := cfg.PreviewChanges(changes, envelopes)
 	if err != nil {
 		return zero, time.Time{}, err
 	}
@@ -108,12 +175,15 @@ func (s AccessPreviewer) Preview(ctx context.Context, current identities.Current
 	if err != nil {
 		return zero, time.Time{}, identity.ErrUnavailable
 	}
-	out, err := cfg.PreviewAccess(changes, snap, s.Clusters, i.Policy, s.Now())
+	out, err := cfg.PreviewAccess(changes, snap, s.Clusters, envelopes, i.Policy, s.Now())
 	if err != nil {
 		return zero, time.Time{}, err
 	}
 	fresh, err := current.ResolveIdentity(ctx)
-	if err != nil || fresh.Principal != i.Principal || fresh.Policy != i.Policy || !fresh.Valid(s.Now()) || !admin.Operator(fresh) {
+	if err != nil || fresh.Principal != i.Principal || fresh.Policy != i.Policy || !fresh.Valid(s.Now()) {
+		return zero, time.Time{}, identity.ErrDenied
+	}
+	if again, _, err := s.authority(fresh, admin, adminValid); err != nil || (again == nil) != (envelopes == nil) || len(again) != len(envelopes) {
 		return zero, time.Time{}, identity.ErrDenied
 	}
 	until = identity.Earlier(until, fresh.ValidUntil)

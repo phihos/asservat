@@ -293,6 +293,19 @@ func (d *AccessBindingSpecDecoder) DecodeAccessBindingSpec(spec []byte) (value.B
 	return b, nil
 }
 
+// DecodePermissionSourceSpec decodes a proposed PermissionSource spec with the
+// observed source schema and checks (ADR-237).
+func (d *AccessBindingSpecDecoder) DecodePermissionSourceSpec(spec []byte) (value.Source, error) {
+	if d == nil || d.validator == nil {
+		return value.Source{}, value.ErrUnavailable
+	}
+	s, err := d.validator.source(permissionObject{Spec: spec}, value.Resource{Kind: "PermissionSource"})
+	if err != nil {
+		return value.Source{}, value.ErrInvalid
+	}
+	return s, nil
+}
+
 func (v *permissionValidator) source(object permissionObject, ref value.Resource) (value.Source, error) {
 	var spec wire.PermissionSourceSpec
 	digest, err := decodePermissionSpec(object.Spec, v.sourceSchema, &spec)

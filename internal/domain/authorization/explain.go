@@ -87,7 +87,24 @@ func Explain(i identity.Identity, p Projection, op Operation, t Target, now time
 		}
 		return Undisclosed()
 	}
-	out := Explanation{Disclosed: true, Target: t}
+	out := detail(r, d, t)
+	out.Disclosed = true
+	return out
+}
+
+// Decide runs the ordinary target evaluator (ScopeEligibility) and reports the
+// decision, the condition that decided it, the contributing allow or matching
+// deny assignments and, on Allow, its validity, without Explain's
+// caller-visibility rule. It serves the administrator's configuration impact
+// preview (ADR-237) over synthetic single-subject identities and grants
+// nothing.
+func Decide(i identity.Identity, p Projection, op Operation, t Target, now time.Time) Explanation {
+	r, d := evaluateDetail(i, p, op, t, nil, now, false)
+	return detail(r, d, t)
+}
+
+func detail(r Result, d evaluationDetail, t Target) Explanation {
+	out := Explanation{Target: t}
 	out.Decision, out.Unmet, out.MissingScope = decide(r, d)
 	switch r.Reason {
 	case "Eligible":
@@ -101,16 +118,6 @@ func Explain(i identity.Identity, p Projection, op Operation, t Target, now time
 		}
 	}
 	return out
-}
-
-// Decide runs the ordinary target evaluator (ScopeEligibility) and names the
-// condition that decided its result, without Explain's caller-visibility rule.
-// It serves the administrator's configuration impact preview (ADR-237) over
-// synthetic single-subject identities and grants nothing.
-func Decide(i identity.Identity, p Projection, op Operation, t Target, now time.Time) (Decision, string) {
-	r, d := evaluateDetail(i, p, op, t, nil, now, false)
-	decision, unmet, _ := decide(r, d)
-	return decision, unmet
 }
 
 // decide maps the evaluator's reason to the explained decision; Explain and

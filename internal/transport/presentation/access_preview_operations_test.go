@@ -73,6 +73,10 @@ func (f *previewOpsFixture) cell(workload, group string) cfg.PreviewCell {
 	return cfg.PreviewCell{Target: t, Projection: p}
 }
 
+func (f *previewOpsFixture) DecodePermissionSourceSpec(spec []byte) (cfg.Source, error) {
+	return cfg.Source{Resource: cfg.Resource{SpecDigest: artifact.Digest{5}}, ClusterID: accessCluster, Type: "namespaceMetadata", Enabled: true}, nil
+}
+
 func newPreviewOps(t *testing.T) (*previewOpsFixture, *AccessPreviewOperations) {
 	f := &previewOpsFixture{now: time.Now().UTC(), groups: []string{"platform-admins"}, issuer: "https://id.example.invalid"}
 	f.cells = []cfg.PreviewCell{f.cell(cfg.OtherWorkloads, "team-a")}
@@ -96,9 +100,26 @@ type previewReply struct {
 			Operation      string            `json:"operation"`
 			Before, After  string
 			AfterUnmet     string `json:"after_unmet"`
+			BeforeBasis    []struct {
+				BasisUID string `json:"basis_uid"`
+				Revision string `json:"revision"`
+				Proposed bool   `json:"proposed"`
+			} `json:"before_basis"`
+			AfterBasis []struct {
+				BasisUID string `json:"basis_uid"`
+				Revision string `json:"revision"`
+				Proposed bool   `json:"proposed"`
+			} `json:"after_basis"`
 		} `json:"deltas"`
-		Unmatched []map[string]string `json:"unmatched"`
+		Unmatched    []map[string]string `json:"unmatched"`
+		NotEvaluated []map[string]string `json:"not_evaluated"`
+		Unavailable  []json.RawMessage   `json:"unavailable"`
+		ListedRows   int                 `json:"listed_rows"`
+		PageOffset   int                 `json:"page_offset"`
 	} `json:"data"`
+	NextCursor *string `json:"next_cursor"`
+	size       int
+	raw        []byte
 }
 
 func callPreview(t *testing.T, f *previewOpsFixture, s *AccessPreviewOperations, input string) (previewReply, error) {
@@ -111,6 +132,7 @@ func callPreview(t *testing.T, f *previewOpsFixture, s *AccessPreviewOperations,
 	if err := json.Unmarshal(reply.Body, &out); err != nil {
 		t.Fatal(err)
 	}
+	out.size, out.raw = len(reply.Body), reply.Body
 	return out, nil
 }
 
@@ -128,8 +150,24 @@ func TestPreviewAccessChangeReply(t *testing.T) {
 	if !d.OtherWorkloads || d.Subject["id"] != "team-a" || d.Operation != "read" || d.Before != "Allow" || d.After != "Deny" || d.AfterUnmet != "ExplicitDeny" {
 		t.Fatalf("delta %+v", d)
 	}
-	if len(got.Data.Unmatched) != 1 || got.Data.Unmatched[0]["uid"] != "gone" {
+	if len(got.Data.Unmatched) != 1 || got.Data.Unmatched[0]["uid"] != "gone" || got.NextCursor != nil {
 		t.Fatalf("unmatched %+v", got.Data.Unmatched)
+	}
+	// Each side names the assignment that decided it with its revision.
+	if len(d.BeforeBasis) != 1 || d.BeforeBasis[0].BasisUID != "binding-a" || d.BeforeBasis[0].Proposed || d.BeforeBasis[0].Revision != "09"+strings.Repeat("00", 31) ||
+		len(d.AfterBasis) != 1 || !d.AfterBasis[0].Proposed || d.AfterBasis[0].Revision != "07"+strings.Repeat("00", 31) {
+		t.Fatalf("revisions %+v / %+v", d.BeforeBasis, d.AfterBasis)
+	}
+}
+
+// A PermissionSource creation is accepted, decoded and reported Indeterminate.
+func TestPreviewAccessChangeSourceIndeterminate(t *testing.T) {
+	f, s := newPreviewOps(t)
+	source := `{"enabled":true,"clusterID":"` + accessCluster + `","type":"namespaceMetadata","namespaceSelector":{"matchLabels":{"team":"payments"}},"excludedNamespaces":["kube-system"],"role":"workload-maintainer","maxDecisionAgeSeconds":30,"maxNamespaces":10,` +
+		`"protection":{"mode":"administratorManaged","reviewRef":"review"},"metadataMapping":{"field":"annotation","key":"example.invalid/owner","mode":"groupID","issuer":"https://id.example.invalid"}}`
+	got, err := callPreview(t, f, s, `{"changes":[{"action":"create","kind":"PermissionSource","spec":`+source+`}]}`)
+	if err != nil || got.Status != "ok" || got.Data.Complete || len(got.Data.NotEvaluated) != 1 || got.Data.NotEvaluated[0]["reason"] != "InheritanceNotAccepted" || got.Data.NotEvaluated[0]["decision"] != "Indeterminate" {
+		t.Fatalf("%v %+v", err, got)
 	}
 }
 
@@ -161,18 +199,55 @@ func TestPreviewAccessChangeInvalidInput(t *testing.T) {
 	}
 }
 
-// Long subject IDs never push the reply beyond the shared output limit; the
-// total still counts every change.
-func TestPreviewAccessChangeReplyBudget(t *testing.T) {
+// A result larger than one reply is paged: every page fits the shared
+// operation reply limit, the pages together list every row within the
+// 256 KiB result bound, and a cursor from another result is refused.
+func TestPreviewAccessChangePages(t *testing.T) {
 	f, s := newPreviewOps(t)
 	group := strings.Repeat("g", 256)
 	f.cells = nil
-	for n := range 40 {
+	for n := range 300 {
 		f.cells = append(f.cells, f.cell("wl-"+strconv.Itoa(n), group))
 	}
-	got, err := callPreview(t, f, s, `{"changes":[{"action":"create","kind":"AccessBinding","spec":`+denySpec(group, "Narrow")+`}]}`)
-	if err != nil || got.Status != "ok" || got.Data.DeltasTotal != 80 || len(got.Data.Deltas) == 0 || len(got.Data.Deltas) >= 64 {
-		t.Fatalf("%v total=%d rows=%d", err, got.Data.DeltasTotal, len(got.Data.Deltas))
+	input := func(cursor string) string {
+		in := `{"changes":[{"action":"create","kind":"AccessBinding","spec":` + denySpec(group, "Narrow") + `}]`
+		if cursor != "" {
+			in += `,"cursor":"` + cursor + `"`
+		}
+		return in + `}`
+	}
+	cursor, rows, pages, listedBytes := "", 0, 0, 0
+	var first previewReply
+	for {
+		got, err := callPreview(t, f, s, input(cursor))
+		if err != nil || got.Status != "ok" || got.size > contracts.InvestigationOutputLimit || got.Data.PageOffset != rows || got.Data.DeltasTotal != 600 {
+			t.Fatalf("page %d: %v status=%s size=%d offset=%d", pages, err, got.Status, got.size, got.Data.PageOffset)
+		}
+		if pages == 0 {
+			first = got
+		}
+		rows += len(got.Data.Deltas)
+		var page struct {
+			Data struct{ Deltas []json.RawMessage } `json:"data"`
+		}
+		if json.Unmarshal(got.raw, &page) != nil {
+			t.Fatal("page")
+		}
+		for _, d := range page.Data.Deltas {
+			listedBytes += len(d)
+		}
+		pages++
+		if got.NextCursor == nil {
+			break
+		}
+		cursor = *got.NextCursor
+	}
+	if pages < 2 || rows != first.Data.ListedRows || rows >= 600 || listedBytes > 256<<10 || listedBytes < 200<<10 {
+		t.Fatalf("pages %d rows %d listed %d bytes %d", pages, rows, first.Data.ListedRows, listedBytes)
+	}
+	stale, err := callPreview(t, f, s, input("1:"+strings.Repeat("0", 32)))
+	if err != nil || stale.Status != "error" || stale.Data.Code != "PreviewChanged" {
+		t.Fatalf("foreign cursor: %v %+v", err, stale)
 	}
 }
 

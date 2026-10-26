@@ -189,7 +189,11 @@ def main():
             output.pop("$id", None)
             output["properties"]["provenance"] = {"type": "array", "maxItems": 0}
             output["properties"]["truncated"] = {"const": False}
-            output["properties"]["next_cursor"] = {"type": "null"}
+            if name != "preview_access_change":
+                output["properties"]["next_cursor"] = {"type": "null"}
+            else:
+                # ADR-237: the preview pages its bounded result.
+                output["properties"]["next_cursor"] = {"anyOf": [{"type": "string", "pattern": "^[0-9]{1,7}:[0-9a-f]{32}$"}, {"type": "null"}]}
             output["properties"]["narrowing_hint"] = {"type": "null"}
             output["properties"]["data_class"] = {"const": "metadata"}
             if name == "list_capture_history":
