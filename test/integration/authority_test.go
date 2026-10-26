@@ -278,6 +278,14 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if len(snap.Cells) != 3 || len(snap.Unmatched) != 1 || snap.Unmatched[0].UID != "absent" {
 			t.Fatalf("cells %d unmatched %+v", len(snap.Cells), snap.Unmatched)
 		}
+		// A delegated previewer's read (Allowed = their envelope namespaces)
+		// does not match an object in another namespace: it is reported
+		// Unmatched like a nonexistent UID and its namespace is not read.
+		elsewhere := cfg.PreviewNamespace{ClusterID: s.target.ClusterID, NamespaceUID: "envelope-namespace"}
+		limited, err := s.p.PreviewProjections(ctx, cfg.PreviewRead{Namespaces: []cfg.PreviewNamespace{elsewhere}, Allowed: []cfg.PreviewNamespace{elsewhere}, Bases: []cfg.PreviewBasis{{Kind: "AccessBinding", UID: wide.Resource.UID}, {Kind: "AccessBinding", UID: "absent"}}})
+		if err != nil || len(limited.Unmatched) != 2 || len(limited.Cells) != 1 || limited.Cells[0].Target.NamespaceUID != elsewhere.NamespaceUID {
+			t.Fatalf("envelope read: %v %+v", err, limited)
+		}
 		allows := map[string]int{}
 		for _, c := range snap.Cells {
 			if c.Unavailable != "" || c.Projection.Target != c.Target {

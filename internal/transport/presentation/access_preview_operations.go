@@ -169,7 +169,7 @@ func previewBasis(rows []cfg.PreviewAssignment) []previewBasisData {
 func previewMessage(p cfg.AccessPreview, listed int) string {
 	switch {
 	case len(p.NotEvaluated) > 0:
-		return "PermissionSource creations or edits are Indeterminate: this installation does not yet accept inherited permissions, so applying them changes no access now. Nothing was changed: apply the reviewed objects with kubectl or GitOps."
+		return "PermissionSource creations or edits are Indeterminate: this installation does not yet accept inherited permissions, so applying them changes no access now. An edited source's current assignments, if any, stay in effect in the after state of every listed decision. Nothing was changed: apply the reviewed objects with kubectl or GitOps."
 	case !p.Complete():
 		return "Some targets could not be evaluated and are listed as Indeterminate; their access after the change is unknown. Nothing was changed: apply the reviewed objects with kubectl or GitOps."
 	case p.DeltasTotal == 0:

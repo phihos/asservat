@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -96,13 +97,30 @@ func TestPreviewDelegatedEnvelope(t *testing.T) {
 		}
 	}
 	// binding-a is namespace-wide: deleting it touches the namespace's other
-	// workloads, which a workload-narrowed envelope does not cover.
-	changes, _, err = PreviewChanges([]AccessChange{{Action: "delete", Kind: "AccessBinding", UID: "binding-a"}}, narrow)
+	// workloads, which a workload-narrowed envelope does not cover. It is
+	// reported exactly like a UID that does not exist (Gitar review on #77):
+	// same reply, nothing removed.
+	changes, read, err := PreviewChanges([]AccessChange{{Action: "delete", Kind: "AccessBinding", UID: "binding-a"}}, narrow)
+	if err != nil || len(read.Allowed) != 1 || read.Allowed[0] != (PreviewNamespace{previewCluster, "ns-uid"}) || len(read.Namespaces) != 1 {
+		t.Fatalf("%v %+v", err, read)
+	}
+	foreign, err := PreviewAccess(changes, cells, []string{previewCluster}, narrow, previewPolicy, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := PreviewAccess(changes, cells, []string{previewCluster}, narrow, previewPolicy, now); !errors.Is(err, ErrDenied) {
-		t.Fatalf("delete outside the envelope: %v", err)
+	absentChanges, _, _ := PreviewChanges([]AccessChange{{Action: "delete", Kind: "AccessBinding", UID: "binding-a"}}, narrow)
+	absent, err := PreviewAccess(absentChanges, PreviewSnapshot{Cells: cells.Cells, Unmatched: []PreviewBasis{{"AccessBinding", "binding-a"}}}, []string{previewCluster}, narrow, previewPolicy, now)
+	if err != nil || !reflect.DeepEqual(foreign, absent) || len(foreign.Unmatched) != 1 || foreign.DeltasTotal != 0 {
+		t.Fatalf("foreign UID distinguishable from a nonexistent one:\n%+v\n%+v", foreign, absent)
+	}
+	// An update of such an object adds its proposed rows like an update of a
+	// nonexistent UID would.
+	update := []AccessChange{{Action: "update", Kind: "AccessBinding", UID: "binding-a", Binding: previewBinding("Deny", "team-a", "wl-1")}}
+	updateChanges, _, _ := PreviewChanges(update, narrow)
+	foreign, err1 := PreviewAccess(updateChanges, cells, []string{previewCluster}, narrow, previewPolicy, now)
+	absent, err2 := PreviewAccess(updateChanges, PreviewSnapshot{Cells: cells.Cells, Unmatched: []PreviewBasis{{"AccessBinding", "binding-a"}}}, []string{previewCluster}, narrow, previewPolicy, now)
+	if err1 != nil || err2 != nil || !reflect.DeepEqual(foreign, absent) || foreign.DeltasTotal != 3 {
+		t.Fatalf("update distinguishable:\n%+v\n%+v", foreign, absent)
 	}
 	wide := []PreviewEnvelope{payments()}
 	if got, err := PreviewAccess(changes, cells, []string{previewCluster}, wide, previewPolicy, now); err != nil || got.Targets != 2 || got.DeltasTotal != 6 {

@@ -40,10 +40,15 @@ only by reading every binding.
      owner deployment (`public.permissionDelegations`); previewers are not part of the guard and
      grant no Kubernetes write. As the native guard does, every proposed object must fit one of the
      caller's envelopes (cluster, namespace, workloads within the envelope, allowed roles and
-     issuers, no automation envelope) and every updated or deleted object's current assignments
-     must lie within them; PermissionSource changes are administrator-only. Otherwise the preview
-     is refused (`DelegationExceeded`) before any projection read for new objects. Only cells inside
-     the caller's envelopes are reported.
+     issuers, no automation envelope) and PermissionSource changes are administrator-only;
+     otherwise the preview is refused (`DelegationExceeded`) before any projection read. That
+     refusal concerns only the caller's own proposed scope and reveals nothing. Updated or deleted
+     objects are matched only inside the caller's envelope namespaces (`PreviewRead.Allowed`), the
+     envelope namespaces are always read, and an object with any current assignment outside the
+     envelope is neither removed nor evaluated: it is reported in `unmatched` exactly like a UID
+     that does not exist (an update still adds its proposed rows, as for a nonexistent UID). A
+     previewer therefore cannot probe for objects beyond their envelope (Gitar review of PR #77).
+     Only cells inside the caller's envelopes are reported.
 4. **Targets are workload scope cells of the current accepted projection, not a pod listing.** For
    every namespace that a proposed binding names or that holds an updated/deleted object, the cells
    are each workload UID named by a current basis or by the proposal, plus one cell that stands for
@@ -71,7 +76,9 @@ only by reading every binding.
    reconciler accepts explicit bindings only (`docs/architecture/permission-acceptance.md`:
    namespace-metadata and exec inheritance need their own qualified current-source paths, which do
    not exist yet), so the hub holds no accepted namespace-metadata observation and applying a
-   source changes no access today. A PermissionSource delete removes the source's current
+   source changes no access today; the message states that an edited source's current
+   assignments, if any, stay in effect in the after state of every listed decision. A
+   PermissionSource delete removes the source's current
    assignments like a binding delete. Recovery outages and identity or fleet-settings failures
    refuse the preview.
 7. **Result, revisions and freshness.** `complete`, `targets_evaluated`, `fresh_until` (the
@@ -146,8 +153,9 @@ merge it after them or renumber.
   cluster Indeterminate, stale projection never Allow, 17 changes / 1,001 targets refused, invalid
   proposals, deciding revisions with `proposed`, freshness expiry, PermissionSource create
   Indeterminate, delegated envelope: admitted change, cells outside the envelope omitted, refusals
-  for namespace-wide/foreign-namespace/automation/foreign-role/foreign-issuer/source changes and for
-  deleting a binding wider than the envelope),
+  for namespace-wide/foreign-namespace/automation/foreign-role/foreign-issuer/source changes, and
+  identical replies (`reflect.DeepEqual`) for deleting or updating a binding wider than the
+  envelope and for a nonexistent UID),
   `internal/application/authorization/access_preview_test.go` and
   `access_preview_delegation_test.go` (fleet operator; delegation previewer inside/outside the
   envelope with no read on refusal; non-previewer refused; delegation without fleet
@@ -159,7 +167,8 @@ merge it after them or renumber.
   `tools/call` never reaches the use case), console unit tests.
 - Real PostgreSQL (custody fixture, `scripts/test-custody.py --run
   '^TestPermissionAuthorityWithRealServices$'`): `permission-impact-preview` (three cells under one
-  stream lock, unmatched UID, delete of a namespace-wide allow) and
+  stream lock, unmatched UID, an envelope-limited read reporting a foreign-namespace object as
+  unmatched without reading its namespace, delete of a namespace-wide allow) and
   `permission-impact-preview-1000-targets` (17 accepted bindings naming 992 workloads plus 7
   proposal-named workloads and the other-workloads cell: 1,000 cells read in 1.269 s,
   read+evaluate 1.314 s, under `-race`).

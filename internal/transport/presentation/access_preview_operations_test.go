@@ -92,6 +92,7 @@ type previewReply struct {
 	Status string `json:"status"`
 	Data   struct {
 		Code        string `json:"code"`
+		Message     string `json:"message"`
 		Complete    bool   `json:"complete"`
 		DeltasTotal int    `json:"deltas_total"`
 		Deltas      []struct {
@@ -165,8 +166,8 @@ func TestPreviewAccessChangeSourceIndeterminate(t *testing.T) {
 	f, s := newPreviewOps(t)
 	source := `{"enabled":true,"clusterID":"` + accessCluster + `","type":"namespaceMetadata","namespaceSelector":{"matchLabels":{"team":"payments"}},"excludedNamespaces":["kube-system"],"role":"workload-maintainer","maxDecisionAgeSeconds":30,"maxNamespaces":10,` +
 		`"protection":{"mode":"administratorManaged","reviewRef":"review"},"metadataMapping":{"field":"annotation","key":"example.invalid/owner","mode":"groupID","issuer":"https://id.example.invalid"}}`
-	got, err := callPreview(t, f, s, `{"changes":[{"action":"create","kind":"PermissionSource","spec":`+source+`}]}`)
-	if err != nil || got.Status != "ok" || got.Data.Complete || len(got.Data.NotEvaluated) != 1 || got.Data.NotEvaluated[0]["reason"] != "InheritanceNotAccepted" || got.Data.NotEvaluated[0]["decision"] != "Indeterminate" {
+	got, err := callPreview(t, f, s, `{"changes":[{"action":"update","kind":"PermissionSource","uid":"source-uid","spec":`+source+`}]}`)
+	if err != nil || got.Status != "ok" || got.Data.Complete || len(got.Data.NotEvaluated) != 1 || got.Data.NotEvaluated[0]["reason"] != "InheritanceNotAccepted" || got.Data.NotEvaluated[0]["decision"] != "Indeterminate" || got.Data.NotEvaluated[0]["uid"] != "source-uid" || !strings.Contains(got.Data.Message, "stay in effect in the after state") {
 		t.Fatalf("%v %+v", err, got)
 	}
 }

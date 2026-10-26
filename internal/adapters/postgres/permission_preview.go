@@ -43,11 +43,14 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 		for _, ref := range r.Bases {
 			found := false
 			for _, b := range bases {
-				if b.Kind != ref.Kind || b.Uid != ref.UID {
+				ns := cfg.PreviewNamespace{ClusterID: uid(b.ClusterID), NamespaceUID: b.NamespaceUid}
+				// A delegated previewer's read matches objects only inside
+				// their envelope namespaces; elsewhere they look nonexistent.
+				if b.Kind != ref.Kind || b.Uid != ref.UID || r.Allowed != nil && !slices.Contains(r.Allowed, ns) {
 					continue
 				}
 				found = true
-				if ns := (cfg.PreviewNamespace{ClusterID: uid(b.ClusterID), NamespaceUID: b.NamespaceUid}); !slices.Contains(namespaces, ns) {
+				if !slices.Contains(namespaces, ns) {
 					namespaces = append(namespaces, ns)
 				}
 			}

@@ -58,6 +58,10 @@ type PreviewRead struct {
 	Namespaces []PreviewNamespace
 	Workloads  map[PreviewNamespace][]string
 	Bases      []PreviewBasis
+	// Allowed, when set, restricts which namespaces may match an updated or
+	// deleted object: a delegated previewer's envelope namespaces. A match
+	// elsewhere is reported Unmatched, exactly like a nonexistent object.
+	Allowed []PreviewNamespace
 }
 
 // PreviewCell is one workload scope with its current accepted projection.
@@ -236,6 +240,17 @@ func PreviewChanges(changes []AccessChange, envelopes []PreviewEnvelope) ([]Acce
 			}
 		}
 	}
+	// A delegated previewer always reads every envelope namespace, so the
+	// target set does not depend on whether an updated or deleted UID exists.
+	for _, e := range envelopes {
+		ns := PreviewNamespace{e.Scope.ClusterID, e.Scope.Namespace.UID}
+		if !slices.Contains(read.Allowed, ns) {
+			read.Allowed = append(read.Allowed, ns)
+		}
+		if !slices.Contains(read.Namespaces, ns) {
+			read.Namespaces = append(read.Namespaces, ns)
+		}
+	}
 	return out, read, nil
 }
 
@@ -249,28 +264,50 @@ var previewOperations = []authorization.Operation{authorization.CollectContext, 
 // result describes configuration rather than one client. Group members are
 // never enumerated. Cells outside the administered clusters or without a
 // current projection are reported Indeterminate and never evaluated. With
-// envelopes, an updated or deleted object must lie within the caller's
-// envelopes (ErrDenied otherwise, as the native guard checks the existing
-// object) and only cells inside them are reported.
+// envelopes, only cells inside them are reported, and an updated or deleted
+// object with any current assignment outside them is neither removed nor
+// evaluated: it is reported Unmatched, exactly like an object that does not
+// exist, so a previewer cannot learn about objects beyond their envelope.
 func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []string, envelopes []PreviewEnvelope, policy identity.Revision, now time.Time) (AccessPreview, error) {
 	if len(snap.Cells) > MaxPreviewTargets {
 		return AccessPreview{}, ErrLimit
 	}
-	out := AccessPreview{Revision: snap.Revision, Unmatched: snap.Unmatched}
+	out := AccessPreview{Revision: snap.Revision}
 	for _, c := range changes {
 		if c.sourceSpec() {
 			out.NotEvaluated = append(out.NotEvaluated, c)
 		}
 	}
+	unmatched, requested := slices.Clone(snap.Unmatched), changes
 	if envelopes != nil {
-		for _, cell := range snap.Cells {
-			for _, rows := range [][]authorization.CurrentAssignment{cell.Projection.Allows, cell.Projection.Denies} {
-				for _, r := range rows {
-					if removedBy(changes, r.Audience) && !slices.ContainsFunc(envelopes, func(e PreviewEnvelope) bool { return e.admitsRow(cell.Target, r.Audience) }) {
-						return AccessPreview{}, ErrDenied
+		var effective []AccessChange
+		for _, c := range changes {
+			foreign := false
+			for _, cell := range snap.Cells {
+				for _, rows := range [][]authorization.CurrentAssignment{cell.Projection.Allows, cell.Projection.Denies} {
+					for _, r := range rows {
+						if removedBy([]AccessChange{c}, r.Audience) && !slices.ContainsFunc(envelopes, func(e PreviewEnvelope) bool { return e.admitsRow(cell.Target, r.Audience) }) {
+							foreign = true
+						}
 					}
 				}
 			}
+			if foreign {
+				// Like a nonexistent object: nothing is removed, and an
+				// update still adds its proposed rows under the same UID.
+				if ref := (PreviewBasis{c.Kind, c.UID}); !slices.Contains(unmatched, ref) {
+					unmatched = append(unmatched, ref)
+				}
+				c.UID = ""
+			}
+			effective = append(effective, c)
+		}
+		changes = effective
+	}
+	// Report unmatched objects in request order, independent of why.
+	for _, c := range requested {
+		if ref := (PreviewBasis{c.Kind, c.UID}); c.UID != "" && slices.Contains(unmatched, ref) && !slices.Contains(out.Unmatched, ref) {
+			out.Unmatched = append(out.Unmatched, ref)
 		}
 	}
 	for _, cell := range snap.Cells {
