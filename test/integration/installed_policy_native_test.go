@@ -24,11 +24,13 @@ import (
 	domaincapture "asservat.local/asservat/internal/domain/capture"
 	"github.com/jackc/pgx/v5/pgxpool"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	apps "k8s.io/api/apps/v1"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/utils/ptr"
 )
 
 // installedPolicyFixture is the first workload cluster's regional workload
@@ -168,6 +170,10 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		t.Fatal("administrator automation binding", err)
 	}
 	digest := planning.RecipeDigest()
+	if installedJourneyFocus() == "alert" {
+		installedAlertPhase(t, ctx, admin, root, f, digest, read, wait, runningPods, started)
+		return
+	}
 	installedProbePhase(t, ctx, admin, root, f, digest, read, wait, observe, runningPods, started)
 	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": installedPolicyName}, "spec": map[string]any{
 		"target":    map[string]any{"cluster": f.cluster, "namespace": f.namespace, "workloadRef": map[string]any{"apiVersion": "apps/v1", "kind": "Deployment", "name": f.workload}, "maxPods": 1, "selection": "triggeringPod", "adoption": "pinUID"},
@@ -552,6 +558,174 @@ func installedProbePhase(t *testing.T, ctx context.Context, admin *pgxpool.Pool,
 		}
 		return len(pods) == 3
 	})
+}
+
+const installedAlertPolicyName = "regional-alerts"
+
+// installAlertmanager runs the official Alertmanager image (its default
+// configuration; no Prometheus) in the workload cluster's monitoring
+// namespace and returns its in-cluster URL for installer-cluster --alertmanager.
+func installAlertmanager(t *testing.T, ctx context.Context, region kubernetes.Interface, image string) string {
+	t.Helper()
+	if image == "" {
+		t.Fatal("alert focus without the harness's Alertmanager image")
+	}
+	if _, err := region.CoreV1().Namespaces().Create(ctx, &core.Namespace{ObjectMeta: meta.ObjectMeta{Name: "monitoring", Labels: map[string]string{"pod-security.kubernetes.io/enforce": "restricted"}}}, meta.CreateOptions{}); err != nil {
+		t.Fatal("monitoring namespace", err)
+	}
+	labels := map[string]string{"app": "alertmanager"}
+	if _, err := region.AppsV1().Deployments("monitoring").Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: "alertmanager"}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Selector: &meta.LabelSelector{MatchLabels: labels},
+		Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: core.PodSpec{AutomountServiceAccountToken: ptr.To(false),
+			SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65534)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}},
+			Volumes:         []core.Volume{{Name: "data", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{}}}},
+			Containers: []core.Container{{Name: "alertmanager", Image: image, ImagePullPolicy: core.PullIfNotPresent,
+				Args:            []string{"--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/alertmanager", "--cluster.listen-address="},
+				Ports:           []core.ContainerPort{{Name: "web", ContainerPort: 9093}},
+				VolumeMounts:    []core.VolumeMount{{Name: "data", MountPath: "/alertmanager"}},
+				ReadinessProbe:  &core.Probe{ProbeHandler: core.ProbeHandler{HTTPGet: &core.HTTPGetAction{Path: "/-/ready", Port: intstr.FromString("web")}}, PeriodSeconds: 2},
+				SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}}}}}, meta.CreateOptions{}); err != nil {
+		t.Fatal("Alertmanager Deployment", err)
+	}
+	if _, err := region.CoreV1().Services("monitoring").Create(ctx, &core.Service{ObjectMeta: meta.ObjectMeta{Name: "alertmanager"}, Spec: core.ServiceSpec{Selector: labels, Ports: []core.ServicePort{{Name: "web", Port: 9093, TargetPort: intstr.FromString("web")}}}}, meta.CreateOptions{}); err != nil {
+		t.Fatal("Alertmanager Service", err)
+	}
+	return "http://alertmanager.monitoring.svc:9093"
+}
+
+// installedAlertPhase qualifies the ADR-231 alert detector against the real
+// Alertmanager of installAlertmanager: no occurrence before an alert; a
+// synthetic alert posted to Alertmanager's own v2 API for one Pod yields one
+// occurrence keyed by its startsAt and one policy capture of exactly that Pod;
+// polls while it keeps firing add none; after it is resolved and a clean poll
+// re-arms the Pod, a new episode (later startsAt) yields a second occurrence.
+func installedAlertPhase(t *testing.T, ctx context.Context, admin *pgxpool.Pool, root string, f *installedPolicyFixture, digest artifact.Digest, read func(context.Context, string, any) (installedJourneyEnvelope, error), wait func(string, time.Duration, func(context.Context) bool), runningPods func() []core.Pod, started time.Time) {
+	t.Helper()
+	proxy := "/api/v1/namespaces/monitoring/services/alertmanager:web/proxy"
+	wait("a ready Alertmanager", 2*time.Minute, func(poll context.Context) bool {
+		return f.region.CoreV1().RESTClient().Get().AbsPath(proxy+"/-/ready").Do(poll).Error() == nil
+	})
+	policy := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "DebugPolicy", "metadata": map[string]any{"name": installedAlertPolicyName}, "spec": map[string]any{
+		"target":    map[string]any{"cluster": f.cluster, "namespace": f.namespace, "workloadRef": map[string]any{"apiVersion": "apps/v1", "kind": "Deployment", "name": f.workload}, "maxPods": 1, "selection": "triggeringPod", "adoption": "pinUID"},
+		"detectors": []any{map[string]any{"id": "alerting", "kind": "alert", "options": map[string]any{"receiverRef": "alertmanager", "status": "firing", "matchLabels": map[string]any{"alertname": "SyntheticAlert"}}}},
+		"when":      map[string]any{"detector": "alerting"},
+		"recipeRef": map[string]any{"name": planning.ContextRecipeName, "digest": hex.EncodeToString(digest[:])},
+		"budgets":   map[string]any{"cooldown": "5m", "burst": 2, "maxOccurrencesPerHour": 12, "maxConcurrentActions": 1},
+		"retention": fmt.Sprintf("%ds", installedJourneyRetention), "suspended": false,
+		"observation": map[string]any{"mode": "allAuthorized"},
+		"evaluation":  map[string]any{"scope": "pod", "fireOnActivation": false, "rearmFor": "10s"}}}
+	body, _ := json.Marshal(policy)
+	if err := f.hub.Post().AbsPath(f.base + "debugpolicies").Body(body).Do(ctx).Error(); err != nil {
+		t.Fatal("maintainer applies the hub-held alert DebugPolicy", err)
+	}
+	var activated struct {
+		PolicyUID string `json:"policy_uid"`
+		State     string `json:"state"`
+	}
+	activation := map[string]string{"policy_name": installedAlertPolicyName, "idempotency_key": "installed-alert-activation"}
+	wait("an active alert policy", 3*time.Minute, func(poll context.Context) bool {
+		reply, err := read(poll, "activate_policy", activation)
+		if err != nil || reply.Status != "ok" {
+			if err == nil {
+				t.Logf("installed activate_policy (alert): %s", reply.Data)
+			}
+			return false
+		}
+		if installedJourneyDecode(reply.Data, &activated) != nil {
+			t.Fatal("alert activation data")
+		}
+		return activated.State == "active"
+	})
+	t.Logf("installed alert journey: alert policy %s activated %s after start", activated.PolicyUID, time.Since(started).Round(time.Second))
+	scalar := func(query string, args ...any) int64 {
+		t.Helper()
+		var n int64
+		if err := admin.QueryRow(ctx, query, args...).Scan(&n); err != nil {
+			t.Fatal(query, err)
+		}
+		return n
+	}
+	occurrences := func() int64 {
+		return scalar(`SELECT count(*) FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2`, root, activated.PolicyUID)
+	}
+	armed := func(pods ...string) int64 {
+		return scalar(`SELECT count(*) FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND detector='alert' AND armed AND pod_uid=ANY($3::text[])`, root, activated.PolicyUID, pods)
+	}
+	pods := runningPods()
+	var uids []string
+	for _, p := range pods {
+		uids = append(uids, string(p.UID))
+	}
+	wait("the armed alert baseline of all Pods", time.Minute, func(context.Context) bool { return armed(uids...) == int64(len(uids)) })
+	if occurrences() != 0 {
+		t.Fatal("alert policy fired without an alert")
+	}
+	victim := pods[len(pods)-1]
+	post := func(startsAt, endsAt time.Time) {
+		t.Helper()
+		alert, _ := json.Marshal([]any{map[string]any{"labels": map[string]string{"alertname": "SyntheticAlert", "namespace": f.namespace, "pod": victim.Name},
+			"annotations": map[string]string{"summary": "synthetic MUST-NOT-LEAK"}, "startsAt": startsAt.UTC().Format(time.RFC3339), "endsAt": endsAt.UTC().Format(time.RFC3339)}})
+		if err := f.region.CoreV1().RESTClient().Post().AbsPath(proxy+"/api/v2/alerts").SetHeader("Content-Type", "application/json").Body(alert).Do(ctx).Error(); err != nil {
+			t.Fatal("post the synthetic alert to Alertmanager", err)
+		}
+	}
+	// One episode: an occurrence keyed by its startsAt second and one capture
+	// pinned to the alert's Pod.
+	episode := func(n int64, startsAt time.Time) string {
+		t.Helper()
+		var captureID string
+		wait("an alert policy capture", 3*time.Minute, func(poll context.Context) bool {
+			err := admin.QueryRow(poll, `SELECT coalesce(capture_id::text,'') FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3 AND detector='alert' AND restarts=$4`, root, activated.PolicyUID, string(victim.UID), startsAt.Unix()).Scan(&captureID)
+			return err == nil && captureID != ""
+		})
+		var executor string
+		var pinned bool
+		if err := admin.QueryRow(ctx, `SELECT convert_from(scope_json,'UTF8')::jsonb#>>'{executor,subject}',position($2 in convert_from(pod_pin_json,'UTF8'))>0 FROM context_capture WHERE id=$1`, captureID, string(victim.UID)).Scan(&executor, &pinned); err != nil || executor != "policy:"+activated.PolicyUID || !pinned {
+			t.Fatal("alert capture provenance", executor, pinned, err)
+		}
+		if got := occurrences(); got != n {
+			t.Fatal("alert occurrences", got, "want", n)
+		}
+		return captureID
+	}
+	firstStart := time.Now().Add(-2 * time.Second).Truncate(time.Second)
+	post(firstStart, firstStart.Add(10*time.Minute))
+	first := episode(1, firstStart)
+	t.Logf("installed alert journey: the posted alert on Pod %s yielded capture %s by policy:%s, %s after start", victim.Name, first, activated.PolicyUID, time.Since(started).Round(time.Second))
+	// The alert keeps firing: a poll after the occurrence leaves one
+	// occurrence and the Pod disarmed.
+	wait("an alert poll after the occurrence", time.Minute, func(poll context.Context) bool {
+		var later bool
+		err := admin.QueryRow(poll, `SELECT w.last_seen>o.created_at+interval '2 seconds' FROM policy_pod_watermark w JOIN policy_occurrence o ON o.root_id=w.root_id AND o.policy_uid=w.policy_uid AND o.pod_uid=w.pod_uid WHERE w.root_id=$1 AND w.policy_uid=$2 AND w.pod_uid=$3 AND w.detector='alert'`, root, activated.PolicyUID, string(victim.UID)).Scan(&later)
+		return err == nil && later
+	})
+	var status struct {
+		Detector struct {
+			Kind string `json:"kind"`
+		} `json:"detector"`
+		Recent []struct {
+			Detector  string `json:"detector"`
+			CaptureID string `json:"capture_id"`
+			FailedAt  string `json:"failed_at"`
+		} `json:"recent"`
+	}
+	reply, err := read(ctx, "get_policy_status", map[string]string{"policy_name": installedAlertPolicyName})
+	if err != nil || reply.Status != "ok" || installedJourneyDecode(reply.Data, &status) != nil {
+		t.Fatal("alert policy status", err, reply.Status)
+	}
+	if occurrences() != 1 || armed(string(victim.UID)) != 0 || status.Detector.Kind != "alert" || len(status.Recent) != 1 || status.Recent[0].Detector != "alert" || status.Recent[0].CaptureID != first || status.Recent[0].FailedAt == "" || strings.Contains(string(reply.Data), "MUST-NOT-LEAK") {
+		t.Fatal("alert occurrence while firing", occurrences(), string(reply.Data))
+	}
+	// Resolved (endsAt now): a clean poll re-arms the Pod; a new episode
+	// (later startsAt) is a second occurrence within the shared burst.
+	post(firstStart, time.Now())
+	wait("the re-armed Pod after resolution", time.Minute, func(context.Context) bool { return armed(string(victim.UID)) == 1 })
+	if occurrences() != 1 {
+		t.Fatal("resolution fired an occurrence")
+	}
+	secondStart := time.Now().Truncate(time.Second)
+	post(secondStart, secondStart.Add(10*time.Minute))
+	second := episode(2, secondStart)
+	t.Logf("installed alert journey: after resolution and re-arm the re-posted alert yielded capture %s; complete %s after start", second, time.Since(started).Round(time.Second))
 }
 
 // installedKillContainer SIGKILLs the regional app container of one Pod on

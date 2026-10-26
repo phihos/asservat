@@ -84,11 +84,23 @@ Verification (each run under 20 minutes; tracked test/results files restored aft
 - Installed `ASSERVAT_JOURNEY_FOCUS=policy` (unchanged test, regression only): PASS, go test
   706 s, harness wall 13 m 45 s; probe capture 58 s after start, restart capture and download,
   storm of 11 kills with 8 suppressed, deactivation; source unchanged, no cleanup failures.
-- Not qualified: no installed run reads a real Alertmanager. Extending the policy focus would need
-  an Alertmanager stub image in the fast fixture, the new regional input in its regional install,
-  and a second workload, because the probe occurrence and first exit capture already spend the
-  shared workload burst. Alert detection against a live Alertmanager (HA pair, route prefix, TLS)
-  remains a gap.
+- Installed against a real Alertmanager: new focus `ASSERVAT_JOURNEY_FOCUS=alert` (CI suite
+  `continuation-alert`) on the fast fixture. A separate focus rather than a policy-focus phase:
+  the probe and exit phases already spend the workload's shared burst of 2, and a second workload
+  would need its own namespace, budget slot and maintainer binding. The workload cluster's node
+  pulls the official `quay.io/prometheus/alertmanager` v0.28.1 by digest (like the pause image;
+  `kind load` of this multi-platform image failed under Docker's containerd image store, run 1,
+  fixture setup only); the test runs it with its default configuration in `monitoring` and
+  passes `--alertmanager http://alertmanager.monitoring.svc:9093` to `installer-cluster`. Alerts
+  are posted through the API server's service proxy to Alertmanager's `POST /api/v2/alerts`.
+  Run 2: PASS, go test 525 s, harness wall 10 m 31 s, setup to scenario 428 s. Alert policy
+  activated 6 s after start, all three Pods armed with no occurrence; the alert on one Pod yielded
+  one occurrence keyed by its `startsAt` second and one capture by `policy:<uid>` pinned to that
+  Pod 40 s after start; a later poll while firing left one occurrence and the Pod disarmed; status
+  reported `alert`, `failed_at` and no annotation text; after resolution (`endsAt` now) the Pod
+  re-armed, and a re-post with a later `startsAt` yielded the second occurrence and capture,
+  1 m 21 s after start. Source unchanged, no cleanup failures. Still not covered: Alertmanager HA
+  pairs, route prefixes and TLS.
 
 ## Probe-failure trigger; log and resource detectors paused (ADR-230, 2026-10-26)
 
