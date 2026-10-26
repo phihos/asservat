@@ -173,7 +173,10 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 			// A probe re-arms at a poll whose window is empty, which proves a
 			// window without failure; a longer rearmFor cannot be proven.
 			rearm, ok := policyDuration(evaluation.RearmFor)
-			if !ok || rearm > out.ProbeWindow {
+			if !ok {
+				return reject(".evaluation.rearmFor", "invalid duration")
+			}
+			if rearm > out.ProbeWindow {
 				return reject(".evaluation.rearmFor", "must not exceed the probe window")
 			}
 		}

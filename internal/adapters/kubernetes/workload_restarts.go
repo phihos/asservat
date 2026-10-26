@@ -200,9 +200,13 @@ func restartReason(reason string) string {
 	}
 }
 
-// probeEventLimit bounds the one Event LIST of a probe observation; a
+// probeEventLimit and probeEventPages bound the Event LIST of a probe
+// observation (the selector is namespace-wide, so neighbours count); a
 // namespace with more Unhealthy Pod Events is not observed (Unknown).
-const probeEventLimit = 512
+const (
+	probeEventLimit = 512
+	probeEventPages = 4
+)
 
 type probeEventTime struct{ time.Time }
 
@@ -228,12 +232,33 @@ func (t *probeEventTime) UnmarshalJSON(b []byte) error {
 // read; message text is never returned or kept. For each Pod it reports the
 // newest matching failure second and a proven lower bound of failures in
 // the window: an Event series that started inside the window counts all its
-// failures, one that started earlier counts only its latest. A continued,
-// truncated or malformed LIST fails, so the poll is Unknown.
+// failures, one that started earlier counts only its latest. A LIST longer than
+// probeEventPages pages, truncated or malformed fails, so the poll is Unknown. A series
+// that started before the window proves only one failure in it, so a
+// minimumFailures above one fires only for failures that began inside the
+// window (ADR-230).
 func (c *PodTargets) probeFailures(ctx context.Context, namespace string, r value.RestartRequest, now time.Time, pods []value.PodRestarts) error {
-	raw, err := c.client.raw(ctx, "/api/v1/namespaces/"+namespace+"/events", map[string]string{"fieldSelector": "involvedObject.kind=Pod,reason=Unhealthy", "limit": strconv.Itoa(probeEventLimit)})
+	index := make(map[string]int, len(pods))
+	for i, p := range pods {
+		index[p.UID] = i
+	}
+	params := map[string]string{"fieldSelector": "involvedObject.kind=Pod,reason=Unhealthy", "limit": strconv.Itoa(probeEventLimit)}
+	for page := 0; page < probeEventPages; page++ {
+		next, err := c.probeEventPage(ctx, namespace, params, index, r, now, pods)
+		if err != nil || next == "" {
+			return err
+		}
+		params["continue"] = next
+	}
+	return value.ErrLimit
+}
+
+// probeEventPage reads one Event LIST page into pods and returns its
+// continue token.
+func (c *PodTargets) probeEventPage(ctx context.Context, namespace string, params map[string]string, index map[string]int, r value.RestartRequest, now time.Time, pods []value.PodRestarts) (string, error) {
+	raw, err := c.client.raw(ctx, "/api/v1/namespaces/"+namespace+"/events", params)
 	if err != nil {
-		return targetReadError(err)
+		return "", targetReadError(err)
 	}
 	var list struct {
 		APIVersion, Kind string
@@ -256,14 +281,10 @@ func (c *PodTargets) probeFailures(ctx context.Context, namespace string, r valu
 		}
 	}
 	if json.Unmarshal(raw, &list) != nil || list.APIVersion != "v1" || list.Kind != "EventList" || list.Items == nil {
-		return value.ErrUnavailable
+		return "", value.ErrUnavailable
 	}
-	if list.Metadata.Continue != "" || len(list.Items) > probeEventLimit || list.Metadata.RemainingItemCount != nil && *list.Metadata.RemainingItemCount != 0 {
-		return value.ErrLimit
-	}
-	index := make(map[string]int, len(pods))
-	for i, p := range pods {
-		index[p.UID] = i
+	if len(list.Items) > probeEventLimit || list.Metadata.Continue == "" && list.Metadata.RemainingItemCount != nil && *list.Metadata.RemainingItemCount != 0 {
+		return "", value.ErrLimit
 	}
 	failed, errored := r.Probe+" probe failed", r.Probe+" probe errored"
 	windowStart := now.Unix() - r.ProbeWindowSeconds
@@ -286,7 +307,12 @@ func (c *PodTargets) probeFailures(ctx context.Context, namespace string, r valu
 			first = e.EventTime.Time
 		}
 		if last.Unix() < value.MinProbeLast || last.Unix() >= 1<<31 || count < 0 || count > 1<<31 {
-			return value.ErrUnavailable
+			return "", value.ErrUnavailable
+		}
+		// Event times come from node clocks: a future time would raise the
+		// watermark past later real failures, so it counts as now.
+		if last.After(now) {
+			last = now
 		}
 		count = max(count, 1)
 		p := &pods[i]
@@ -298,5 +324,5 @@ func (c *PodTargets) probeFailures(ctx context.Context, namespace string, r valu
 			p.ProbeFailures = min(p.ProbeFailures+count, 1<<31)
 		}
 	}
-	return nil
+	return list.Metadata.Continue, nil
 }

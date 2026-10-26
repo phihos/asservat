@@ -150,7 +150,7 @@ func TestWorkloadRestartObservationListsOwnedPodsOnce(t *testing.T) {
 func TestWorkloadProbeObservationCountsUnhealthyEvents(t *testing.T) {
 	now := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
 	at := func(d time.Duration) string { return now.Add(d).Format(time.RFC3339) }
-	for _, mode := range []string{"probe", "truncated", "denied", "malformed"} {
+	for _, mode := range []string{"probe", "paged", "future", "truncated", "denied", "malformed"} {
 		t.Run(mode, func(t *testing.T) {
 			var events atomic.Int64
 			clock := &atomic.Int64{}
@@ -201,9 +201,18 @@ func TestWorkloadProbeObservationCountsUnhealthyEvents(t *testing.T) {
 					if mode == "malformed" {
 						items = append(items, event("a", "Readiness probe failed: x", 1, at(-time.Second), "not-a-time"))
 					}
+					if mode == "future" {
+						// A skewed node clock counts as now.
+						items = append(items, event("b", "Readiness probe failed: skew", 1, at(time.Hour), at(time.Hour)))
+					}
 					metadata := map[string]any{"resourceVersion": "events-rv"}
-					if mode == "truncated" {
+					switch {
+					case mode == "truncated":
 						metadata["continue"] = "more"
+					case mode == "paged" && r.URL.Query().Get("continue") == "":
+						metadata["continue"], items = "page-2", items[:2]
+					case mode == "paged":
+						items = items[2:]
 					}
 					object = map[string]any{"apiVersion": "v1", "kind": "EventList", "metadata": metadata, "items": items}
 				default:
@@ -240,11 +249,18 @@ func TestWorkloadProbeObservationCountsUnhealthyEvents(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || !o.Valid(now) || o.Probe != "Readiness" || len(o.Pods) != 2 || events.Load() != 1 {
+			lists, bFailures, bLast := int64(1), int64(0), now.Add(-120*time.Second).Unix()
+			if mode == "paged" {
+				lists = 2
+			}
+			if mode == "future" {
+				bFailures, bLast = 1, now.Unix()
+			}
+			if err != nil || !o.Valid(now) || o.Probe != "Readiness" || len(o.Pods) != 2 || events.Load() != lists {
 				t.Fatal(o, err)
 			}
 			a, b := o.Pods[0], o.Pods[1]
-			if a.UID != "pod-a" || a.ProbeFailures != 4 || a.ProbeLast != now.Add(-5*time.Second).Unix() || b.UID != "pod-b" || b.ProbeFailures != 0 || b.ProbeLast != now.Add(-120*time.Second).Unix() {
+			if a.UID != "pod-a" || a.ProbeFailures != 4 || a.ProbeLast != now.Add(-5*time.Second).Unix() || b.UID != "pod-b" || b.ProbeFailures != bFailures || b.ProbeLast != bLast {
 				t.Fatal("probe failures", o.Pods)
 			}
 			raw, _ := json.Marshal(o)

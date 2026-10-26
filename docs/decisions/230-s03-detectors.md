@@ -65,8 +65,8 @@ added · 6 failure/degraded states added · 7 own configuration · 8 outside dep
 7. No.
 8. kubelet's Event reason `Unhealthy` and message prefix `<Liveness|Readiness|Startup> probe
    failed`/`errored` (stable kubelet format, not an API contract), Event TTL (default 1 h).
-9. Probe policies only: one Event LIST per policy per 15 s (limit 512, field-selected, namespace
-   scoped). At the ADR-228 cap of 16 active policies per cluster: ≤ about 1.1 LIST/s per cluster on
+9. Probe policies only: one Event LIST per policy per 15 s (pages of 512, at most 4; field-selected, namespace
+   scoped). At the ADR-228 cap of 16 active policies per cluster: ≤ about 1.1 LIST/s per cluster (4.3 in a namespace past 512 Unhealthy Events) on
    top of the existing Pod LIST; answer grows by ≤ about 40 bytes per Pod (128 Pods stay within one
    frame). SQL: one boolean column per watermark row, no new rows or tables.
 10. Additive migration 00084 (floor stays 81); disabling is deactivating the policy (ADR-229).
@@ -156,11 +156,17 @@ detectors". S-03 does not need them; doing nothing satisfies the actual requirem
    when present, must not exceed `window`; `fireOnActivation: true` is rejected as for exit.
 2. **Observation.** `observe-workload-restarts` takes an optional probe type and window. With them,
    the region adds one Event LIST of the namespace (`involvedObject.kind=Pod,reason=Unhealthy`,
-   limit 512; continued or truncated → Unknown) to its Pod LIST and reports for each owned Pod the
+   pages of 512, at most 4 pages since the selector also matches neighbouring workloads; more,
+   truncated or malformed → Unknown) to its Pod LIST and reports for each owned Pod the
    newest matching failure time (`lastTimestamp`, `series.lastObservedTime` or `eventTime`, unix
    seconds) and a proven lower bound of failures within the window: an Event series that started
    inside the window counts its `count` (or `series.count`), one that started before counts one.
-   Message text never leaves the region.
+   Message text never leaves the region. Kubelet aggregates identical failures into one Event
+   whose `firstTimestamp` stays fixed, so a series that began before the window counts one:
+   `minimumFailures` above one only fires for failures that began inside the window. Per-poll
+   count deltas would lift this at the cost of per-Pod count state; `minimumFailures: 1` is the
+   reliable setting. An Event time later than the observation (node clock skew) counts as the
+   observation time, so it cannot raise the watermark above later real failures.
 3. **Level with re-arm.** The detector is a level: a Pod is failing while at least
    `minimumFailures` failures fall in the window. One occurrence fires on a rising edge only, keyed
    (policy, Pod UID, newest failure second). The first observation of a Pod is its baseline: armed
