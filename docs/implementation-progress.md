@@ -29,6 +29,16 @@ Verification:
   DebugPolicies, the test's reply parser, a zero draft scope digest, and the first start refused at
   the ADR-212 headroom (fixed by continuation and by not bounding the policy identity with the
   five-second recovery read).
+- PR #55 CI fixes: design-check and console-check (browser OpenAPI paths/schemas and
+  operations.yaml entries for `activate_policy`/`get_policy_status`; regenerated
+  `web/src/generated/capture.d.ts`), the custody upgrade test now asserts the head migration's
+  declared floor (`TestCustodyUpgradeSchemaWithRealPostgres` PASS), the policy trigger repeats a
+  review that admitted nothing for a transient reason (at most three, two seconds apart; the CI
+  run had refused the first occurrence after a failed regional Pod read), and the storm is 90 s.
+  The installed journey is split: `ASSERVAT_JOURNEY_FOCUS=browser` (new `[continuation-browser]`
+  suite) runs the console checks and the approved read-only projection and stops; the journey
+  focus runs MCP, Stop, Deny, TargetGone, expiry and deletion with an 80 s retention. Local
+  results: journey 721 s go test (was 911 s), browser 729 s, policy 759 s, all PASS.
 - Restart focus regression: passed in 741 s (go test 739 s).
 - Custody (real PostgreSQL): `--run '^(TestPermissionAuthorityPoliciesWithRealServices|TestContextAdmissionWithRealServices)$'`
   303 PASS (657 s), including four new restart-trigger subtests under compiled hub-runtime

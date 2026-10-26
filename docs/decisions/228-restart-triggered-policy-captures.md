@@ -53,7 +53,11 @@ or an executor that could run a capture.
    delegation (`EvaluatePolicy`) instead of personal scopes and groups. The default audience is
    computed exactly as for a human; neither the creator nor the executor is added. The intent
    audit, the signed regional work and the SQL capture-intent check accept exactly this principal
-   besides a human. A start that becomes ambiguous is never repeated (ADR-223).
+   besides a human. A start that becomes ambiguous is never repeated (ADR-223). A review that
+   admitted nothing for a transient reason (a lost regional exchange, a replaced standby) is
+   reviewed again at most three times, two seconds apart, repeating every check; authority,
+   capacity, invalid input, a conflicting admission and a replaced Pod are final. The occurrence
+   key keeps admission to at most one capture.
 7. **Budgets (migration 00082, schema 82).** One transaction per policy and poll, under the
    policy-source row lock and the workload budget row locks: watermarks, occurrences (unique per
    restart), a generic-cell-rate budget per workload (one per five minutes, burst two, shared by
@@ -150,6 +154,11 @@ workload storm limits, finite expiry, encrypted audit, every authorization check
   occurrence (2 in total), counted the other 10 as suppressed, kept 3 watermark rows and 1
   suppression row, and no capture followed in the 30 quiet seconds. Restart focus regression:
   741 s, passed. Details in [implementation progress](../implementation-progress.md).
+- PR #55 CI: the first CI policy run refused the first occurrence as `unavailable` (the regional
+  exchange failed on the Pod read and the review was not repeated); fixed by the bounded review
+  retry above. The storm is now 90 s (it saturates the workload window within the first minute).
+  Local re-run: 759 s go test, passed (capture 44 s after start; storm 11 kills, 11 observed
+  restarts, 2 occurrences, 10 suppressed, 1 suppression row, 3 watermark rows).
 
 ## Next increment
 
