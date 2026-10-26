@@ -10,8 +10,10 @@ import (
 	"time"
 
 	app "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/application/sharing"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	capture "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/catalog"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -88,4 +90,59 @@ func (s *consoleSyntheticCases) control(w http.ResponseWriter, r *http.Request, 
 		s.expiresAt = time.Now().Add(time.Duration(*in.ExpiresInMS) * time.Millisecond)
 	}
 	w.WriteHeader(204)
+}
+
+// consoleSyntheticShares is the test-only ADR-232 share service behind the
+// actual browser route, CSRF/idempotency checks and canonical contracts. It
+// grants nothing: recipient reads are not modeled here.
+type consoleSyntheticShares struct {
+	mu     sync.Mutex
+	shares []authorization.Share
+}
+
+func (s *consoleSyntheticShares) Create(ctx context.Context, current app.CurrentIdentity, in sharing.CreateInput) (authorization.Share, bool, error) {
+	i, err := current.ResolveIdentity(ctx)
+	if err != nil {
+		return authorization.Share{}, false, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if in.CaseID != consoleCaptureID(80) || in.ArtifactID != consoleCaptureID(81) || in.Version != (artifact.Digest{9}) || len(in.Recipients) != 1 || in.Recipients[0].Issuer != i.Principal.Issuer || in.ExpiresAt.After(time.Now().Add(7*24*time.Hour)) {
+		return authorization.Share{}, false, capture.ErrInvalid
+	}
+	share := authorization.Share{ID: consoleCaptureID(600 + len(s.shares)), CaseID: in.CaseID, ArtifactID: in.ArtifactID, Creator: i.Principal, Recipients: in.Recipients, ExpiresAt: in.ExpiresAt, Revision: 1}
+	s.shares = append(s.shares, share)
+	return share, false, nil
+}
+
+func (s *consoleSyntheticShares) List(ctx context.Context, current app.CurrentIdentity, view string, _ int) ([]sharing.View, time.Time, error) {
+	i, err := current.ResolveIdentity(ctx)
+	if err != nil {
+		return nil, time.Time{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := []sharing.View{}
+	for _, share := range s.shares {
+		if view == "owned" {
+			phase := authorization.ShareActive
+			if share.Revision == 2 {
+				phase = authorization.ShareRevoked
+			}
+			out = append(out, sharing.View{Share: share, Phase: phase})
+		}
+	}
+	return out, i.ValidUntil, nil
+}
+
+func (s *consoleSyntheticShares) Revoke(_ context.Context, _ app.CurrentIdentity, id string, expected int64, _ string) (authorization.Share, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for n := range s.shares {
+		if s.shares[n].ID == id && s.shares[n].Revision == expected {
+			s.shares[n].Revision, s.shares[n].RevokedAt = 2, time.Now()
+			return s.shares[n], false, nil
+		}
+	}
+	return authorization.Share{}, false, capture.ErrConflict
 }

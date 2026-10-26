@@ -6,6 +6,7 @@ import { validCSRF, validSession } from '../src/generated/validate-auth.js';
 import * as capture from '../src/generated/validate-capture.js';
 import * as projection from '../src/generated/validate-projection.js';
 import * as policy from '../src/generated/validate-policy.js';
+import * as sharing from '../src/generated/validate-sharing.js';
 
 assert.equal(validCSRF({ csrf_token: 'C'.repeat(43) }), true);
 assert.equal(validCSRF({ csrf_token: '😀'.repeat(257) }), false);
@@ -118,3 +119,13 @@ assert.equal(policy.validOutput_deactivate_policy({ ...policyReply, data: { ...p
 assert.equal(policy.validInput_deactivate_policy({ policy_name: 'regional-restarts', idempotency_key: 'k' }), true);
 assert.equal(policy.validInput_deactivate_policy({ policy_name: 'Bad_Name', idempotency_key: 'k' }), false);
 console.log('Native ESM policy validators passed positive and negative checks.');
+const shareReply = { ...policyReply, data: { share_id: '00000000-0000-4000-8000-000000000003', phase: 'Revoked', revision: 2 } };
+assert.equal(sharing.validOutput_revoke_share(shareReply), true);
+assert.equal(sharing.validOutput_revoke_share({ ...shareReply, data: { ...shareReply.data, phase: 'Active' } }), false);
+const shareInput = { case_id: '00000000-0000-4000-8000-000000000002', artifacts: [{ artifactID: '00000000-0000-4000-8000-000000000004', digest: 'ab'.repeat(32) }],
+  recipients: [{ kind: 'Group', issuer: 'https://identity.invalid', id: 'team' }], data_classes: ['metadata'], operations: ['get_case'],
+  expires_at: '2026-10-27T12:00:00Z', reason: 'incident review', idempotency_key: 'k' };
+assert.equal(sharing.validInput_create_share(shareInput), true);
+assert.equal(sharing.validInput_create_share({ ...shareInput, recipients: [{ kind: 'Team', issuer: 'https://identity.invalid', id: 'team' }] }), false);
+assert.equal(sharing.validInput_list_shares({ view: 'received', limit: 100 }), true);
+console.log('Native ESM share validators passed positive and negative checks.');

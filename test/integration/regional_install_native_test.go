@@ -894,9 +894,10 @@ func (b *regionalBudget) addPolicy() {
 func (b *regionalBudget) addBinding(w regionalWorkload) {
 	b.t.Helper()
 	roles := []any{"workload-maintainer"}
-	if installedJourneyFocus() == "share" {
+	if installedJourneyFocus() == "share" || installedJourneyFocus() == "browser" {
 		// ADR-232: the developer group also owns the workload's evidence, so
 		// its captures' retained audience includes the evidence-owner role.
+		// The browser focus shares from the console session.
 		roles = append(roles, "evidence-owner")
 	}
 	b.binding = map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": b.bindingName}, "spec": map[string]any{"effect": "Allow",

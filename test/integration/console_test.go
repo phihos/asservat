@@ -74,6 +74,14 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// ADR-232 share operations on the same browser route (synthetic service).
+	shareOperations, err := presentation.NewShareOperations(origin, time.Now, func() string { return consoleCaptureID(502) }, &consoleSyntheticShares{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if composed, err = presentation.NewInvestigationShareOperations(composed, shareOperations); err != nil {
+		t.Fatal(err)
+	}
 	investigations, err := browser.NewInvestigationHandler(sessionHandler, composed, 4)
 	if err != nil {
 		t.Fatal(err)
@@ -197,7 +205,7 @@ func (s *consoleSyntheticSessions) Resolve(_ context.Context, cookie string, ref
 		s.state = "ready"
 	}
 	now := time.Now()
-	return app.SessionView{Identity: identity.Identity{Principal: identity.Principal{Issuer: "https://identity.invalid", Subject: "synthetic-developer", ClientID: "console", Kind: identity.Human}, Policy: identity.Revision{UID: "synthetic-policy", Generation: 1, Digest: [32]byte{1}}, Scopes: []string{"evidence:read", "evidence:capture"}, VerifiedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), s.expiresAt)}, CSRF: strings.Repeat("C", 43), ExpiresAt: s.expiresAt}, nil
+	return app.SessionView{Identity: identity.Identity{Principal: identity.Principal{Issuer: "https://identity.invalid", Subject: "synthetic-developer", ClientID: "console", Kind: identity.Human}, Policy: identity.Revision{UID: "synthetic-policy", Generation: 1, Digest: [32]byte{1}}, Scopes: []string{"evidence:read", "evidence:capture", "evidence:share"}, VerifiedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), s.expiresAt)}, CSRF: strings.Repeat("C", 43), ExpiresAt: s.expiresAt}, nil
 }
 
 func (s *consoleSyntheticSessions) CSRF(_ context.Context, cookie string) (string, error) {

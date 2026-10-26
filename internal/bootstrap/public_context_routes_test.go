@@ -41,6 +41,7 @@ func TestPublicContextRoutesKeepDistinctProtocolOwners(t *testing.T) {
 		{"/api/v1/downloads/00000000-0000-4000-8000-000000000001/content", "content"},
 		{"/captures/new", "console"},
 		{"/policies", "console"},
+		{"/shares", "console"},
 		{"/cases/00000000-0000-4000-8000-000000000001", "console"},
 	} {
 		r := httptest.NewRequest(http.MethodGet, tc.target, nil)

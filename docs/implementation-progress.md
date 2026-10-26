@@ -31,6 +31,30 @@ Verification (tracked test/results files restored after each run):
   its `get_case` and a new `prepare_artifact_download` were NotAvailable and the remaining range
   of the existing session returned 503.
 
+## S-06 increment 2: console sharing (ADR-232, 2026-10-26)
+
+[ADR-232 increment 2](decisions/232-concrete-evidence-share.md#increment-2-console-sharing-2026-10-26)
+adds the console Share panel on the case page (User/Group recipients, 1–168 h duration with
+24 h default, required reason, "What recipients will see" preview, copyable case link) and the
+`/shares` page (Shared with me, Shared by me with Revoke) over the existing browser operation
+route and canonical contracts (`web/src/sharing`, generated `sharing` bundle). No server operation,
+SQL or migration change; the Go console allowlist and public routes add `/shares`. A case read
+through a share hides Download and Share. Console sharing needs `evidence:share` as a default scope
+of the console client; the installed fixture's console client now has it.
+
+Verification:
+- `make console-check` (contract drift, native ESM validators incl. share, `tsc`, vitest 14 files /
+  183 tests incl. 9 share tests): PASS.
+- `make console-browser-check` (built console, real Go TLS/static/session/CSRF/operation route,
+  synthetic share service): PASS, 20 journeys, 17 accessibility scans; the evidence journey now
+  shares from the case panel (identical Idempotency-Key header, artifact digest from the wire),
+  checks the preview and case link at 320 px, lists the share on `/shares` and revokes it.
+- Go unit: `internal/console`, `internal/bootstrap`, `internal/transport/...`,
+  `internal/application/sharing`: PASS.
+- `make pre-push PYTHON=<spec-venv>/bin/python`: PASS.
+- Installed browser focus (`ASSERVAT_JOURNEY_FOCUS=browser`): extended with console
+  create/list/revoke (binding adds `evidence-owner` in this focus); not run locally, pending CI.
+
 ## S-06 increment 1: concrete evidence share (ADR-232, 2026-10-26)
 
 [ADR-232](decisions/232-concrete-evidence-share.md) implements the S-06 plan's increment 1 over

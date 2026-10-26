@@ -173,4 +173,69 @@ Results are in [implementation progress](../implementation-progress.md#s-06-incr
   covers `get_case`, `list_shares` and the download refusal.
 - A share row is not removed when its artifact is deleted; rows stay bounded by the active cap per
   artifact and the audited operation rate. Cleanup belongs with retention composition.
-- Increment 2 (console), 3 (recipient native download), 4 (team management) follow the plan.
+- Increment 2 (console) is below; 3 (recipient native download), 4 (team management) follow the plan.
+
+## Increment 2: console sharing (2026-10-26)
+
+Plan row 2. The console uses the three share operations of this ADR through the existing
+browser operation route (`/api/v1/operations/<name>`: session cookie, exact Origin, CSRF,
+identical `Idempotency-Key` header for `create_share`/`revoke_share`, canonical input/output
+validation, audited dispatch). No new server operation, list endpoint, SQL grant or migration:
+`list_shares` already serves both views, and its rows carry what the console lists.
+
+1. **Case page "Share this artifact"** (one per artifact, `web/src/sharing/SharePanel.tsx`):
+   User/Group recipients by stable ID of the signed-in user's own issuer (≤ 8), a duration in
+   whole hours (1–168, default 24, sent as `expires_at`), the contract's required reason, and
+   "What recipients will see": the artifact's kind, class/completeness and handling notice as
+   the recipient's `get_case` shows them, the effective end `min(expiry, artifact access)` and
+   what is not included (native download, other evidence in the case, workload access, new
+   collections). The panel renders nothing until opened and requests nothing until Share. A
+   lost reply keeps the pending request: the only next action is "Retry same share request"
+   with the identical body and key; a canonical refusal or success clears it.
+2. **Copyable case link** inside the panel (`/cases/<id>`); opening it checks the reader's own
+   rights or share. Copying grants nothing.
+3. **`/shares` page** (`SharesWorkspace`): "Shared with me" (`view=received`, links to the
+   case) and "Shared by me" (`view=owned`, derived phase, Revoke on Active rows with
+   `expected_revision: 1`, the revision of every Active share). A refusal of one list is shown
+   in that section only. The Go console allowlist and public route set add exactly `/shares`.
+4. **Recipient view:** on a case read through a share (`access: shared`) the console shows
+   neither Download nor the Share panel and says that a share does not include native
+   download (increment 3). This is presentation only; the server refuses both regardless.
+5. **Browser scope:** browser sessions carry the token scopes of the console client. The login
+   request is unchanged (`openid evidence:read evidence:download evidence:capture`); an
+   operator who enables console sharing adds `evidence:share` as a **default** client scope of
+   the console client, as the installed fixture now does. Without it the panel shows the
+   server's NotAvailable message; nothing else changes.
+
+Agent-authored choices (not maintainer requirements): whole-hour duration input, Revoke offered
+only for Active rows, recipient entry as type + ID, hiding Download/Share on shared cases.
+
+### Complexity gate (increment 2)
+
+1. Frequency/harm: every console user who should share or read a share needs an MCP client
+   today; not hypothetical.
+2. Risk accepted: yes (sharing within the organization; increment 1).
+3. Typical: yes (the console is the primary human interface).
+4. Precedent: share dialog with recipients, expiry and copy-link (Google Drive, Grafana);
+   general product knowledge.
+5. Privileges added: 0 server privileges, 0 new operations, 0 SQL grants; 1 static console
+   path (`/shares`); 1 operator step (default `evidence:share` scope on the console client). No
+   browser provider token.
+6. Failure/degraded states: 1 (uncertain create, retried with the same key); refusals are the
+   server's canonical messages.
+7. Configuration for its own machinery: no.
+8. Outside Asservat's control: the Keycloak console client's default scopes.
+9. Cost: case page 0 extra requests; `/shares` 2 `list_shares` calls (≤ 100 rows each, 1
+   projection read per distinct target); create 1 call; revoke 1 call + 2 list calls. Main
+   bundle +149 KB unminified generated validators (same pattern as the policy page).
+10. Upgrade/rollback/disable: web assets plus one route, no schema; rollback removes the page;
+    removing the default scope disables console sharing.
+11. Smaller fix: MCP-only sharing exists and leaves console users without it; no extra list
+    endpoint was needed.
+
+### Qualification (increment 2)
+
+Results are in [implementation progress](../implementation-progress.md#s-06-increment-2-console-sharing-adr-232-2026-10-26).
+The installed browser focus (`ASSERVAT_JOURNEY_FOCUS=browser`) now also creates, lists and
+revokes a share from the console session (its binding adds `evidence-owner` like the share
+focus); it runs in CI, not locally.

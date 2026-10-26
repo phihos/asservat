@@ -18,7 +18,7 @@ generation, TypeScript and behavior tests; `make console-build` produces
 startup. The constructor accepts an exact HTTPS origin and a complete local
 Vite bundle. It rejects extra files, symlinks, source maps, remote entry-point
 references and malformed packages. The handler serves the currently implemented
-`/`, `/captures/new` and exact UUID `/captures/<id>` shells and exact hashed assets. It never substitutes HTML for an unknown
+`/`, `/captures/new`, `/policies`, `/shares` and exact UUID `/captures/<id>` and `/cases/<id>` shells and exact hashed assets. It never substitutes HTML for an unknown
 API, authentication, download or console route. Bootstrap must compose those
 handlers explicitly and qualify any separate TLS termination boundary.
 

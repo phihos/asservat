@@ -69,7 +69,8 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	audience := func(value string) map[string]any {
 		return map[string]any{"name": "audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "config": map[string]string{"included.custom.audience": value, "access.token.claim": "true", "id.token.claim": "false"}}
 	}
-	scopes := []string{"basic", "evidence:read", "evidence:download", "evidence:capture"}
+	// evidence:share is a default console scope so the browser can share (ADR-232 console).
+	scopes := []string{"basic", "evidence:read", "evidence:download", "evidence:capture", "evidence:share"}
 	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "console", "protocol": "openid-connect", "publicClient": false, "secret": consoleSecret, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{strings.TrimSuffix(origin, "/") + "/auth/callback"}, "defaultClientScopes": scopes, "optionalClientScopes": []string{}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{audience("asservat-api"), groups}})
 	// Each MCP token names exactly one resource: the MCP endpoint, or the
 	// download content route (ADR-204 decision 10). The client requests one
