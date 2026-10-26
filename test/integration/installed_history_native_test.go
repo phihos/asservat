@@ -116,7 +116,20 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 			UID string `json:"uid"`
 		} `json:"selected_pods"`
 	}
-	if status, code := call(developer, "preview_capture", map[string]string{"history_capture_id": captureID}, &preview); status != "ok" || preview.PreviewID == "" || preview.Repeated != captureID || !preview.Enabled || len(preview.SelectedPods) != 1 {
+	// A preview is retryable NotAvailable while a fact it gathers expires
+	// before the others are read ("facts/current"), e.g. while the workload's
+	// storage binding is refreshed after the capture-time-share capture just
+	// used it. Like the journey's own preview, retry up to four reviews.
+	status, code = "", ""
+	for attempt := 1; attempt <= 4; attempt++ {
+		if status, code = call(developer, "preview_capture", map[string]string{"history_capture_id": captureID}, &preview); status == "ok" || code != "NotAvailable" {
+			break
+		}
+		if attempt < 4 && installedJourneyPause(ctx, 2*time.Second) != nil {
+			t.Fatal("installed repeat preview", ctx.Err())
+		}
+	}
+	if status != "ok" || preview.PreviewID == "" || preview.Repeated != captureID || !preview.Enabled || len(preview.SelectedPods) != 1 {
 		diagnose()
 		t.Fatal("installed repeat preview", status, code, preview)
 	}
