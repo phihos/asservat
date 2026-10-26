@@ -36,13 +36,41 @@ type ContextHistoryService struct {
 	RootID, InstallationID string
 	Reader                 ContextHistoryReader
 	Targets                ContextTargets
-	Previews               ContextRepeatPreview
-	Recovery               fleetapp.RecoveryReader
-	Now                    func() time.Time
+	// Workloads resolves a Deployment or StatefulSet to its current object
+	// identity without requiring a Pod (the regional workload LIST of
+	// ADR-228), so history of a workload scaled to zero stays readable.
+	Workloads RestartObserver
+	Previews  ContextRepeatPreview
+	Recovery  fleetapp.RecoveryReader
+	Now       func() time.Time
 }
 
 func (s ContextHistoryService) configured() bool {
-	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Reader != nil && s.Targets != nil && s.Previews != nil && s.Recovery != nil && s.Now != nil
+	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Reader != nil && s.Targets != nil && s.Workloads != nil && s.Previews != nil && s.Recovery != nil && s.Now != nil
+}
+
+// workload resolves the named target to its current object identity: a
+// Deployment or StatefulSet without needing any Pod, an explicit Pod as
+// itself. Stored history must not depend on the workload's live Pods.
+func (s ContextHistoryService) workload(ctx context.Context, ref targets.WorkloadRequest) (authorization.Target, time.Time, error) {
+	if ref.Kind == "Pod" {
+		p, err := s.Targets.ResolveWorkload(ctx, ref)
+		if err != nil {
+			return authorization.Target{}, time.Time{}, err
+		}
+		if !p.Valid(s.Now()) || p.Request.ClusterID != ref.ClusterID || p.Request.Namespace.Name != ref.Namespace || p.Request.Workload.Kind != "Pod" || p.Request.PodName != ref.Name {
+			return authorization.Target{}, time.Time{}, value.ErrUnavailable
+		}
+		return p.Target(), p.FreshUntil, nil
+	}
+	o, err := s.Workloads.ObserveWorkloadRestarts(ctx, targets.RestartRequest{WorkloadRequest: ref})
+	if err != nil {
+		return authorization.Target{}, time.Time{}, err
+	}
+	if !o.Valid(s.Now()) || o.ClusterID != ref.ClusterID || o.Namespace.Name != ref.Namespace || o.Workload.Kind != ref.Kind || o.Workload.Name != ref.Name || o.Probe != "" || o.Alert {
+		return authorization.Target{}, time.Time{}, value.ErrUnavailable
+	}
+	return authorization.WorkloadScope(o.ClusterID, o.Namespace.UID, o.Workload.UID), o.FreshUntil, nil
 }
 
 func (s ContextHistoryService) begin(ctx context.Context, source identities.CurrentIdentity) (identity.Identity, error) {
@@ -87,18 +115,15 @@ func (s ContextHistoryService) List(ctx context.Context, source identities.Curre
 	}
 	// The name resolves to the workload's current UIDs before any history
 	// lookup; an absent or unauthorized workload is the uniform refusal.
-	target, err := s.Targets.ResolveWorkload(ctx, ref)
+	target, observedUntil, err := s.workload(ctx, ref)
 	if err != nil {
 		return zero, err
 	}
-	if !target.Valid(s.Now()) || target.Request.ClusterID != ref.ClusterID || target.Request.Namespace.Name != ref.Namespace || target.Request.Workload.Kind != ref.Kind || target.Request.Workload.Name != ref.Name {
-		return zero, value.ErrUnavailable
-	}
-	page, err := s.Reader.ListCaptureHistory(ctx, value.HistoryQuery{RootID: s.RootID, Target: target.Target(), Origins: origins, After: after, Limit: limit, Identity: i, Recovery: r})
+	page, err := s.Reader.ListCaptureHistory(ctx, value.HistoryQuery{RootID: s.RootID, Target: target, Origins: origins, After: after, Limit: limit, Identity: i, Recovery: r})
 	if err != nil {
 		return zero, err
 	}
-	until := identity.Earlier(identity.Earlier(page.ValidUntil, i.ValidUntil), identity.Earlier(r.FreshUntil, target.FreshUntil))
+	until := identity.Earlier(identity.Earlier(page.ValidUntil, i.ValidUntil), identity.Earlier(r.FreshUntil, observedUntil))
 	if page.ValidUntil, err = s.finish(ctx, source, i, until); err != nil {
 		return zero, err
 	}

@@ -29,12 +29,19 @@ listing tool.
    compatibility floor stays 81. The retained capture-intent view is re-created to keep exposing
    every capture column.
 2. **Identity, not names.** `list_capture_history(target_ref, origin, cursor, limit)` first
-   resolves the named workload to its current namespace and workload UIDs (the existing target
-   resolver, as `list_diagnostics` does) and then queries by UID. A namespace or workload
-   recreated under the same name has new UIDs and starts an empty history. A workload that does
-   not currently resolve has no listable history (uniform `NotAvailable`).
-3. **Visibility.** The caller needs current ordinary `ReadApproved` eligibility on the workload
-   (otherwise the whole list is refused). Each row is then visible to its original requester
+   resolves the named workload to its current namespace and workload object UIDs and then
+   queries by UID. Stored history must not depend on the workload's live Pods (maintainer rule,
+   2026-10-23): a Deployment or StatefulSet is resolved through the existing regional workload
+   LIST of ADR-228 (`ObserveWorkloadRestarts`, no probe or alert), which names the namespace and
+   workload objects with any number of Pods from 0 to 128, so a workload scaled to zero or
+   without a ready Pod still lists its history. No new regional query is added. An explicit Pod
+   target resolves the Pod itself. A namespace or workload recreated under the same name has new
+   UIDs and starts an empty history; an absent workload object is the uniform `NotAvailable`.
+   Limitation: the reused LIST fails closed for a workload with more than 128 Pods.
+3. **Visibility.** The caller needs current ordinary `ReadApproved` eligibility on the workload,
+   evaluated on the whole-workload target (`authorization.WorkloadScope`, the convention
+   `PolicyScope` already uses; projections are workload-scoped), otherwise the whole list is
+   refused. Each row is then visible to its original requester
    (issuer, subject, kind; any client) or to a caller whose current contributing assignment is
    part of that capture's retained audience (`CaptureHistoryEligibility`). A newly granted or
    re-created assignment is not in an older capture's audience. A share grants no workload
@@ -101,9 +108,11 @@ design prevents adding it.
 6. **Failure/degraded states added:** 1 (`TargetReplaced`). History unavailability is the
    existing uniform `NotAvailable`.
 7. **Self-configuration:** none (seven days, 100, 200 are constants).
-8. **Outside Asservat's control:** none new; the target resolver is the one `list_diagnostics`
-   uses.
-9. **Aggregate cost:** per list: 1 target resolution (as `list_diagnostics`), 1 indexed keyset
+8. **Outside Asservat's control:** none new; the regional workload LIST is the one restart
+   policies already use (namespace, workload and one Pod LIST of at most 129 items, the existing
+   connector RBAC).
+9. **Aggregate cost:** per list: 1 regional workload LIST (Deployment/StatefulSet) or 1 Pod
+   resolution (explicit Pod), 1 indexed keyset
    query of ≤ 200 rows, 2 batched reads for ≤ 100 visible rows, 1 permission projection read.
    Per settings read: 2 indexed reads. Per insert: one trigger evaluation and one index entry
    (≤ 200 bytes). 0 watches, 0 background work; cost does not grow with cluster or node count.

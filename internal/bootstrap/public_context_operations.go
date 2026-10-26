@@ -60,8 +60,10 @@ func NewPublicContextOperations(c PublicContextOperationsConfig, s PublicContext
 	// ADR-236: the progress SQL reader also reads capture history; "Collect
 	// again" runs the same composed preview as a new request.
 	var history presentation.ContextHistoryUseCase
-	if reader, ok := v.progress.Reader.(captureapp.ContextHistoryReader); ok {
-		history = captureapp.ContextHistoryService{RootID: c.RootID, InstallationID: c.InstallationID, Reader: reader, Targets: v.submission.Targets, Previews: v.submission, Recovery: v.submission.Recovery, Now: c.Now}
+	reader, readerOK := v.progress.Reader.(captureapp.ContextHistoryReader)
+	workloads, workloadsOK := v.submission.Targets.(captureapp.RestartObserver)
+	if readerOK && workloadsOK {
+		history = captureapp.ContextHistoryService{RootID: c.RootID, InstallationID: c.InstallationID, Reader: reader, Targets: v.submission.Targets, Workloads: workloads, Previews: v.submission, Recovery: v.submission.Recovery, Now: c.Now}
 	}
 	captures, err := presentation.NewContextOperationsWithHistory(presentation.ContextOperationsConfig{PublicOrigin: c.PublicOrigin, CollectionEnabled: c.CollectionEnabled, Now: c.Now, NewID: c.NewID}, v.submission, v.progress, history)
 	if err != nil {

@@ -8,6 +8,8 @@ import (
 
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/targets"
 )
 
 // Test-only history reader: the SQL visibility rules are qualified by the
@@ -29,25 +31,60 @@ func (h *historyReaderFixture) ReadCaptureSettings(_ context.Context, q value.Se
 	return s, h.err
 }
 
-func historyService(f *investigationFixture) (ContextHistoryService, *historyReaderFixture) {
-	r := &historyReaderFixture{f: f, settings: value.CaptureSettings{ClusterID: fixtureID(4), NamespaceUID: "ns", WorkloadUID: "deployment", Namespace: "payments", WorkloadKind: "Deployment", WorkloadName: "api", RequestedSeconds: 120, ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}}
-	return ContextHistoryService{RootID: f.svc.RootID, InstallationID: f.svc.InstallationID, Reader: r, Targets: f, Previews: f.svc, Recovery: f, Now: func() time.Time { return f.now }}, r
+// Test-only regional workload LIST: the workload object with zero Pods.
+type workloadObserverFixture struct {
+	f        *investigationFixture
+	uid      string
+	err      error
+	observed int
 }
 
-func TestContextHistoryListsByCurrentWorkloadIdentity(t *testing.T) {
+func (w *workloadObserverFixture) ObserveWorkloadRestarts(_ context.Context, r targets.RestartRequest) (targets.RestartObservation, error) {
+	w.observed++
+	return targets.RestartObservation{ClusterID: r.ClusterID, Namespace: configuration.NamespaceRef{Name: r.Namespace, UID: "ns"}, Workload: configuration.WorkloadRef{Kind: r.Kind, Name: r.Name, UID: w.uid}, Pods: []targets.PodRestarts{}, ObservedAt: w.f.now, FreshUntil: w.f.now.Add(5 * time.Second)}, w.err
+}
+
+func historyService(f *investigationFixture) (ContextHistoryService, *historyReaderFixture) {
+	s, r, _ := historyServiceWithWorkloads(f)
+	return s, r
+}
+
+func historyServiceWithWorkloads(f *investigationFixture) (ContextHistoryService, *historyReaderFixture, *workloadObserverFixture) {
+	r := &historyReaderFixture{f: f, settings: value.CaptureSettings{ClusterID: fixtureID(4), NamespaceUID: "ns", WorkloadUID: "deployment", Namespace: "payments", WorkloadKind: "Deployment", WorkloadName: "api", RequestedSeconds: 120, ObservedAt: f.now, ValidUntil: f.now.Add(5 * time.Second)}}
+	w := &workloadObserverFixture{f: f, uid: "deployment"}
+	return ContextHistoryService{RootID: f.svc.RootID, InstallationID: f.svc.InstallationID, Reader: r, Targets: f, Workloads: w, Previews: f.svc, Recovery: f, Now: func() time.Time { return f.now }}, r, w
+}
+
+func TestContextHistoryListsAWorkloadWithoutPods(t *testing.T) {
 	f := newInvestigationFixture()
-	s, r := historyService(f)
+	s, r, w := historyServiceWithWorkloads(f)
 	ref := f.intent().Target
-	if _, err := s.List(t.Context(), f.source(t, t.Context()), ref, []value.HistoryOrigin{value.HistoryManual}, nil, 20); err != nil {
-		t.Fatal(err)
-	}
-	// The SQL lookup uses the resolved current UIDs, never the name.
-	if r.listed.Target != f.target.Target() || r.listed.Limit != 20 || r.listed.Identity.Principal != f.actor {
-		t.Fatal("history not keyed by the current workload identity", r.listed)
-	}
+	// Scaled to zero: no Pod resolves, yet history lists by the workload's
+	// current object identity (memory rule: stored reads need no live Pods).
 	f.missing = true
+	if _, err := s.List(t.Context(), f.source(t, t.Context()), ref, []value.HistoryOrigin{value.HistoryManual}, nil, 20); err != nil {
+		t.Fatal("history of a workload without Pods", err)
+	}
+	if want := authorization.WorkloadScope(fixtureID(4), "ns", "deployment"); r.listed.Target != want || r.listed.Limit != 20 || r.listed.Identity.Principal != f.actor || f.targetReads.Load() != 0 || w.observed != 1 {
+		t.Fatal("history not keyed by the current workload identity", r.listed, f.targetReads.Load())
+	}
+	// Recreated under the same name: the new UID is what the reader gets.
+	w.uid = "deployment-recreated"
+	if _, err := s.List(t.Context(), f.source(t, t.Context()), ref, []value.HistoryOrigin{value.HistoryManual}, nil, 20); err != nil || r.listed.Target.WorkloadUID != "deployment-recreated" {
+		t.Fatal("recreated workload", err, r.listed.Target)
+	}
+	// An absent workload object is refused.
+	w.err = targets.ErrUnavailable
 	if _, err := s.List(t.Context(), f.source(t, t.Context()), ref, []value.HistoryOrigin{value.HistoryManual}, nil, 20); err == nil {
 		t.Fatal("history listed for a workload that does not resolve")
+	}
+	// An explicit Pod target is itself the workload.
+	f.missing = false
+	pod := targets.WorkloadRequest{ClusterID: fixtureID(4), Namespace: "payments", Kind: "Pod", Name: "api-a"}
+	f.target.Request.Workload = configuration.WorkloadRef{Kind: "Pod", Name: "api-a", UID: "pod"}
+	f.target.Pin.ControllerUID = ""
+	if _, err := s.List(t.Context(), f.source(t, t.Context()), pod, []value.HistoryOrigin{value.HistoryManual}, nil, 20); err != nil || r.listed.Target != f.target.Target() {
+		t.Fatal("pod history", err, r.listed.Target)
 	}
 }
 

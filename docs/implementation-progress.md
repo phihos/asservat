@@ -49,6 +49,21 @@ parallel ADR-234/235 work were present locally only so the contiguous migration 
   named the original namespace/workload; `preview_capture(history_capture_id)` returned
   `repeated_from_capture_id`; `request_capture` accepted a new capture that was collected
   (Succeeded) and then led the history ahead of the original.
+- Follow-up before PR (rebased onto `origin/main` with migration 00087; 00088 is a local
+  placeholder only): the first version resolved the list selector through Pod selection, so a
+  workload scaled to zero or without a ready Pod could not list its history, contrary to the
+  maintainer rule that stored reads must not depend on live source-workload state. A Deployment or
+  StatefulSet now resolves through the existing regional workload LIST (0–128 Pods; fails closed
+  above 128) and read rights are evaluated on the whole-workload target
+  (`authorization.WorkloadScope`, as `PolicyScope`). Unit `TestContextHistoryListsAWorkloadWithoutPods`
+  (no Pod resolves, history listed by workload UID; recreated UID passed through; absent object
+  refused; explicit Pod) and `go test` of domain, application/capture, presentation, bootstrap and
+  adapters/postgres: PASS. Custody `--run 'TestContextAdmissionWithRealServices/(capture-history|progress-current)'`:
+  PASS, 6 history subtests including the new `workload-without-pods-lists-history` (all queries
+  now use the Pod-free workload target). Installed `share` focus rerun with the regional workload
+  LIST path: PASS, go test 478.7 s (`installer-continuation` 287.1 s), source unchanged, no
+  cleanup failures, the same history, refusal and Collect again results. `make pre-push`: PASS.
+  The installed workload keeps a running Pod; zero Pods is covered by the unit and custody cases.
 
 ## S-06 increment 7: caller-only access explanation (ADR-234, 2026-10-26)
 

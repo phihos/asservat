@@ -46,7 +46,7 @@ type HistoryCursor struct {
 // authority by the caller, and the origins to list.
 type HistoryQuery struct {
 	RootID   string
-	Target   authorization.Target // PodUID is the currently resolved Pod; rows keep their own
+	Target   authorization.Target // workload scope (authorization.WorkloadScope) or an explicit Pod; rows keep their own Pod
 	Origins  []HistoryOrigin
 	After    *HistoryCursor
 	Limit    int

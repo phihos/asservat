@@ -8,6 +8,7 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/authorization"
 	capture "asservat.local/asservat/internal/domain/capture"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -58,7 +59,11 @@ func qualifyCaptureHistory(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 	if err != nil {
 		t.Fatal(err)
 	}
-	target := s.a.Plan.Input.Target.Target()
+	// A Deployment's history is listed by its workload object identity, with
+	// no Pod (authorization.WorkloadScope): it stays readable when the
+	// workload is scaled to zero or has no ready Pod.
+	pod := s.a.Plan.Input.Target.Target()
+	target := authorization.WorkloadScope(pod.ClusterID, pod.NamespaceUID, pod.WorkloadUID)
 	as := func(subject string, groups []string) (capture.HistoryQuery, capture.SettingsQuery) {
 		t.Helper()
 		refresh()
@@ -117,6 +122,17 @@ func qualifyCaptureHistory(t *testing.T, ctx context.Context, admin *pgxpool.Poo
 		q.Origins = []capture.HistoryOrigin{capture.HistoryPolicy}
 		if page, err = reader.ListCaptureHistory(ctx, q); err != nil || len(page.Entries) != 0 {
 			t.Fatal("manual captures listed as policy history", ids(page), err)
+		}
+	})
+	t.Run("workload-without-pods-lists-history", func(t *testing.T) {
+		// The workload scope names no Pod at all: every captured Pod is gone.
+		q, _ := as(requester, []string{"maintainers"})
+		if q.Target.PodUID == pod.PodUID {
+			t.Fatal("fixture target still names a Pod")
+		}
+		page, err := reader.ListCaptureHistory(ctx, q)
+		if err != nil || !same(ids(page), []string{third, second, first}) {
+			t.Fatal("history of a workload without Pods", ids(page), err)
 		}
 	})
 	t.Run("retained-audience-member-sees-and-reads-settings", func(t *testing.T) {
