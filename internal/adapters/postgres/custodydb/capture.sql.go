@@ -42,7 +42,7 @@ func (q *Queries) AcknowledgeCaptureIntent(ctx context.Context, arg AcknowledgeC
 }
 
 const findContextCapture = `-- name: FindContextCapture :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction FROM context_capture WHERE root_id=$1 AND request_key=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin FROM context_capture WHERE root_id=$1 AND request_key=$2
 `
 
 type FindContextCaptureParams struct {
@@ -83,12 +83,16 @@ func (q *Queries) FindContextCapture(ctx context.Context, arg FindContextCapture
 		&i.PreviewID,
 		&i.IntentOperationID,
 		&i.ShareInstruction,
+		&i.HistoryClusterID,
+		&i.HistoryNamespaceUid,
+		&i.HistoryWorkloadUid,
+		&i.HistoryOrigin,
 	)
 	return i, err
 }
 
 const findContextCaptureByPreview = `-- name: FindContextCaptureByPreview :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction FROM context_capture WHERE root_id=$1 AND preview_id=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin FROM context_capture WHERE root_id=$1 AND preview_id=$2
 `
 
 type FindContextCaptureByPreviewParams struct {
@@ -129,12 +133,16 @@ func (q *Queries) FindContextCaptureByPreview(ctx context.Context, arg FindConte
 		&i.PreviewID,
 		&i.IntentOperationID,
 		&i.ShareInstruction,
+		&i.HistoryClusterID,
+		&i.HistoryNamespaceUid,
+		&i.HistoryWorkloadUid,
+		&i.HistoryOrigin,
 	)
 	return i, err
 }
 
 const findLegacyContextPreviewCapture = `-- name: FindLegacyContextPreviewCapture :many
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction FROM context_capture WHERE root_id=$1 AND preview_id IS NULL AND submission_digest=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin FROM context_capture WHERE root_id=$1 AND preview_id IS NULL AND submission_digest=$2
  AND convert_from(scope_json,'UTF8')::jsonb #>> '{executor,issuer}' = $3::text
  AND convert_from(scope_json,'UTF8')::jsonb #>> '{executor,subject}' = $4::text
  AND convert_from(scope_json,'UTF8')::jsonb #>> '{executor,clientID}' = $5::text
@@ -197,6 +205,10 @@ func (q *Queries) FindLegacyContextPreviewCapture(ctx context.Context, arg FindL
 			&i.PreviewID,
 			&i.IntentOperationID,
 			&i.ShareInstruction,
+			&i.HistoryClusterID,
+			&i.HistoryNamespaceUid,
+			&i.HistoryWorkloadUid,
+			&i.HistoryOrigin,
 		); err != nil {
 			return nil, err
 		}
@@ -210,7 +222,7 @@ func (q *Queries) FindLegacyContextPreviewCapture(ctx context.Context, arg FindL
 
 const insertContextCapture = `-- name: InsertContextCapture :one
 INSERT INTO context_capture(id,root_id,request_key,submission_digest,scope_digest,scope_json,expectation_json,pod_pin_json,attempt_id,permission_epoch,permission_sequence,identity_policy_uid,identity_policy_generation,identity_policy_digest,deadline,preview_id,intent_operation_id,share_instruction)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin
 `
 
 type InsertContextCaptureParams struct {
@@ -286,6 +298,10 @@ func (q *Queries) InsertContextCapture(ctx context.Context, arg InsertContextCap
 		&i.PreviewID,
 		&i.IntentOperationID,
 		&i.ShareInstruction,
+		&i.HistoryClusterID,
+		&i.HistoryNamespaceUid,
+		&i.HistoryWorkloadUid,
+		&i.HistoryOrigin,
 	)
 	return i, err
 }
@@ -324,7 +340,7 @@ func (q *Queries) InsertContextStorage(ctx context.Context, arg InsertContextSto
 }
 
 const lockContextCapture = `-- name: LockContextCapture :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction FROM context_capture WHERE id=$1 AND root_id=$2 FOR UPDATE
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin FROM context_capture WHERE id=$1 AND root_id=$2 FOR UPDATE
 `
 
 type LockContextCaptureParams struct {
@@ -365,6 +381,10 @@ func (q *Queries) LockContextCapture(ctx context.Context, arg LockContextCapture
 		&i.PreviewID,
 		&i.IntentOperationID,
 		&i.ShareInstruction,
+		&i.HistoryClusterID,
+		&i.HistoryNamespaceUid,
+		&i.HistoryWorkloadUid,
+		&i.HistoryOrigin,
 	)
 	return i, err
 }
@@ -404,7 +424,7 @@ func (q *Queries) LockContextStorage(ctx context.Context, arg LockContextStorage
 }
 
 const pendingCaptureIntents = `-- name: PendingCaptureIntents :many
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction FROM context_capture WHERE root_id=$1 AND state='accepted_pending_audit' AND intent_operation_id IS NULL ORDER BY created_at,id LIMIT 2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin FROM context_capture WHERE root_id=$1 AND state='accepted_pending_audit' AND intent_operation_id IS NULL ORDER BY created_at,id LIMIT 2
 `
 
 func (q *Queries) PendingCaptureIntents(ctx context.Context, rootID pgtype.UUID) ([]ContextCapture, error) {
@@ -446,6 +466,10 @@ func (q *Queries) PendingCaptureIntents(ctx context.Context, rootID pgtype.UUID)
 			&i.PreviewID,
 			&i.IntentOperationID,
 			&i.ShareInstruction,
+			&i.HistoryClusterID,
+			&i.HistoryNamespaceUid,
+			&i.HistoryWorkloadUid,
+			&i.HistoryOrigin,
 		); err != nil {
 			return nil, err
 		}
@@ -458,7 +482,7 @@ func (q *Queries) PendingCaptureIntents(ctx context.Context, rootID pgtype.UUID)
 }
 
 const readExactCaptureIntent = `-- name: ReadExactCaptureIntent :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction FROM context_capture WHERE root_id=$1 AND id=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin FROM context_capture WHERE root_id=$1 AND id=$2
 `
 
 type ReadExactCaptureIntentParams struct {
@@ -499,6 +523,10 @@ func (q *Queries) ReadExactCaptureIntent(ctx context.Context, arg ReadExactCaptu
 		&i.PreviewID,
 		&i.IntentOperationID,
 		&i.ShareInstruction,
+		&i.HistoryClusterID,
+		&i.HistoryNamespaceUid,
+		&i.HistoryWorkloadUid,
+		&i.HistoryOrigin,
 	)
 	return i, err
 }

@@ -149,6 +149,9 @@ func qualifyContextProgress(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			t.Fatal("current revoked source returned progress", got, err)
 		}
 	})
+	t.Run("capture-history-visibility-identity-and-window", func(t *testing.T) {
+		qualifyCaptureHistory(t, ctx, admin, readPool, create)
+	})
 	t.Run("progress-does-not-renew-identity-after-blocking-lock", func(t *testing.T) {
 		s := create(t, 1)
 		if _, err := s.s.AdmitContext(ctx, s.a); err != nil {

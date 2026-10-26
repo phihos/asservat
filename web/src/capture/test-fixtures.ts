@@ -35,9 +35,21 @@ export function resolvedClosedResult(): Output<'resolve_capture_request'> {
 export function resolvedAcceptedResult(): Output<'resolve_capture_request'> {
   return result<'resolve_capture_request'>({ state: 'accepted', capture_id: id(8), phase: 'Accepted', navigation_uri: 'https://asservat.example.invalid/captures/' + id(8), operation: 'collect' });
 }
+export function historyResult(ids: string[] = []): Output<'list_capture_history'> {
+  const accepted = new Date(Date.now() - 3_600_000);
+  const expires = new Date(accepted.getTime() + 7 * 86_400_000).toISOString();
+  return result<'list_capture_history'>({ kind: 'captureHistoryPage', ordering: 'acceptedAtDescCaptureIDDesc', history: ids.map(capture => ({
+    capture_id: capture, origin: 'manual', accepted_at: accepted.toISOString(), summary_expires_at: expires, phase: 'Succeeded', action_kinds: ['kubernetesSnapshot'],
+    evidence_state: 'available', repeat_state: 'available', settings_expires_at: expires, navigation_uri: 'https://asservat.example.invalid/captures/' + capture, operation: 'collect' })) });
+}
+export function repeatedPreviewResult(from: string): Output<'preview_capture'> {
+  const value = previewResult();
+  (value.data as { repeated_from_capture_id?: string }).repeated_from_capture_id = from;
+  return value;
+}
 export class SyntheticOperations implements Operations {
   calls: { name: Operation; input: unknown; signal: AbortSignal; csrf: string }[] = [];
-  responder: (name: Operation) => unknown | Promise<unknown> = name => ({ list_diagnostics: catalogResult, preview_capture: previewResult, request_capture: acceptedResult, resolve_capture_request: resolvedClosedResult, get_capture: progressResult })[name]();
+  responder: (name: Operation) => unknown | Promise<unknown> = name => ({ list_diagnostics: catalogResult, preview_capture: previewResult, request_capture: acceptedResult, resolve_capture_request: resolvedClosedResult, get_capture: progressResult, list_capture_history: () => historyResult() })[name]();
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), signal, csrf });
     return await this.responder(name) as Output<N>;

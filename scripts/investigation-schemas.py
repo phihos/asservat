@@ -14,7 +14,36 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access"]
+NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings"]
+
+
+def history_subset(name, tool):
+    """ADR-236 increment: pod-status history by the target_ref selector only
+    (no handles, discovery origin or pending replies); settings are the
+    canonical captureSettings record. Every runtime input/output is valid
+    canonically."""
+    description = copy.deepcopy(tool)
+    description.pop("enabledByDefault", None)
+    schema = description["inputSchema"]
+    props = schema["properties"]
+    branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
+    success = next(b for b in branches if b["properties"]["status"].get("const") == "ok")
+    error = next(b for b in branches if b["properties"]["status"].get("const") == "error")
+    if name == "list_capture_history":
+        for key in ("target_handle", "cluster_id", "target"):
+            props.pop(key)
+        props["origin"] = {"enum": ["manual", "policy", "all"]}
+        schema.pop("oneOf")
+        schema["required"] = ["target_ref"]
+        description["description"] = ("List recent accepted pod-status captures of a currently authorized named workload, newest first, for seven days after acceptance: "
+                                      "your own requests and those whose retained audience you currently belong to. Origin manual (default), policy or all; "
+                                      "at most limit entries (default 20, maximum 100) and next_cursor for more. A recreated workload starts a new history. "
+                                      "Repeat one with preview_capture history_capture_id. No evidence or settings are read.")
+    else:
+        success["properties"]["data"] = {"$ref": PREFIX + "capture-history.schema.json#/$defs/record"}
+        description["description"] = ("Read the repeatable settings of one visible capture-history entry: its authored target, recipe, dependency pins and requested retention. "
+                                       "No reason, recipients, grants, credentials or old pod selection. Repeat it with preview_capture history_capture_id.")
+    return description, [success, error]
 
 
 def share_subset(name, tool):
@@ -143,15 +172,18 @@ def main():
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
-        if name in ("activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access"):
+        if name in ("activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings"):
             # ADR-228: the runtime implements the whole canonical contract.
             # ADR-232: the share tools implement a bounded subset.
             # ADR-234: explain_access implements the whole canonical contract.
+            # ADR-236: the two history tools implement a bounded subset.
             description = copy.deepcopy(tool)
             description.pop("enabledByDefault", None)
             branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
             if name in ("create_share", "list_shares", "revoke_share"):
                 description, branches = share_subset(name, tool)
+            if name in ("list_capture_history", "get_capture_settings"):
+                description, branches = history_subset(name, tool)
             output = copy.deepcopy(common)
             output.pop("$id", None)
             output["properties"]["provenance"] = {"type": "array", "maxItems": 0}
@@ -159,6 +191,10 @@ def main():
             output["properties"]["next_cursor"] = {"type": "null"}
             output["properties"]["narrowing_hint"] = {"type": "null"}
             output["properties"]["data_class"] = {"const": "metadata"}
+            if name == "list_capture_history":
+                output["properties"]["next_cursor"] = copy.deepcopy(common["properties"]["next_cursor"])  # a cursor or null
+            if name == "get_capture_settings":
+                output["properties"]["data_class"] = {"enum": ["metadata", "extract"]}  # extract on success
             output["allOf"] = [{"oneOf": branches}]
             description["inputSchema"] = localize(description["inputSchema"])
             description["outputSchema"] = localize(output)
@@ -166,7 +202,7 @@ def main():
             continue
         keys = {
             "list_diagnostics": ["target_ref"],
-            "preview_capture": ["target_ref", "preset_ref", "requested_retention_seconds", "sharing"],
+            "preview_capture": ["target_ref", "preset_ref", "requested_retention_seconds", "sharing", "history_capture_id"],
             "request_capture": ["preview_id", "idempotency_key", "continue_acquisition"],
             "resolve_capture_request": ["preview_id", "idempotency_key"],
             "get_capture": ["capture_id"],
@@ -188,7 +224,15 @@ def main():
             sharing["properties"]["recipients"]["maxItems"] = 8
             props["sharing"] = sharing
         input_schema = {"type": "object", "additionalProperties": False, "properties": props,
-                        "required": [k for k in keys if k not in ("requested_retention_seconds", "continue_acquisition", "sharing")]}
+                        "required": [k for k in keys if k not in ("requested_retention_seconds", "continue_acquisition", "sharing", "history_capture_id")]}
+        if name == "preview_capture":
+            # ADR-236: either a named target with the preset, or one history
+            # entry whose target and requested retention are restored.
+            input_schema["required"] = []
+            input_schema["oneOf"] = [
+                {"required": ["target_ref", "preset_ref"], "not": {"required": ["history_capture_id"]}},
+                {"required": ["history_capture_id"], "not": {"anyOf": [{"required": [k]} for k in ("target_ref", "preset_ref", "requested_retention_seconds")]}},
+            ]
         branches = tool["outputSchema"]["allOf"][1]["oneOf"]
         success = copy.deepcopy(next(b for b in branches if b["properties"]["status"].get("const") == "ok"))
         error = copy.deepcopy(next(b for b in branches if b["properties"]["status"].get("const") == "error"))
@@ -207,7 +251,8 @@ def main():
         if name=="cancel_artifact_download":
             success["properties"]["data"]={"$ref":PREFIX+"artifact-download.schema.json#/$defs/cancelReceipt"}
         if output_keys is not None:
-            data["properties"] = {k: v for k, v in data["properties"].items() if k in output_keys}
+            optional = ["repeated_from_capture_id"] if name == "preview_capture" else []
+            data["properties"] = {k: v for k, v in data["properties"].items() if k in output_keys + optional}
         # Preserve the exact preset conditions, including retention anchors.
         # Localizing below also closes references within these conditions.
         if name == "preview_capture":
@@ -256,7 +301,7 @@ def main():
             "name": name,
             "description": {
                 "list_diagnostics": "List the supported pod-status preset for a currently authorized named workload. No evidence collection.",
-                "preview_capture": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 is supported by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately.",
+                "preview_capture": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 is supported by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately. Collect again: pass history_capture_id from list_capture_history (optionally with sharing) to restore its target and requested retention into a fresh preview with every current check.",
                 "request_capture": "Submit the reviewed pod-status preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt.",
                 "resolve_capture_request": tool["description"],
                 "get_capture": "Read authorized pod-status capture progress. No evidence bytes. Finalizing is not publication; Indeterminate must not be automatically recaptured.",

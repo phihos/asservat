@@ -1,6 +1,6 @@
 import type { Session } from '../auth/session';
 import type { Recipient } from '../sharing/shares';
-import { operations, OperationFailure, operationMessage, type Operations, type Target, type Diagnostic, type Preview, type Progress, type Input, type Output, type Operation, type Data } from './http';
+import { operations, OperationFailure, operationMessage, type Operations, type Target, type Diagnostic, type Preview, type Progress, type HistoryEntry, type Input, type Output, type Operation, type Data } from './http';
 
 // sharing/shareHours: the optional capture-time share of the result (ADR-235);
 // no hours means the server default (24 hours after publication).
@@ -9,7 +9,10 @@ export type State = {
   stage: 'target' | 'diagnostics' | 'review' | 'reviewed' | 'uncertain' | 'closed' | 'progress';
   busy: boolean; draft: Draft; diagnostics?: Diagnostic[]; preview?: Preview;
   progress?: Progress; captureID?: string; error?: string; stale?: boolean; expired?: boolean; resolving?: boolean; canContinue?: boolean; continuing?: boolean;
+  // ADR-236: recent captures of the draft target and the capture a review repeats.
+  history?: HistoryEntry[]; historyMessage?: string; repeatedFrom?: string;
 };
+export const historyPageSize = 10;
 type Receipt = { preview_id: string; idempotency_key: string; captureID?: string; revision?: number; closed?: true; continuationBlocked?: true };
 type ReviewedHandle = { id: string; expiresAt: number };
 const emptyDraft = (): Draft => ({ target: { cluster_id: '', namespace: '', kind: 'Deployment', name: '' }, retention: '' });
@@ -31,6 +34,7 @@ export class Investigation {
   private receipt?: Receipt;
   private reviewed?: ReviewedHandle;
   private selected?: Diagnostic;
+  private repeatOf?: string;
   readonly snapshot = () => this.state;
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   constructor(private client: Operations = operations, private newID: () => string = () => crypto.randomUUID()) {}
@@ -43,14 +47,14 @@ export class Investigation {
     if (identity !== this.identity) this.reset();
     this.identity = identity; this.session = session; this.scope = scope;
     this.invalidate();
-    this.selected = undefined;
+    this.selected = undefined; this.repeatOf = undefined;
     if (captureID && !this.receipt) this.receipt = { preview_id: '', idempotency_key: '', captureID };
-    this.publish({ diagnostics: undefined, preview: undefined, progress: undefined, error: undefined, busy: false, resolving: false, continuing: false,
+    this.publish({ diagnostics: undefined, preview: undefined, progress: undefined, error: undefined, busy: false, resolving: false, continuing: false, history: undefined, historyMessage: undefined,
       captureID: this.receipt?.captureID, stage: this.receipt ? this.receiptStage() : this.reviewed ? 'reviewed' : 'target', expired: this.reviewed ? this.reviewed.expiresAt <= Date.now() : false });
     this.expireReview();
     const abort = () => {
-      this.invalidate(); this.session = undefined; this.selected = undefined;
-      this.publish({ diagnostics: undefined, preview: undefined, progress: undefined, busy: false, resolving: false, continuing: false,
+      this.invalidate(); this.session = undefined; this.selected = undefined; this.repeatOf = undefined;
+      this.publish({ diagnostics: undefined, preview: undefined, progress: undefined, busy: false, resolving: false, continuing: false, history: undefined, historyMessage: undefined,
         stage: this.receipt ? this.receiptStage() : this.reviewed ? 'reviewed' : 'target' });
     };
     scope.addEventListener('abort', abort, { once: true });
@@ -61,16 +65,16 @@ export class Investigation {
 
   reset = () => {
     this.invalidate(); this.identity = undefined; this.session = undefined; this.scope = undefined;
-    this.receipt = undefined; this.selected = undefined; this.reviewed = undefined;
+    this.receipt = undefined; this.selected = undefined; this.reviewed = undefined; this.repeatOf = undefined;
     this.state = { stage: 'target', busy: false, draft: emptyDraft() };
     for (const listener of this.listeners) listener();
   };
   setDraft = (draft: Draft) => {
     if (this.receipt || this.state.busy) return;
-    this.invalidate(); this.selected = undefined; this.reviewed = undefined;
-    this.publish({ draft: structuredClone(draft), stage: 'target', preview: undefined, diagnostics: undefined, error: undefined });
+    this.invalidate(); this.selected = undefined; this.reviewed = undefined; this.repeatOf = undefined;
+    this.publish({ draft: structuredClone(draft), stage: 'target', preview: undefined, diagnostics: undefined, error: undefined, history: undefined, historyMessage: undefined });
   };
-  edit = () => { if (!this.receipt) { this.invalidate(); this.reviewed = undefined; this.publish({ stage: 'target', preview: undefined, diagnostics: undefined, error: undefined, busy: false }); } };
+  edit = () => { if (!this.receipt) { this.invalidate(); this.reviewed = undefined; this.repeatOf = undefined; this.publish({ stage: 'target', preview: undefined, diagnostics: undefined, error: undefined, busy: false, history: undefined, historyMessage: undefined }); } };
   editClosedRequest = () => {
     if (!this.receipt?.closed || this.receipt.captureID || this.state.busy) return;
     this.receipt = undefined; this.selected = undefined;
@@ -110,10 +114,46 @@ export class Investigation {
   discover = async () => {
     if (this.receipt || this.state.busy) return;
     const data = await this.run('list_diagnostics', { target_ref: structuredClone(this.state.draft.target) });
-    if (data) this.publish({ stage: 'diagnostics', diagnostics: data.diagnostics });
+    if (!data) return;
+    this.publish({ stage: 'diagnostics', diagnostics: data.diagnostics, history: undefined, historyMessage: undefined });
+    await this.loadHistory();
+  };
+  // Recent captures of the draft target (ADR-236). Its own failure leaves the
+  // diagnostics usable; the server decides visibility for every entry.
+  private async loadHistory() {
+    const session = this.session, scope = this.scope, request = this.request;
+    if (!session || !scope || scope.aborted || !request) return;
+    const generation = this.generation;
+    let history: HistoryEntry[] | undefined, historyMessage: string | undefined;
+    try {
+      const result = await this.client.call('list_capture_history', { target_ref: structuredClone(this.state.draft.target), limit: historyPageSize }, session.csrf_token, request.signal);
+      if (generation !== this.generation || scope.aborted) return;
+      if (result.status === 'ok') history = result.data.history;
+      else historyMessage = result.status === 'error' ? result.data.message : 'Recent captures are not available yet. Find diagnostics again to retry.';
+    } catch (error) {
+      if (generation !== this.generation || scope.aborted) return;
+      historyMessage = operationMessage(error);
+    }
+    this.publish({ history, historyMessage });
+  }
+  // "Collect again": the server restores the capture's target and requested
+  // retention into a fresh preview and runs every current check.
+  repeat = async (captureID: string) => {
+    if (this.receipt || this.state.busy) return;
+    this.selected = undefined; this.repeatOf = captureID; this.reviewed = undefined;
+    const requested = structuredClone(this.state.draft.target);
+    this.publish({ stage: 'diagnostics', preview: undefined });
+    const data = await this.run('preview_capture', { history_capture_id: captureID });
+    if (!data || this.repeatOf !== captureID) return;
+    if (data.repeated_from_capture_id !== captureID) {
+      this.publish({ error: 'The review response could not be verified. Refresh the review before continuing.' }); return;
+    }
+    this.acceptPreview(data, requested);
   };
   preview = async (diagnostic = this.selected) => {
+    if (!diagnostic && this.repeatOf) return this.repeat(this.repeatOf);
     if (this.receipt || this.state.busy || !diagnostic) return;
+    this.repeatOf = undefined;
     if (diagnostic.preset_ref?.name !== 'pod-status' || diagnostic.preset_ref.version !== 'v1') {
       this.publish({ error: 'This diagnostic is not supported by this console yet.' }); return;
     }
@@ -144,8 +184,13 @@ export class Investigation {
     this.publish({ stage: 'diagnostics', preview: undefined });
     const data = await this.run('preview_capture', input);
     if (!data) return;
+    if (data.repeated_from_capture_id !== undefined) {
+      this.publish({ error: 'The review response could not be verified. Refresh the review before continuing.' }); return;
+    }
+    this.acceptPreview(data, input.target_ref!);
+  };
+  private acceptPreview(data: Preview, requested: Target) {
     const pod = data.selected_pods?.[0];
-    const requested = input.target_ref!;
     if (data.preset_ref?.name !== 'pod-status' || data.selected_pods?.length !== 1 ||
         data.capture_assessment.planDigest !== data.execution_digest || !data.target_ref ||
         data.capture_assessment.actions.some(action => action.retention.anchorRule !== 'submissionPreparation') ||
@@ -157,10 +202,10 @@ export class Investigation {
     }
     const remaining = Math.min(5_000, Date.parse(data.capture_assessment.validUntil) - Date.now(), Date.parse(data.expires_at) - Date.now());
     if (data.capture_enabled && data.blockers.length === 0 && !data.approval_required) this.reviewed = { id: data.preview_id, expiresAt: Date.parse(data.expires_at) };
-    this.publish({ stage: 'review', preview: data, stale: remaining <= 0, expired: Date.parse(data.expires_at) <= Date.now() });
+    this.publish({ stage: 'review', preview: data, repeatedFrom: data.repeated_from_capture_id, stale: remaining <= 0, expired: Date.parse(data.expires_at) <= Date.now() });
     this.timer = setTimeout(() => this.publish({ stale: true }), Math.max(0, remaining));
     this.previewExpiry = setTimeout(() => this.publish({ expired: true }), Math.max(0, Date.parse(data.expires_at) - Date.now()));
-  };
+  }
   submit = async () => {
     if (this.receipt || this.state.busy) return;
     const preview = this.state.preview;

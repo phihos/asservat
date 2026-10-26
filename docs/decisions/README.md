@@ -1,5 +1,13 @@
 # Decision records
 
+[ADR-236 — Recent captures and Collect again](236-capture-history-collect-again.md) is S-06
+increment 6: migration 00089 records each accepted capture's cluster, namespace UID, workload UID
+and origin at acceptance (no backfill); `list_capture_history` lists the last seven days of a
+named workload's captures by its current UIDs to the requester and current retained-audience
+members; `get_capture_settings` returns the accepted target, recipe, pins and requested retention;
+`preview_capture(history_capture_id)` runs the ordinary preview with every current check. Console
+"Recent captures" with "Collect again". Snapshots, digests, eviction and lineage are increment 12.
+
 [ADR-234 — Caller-only access explanation](234-access-explanation.md) is S-06 increment 7:
 `explain_access(target_ref, operation)` over MCP and the browser route runs the real ordinary
 evaluator for the caller's own access and reports Allow/Deny/Indeterminate, the unmet condition and

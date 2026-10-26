@@ -43,6 +43,8 @@ summary { cursor: pointer; min-height: 44px; padding: 8px 0; color: #126b54; }
 .button:disabled, .button[data-disabled] { opacity: .65; cursor: default; }
 .progress-actions { list-style: none; padding: 0; margin: 24px 0; }
 .progress-actions li { display: flex; justify-content: space-between; gap: 20px; border-top: 1px solid #e3e6e9; padding: 16px 0; }
+.recent-captures { list-style: none; padding: 0; margin: 16px 0; }
+.recent-captures li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px 20px; border-top: 1px solid #e3e6e9; padding: 12px 0; }
 @media (max-width: 480px) { .form-row { grid-template-columns: 1fr; gap: 0; } .facts { grid-template-columns: 1fr; gap: 4px; } .facts dd { margin-bottom: 12px; } }
 .skip-link { position: fixed; top: 8px; left: 8px; transform: translateY(-200%); padding: 12px; background: #fff; z-index: 2; }
 .skip-link:focus { transform: translateY(0); }

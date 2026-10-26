@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 is supported by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately.",
+  "description": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 is supported by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately. Collect again: pass history_capture_id from list_capture_history (optionally with sharing) to restore its target and requested retention into a fresh preview with every current check.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -85,11 +85,49 @@
         "required": [
           "recipients"
         ]
+      },
+      "history_capture_id": {
+        "type": "string",
+        "format": "uuid"
       }
     },
-    "required": [
-      "target_ref",
-      "preset_ref"
+    "required": [],
+    "oneOf": [
+      {
+        "required": [
+          "target_ref",
+          "preset_ref"
+        ],
+        "not": {
+          "required": [
+            "history_capture_id"
+          ]
+        }
+      },
+      {
+        "required": [
+          "history_capture_id"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "target_ref"
+              ]
+            },
+            {
+              "required": [
+                "preset_ref"
+              ]
+            },
+            {
+              "required": [
+                "requested_retention_seconds"
+              ]
+            }
+          ]
+        }
+      }
     ],
     "$defs": {
       "d0": {
@@ -286,6 +324,10 @@
                     "type": "string",
                     "format": "uri",
                     "maxLength": 2048
+                  },
+                  "repeated_from_capture_id": {
+                    "type": "string",
+                    "format": "uuid"
                   },
                   "lifecycle_plan": {
                     "$ref": "#/$defs/d0"

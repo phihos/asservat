@@ -46,10 +46,19 @@ type ContextOperationsConfig struct {
 	NewID             func() string
 }
 
+// ContextHistoryUseCase is the ADR-236 history service. It is optional: an
+// installation without it serves no history tools and no repeat branch.
+type ContextHistoryUseCase interface {
+	List(context.Context, identities.CurrentIdentity, targets.WorkloadRequest, []value.HistoryOrigin, *value.HistoryCursor, int) (value.HistoryPage, error)
+	Settings(context.Context, identities.CurrentIdentity, string) (value.CaptureSettings, error)
+	PreviewRepeat(context.Context, identities.CurrentIdentity, string, *value.ContextSharing) (app.ContextPreviewResult, value.CaptureSettings, error)
+}
+
 type ContextOperations struct {
 	config    ContextOperationsConfig
 	captures  ContextUseCase
 	progress  ContextProgressUseCase
+	history   ContextHistoryUseCase
 	contracts *contracts.InvestigationContracts
 }
 
@@ -63,6 +72,12 @@ func (s *ContextOperations) PublicOrigin() string {
 var ErrOperationsConfiguration = errors.New("invalid context operations configuration")
 
 func NewContextOperations(c ContextOperationsConfig, capture ContextUseCase, progress ContextProgressUseCase) (*ContextOperations, error) {
+	return NewContextOperationsWithHistory(c, capture, progress, nil)
+}
+
+// NewContextOperationsWithHistory also serves list_capture_history,
+// get_capture_settings and the preview_capture history branch (ADR-236).
+func NewContextOperationsWithHistory(c ContextOperationsConfig, capture ContextUseCase, progress ContextProgressUseCase, history ContextHistoryUseCase) (*ContextOperations, error) {
 	u, err := url.Parse(c.PublicOrigin)
 	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || u.Opaque != "" || len(c.PublicOrigin) > 1800 || capture == nil || progress == nil || c.Now == nil || c.NewID == nil {
 		return nil, ErrOperationsConfiguration
@@ -71,13 +86,16 @@ func NewContextOperations(c ContextOperationsConfig, capture ContextUseCase, pro
 	if err != nil {
 		return nil, err
 	}
-	return &ContextOperations{config: c, captures: capture, progress: progress, contracts: wire}, nil
+	return &ContextOperations{config: c, captures: capture, progress: progress, history: history, contracts: wire}, nil
 }
 
 func (s *ContextOperations) ToolNames() []string {
 	out := []string{"list_diagnostics", "preview_capture", "get_capture", "resolve_capture_request"}
 	if s != nil && s.config.CollectionEnabled {
 		out = append(out, "request_capture")
+	}
+	if s != nil && s.history != nil {
+		out = append(out, "list_capture_history", "get_capture_settings")
 	}
 	return out
 }
@@ -113,6 +131,11 @@ type ContextOperationInput struct {
 	ContinueAcquisition bool              `json:"continue_acquisition,omitempty"`
 	// Sharing is the optional capture-time share of the result (ADR-235).
 	Sharing *ContextSharingInput `json:"sharing,omitempty"`
+	// ADR-236: the preview_capture history branch and list_capture_history.
+	HistoryCaptureID string `json:"history_capture_id,omitempty"`
+	Origin           string `json:"origin,omitempty"`
+	Cursor           string `json:"cursor,omitempty"`
+	Limit            int    `json:"limit,omitempty"`
 }
 
 // ContextSharingInput is the implemented subset of the canonical capture
@@ -216,6 +239,7 @@ type ContextPreviewData struct {
 	Target           WorkloadReference  `json:"target_ref"`
 	SelectedPods     []SelectedPod      `json:"selected_pods"`
 	PodSelection     string             `json:"pod_selection"`
+	RepeatedFrom     string             `json:"repeated_from_capture_id,omitempty"`
 }
 type ContextAcceptedData struct {
 	CaptureID     string `json:"capture_id"`
@@ -284,6 +308,9 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 		// disappearance discloses nothing new. Retrying the same preview cannot
 		// succeed; the workload must be reviewed again.
 		return OperationFailure{"TargetGone", "The reviewed Pod no longer exists or was replaced. This request started no capture. Preview the workload again to select its current Pod.", false}
+	case !request && errors.Is(err, value.ErrTargetReplaced):
+		// Reported only after current collection eligibility on the new workload.
+		return OperationFailure{"TargetReplaced", "The workload was recreated since the original capture, so its history does not carry over. Preview the workload by name to review the new one.", false}
 	case errors.Is(err, value.ErrCapacity):
 		return OperationFailure{"CapacityUnavailable", "Capacity is unavailable. Retry the same request after capacity becomes available.", true}
 	case !request && (errors.Is(err, value.ErrDenied) || errors.Is(err, identity.ErrDenied) || errors.Is(err, targets.ErrDenied)):
@@ -386,15 +413,39 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 		}
 	case "preview_capture":
 		var result app.ContextPreviewResult
-		result, operationErr = s.captures.Preview(ctx, current, value.ContextIntent{Target: in.Target.target(), Diagnostic: value.ContextDiagnosticName, RequestedSeconds: in.RequestedSeconds, Sharing: in.Sharing.intent()})
+		target, repeated := in.Target, ""
+		if in.HistoryCaptureID != "" {
+			// "Collect again" (ADR-236): the history entry supplies the target
+			// and requested retention; the preview runs every current check.
+			if s.history == nil {
+				return OperationReply{}, contracts.ErrInvestigationWire
+			}
+			var settings value.CaptureSettings
+			result, settings, operationErr = s.history.PreviewRepeat(ctx, current, in.HistoryCaptureID, in.Sharing.intent())
+			target = WorkloadReference{ClusterID: settings.ClusterID, Namespace: settings.Namespace, Kind: settings.WorkloadKind, Name: settings.WorkloadName}
+			repeated = in.HistoryCaptureID
+		} else {
+			result, operationErr = s.captures.Preview(ctx, current, value.ContextIntent{Target: in.Target.target(), Diagnostic: value.ContextDiagnosticName, RequestedSeconds: in.RequestedSeconds, Sharing: in.Sharing.intent()})
+		}
 		if operationErr == nil {
 			until = identity.Earlier(until, identity.Earlier(result.ValidUntil, result.Assessment.ValidUntil))
 			p := result.Preview
 			selection := "lexicalEligiblePod"
-			if in.Target.Kind == "Pod" {
+			if target.Kind == "Pod" {
 				selection = "explicitPod"
 			}
-			out.Data = ContextPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: result.Assessment.OutputLimit, CaptureEnabled: s.config.CollectionEnabled, Blockers: collectionBlockers(s.config.CollectionEnabled), Warnings: sharingWarning(p.Intent.Sharing), NavigationURI: s.config.PublicOrigin + "/captures/new", Lifecycle: ContextLifecycle(), Assessment: ContextAssessment(result.Assessment), Preset: PresetReference{"pod-status", "v1"}, Target: in.Target, SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}, PodSelection: selection}
+			out.Data = ContextPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: result.Assessment.OutputLimit, CaptureEnabled: s.config.CollectionEnabled, Blockers: collectionBlockers(s.config.CollectionEnabled), Warnings: sharingWarning(p.Intent.Sharing), NavigationURI: s.config.PublicOrigin + "/captures/new", Lifecycle: ContextLifecycle(), Assessment: ContextAssessment(result.Assessment), Preset: PresetReference{"pod-status", "v1"}, Target: target, SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}, PodSelection: selection, RepeatedFrom: repeated}
+		}
+	case "list_capture_history", "get_capture_settings":
+		if s.history == nil {
+			return OperationReply{}, contracts.ErrInvestigationWire
+		}
+		var historyUntil time.Time
+		var cursor *string
+		out.Data, cursor, historyUntil, operationErr = s.historyCall(ctx, current, name, in)
+		if operationErr == nil {
+			until = identity.Earlier(until, historyUntil)
+			out.NextCursor = cursor
 		}
 	case "request_capture":
 		if !s.config.CollectionEnabled {
@@ -455,7 +506,10 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 		return OperationReply{}, contracts.ErrInvestigationWire
 	}
 	if operationErr != nil {
-		out.Status, out.Data = "error", publicCaptureFailure(operationErr, name == "request_capture" || name == "resolve_capture_request")
+		out.Status, out.Data, out.NextCursor = "error", publicCaptureFailure(operationErr, name == "request_capture" || name == "resolve_capture_request"), nil
+	}
+	if name == "get_capture_settings" && out.Status == "ok" {
+		out.DataClass = "extract" // canonical class of a settings projection
 	}
 	finalIdentity, err := current.ResolveIdentity(ctx)
 	if err != nil || ctx.Err() != nil || !i.Valid(s.config.Now()) || !finalIdentity.Valid(s.config.Now()) || finalIdentity.Principal != i.Principal {

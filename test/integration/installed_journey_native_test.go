@@ -457,6 +457,8 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			if installedJourneyFocus() == "share" {
 				// ADR-232: share the published artifact with the unrelated principal.
 				installedJourneyShare(t, ctx, wire, identity, transport, origin, progress.CaseID, investigation.Artifacts[0].ArtifactID, native, previewArguments, diagnose)
+				// ADR-236: recent captures and Collect again over MCP.
+				installedJourneyHistory(t, ctx, wire, identity, transport, origin, target, accepted.CaptureID, diagnose)
 			}
 			t.Logf("installed journey: short journey in cluster %s complete; its native file names Pod %s in namespace %s", cluster, projected.PodUID, projected.NamespaceUID)
 			return

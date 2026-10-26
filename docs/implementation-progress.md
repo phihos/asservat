@@ -8,6 +8,48 @@ through the thirty-minute connector certificate period (≈35 minutes per run), 
 `custody`. The real-time post-expiry cleanup chain is an explicit unqualified gap; see
 [validation](validation.md).
 
+## S-06 increment 6: recent captures and Collect again (ADR-236, 2026-10-26)
+
+[ADR-236](decisions/236-capture-history-collect-again.md): migration 00089 (schema 89, floor 81)
+records each accepted capture's cluster, namespace UID, workload UID and origin at acceptance
+(trigger; no backfill; immutable) with one keyset index. `list_capture_history(target_ref, origin,
+cursor, limit)` resolves the named workload to its current UIDs, then lists seven days of
+captures visible to the requester or a current retained-audience member;
+`get_capture_settings` returns the canonical settings record; `preview_capture(history_capture_id)`
+runs the ordinary preview of the original workload and retention (`TargetReplaced` for a recreated
+workload, after current collection eligibility). Console "Recent captures" panel with "Collect
+again". Operation-name functions include `explain_access` (ADR-234) plus the two new names.
+Deferred to increment 12: parameter snapshots, keyed digests, eviction, persisted lineage.
+
+Verification (tracked test/results files restored after each run; migrations 00087/00088 of the
+parallel ADR-234/235 work were present locally only so the contiguous migration bundle loads):
+- Unit: domain/authorization (`CaptureHistoryEligibility`: requester on any client, retained
+  member, re-granted assignment refused, deny, scope), application/capture (history keyed by the
+  resolved UIDs; repeat restores target and retention through the normal preview; recreated
+  workload `TargetReplaced` only after collection eligibility), transport/presentation (tools only
+  with a history service, canonical outputs, cursor bound to selector and origin, settings
+  digest, exclusive history branch, uniform denial): PASS. Console `make console-check`: PASS
+  (15 files, 189 tests, including Recent captures and Collect again); `make
+  console-browser-check`: PASS (the browser journey does not yet open the new panel).
+  `make pre-push`: PASS.
+- Custody (real PostgreSQL), `--run 'TestContextAdmissionWithRealServices/capture-history'`:
+  PASS (5 subtests: newest-first keyset pages and origin filter; retained-audience member lists
+  and reads settings; a recreated workload UID lists nothing and a principal without workload
+  rights (share-only recipient) is refused list and settings; history identity is recorded at
+  acceptance, immutable, absent for pre-migration rows and rows older than seven days; a suspended
+  permission source refuses list and settings).
+- Installed `share` focus (`scripts/ci-native.sh continuation-share`, fast fixture): the first run
+  failed: `list_capture_history` returned UnsupportedRequest because the SQL reader checked the
+  recovery proof at the identity's earlier verification instant (the service verifies identity
+  before reading recovery). Fixed (both inputs checked at the later instant; the custody test now
+  orders them like the service) and rerun: PASS, go test 484.9 s (`installer-continuation`
+  293.3 s), source unchanged, no cleanup failures. The developer listed the published capture
+  (manual, Succeeded, repeat available); the unrelated user's `list_capture_history`,
+  `get_capture_settings` and `preview_capture(history_capture_id)` were NotAvailable; settings
+  named the original namespace/workload; `preview_capture(history_capture_id)` returned
+  `repeated_from_capture_id`; `request_capture` accepted a new capture that was collected
+  (Succeeded) and then led the history ahead of the original.
+
 ## S-06 increment 7: caller-only access explanation (ADR-234, 2026-10-26)
 
 [ADR-234](decisions/234-access-explanation.md) adds `explain_access(target_ref, operation)` on MCP
