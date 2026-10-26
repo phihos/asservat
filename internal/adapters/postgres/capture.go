@@ -172,7 +172,7 @@ func admittedRecord(row custodydb.ContextCapture) (value.Accepted, error) {
 // currentCaptureEligibility re-evaluates the identity snapshot against the SQL
 // projection after locks. Freshness, deny precedence, group membership and the
 // complete default audience use the same domain evaluator as the caller.
-func currentCaptureEligibility(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, a value.Admission) (authorization.CaptureEligibility, error) {
+func (s *ContextAdmissions) currentCaptureEligibility(ctx context.Context, q *custodydb.Queries, stream custodydb.PermissionStream, trust custodydb.FleetCurrentTrust, a value.Admission) (authorization.CaptureEligibility, error) {
 	p, err := permissionProjection(ctx, q, stream, a.Plan.Input.Target.Target())
 	if err != nil {
 		return authorization.CaptureEligibility{}, value.ErrUnavailable
@@ -181,7 +181,9 @@ func currentCaptureEligibility(ctx context.Context, q *custodydb.Queries, stream
 	if err != nil {
 		return authorization.CaptureEligibility{}, err
 	}
-	fresh := authorization.ContextEligibility(a.Eligibility.VerifiedIdentity, p, a.Eligibility.Target, n.Time)
+	// A policy executor re-checks its accepted policy and team delegation
+	// after these locks (ADR-228); a human is evaluated as before.
+	fresh := contextEligibilityIn(ctx, q, stream, trust, s.root, s.recovery.installationID(), a.Eligibility.VerifiedIdentity, p, a.Eligibility.Target, n.Time)
 	if !fresh.Eligible || !n.Time.Before(a.Eligibility.ValidUntil) {
 		return fresh, value.ErrDenied
 	}
@@ -242,7 +244,7 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 		if err != nil {
 			return err
 		}
-		fresh, err := currentCaptureEligibility(ctx, q, stream, a)
+		fresh, err := s.currentCaptureEligibility(ctx, q, stream, recovery, a)
 		if err != nil {
 			return err
 		}
@@ -255,7 +257,7 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 			if err != nil {
 				return err
 			}
-			fresh, err = currentCaptureEligibility(ctx, q, stream, a)
+			fresh, err = s.currentCaptureEligibility(ctx, q, stream, recovery, a)
 			if err != nil {
 				return err
 			}
@@ -290,7 +292,7 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 					return err
 				}
 				out.Replay = true
-				fresh, err = currentCaptureEligibility(ctx, q, stream, a)
+				fresh, err = s.currentCaptureEligibility(ctx, q, stream, recovery, a)
 				if err != nil {
 					return err
 				}
@@ -391,7 +393,7 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 				return err
 			}
 			var err error
-			fresh, err = currentCaptureEligibility(ctx, q, stream, a)
+			fresh, err = s.currentCaptureEligibility(ctx, q, stream, recovery, a)
 			if err != nil {
 				return err
 			}

@@ -19,7 +19,9 @@ func (r OperationIntent) capturePayloadValid() bool {
 		return r.Capture == nil
 	}
 	c := r.Capture
-	if c == nil || !c.Valid() || c.Actor.Kind != identity.Human || r.Actor != c.Actor || r.Peer != nil || r.Process != nil || r.ID != c.CaptureID || r.RootID != c.RootID || r.TraceID != c.OccurrenceID || r.InputFormat != CaptureOperationInputFormat || !r.CreatedAt.Equal(c.CreatedAt) || r.WriteUntil.After(c.Deadline) {
+	// The actor is the authenticated human or an accepted policy executor
+	// (ADR-228); the encrypted intent names it either way.
+	if c == nil || !c.Valid() || !authorization.CaptureActor(c.Actor) || r.Actor != c.Actor || r.Peer != nil || r.Process != nil || r.ID != c.CaptureID || r.RootID != c.RootID || r.TraceID != c.OccurrenceID || r.InputFormat != CaptureOperationInputFormat || !r.CreatedAt.Equal(c.CreatedAt) || r.WriteUntil.After(c.Deadline) {
 		return false
 	}
 	// BindOperationLifecycle first validates the payload without a binding.

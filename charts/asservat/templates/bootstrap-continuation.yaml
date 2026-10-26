@@ -47,6 +47,11 @@ rules:
   - apiGroups: [asservat.io]
     resources: [accessbindings]
     verbs: [delete]
+  # ADR-228: the hub-api reads hub-held DebugPolicies (the runner grants it)
+  # and the administrator applies them.
+  - apiGroups: [asservat.io]
+    resources: [debugpolicies]
+    verbs: [get, create]
   # ADR-195: the hub-worker's retention reader and guard probe, and the
   # installation administrator's baseline policy and its later edits.
   - apiGroups: [asservat.io]

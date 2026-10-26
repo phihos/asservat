@@ -196,3 +196,21 @@ func (a publicAuditStore) windowObjects(id string) (auditapp.DownloadWindowObjec
 	}
 	return objectstore.NewDownloadWindowAuditObjects(a.store, id, a.seal, a.open)
 }
+
+// WritePolicyAcceptance writes one encrypted ADR-228 policy acceptance audit
+// record under the installed audit credential observation.
+func (s *installedOperationAudit) WritePolicyAcceptance(ctx context.Context, r audit.PolicyAcceptance) (audit.Receipt, error) {
+	if !r.Valid() {
+		return audit.Receipt{}, mounts.ErrUnavailable
+	}
+	return withInstalledAudit(ctx, s, time.Now().Add(5*time.Second), func(call context.Context, store *objectstore.Store) (audit.Receipt, error) {
+		return (&objectstore.PolicyAcceptanceObjects{Store: store, Seal: s.seal, Open: s.open}).WritePolicyAcceptance(call, r)
+	})
+}
+
+func (a publicAuditStore) policyObjects() auditapp.PolicyAcceptanceWriter {
+	if a.operation != nil {
+		return a.operation
+	}
+	return &objectstore.PolicyAcceptanceObjects{Store: a.store, Seal: a.seal, Open: a.open}
+}

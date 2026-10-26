@@ -29,6 +29,7 @@ import (
 	"asservat.local/asservat/internal/domain/capture"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -710,6 +711,258 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		s.input.Submission.ScopeDigest = s.input.Authority.ScopeDigest
 		if _, e = s.read.AcceptPolicy(ctx, s.input); e == nil {
 			t.Fatal("read role acquired acceptance")
+		}
+	})
+	// ADR-228 trigger ledger through the compiled ordinary hub union grants.
+	hubRole := narrowRole(t, ctx, admin, "policy_hub_", "synthetic-policy-hub", func(role string) []string {
+		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
+		if !ok {
+			t.Fatal("missing compiled hub grants")
+		}
+		return grants
+	})
+	hubPool := poolFor(hubRole, "synthetic-policy-hub")
+	trigger := func(t *testing.T, s setup) *postgres.PolicyTriggers {
+		t.Helper()
+		r, err := postgres.NewPolicyTriggers(ctx, hubPool, s.input.RootID, s.input.Authority.InstallationID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return r
+	}
+	restartPolicy := func(s setup) capture.RestartPolicy {
+		return capture.RestartPolicy{ClusterID: s.input.Authority.ClusterID, Namespace: "app", WorkloadKind: "Deployment", WorkloadName: "app", Reasons: []string{"Error", "OOMKilled"}, Interval: 5 * time.Minute, Burst: 2, RetentionSeconds: 3600, ObservedPods: targets.MaxRestartPods}
+	}
+	observed := func(s setup, pods ...targets.PodRestarts) targets.RestartObservation {
+		now := clock()
+		a := s.input.Authority
+		return targets.RestartObservation{ClusterID: a.ClusterID, Namespace: cfg.NamespaceRef{Name: "app", UID: a.NamespaceUID}, Workload: cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: a.WorkloadUID}, Pods: pods, ObservedAt: now, FreshUntil: now.Add(5 * time.Second)}
+	}
+	pod := func(uid string, restarts int64) targets.PodRestarts {
+		return targets.PodRestarts{Name: "app-" + uid[:8], UID: uid, Restarts: restarts, Reason: "Error", ExitCode: 137}
+	}
+	// activeTrigger accepts and audits one policy, then refreshes its source.
+	activeTrigger := func(t *testing.T) (setup, *postgres.PolicyTriggers) {
+		t.Helper()
+		s := newSetup(t)
+		accept(t, s)
+		flush(t, s)
+		observe(t, &s)
+		return s, trigger(t, s)
+	}
+	tick := func(t *testing.T, s setup, l *postgres.PolicyTriggers, o targets.RestartObservation) []capture.PolicyOccurrence {
+		t.Helper()
+		got, err := l.Tick(ctx, capture.PolicyTick{Policy: restartPolicy(s), Authority: s.input.Authority, Observation: o})
+		if err != nil {
+			t.Fatal("tick", err)
+		}
+		return got
+	}
+	suppressed := func(t *testing.T, s setup, reason string) int64 {
+		t.Helper()
+		var n int64
+		if err := admin.QueryRow(ctx, `SELECT coalesce(sum(count),0) FROM policy_suppression WHERE root_id=$1 AND policy_uid=$2 AND reason=$3`, s.input.RootID, s.input.Authority.PolicyUID, reason).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+	t.Run("restart-trigger-baseline-replay-and-concurrent-duplicates", func(t *testing.T) {
+		s, l := activeTrigger(t)
+		a := custodyID()
+		if got := tick(t, s, l, observed(s, pod(a, 1))); len(got) != 0 {
+			t.Fatal("first observation fired", got)
+		}
+		got := tick(t, s, l, observed(s, pod(a, 2)))
+		if len(got) != 1 || got[0].PodUID != a || got[0].Restarts != 2 {
+			t.Fatal("restart did not fire once", got)
+		}
+		if again := tick(t, s, l, observed(s, pod(a, 2))); len(again) != 0 {
+			t.Fatal("replayed poll fired", again)
+		}
+		// Concurrent duplicate polls of the next restart: one occurrence.
+		var wg sync.WaitGroup
+		results := make(chan int, 4)
+		o := observed(s, pod(a, 3))
+		for range 4 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				r, err := l.Tick(ctx, capture.PolicyTick{Policy: restartPolicy(s), Authority: s.input.Authority, Observation: o})
+				if err != nil {
+					t.Error(err)
+				}
+				results <- len(r)
+			}()
+		}
+		wg.Wait()
+		close(results)
+		total := 0
+		for n := range results {
+			total += n
+		}
+		var rows, spent int64
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID).Scan(&rows); err != nil {
+			t.Fatal(err)
+		}
+		if err := admin.QueryRow(ctx, `SELECT executions_spent FROM policy_acceptance WHERE root_id=$1 AND policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID).Scan(&spent); err != nil {
+			t.Fatal(err)
+		}
+		if total != 1 || rows != 2 || spent != 2 {
+			t.Fatal("concurrent duplicate polls", total, rows, spent)
+		}
+		// A vanished Pod's watermark goes; its replacement is a new baseline.
+		b := custodyID()
+		if got := tick(t, s, l, observed(s, pod(b, 7))); len(got) != 0 {
+			t.Fatal("replacement Pod fired on first sight")
+		}
+		var marks int64
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID).Scan(&marks); err != nil || marks != 1 {
+			t.Fatal("vanished Pod watermark kept", marks, err)
+		}
+	})
+	t.Run("restart-trigger-shared-window-cooldown-and-reopen", func(t *testing.T) {
+		s, l := activeTrigger(t)
+		a, b, c := custodyID(), custodyID(), custodyID()
+		tick(t, s, l, observed(s, pod(a, 1), pod(b, 1), pod(c, 1)))
+		// Three Pods restart in one poll, one of them three times: the shared
+		// burst of two admits two; the rest are one cooldown and two coalesced.
+		got := tick(t, s, l, observed(s, pod(a, 2), pod(b, 2), pod(c, 4)))
+		if len(got) != 2 || suppressed(t, s, "cooldown") != 1 || suppressed(t, s, "coalesced") < 2 {
+			t.Fatal("burst", len(got), suppressed(t, s, "cooldown"), suppressed(t, s, "coalesced"))
+		}
+		var rows int64
+		if err := admin.QueryRow(ctx, `SELECT count(*) FROM policy_suppression WHERE root_id=$1 AND policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID).Scan(&rows); err != nil || rows != 2 {
+			t.Fatal("one suppression row per reason", rows, err)
+		}
+		if got = tick(t, s, l, observed(s, pod(a, 3), pod(b, 3), pod(c, 5))); len(got) != 0 || suppressed(t, s, "cooldown") != 4 {
+			t.Fatal("window did not hold", len(got), suppressed(t, s, "cooldown"))
+		}
+		// Ten minutes later (shifted in SQL) both budgets have refilled.
+		if _, err := admin.Exec(ctx, `UPDATE policy_workload_window SET tat=tat-interval '10 minutes' WHERE root_id=$1`, s.input.RootID); err != nil {
+			t.Fatal(err)
+		}
+		if got = tick(t, s, l, observed(s, pod(a, 4), pod(b, 3), pod(c, 5))); len(got) != 1 || got[0].PodUID != a {
+			t.Fatal("window did not reopen", got)
+		}
+		// A second policy on the same workload shares the workload budget.
+		second := s
+		second.input.Authority.PolicyUID = custodyID()
+		second.input.Authority.Executor = authorization.PolicyPrincipal(s.input.Authority.InstallationID, second.input.Authority.PolicyUID)
+		second.input.Authority.ScopeDigest = artifact.Digest{77}
+		second.input.Submission.ScopeDigest = second.input.Authority.ScopeDigest
+		second.input.Submission.Nonce = custodyID()
+		second.observation.Revision.UID = second.input.Authority.PolicyUID
+		second.observation.Name = "second-policy"
+		second.input.Submission.Source = second.observation.Revision
+		second.input.Submission.Name = second.observation.Name
+		observe(t, &second)
+		second.input.Submission.IssuedAt = clock()
+		second.input.Submission.ExpiresAt = second.input.Submission.IssuedAt.Add(30 * time.Second)
+		second.input.Recovery.ObservedAt, second.input.Recovery.FreshUntil = clock(), clock().Add(5*time.Second)
+		second.input.Author.VerifiedAt, second.input.Author.ValidUntil = clock(), clock().Add(30*time.Second)
+		second.input.Verification = syntheticSubmissionCheck(second.input, clock())
+		accept(t, second)
+		flush(t, second)
+		observe(t, &second)
+		l2 := trigger(t, second)
+		tick(t, second, l2, observed(second, pod(a, 4)))
+		if got := tick(t, second, l2, observed(second, pod(a, 5))); len(got) != 1 {
+			t.Fatal("second policy within the shared burst", got)
+		}
+		if got := tick(t, second, l2, observed(second, pod(a, 6))); len(got) != 0 {
+			t.Fatal("two policies multiplied the workload budget", got)
+		}
+		// A storm on this workload leaves another workload's budget untouched.
+		other, lo := activeTrigger(t)
+		d := custodyID()
+		tick(t, other, lo, observed(other, pod(d, 1)))
+		if got := tick(t, other, lo, observed(other, pod(d, 2))); len(got) != 1 {
+			t.Fatal("independent workload was throttled", got)
+		}
+	})
+	t.Run("restart-trigger-spend-cap-saturation-and-single-link", func(t *testing.T) {
+		s, l := activeTrigger(t)
+		a := custodyID()
+		tick(t, s, l, observed(s, pod(a, 1)))
+		max := s.input.Authority.Limits.MaxExecutions
+		if _, err := admin.Exec(ctx, `UPDATE policy_acceptance SET executions_spent=$3 WHERE root_id=$1 AND policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID, max+1); err == nil {
+			t.Fatal("spend above the accepted ceiling stored")
+		}
+		if _, err := admin.Exec(ctx, `UPDATE policy_acceptance SET executions_spent=$3 WHERE root_id=$1 AND policy_uid=$2`, s.input.RootID, s.input.Authority.PolicyUID, max-1); err != nil {
+			t.Fatal(err)
+		}
+		got := tick(t, s, l, observed(s, pod(a, 2)))
+		if len(got) != 1 {
+			t.Fatal("last execution not admitted", got)
+		}
+		if _, err := admin.Exec(ctx, `UPDATE policy_workload_window SET tat=tat-interval '1 hour' WHERE root_id=$1`, s.input.RootID); err != nil {
+			t.Fatal(err)
+		}
+		if more := tick(t, s, l, observed(s, pod(a, 3))); len(more) != 0 || suppressed(t, s, "budget") != 1 {
+			t.Fatal("execution ceiling exceeded", more)
+		}
+		// The occurrence links its one capture once; nothing re-admits it.
+		capture := custodyID()
+		if err := l.RecordOccurrence(ctx, got[0], capture, ""); err == nil {
+			t.Fatal("link to an absent capture accepted")
+		}
+		if err := l.RecordOccurrence(ctx, got[0], "", "capacity"); err != nil {
+			t.Fatal(err)
+		}
+		if err := l.RecordOccurrence(ctx, got[0], "", "capacity"); err == nil {
+			t.Fatal("refused occurrence recorded twice")
+		}
+		if suppressed(t, s, "capacity") != 1 {
+			t.Fatal("capacity refusal not summarized")
+		}
+		// Saturating content-free counter: one row, bounded count.
+		if _, err := admin.Exec(ctx, `UPDATE policy_suppression SET count=2147483646 WHERE root_id=$1 AND policy_uid=$2 AND reason='budget'`, s.input.RootID, s.input.Authority.PolicyUID); err != nil {
+			t.Fatal(err)
+		}
+		tick(t, s, l, observed(s, pod(a, 4)))
+		tick(t, s, l, observed(s, pod(a, 5)))
+		if suppressed(t, s, "budget") != 2147483647 {
+			t.Fatal("suppression count did not saturate", suppressed(t, s, "budget"))
+		}
+		status, err := l.Status(ctx, s.input.Authority.PolicyUID)
+		if err != nil || status.ExecutionsSpent != max || status.Occurrences != 1 || status.WatchedPods != 1 || len(status.Suppressions) < 2 {
+			t.Fatal("status", status, err)
+		}
+	})
+	t.Run("restart-trigger-refuses-stale-suspended-or-replaced-scope", func(t *testing.T) {
+		for _, mode := range []string{"suspended", "stale", "other-workload", "other-scope", "unaudited"} {
+			t.Run(mode, func(t *testing.T) {
+				s, l := activeTrigger(t)
+				a := custodyID()
+				tick(t, s, l, observed(s, pod(a, 1)))
+				o := observed(s, pod(a, 2))
+				in := capture.PolicyTick{Policy: restartPolicy(s), Authority: s.input.Authority, Observation: o}
+				switch mode {
+				case "suspended":
+					s.observation.Suspended = true
+					s.observation.Revision.Generation++
+					observe(t, &s)
+				case "stale":
+					if _, err := admin.Exec(ctx, `UPDATE policy_source SET observed_at=observed_at-interval '1 minute',fresh_until=fresh_until-interval '1 minute' WHERE root_id=$1`, s.input.RootID); err != nil {
+						t.Fatal(err)
+					}
+				case "other-workload":
+					in.Observation.Workload.UID = custodyID()
+				case "other-scope":
+					in.Authority.ScopeDigest = artifact.Digest{99}
+				case "unaudited":
+					if _, err := admin.Exec(ctx, `UPDATE policy_acceptance SET acknowledged_at=NULL,receipt_json=NULL WHERE root_id=$1`, s.input.RootID); err != nil {
+						t.Fatal(err)
+					}
+				}
+				if got, err := l.Tick(ctx, in); err == nil || len(got) != 0 {
+					t.Fatal("trigger spent under", mode, got)
+				}
+				var spent int64
+				if err := admin.QueryRow(ctx, `SELECT executions_spent FROM policy_acceptance WHERE root_id=$1`, s.input.RootID).Scan(&spent); err != nil || spent != 0 {
+					t.Fatal("refused tick spent", spent, err)
+				}
+			})
 		}
 	})
 	// Compile-time audit payload/receipt compatibility used by role-specific APIs.

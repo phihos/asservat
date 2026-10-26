@@ -165,7 +165,7 @@ func resolveContextRequest(ctx context.Context, l *Ledger, root string, guard *R
 				}
 				permissionUntil = eligible.ValidUntil
 			} else {
-				eligible := authorization.ContextEligibility(in.Identity, p, target, n.Time)
+				eligible := contextEligibilityIn(ctx, q, stream, recovery, root, guard.installationID(), in.Identity, p, target, n.Time)
 				if !eligible.Eligible {
 					return value.ErrDenied
 				}

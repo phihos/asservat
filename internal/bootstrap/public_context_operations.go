@@ -1,8 +1,11 @@
 package bootstrap
 
 import (
+	"os"
+
 	analysisapp "asservat.local/asservat/internal/application/analysis"
 	executionapp "asservat.local/asservat/internal/application/execution"
+	planningapp "asservat.local/asservat/internal/application/planning"
 	"time"
 
 	auditapp "asservat.local/asservat/internal/application/audit"
@@ -119,4 +122,27 @@ func regionalHubRunner(r executionapp.APIContextRunner) bool {
 	return r.Read != nil && r.Prepare != nil && r.Record != nil && r.Eligibility != nil && r.Retention != nil &&
 		r.Capabilities == nil && r.Recovery == nil && r.Now == nil &&
 		r.Process == nil && r.Local == nil && r.Starts == nil && r.Targets == nil && r.Output == nil && r.Collector == nil
+}
+
+// composePublicPolicies composes the ADR-228 restart-trigger services onto
+// the same investigation, recovery and clock as the public operations. The
+// trigger reuses the composed submission unchanged: preview, admission,
+// intent audit and regional start run exactly as for a human request.
+func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.PolicyOperations, *captureapp.PolicyTrigger, error) {
+	v, err := composePublicContextUseCases(c, s)
+	if err != nil || pc == nil || pc.policies == nil || pc.policyTriggers == nil || pc.automation == nil || pc.hubPolicies == nil || pc.permissions == nil {
+		return nil, nil, presentation.ErrOperationsConfiguration
+	}
+	observer, ok := v.submission.Targets.(captureapp.RestartObserver)
+	if !ok {
+		return nil, nil, presentation.ErrOperationsConfiguration
+	}
+	activation := captureapp.PolicyActivation{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Documents: pc.hubPolicies, Sources: pc.policies, Observer: observer, Ledger: pc.policyTriggers, Permissions: pc.permissions, Automation: pc.automation, Acceptor: pc.policies, Audit: pc.policyAudit, Recovery: v.submission.Recovery, Now: c.Now, Report: eventLog(os.Stderr, "policy activation refused")}
+	status := captureapp.PolicyStatusService{RootID: c.RootID, InstallationID: c.InstallationID, Documents: pc.hubPolicies, Ledger: pc.policyTriggers, Permissions: pc.permissions, Recovery: v.submission.Recovery, Now: c.Now}
+	operations, err := presentation.NewPolicyOperations(c.PublicOrigin, c.Now, c.NewID, activation, status)
+	if err != nil {
+		return nil, nil, err
+	}
+	trigger := &captureapp.PolicyTrigger{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Ledger: pc.policyTriggers, Documents: pc.hubPolicies, Sources: pc.policies, Accepted: pc.policies, Observer: observer, Capture: v.submission, Audit: pc.policyAudit, Now: c.Now, Report: timedEventLog(os.Stderr, "policy trigger")}
+	return operations, trigger, nil
 }

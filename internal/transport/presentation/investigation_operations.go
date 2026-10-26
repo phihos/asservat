@@ -51,6 +51,32 @@ func NewInvestigationProjectionOperations(base *InvestigationOperations, project
 	return &out, nil
 }
 
+// NewInvestigationPolicyOperations adds the ADR-228 policy operations to an
+// already composed installation, through the same audited routing.
+func NewInvestigationPolicyOperations(base *InvestigationOperations, policies *PolicyOperations) (*InvestigationOperations, error) {
+	if base == nil || policies == nil || policies.PublicOrigin() != base.origin {
+		return nil, ErrOperationsConfiguration
+	}
+	out := *base
+	out.names = append([]string(nil), base.names...)
+	out.routes = make(map[string]Operations, len(base.routes)+2)
+	for k, v := range base.routes {
+		out.routes[k] = v
+	}
+	for _, name := range policies.ToolNames() {
+		if _, exists := out.routes[name]; exists {
+			return nil, ErrOperationsConfiguration
+		}
+		if _, ok := policies.Tool(name); !ok {
+			return nil, ErrOperationsConfiguration
+		}
+		out.routes[name] = policies
+		out.names = append(out.names, name)
+	}
+	sort.Strings(out.names)
+	return &out, nil
+}
+
 func NewInvestigationOperations(captures *ContextOperations, cases *ContextCaseOperations, downloads ...*ContextDownloadOperations) (*InvestigationOperations, error) {
 	if len(downloads) > 1 || captures == nil && cases == nil && (len(downloads) == 0 || downloads[0] == nil) {
 		return nil, ErrOperationsConfiguration
@@ -148,6 +174,8 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 	case *ContextCaseOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *ContextDownloadOperations:
+		return p.CallWithContext(ctx, current, call, name, raw)
+	case *PolicyOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	default:
 		return OperationReply{}, contracts.ErrInvestigationWire

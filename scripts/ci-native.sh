@@ -31,6 +31,9 @@ declare -A suites=(
   # ADR-227: upgrade of hub-api and hub-worker to a second release image and
   # image-only rollback, with a capture on each side of the upgrade.
   [continuation-upgrade]="env ASSERVAT_JOURNEY_FOCUS=upgrade $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  # ADR-228: the restart-trigger policy journey (activation, one policy
+  # capture and download, a bounded three-replica crash storm).
+  [continuation-policy]="env ASSERVAT_JOURNEY_FOCUS=policy $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [direct-observation]="$context --run ^TestDirectHolderObservationWithRealKubernetes\$"
   [federation-regional]="$context --run ^TestFederationRegionalProductWithRealKubernetes\$"
   [initial-handover]="$context --initial-handover"

@@ -845,6 +845,9 @@ func qualifyRegionalCapacity(t *testing.T, ctx context.Context, admin *pgxpool.P
 				}
 				t.Fatal("reviewed Pod not found", uid)
 			}
+			// ADR-228: the policy focus drives this workload and the operator's
+			// hub access itself; recorded here, before its journey runs.
+			installedPolicyTarget = &installedPolicyFixture{region: region, hub: client, base: base, cluster: cluster, namespace: ns.Name, workload: app.Name, binding: binding["spec"].(map[string]any)}
 			journey(cluster, ns.Name, app.Name, deny, gone)
 		}()
 	}

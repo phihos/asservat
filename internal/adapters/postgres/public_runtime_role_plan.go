@@ -140,6 +140,8 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// The only effects are one reviewed capture, its original custody
 		// reservation and the atomically prepaid private audit pair. Existing
 		// storage binding and quota/source configuration remain read-only.
+		// ADR-228: a policy executor re-checks its acceptance after locks.
+		read("policy_source", "policy_acceptance")
 		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_storage_binding", "context_preview", "context_preview_fence", "context_control_pool", "context_control_account", "context_control_charge", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "custody_event", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
@@ -156,6 +158,25 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		for _, signature := range []string{"lock_capture_audit_admission(uuid,uuid)", "reserve_capture_audit(uuid,uuid,jsonb,bytea,timestamptz)", "capacity_managed_admission_until(uuid,uuid,text,timestamptz)"} {
 			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
 		}
+	case "policy-automation":
+		// ADR-228: hub-api policy activation, source observation, acceptance
+		// audit acknowledgement and the restart trigger ledger, in the ordinary
+		// hub union (ADR-222). Delegation and permission reads are read-only.
+		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "policy_source", "policy_acceptance", "policy_pod_watermark", "policy_occurrence", "policy_workload_window", "policy_suppression")
+		add("fleet_current_trust", "UPDATE", "installation_id")
+		add("permission_stream", "UPDATE", "id")
+		add("policy_source", "INSERT")
+		add("policy_source", "UPDATE", "generation", "spec_digest", "resource_version", "observed_at", "fresh_until", "deleted", "suspended", "intent_version", "collection_digest", "creator_json", "active_id")
+		add("policy_acceptance", "INSERT")
+		add("policy_acceptance", "UPDATE", "acknowledged_at", "receipt_json", "executions_spent")
+		add("policy_pod_watermark", "INSERT")
+		add("policy_pod_watermark", "DELETE")
+		add("policy_occurrence", "INSERT")
+		add("policy_occurrence", "UPDATE", "capture_id", "outcome")
+		add("policy_workload_window", "INSERT")
+		add("policy_workload_window", "UPDATE", "tat")
+		add("policy_suppression", "INSERT")
+		add("policy_suppression", "UPDATE", "last_at", "count")
 	case "capture-journal":
 		for _, signature := range []string{"read_capture_operation(uuid,uuid)", "capture_audit_journal(uuid,jsonb,text,jsonb)", "claim_capture_reconciliation(uuid,jsonb,text)"} {
 			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})

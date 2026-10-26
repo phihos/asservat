@@ -804,7 +804,7 @@ func initialBootstrapChainRemovedGuard(err error, d contracts.InitialBootstrap) 
 // installedClusterCount is the hub plus its workload clusters: two for the
 // focused runs that use one workload cluster, three otherwise.
 func installedClusterCount() int {
-	if f := installedJourneyFocus(); f == "restart" || f == "journey" || f == "upgrade" {
+	if f := installedJourneyFocus(); f == "restart" || f == "journey" || f == "upgrade" || f == "policy" {
 		return 2
 	}
 	return 3

@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"encoding/json"
+	rbac "k8s.io/api/rbac/v1"
 	"reflect"
 	"slices"
 	"testing"
@@ -64,7 +65,8 @@ func TestProviderInstalledOwnerSeparatesSQLStorageAndNativeAuthentication(t *tes
 	_, _, _, processing, processingGuard := CapacitySourceNames(p.InstallationID)
 	public, guards = append(public, processing), append(guards, processingGuard)
 	extra := w.Role.Rules[len(v1.Role.Rules):]
-	if len(extra) != 3 || !reflect.DeepEqual(extra[1].ResourceNames, public) || !reflect.DeepEqual(extra[1].Verbs, []string{"get", "update"}) || !reflect.DeepEqual(extra[2].ResourceNames, append([]string{contracts.OwnerBrowserSettingsName(p.InstallationID), contracts.OwnerIdentitySettingsName(p.InstallationID)}, contracts.OwnerClusterTopologyNames(p.InstallationID)...)) || !reflect.DeepEqual(extra[2].Verbs, []string{"get"}) {
+	// ADR-228: and get on hub-held DebugPolicies, no other verb or resource.
+	if len(extra) != 4 || !reflect.DeepEqual(extra[3], rbac.PolicyRule{APIGroups: []string{"asservat.io"}, Resources: []string{"debugpolicies"}, Verbs: []string{"get"}}) || !reflect.DeepEqual(extra[1].ResourceNames, public) || !reflect.DeepEqual(extra[1].Verbs, []string{"get", "update"}) || !reflect.DeepEqual(extra[2].ResourceNames, append([]string{contracts.OwnerBrowserSettingsName(p.InstallationID), contracts.OwnerIdentitySettingsName(p.InstallationID)}, contracts.OwnerClusterTopologyNames(p.InstallationID)...)) || !reflect.DeepEqual(extra[2].Verbs, []string{"get"}) {
 		t.Fatal("unexpected provider privilege graph")
 	}
 	cluster := w.ClusterRole.Rules

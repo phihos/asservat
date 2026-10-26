@@ -234,7 +234,11 @@
           "maxLength": 256
         },
         "kind": {
-          "const": "human"
+          "enum": [
+            "human",
+            "workload"
+          ],
+          "description": "workload only for the exact policy executor of an accepted DebugPolicy (ADR-228)"
         }
       },
       "required": [

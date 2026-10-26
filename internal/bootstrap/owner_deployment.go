@@ -22,6 +22,7 @@ import (
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
 	"asservat.local/asservat/internal/adapters/postgres"
+	captureapp "asservat.local/asservat/internal/application/capture"
 	app "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	configuration "asservat.local/asservat/internal/domain/configuration"
@@ -63,7 +64,9 @@ type OwnerDeployment struct {
 	publicContext   *publicContext
 	publicDownloads *publicDownloads
 	publicHandler   http.Handler
-	shared          publicShared
+	// policyTrigger is the ADR-228 restart trigger; RunPublic supervises it.
+	policyTrigger *captureapp.PolicyTrigger
+	shared        publicShared
 	// ADR-182: backend and public input roots (the owner root in the legacy
 	// layout) and, in the installed layout, the provider effects.
 	backend, publicFiles *providerInputs
@@ -489,6 +492,15 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 	}
 	done := make(chan struct{})
 	stop := context.AfterFunc(d.root, func() { shutdown(); close(done) })
+	// ADR-228: the restart trigger polls while the public layer serves and
+	// joins before the deployment releases its pools.
+	if d.policyTrigger != nil {
+		d.owners.Add(1)
+		go func() {
+			defer d.owners.Done()
+			_ = d.policyTrigger.Run(d.root)
+		}()
+	}
 	err := server.ServeTLS(listener, "", "")
 	if stop() {
 		d.cancel()

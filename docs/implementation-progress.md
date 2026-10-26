@@ -1,5 +1,47 @@
 # Sustained implementation progress
 
+## Restart-triggered policy captures, first S-03 increment (ADR-228, 2026-10-26)
+
+[ADR-228](decisions/228-restart-triggered-policy-captures.md): a hub-held DebugPolicy with one
+exit detector (OOMKilled/Error/CrashLoopBackOff, optional exit codes) is activated by the
+authenticated human with the new MCP/browser operation `activate_policy` (in-process acceptance
+against the sole automation AccessBinding, existing encrypted acceptance audit) and explained by
+`get_policy_status`. hub-api polls each active policy every 15 s with one new regional query,
+`observe-workload-restarts` (one bounded Pod LIST, at most 128 Pods), and keeps watermarks,
+deduplicated occurrences, generic-cell-rate budgets (workload: one per five minutes, burst two,
+shared by all policies; per policy: tighten only), execution spend and one saturating suppression
+row per reason in migration 00082 (schema 82, additive, floor 81). Each occurrence runs the
+unchanged S-02 preview/request/start under the policy executor; every eligibility point evaluates
+the executor through its acknowledged acceptance and current team delegation. Policy source
+freshness is 30 s (was 5 s). A start refused before any effect is continued at most three times,
+two seconds apart (as human requests are). Limitations: the trigger loop runs captures inline, so
+one capture (up to 30 s) delays the other policies' polls; intermediate restarts' reasons between
+two polls are not observed; console screens are not built.
+
+Verification:
+- `ASSERVAT_JOURNEY_FOCUS=policy` (new `[continuation-policy]` suite) passed in 823 s (go test
+  815 s): activation 9 s after the envelope, the killed container's capture ran as
+  `policy:<uid>` (restart 1) and was downloaded (354 bytes) 42 s after the start of the scenario;
+  the 150 s three-replica storm (14 kills, 11 observed restarts) admitted one more occurrence
+  (2 total), counted 10 suppressed, kept 3 watermark rows and 1 suppression row; no capture in
+  the 30 quiet seconds. Source unchanged, no cleanup failures. Nine earlier runs failed and were
+  fixed: missing tables in the first-activation inventory, the runner could not create
+  DebugPolicies, the test's reply parser, a zero draft scope digest, and the first start refused at
+  the ADR-212 headroom (fixed by continuation and by not bounding the policy identity with the
+  five-second recovery read).
+- Restart focus regression: passed in 741 s (go test 739 s).
+- Custody (real PostgreSQL): `--run '^(TestPermissionAuthorityPoliciesWithRealServices|TestContextAdmissionWithRealServices)$'`
+  303 PASS (657 s), including four new restart-trigger subtests under compiled hub-runtime
+  grants; `--initial-installation` 85 PASS.
+- `go test -race` of every package except the Kubernetes adapter (50 packages) passes; the
+  Kubernetes adapter passes `-race` for `-run 'Policy|WorkloadRestart|Owner.*Installed|ProviderInstalled|PodTargets|NamedWorkload|HubHeld|WorkloadTarget'`
+  and `-run 'PublicRuntime|Release|HubWorker|Capability'` (the full package does not fit one
+  20-minute run; CI shards it). go vet, go-architecture-check, sql-check, spec-check,
+  architecture-check, helm-check and the schema/CRD bundle checks pass.
+- Not measured: the per-exchange query use of the trigger polls (the eight-query exchange bound
+  is enforced by the router; the run logged no trigger refusal on success because hub logs are
+  printed only on failure).
+
 ## Followers on the release record (ADR-227 phase 3, 2026-10-25)
 
 `installer-upgrade` now also moves the key service, publisher and federation Deployments (each

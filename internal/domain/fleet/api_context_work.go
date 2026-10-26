@@ -63,7 +63,7 @@ type APIContextWork struct {
 }
 
 func (w APIContextWork) Valid(now time.Time) bool {
-	if !w.Channel.Valid() || !authorization.UUID(w.CaptureID) || !authorization.UUID(w.AttemptID) || !w.Actor.Valid() || w.Actor.Kind != identity.Human || !w.Target.Valid() || w.Target.ClusterID != w.Channel.Connector.Binding.ClusterID || !w.Capability.Valid() || !identity.Fresh(w.IssuedAt, w.NotAfter, now, 5*time.Second) {
+	if !w.Channel.Valid() || !authorization.UUID(w.CaptureID) || !authorization.UUID(w.AttemptID) || !authorization.CaptureActor(w.Actor) || !w.Target.Valid() || w.Target.ClusterID != w.Channel.Connector.Binding.ClusterID || !w.Capability.Valid() || !identity.Fresh(w.IssuedAt, w.NotAfter, now, 5*time.Second) {
 		return false
 	}
 	for _, d := range []artifact.Digest{w.ScopeDigest, w.ExpectationDigest, w.IntentDigest, w.BudgetDigest, w.ProjectionDigest} {

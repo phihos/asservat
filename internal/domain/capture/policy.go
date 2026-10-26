@@ -8,6 +8,9 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
+// PolicySourceInterval bounds one policy source observation (ADR-228).
+const PolicySourceInterval = authorization.PolicySourceInterval
+
 // PolicySource is a protected, complete Kubernetes observation. Source writers
 // cannot accept execution. A tombstoned UID cannot be reused or revived.
 type PolicySource struct {
@@ -21,7 +24,7 @@ type PolicySource struct {
 }
 
 func (s PolicySource) Valid(now time.Time) bool {
-	return s.CollectionDigest != (artifact.Digest{}) && authorization.UUID(s.InstallationID) && authorization.UUID(s.ClusterID) && identity.Text(s.NamespaceUID, 64) && identity.Text(s.Name, 253) && s.Revision.Valid() && s.Revision.Generation <= 2147483647 && identity.Text(s.ResourceVersion, 128) && identity.Fresh(s.ObservedAt, s.FreshUntil, now, 5*time.Second)
+	return s.CollectionDigest != (artifact.Digest{}) && authorization.UUID(s.InstallationID) && authorization.UUID(s.ClusterID) && identity.Text(s.NamespaceUID, 64) && identity.Text(s.Name, 253) && s.Revision.Valid() && s.Revision.Generation <= 2147483647 && identity.Text(s.ResourceVersion, 128) && identity.Fresh(s.ObservedAt, s.FreshUntil, now, PolicySourceInterval)
 }
 
 // VerifiedPolicySubmission comes only from independently verified ingress and
@@ -42,6 +45,10 @@ func (s VerifiedPolicySubmission) Valid(now time.Time) bool {
 	return (s.ReplacesID == "" || authorization.UUID(s.ReplacesID)) && authorization.UUID(s.Nonce) && s.Actor.Valid() && s.Actor.Kind == identity.Human && s.Source.Valid() && authorization.UUID(s.ClusterID) && identity.Text(s.NamespaceUID, 64) && identity.Text(s.Name, 253) && s.ScopeDigest != (artifact.Digest{}) && s.EnvelopeDigest != (artifact.Digest{}) && identity.Fresh(s.IssuedAt, s.ExpiresAt, now, 60*time.Second)
 }
 
+// PolicyAdmission binds the submission to the policy object's own location
+// (source cluster/namespace) and the authority to its target workload. ADR-228
+// hub-held policies live in the hub control namespace, so the two locations
+// differ; the target is bound by the accepted authority and Target only.
 type PolicyAdmission struct {
 	RootID       string
 	Submission   VerifiedPolicySubmission
@@ -54,7 +61,7 @@ type PolicyAdmission struct {
 
 func (a PolicyAdmission) Valid(now time.Time) bool {
 	s, p := a.Submission, a.Authority
-	return authorization.UUID(a.RootID) && s.Valid(now) && a.Verification.Valid(now) && a.Verification.Submission == s && a.Verification.RootID == a.RootID && a.Verification.InstallationID == p.InstallationID && a.Verification.IssuerEpoch == a.Recovery.IssuerEpoch && a.Author.Valid(now) && a.Author.Principal == s.Actor && p.Valid(now) && a.Target.Valid() && a.Target.ClusterID == p.ClusterID && a.Target.NamespaceUID == p.NamespaceUID && a.Target.WorkloadUID == p.WorkloadUID && s.Source.UID == p.PolicyUID && s.ScopeDigest == p.ScopeDigest && s.ClusterID == p.ClusterID && s.NamespaceUID == p.NamespaceUID && a.Recovery.Valid(now) && a.Recovery.InstallationID == p.InstallationID
+	return authorization.UUID(a.RootID) && s.Valid(now) && a.Verification.Valid(now) && a.Verification.Submission == s && a.Verification.RootID == a.RootID && a.Verification.InstallationID == p.InstallationID && a.Verification.IssuerEpoch == a.Recovery.IssuerEpoch && a.Author.Valid(now) && a.Author.Principal == s.Actor && p.Valid(now) && a.Target.Valid() && a.Target.ClusterID == p.ClusterID && a.Target.NamespaceUID == p.NamespaceUID && a.Target.WorkloadUID == p.WorkloadUID && s.Source.UID == p.PolicyUID && s.ScopeDigest == p.ScopeDigest && a.Recovery.Valid(now) && a.Recovery.InstallationID == p.InstallationID
 }
 
 // PolicyAcceptance is immutable provenance, not a permit or current eligibility.
@@ -74,7 +81,7 @@ type PolicyAcceptance struct {
 
 func (r PolicyAcceptance) Valid() bool {
 	a, s := r.Authority, r.Submission
-	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.Source.Valid(r.AcceptedAt) && !r.Source.Deleted && !r.Source.Suspended && r.IntentVersion > 0 && s.Valid(r.AcceptedAt) && a.Valid(r.AcceptedAt) && r.Submitter == s.Actor && r.IdentityRevision.Valid() && r.PermissionRevision.Valid() && r.Recovery.Valid(r.AcceptedAt) && r.Source.InstallationID == a.InstallationID && r.Recovery.InstallationID == a.InstallationID && r.Source.Revision == s.Source && s.Source.UID == a.PolicyUID && r.Source.ClusterID == s.ClusterID && s.ClusterID == a.ClusterID && r.Source.NamespaceUID == s.NamespaceUID && s.NamespaceUID == a.NamespaceUID && r.Source.Name == s.Name && a.ScopeDigest == s.ScopeDigest
+	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.Source.Valid(r.AcceptedAt) && !r.Source.Deleted && !r.Source.Suspended && r.IntentVersion > 0 && s.Valid(r.AcceptedAt) && a.Valid(r.AcceptedAt) && r.Submitter == s.Actor && r.IdentityRevision.Valid() && r.PermissionRevision.Valid() && r.Recovery.Valid(r.AcceptedAt) && r.Source.InstallationID == a.InstallationID && r.Recovery.InstallationID == a.InstallationID && r.Source.Revision == s.Source && s.Source.UID == a.PolicyUID && r.Source.ClusterID == s.ClusterID && r.Source.NamespaceUID == s.NamespaceUID && r.Source.Name == s.Name && a.ScopeDigest == s.ScopeDigest
 }
 
 type AcceptedPolicy struct {

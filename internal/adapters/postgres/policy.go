@@ -256,44 +256,53 @@ func (s *Policies) AcceptedPolicyAuthority(ctx context.Context, policy string) (
 		if err != nil {
 			return err
 		}
-		source := policySource(row)
-		now, err := q.CurrentTime(ctx)
-		if err != nil {
-			return err
-		}
-		if source.InstallationID != s.installation || source.Deleted || source.Suspended || !source.Valid(now.Time) {
-			return value.ErrUnavailable
-		}
-		started := now.Time
-		accepted, err := q.ReadPolicyAcceptance(ctx, custodydb.ReadPolicyAcceptanceParams{RootID: id(s.root), ID: row.ActiveID})
-		if err != nil {
-			return err
-		}
-		r, err := decodePolicy(accepted)
-		if err != nil {
-			return err
-		}
-		var receipt audit.Receipt
-		if !accepted.AcknowledgedAt.Valid || json.Unmarshal(accepted.ReceiptJson, &receipt) != nil || !receipt.ValidPolicyAcceptance(s.root, r.ID) || (r.IntentVersion != row.IntentVersion || r.Source.CollectionDigest != source.CollectionDigest) || !samePolicySourceIdentity(r.Source, source) || r.Recovery.IssuerEpoch != uid(trust.IssuerEpoch) {
-			return value.ErrUnavailable
-		}
-		now, err = q.CurrentTime(ctx)
-		if err != nil {
-			return err
-		}
-		recovery, err := recoveryState(trust, now.Time, now.Time)
-		if err != nil {
-			return err
-		}
-		until := identity.Earlier(source.FreshUntil, identity.Earlier(recovery.FreshUntil, r.Authority.NotAfter))
-		if now.Time.Before(started) || !source.Valid(now.Time) || !r.Authority.Valid(now.Time) || !now.Time.Before(until) {
-			return value.ErrUnavailable
-		}
-		out = authorization.AcceptedPolicySnapshot{Authority: r.Authority, ObservedAt: source.ObservedAt, FreshUntil: until}
-		return nil
+		out, _, err = acceptedPolicyIn(ctx, q, s.root, s.installation, trust, row)
+		return err
 	})
 	if err != nil {
 		return authorization.AcceptedPolicySnapshot{}, captureError(err)
 	}
 	return out, nil
+}
+
+// acceptedPolicyIn checks the current acknowledged acceptance of one policy
+// source row inside the caller's transaction, which already holds the
+// recovery and permission-root locks (or shares them). The snapshot's
+// FreshUntil is the original source/recovery bound, never renewed here.
+func acceptedPolicyIn(ctx context.Context, q *custodydb.Queries, root, installation string, trust custodydb.FleetCurrentTrust, row custodydb.PolicySource) (authorization.AcceptedPolicySnapshot, value.PolicyAcceptance, error) {
+	var zero authorization.AcceptedPolicySnapshot
+	source := policySource(row)
+	now, err := q.CurrentTime(ctx)
+	if err != nil {
+		return zero, value.PolicyAcceptance{}, err
+	}
+	if source.InstallationID != installation || source.Deleted || source.Suspended || !source.Valid(now.Time) || !row.ActiveID.Valid {
+		return zero, value.PolicyAcceptance{}, value.ErrUnavailable
+	}
+	started := now.Time
+	accepted, err := q.ReadPolicyAcceptance(ctx, custodydb.ReadPolicyAcceptanceParams{RootID: id(root), ID: row.ActiveID})
+	if err != nil {
+		return zero, value.PolicyAcceptance{}, err
+	}
+	r, err := decodePolicy(accepted)
+	if err != nil {
+		return zero, value.PolicyAcceptance{}, err
+	}
+	var receipt audit.Receipt
+	if !accepted.AcknowledgedAt.Valid || json.Unmarshal(accepted.ReceiptJson, &receipt) != nil || !receipt.ValidPolicyAcceptance(root, r.ID) || (r.IntentVersion != row.IntentVersion || r.Source.CollectionDigest != source.CollectionDigest) || !samePolicySourceIdentity(r.Source, source) || r.Recovery.IssuerEpoch != uid(trust.IssuerEpoch) {
+		return zero, value.PolicyAcceptance{}, value.ErrUnavailable
+	}
+	now, err = q.CurrentTime(ctx)
+	if err != nil {
+		return zero, value.PolicyAcceptance{}, err
+	}
+	recovery, err := recoveryState(trust, now.Time, now.Time)
+	if err != nil {
+		return zero, value.PolicyAcceptance{}, err
+	}
+	until := identity.Earlier(source.FreshUntil, identity.Earlier(recovery.FreshUntil, r.Authority.NotAfter))
+	if now.Time.Before(started) || !source.Valid(now.Time) || !r.Authority.Valid(now.Time) || !now.Time.Before(until) {
+		return zero, value.PolicyAcceptance{}, value.ErrUnavailable
+	}
+	return authorization.AcceptedPolicySnapshot{Authority: r.Authority, ObservedAt: source.ObservedAt, FreshUntil: until, SourceUntil: identity.Earlier(source.FreshUntil, r.Authority.NotAfter)}, r, nil
 }

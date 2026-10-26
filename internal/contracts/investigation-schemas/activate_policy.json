@@ -1,0 +1,207 @@
+{
+  "name": "activate_policy",
+  "description": "Activate the current revision of a hub-held restart-trigger DebugPolicy for your team (ADR-228). Requires whole-pod collection rights and membership in a sponsoring group of the workload's automation AccessBinding. The policy then captures pod status automatically on Pod restarts within the team's finite envelope. Retry an uncertain result with the same idempotency key.",
+  "annotations": {
+    "readOnlyHint": false,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "policy_name": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 253,
+        "pattern": "^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+      },
+      "idempotency_key": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "required": [
+      "policy_name",
+      "idempotency_key"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "const": "metadata"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "type": "null"
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "policy_uid": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "acceptance_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "state": {
+                    "enum": [
+                      "active",
+                      "pendingAudit"
+                    ]
+                  },
+                  "expires_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "max_executions": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10000
+                  },
+                  "replay": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "policy_uid",
+                  "acceptance_id",
+                  "state",
+                  "expires_at",
+                  "max_executions",
+                  "replay"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

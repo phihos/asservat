@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result"]
+NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status"]
 
 
 def main():
@@ -89,6 +89,22 @@ def main():
                 # The Go validator additionally applies the original output
                 # schema and relational request/timing checks to this object.
             output["allOf"] = [{"oneOf": branches}]
+            description["inputSchema"] = localize(description["inputSchema"])
+            description["outputSchema"] = localize(output)
+            result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
+            continue
+        if name in ("activate_policy", "get_policy_status"):
+            # ADR-228: the runtime implements the whole canonical contract.
+            description = copy.deepcopy(tool)
+            description.pop("enabledByDefault", None)
+            output = copy.deepcopy(common)
+            output.pop("$id", None)
+            output["properties"]["provenance"] = {"type": "array", "maxItems": 0}
+            output["properties"]["truncated"] = {"const": False}
+            output["properties"]["next_cursor"] = {"type": "null"}
+            output["properties"]["narrowing_hint"] = {"type": "null"}
+            output["properties"]["data_class"] = {"const": "metadata"}
+            output["allOf"] = [{"oneOf": copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])}]
             description["inputSchema"] = localize(description["inputSchema"])
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()

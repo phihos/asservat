@@ -41,7 +41,7 @@ func (e AutomationEvaluator) Eligibility(ctx context.Context, use value.PolicyUs
 	}
 	p, err := e.Current.PolicyAutomationAuthority(ctx, a, use.Target)
 	now := e.Now()
-	if err != nil || ctx.Err() != nil || now.Before(started) || !now.Before(started.Add(5*time.Second)) || !identity.Fresh(accepted.ObservedAt, accepted.FreshUntil, now, 5*time.Second) {
+	if err != nil || ctx.Err() != nil || now.Before(started) || !now.Before(started.Add(5*time.Second)) || !identity.Fresh(accepted.ObservedAt, accepted.FreshUntil, now, value.PolicySourceInterval) {
 		return deny()
 	}
 	result := value.EvaluatePolicy(a, p, use, now)

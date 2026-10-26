@@ -86,6 +86,17 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 	if err != nil {
 		return nil, &fixedStepError{"operations", mounts.ErrUnavailable}
 	}
+	// ADR-228: activate_policy and get_policy_status on the same audited
+	// routes, and the restart trigger that RunPublic supervises.
+	policies, trigger, err := composePublicPolicies(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
+	if err != nil {
+		return nil, &fixedStepError{"policies", mounts.ErrUnavailable}
+	}
+	if operations, err = presentation.NewInvestigationPolicyOperations(operations, policies); err != nil {
+		return nil, &fixedStepError{"policies", mounts.ErrUnavailable}
+	}
+	d.policyTrigger = trigger
 	o := p.OperationAudit
 	services := PublicContextServices{Sessions: id.sessions, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
 	if pc.fleet != nil {
