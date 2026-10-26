@@ -85,7 +85,8 @@ export class Shares {
     const input = this.pending;
     this.publish({ busy: true, message: undefined, created: undefined });
     const reply = await this.run('create_share', input);
-    if (!reply) { this.publish({ busy: false }); return; }
+    // An aborted call may already have reached the server: stay uncertain.
+    if (!reply) { this.publish({ busy: false, uncertain: true }); return; }
     if (reply.definite) this.pending = undefined;
     this.publish({ busy: false, uncertain: !reply.definite, message: reply.message,
       created: reply.data && { shareID: reply.data.share_id, expiresAt: input.expires_at, recipients: input.recipients.length } });
