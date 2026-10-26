@@ -62,11 +62,11 @@ const installedJourneyRetention = 240
 // installedJourneyRetentionSeconds is the journey's retention. The focused
 // journey run (ASSERVAT_JOURNEY_FOCUS=journey) moves the console checks and
 // the approved projection to the browser focus and reached the expiry wait
-// about 50 s after acceptance locally, so 110 s keeps a margin of about a
-// minute and the run stays near 15 minutes.
+// 25 s after acceptance locally, so 80 s keeps a margin of about a minute
+// and the run stays well under 15 minutes.
 func installedJourneyRetentionSeconds() int64 {
 	if installedJourneyFocus() == "journey" {
-		return 110
+		return 80
 	}
 	return installedJourneyRetention
 }
