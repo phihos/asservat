@@ -22,7 +22,8 @@ type RecoveryReader interface {
 
 // ContextCaseService composes the existing ordinary evaluator and verified
 // catalog/retention reader. It performs no acquisition, decryption or effects.
-// Raw/share paths cannot fall back to this approved pod-status view.
+// Raw paths cannot fall back to this approved pod-status view; a concrete
+// share (ADR-232) admits its recipients to exactly its artifact.
 type ContextCaseService struct {
 	RootID, InstallationID string
 	Routes                 ContextCaseRoutes
@@ -31,7 +32,11 @@ type ContextCaseService struct {
 	Retention              permissions.DownloadRetentionResolver
 	Recovery               RecoveryReader
 	Processing             permissions.DownloadProcessingReader
-	Now                    func() time.Time
+	// Shares is the ADR-232 recipient branch. It is consulted only after the
+	// ordinary evaluator refuses, keyed by the caller and one artifact, and
+	// before any catalog read of that artifact. Nil disables sharing.
+	Shares permissions.ShareReader
+	Now    func() time.Time
 }
 
 type authorizedContext struct {
@@ -40,6 +45,8 @@ type authorizedContext struct {
 	permission identity.Revision
 	record     permissions.ContextDownloadEvidence
 	processing artifact.DownloadProcessingProof
+	// share is the admitting share of a recipient read; nil for ordinary reads.
+	share *authorization.Share
 }
 
 func (s ContextCaseService) GetContextCase(ctx context.Context, source identities.CurrentIdentity, caseID string) (value.ContextCase, error) {
@@ -75,8 +82,14 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 			return zero, value.ErrUnavailable
 		}
 		eligible := authorization.ScopeEligibility(i, p, authorization.ReadApproved, route.Target, s.Now())
+		var share *authorization.Share
 		if !eligible.Eligible {
-			continue
+			// Recipient branch: the caller's own shares of this artifact are
+			// read before, and instead of, any evidence lookup. No share, no
+			// catalog read.
+			if share, eligible = s.shared(ctx, i, p, route, caseID, nil, artifact.Digest{}); share == nil {
+				continue
+			}
 		}
 		record, err := s.Catalog.ContextDownloadEvidence(ctx, route.ArtifactID)
 		if err != nil {
@@ -87,7 +100,19 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 			return zero, value.ErrUnavailable
 		}
 		retained := authorization.Retained{ArtifactID: route.ArtifactID, Target: route.Target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
-		initial := authorization.Evaluate(i, p, authorization.ReadApproved, route.Target, &retained, s.Now())
+		var initial authorization.Result
+		if share == nil {
+			initial = authorization.Evaluate(i, p, authorization.ReadApproved, route.Target, &retained, s.Now())
+			if !initial.Eligible {
+				// Current whole-pod rights outside the retained audience: a
+				// share may still admit this caller to the artifact.
+				share, initial = s.shared(ctx, i, p, route, caseID, &retained, record.Version)
+			}
+		} else {
+			// A share covers one concrete verified version and needs a current
+			// pinned manager inside the retained audience.
+			share, initial = permissions.RecipientShare(i, p, route.Target, &retained, []authorization.Share{*share}, s.RootID, caseID, route.ArtifactID, record.Version, s.Now())
+		}
 		if !initial.Eligible {
 			continue
 		}
@@ -103,7 +128,7 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 			until = identity.Earlier(until, at)
 		}
 		retained.ExpiresAt = resolved.ExpiresAt
-		records = append(records, authorizedContext{artifact: value.ContextCaseArtifact{ArtifactID: route.ArtifactID, CaptureID: route.CaptureID, Target: route.Target, Version: record.Version, ExpiresAt: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy}, retained: retained, permission: p.Revision, record: record, processing: processing})
+		records = append(records, authorizedContext{artifact: value.ContextCaseArtifact{ArtifactID: route.ArtifactID, CaptureID: route.CaptureID, Target: route.Target, Version: record.Version, ExpiresAt: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Shared: share != nil}, retained: retained, permission: p.Revision, record: record, processing: processing, share: share})
 	}
 	if len(records) == 0 {
 		return zero, value.ErrUnavailable
@@ -122,6 +147,16 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 			return zero, value.ErrUnavailable
 		}
 		eligible := authorization.Evaluate(current, p, authorization.ReadApproved, record.artifact.Target, &record.retained, s.Now())
+		if record.share != nil {
+			// Re-read the share: a revocation or expiry since the first read
+			// refuses the whole response.
+			rows, err := s.Shares.RecipientShares(ctx, record.artifact.ArtifactID, current)
+			latest, same := permissions.SameShare(*record.share, rows)
+			if err != nil || !same {
+				return zero, value.ErrUnavailable
+			}
+			eligible = authorization.EvaluateShare(current, p, record.artifact.Target, &record.retained, latest, s.Now())
+		}
 		if !eligible.Eligible {
 			return zero, value.ErrUnavailable
 		}
@@ -149,6 +184,22 @@ func (s ContextCaseService) GetContextCase(ctx context.Context, source identitie
 		return zero, value.ErrUnavailable
 	}
 	return out, nil
+}
+
+// shared is the recipient branch for one route: the caller's shares of this
+// artifact only (keyed by caller and artifact), evaluated against the current
+// projection. It returns nil when no share admits the caller.
+func (s ContextCaseService) shared(ctx context.Context, i identity.Identity, p authorization.Projection, route value.ContextCaseRoute, caseID string, retained *authorization.Retained, version artifact.Digest) (*authorization.Share, authorization.Result) {
+	if s.Shares == nil {
+		return nil, authorization.Result{Reason: "NoEntitlement"}
+	}
+	rows, err := s.Shares.RecipientShares(ctx, route.ArtifactID, i)
+	if err != nil {
+		// An unavailable share ledger admits nobody through a share, but it
+		// never makes an ordinary reader's other artifacts unavailable.
+		return nil, authorization.Result{Reason: "ShareUnavailable"}
+	}
+	return permissions.RecipientShare(i, p, route.Target, retained, rows, s.RootID, caseID, route.ArtifactID, version, s.Now())
 }
 
 func sameIdentity(a, b identity.Identity, now time.Time) bool {

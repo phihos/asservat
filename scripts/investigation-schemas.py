@@ -14,7 +14,53 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy"]
+NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share"]
+
+
+def share_subset(name, tool):
+    """ADR-232 increment 1: one concrete pod-status artifact per share, the
+    get_case read only, no sharing intents, management selection, cursors or
+    pending replies. Every runtime input/output is valid canonically."""
+    description = copy.deepcopy(tool)
+    description.pop("enabledByDefault", None)
+    schema = description["inputSchema"]
+    props = schema["properties"]
+    branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
+    success = next(b for b in branches if b["properties"]["status"].get("const") == "ok")
+    error = next(b for b in branches if b["properties"]["status"].get("const") == "error")
+    data = success["properties"]["data"]
+    if name == "create_share":
+        props.pop("management")
+        props["artifacts"]["minItems"] = props["artifacts"]["maxItems"] = 1
+        props["recipients"]["maxItems"] = 8
+        props["data_classes"] = {"const": ["metadata"]}
+        props["operations"] = {"const": ["get_case"]}
+        description["description"] = ("Share one stored pod-status artifact (its exact digest from get_case) with up to eight users or groups of your identity provider until expires_at "
+                                      "(at most seven days, never past the artifact's retention). Recipients can read it with get_case; download, inspection of other artifacts and capture rights are not shared. "
+                                      "Needs the evidence-owner role on the workload and the evidence:share scope. Repeat an uncertain request with the same idempotency key.")
+        data["properties"] = {k: v for k, v in data["properties"].items() if k in ("share_id", "phase")}
+        data["properties"]["phase"] = {"const": "Active"}
+    elif name == "list_shares":
+        props.pop("cursor")
+        props.pop("include_intents")
+        schema.pop("allOf")
+        description["description"] = ("List your own shares (view owned, every phase) or the shares you can currently read (view received, Active only). "
+                                      "Most recent first, at most limit (default 20, maximum 100).")
+        data["properties"] = {k: v for k, v in data["properties"].items() if k == "shares"}
+        row = data["properties"]["shares"]["items"]
+        row["properties"].pop("origin")
+        row["properties"]["phase"] = {"enum": ["Active", "Expired", "Revoked", "Suspended"]}
+    else:
+        props.pop("sharing_intent_id")
+        schema.pop("oneOf")
+        schema["required"] = ["share_id", "expected_revision", "idempotency_key"]
+        description["description"] = ("Revoke one of your shares. A share has revision 1 until it is revoked (revision 2). Recipients lose access at their next read; "
+                                      "independent rights are unchanged. Repeating with the same idempotency key is harmless.")
+        data["properties"].pop("sharing_intent_id")
+        data.pop("oneOf")
+        data["required"] = ["share_id", "phase", "revision"]
+        data["properties"]["revision"] = {"const": 2}
+    return description, [success, error]
 
 
 def main():
@@ -93,10 +139,14 @@ def main():
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
-        if name in ("activate_policy", "get_policy_status", "deactivate_policy"):
+        if name in ("activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share"):
             # ADR-228: the runtime implements the whole canonical contract.
+            # ADR-232: the share tools implement a bounded subset.
             description = copy.deepcopy(tool)
             description.pop("enabledByDefault", None)
+            branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
+            if name in ("create_share", "list_shares", "revoke_share"):
+                description, branches = share_subset(name, tool)
             output = copy.deepcopy(common)
             output.pop("$id", None)
             output["properties"]["provenance"] = {"type": "array", "maxItems": 0}
@@ -104,7 +154,7 @@ def main():
             output["properties"]["next_cursor"] = {"type": "null"}
             output["properties"]["narrowing_hint"] = {"type": "null"}
             output["properties"]["data_class"] = {"const": "metadata"}
-            output["allOf"] = [{"oneOf": copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])}]
+            output["allOf"] = [{"oneOf": branches}]
             description["inputSchema"] = localize(description["inputSchema"])
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
@@ -158,13 +208,14 @@ def main():
             row["properties"]["preset_ref"]["properties"]["name"] = {"const": "pod-status"}
             data["properties"]["diagnostics"]["maxItems"] = 1
         if name == "get_case":
-            # Ordinary verified pod-status metadata only. No raw/shared/native
+            # Verified pod-status metadata only (ordinary or ADR-232 shared). No raw/native
             # file metadata, invented titles or historical timeline projection.
             case = data["properties"]["case"]
             case["properties"] = {k: v for k, v in case["properties"].items()
                                   if k in ("case_id", "status", "access")}
             case["properties"]["status"] = {"const": "Ready"}
-            case["properties"]["access"] = {"const": "ordinary"}
+            # ADR-232: "shared" when a share admitted an artifact of the view.
+            case["properties"]["access"] = {"enum": ["ordinary", "shared"]}
             artifacts = data["properties"]["artifacts"]
             artifacts["minItems"] = 1
             row = artifacts["items"]["properties"]
@@ -198,7 +249,7 @@ def main():
                 "prepare_artifact_download": "Prepare an ordinary pod-status native download with a stable idempotency key. Retry unknown replies with the same key. Only an explicit acknowledged continuation may repeat preparation automatically.",
  "cancel_artifact_download": tool["description"],
  "get_artifact_download": "Read current authorized download status and verified native metadata. Never starts, repairs or decrypts evidence. Native file bytes use the authenticated content path, not MCP.",
- "get_case": "Read a currently authorized ordinary case of verified pod-status artifacts and effective handling dates. Artifact digest is the verified ciphertext-copy version, not native file SHA-256. No native bytes, raw or shared access.",
+ "get_case": "Read a currently authorized case of verified pod-status artifacts and effective handling dates: ordinary access, or artifacts an evidence owner shared with you (access shared). Artifact digest is the verified ciphertext-copy version, not native file SHA-256. No native bytes or raw access; shared artifacts cannot be downloaded.",
             }[name],
             "annotations": tool["annotations"],
             "inputSchema": localize(input_schema),

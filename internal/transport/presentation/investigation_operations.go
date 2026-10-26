@@ -54,7 +54,22 @@ func NewInvestigationProjectionOperations(base *InvestigationOperations, project
 // NewInvestigationPolicyOperations adds the ADR-228 policy operations to an
 // already composed installation, through the same audited routing.
 func NewInvestigationPolicyOperations(base *InvestigationOperations, policies *PolicyOperations) (*InvestigationOperations, error) {
-	if base == nil || policies == nil || policies.PublicOrigin() != base.origin {
+	if policies == nil {
+		return nil, ErrOperationsConfiguration
+	}
+	return withOperations(base, policies)
+}
+
+// NewInvestigationShareOperations adds the ADR-232 share operations the same way.
+func NewInvestigationShareOperations(base *InvestigationOperations, shares *ShareOperations) (*InvestigationOperations, error) {
+	if shares == nil {
+		return nil, ErrOperationsConfiguration
+	}
+	return withOperations(base, shares)
+}
+
+func withOperations(base *InvestigationOperations, policies Operations) (*InvestigationOperations, error) {
+	if base == nil || policies.PublicOrigin() != base.origin {
 		return nil, ErrOperationsConfiguration
 	}
 	out := *base
@@ -176,6 +191,8 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 	case *ContextDownloadOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *PolicyOperations:
+		return p.CallWithContext(ctx, current, call, name, raw)
+	case *ShareOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	default:
 		return OperationReply{}, contracts.ErrInvestigationWire

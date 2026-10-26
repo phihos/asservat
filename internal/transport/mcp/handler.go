@@ -394,6 +394,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if _, ok := h.operations.Tool("prepare_artifact_download"); ok {
 				scopes = append(scopes, "evidence:download")
 			}
+			if _, ok := h.operations.Tool("create_share"); ok {
+				scopes = append(scopes, "evidence:share")
+			}
 		}
 		_ = json.NewEncoder(w).Encode(struct {
 			Resource             string   `json:"resource"`

@@ -92,6 +92,9 @@ type publicContext struct {
 	automation     *postgres.AutomationAuthorities
 	hubPolicies    *kube.HubPolicySources
 	policyAudit    auditapp.PolicyAcceptancePublisher
+	// ADR-232 concrete evidence shares and the case routes they bind to.
+	shares     *postgres.EvidenceShares
+	caseRoutes *postgres.ContextCaseReads
 }
 
 func decodeAuditPolicy(raw json.RawMessage, lane, root, installation string) (audit.OperationLifecyclePolicy, error) {
@@ -162,7 +165,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		return out, nil
 	}
-	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution", "policy-automation")
+	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution", "policy-automation", "evidence-share")
 	if err != nil {
 		return nil, err
 	}
@@ -361,7 +364,11 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if out.catalog, err = postgres.NewContextPublications(ctx, sql["hub-metadata-read"], root); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing}
+	if out.shares, err = postgres.NewEvidenceShares(ctx, sql["evidence-share"], root, recovery); err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.caseRoutes = routes
+	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares}
 	if out.fleet, err = newPublicFleet(ctx, c, providers, pools, observer, probe, a); err != nil {
 		return nil, err
 	}

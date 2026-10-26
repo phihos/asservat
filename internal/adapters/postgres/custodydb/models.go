@@ -1466,6 +1466,31 @@ type DownloadWorkerOwner struct {
 	ReleasedAt   pgtype.Timestamptz
 }
 
+type EvidenceShare struct {
+	ID             pgtype.UUID
+	RootID         pgtype.UUID
+	ArtifactID     pgtype.UUID
+	CaseID         pgtype.UUID
+	ClusterID      pgtype.UUID
+	NamespaceUid   string
+	WorkloadUid    string
+	PodUid         string
+	Version        []byte
+	CreatorIssuer  string
+	CreatorSubject string
+	CreatorClient  string
+	Management     []byte
+	Recipients     []byte
+	RecipientKeys  []string
+	IdempotencyKey string
+	RequestDigest  []byte
+	CreatedAt      pgtype.Timestamptz
+	ExpiresAt      pgtype.Timestamptz
+	RevokedAt      pgtype.Timestamptz
+	RevokeKey      pgtype.Text
+	Revision       int64
+}
+
 type FleetBootstrap struct {
 	InstallationID       pgtype.UUID
 	ID                   pgtype.UUID

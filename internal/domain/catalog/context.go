@@ -72,6 +72,8 @@ type ContextCaseArtifact struct {
 	// existing versioned ciphertext-copy receipt serialization. It is NOT the native file SHA256.
 	Version             artifact.Digest
 	ExpiresAt, DeleteBy time.Time
+	// Shared marks an artifact admitted through a recipient's share (ADR-232).
+	Shared bool
 }
 
 func (c ContextCase) Valid(now time.Time) bool {

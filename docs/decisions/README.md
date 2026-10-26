@@ -1,5 +1,11 @@
 # Decision records
 
+[ADR-232 — Concrete evidence share of one stored artifact](232-concrete-evidence-share.md) is S-06
+increment 1: `create_share`/`list_shares`/`revoke_share` over MCP, one `evidence_share` row per
+share with derived Active/Expired/Revoked/Suspended state (migration 00086), pinned owner
+assignments, and a recipient branch consulted only after ordinary eligibility refuses and before
+any evidence lookup. Recipients read `get_case`; native download stays refused.
+
 [ADR-231 — Alert trigger from the in-cluster Alertmanager API](231-alert-detector.md) lets existing
 Prometheus and log-stack alert rules trigger captures: the regional connector reads the cluster's
 configured Alertmanager v2 API on the existing 15-second poll (no hub endpoint or credential),

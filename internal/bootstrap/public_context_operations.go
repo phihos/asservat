@@ -12,6 +12,7 @@ import (
 	captureapp "asservat.local/asservat/internal/application/capture"
 	catalogapp "asservat.local/asservat/internal/application/catalog"
 	"asservat.local/asservat/internal/application/evidence"
+	"asservat.local/asservat/internal/application/sharing"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/transport/presentation"
 )
@@ -146,4 +147,15 @@ func composePublicPolicies(c PublicContextOperationsConfig, s PublicContextOpera
 	}
 	trigger := &captureapp.PolicyTrigger{RootID: c.RootID, InstallationID: c.InstallationID, RecipeName: planningapp.ContextRecipeName, RecipeDigest: planningapp.RecipeDigest(), Ledger: pc.policyTriggers, Documents: pc.hubPolicies, Sources: pc.policies, Accepted: pc.policies, Observer: observer, Capture: v.submission, Audit: pc.policyAudit, Now: c.Now, Report: timedEventLog(os.Stderr, "policy trigger")}
 	return operations, trigger, nil
+}
+
+// composePublicShares composes the ADR-232 share operations on the same case
+// routes, permissions, catalog, recovery and clock as get_case.
+func composePublicShares(c PublicContextOperationsConfig, s PublicContextOperationServices, pc *publicContext) (*presentation.ShareOperations, error) {
+	v, err := composePublicContextUseCases(c, s)
+	if err != nil || pc == nil || pc.shares == nil || pc.caseRoutes == nil || pc.permissions == nil || pc.catalog == nil {
+		return nil, presentation.ErrOperationsConfiguration
+	}
+	service := sharing.Service{RootID: c.RootID, InstallationID: c.InstallationID, Routes: pc.caseRoutes, Permissions: pc.permissions, Catalog: pc.catalog, Store: pc.shares, Recovery: v.submission.Recovery, NewID: c.NewID, Now: c.Now}
+	return presentation.NewShareOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }

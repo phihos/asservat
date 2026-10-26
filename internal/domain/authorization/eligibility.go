@@ -141,7 +141,8 @@ func (e Retained) valid() bool {
 }
 
 // Evaluate is the ordinary context/approved-evidence facet only. It has no share
-// or raw-grant fallback. Adding those must preserve deny and retained audiences.
+// or raw-grant fallback: the share branch is the separate EvaluateShare, which
+// callers consult only after this facet refuses (ADR-232).
 func Evaluate(i identity.Identity, p Projection, op Operation, t Target, e *Retained, now time.Time) Result {
 	return evaluate(i, p, op, t, e, now, true)
 }
@@ -161,7 +162,7 @@ func evaluate(i identity.Identity, p Projection, op Operation, t Target, e *Reta
 	if !i.Valid(now) {
 		return deny("IdentityUnavailable")
 	}
-	if !p.Revision.Valid() || p.Target != t || !p.DeniesComplete || !identity.Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) || !identity.Fresh(p.DeniesObservedAt, p.DeniesFreshUntil, now, PermissionObservationInterval) || !rowsValid(p.Allows) || !rowsValid(p.Denies) {
+	if !projectionCurrent(p, t, now) {
 		return deny("PermissionUnavailable")
 	}
 	if op == CollectContext && e != nil {

@@ -3,7 +3,8 @@ package postgres
 // Exact permanent-table inventory, including five SQL54 managed-capacity tables
 // migration 00065's two regional capacity tables (ADR-197) and migration
 // 00066's refresh demands (ADR-200), 00067 deletion, 00068 queries and
-// 00082's four restart-trigger tables (ADR-228).
+// 00082's four restart-trigger tables (ADR-228) and 00086's evidence shares
+// (ADR-232).
 // Missing or unknown relations reject first activation.
 // initialTransientTables exist only part way through migration replay: 00043
 // creates them and 00078 drops them (ADR-224). They never belong to a
@@ -90,6 +91,7 @@ var initialInstallationTables = []string{
 	"download_worker_configuration_revision",
 	"download_worker_enrollment",
 	"download_worker_owner",
+	"evidence_share",
 	"fleet_bootstrap",
 	"fleet_bootstrap_intent",
 	"fleet_certificate_issue",

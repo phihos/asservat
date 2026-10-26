@@ -600,6 +600,7 @@ components:
   package_roots:
   - internal/application/sharing
   allowed_dependencies:
+  - C-02
   - C-03
   - C-07
   - C-08

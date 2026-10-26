@@ -1,5 +1,65 @@
 # Sustained implementation progress
 
+## S-06 increment 1: concrete evidence share (ADR-232, 2026-10-26)
+
+[ADR-232](decisions/232-concrete-evidence-share.md) implements the S-06 plan's increment 1 over
+MCP (and the browser operation route): `create_share`, `list_shares` and `revoke_share` for one
+published pod-status artifact, a recipient-only `get_case` view (access `shared`) and revocation.
+Migration 00086 (schema 86, floor 81) adds `evidence_share` (one row per share; Active, Expired,
+Revoked, Suspended derived at read time; 7-day maximum, 8 recipients, 32 active shares per artifact
+as constants; immutable apart from one revocation). The ordinary evaluator is unchanged; the
+recipient branch (`EvaluateShare`) is consulted only after it refuses, keyed by (artifact, caller's
+user/group keys) before any catalog read, and every read re-reads the share. Current denies win.
+Management pins the creator's contributing `evidence-owner` assignments (ID and basis digest), so
+a re-granted binding never restores a suspended share. Native download stays refused for
+recipients (increment 3). New hub-runtime duty `evidence-share`; share service in the C-17 package
+`internal/application/sharing`.
+
+Prerequisites: (a) group freshness ≤ 5 min holds for browser sessions, MCP and download tokens
+(`identity.Admit` bounds identities by `IssuedAt + GroupMaxAge`, policy rejects > 5 min), so Group
+recipients are accepted; (b) the installed Keycloak realm adds `evidence:share` as one more client
+scope (one admin POST, optional on the MCP client).
+
+Verification (tracked test/results files restored after each run):
+- Unit, `-race`: domain/authorization (share matrix: recipient user/group, group churn, unrelated
+  principal, foreign issuer, workload principal, scope, expiry, revocation, user and group deny,
+  retired / re-granted / changed-digest / denied manager, creator deny, other artifact/target,
+  manager outside the retained audience, retention end, stale share read, raw class; no ordinary
+  operation gained), domain/audit, domain/catalog, application/authorization (approved inspection
+  admits a recipient; revocation during the read, no share and deny refuse, no catalog read without
+  a share), application/catalog (recipient view, refusals before the catalog read, revocation and
+  deny during the read), application/sharing (create/replay/conflict/list/revoke, retention clamp,
+  owner loss suspends, refusals: scope, non-owner, foreign issuer, > 7 d, changed version,
+  unrelated caller without catalog read, > 8 recipients, workload caller; received list hides
+  denied), transport/presentation/mcp/browser, contracts, adapters/postgres, bootstrap: PASS.
+  `internal/application/authorization` `TestDownloadPolicyObservation*` fails intermittently with
+  `-count=10` on unchanged `origin/main` as well (timing flake, not touched here).
+- `make pre-push`: PASS (after one gofmt fix). `make sql-check`: PASS (55 files).
+- Custody (real PostgreSQL, compiled hub-runtime grants), `--run
+  '^(TestContextAdmissionWithRealServices|TestCustodyUpgradeSchemaWithRealPostgres)$/^(evidence-share-recipient-read-revocation-expiry-and-deny|ordinary-case-metadata-navigation-and-private-routing)$'`:
+  PASS, go test 10.1 s (harness phase 30.3 s), source unchanged, no cleanup failures. The share
+  subtest (4.8 s): unrelated principal and recipient refused before any share; maintainer
+  without `evidence-owner` cannot share; same-key replay and changed-request Conflict; recipient
+  reads only the shared artifact, a stranger does not; runtime role cannot extend, re-key or delete
+  a share and the owner cannot extend it in place (trigger); six concurrent readers during the
+  revocation: 0 reads succeeded after the revocation returned; revocation replay, second key
+  Conflict, non-creator NotAvailable; 2-second share expires; one accepted permission batch with a
+  user Deny and the owners' binding removed refuses the user share (deny wins) and the group share
+  (pinned owner assignment gone). Upgrade 85 → 86 PASS.
+- Custody `--initial-installation` (exact table inventory incl. `evidence_share`): PASS,
+  `TestInitialInstallationWithRealServices` 135.0 s (phase 138.5 s), source unchanged, no cleanup
+  failures.
+- Installed `share` focus (`ASSERVAT_JOURNEY_FOCUS=share`, fast fixture, `scripts/ci-native.sh
+  continuation-share`): PASS, go test 474.2 s (`installer-continuation` 283.4 s), wall 590 s,
+  source unchanged, no cleanup failures. After the short journey published one artifact: the
+  unrelated Keycloak user's `get_case` NotAvailable; the developer (installed AccessBinding with
+  `workload-maintainer` + `evidence-owner`, token with `evidence:share`) `create_share` ok; the
+  user's `get_case` ok with access `shared` and the same digest, `list_shares(received)` lists it,
+  `prepare_artifact_download` NotAvailable; `revoke_share` ok (revision 2); the user's next
+  `get_case` NotAvailable; `list_shares(owned)` shows Revoked. An earlier run before moving the
+  service into `internal/application/sharing` (no behavior change) also passed (go test 451.1 s,
+  wall 566 s).
+
 ## S-03 exit audit and cross-workload storm fairness test (2026-10-26)
 
 Audit of the S-03 row of [implementation slices](architecture/implementation-slices.md) after
