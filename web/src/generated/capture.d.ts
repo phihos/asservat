@@ -970,6 +970,83 @@ export interface components {
                 retry_after_seconds?: number;
             };
         });
+        McpInput_list_capture_history: {
+            target_handle?: string;
+            target_ref?: {
+                /** Format: uuid */
+                cluster_id: string;
+                namespace: string;
+                /** @enum {unknown} */
+                kind: "Deployment" | "StatefulSet" | "Pod";
+                name: string;
+            };
+            /** Format: uuid */
+            cluster_id?: string;
+            target?: components["schemas"]["Contract_target"];
+            /** @enum {unknown} */
+            origin?: "manual" | "policy" | "discovery" | "all";
+            cursor?: string;
+            limit?: number;
+        } & (unknown | unknown | unknown);
+        Contract_capture_history_5bb857fd69a5246d: {
+            /** @constant */
+            kind: "captureHistoryPage";
+            history: components["schemas"]["Contract_capture_history_d3f629e9c1ad4b52"][];
+            /** @constant */
+            ordering: "acceptedAtDescCaptureIDDesc";
+        };
+        Contract_capture_history_d3f629e9c1ad4b52: {
+            /** Format: uuid */
+            capture_id: string;
+            /** @enum {unknown} */
+            origin: "manual" | "policy" | "discovery";
+            /** Format: date-time */
+            accepted_at: string;
+            /** Format: date-time */
+            summary_expires_at: string;
+            /** @enum {unknown} */
+            phase: "Pending" | "Validating" | "AwaitingApproval" | "Armed" | "Queued" | "Running" | "Finalizing" | "Succeeded" | "Partial" | "Failed" | "Cancelled" | "Indeterminate";
+            action_kinds: ("kubernetesSnapshot" | "logs" | "processSnapshot" | "fileRead" | "packetCapture" | "networkSnapshot" | "runtimeDiagnostic" | "kernelCore" | "liveCore" | "command" | "httpDiagnostic" | "artifactCollect" | "profile" | "syscallTrace")[];
+            /** @enum {unknown} */
+            evidence_state: "pending" | "available" | "partial" | "expired" | "unavailable";
+            /** @enum {unknown} */
+            repeat_state: "available" | "requiresSelection" | "parametersExpired" | "parametersUnavailable" | "targetUnavailable";
+            /** Format: date-time */
+            settings_expires_at?: string;
+            /** Format: uuid */
+            repeated_from_capture_id?: string;
+            /** Format: uri */
+            navigation_uri: string;
+            /** @enum {unknown} */
+            operation?: "collect" | "recordingSave";
+        } & (unknown & unknown);
+        McpOutput_list_capture_history: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: components["schemas"]["Contract_capture_history_5bb857fd69a5246d"];
+            /** @constant */
+            data_class?: "metadata";
+        } | {
+            /** @constant */
+            status: "pending";
+            data: {
+                query_handle: string;
+                retry_after_seconds: number;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
     };
     responses: never;
     parameters: never;

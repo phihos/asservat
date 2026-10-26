@@ -84,7 +84,14 @@ func PolicyContextEligibility(i identity.Identity, a AcceptedPolicyAuthority, p 
 // (acceptance and status): the projection is workload-scoped, so the Pod
 // field names the workload itself. Capture checks use the triggering Pod.
 func PolicyScope(a AcceptedPolicyAuthority) Target {
-	return Target{ClusterID: a.ClusterID, NamespaceUID: a.NamespaceUID, WorkloadUID: a.WorkloadUID, PodUID: a.WorkloadUID}
+	return WorkloadScope(a.ClusterID, a.NamespaceUID, a.WorkloadUID)
+}
+
+// WorkloadScope is the whole-workload target of a check that needs no Pod
+// (policy acceptance, capture history): permission projections are
+// workload-scoped, so the Pod field names the workload itself.
+func WorkloadScope(cluster, namespaceUID, workloadUID string) Target {
+	return Target{ClusterID: cluster, NamespaceUID: namespaceUID, WorkloadUID: workloadUID, PodUID: workloadUID}
 }
 
 // PolicyStopEligibility is the right to deactivate an accepted policy

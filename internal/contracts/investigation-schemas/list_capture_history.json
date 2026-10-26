@@ -1,0 +1,417 @@
+{
+  "name": "list_capture_history",
+  "description": "List recent accepted pod-status captures of a currently authorized named workload, newest first, for seven days after acceptance: your own requests and those whose retained audience you currently belong to. Origin manual (default), policy or all; at most limit entries (default 20, maximum 100) and next_cursor for more. A recreated workload starts a new history. Repeat one with preview_capture history_capture_id. No evidence or settings are read.",
+  "annotations": {
+    "readOnlyHint": true,
+    "destructiveHint": false,
+    "openWorldHint": false
+  },
+  "inputSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "target_ref": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cluster_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "namespace": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "kind": {
+            "enum": [
+              "Deployment",
+              "StatefulSet",
+              "Pod"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 253
+          }
+        },
+        "required": [
+          "cluster_id",
+          "namespace",
+          "kind",
+          "name"
+        ]
+      },
+      "origin": {
+        "enum": [
+          "manual",
+          "policy",
+          "all"
+        ]
+      },
+      "cursor": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
+      "limit": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100
+      }
+    },
+    "required": [
+      "target_ref"
+    ]
+  },
+  "outputSchema": {
+    "title": "Asservat mcp-result v1",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "schema_version": {
+        "const": "mcp-result/v1"
+      },
+      "request_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "data_class": {
+        "const": "metadata"
+      },
+      "status": {
+        "type": "string",
+        "enum": [
+          "ok",
+          "pending",
+          "error"
+        ]
+      },
+      "data": {
+        "type": "object"
+      },
+      "truncated": {
+        "const": false
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "narrowing_hint": {
+        "type": "null"
+      },
+      "warnings": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "maxItems": 32,
+        "minItems": 0,
+        "uniqueItems": true
+      },
+      "provenance": {
+        "type": "array",
+        "maxItems": 0
+      }
+    },
+    "required": [
+      "schema_version",
+      "request_id",
+      "data_class",
+      "status",
+      "data",
+      "truncated",
+      "next_cursor",
+      "narrowing_hint",
+      "warnings",
+      "provenance"
+    ],
+    "allOf": [
+      {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "ok"
+              },
+              "data": {
+                "$ref": "#/$defs/d0"
+              },
+              "data_class": {
+                "const": "metadata"
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "error"
+              },
+              "data": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "retryable": {
+                    "type": "boolean"
+                  },
+                  "navigation_uri": {
+                    "type": "string",
+                    "format": "uri",
+                    "maxLength": 2048
+                  },
+                  "responsible_role": {
+                    "enum": [
+                      "maintainer",
+                      "approver",
+                      "administrator",
+                      "none"
+                    ]
+                  },
+                  "retry_after_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 60
+                  }
+                },
+                "required": [
+                  "code",
+                  "message",
+                  "retryable"
+                ]
+              }
+            },
+            "required": [
+              "status",
+              "data"
+            ]
+          }
+        ]
+      }
+    ],
+    "$defs": {
+      "d1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "capture_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "origin": {
+            "enum": [
+              "manual",
+              "policy",
+              "discovery"
+            ]
+          },
+          "accepted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "summary_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "phase": {
+            "enum": [
+              "Pending",
+              "Validating",
+              "AwaitingApproval",
+              "Armed",
+              "Queued",
+              "Running",
+              "Finalizing",
+              "Succeeded",
+              "Partial",
+              "Failed",
+              "Cancelled",
+              "Indeterminate"
+            ]
+          },
+          "action_kinds": {
+            "type": "array",
+            "items": {
+              "enum": [
+                "kubernetesSnapshot",
+                "logs",
+                "processSnapshot",
+                "fileRead",
+                "packetCapture",
+                "networkSnapshot",
+                "runtimeDiagnostic",
+                "kernelCore",
+                "liveCore",
+                "command",
+                "httpDiagnostic",
+                "artifactCollect",
+                "profile",
+                "syscallTrace"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 16,
+            "uniqueItems": true
+          },
+          "evidence_state": {
+            "enum": [
+              "pending",
+              "available",
+              "partial",
+              "expired",
+              "unavailable"
+            ]
+          },
+          "repeat_state": {
+            "enum": [
+              "available",
+              "requiresSelection",
+              "parametersExpired",
+              "parametersUnavailable",
+              "targetUnavailable"
+            ]
+          },
+          "settings_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "repeated_from_capture_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "navigation_uri": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 2048
+          },
+          "operation": {
+            "enum": [
+              "collect",
+              "recordingSave"
+            ]
+          }
+        },
+        "required": [
+          "capture_id",
+          "origin",
+          "accepted_at",
+          "summary_expires_at",
+          "phase",
+          "action_kinds",
+          "evidence_state",
+          "repeat_state",
+          "navigation_uri"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "repeat_state": {
+                  "enum": [
+                    "available",
+                    "requiresSelection"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "settings_expires_at"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "operation": {
+                  "const": "recordingSave"
+                }
+              },
+              "required": [
+                "operation"
+              ]
+            },
+            "then": {
+              "properties": {
+                "origin": {
+                  "const": "manual"
+                },
+                "repeat_state": {
+                  "enum": [
+                    "requiresSelection",
+                    "parametersExpired",
+                    "parametersUnavailable",
+                    "targetUnavailable"
+                  ]
+                },
+                "action_kinds": {
+                  "type": "array",
+                  "items": {
+                    "enum": [
+                      "packetCapture",
+                      "syscallTrace"
+                    ]
+                  },
+                  "minItems": 1,
+                  "maxItems": 2,
+                  "uniqueItems": true
+                }
+              }
+            }
+          }
+        ]
+      },
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "captureHistoryPage"
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d1"
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "ordering": {
+            "const": "acceptedAtDescCaptureIDDesc"
+          }
+        },
+        "required": [
+          "kind",
+          "history",
+          "ordering"
+        ]
+      }
+    }
+  }
+}

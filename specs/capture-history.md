@@ -54,7 +54,7 @@ Given evidence has expired but an authorized configuration snapshot remains with
 
 ## REQ-HIS-004 — Browser and agent use the same history
 
-Add `list_capture_history` with exactly one of a current `target_handle` or explicit `cluster_id` plus `target` selector, optional origin filter, cursor and page limit (default 20, maximum 100). An explicit selector resolves namespace/workload identity under current authority before lookup. Default origin is manual. Stable ordering is descending accepted time then capture ID; cursors bind caller/client, selector/origin, authorization revision and query snapshot under the existing 15-minute maximum. Bound scan work and never leak hidden totals; provide a narrowing hint for incomplete scans.
+Add `list_capture_history` with exactly one of a current `target_handle`, a named `target_ref` (as in `preview_capture`) or explicit `cluster_id` plus `target` selector, optional origin filter, cursor and page limit (default 20, maximum 100). An explicit selector resolves namespace/workload identity under current authority before lookup. Default origin is manual. Stable ordering is descending accepted time then capture ID; cursors bind caller/client, selector/origin, authorization revision and query snapshot under the existing 15-minute maximum. Bound scan work and never leak hidden totals; provide a narrowing hint for incomplete scans.
 
 `get_capture_settings(capture_id)` returns the authorized immutable settings projection: original target, expanded recipe, dependency pins, requested retention if present, settings digest, original effective digest and expiry. It does not return historical reason, recipients, credentials or grants. Arbitrary strings remain untrusted data. The full projection still obeys the standard MCP byte limit; an oversized snapshot returns SettingsTooLarge with authenticated browser navigation rather than malformed/truncated executable settings. Repeating by reference remains available without downloading the settings; the browser presents bounded sections under identical authorization. This limit does not permit larger raw tool responses.
 
@@ -65,6 +65,15 @@ Both new read tools use evidence:read and current scoped history authorization; 
 ### SC-HIS-004
 
 Given an eligible external agent sees a successful capture in selector history, when it calls preview_capture with history_capture_id and then submits the returned preview, then one new capture uses the retained settings under current authorization. Combining history_capture_id with a different target is rejected. Share-only access, revoked history access, expired settings and unavailable dependencies cannot be bypassed through handles or get_capture_settings. A large snapshot can still be repeated by reference within normal MCP output limits.
+
+## First implementation (ADR-236)
+
+[ADR-236](../docs/decisions/236-capture-history-collect-again.md) implements the base of REQ-HIS-001–004 for the pod-status preset; the remaining mechanisms ship with the first parameterized recipe (S-06 increment 12) and stay required:
+
+- History begins at migration 00089. Each accepted capture records its cluster, namespace UID, workload UID and origin (`manual` or `policy`) at acceptance; there is no backfill and no discovery origin yet. The selector key is the current workload identity: `list_capture_history` resolves the named workload object first (without requiring any Pod, so a workload scaled to zero keeps its history readable), so a recreated namespace or workload starts a new history.
+- `list_capture_history` also accepts `target_ref` (the selector `preview_capture` takes); the runtime implements only that selector. Visibility: current ordinary read rights on the workload, then the original requester or a current member of the capture's retained audience. Summaries and settings are available for seven days after acceptance (the initial case-metadata default). Pages are bounded to 100 entries and 200 examined rows; the cursor is a keyset position bound to the selector and origin, and every page re-authorizes every row.
+- For pod-status the repeatable settings are the accepted authored target, the built-in recipe and its dependency pins and the requested retention. These contain no user-supplied content beyond the workload name, so the immutable accepted scope serves as the parameter snapshot; encrypted parameter records, keyed selector/settings digests, the 1,000/100,000 ceilings and eviction, `SettingsTooLarge` and `HistoryUnavailable` are deferred.
+- `preview_capture(history_capture_id)` returns `repeated_from_capture_id` and runs every check of a new preview. A name that now resolves to another workload UID fails with `TargetReplaced` after current collection eligibility. `request_capture` and `get_capture` do not yet return `repeated_from_capture_id`; persisted lineage is deferred.
 
 ## Repeating compositions
 

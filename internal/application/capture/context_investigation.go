@@ -235,6 +235,21 @@ func (s ContextInvestigation) plan(p value.ContextPreview, f contextFacts) (plan
 // Preview observes authorized metadata and writes only a bounded draft. It does
 // not reserve custody/storage, write acquisition intent or start a collector.
 func (s ContextInvestigation) Preview(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent) (result ContextPreviewResult, failure error) {
+	return s.preview(ctx, source, intent, nil)
+}
+
+// PreviewRepeat is Preview for "Collect again" (ADR-236): every current check
+// runs exactly as for a new preview, and the named workload must still
+// resolve to the original namespace and workload identity. A recreated
+// workload is reported only after current collection eligibility on it.
+func (s ContextInvestigation) PreviewRepeat(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, original authorization.Target) (result ContextPreviewResult, failure error) {
+	if !authorization.UUID(original.ClusterID) || !identity.Text(original.NamespaceUID, 64) || !identity.Text(original.WorkloadUID, 64) {
+		return ContextPreviewResult{}, previewFailure("repeat/original", value.ErrInvalid)
+	}
+	return s.preview(ctx, source, intent, &original)
+}
+
+func (s ContextInvestigation) preview(ctx context.Context, source identities.CurrentIdentity, intent value.ContextIntent, original *authorization.Target) (result ContextPreviewResult, failure error) {
 	defer func() { s.reportPreviewFailure(failure) }()
 	var zero ContextPreviewResult
 	if !s.configured() || ctx == nil || source == nil || ctx.Err() != nil {
@@ -273,6 +288,9 @@ func (s ContextInvestigation) Preview(ctx context.Context, source identities.Cur
 	f, err := s.facts(ctx, source, i.Principal, intent, target, created, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
 	if err != nil {
 		return zero, previewFailure("facts", err)
+	}
+	if original != nil && (target.Request.ClusterID != original.ClusterID || target.Request.Namespace.UID != original.NamespaceUID || target.Request.Workload.UID != original.WorkloadUID) {
+		return zero, previewFailure("repeat/target", value.ErrTargetReplaced)
 	}
 	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
 	p.ExecutionClass = target.ExecutionClass

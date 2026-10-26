@@ -9721,6 +9721,31 @@ components:
           type: string
           minLength: 1
           maxLength: 128
+        target_ref:
+          type: object
+          additionalProperties: false
+          properties:
+            cluster_id:
+              type: string
+              format: uuid
+            namespace:
+              type: string
+              minLength: 1
+              maxLength: 63
+            kind:
+              enum:
+              - Deployment
+              - StatefulSet
+              - Pod
+            name:
+              type: string
+              minLength: 1
+              maxLength: 253
+          required:
+          - cluster_id
+          - namespace
+          - kind
+          - name
         cluster_id:
           type: string
           format: uuid
@@ -9750,12 +9775,27 @@ components:
             - cluster_id
           - required:
             - target
+          - required:
+            - target_ref
+      - required:
+        - target_ref
+        not:
+          anyOf:
+          - required:
+            - target_handle
+          - required:
+            - cluster_id
+          - required:
+            - target
       - required:
         - cluster_id
         - target
         not:
-          required:
-          - target_handle
+          anyOf:
+          - required:
+            - target_handle
+          - required:
+            - target_ref
     McpOutput_list_capture_history:
       allOf:
       - $ref: https://asservat.io/spec/v1/mcp-result.schema.json

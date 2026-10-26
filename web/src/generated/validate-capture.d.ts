@@ -10,3 +10,5 @@ export declare function validInput_resolve_capture_request(value: unknown): valu
 export declare function validOutput_resolve_capture_request(value: unknown): value is components['schemas']['McpOutput_resolve_capture_request'];
 export declare function validInput_get_capture(value: unknown): value is components['schemas']['McpInput_get_capture'];
 export declare function validOutput_get_capture(value: unknown): value is components['schemas']['McpOutput_get_capture'];
+export declare function validInput_list_capture_history(value: unknown): value is components['schemas']['McpInput_list_capture_history'];
+export declare function validOutput_list_capture_history(value: unknown): value is components['schemas']['McpOutput_list_capture_history'];

@@ -84,7 +84,7 @@ func humanOperationInputValid(name, format string) bool {
 		return format == CaptureOperationInputFormat
 	case "initialize_processing", "restrict_processing", "release_processing":
 		return format == "processing-input/v1"
-	case "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "resolve_capture_request", "invalid_operation", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access":
+	case "list_diagnostics", "preview_capture", "request_capture", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "resolve_capture_request", "invalid_operation", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings":
 		return format == "context-input/v1" || format == "invalid-input/v1"
 	default:
 		return false

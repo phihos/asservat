@@ -384,6 +384,10 @@ type CaptureOperationIntent struct {
 	PreviewID                pgtype.UUID
 	IntentOperationID        pgtype.UUID
 	ShareInstruction         []byte
+	HistoryClusterID         pgtype.UUID
+	HistoryNamespaceUid      pgtype.Text
+	HistoryWorkloadUid       pgtype.Text
+	HistoryOrigin            pgtype.Text
 }
 
 type CaptureOperationLifecycle struct {
@@ -763,6 +767,10 @@ type ContextCapture struct {
 	PreviewID                pgtype.UUID
 	IntentOperationID        pgtype.UUID
 	ShareInstruction         []byte
+	HistoryClusterID         pgtype.UUID
+	HistoryNamespaceUid      pgtype.Text
+	HistoryWorkloadUid       pgtype.Text
+	HistoryOrigin            pgtype.Text
 }
 
 type ContextCaseLocator struct {

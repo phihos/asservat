@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
-import { Investigation } from './investigation';
-import type { Preview, Progress, Target } from './http';
+import { Investigation, type State } from './investigation';
+import type { HistoryEntry, Preview, Progress, Target } from './http';
 import { captureIDFromPath } from '../routes';
 import { WhyAccess } from '../access/WhyAccess';
 import { RecipientsEditor } from '../sharing/SharePanel';
@@ -62,6 +62,27 @@ const sharingLabels: Record<NonNullable<Progress['sharing']>['state'], string> =
 };
 
 const actionLabels: Record<string, string> = { Finalizing: 'Verifying and publishing', TargetGone: 'The selected Pod no longer exists; nothing was collected', Denied: 'Kubernetes denied reading the Pod status; nothing was collected' };
+const evidenceLabels: Record<HistoryEntry['evidence_state'], string> = {
+  pending: 'Evidence pending', available: 'Evidence available', partial: 'Partial evidence', expired: 'Evidence expired', unavailable: 'No evidence',
+};
+
+// Recent captures of this target (ADR-236). "Collect again" restores the
+// capture's target and requested retention into a new review; the server
+// rechecks current access, limits and the selected pod.
+function RecentCaptures({ state, controller }: { state: State; controller: Investigation }) {
+  return <section className="review-section" aria-labelledby="recent-heading" aria-busy={state.history === undefined && !state.historyMessage}>
+    <h2 id="recent-heading">Recent captures</h2>
+    {state.historyMessage ? <p className="notice">{state.historyMessage}</p>
+      : state.history === undefined ? <p role="status">Loading recent captures…</p>
+      : state.history.length === 0 ? <p>No captures of this target in the last 7 days that you can see.</p>
+      : <ul className="recent-captures">{state.history.map(entry => <li key={entry.capture_id}>
+        <span><a href={'/captures/' + entry.capture_id}>{new Date(entry.accepted_at).toLocaleString()}</a> · {phases[entry.phase]} · {evidenceLabels[entry.evidence_state]}</span>
+        {entry.repeat_state === 'available' && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.repeat(entry.capture_id)}>Collect again</Button>}
+      </li>)}</ul>}
+    <p className="field-help">Shows the last 7 days of your own requests and of requests your team could access when they were made. Collecting again reviews the same settings with your current access and limits; nothing is collected until you confirm.</p>
+  </section>;
+}
+
 
 export function CaptureWorkspace({ session, scope, controller }: { session: Session; scope: AbortSignal; controller: Investigation }) {
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
@@ -108,8 +129,10 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         <Button className="button" isDisabled={state.busy || diagnostic.preset_ref?.name !== 'pod-status'} onPress={() => void controller.preview(diagnostic)}>{state.busy ? 'Preparing review…' : 'Review collection'}</Button>
       </article>)}
       <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>Change target</Button>
+      <RecentCaptures state={state} controller={controller}/>
     </section>}
     {state.stage === 'review' && state.preview && <section aria-label="Collection review" aria-busy={state.busy}>
+      {state.repeatedFrom && <p className="notice">Collecting again with the settings of capture <span className="identifier">{state.repeatedFrom}</span>: the same target and requested retention. The pod, access and limits below are checked now.</p>}
       <Assessment preview={state.preview}/>
       {state.preview.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
       {state.preview.blockers.length > 0 && <WhyAccess key={JSON.stringify(draft.target)} session={session} scope={scope} target={draft.target} operation="capture"/>}
