@@ -5,6 +5,11 @@ first S-03 increment: hub-held exit-detector DebugPolicies, MCP/browser activati
 regional restart poll and migration 00082's deduplicated, workload-budgeted trigger ledger; captures
 reuse the S-02 pipeline under the policy executor.
 
+[ADR-229 — Policy deactivation and console](229-policy-deactivation-and-console.md) adds
+`deactivate_policy` (team-maintainer authority, clears the current acceptance, no refund, no
+reactivation of an unchanged revision; migration 00083), the console `/policies` page and
+per-policy capture goroutines off the poll loop.
+
 [ADR-227 — Supported upgrade and image-only rollback](227-upgrade-and-rollback.md) adds a
 database-declared schema compatibility floor, an `installer-upgrade` migrator and one installation
 release record that replaces the per-component image pins; the key service, publisher and federation follow it too, while download workers and the regional connector stay on the original image.

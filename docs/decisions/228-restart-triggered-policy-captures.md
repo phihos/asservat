@@ -171,4 +171,5 @@ workload storm limits, finite expiry, encrypted audit, every authorization check
 
 Log/resource/probe detectors (node-local, watch-based), policy grants for intrusive actions,
 browser UI for activation and status, policy deactivation/replacement in the UI, and the
-all-replica selection modes beyond `triggeringPod`.
+all-replica selection modes beyond `triggeringPod`. Deactivation, the console page and off-loop
+captures followed in [ADR-229](229-policy-deactivation-and-console.md).

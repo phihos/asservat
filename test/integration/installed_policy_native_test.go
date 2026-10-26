@@ -400,7 +400,7 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		t.Fatal("repeated deactivation", again)
 	}
 	status.State = ""
-	if !observe(ctx, "get_policy_status", map[string]string{"policy_name": installedPolicyName}, &status) || status.State != "deactivated" || status.Captured != 1 {
+	if !observe(ctx, "get_policy_status", map[string]string{"policy_name": installedPolicyName}, &status) || status.State != "deactivated" || status.Captured != scalar(`SELECT count(capture_id) FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2`, root, activated.PolicyUID) {
 		t.Fatal("deactivated policy status", status)
 	}
 	t.Logf("installed policy journey: deactivated %s after start; %d kill(s) %s later changed no watermark, occurrence, suppression or spend", stoppedAt.Sub(started).Round(time.Second), killed, time.Since(stoppedAt).Round(time.Second))
