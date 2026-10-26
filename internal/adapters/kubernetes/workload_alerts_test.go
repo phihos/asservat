@@ -41,7 +41,7 @@ func TestAlertmanagerURL(t *testing.T) {
 func TestWorkloadAlertObservationMapsActiveAlertsToPods(t *testing.T) {
 	now := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
 	at := func(d time.Duration) string { return now.Add(d).Format(time.RFC3339Nano) }
-	for _, mode := range []string{"alerts", "future", "unconfigured", "unreachable", "status", "redirect", "oversized", "too-many", "malformed", "not-array", "unknown-state"} {
+	for _, mode := range []string{"alerts", "future", "unconfigured", "unreachable", "status", "redirect", "oversized", "too-many", "malformed", "not-array", "unknown-state", "foreign-malformed"} {
 		t.Run(mode, func(t *testing.T) {
 			var gets atomic.Int64
 			alert := func(labels map[string]string, starts, state string) map[string]any {
@@ -62,7 +62,7 @@ func TestWorkloadAlertObservationMapsActiveAlertsToPods(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				gets.Add(1)
 				q := r.URL.Query()
-				if r.Method != http.MethodGet || r.URL.Path != "/prefix/api/v2/alerts" || q.Get("active") != "true" || q.Get("silenced") != "false" || q.Get("inhibited") != "false" || q.Get("filter") != `namespace="payments"` || r.Header.Get("Authorization") != "" {
+				if r.Method != http.MethodGet || r.URL.Path != "/prefix/api/v2/alerts" || q.Get("active") != "true" || q.Get("silenced") != "false" || q.Get("inhibited") != "false" || len(q["filter"]) != 2 || q["filter"][0] != `namespace="payments"` || !strings.HasPrefix(q["filter"][1], `pod=~"`) || strings.Count(q["filter"][1], "|") != 1 || r.Header.Get("Authorization") != "" {
 					t.Errorf("unexpected Alertmanager request %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
 				}
 				switch mode {
@@ -105,6 +105,9 @@ func TestWorkloadAlertObservationMapsActiveAlertsToPods(t *testing.T) {
 					items = append(items, alert(labels("b"), "not-a-time", "active"))
 				case "unknown-state":
 					items = append(items, alert(labels("b"), at(-time.Minute), "resolved"))
+				case "foreign-malformed":
+					// Malformed alerts of other workloads are ignored.
+					items = append(items, alert(nil, "not-a-time", "active"), alert(labels("unknown-pod"), "not-a-time", "resolved"))
 				}
 				_ = json.NewEncoder(w).Encode(items)
 			}))

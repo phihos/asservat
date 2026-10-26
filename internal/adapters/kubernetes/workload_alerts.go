@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"time"
 
@@ -67,10 +68,21 @@ func (c *PodTargets) WithAlertmanager(a *Alertmanager) *PodTargets {
 // malformed answers fail, so the poll is Unknown and fires nothing.
 func (a *Alertmanager) firing(ctx context.Context, namespace string, match map[string]string, now time.Time, pods []value.PodRestarts) error {
 	index := make(map[string]int, len(pods))
+	names := make([]string, 0, len(pods))
 	for i, p := range pods {
 		index[p.Name] = i
+		names = append(names, p.Name)
 	}
-	query := url.Values{"active": {"true"}, "silenced": {"false"}, "inhibited": {"false"}, "filter": {`namespace="` + namespace + `"`}}
+	if len(names) == 0 {
+		return nil
+	}
+	// The pod matcher narrows the answer to this workload's Pods, so alerts of
+	// other workloads in the namespace cannot reach the answer bounds. Pod
+	// names are DNS subdomains: an unescaped "." only widens the server-side
+	// match, and the exact name check below still applies. matchLabels stay
+	// client-side: arbitrary values would need Alertmanager's quoting rules.
+	slices.Sort(names)
+	query := url.Values{"active": {"true"}, "silenced": {"false"}, "inhibited": {"false"}, "filter": {`namespace="` + namespace + `"`, `pod=~"` + strings.Join(names, "|") + `"`}}
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, a.alerts+"?"+query.Encode(), nil)
 	if err != nil {
 		return value.ErrUnavailable
@@ -103,8 +115,11 @@ func (a *Alertmanager) firing(ctx context.Context, namespace string, match map[s
 		return value.ErrLimit
 	}
 	for _, alert := range alerts {
-		if alert.Labels == nil {
-			return value.ErrUnavailable
+		// Only alerts of this policy are validated: a malformed alert of
+		// another workload must not make this poll Unknown.
+		i, owned := index[alert.Labels["pod"]]
+		if alert.Labels["namespace"] != namespace || !owned || !labelsMatch(alert.Labels, match) {
+			continue
 		}
 		switch alert.Status.State {
 		case "active", "unprocessed":
@@ -112,10 +127,6 @@ func (a *Alertmanager) firing(ctx context.Context, namespace string, match map[s
 			continue
 		default:
 			return value.ErrUnavailable
-		}
-		i, owned := index[alert.Labels["pod"]]
-		if alert.Labels["namespace"] != namespace || !owned || !labelsMatch(alert.Labels, match) {
-			continue
 		}
 		started, err := time.Parse(time.RFC3339Nano, alert.StartsAt)
 		if err != nil || started.Unix() < value.MinProbeLast || started.Unix() >= 1<<31 {

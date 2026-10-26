@@ -34,8 +34,9 @@ credential on the hub and no episode tombstone store.
    a poll without a matching alert and the next occurrence can follow one poll later; a longer hold
    belongs to the rule's `for` and `keep_firing_for`. `fireOnActivation: true` stays rejected.
 3. **Observation.** For an alert request the region, after its Pod LIST, sends one
-   `GET <base>/api/v2/alerts?active=true&silenced=false&inhibited=false&filter=namespace="<ns>"`
-   (no redirect, no proxy, no credential, 5-second request bound). An alert counts for a Pod when
+   `GET <base>/api/v2/alerts?active=true&silenced=false&inhibited=false&filter=namespace="<ns>"&filter=pod=~"<pod>|…"`
+   with the workload's observed Pod names (sorted; none → no request), so other workloads' alerts
+   never reach the answer bounds; `matchLabels` stay client-side (no Alertmanager quoting) (no redirect, no proxy, no credential, 5-second request bound). An alert counts for a Pod when
    its `namespace` label is the policy's namespace, its `pod` label names an observed Pod of the
    workload and every `matchLabels` value matches; state `active`/`unprocessed` counts, `suppressed`
    does not. The region returns per Pod only the number of matching alerts and the newest `startsAt`
@@ -58,8 +59,8 @@ credential on the hub and no episode tombstone store.
    Pod is the same level; a later startsAt after re-arm is a new episode. First observation is a
    baseline (armed only without a matching alert); re-arm at the first poll with no matching alert.
 6. **Unknown.** Alertmanager unreachable, non-200 or redirect, > 1 MiB or > 1024 alerts of the
-   namespace (the API has no paging), malformed JSON, an unknown state or an invalid `startsAt` of
-   a matching alert: the existing Unknown (the poll fails, fires nothing, re-arms nothing). A
+   workload's Pods (the API has no paging), malformed JSON, or an unknown state or invalid
+   `startsAt` of a matching alert (other alerts are not validated): the existing Unknown (the poll fails, fires nothing, re-arms nothing). A
    region without a configured Alertmanager answers `unsupported`, so activation is refused
    (`DetectorUnavailable`) instead of leaving the policy permanently Unknown. No new degraded state.
 7. **Ledger.** Migration 00085 (schema 85, floor 81) widens the `detector` CHECKs to `alert` and
