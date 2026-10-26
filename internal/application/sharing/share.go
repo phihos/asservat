@@ -189,10 +189,13 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 	return out, replay, nil
 }
 
-// List returns the caller's own shares (owned: every phase, derived from the
-// current projection of each target) or the shares it can read now
-// (received: only Active shares that EvaluateShare admits, never another
-// recipient's or a suspended/denied one).
+// List returns the caller's own shares (owned: every phase; Revoked and
+// Expired need no projection, and a target without a current projection
+// shows Suspended rather than failing the list) or the shares received by
+// the caller (received: unrevoked, unexpired shares whose share-level checks
+// pass, never another recipient's or a suspended/denied one). Received rows
+// are candidates: the artifact's retained audience, retention end and data
+// class are checked only by the read itself (get_case, inspection, download).
 func (s Service) List(ctx context.Context, current identities.CurrentIdentity, view string, limit int) ([]View, time.Time, error) {
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() || limit < 1 || limit > 100 || view != "owned" && view != "received" {
 		return nil, time.Time{}, capture.ErrInvalid
@@ -210,7 +213,10 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 	if view == "owned" {
 		rows, err = s.Store.OwnedShares(ctx, i.Principal, limit)
 	} else {
-		rows, err = s.Store.ReceivedShares(ctx, i, limit)
+		// Filtering happens after the SQL page, so fetch the full bound and
+		// trim: a suspended or denied row never pushes a readable one off a
+		// small page. ponytail: beyond 100 candidates add keyset paging.
+		rows, err = s.Store.ReceivedShares(ctx, i, 100)
 	}
 	if err != nil {
 		return nil, time.Time{}, capture.ErrUnavailable
@@ -222,15 +228,26 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 		if row.RootID != s.RootID {
 			return nil, time.Time{}, capture.ErrUnavailable
 		}
+		if view == "owned" && (row.Creator.Issuer != i.Principal.Issuer || row.Creator.Subject != i.Principal.Subject) {
+			return nil, time.Time{}, capture.ErrUnavailable
+		}
+		if view == "owned" && (!row.RevokedAt.IsZero() || !s.Now().Before(row.ExpiresAt)) {
+			// Final phases do not depend on permissions.
+			out = append(out, View{row, row.Phase(value.Projection{}, s.Now())})
+			continue
+		}
 		p, ok := projections[row.Target]
 		if !ok {
 			if p, err = s.Permissions.Permissions(ctx, row.Target); err != nil {
-				return nil, time.Time{}, capture.ErrUnavailable
+				p = value.Projection{}
 			}
 			projections[row.Target] = p
 		}
 		until = identity.Earlier(until, row.ValidUntil)
 		if view == "received" {
+			if len(out) == limit {
+				break
+			}
 			r := value.EvaluateShare(i, p, row.Target, nil, row, s.Now())
 			if !r.Eligible {
 				continue
@@ -239,12 +256,12 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 			out = append(out, View{row, value.ShareActive})
 			continue
 		}
-		if row.Creator.Issuer != i.Principal.Issuer || row.Creator.Subject != i.Principal.Subject {
-			return nil, time.Time{}, capture.ErrUnavailable
-		}
-		// The derived phase needs a current projection of the target.
+		// Without a current projection the managers cannot be proven, so the
+		// row shows Suspended instead of failing the whole list (revocation
+		// must stay reachable).
 		if !projectionCurrentFor(p, row.Target, s.Now()) {
-			return nil, time.Time{}, capture.ErrUnavailable
+			out = append(out, View{row, value.ShareSuspended})
+			continue
 		}
 		until = identity.Earlier(until, identity.Earlier(p.FreshUntil, p.DeniesFreshUntil))
 		out = append(out, View{row, row.Phase(p, s.Now())})

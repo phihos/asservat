@@ -275,3 +275,43 @@ func TestShareReceivedListsOnlyReadableShares(t *testing.T) {
 		t.Fatal("owned list without evidence:share", err)
 	}
 }
+
+func TestShareOwnedListSurvivesUnavailableProjection(t *testing.T) {
+	f, s := newFixture()
+	revoked, _, err := s.Create(context.Background(), f, f.input("k1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := s.Revoke(context.Background(), f, revoked.ID, 1, "r1"); err != nil {
+		t.Fatal(err)
+	}
+	active, _, err := s.Create(context.Background(), f, f.input("k2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The target's projection becomes unavailable: the list still answers,
+	// the revoked row keeps its final phase and the other shows Suspended.
+	f.p.Target.WorkloadUID = "gone"
+	owned, _, err := s.List(context.Background(), f, "owned", 20)
+	if err != nil || len(owned) != 2 {
+		t.Fatal("owned list failed on an unavailable projection", err, owned)
+	}
+	for _, v := range owned {
+		if want := map[string]value.SharePhase{revoked.ID: value.ShareRevoked, active.ID: value.ShareSuspended}[v.Share.ID]; v.Phase != want {
+			t.Fatal("phase", v.Share.ID, v.Phase, want)
+		}
+	}
+}
+
+func TestShareReceivedListTrimsAfterFiltering(t *testing.T) {
+	f, s := newFixture()
+	for _, k := range []string{"k1", "k2"} {
+		if _, _, err := s.Create(context.Background(), f, f.input(k)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	f.i.Principal.Subject, f.i.Groups, f.i.Scopes = "outsider", []string{"outsiders"}, []string{"evidence:read"}
+	if got, _, err := s.List(context.Background(), f, "received", 1); err != nil || len(got) != 1 {
+		t.Fatal("received page", err, got)
+	}
+}

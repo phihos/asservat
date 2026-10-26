@@ -73,8 +73,12 @@ scopes are unchanged.
    reply refuses the response. A share-ledger outage admits nobody through a share and never
    makes an ordinary reader's other artifacts unavailable.
 6. **Listing and revocation.** `list_shares(view=owned)` (needs `evidence:share`) lists the
-   caller's own shares with their derived phase; `view=received` lists only shares that
-   `EvaluateShare` admits now (Active, not denied), at most 100, newest first, no cursor.
+   caller's own shares with their derived phase (Revoked/Expired need no projection; a target
+   without a current projection shows Suspended instead of failing the list, so revocation stays
+   reachable); `view=received` lists unrevoked, unexpired shares whose share-level checks
+   `EvaluateShare` admits now (not denied), filtered from the first 100 candidates and then trimmed
+   to the page, newest first, no cursor. Received rows are candidates: the artifact's retained
+   audience, retention end and data class are checked by the read itself.
    `revoke_share(share_id, expected_revision, idempotency_key)` is creator-only in this increment;
    revocation only restricts access, so it needs no current owner assignment. The same key after
    success is a replay; another key or a stale revision is Conflict; another principal's share is
