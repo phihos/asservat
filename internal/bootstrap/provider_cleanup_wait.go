@@ -31,7 +31,7 @@ func (d *InstalledHubWorkerDeployment) runProviderCleanup(ctx context.Context) e
 		}
 		if ready {
 			if mountUntil.IsZero() {
-				mountUntil = time.Now().Add(30 * time.Second)
+				mountUntil = time.Now().Add(projectionMountWait)
 			}
 			if !time.Now().Before(mountUntil) {
 				return mounts.ErrUnavailable
