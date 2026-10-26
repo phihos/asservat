@@ -17,8 +17,10 @@ import (
 // ContextDownloadEvidence is a verified catalog/retention projection, not an
 // upload manifest. No native evidence or checksum is needed for authorization.
 type ContextDownloadEvidence struct {
-	PurposeRef             string
-	CaptureID              string
+	PurposeRef string
+	CaptureID  string
+	// CaseID binds a recipient's share to the artifact's case (ADR-233).
+	CaseID                 string
 	Version                artifact.Digest
 	Audience               []artifact.AudienceAssignment
 	Retained               privacy.RetainedArtifact
@@ -39,8 +41,8 @@ type DownloadEnvironmentReader interface {
 }
 
 // ContextDownloadAuthority composes ordinary approved-metadata entitlement with
-// current retained obligations. Raw artifacts and shares require their own
-// reviewed authority facets; there is no fallback when a prerequisite is absent.
+// current retained obligations. Raw artifacts require their own reviewed
+// authority facet; there is no fallback when a prerequisite is absent.
 type ContextDownloadAuthority struct {
 	RootID      string
 	Identities  identities.Resolver
@@ -48,7 +50,11 @@ type ContextDownloadAuthority struct {
 	Catalog     ContextDownloadCatalog
 	Retention   DownloadRetentionResolver
 	Environment DownloadEnvironmentReader
-	Now         func() time.Time
+	// Shares is the ADR-233 recipient branch: consulted only when ordinary
+	// target eligibility refuses, before the catalog read, and re-read at the
+	// final check and at every entitlement reconstruction. Nil disables it.
+	Shares ShareReader
+	Now    func() time.Time
 }
 
 func (s ContextDownloadAuthority) CheckDownload(ctx context.Context, token string, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
@@ -59,8 +65,8 @@ func (s ContextDownloadAuthority) CheckDownloadCurrent(ctx context.Context, sour
 	return s.checkDownloadCurrent(ctx, source, scope, nil)
 }
 
-// A non-nil ordinary slot belongs to one original response. Only the ordinary
-// entitlement may survive a short identity batch; every other fact below is
+// A non-nil ordinary slot belongs to one original response. Only the
+// entitlement (ordinary or shared) may survive a short identity batch; every other fact below is
 // reobserved and the resulting effect authority still lasts at most five seconds.
 func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, source identities.CurrentIdentity, scope artifact.DownloadScope, ordinary **downloadEntitlement) (artifact.DownloadAuthority, error) {
 	var out artifact.DownloadAuthority
@@ -89,10 +95,18 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 		}
 	}
 	var p value.Projection
+	var share *value.Share
 	if accepted == nil {
 		p, err = s.Permissions.Permissions(ctx, target)
-		if err != nil || !value.ScopeEligibility(i, p, value.DownloadApproved, target, s.Now()).Eligible {
+		if err != nil {
 			return out, downloadRefused("permission", err)
+		}
+		if !value.ScopeEligibility(i, p, value.DownloadApproved, target, s.Now()).Eligible {
+			// Recipient branch (ADR-233): the caller's own shares of exactly
+			// this artifact and version; no admitting share, no catalog read.
+			if share, _, err = s.recipientShare(ctx, i, p, target, nil, "", scope); share == nil {
+				return out, downloadRefused("permission", err)
+			}
 		}
 	}
 	record, err := s.Catalog.ContextDownloadEvidence(ctx, scope.ArtifactID)
@@ -106,10 +120,23 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	r.OriginPolicies = slices.Clone(r.OriginPolicies)
 	retained := value.Retained{ArtifactID: scope.ArtifactID, Target: target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
 	var initial value.Result
-	if accepted == nil {
-		initial = value.Evaluate(i, p, value.DownloadApproved, target, &retained, s.Now())
-	} else {
+	switch {
+	case accepted != nil:
 		initial = accepted.evaluate(i, scope, retained, s.Now())
+	case share != nil:
+		// The share read above, now against the retained record and its case.
+		if !value.UUID(record.CaseID) {
+			return out, downloadRefused("catalog-record", nil)
+		}
+		share, initial = recipientShare(value.DownloadApproved, i, p, target, &retained, []value.Share{*share}, s.RootID, record.CaseID, scope.ArtifactID, scope.Version, s.Now())
+	default:
+		initial = value.Evaluate(i, p, value.DownloadApproved, target, &retained, s.Now())
+		if !initial.Eligible && value.UUID(record.CaseID) {
+			// Whole-pod rights outside the retained audience: a share may admit.
+			if share, initial, err = s.recipientShare(ctx, i, p, target, &retained, record.CaseID, scope); err != nil {
+				return out, downloadRefused("share", err)
+			}
+		}
 	}
 	if !initial.Eligible {
 		return out, downloadRefused("audience", nil)
@@ -138,7 +165,18 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 			return out, downloadRefused("permission-final", err)
 		}
 		permission = latest.Revision
-		final = value.Evaluate(current, latest, value.DownloadApproved, target, &retained, s.Now())
+		if share == nil {
+			final = value.Evaluate(current, latest, value.DownloadApproved, target, &retained, s.Now())
+		} else {
+			// A revocation or expiry since the first share read refuses.
+			rows, err := s.Shares.RecipientShares(ctx, scope.ArtifactID, current)
+			again, same := SameShare(*share, rows)
+			if err != nil || !same {
+				return out, downloadRefused("share-final", err)
+			}
+			share = &again
+			final = value.EvaluateShareFor(value.DownloadApproved, current, latest, target, &retained, again, s.Now())
+		}
 	} else {
 		permission = accepted.permission
 		final = accepted.evaluate(current, scope, retained, s.Now())
@@ -159,11 +197,22 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	out = artifact.DownloadAuthority{Environment: environment, Scope: scope, PermissionEpoch: permission.UID, PermissionSequence: permission.Generation, ProjectionDigest: permission.Digest, IdentityRevision: current.Policy, CheckedAt: started, ValidUntil: until, AccessUntil: resolved.ExpiresAt, DeleteBy: resolved.DeleteBy, Retention: resolved.Proof}
 	// This digest describes the current decision; it is neither an approval nor
 	// an authentication token. Native hashes, credentials and evidence stay out.
+	// A shared decision also binds the admitting share and its revision.
+	var shareID string
+	var shareRevision int64
+	switch {
+	case share != nil:
+		shareID, shareRevision = share.ID, share.Revision
+	case accepted != nil:
+		shareID, shareRevision = accepted.shareID, accepted.shareRevision
+	}
 	encoded, err := json.Marshal(struct {
-		Authority   artifact.DownloadAuthority
-		Environment artifact.DownloadEnvironment
-		Assignments []artifact.AudienceAssignment
-	}{out, environment, final.ContributingAssignments})
+		Authority     artifact.DownloadAuthority
+		Environment   artifact.DownloadEnvironment
+		Assignments   []artifact.AudienceAssignment
+		ShareID       string `json:",omitempty"`
+		ShareRevision int64  `json:",omitempty"`
+	}{out, environment, final.ContributingAssignments, shareID, shareRevision})
 	if err != nil {
 		return artifact.DownloadAuthority{}, downloadRefused("decision", nil)
 	}
@@ -174,7 +223,21 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	if ordinary != nil && accepted == nil {
 		// Commit the private observation only after the complete short authority
 		// succeeds. Failure in retention/environment/final identity cannot seed it.
-		*ordinary = newDownloadEntitlement(scope, current, permission, retained.Audience, final.ContributingAssignments, started)
+		*ordinary = newDownloadEntitlement(scope, current, permission, retained.Audience, final.ContributingAssignments, started, share)
 	}
 	return out, nil
+}
+
+// recipientShare reads the caller's shares of the scope's exact artifact and
+// version and returns the admitting one, if any (ADR-233).
+func (s ContextDownloadAuthority) recipientShare(ctx context.Context, i identity.Identity, p value.Projection, t value.Target, retained *value.Retained, caseID string, scope artifact.DownloadScope) (*value.Share, value.Result, error) {
+	if s.Shares == nil {
+		return nil, value.Result{Reason: "NoEntitlement"}, nil
+	}
+	rows, err := s.Shares.RecipientShares(ctx, scope.ArtifactID, i)
+	if err != nil {
+		return nil, value.Result{}, err
+	}
+	share, r := recipientShare(value.DownloadApproved, i, p, t, retained, rows, s.RootID, caseID, scope.ArtifactID, scope.Version, s.Now())
+	return share, r, nil
 }

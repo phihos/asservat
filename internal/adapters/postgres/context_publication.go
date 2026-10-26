@@ -407,7 +407,7 @@ func (s *ContextPublications) ContextDownloadEvidence(ctx context.Context, artif
 		if !identity.Fresh(started.Time, until, now.Time, 5*time.Second) {
 			return privacy.ErrExpired
 		}
-		out = authorizationapp.ContextDownloadEvidence{CaptureID: e.CaptureUID, PurposeRef: e.PurposeRef, Audience: e.Audience, Retained: retained, ObservedAt: started.Time, ValidUntil: until}
+		out = authorizationapp.ContextDownloadEvidence{CaptureID: e.CaptureUID, CaseID: e.CaseID, PurposeRef: e.PurposeRef, Audience: e.Audience, Retained: retained, ObservedAt: started.Time, ValidUntil: until}
 		copy(out.Version[:], row.ContextVerification.CopiesDigest)
 		return nil
 	})

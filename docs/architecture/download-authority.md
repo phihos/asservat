@@ -26,7 +26,17 @@ Known SQL permission changes may deny earlier; 30 seconds is reconstruction
 cadence, not a revocation guarantee. The concrete native response consumes the
 coordinator's exact short authority privately rather than reconstructing it.
 
-The SQL [retention effect checks](retention-effects.md), batch accounting and immutable encrypted audit still precede every disclosure. The authorizer alone does not emit bytes or reserve a session. Raw artifacts and explicit shares require their separately reviewed access facets; unsupported input cannot be relabeled as approved context. Browser and MCP will use the same application path, without a second consent step for ordinary access.
+[ADR-233](../decisions/233-recipient-native-download.md) adds the concrete-share branch of
+[ADR-232](../decisions/232-concrete-evidence-share.md): only when ordinary target eligibility
+refuses, the caller's own shares of exactly the scope's artifact and version are read before the
+catalog lookup (no admitting share, no lookup); after the catalog read the share must also name
+the artifact's case, its pinned manager must be in the original audience, and the final check
+re-reads the share. A share-admitted response entitlement uses the same 30-second reconstruction,
+bounded by the share's expiry, and the decision digest binds the share ID and revision. Current
+denies win, `evidence:download` is required, and sessions are charged to the workload's existing
+allocation.
+
+The SQL [retention effect checks](retention-effects.md), batch accounting and immutable encrypted audit still precede every disclosure. The authorizer alone does not emit bytes or reserve a session. Raw artifacts require their separately reviewed access facet; unsupported input cannot be relabeled as approved context. Browser and MCP will use the same application path, without a second consent step for ordinary access.
 
 Unit/race tests pass in `test/results/download-authority-unit.log`: revoked membership, denies arriving during I/O, changed client/identity policy, unrelated artifact/version/store, purpose changes, closed/lengthened retention and expired original observations all refuse access. The real SQL/S3/native-HTTPS suite passed with this authorizer and its actual catalog/permission/retained-policy adapters (`test/results/download-authority-integration.log`, 52.904 seconds; unchanged source and complete cleanup). Go/race/import/SQL/spec/architecture/design gates also passed in `test/results/download-authority-gates.log`. IdP claims, installation observations and regional/recovery qualification remain explicit fixture inputs. Public ingress/relay, complete raw/share authority and the developer UI/MCP workflow are still pending.
 

@@ -11,8 +11,9 @@ import (
 
 // ADR-232 (S-06 increment 1): a concrete share of one stored pod-status
 // artifact. A share grants ReadApproved of exactly that artifact to its
-// recipients; it never grants DownloadApproved, collection, raw access or
-// inventory. It is evaluated only after ordinary eligibility fails.
+// recipients and, since ADR-233, DownloadApproved of the same artifact; it
+// never grants collection, raw access or inventory. It is evaluated only after
+// ordinary eligibility fails.
 const (
 	// ShareMaxLifetime bounds every share; ShareDefaultLifetime is used when
 	// the creator names no expiry. Both are constants, not configuration.
@@ -169,10 +170,21 @@ func (s Share) managers(p Projection, now time.Time) []CurrentAssignment {
 // ordinary evaluator; the share must be active, name the caller and cover the
 // exact target (and, with e, the exact artifact, with at least one current
 // pinned manager inside the artifact's retained audience). It never grants
-// DownloadApproved or CollectContext.
+// CollectContext; DownloadApproved is EvaluateShareFor.
 func EvaluateShare(i identity.Identity, p Projection, t Target, e *Retained, s Share, now time.Time) Result {
+	return evaluateShare(ReadApproved, i, p, t, e, s, now)
+}
+
+// EvaluateShareFor is EvaluateShare for ReadApproved or DownloadApproved.
+// DownloadApproved (ADR-233) also requires the evidence:download scope, as the
+// ordinary facet does; denies of either operation's roles win alike.
+func EvaluateShareFor(op Operation, i identity.Identity, p Projection, t Target, e *Retained, s Share, now time.Time) Result {
+	return evaluateShare(op, i, p, t, e, s, now)
+}
+
+func evaluateShare(op Operation, i identity.Identity, p Projection, t Target, e *Retained, s Share, now time.Time) Result {
 	deny := func(reason string) Result { return Result{Reason: reason} }
-	if !t.Valid() || !s.Valid() || s.Target != t {
+	if op != ReadApproved && op != DownloadApproved || !t.Valid() || !s.Valid() || s.Target != t {
 		return deny("InvalidRequest")
 	}
 	if !i.Valid(now) {
@@ -190,11 +202,11 @@ func EvaluateShare(i identity.Identity, p Projection, t Target, e *Retained, s S
 			return deny("PermissionUnavailable")
 		}
 		until = identity.Earlier(until, d.FreshUntil)
-		if matches(d.Audience, i) && permits(d.Audience.Role, ReadApproved) {
+		if matches(d.Audience, i) && permits(d.Audience.Role, op) {
 			return deny("ExplicitDeny")
 		}
 	}
-	if !slices.Contains(i.Scopes, "evidence:read") {
+	if !slices.Contains(i.Scopes, "evidence:read") || op == DownloadApproved && !slices.Contains(i.Scopes, "evidence:download") {
 		return deny("InsufficientScope")
 	}
 	recipient := false

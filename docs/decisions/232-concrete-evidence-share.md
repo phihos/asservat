@@ -65,7 +65,8 @@ scopes are unchanged.
    matching deny win exactly as the ordinary facet does, requires `evidence:read`, the caller as
    a recipient, an Active share for the exact target and artifact, and (with the retained record)
    a current pinned manager inside the retained audience and metadata data class. It grants only
-   ReadApproved; never DownloadApproved, CollectContext, inventory or raw access.
+   ReadApproved; never DownloadApproved, CollectContext, inventory or raw access. (Amended by
+   [ADR-233](233-recipient-native-download.md): DownloadApproved of the same artifact.)
 5. **No evidence lookup before eligibility.** In every changed read path the share lookup is a
    SQL read keyed by (artifact, caller's own user and group keys) **before** the catalog read, so
    a principal without an admitting share is refused before any evidence lookup. Each read
@@ -108,7 +109,7 @@ scopes are unchanged.
 | `application/authorization/projection.go` preliminary (approved inspection) | `ScopeEligibility` refused → refuse before `ContextProjectionEvidence` | refused → share lookup; no admitting share → refuse **before** the catalog read; final and end checks re-read the share; the decision digest binds the share ID and revision |
 | `application/sharing/share.go` (`create_share`, new C-17 package) | — | `ScopeEligibility` before `ContextDownloadEvidence`, then `ShareManagement` |
 | `application/authorization/eligibility.go:74` (`Evaluator.EligibilityCurrent`) | ordinary only | unchanged: no share branch, recipients refused |
-| `application/authorization/download.go:94` (download authorizer) | ordinary only | unchanged: recipients refused (recipient native download is increment 3); installed focus verifies |
+| `application/authorization/download.go:94` (download authorizer) | ordinary only | unchanged here: recipients refused; [ADR-233](233-recipient-native-download.md) adds the share branch (increment 3) |
 | `adapters/postgres/context_resolution.go` (`resolve_capture_request`) | requester and ordinary scope | unchanged: shares never grant capture or resolution |
 | `domain/authorization/capture_progress.go`, `policy_capture.go` | ordinary / policy executor | unchanged |
 

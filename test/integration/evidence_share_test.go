@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres"
+	authapp "asservat.local/asservat/internal/application/authorization"
 	catalogapp "asservat.local/asservat/internal/application/catalog"
 	configapp "asservat.local/asservat/internal/application/configuration"
 	identities "asservat.local/asservat/internal/application/identity"
@@ -112,6 +113,31 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	}
 	user := []authorization.ShareRecipient{{Kind: "User", Issuer: issuer, ID: "synthetic-recipient"}}
 
+	// ADR-233: the actual download authorizer with the real share ledger, and
+	// the SQL download fence over a share-admitted decision.
+	download := authapp.ContextDownloadAuthority{RootID: s.a.RootID, Permissions: s.p, Catalog: reader, Retention: privacyapp.RetentionResolver{RetainedPolicies: s.retention, Now: time.Now}, Environment: newDownloadTestEnvironment(t, ctx, pool, s, e.Registration), Shares: store, Now: time.Now}
+	ledger, err := postgres.NewDownloads(ctx, pool, s.a.RootID, postgres.EffectTransactionGuards{Retention: s.retention.guard, Recovery: s.recovery.guard})
+	if err != nil {
+		t.Fatal(err)
+	}
+	downloads := func(subject string, groups []string, scopes ...string) bool {
+		t.Helper()
+		principal := s.a.Eligibility.VerifiedIdentity.Principal
+		principal.Subject = subject
+		scope := artifact.DownloadScope{RootID: s.a.RootID, ArtifactID: e.Registration.Location.ArtifactID, CaptureID: e.CaptureUID, ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID, Version: verified.Version, Principal: principal}
+		a, err := download.CheckDownloadCurrent(ctx, as(subject, groups, scopes...), scope)
+		if err != nil {
+			return false
+		}
+		if _, err := ledger.ReadContextDownloadSource(ctx, a); err != nil {
+			t.Fatal("SQL download fence refused a share-admitted decision", err)
+		}
+		return true
+	}
+	if downloads("synthetic-recipient", nil, "evidence:read", "evidence:download") {
+		t.Fatal("principal without a share downloaded")
+	}
+
 	// Before any share: refused, like any unrelated principal.
 	if reads(recipient()) || reads(stranger()) {
 		t.Fatal("principal without a share read the case")
@@ -135,6 +161,12 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	}
 	if reads(stranger()) {
 		t.Fatal("unrelated principal read through another principal's share")
+	}
+	if !downloads("synthetic-recipient", nil, "evidence:read", "evidence:download") {
+		t.Fatal("recipient could not download the shared artifact")
+	}
+	if downloads("synthetic-recipient", nil, "evidence:read") || downloads("synthetic-stranger", nil, "evidence:read", "evidence:download") {
+		t.Fatal("download without evidence:download or through another principal's share")
 	}
 	if got, _, err := shares.List(ctx, recipient(), "received", 20); err != nil || len(got) != 1 || got[0].Share.ID != first.ID {
 		t.Fatal("received list", err, got)
@@ -199,8 +231,8 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if err != nil || replay || revoked.Revision != 2 || late != 0 {
 		t.Fatal("revocation", err, replay, revoked.Revision, "reads after revocation:", late)
 	}
-	if reads(recipient()) {
-		t.Fatal("revoked share still readable")
+	if reads(recipient()) || downloads("synthetic-recipient", nil, "evidence:read", "evidence:download") {
+		t.Fatal("revoked share still readable or downloadable")
 	}
 	if again, replay, err := shares.Revoke(ctx, owner(), first.ID, 1, "revoke-1"); err != nil || !replay || again.Revision != 2 {
 		t.Fatal("revocation replay", err, replay)
@@ -233,7 +265,7 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	reviewer := func() identities.CurrentIdentity {
 		return as("synthetic-reviewer", []string{"synthetic-reviewers"}, "evidence:read")
 	}
-	if !reads(recipient()) || !reads(reviewer()) {
+	if !reads(recipient()) || !reads(reviewer()) || !downloads("synthetic-reviewer", []string{"synthetic-reviewers"}, "evidence:read", "evidence:download") {
 		t.Fatal("active user/group shares unreadable")
 	}
 	now := time.Now().UTC().Truncate(time.Microsecond)

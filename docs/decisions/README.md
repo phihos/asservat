@@ -1,5 +1,11 @@
 # Decision records
 
+[ADR-233 — Recipient native download of a shared artifact](233-recipient-native-download.md) is
+S-06 increment 3: the download authorizer consults a recipient's share of exactly the scope's
+artifact and version only after ordinary eligibility refuses and before the catalog read, re-reads
+it at the final check and at the existing 30-second response reconstruction, and charges the
+workload's existing download allocation. No migration or new grant.
+
 [ADR-232 — Concrete evidence share of one stored artifact](232-concrete-evidence-share.md) is S-06
 increment 1: `create_share`/`list_shares`/`revoke_share` over MCP, one `evidence_share` row per
 share with derived Active/Expired/Revoked/Suspended state (migration 00086), pinned owner

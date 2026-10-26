@@ -79,6 +79,9 @@ func (s *DownloadResponseAuthority) Close() {
 // Ordinary entitlement is accepted after fresh complete permission evaluation.
 // Its separate reconstruction interval never changes the source projection's
 // dates and is never a complete DownloadAuthority or a SQL effect permit.
+// A shared entitlement (ADR-233) uses the same interval, ends no later than
+// its share and re-reads the share at reconstruction, so a revoked, expired
+// or suspended share refuses at the next recheck.
 const downloadPermissionRecheck = 30 * time.Second
 
 type downloadEntitlement struct {
@@ -87,9 +90,11 @@ type downloadEntitlement struct {
 	permission             identity.Revision
 	audience, contributing []artifact.AudienceAssignment
 	observedAt, recheckAt  time.Time
+	shareID                string
+	shareRevision          int64
 }
 
-func newDownloadEntitlement(scope artifact.DownloadScope, i identity.Identity, permission identity.Revision, audience, contributing []artifact.AudienceAssignment, started time.Time) *downloadEntitlement {
+func newDownloadEntitlement(scope artifact.DownloadScope, i identity.Identity, permission identity.Revision, audience, contributing []artifact.AudienceAssignment, started time.Time, share *value.Share) *downloadEntitlement {
 	i.Groups, i.Scopes = slices.Clone(i.Groups), slices.Clone(i.Scopes)
 	slices.Sort(i.Groups)
 	slices.Sort(i.Scopes)
@@ -98,7 +103,12 @@ func newDownloadEntitlement(scope artifact.DownloadScope, i identity.Identity, p
 	// The old short identity is not reusable authority. Keep only its exact claim
 	// set for comparison with each independently authenticated new batch.
 	i.VerifiedAt, i.ValidUntil = time.Time{}, time.Time{}
-	return &downloadEntitlement{scope: scope, identity: i, permission: permission, audience: audience, contributing: slices.Clone(contributing), observedAt: started, recheckAt: started.Add(downloadPermissionRecheck)}
+	d := &downloadEntitlement{scope: scope, identity: i, permission: permission, audience: audience, contributing: slices.Clone(contributing), observedAt: started, recheckAt: started.Add(downloadPermissionRecheck)}
+	if share != nil {
+		d.shareID, d.shareRevision = share.ID, share.Revision
+		d.recheckAt = identity.Earlier(d.recheckAt, share.ExpiresAt)
+	}
+	return d
 }
 
 func (d *downloadEntitlement) current(now time.Time) bool {
