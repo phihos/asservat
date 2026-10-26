@@ -55,6 +55,12 @@ func (s PolicyStatusService) Get(ctx context.Context, current identities.Current
 	if err != nil || status.ActiveID == "" && status.DeactivatedID == "" {
 		return zero, time.Time{}, value.ErrUnavailable
 	}
+	if status.ActiveID == "" {
+		// A deactivated policy is not polled, so the ledger's source row is not
+		// refreshed; report the current object's generation (a changed
+		// revision can be activated again).
+		status.Generation = source.Revision.Generation
+	}
 	target := authorization.PolicyScope(status.Authority)
 	projection, err := s.Permissions.Permissions(ctx, target)
 	if err != nil {

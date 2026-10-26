@@ -59,6 +59,11 @@ it('shows content-free status and deactivates with CSRF and one idempotency key'
   // An unchanged deactivated revision cannot be activated again: no button, only the hint.
   expect(screen.queryByRole('button', { name: 'Activate' })).toBeNull();
   expect(screen.getByText(/change the DebugPolicy to activate a new revision/)).toBeTruthy();
+  // After the DebugPolicy changes, status reports `changed` and Activate returns.
+  client.state = 'changed';
+  fireEvent.click(screen.getByRole('button', { name: 'Check status' }));
+  expect(await screen.findByText('Changed since activation')).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Activate' })).toBeTruthy();
 });
 
 it('offers activation of a policy without status and shows the server refusal', async () => {

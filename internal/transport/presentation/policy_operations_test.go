@@ -67,9 +67,14 @@ func TestPolicyDeactivationOperationContract(t *testing.T) {
 		t.Fatal("reactivation refusal", out)
 	}
 	// Status of a deactivated policy reports it, with its last acceptance.
-	f.status = value.PolicyStatus{PolicyUID: "policy-uid", DeactivatedID: "99999999-9999-4999-8999-999999999999", Generation: 1, IntentVersion: 1, AcceptedIntentVersion: 1, MaxExecutions: 10, NotAfter: time.Now().Add(time.Hour)}
+	f.status = value.PolicyStatus{PolicyUID: "policy-uid", DeactivatedID: "99999999-9999-4999-8999-999999999999", Generation: 1, AcceptedGeneration: 1, IntentVersion: 1, AcceptedIntentVersion: 1, MaxExecutions: 10, NotAfter: time.Now().Add(time.Hour)}
 	if out = policyCall(t, s, f, "get_policy_status", `{"policy_name":"restarts"}`); out["status"] != "ok" || out["data"].(map[string]any)["state"] != "deactivated" || out["data"].(map[string]any)["acceptance_id"] != f.status.DeactivatedID {
 		t.Fatal("deactivated status", out)
+	}
+	// A new DebugPolicy generation after deactivation can be activated: changed.
+	f.status.Generation = 2
+	if out = policyCall(t, s, f, "get_policy_status", `{"policy_name":"restarts"}`); out["data"].(map[string]any)["state"] != "changed" {
+		t.Fatal("changed revision after deactivation", out)
 	}
 	// Without whole-pod collection rights nothing is dispatched.
 	f.scopes = []string{"evidence:read"}

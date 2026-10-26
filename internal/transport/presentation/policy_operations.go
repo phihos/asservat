@@ -248,6 +248,9 @@ func policyState(st value.PolicyStatus, now time.Time) string {
 	switch {
 	case st.Deleted:
 		return "deleted"
+	case st.ActiveID == "" && st.Generation != st.AcceptedGeneration:
+		// Deactivated, but the DebugPolicy has a new revision to activate.
+		return "changed"
 	case st.ActiveID == "":
 		return "deactivated"
 	case st.Suspended:

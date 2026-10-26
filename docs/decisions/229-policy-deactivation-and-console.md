@@ -38,7 +38,7 @@ ran each capture inline, so one capture (up to 45 s) delayed every other policy'
    `UNIQUE(root_id, policy_uid, scope_digest)` already makes an unchanged revision unacceptable a
    second time; `activate_policy` now reports this as `PolicyDeactivated` instead of `Conflict`,
    and a retried activation under the old key no longer reports the deactivated acceptance as
-   active. To activate again, the maintainer changes the DebugPolicy (a new generation). This keeps
+   active. To activate again, the maintainer changes the DebugPolicy (a new generation). Status then reports the existing `changed` state (the current object's generation differs from the deactivated acceptance's), so the console offers Activate again. This keeps
    ADR-228's rule that stopping and starting can never reset a policy's spend or expiry.
 5. **Audit.** The call goes through the existing two-phase encrypted operation audit (intent
    before the operation, outcome with `effect: accepted` and the acceptance ID in the digested
