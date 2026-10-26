@@ -36,7 +36,9 @@ ORDER BY created_at, id LIMIT 32;
 SELECT * FROM evidence_share WHERE root_id=sqlc.arg(root_id)
  AND ((creator_issuer=sqlc.arg(creator_issuer) AND creator_subject=sqlc.arg(creator_subject))
   OR (revoked_at IS NULL AND expires_at>clock_timestamp() AND management @> ANY(sqlc.arg(managers)::jsonb[])))
-ORDER BY created_at DESC, id LIMIT sqlc.arg(row_limit);
+-- Active rows first, so old revoked/expired own shares never push a share the
+-- caller can still revoke out of the bounded page.
+ORDER BY (revoked_at IS NULL AND expires_at>clock_timestamp()) DESC, created_at DESC, id LIMIT sqlc.arg(row_limit);
 
 -- name: ReadShare :one
 SELECT * FROM evidence_share WHERE root_id=$1 AND id=$2;

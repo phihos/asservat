@@ -114,7 +114,7 @@ const listOwnedShares = `-- name: ListOwnedShares :many
 SELECT id, root_id, artifact_id, case_id, cluster_id, namespace_uid, workload_uid, pod_uid, version, creator_issuer, creator_subject, creator_client, management, recipients, recipient_keys, idempotency_key, request_digest, created_at, expires_at, revoked_at, revoke_key, revision FROM evidence_share WHERE root_id=$1
  AND ((creator_issuer=$2 AND creator_subject=$3)
   OR (revoked_at IS NULL AND expires_at>clock_timestamp() AND management @> ANY($4::jsonb[])))
-ORDER BY created_at DESC, id LIMIT $5
+ORDER BY (revoked_at IS NULL AND expires_at>clock_timestamp()) DESC, created_at DESC, id LIMIT $5
 `
 
 type ListOwnedSharesParams struct {
@@ -130,6 +130,8 @@ type ListOwnedSharesParams struct {
 // (ADR-232 increment 4; each pattern is a one-element array
 // [{"Kind","Issuer","SubjectID"}]). Candidates only: the service lists a team
 // share only while the caller holds a pinned assignment that is still current.
+// Active rows first, so old revoked/expired own shares never push a share the
+// caller can still revoke out of the bounded page.
 func (q *Queries) ListOwnedShares(ctx context.Context, arg ListOwnedSharesParams) ([]EvidenceShare, error) {
 	rows, err := q.db.Query(ctx, listOwnedShares,
 		arg.RootID,
