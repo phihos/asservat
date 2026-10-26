@@ -1154,6 +1154,12 @@ func installerCrashHubWorker(t *testing.T, ctx context.Context, api kubernetes.I
 	}
 	pod := pods.Items[0]
 	node, before := pod.Spec.NodeName, pod.Status.ContainerStatuses[0].RestartCount
+	// Startup waits for the kubelet's projection refresh instead of exiting
+	// (a fixed 30 s mount wait restarted it in 3 of 5 runs on 2026-10-26).
+	if before != 0 {
+		installedProcessDiagnostics(t, ctx, api, namespace, deployment)
+		t.Fatal("hub-worker restarted before the forced crash", before)
+	}
 	cluster := strings.TrimSuffix(strings.TrimSuffix(node, "-control-plane"), "-worker")
 	if !strings.HasPrefix(node, "asservat-") || cluster == node {
 		t.Fatal("hub-worker not on an owned harness node", node)

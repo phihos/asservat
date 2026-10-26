@@ -14,6 +14,17 @@ import (
 
 var errCapacityProjectionMountPending = errors.New("capacity projection mount pending")
 
+// projectionMountWait bounds how long a Lease-owned child waits for the
+// kubelet to add an acknowledged projection to its already-mounted volume.
+// Kubelet refreshes mounted ConfigMap/Secret volumes only on a Pod resync:
+// syncFrequency (default 1m) jittered by up to 1.5x, i.e. up to 90s, plus
+// watch/cache propagation ("kubelet sync period + cache propagation delay",
+// kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically).
+// The former 30s bound was shorter than that and exited healthy processes
+// (measured 2026-10-26: mount pending 30s, exit, restart, 17s Lease wait).
+// Original setup/operation deadlines still apply inside each attempt.
+const projectionMountWait = 2 * time.Minute
+
 func capacityProjectionMatches(c contracts.CapacityDeployment, m contracts.CapacityCredentialManifest, p contracts.CapacityRuntimeProjectionClaim, worker contracts.HubWorkerDeployment) bool {
 	a := worker.Activation
 	w := m.Input.Worker
@@ -41,7 +52,7 @@ func (d *CapacityHubWorkerDeployment) runCapacity(ctx context.Context) error {
 		}
 		if ready {
 			if mountUntil.IsZero() {
-				mountUntil = time.Now().Add(30 * time.Second)
+				mountUntil = time.Now().Add(projectionMountWait)
 			}
 			if !time.Now().Before(mountUntil) {
 				return mounts.ErrUnavailable

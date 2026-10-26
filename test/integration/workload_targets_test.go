@@ -210,6 +210,9 @@ func qualifyStatefulTarget(t *testing.T, ctx context.Context, admin *kubernetes.
 	})
 	template := original.Spec.Template.DeepCopy()
 	template.Labels = labels
+	// Foreground deletion waits for the Pod; the default 30 s grace equals the
+	// 30 s cleanup bound, so the synthetic Pod stops within one second.
+	template.Spec.TerminationGracePeriodSeconds = ptr.To(int64(1))
 	stateful, err := admin.AppsV1().StatefulSets(ns).Create(ctx, &apps.StatefulSet{ObjectMeta: meta.ObjectMeta{Name: name, Namespace: ns}, Spec: apps.StatefulSetSpec{Replicas: ptr.To(int32(1)), ServiceName: name, Selector: &meta.LabelSelector{MatchLabels: labels}, Template: *template}}, meta.CreateOptions{})
 	if err != nil {
 		t.Fatal(err)

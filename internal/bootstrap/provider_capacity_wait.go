@@ -38,7 +38,7 @@ func (d *CapacityHubWorkerDeployment) runProviderCapacity(ctx context.Context) e
 		}
 		if ready {
 			if mountUntil.IsZero() {
-				mountUntil = time.Now().Add(30 * time.Second)
+				mountUntil = time.Now().Add(projectionMountWait)
 			}
 			if !time.Now().Before(mountUntil) {
 				return &fixedStepError{"mount-wait", mounts.ErrUnavailable}
