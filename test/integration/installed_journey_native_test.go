@@ -60,12 +60,13 @@ func (b installedJourneyBearer) RoundTrip(r *http.Request) (*http.Response, erro
 const installedJourneyRetention = 240
 
 // installedJourneyRetentionSeconds is the journey's retention. The focused
-// journey run (ASSERVAT_JOURNEY_FOCUS=journey) moves the console checks to the
-// browser focus and reaches the expiry wait about 75 s sooner, so 150 s keeps
-// the same margin and the run fits the 20-minute rule with room to spare.
+// journey run (ASSERVAT_JOURNEY_FOCUS=journey) moves the console checks and
+// the approved projection to the browser focus and reached the expiry wait
+// about 50 s after acceptance locally, so 110 s keeps a margin of about a
+// minute and the run stays near 15 minutes.
 func installedJourneyRetentionSeconds() int64 {
 	if installedJourneyFocus() == "journey" {
-		return 150
+		return 110
 	}
 	return installedJourneyRetention
 }
@@ -393,7 +394,9 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 		t.Logf("installed journey: the regional capture in cluster %s was collected, verified and published", cluster)
 		var approved query.ContextExcerpt
 		var checkQueryRetired func()
-		if !short {
+		// The approved read-only projection (and its retirement check) belongs
+		// to the console checks: the browser focus and the unfocused run.
+		if browserChecks {
 			approved, checkQueryRetired = installedApprovedProjection(t, ctx, identity, transport, origin, progress.CaseID, investigation.Artifacts[0].ArtifactID, preview.SelectedPods[0].UID, expires, projectionCheck)
 		}
 		// A hub-local download worker (ADR-204) prepares the native file; the
@@ -444,7 +447,7 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			diagnose()
 			t.Fatal("installed native download differs from its metadata or selected Pod", response.StatusCode, size, err)
 		}
-		if !short {
+		if browserChecks {
 			if err := installedProjectionMatchesNative(approved, native); err != nil {
 				t.Fatal(err)
 			}
@@ -529,7 +532,9 @@ func installedJourney(t *testing.T, ctx context.Context, admin *pgxpool.Pool, ro
 			diagnose()
 			t.Fatal("installed Stop requires one acknowledged distinct nonterminal download", stopReply.RequestID, err)
 		}
-		checkQueryRetired()
+		if checkQueryRetired != nil {
+			checkQueryRetired()
+		}
 		// Preparing need not advertise a content link. Retain the public route
 		// for this acknowledged ID; no second readiness/worker wait is needed.
 		stopContentPath := "/api/v1/downloads/" + stopDownload.DownloadID + "/content"

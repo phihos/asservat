@@ -28,7 +28,8 @@ declare -A suites=(
   [continuation-journey]="env ASSERVAT_JOURNEY_FOCUS=journey $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   # The console checks of the first cluster's journey (browser submission,
   # console/MCP preview, case, approved extract and native download agreement),
-  # split from the journey run so each stays within 15 minutes.
+  # and the approved read-only projection, split from the journey run so each
+  # stays within about 15 minutes.
   [continuation-browser]="env ASSERVAT_JOURNEY_FOCUS=browser $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-restart]="env ASSERVAT_JOURNEY_FOCUS=restart $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   [continuation-clusters]="env ASSERVAT_JOURNEY_FOCUS=clusters $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
