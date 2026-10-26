@@ -59,7 +59,7 @@ func (f *fixture) RecoveryState(context.Context) (artifact.RecoveryProof, error)
 }
 
 // memoryStore is an in-memory share ledger with the SQL adapter's replay,
-// conflict and creator-only revocation rules.
+// conflict and creator-or-pinned-manager revocation rules.
 type memoryStore struct {
 	now     func() time.Time
 	rows    []value.Share
@@ -98,10 +98,25 @@ func (s *memoryStore) CreateShare(_ context.Context, r Request, _ artifact.Recov
 	s.rows = append(s.rows, r.Share)
 	return s.stamp(r.Share), false, nil
 }
-func (s *memoryStore) OwnedShares(_ context.Context, creator identity.Principal, _ int) ([]value.Share, error) {
+func (s *memoryStore) Share(_ context.Context, id string) (value.Share, error) {
+	for _, r := range s.rows {
+		if r.ID == id {
+			return s.stamp(r), nil
+		}
+	}
+	return value.Share{}, capture.ErrDenied
+}
+
+// OwnedShares mirrors the SQL candidates: created rows, plus unrevoked,
+// unexpired rows pinning one of the caller's user/group subjects.
+func (s *memoryStore) OwnedShares(_ context.Context, caller identity.Identity, _ int) ([]value.Share, error) {
 	var out []value.Share
 	for _, r := range s.rows {
-		if r.Creator.Subject == creator.Subject {
+		pinned := false
+		for _, a := range r.Management {
+			pinned = pinned || a.Issuer == caller.Principal.Issuer && (a.Kind == "User" && a.SubjectID == caller.Principal.Subject || a.Kind == "Group" && slices.Contains(caller.Groups, a.SubjectID))
+		}
+		if r.Creator.Subject == caller.Principal.Subject || pinned && r.RevokedAt.IsZero() && s.now().Before(r.ExpiresAt) {
 			out = append(out, s.stamp(r))
 		}
 	}
@@ -121,7 +136,11 @@ func (s *memoryStore) ReceivedShares(ctx context.Context, caller identity.Identi
 }
 func (s *memoryStore) RevokeShare(_ context.Context, r Revocation, _ artifact.RecoveryProof) (value.Share, bool, error) {
 	for i := range s.rows {
-		if s.rows[i].ID == r.ShareID && s.rows[i].Creator.Subject == r.Creator.Subject {
+		pinned := len(r.Managers) > 0
+		for _, id := range r.Managers {
+			pinned = pinned && slices.ContainsFunc(s.rows[i].Management, func(a artifact.AudienceAssignment) bool { return a.AssignmentID == id })
+		}
+		if s.rows[i].ID == r.ShareID && (s.rows[i].Creator.Subject == r.Actor.Subject || pinned) {
 			if !s.rows[i].RevokedAt.IsZero() {
 				return s.stamp(s.rows[i]), true, nil
 			}
@@ -313,5 +332,167 @@ func TestShareReceivedListTrimsAfterFiltering(t *testing.T) {
 	f.i.Principal.Subject, f.i.Groups, f.i.Scopes = "outsider", []string{"outsiders"}, []string{"evidence:read"}
 	if got, _, err := s.List(context.Background(), f, "received", 1); err != nil || len(got) != 1 {
 		t.Fatal("received page", err, got)
+	}
+}
+
+// addOwnerTeam adds a current evidence-owner Group assignment that is also in
+// the retained audience (an owner team at capture time).
+func (f *fixture) addOwnerTeam(group string, n int) artifact.AudienceAssignment {
+	a := f.record.Audience[1]
+	a.SubjectID, a.AssignmentID = group, testID(n)
+	f.p.Allows = append(f.p.Allows, value.CurrentAssignment{Audience: a, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second)})
+	f.record.Audience = append(f.record.Audience, a)
+	return a
+}
+
+func (f *fixture) dropAllow(assignmentID string) {
+	f.p.Allows = slices.DeleteFunc(f.p.Allows, func(a value.CurrentAssignment) bool { return a.Audience.AssignmentID == assignmentID })
+}
+
+func listed(views []View, id string) (value.SharePhase, bool) {
+	for _, v := range views {
+		if v.Share.ID == id {
+			return v.Phase, true
+		}
+	}
+	return "", false
+}
+
+// ADR-232 increment 4: management is the creator's owner teams; any current
+// member manages; the creator's departure keeps the share; losing every team
+// suspends it; a newly added owner assignment manages no older share.
+func TestShareTeamManagement(t *testing.T) {
+	ctx := context.Background()
+	f, s := newFixture()
+	teamB := f.addOwnerTeam("owners-b", 13)
+	creator := f.i
+	creator.Groups = []string{"owners", "owners-b"}
+	f.i = creator
+	share, _, err := s.Create(ctx, f, f.input("k1"))
+	if err != nil || len(share.Management) != 2 || share.Management[0].Kind != "Group" || share.Management[1].Kind != "Group" {
+		t.Fatal("create with two owner teams", err, share.Management)
+	}
+	mate := creator
+	mate.Principal.Subject, mate.Groups = "mate", []string{"owners"}
+	// A team member who did not create the share manages it.
+	f.i = mate
+	if owned, _, err := s.List(ctx, f, "owned", 20); err != nil {
+		t.Fatal(err)
+	} else if phase, ok := listed(owned, share.ID); !ok || phase != value.ShareActive {
+		t.Fatal("team member does not see the managed share", owned)
+	}
+	// The creator leaves both teams: the share stays Active, still listed
+	// for the creator (created) and the member revokes it.
+	f.i = creator
+	f.i.Groups = nil
+	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 1 || owned[0].Phase != value.ShareActive {
+		t.Fatal("creator departure changed the share", owned)
+	}
+	f.i = mate
+	if revoked, _, err := s.Revoke(ctx, f, share.ID, 1, "r-mate"); err != nil || revoked.Revision != 2 {
+		t.Fatal("team member could not revoke", err)
+	}
+	// A revoked team share leaves the member's (not the creator's) view.
+	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 0 {
+		t.Fatal("revoked team share still listed for the member", owned)
+	}
+
+	f.i = creator
+	second, _, err := s.Create(ctx, f, f.input("k2"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Team "owners" loses its assignment: its member no longer manages, the
+	// share stays Active through owners-b.
+	owners := f.p.Allows[1].Audience
+	f.dropAllow(owners.AssignmentID)
+	f.i = mate
+	if _, _, err := s.Revoke(ctx, f, second.ID, 1, "r-lost"); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("member of a team without a current assignment revoked", err)
+	}
+	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 0 {
+		t.Fatal("member of a lost team lists the share", owned)
+	}
+	f.i = creator
+	if owned, _, _ := s.List(ctx, f, "owned", 20); func() bool { p, ok := listed(owned, second.ID); return !ok || p != value.ShareActive }() {
+		t.Fatal("share with one remaining team not Active", owned)
+	}
+	// Both teams lost: Suspended.
+	f.dropAllow(teamB.AssignmentID)
+	if owned, _, _ := s.List(ctx, f, "owned", 20); func() bool { p, ok := listed(owned, second.ID); return !ok || p != value.ShareSuspended }() {
+		t.Fatal("share without a current team not Suspended", owned)
+	}
+	// Re-granting "owners" is a new assignment ID: no restoration, and its
+	// members cannot manage the old share.
+	regranted := owners
+	regranted.AssignmentID = testID(14)
+	f.p.Allows = append(f.p.Allows, value.CurrentAssignment{Audience: regranted, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second)})
+	if owned, _, _ := s.List(ctx, f, "owned", 20); func() bool { p, ok := listed(owned, second.ID); return !ok || p != value.ShareSuspended }() {
+		t.Fatal("re-granted owner binding restored a suspended share", owned)
+	}
+	f.i = mate
+	if _, _, err := s.Revoke(ctx, f, second.ID, 1, "r-new"); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("newly added owner managed an old share", err)
+	}
+	if owned, _, _ := s.List(ctx, f, "owned", 20); len(owned) != 0 {
+		t.Fatal("newly added owner lists an old share", owned)
+	}
+	// The creator can still revoke the suspended share.
+	f.i = creator
+	if _, _, err := s.Revoke(ctx, f, second.ID, 1, "r-creator"); err != nil {
+		t.Fatal("creator could not revoke a suspended share", err)
+	}
+}
+
+func TestShareManagementPersonalTeamsAndDeny(t *testing.T) {
+	ctx := context.Background()
+	// Individually assigned only: creator-only management.
+	f, s := newFixture()
+	personal := f.record.Audience[1]
+	personal.Kind, personal.SubjectID, personal.AssignmentID = "User", "owner", testID(15)
+	f.p.Allows = []value.CurrentAssignment{f.p.Allows[0], {Audience: personal, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second)}}
+	f.record.Audience = []artifact.AudienceAssignment{f.record.Audience[0], personal}
+	share, _, err := s.Create(ctx, f, f.input("k1"))
+	if err != nil || len(share.Management) != 1 || share.Management[0].Kind != "User" {
+		t.Fatal("individual owner", err, share.Management)
+	}
+	other := f.i
+	other.Principal.Subject = "someone-else"
+	f.i = other
+	if _, _, err := s.Revoke(ctx, f, share.ID, 1, "r"); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("another user managed a personal share", err)
+	}
+
+	// Team and individual owner: the teams manage (not the personal row).
+	f, s = newFixture()
+	personal.SubjectID = f.i.Principal.Subject
+	f.p.Allows = append(f.p.Allows, value.CurrentAssignment{Audience: personal, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second)})
+	f.record.Audience = append(f.record.Audience, personal)
+	share, _, err = s.Create(ctx, f, f.input("k1"))
+	if err != nil || len(share.Management) != 1 || share.Management[0].Kind != "Group" {
+		t.Fatal("team management not preferred", err, share.Management)
+	}
+	// A current deny of a member removes their management.
+	mate := f.i
+	mate.Principal.Subject = "mate"
+	d := f.p.Allows[0]
+	d.Audience.Kind, d.Audience.SubjectID, d.Audience.AssignmentID = "User", "mate", testID(63)
+	f.p.Denies = []value.CurrentAssignment{d}
+	f.i = mate
+	if _, _, err := s.Revoke(ctx, f, share.ID, 1, "r"); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("denied member revoked", err)
+	}
+	f.p.Denies = nil
+	if _, _, err := s.Revoke(ctx, f, share.ID, 1, "r"); err != nil {
+		t.Fatal("member revoke", err)
+	}
+
+	// More than eight owner teams: refused, never truncated.
+	f, s = newFixture()
+	for n := 0; n < value.ShareMaxManagers; n++ {
+		f.i.Groups = append(f.i.Groups, f.addOwnerTeam(fmt.Sprintf("owners-%d", n), 30+n).SubjectID)
+	}
+	if _, _, err := s.Create(ctx, f, f.input("k1")); !errors.Is(err, ErrManagementTooBroad) || len(f.store.created) != 0 {
+		t.Fatal("nine owner teams", err)
 	}
 }

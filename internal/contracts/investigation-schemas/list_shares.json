@@ -1,6 +1,6 @@
 {
   "name": "list_shares",
-  "description": "List your own shares (view owned, every phase) or the shares you can currently read (view received, Active only). Most recent first, at most limit (default 20, maximum 100).",
+  "description": "List the shares you created (view owned, every phase) or currently manage through a pinned owner team (unrevoked, unexpired), with revision, created_by and managed_by; or the shares you can currently read (view received, Active only). Most recent first, at most limit (default 20, maximum 100).",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -128,6 +128,24 @@
                         "expires_at": {
                           "type": "string",
                           "format": "date-time"
+                        },
+                        "revision": {
+                          "enum": [
+                            1,
+                            2
+                          ]
+                        },
+                        "created_by": {
+                          "$ref": "#/$defs/d0"
+                        },
+                        "managed_by": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/$defs/d0"
+                          },
+                          "minItems": 1,
+                          "maxItems": 8,
+                          "uniqueItems": true
                         }
                       },
                       "required": [
@@ -206,6 +224,35 @@
           }
         ]
       }
-    ]
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "User",
+              "Group"
+            ]
+          },
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "kind",
+          "issuer",
+          "id"
+        ]
+      }
+    }
   }
 }

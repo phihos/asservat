@@ -268,7 +268,10 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err != nil {
 			t.Fatal(err)
 		}
-		qualifyEvidenceShare(t, ctx, admin, poolFor, f.scenario, f.e, f.reader)
+		publishAuthority := func() error {
+			return (auditapp.AuthorityPublisher{Ledger: f.scenario.p, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx)
+		}
+		qualifyEvidenceShare(t, ctx, admin, poolFor, f.scenario, f.e, f.reader, publishAuthority)
 	})
 
 	t.Run("progress-revisions-follow-durable-verification-audit-and-publication", func(t *testing.T) {

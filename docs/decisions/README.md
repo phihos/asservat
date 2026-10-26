@@ -7,6 +7,11 @@ the caller's own contributing assignments; callers without an assignment on the 
 uniform answer. Console "Why?" link on capture errors and blockers. Migration 00087 adds the audit
 operation name.
 
+[ADR-232 increment 4 — team management](232-concrete-evidence-share.md#increment-4-team-management)
+pins the creator's owner teams (creator-only without a team, more than eight refused), lets every
+current holder of a pinned assignment list and revoke the share, and returns `revision`,
+`created_by` and `managed_by` in `list_shares(view=owned)`. No migration or new grant.
+
 [ADR-233 — Recipient native download of a shared artifact](233-recipient-native-download.md) is
 S-06 increment 3: the download authorizer consults a recipient's share of exactly the scope's
 artifact and version only after ordinary eligibility refuses and before the catalog read, re-reads

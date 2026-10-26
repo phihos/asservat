@@ -127,6 +127,7 @@ requirements:
   scenarios:
   - SC-SHR-003
   - SC-SHR-009
+  - SC-SHR-008
   tasks:
   - TASK-07
 - requirement: REQ-SHR-004

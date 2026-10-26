@@ -31,7 +31,12 @@ func (f *shareOperationsFixture) Create(_ context.Context, _ identities.CurrentI
 }
 func (f *shareOperationsFixture) List(_ context.Context, _ identities.CurrentIdentity, view string, limit int) ([]sharing.View, time.Time, error) {
 	f.calls = append(f.calls, "list-"+view)
-	s := authorization.Share{ID: "11111111-1111-4111-8111-111111111111", CaseID: "22222222-2222-4222-8222-222222222222", ExpiresAt: time.Now().Add(time.Hour)}
+	issuer := "https://id.example.invalid"
+	team := artifact.AudienceAssignment{Kind: "Group", Issuer: issuer, SubjectID: "owners", Role: "evidence-owner", AssignmentID: "33333333-3333-4333-8333-333333333333"}
+	again := team
+	again.AssignmentID = "44444444-4444-4444-8444-444444444444"
+	s := authorization.Share{ID: "11111111-1111-4111-8111-111111111111", CaseID: "22222222-2222-4222-8222-222222222222", ExpiresAt: time.Now().Add(time.Hour), Revision: 1,
+		Creator: identity.Principal{Issuer: issuer, Subject: "creator", ClientID: "mcp", Kind: identity.Human}, Management: []artifact.AudienceAssignment{team, again}}
 	return []sharing.View{{Share: s, Phase: authorization.ShareSuspended}}, time.Now().Add(5 * time.Second), nil
 }
 func (f *shareOperationsFixture) Revoke(_ context.Context, _ identities.CurrentIdentity, id string, expected int64, key string) (authorization.Share, bool, error) {
@@ -62,8 +67,13 @@ func TestShareOperationsContract(t *testing.T) {
 	if out := shareCall(t, s, f, "create_share", create); out["status"] != "ok" || out["data"].(map[string]any)["phase"] != "Active" || f.input.Version[0] != 0x0a || f.input.Recipients[0].ID != "outsider" || f.input.ExpiresAt.IsZero() {
 		t.Fatal("create reply", out, f.input)
 	}
-	if out := shareCall(t, s, f, "list_shares", `{"view":"owned"}`); out["status"] != "ok" || out["data"].(map[string]any)["shares"].([]any)[0].(map[string]any)["phase"] != "Suspended" {
+	// The owned view names revision, "Created by" and "Managed by" (one entry
+	// per team, not per assignment).
+	if out := shareCall(t, s, f, "list_shares", `{"view":"owned"}`); out["status"] != "ok" {
 		t.Fatal("list reply", out)
+	} else if row := out["data"].(map[string]any)["shares"].([]any)[0].(map[string]any); row["phase"] != "Suspended" || row["revision"] != float64(1) ||
+		row["created_by"].(map[string]any)["id"] != "creator" || len(row["managed_by"].([]any)) != 1 || row["managed_by"].([]any)[0].(map[string]any)["id"] != "owners" {
+		t.Fatal("owned row", row)
 	}
 	if out := shareCall(t, s, f, "revoke_share", `{"share_id":"11111111-1111-4111-8111-111111111111","expected_revision":1,"idempotency_key":"r"}`); out["status"] != "ok" || out["data"].(map[string]any)["revision"] != float64(2) {
 		t.Fatal("revoke reply", out)
@@ -90,6 +100,8 @@ func TestShareOperationsContract(t *testing.T) {
 	}
 	if out := shareCall(t, s, f, "list_shares", `{"view":"received"}`); out["status"] != "ok" || f.calls[0] != "list-received" {
 		t.Fatal("received list", out)
+	} else if row := out["data"].(map[string]any)["shares"].([]any)[0].(map[string]any); row["created_by"] != nil || row["managed_by"] != nil || row["revision"] != nil {
+		t.Fatal("received row exposes management", row)
 	}
 	f.scopes, f.createErr = []string{"evidence:read", "evidence:share"}, value.ErrCapacity
 	if out := shareCall(t, s, f, "create_share", create); out["data"].(map[string]any)["code"] != "ShareLimit" {

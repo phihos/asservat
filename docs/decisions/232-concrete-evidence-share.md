@@ -1,6 +1,7 @@
 # ADR-232 — Concrete evidence share of one stored artifact (S-06 increment 1)
 
-Date: 2026-10-26. Status: accepted; implemented; qualification below.
+Date: 2026-10-26. Status: accepted; implemented; qualification below. Amended the same day by
+[increment 4 (team management)](#increment-4-team-management).
 Requirements: REQ-SHR-001/002/003 (narrowed below), S-06 (TASK-07). Plan: the S-06 plan
 `docs/reviews/s06-plan-2026-10-26.md` (branch `simplify/s06-plan`), increment 1 (F1 concrete share, F2 recipient-only
 view, F3 revocation).
@@ -80,7 +81,8 @@ scopes are unchanged.
    `EvaluateShare` admits now (not denied), filtered from the first 100 candidates and then trimmed
    to the page, newest first, no cursor. Received rows are candidates: the artifact's retained
    audience, retention end and data class are checked by the read itself.
-   `revoke_share(share_id, expected_revision, idempotency_key)` is creator-only in this increment;
+   `revoke_share(share_id, expected_revision, idempotency_key)` is creator-only in this increment
+   (increment 4 adds every current manager);
    revocation only restricts access, so it needs no current owner assignment. The same key after
    success is a replay; another key or a stale revision is Conflict; another principal's share is
    NotAvailable without saying why.
@@ -129,7 +131,7 @@ maintainer requirement:
 - No directory check that a group ID exists (it would need directory-reader credentials that
   ADR-059 forbids by default). Use-time admission enforces organization identity eligibility at
   every request; a creation-time recipient eligibility check is not implemented.
-- Creator-only revocation and management; team managers are increment 4.
+- Creator-only revocation and management; team managers are increment 4 (implemented below).
 
 ## Complexity gate (AGENTS.md)
 
@@ -242,3 +244,80 @@ Results are in [implementation progress](../implementation-progress.md#s-06-incr
 The installed browser focus (`ASSERVAT_JOURNEY_FOCUS=browser`) now also creates, lists and
 revokes a share from the console session (its binding adds `evidence-owner` like the share
 focus); it runs in CI, not locally.
+
+- Increments 2 (console) and 3 (recipient native download, [ADR-233](233-recipient-native-download.md))
+  are implemented (increment 2 above); increment 4 is below.
+
+## Increment 4: team management
+
+Plan row 4 of the S-06 plan. Increment 1 already pinned the creator's contributing
+`evidence-owner` assignments (complete assignment, ID and basis digest) and derived Suspended from
+them, so this increment changes which assignments are pinned, who may revoke, and what the owned
+list returns. No migration, SQL grant, schema version or Kubernetes change.
+
+1. **Default management (REQ-SHR-008).** `ShareManagement` pins the creator's contributing
+   `evidence-owner` **Group** assignments (the owner teams, within the artifact's retained
+   audience). Only when the creator has no owner team does it pin the individual User assignment
+   (creator-only management). Increment 1 pinned both kinds; a creator's personal assignment no
+   longer keeps a team share Active after every team is lost. More than eight owner assignments
+   are refused (`ManagementTooBroad`), never truncated; increment 1 truncated silently.
+2. **Current manager.** `Share.ManagedBy` returns the pinned assignments a caller holds now: a
+   human with `evidence:share`, a current target projection with a complete fresh deny snapshot,
+   no current deny naming the caller, and the pinned assignment still exactly a current allow
+   (`Share.managers`, which already applied the creator-deny rule). Group membership changes within
+   the same assignment keep a member managing, so the creator's departure does not affect the
+   share. A newly added owner binding, even for the same group, is a new assignment ID and manages
+   no older share; a share without any current pinned assignment is Suspended and nobody but the
+   creator can revoke it.
+3. **Revocation.** `revoke_share` reads the share by ID; its creator revokes as before (no current
+   assignment needed). Anyone else must be a current manager; the service passes the held
+   assignment IDs and the SQL revocation, which locks the row, requires each to be pinned by the
+   immutable row. Otherwise NotAvailable, without saying whether the share exists. A team member's
+   revocation of an already revoked share under another key is Conflict, as for the creator.
+   The actor is recorded by the existing audited operation; the row stays creator-keyed.
+4. **Owned list.** `list_shares(view=owned)` returns the caller's created shares in every phase
+   plus unrevoked, unexpired shares pinning one of the caller's user or group subjects (SQL
+   candidates by JSON containment on `management`), kept only while `ManagedBy` holds now. Rows
+   are filtered from the first 100 candidates and then trimmed to the page, newest first. Owned
+   rows carry `revision` (for `revoke_share`), `created_by` (the immutable creator) and
+   `managed_by` (the pinned subjects, one per group); received rows stay minimal. The canonical
+   `list_shares` row gains these optional fields (`specs/contracts/mcp-tools.json`, the browser
+   OpenAPI copy and the generated runtime subset).
+
+Management grants no read of the artifact: a manager reads only through ordinary rights or a
+share, exactly as before.
+
+### Complexity gate (AGENTS.md), increment 4
+
+1. **Frequency/harm:** the accepted case is the creator leaving or being absent while a share
+   stays active; before this increment only an administrator (Deny AccessBinding or removing
+   `evidence-owner`) could stop it, both broader than one share. Frequency unmeasured; not
+   hypothetical or test-induced (REQ-SHR-008, SC-SHR-008).
+2. **Risk accepted:** yes (accepted decision: multiple owner teams manage shares; creators stay
+   immutable audit actors).
+3. **Typical:** yes; owner rights are normally granted to groups.
+4. **Precedent:** group-owned objects managed by any current member (GitLab group resources,
+   shared drives); general product knowledge, not a verified research baseline.
+5. **Privileges:** none added: no SQL grant (the duty already has SELECT/UPDATE on
+   `evidence_share`), no Kubernetes, credential, network, collector or worker change. Current team
+   members gain list/revoke of shares pinning their team; no evidence read.
+6. **Failure/degraded states:** 0 new phases; 1 new refusal (`ManagementTooBroad`). An unavailable
+   projection refuses non-creator management (fail closed); the creator's revocation is unaffected.
+7. **Configuration for its own machinery:** none.
+8. **Outside Asservat's control:** IdP stable group IDs and ≤5-minute group freshness (unchanged).
+9. **Aggregate cost:** ordinary reads and recipient reads: 0 extra. Owned list: 1 SQL query
+   (creator index or a containment filter over the root's `evidence_share` rows, ≤ 100 candidates)
+   plus 1 projection read per distinct target, as before. Non-creator revoke: +1 primary-key read
+   and +1 projection read; creator revoke: +1 primary-key read. The containment filter has no
+   index: rows are bounded by audited share creation; add a `jsonb_path_ops` GIN index if a
+   measured owned list becomes slow. 0 Kubernetes requests.
+10. **Upgrade/rollback/disable:** no migration (schema 86, floor 81). An increment-1 binary reads
+    the same rows identically (its creator-only revoke and list simply ignore team members).
+    Disable as before (remove `evidence:share` or `evidence-owner`).
+11. **Smaller fix:** documenting the limitation leaves SC-SHR-008 unmet and administrators as the
+    only stop; explicit management selection and transfer (the full REQ-SHR-008 surface) stay
+    unimplemented because the default covers the accepted case.
+
+### Qualification (increment 4)
+
+Results are in [implementation progress](../implementation-progress.md#s-06-increment-4-team-management-adr-232-2026-10-26).

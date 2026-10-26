@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -155,6 +156,9 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 	}
 	retained := value.Retained{ArtifactID: route.ArtifactID, Target: route.Target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
 	eligible, owners := value.ShareManagement(i, p, route.Target, &retained, s.Now())
+	if eligible.Reason == "ManagementTooBroad" {
+		return zero, false, ErrManagementTooBroad
+	}
 	if !eligible.Eligible {
 		return zero, false, capture.ErrDenied
 	}
@@ -189,9 +193,12 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 	return out, replay, nil
 }
 
-// List returns the caller's own shares (owned: every phase; Revoked and
-// Expired need no projection, and a target without a current projection
-// shows Suspended rather than failing the list) or the shares received by
+// List returns the shares the caller created or currently manages (owned:
+// created shares in every phase, where Revoked and Expired need no projection
+// and a target without a current projection shows Suspended rather than
+// failing the list; plus unrevoked, unexpired shares of which the caller holds
+// a current pinned management assignment, ADR-232 increment 4) or the shares
+// received by
 // the caller (received: unrevoked, unexpired shares whose share-level checks
 // pass, never another recipient's or a suspended/denied one). Received rows
 // are candidates: the artifact's retained audience, retention end and data
@@ -209,13 +216,13 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 	if view == "owned" && (i.Principal.Kind != identity.Human || !slices.Contains(i.Scopes, value.ShareScope)) {
 		return nil, time.Time{}, capture.ErrDenied
 	}
+	// Filtering happens after the SQL page, so fetch the full bound and trim:
+	// a suspended, denied or no longer managed row never pushes a listed one
+	// off a small page. ponytail: beyond 100 candidates add keyset paging.
 	var rows []value.Share
 	if view == "owned" {
-		rows, err = s.Store.OwnedShares(ctx, i.Principal, limit)
+		rows, err = s.Store.OwnedShares(ctx, i, 100)
 	} else {
-		// Filtering happens after the SQL page, so fetch the full bound and
-		// trim: a suspended or denied row never pushes a readable one off a
-		// small page. ponytail: beyond 100 candidates add keyset paging.
 		rows, err = s.Store.ReceivedShares(ctx, i, 100)
 	}
 	if err != nil {
@@ -228,10 +235,11 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 		if row.RootID != s.RootID {
 			return nil, time.Time{}, capture.ErrUnavailable
 		}
-		if view == "owned" && (row.Creator.Issuer != i.Principal.Issuer || row.Creator.Subject != i.Principal.Subject) {
-			return nil, time.Time{}, capture.ErrUnavailable
+		if len(out) == limit {
+			break
 		}
-		if view == "owned" && (!row.RevokedAt.IsZero() || !s.Now().Before(row.ExpiresAt)) {
+		created := createdBy(row, i.Principal)
+		if view == "owned" && created && (!row.RevokedAt.IsZero() || !s.Now().Before(row.ExpiresAt)) {
 			// Final phases do not depend on permissions.
 			out = append(out, View{row, row.Phase(value.Projection{}, s.Now())})
 			continue
@@ -244,10 +252,18 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 			projections[row.Target] = p
 		}
 		until = identity.Earlier(until, row.ValidUntil)
-		if view == "received" {
-			if len(out) == limit {
-				break
+		if view == "owned" && !created {
+			// A team share is listed only while the caller holds one of its
+			// pinned management assignments now.
+			held, valid := row.ManagedBy(i, p, s.Now())
+			if len(held) == 0 {
+				continue
 			}
+			until = identity.Earlier(until, valid)
+			out = append(out, View{row, row.Phase(p, s.Now())})
+			continue
+		}
+		if view == "received" {
 			r := value.EvaluateShare(i, p, row.Target, nil, row, s.Now())
 			if !r.Eligible {
 				continue
@@ -273,9 +289,11 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 	return out, identity.Earlier(until, final.ValidUntil), nil
 }
 
-// Revoke revokes one of the caller's own shares (increment 1: the creator
-// only). Revocation only restricts access, so it needs no current owner
-// assignment; another principal's share is NotAvailable.
+// Revoke revokes one share for its creator or a current manager (ADR-232
+// increment 4: a principal holding one of the pinned management assignments
+// now). Revocation only restricts access, so the creator needs no current
+// owner assignment. A share the caller neither created nor manages is
+// NotAvailable without saying why.
 func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity, shareID string, expected int64, key string) (value.Share, bool, error) {
 	var zero value.Share
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() {
@@ -294,7 +312,28 @@ func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity,
 	if err != nil {
 		return zero, false, err
 	}
-	out, replay, err := s.Store.RevokeShare(ctx, Revocation{ShareID: shareID, Creator: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}, recovery)
+	share, err := s.Store.Share(ctx, shareID)
+	if errors.Is(err, capture.ErrDenied) {
+		return zero, false, capture.ErrDenied
+	}
+	if err != nil || share.ID != shareID || share.RootID != s.RootID {
+		return zero, false, capture.ErrUnavailable
+	}
+	revocation := Revocation{ShareID: shareID, Actor: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}
+	if !createdBy(share, i.Principal) {
+		p, err := s.Permissions.Permissions(ctx, share.Target)
+		if err != nil {
+			return zero, false, capture.ErrDenied
+		}
+		held, _ := share.ManagedBy(i, p, s.Now())
+		if len(held) == 0 {
+			return zero, false, capture.ErrDenied
+		}
+		for _, a := range held {
+			revocation.Managers = append(revocation.Managers, a.AssignmentID)
+		}
+	}
+	out, replay, err := s.Store.RevokeShare(ctx, revocation, recovery)
 	if err != nil {
 		return zero, false, err
 	}
@@ -302,6 +341,15 @@ func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity,
 		return zero, false, capture.ErrUnavailable
 	}
 	return out, replay, nil
+}
+
+// ErrManagementTooBroad refuses a share whose creator holds more than
+// value.ShareMaxManagers owner-team assignments: management is never
+// silently truncated (REQ-SHR-008).
+var ErrManagementTooBroad = errors.New("share management exceeds eight owner assignments")
+
+func createdBy(s value.Share, p identity.Principal) bool {
+	return s.Creator.Issuer == p.Issuer && s.Creator.Subject == p.Subject
 }
 
 // projectionCurrentFor exposes the domain's projection precondition for an
