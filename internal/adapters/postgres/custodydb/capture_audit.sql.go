@@ -152,7 +152,7 @@ func (q *Queries) ReadCaptureOperation(ctx context.Context, arg ReadCaptureOpera
 }
 
 const readCaptureOperationIntent = `-- name: ReadCaptureOperationIntent :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id FROM capture_operation_intents WHERE root_id=$1 AND id=$2
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction FROM capture_operation_intents WHERE root_id=$1 AND id=$2
 `
 
 type ReadCaptureOperationIntentParams struct {
@@ -192,6 +192,7 @@ func (q *Queries) ReadCaptureOperationIntent(ctx context.Context, arg ReadCaptur
 		&i.DeadlineObservedAt,
 		&i.PreviewID,
 		&i.IntentOperationID,
+		&i.ShareInstruction,
 	)
 	return i, err
 }

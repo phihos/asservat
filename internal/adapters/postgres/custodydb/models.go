@@ -383,6 +383,7 @@ type CaptureOperationIntent struct {
 	DeadlineObservedAt       pgtype.Timestamptz
 	PreviewID                pgtype.UUID
 	IntentOperationID        pgtype.UUID
+	ShareInstruction         []byte
 }
 
 type CaptureOperationLifecycle struct {
@@ -761,6 +762,7 @@ type ContextCapture struct {
 	DeadlineObservedAt       pgtype.Timestamptz
 	PreviewID                pgtype.UUID
 	IntentOperationID        pgtype.UUID
+	ShareInstruction         []byte
 }
 
 type ContextCaseLocator struct {

@@ -46,10 +46,12 @@ type ContextIntent struct {
 	Diagnostic       string
 	RequestedSeconds int64
 	Reason           *ProtectedReasonRef
+	// Sharing (ADR-235) is an optional capture-time share of the result.
+	Sharing *ContextSharing `json:",omitempty"`
 }
 
 func (i ContextIntent) Valid() bool {
-	return i.Target.Valid() && i.Diagnostic == ContextDiagnosticName && i.RequestedSeconds >= 0 && i.RequestedSeconds <= privacy.MaxAgeSeconds && (i.Reason == nil || i.Reason.Valid())
+	return i.Target.Valid() && i.Diagnostic == ContextDiagnosticName && i.RequestedSeconds >= 0 && i.RequestedSeconds <= privacy.MaxAgeSeconds && (i.Reason == nil || i.Reason.Valid()) && (i.Sharing == nil || i.Sharing.Valid())
 }
 
 // ContextStorageSelection records the reviewed placement without freshness or
@@ -161,6 +163,7 @@ func (p ContextPreview) Clone() ContextPreview {
 		r := *p.Intent.Reason
 		p.Intent.Reason = &r
 	}
+	p.Intent.Sharing = p.Intent.Sharing.clone()
 	return p
 }
 

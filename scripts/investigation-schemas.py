@@ -166,7 +166,7 @@ def main():
             continue
         keys = {
             "list_diagnostics": ["target_ref"],
-            "preview_capture": ["target_ref", "preset_ref", "requested_retention_seconds"],
+            "preview_capture": ["target_ref", "preset_ref", "requested_retention_seconds", "sharing"],
             "request_capture": ["preview_id", "idempotency_key", "continue_acquisition"],
             "resolve_capture_request": ["preview_id", "idempotency_key"],
             "get_capture": ["capture_id"],
@@ -178,8 +178,17 @@ def main():
         props = {k: copy.deepcopy(tool["inputSchema"]["properties"][k]) for k in keys}
         if "preset_ref" in props:
             props["preset_ref"]["properties"]["name"] = {"const": "pod-status"}
+        if "sharing" in props:
+            # ADR-235: capture-time sharing of the one pod-status result with
+            # up to eight recipients and an optional absolute end; no output
+            # selection, reason override or management selection.
+            sharing = copy.deepcopy(documents["sharing-request.schema.json"]["$defs"]["capture"])
+            for k in ("outputSelection", "maxArtifactsPerCapture", "reason", "management"):
+                sharing["properties"].pop(k)
+            sharing["properties"]["recipients"]["maxItems"] = 8
+            props["sharing"] = sharing
         input_schema = {"type": "object", "additionalProperties": False, "properties": props,
-                        "required": [k for k in keys if k not in ("requested_retention_seconds", "continue_acquisition")]}
+                        "required": [k for k in keys if k not in ("requested_retention_seconds", "continue_acquisition", "sharing")]}
         branches = tool["outputSchema"]["allOf"][1]["oneOf"]
         success = copy.deepcopy(next(b for b in branches if b["properties"]["status"].get("const") == "ok"))
         error = copy.deepcopy(next(b for b in branches if b["properties"]["status"].get("const") == "error"))
@@ -189,7 +198,7 @@ def main():
             "preview_capture": ["preview_id", "expires_at", "execution_digest", "pod_count", "max_bytes", "max_process_starts", "approval_required", "capture_enabled", "blockers", "warnings", "navigation_uri", "lifecycle_plan", "capture_assessment", "preset_ref", "target_ref", "selected_pods", "pod_selection"],
             "request_capture": ["capture_id", "phase", "navigation_uri", "operation"],
             "resolve_capture_request": None,
-            "get_capture": ["capture_id", "revision", "phase", "actions", "case_id", "navigation_uri", "retry_after_seconds", "can_cancel", "blockers", "operation"],
+            "get_capture": ["capture_id", "revision", "phase", "actions", "case_id", "navigation_uri", "retry_after_seconds", "can_cancel", "blockers", "operation", "sharing"],
             "get_case": ["case", "artifacts", "timeline"],
  "prepare_artifact_download": None,
  "get_artifact_download": None,
@@ -247,7 +256,7 @@ def main():
             "name": name,
             "description": {
                 "list_diagnostics": "List the supported pod-status preset for a currently authorized named workload. No evidence collection.",
-                "preview_capture": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 is supported by this runtime.",
+                "preview_capture": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 is supported by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately.",
                 "request_capture": "Submit the reviewed pod-status preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt.",
                 "resolve_capture_request": tool["description"],
                 "get_capture": "Read authorized pod-status capture progress. No evidence bytes. Finalizing is not publication; Indeterminate must not be automatically recaptured.",

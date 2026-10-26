@@ -35,7 +35,7 @@ func (q *Queries) ObserveOverdueContextCaptures(ctx context.Context, arg Observe
 }
 
 const readContextProgressFacts = `-- name: ReadContextProgressFacts :one
-SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id,a.state AS custody_state,a.request_digest,
+SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction,a.state AS custody_state,a.request_digest,
  a.copies_digest,a.effective_expires_at,a.effective_delete_by,
  v.capture_id AS verified_capture_id,v.root_id AS verified_root_id,v.verified_at,
  v.expectation_digest,v.copies_digest AS verified_copies_digest,v.intent_digest AS verified_intent_digest,
@@ -107,6 +107,7 @@ func (q *Queries) ReadContextProgressFacts(ctx context.Context, arg ReadContextP
 		&i.ContextCapture.DeadlineObservedAt,
 		&i.ContextCapture.PreviewID,
 		&i.ContextCapture.IntentOperationID,
+		&i.ContextCapture.ShareInstruction,
 		&i.CustodyState,
 		&i.RequestDigest,
 		&i.CopiesDigest,

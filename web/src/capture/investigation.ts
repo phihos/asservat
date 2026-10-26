@@ -1,7 +1,10 @@
 import type { Session } from '../auth/session';
+import type { Recipient } from '../sharing/shares';
 import { operations, OperationFailure, operationMessage, type Operations, type Target, type Diagnostic, type Preview, type Progress, type Input, type Output, type Operation, type Data } from './http';
 
-export type Draft = { target: Target; retention: string };
+// sharing/shareHours: the optional capture-time share of the result (ADR-235);
+// no hours means the server default (24 hours after publication).
+export type Draft = { target: Target; retention: string; sharing?: Recipient[]; shareHours?: number };
 export type State = {
   stage: 'target' | 'diagnostics' | 'review' | 'reviewed' | 'uncertain' | 'closed' | 'progress';
   busy: boolean; draft: Draft; diagnostics?: Diagnostic[]; preview?: Preview;
@@ -123,6 +126,19 @@ export class Investigation {
         this.publish({ error: 'Retention must be a whole number of seconds between 1 and 315360000.' }); return;
       }
       input.requested_retention_seconds = seconds;
+    }
+    const sharing = this.state.draft.sharing ?? [];
+    if (sharing.length > 0 && this.session) {
+      const issuer = this.session.principal.issuer;
+      const share: { recipients: { kind: Recipient['kind']; issuer: string; id: string }[]; notAfter?: string } = { recipients: sharing.map(r => ({ kind: r.kind, issuer, id: r.id })) };
+      const hours = this.state.draft.shareHours;
+      if (hours !== undefined) {
+        if (!Number.isInteger(hours) || hours < 1 || hours > 168) { this.publish({ error: 'Sharing must last between 1 and 168 whole hours.' }); return; }
+        share.notAfter = new Date(Date.now() + hours * 3_600_000).toISOString();
+      }
+      // The generated type marks the defaulted maxArtifactsPerCapture required;
+      // the implemented subset (ADR-235) rejects it, so it is never sent.
+      input.sharing = share as NonNullable<Input<'preview_capture'>['sharing']>;
     }
     this.reviewed = undefined;
     this.publish({ stage: 'diagnostics', preview: undefined });

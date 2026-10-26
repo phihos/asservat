@@ -38,7 +38,10 @@ type ContextProgressService struct {
 	Reader                 ContextProgressReader
 	Recovery               fleetapp.RecoveryReader
 	Navigation             ContextCaseNavigation
-	Now                    func() time.Time
+	// Shares reads capture-time shares (ADR-235). Without it, a capture
+	// carrying a sharing instruction is reported unavailable.
+	Shares CaptureShareReader
+	Now    func() time.Time
 }
 
 func (s ContextProgressService) Get(ctx context.Context, source identities.CurrentIdentity, captureID string) (value.ContextProgress, error) {
@@ -70,6 +73,9 @@ func (s ContextProgressService) Get(ctx context.Context, source identities.Curre
 	out := value.ContextProgress{CaptureID: p.CaptureID, Revision: p.Revision, Phase: p.Phase, ActionPhase: p.ActionPhase, ReasonCode: p.ReasonCode, CreatedAt: p.CreatedAt, Deadline: p.Deadline}
 	if p.Phase == "Pending" || p.Phase == "Running" || p.Phase == "Finalizing" {
 		out.RetryAfterSeconds = 2
+	}
+	if out.Sharing, err = sharingStatus(ctx, s.Shares, p); err != nil {
+		return zero, err
 	}
 	if s.Navigation != nil {
 		link, err := s.Navigation.ContextCaseNavigation(ctx, source, p)

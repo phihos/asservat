@@ -21,9 +21,12 @@ import (
 // scope, shares the artifact with that principal over MCP; the recipient then
 // reads the case (access "shared"), lists the share and (ADR-233) prepares
 // and Range-downloads the native file; after the developer revokes the share,
-// get_case, download preparation and the content route are refused. Every
-// authority input is the installed product's own.
-func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.InvestigationContracts, owner *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID string, native []byte, diagnose func()) {
+// get_case, download preparation and the content route are refused. Finally
+// (ADR-235) the developer requests one new capture shared with the recipient
+// in the same request; after publication get_capture reports Shared and the
+// recipient reads the new case. Every authority input is the installed
+// product's own.
+func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.InvestigationContracts, owner *installedIdentity, transport http.RoundTripper, origin, caseID, artifactID string, native []byte, previewArguments map[string]any, diagnose func()) {
 	t.Helper()
 	connect := func(name string, token func(context.Context) (string, error)) *sdk.ClientSession {
 		t.Helper()
@@ -181,4 +184,55 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 		t.Fatal("installed owned shares", mine)
 	}
 	t.Logf("installed share: unrelated principal refused, shared get_case read, recipient range download (%d of %d bytes), revocation refused the next read, prepare and range (share %s, content status after revocation %d)", half, len(native), created.ShareID, rest.StatusCode)
+
+	// 5. ADR-235: a one-step capture shared with the recipient at request time.
+	arguments := map[string]any{"sharing": map[string]any{"recipients": []map[string]string{{"kind": "User", "issuer": owner.Issuer, "id": outsiderTokens.subject}}}}
+	for k, v := range previewArguments {
+		arguments[k] = v
+	}
+	var previewed struct {
+		PreviewID string   `json:"preview_id"`
+		Warnings  []string `json:"warnings"`
+	}
+	if status, code := call(developer, "preview_capture", arguments, &previewed); status != "ok" || previewed.PreviewID == "" || len(previewed.Warnings) != 1 {
+		diagnose()
+		t.Fatal("installed sharing preview", status, code, previewed)
+	}
+	var accepted struct {
+		CaptureID string `json:"capture_id"`
+	}
+	if status, code := call(developer, "request_capture", map[string]string{"preview_id": previewed.PreviewID, "idempotency_key": "installed-capture-share-1"}, &accepted); status != "ok" || accepted.CaptureID == "" {
+		diagnose()
+		t.Fatal("installed sharing request_capture", status, code)
+	}
+	var progress struct {
+		Phase   string `json:"phase"`
+		CaseID  string `json:"case_id"`
+		Sharing *struct {
+			State   string `json:"state"`
+			ShareID string `json:"share_id"`
+		} `json:"sharing"`
+	}
+	for deadline := time.Now().Add(4 * time.Minute); ; {
+		if status, _ := call(developer, "get_capture", map[string]string{"capture_id": accepted.CaptureID}, &progress); status == "ok" && progress.Sharing != nil {
+			if progress.Phase == "Succeeded" && progress.CaseID != "" && progress.Sharing.State == "Shared" {
+				break
+			}
+			if progress.Sharing.State == "SharingUnavailable" || progress.Phase == "Failed" || progress.Phase == "Indeterminate" {
+				diagnose()
+				t.Fatal("installed capture-time share not materialized", progress.Phase, progress.Sharing.State)
+			}
+		}
+		if time.Now().After(deadline) {
+			diagnose()
+			t.Fatal("installed capture-time share did not publish in time", progress.Phase)
+		}
+		time.Sleep(2 * time.Second)
+	}
+	var sharedCase caseView
+	if status, _ := call(recipient, "get_case", map[string]string{"case_id": progress.CaseID}, &sharedCase); status != "ok" || sharedCase.Case.Access != "shared" || len(sharedCase.Artifacts) != 1 {
+		diagnose()
+		t.Fatal("installed recipient could not read the capture-time share", sharedCase)
+	}
+	t.Logf("installed share: capture %s shared at request time (share %s); the recipient read case %s", accepted.CaptureID, progress.Sharing.ShareID, progress.CaseID)
 }

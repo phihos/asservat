@@ -20,6 +20,32 @@ export function CaseLink({ caseID }: { caseID: string }) {
   </div>;
 }
 
+// Recipient entry shared by the case Share panel and the capture request's
+// "Share results with…" section (ADR-235): stable User/Group IDs of the
+// signed-in user's issuer, at most eight. No <form>, so it can sit inside
+// another form; Enter in the ID field adds the recipient.
+export function RecipientsEditor({ recipients, onChange }: { recipients: Recipient[]; onChange: (next: Recipient[]) => void }) {
+  const [kind, setKind] = useState<Recipient['kind']>('User');
+  const [id, setID] = useState('');
+  const add = () => {
+    const value = id.trim();
+    if (!value || value.length > 256 || recipients.length >= maxRecipients || recipients.some(r => r.kind === kind && r.id === value)) return;
+    onChange([...recipients, { kind, id: value }]); setID('');
+  };
+  return <>
+    <div className="form-row">
+      <label>Recipient type<select value={kind} onChange={event => setKind(event.target.value as Recipient['kind'])}><option value="User">User</option><option value="Group">Group</option></select></label>
+      <label>Recipient ID<input value={id} maxLength={256} autoComplete="off" spellCheck={false} onChange={event => setID(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); add(); } }}/></label>
+    </div>
+    <Button className="button secondary" isDisabled={!id.trim() || recipients.length >= maxRecipients} onPress={add}>Add recipient</Button>
+    {recipients.length > 0 && <ul className="progress-actions" aria-label="Recipients">{recipients.map(r => <li key={r.kind + '\n' + r.id}>
+      <span className="identifier">{r.kind}: {r.id}</span>
+      <Button className="button secondary" onPress={() => onChange(recipients.filter(x => x !== r))}>Remove {r.id}</Button>
+    </li>)}</ul>}
+    <p className="field-help">{recipients.length} of {maxRecipients} recipients.</p>
+  </>;
+}
+
 // Share one artifact (ADR-232). The preview is the recipient's actual view of
 // this artifact; the server decides eligibility, recipients and expiry.
 export function SharePanel({ session, scope, caseID, artifact, preview, controller: injected }: { session: Session; scope: AbortSignal; caseID: string; artifact: { artifact_id: string; digest: string; expires_at: string }; preview: ReactNode; controller?: Shares }) {
@@ -27,19 +53,12 @@ export function SharePanel({ session, scope, caseID, artifact, preview, controll
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
   useEffect(() => controller.attach(session, scope), [controller, session, scope]);
   const [recipients, setRecipients] = useState<Recipient[]>([]);
-  const [kind, setKind] = useState<Recipient['kind']>('User');
-  const [id, setID] = useState('');
   const [hours, setHours] = useState(24);
   const [reason, setReason] = useState('');
   const [open, setOpen] = useState(false);
   const validHours = Number.isInteger(hours) && hours >= 1 && hours <= maxHours;
   const requested = Date.now() + (validHours ? hours : 24) * 3_600_000;
   const ends = Math.min(requested, Date.parse(artifact.expires_at));
-  const add = () => {
-    const value = id.trim();
-    if (!value || value.length > 256 || recipients.length >= maxRecipients || recipients.some(r => r.kind === kind && r.id === value)) return;
-    setRecipients([...recipients, { kind, id: value }]); setID('');
-  };
   const share = async () => {
     await controller.create(caseID, artifact, recipients, hours, reason.trim());
     if (controller.snapshot().created) { setRecipients([]); setReason(''); }
@@ -53,18 +72,7 @@ export function SharePanel({ session, scope, caseID, artifact, preview, controll
     <p>Recipients can read this artifact in this case until the share ends. Use the stable user or group IDs of your identity provider ({session.principal.issuer}), not display names.</p>
     {/* While a request is uncertain the retry must match what the form shows. */}
     <fieldset disabled={state.uncertain}>
-    <form onSubmit={event => { event.preventDefault(); add(); }}>
-      <div className="form-row">
-        <label>Recipient type<select value={kind} onChange={event => setKind(event.target.value as Recipient['kind'])}><option value="User">User</option><option value="Group">Group</option></select></label>
-        <label>Recipient ID<input value={id} maxLength={256} autoComplete="off" spellCheck={false} onChange={event => setID(event.target.value)}/></label>
-      </div>
-      <Button type="submit" className="button secondary" isDisabled={!id.trim() || recipients.length >= maxRecipients}>Add recipient</Button>
-    </form>
-    {recipients.length > 0 && <ul className="progress-actions" aria-label="Recipients">{recipients.map(r => <li key={r.kind + '\n' + r.id}>
-      <span className="identifier">{r.kind}: {r.id}</span>
-      <Button className="button secondary" onPress={() => setRecipients(recipients.filter(x => x !== r))}>Remove {r.id}</Button>
-    </li>)}</ul>}
-    <p className="field-help">{recipients.length} of {maxRecipients} recipients.</p>
+    <RecipientsEditor recipients={recipients} onChange={setRecipients}/>
     <div className="form-row">
       <label>Share for (hours)<input type="number" min={1} max={maxHours} step={1} value={Number.isNaN(hours) ? '' : hours} onChange={event => setHours(event.target.valueAsNumber)}/></label>
       <label>Reason<input value={reason} maxLength={512} onChange={event => setReason(event.target.value)}/></label>

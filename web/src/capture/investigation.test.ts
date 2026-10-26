@@ -135,6 +135,25 @@ it('keeps the administrator retention default absent and rejects malformed custo
   const count = client.calls.length; await controller.preview(controller.snapshot().diagnostics![0]);
   expect(client.calls).toHaveLength(count); expect(controller.snapshot().error).toContain('whole number');
 });
+it('sends capture-time sharing with the issuer of the signed-in user and only an explicit end (ADR-235)', async () => {
+  const { controller, client } = await ready(); controller.edit();
+  controller.setDraft({ target, retention: '', sharing: [{ kind: 'Group', id: 'incident-team' }] });
+  client.responder = name => name === 'list_diagnostics' ? catalogResult() : previewResult();
+  await controller.discover(); await controller.preview(controller.snapshot().diagnostics![0]);
+  expect(client.calls.at(-1)!.input).toMatchObject({ sharing: { recipients: [{ kind: 'Group', issuer: session.principal.issuer, id: 'incident-team' }] } });
+  expect((client.calls.at(-1)!.input as { sharing: object }).sharing).not.toHaveProperty('notAfter');
+  const before = Date.now();
+  controller.edit(); controller.setDraft({ target, retention: '', sharing: [{ kind: 'User', id: 'reviewer' }], shareHours: 2 });
+  await controller.discover(); await controller.preview(controller.snapshot().diagnostics![0]);
+  const end = Date.parse((client.calls.at(-1)!.input as { sharing: { notAfter: string } }).sharing.notAfter);
+  expect(end).toBeGreaterThanOrEqual(before + 2 * 3_600_000); expect(end).toBeLessThan(before + 2 * 3_600_000 + 60_000);
+  controller.edit(); controller.setDraft({ target, retention: '', sharing: [{ kind: 'User', id: 'reviewer' }], shareHours: 169 }); await controller.discover();
+  const count = client.calls.length; await controller.preview(controller.snapshot().diagnostics![0]);
+  expect(client.calls).toHaveLength(count); expect(controller.snapshot().error).toContain('168');
+  controller.edit(); controller.setDraft({ target, retention: '', sharing: [] });
+  await controller.discover(); await controller.preview(controller.snapshot().diagnostics![0]);
+  expect(client.calls.at(-1)!.input).not.toHaveProperty('sharing');
+});
 
 async function uncertain() {
   const setup = await ready();

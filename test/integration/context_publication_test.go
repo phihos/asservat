@@ -7,6 +7,7 @@ import (
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/analysis"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"context"
 	"encoding/json"
@@ -63,7 +64,9 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		publisher                      evidence.ContextPublisher
 		gate                           contextPublicationTestGate
 	}
-	setupWithKeys := func(t *testing.T, provider func(string) (evidence.KeySealer, evidence.KeyOpener), processingCheck func(fixture, *processingTestFixture)) fixture {
+	// admit, when set, replaces the direct admission (ADR-235 admits a
+	// reviewed preview carrying a sharing instruction).
+	setupAdmitted := func(t *testing.T, provider func(string) (evidence.KeySealer, evidence.KeyOpener), processingCheck func(fixture, *processingTestFixture), admit func(*testing.T, *captureAdmissionScenario) capture.Accepted) fixture {
 		t.Helper()
 		ctx := ctx
 		s := create(t, 1)
@@ -78,8 +81,11 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		if provider != nil {
 			seal, open = provider(s.recovery.installation)
 		}
-		accepted, err := s.s.AdmitContext(ctx, s.a)
-		if err != nil {
+		var accepted capture.Accepted
+		var err error
+		if admit != nil {
+			accepted = admit(t, &s)
+		} else if accepted, err = s.s.AdmitContext(ctx, s.a); err != nil {
 			t.Fatal(err)
 		}
 		var f fixture
@@ -161,6 +167,10 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		return f
 	}
 
+	setupWithKeys := func(t *testing.T, provider func(string) (evidence.KeySealer, evidence.KeyOpener), processingCheck func(fixture, *processingTestFixture)) fixture {
+		t.Helper()
+		return setupAdmitted(t, provider, processingCheck, nil)
+	}
 	setup := func(t *testing.T) fixture { return setupWithKeys(t, nil, nil) }
 
 	qualifyPermissionPublicationAuditHistory(t, ctx, admin, func(t *testing.T) permissionPublicationAuditFixture {
@@ -272,6 +282,20 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 			return (auditapp.AuthorityPublisher{Ledger: f.scenario.p, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx)
 		}
 		qualifyEvidenceShare(t, ctx, admin, poolFor, f.scenario, f.e, f.reader, publishAuthority)
+	})
+
+	t.Run("capture-time-share-once-at-publication-and-owner-checked-at-admission", func(t *testing.T) {
+		qualifyCaptureShare(t, ctx, admin, poolFor, create, func(t *testing.T, admit func(*testing.T, *captureAdmissionScenario) capture.Accepted) captureShareFixture {
+			f := setupAdmitted(t, nil, nil, admit)
+			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (artifact.PublishedContext, error) { return f.publisher.Publish(ctx, f.e.CaptureUID, f.copies) },
+				replay: func() error {
+					a, err := f.gate.CheckContextPublication(ctx, f.e)
+					if err == nil {
+						_, err = f.publish.PublishContext(ctx, f.e, f.copies, a)
+					}
+					return err
+				}}
+		})
 	})
 
 	t.Run("progress-revisions-follow-durable-verification-audit-and-publication", func(t *testing.T) {

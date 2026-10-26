@@ -76,7 +76,7 @@ func captureError(err error) error {
 	if err == nil {
 		return nil
 	}
-	for _, e := range []error{value.ErrInvalid, value.ErrDenied, value.ErrChanged, value.ErrUnavailable, value.ErrCapacity, value.ErrProcessingCoverage, value.ErrConflict} {
+	for _, e := range []error{value.ErrInvalid, value.ErrSharingDenied, value.ErrDenied, value.ErrChanged, value.ErrUnavailable, value.ErrCapacity, value.ErrProcessingCoverage, value.ErrConflict} {
 		if errors.Is(err, e) {
 			return e
 		}
@@ -446,6 +446,12 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 		if err = check(); err != nil {
 			return err
 		}
+		// ADR-235: a reviewed sharing instruction requires the requester's
+		// current evidence-owner authority now, before any effect.
+		instruction, err := captureShareInstruction(ctx, q, stream, reviewed, a, fresh.DefaultAudience)
+		if err != nil {
+			return err
+		}
 		if _, err = registerLocked(ctx, q, p, allocation, r); err != nil {
 			return err
 		}
@@ -468,7 +474,7 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 		if s.auditMAC != nil {
 			operationID = in.CaptureID
 		}
-		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(previewID), RequestKey: requestKey(a), SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID)})
+		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(previewID), RequestKey: requestKey(a), SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID), ShareInstruction: instruction})
 		if err != nil {
 			return err
 		}

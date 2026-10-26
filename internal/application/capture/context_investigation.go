@@ -255,6 +255,9 @@ func (s ContextInvestigation) Preview(ctx context.Context, source identities.Cur
 	if err != nil || !i.Valid(s.Now()) {
 		return zero, previewFailure("identity", value.ErrDenied)
 	}
+	if err = previewSharing(intent.Sharing, i, created); err != nil {
+		return zero, previewFailure("sharing", err)
+	}
 	mark = time.Now()
 	recovery, err := s.currentRecovery(ctx)
 	auditapp.MarkStep(ctx, "p-recovery", mark)

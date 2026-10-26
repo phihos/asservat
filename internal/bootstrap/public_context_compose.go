@@ -367,6 +367,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if out.shares, err = postgres.NewEvidenceShares(ctx, sql["evidence-share"], root, recovery); err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	out.progress.Shares = out.shares // ADR-235: get_capture's sharing status
 	out.caseRoutes = routes
 	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares}
 	if out.fleet, err = newPublicFleet(ctx, c, providers, pools, observer, probe, a); err != nil {

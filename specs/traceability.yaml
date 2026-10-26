@@ -134,6 +134,7 @@ requirements:
   spec: specs/authorization.md
   scenarios:
   - SC-SHR-004
+  - SC-SHR-010
   tasks:
   - TASK-02
   - TASK-07

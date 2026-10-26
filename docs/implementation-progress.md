@@ -49,6 +49,41 @@ No migration, grant or schema change; the canonical `list_shares` row gains thre
 - Not run: installed share focus (no installed-path change; the console in PR #70 does not yet
   show `created_by`/`managed_by`).
 
+## S-06 increment 5: capture-time sharing (ADR-235, 2026-10-26)
+
+[ADR-235](decisions/235-capture-time-sharing.md): `preview_capture` accepts `sharing` (≤ 8
+recipients of the requester's issuer, optional `notAfter` ≤ 7 days); the SQL admission transaction
+requires the requester's evidence-owner authority (`ShareManagement` on the projection it already
+locks) and stores one immutable instruction in `context_capture.share_instruction` (migration 00088,
+schema 88, floor 81); an owner-privileged trigger on the case-locator INSERT materializes exactly
+one `evidence_share` row inside the catalog publication transaction. `get_capture` reports
+`sharing.state` (Pending/Shared/SharingUnavailable). Console: "Share results with…" on the capture
+form (shared `RecipientsEditor`) and the sharing status in progress.
+
+Migration numbering: 00087/ADR-234 belong to increment 7 (PR #73). The initial-schema bundle
+requires contiguous migrations, so this branch must merge after #73 (or be rebased onto it); alone,
+`internal/adapters/postgres` initial-schema unit tests and the upgrade test fail on the 00087 gap.
+
+Verification (tracked test/results files restored after each run):
+- Unit: domain/capture, application/capture (`previewSharing` scope/issuer/end matrix,
+  `sharingStatus` states and ledger outage), transport/presentation (sharing mapped into the
+  intent with microsecond end, nine recipients refused, `SharingNotPermitted` audited as denial,
+  `get_capture` sharing projection valid against the runtime schema), adapters/postgres, bootstrap:
+  PASS. Web vitest (capture + sharing): 66 PASS. `make pre-push`: PASS.
+- Custody (real PostgreSQL; migration then numbered 00087, content identical), `--run
+  'TestContextAdmissionWithRealServices/(capture-time-share|evidence-share|progress-revisions)'`:
+  PASS, go test 12.7 s: a requester without evidence-owner is refused (`ErrSharingDenied`) with no
+  capture or custody attempt; an owner's capture stores the instruction (immutable), publication
+  creates exactly one share pinning the `other-owners` assignment with expiry ≤ 24 h, a replayed
+  publication creates none, the compiled hub grants see it and its recipient reads `get_case`
+  (shared); an instruction whose end passed before publication leaves the capture Succeeded and
+  unshared.
+- Installed `share` focus (fast fixture, on a local merge of this branch with PR #73 so migrations
+  are contiguous): PASS, go test 459.7 s (`installer-continuation` 268.3 s), wall 9 min 40 s, no
+  cleanup failures. After the ADR-232/233 steps the developer previewed and requested one capture
+  shared with the unrelated Keycloak user; `get_capture` reported Succeeded/Shared and the
+  recipient's `get_case` of the new case returned access `shared`.
+
 ## S-06 increment 3: recipient native download (ADR-233, 2026-10-26)
 
 [ADR-233](decisions/233-recipient-native-download.md) adds the share branch to the download

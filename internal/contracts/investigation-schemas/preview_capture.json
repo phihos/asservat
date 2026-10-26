@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 is supported by this runtime.",
+  "description": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 is supported by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -64,12 +64,66 @@
         "minimum": 1,
         "maximum": 315360000,
         "description": "Requested evidence-access lifetime in seconds. Omission uses the administrator default; effective access and managed deletion remain bounded by current retention policy and its deletion budget. History restoration preserves its original request; use a normal edited preview to change it."
+      },
+      "sharing": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "recipients": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d0"
+            },
+            "minItems": 1,
+            "maxItems": 8,
+            "uniqueItems": true
+          },
+          "notAfter": {
+            "$ref": "#/$defs/d1"
+          }
+        },
+        "required": [
+          "recipients"
+        ]
       }
     },
     "required": [
       "target_ref",
       "preset_ref"
-    ]
+    ],
+    "$defs": {
+      "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "User",
+              "Group"
+            ]
+          },
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "kind",
+          "issuer",
+          "id"
+        ]
+      },
+      "d1": {
+        "type": "string",
+        "format": "date-time"
+      }
+    }
   },
   "outputSchema": {
     "title": "Asservat mcp-result v1",
