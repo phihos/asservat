@@ -160,6 +160,8 @@ func TestShareValidity(t *testing.T) {
 		"display-name":      func(s *Share) { s.Recipients[0].Kind = "Name" },
 		"non-owner-manager": func(s *Share) { s.Management[0].Role = "evidence-reader" },
 		"revoked-revision":  func(s *Share) { s.RevokedAt = s.CreatedAt },
+		"zero-revision":     func(s *Share) { s.Revision = 0 },
+		"revision-bound":    func(s *Share) { s.Revision = ShareMaxRevision + 1 },
 		"workload-creator":  func(s *Share) { s.Creator.Kind = identity.Workload },
 		"too-many-recipients": func(s *Share) {
 			for len(s.Recipients) <= ShareMaxRecipients {

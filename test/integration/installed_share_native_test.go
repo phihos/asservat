@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -151,6 +152,17 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 	if err != nil || !bytes.Equal(head, native[:half]) {
 		diagnose()
 		t.Fatal("installed recipient range download", err)
+	}
+	// ADR-238 (migration 00091 applied by the installer): the recipient cannot
+	// transfer management, and the owner cannot name a team they do not hold.
+	team := map[string]any{"mode": "teams", "teams": []map[string]string{{"kind": "Group", "issuer": owner.Issuer, "id": "installed-not-an-owner-team"}}}
+	if status, code := call(recipient, "transfer_share", map[string]any{"share_id": created.ShareID, "expected_revision": 1, "idempotency_key": "installed-share-transfer", "management": team}, nil); status != "error" || code != "NotAvailable" {
+		t.Fatal("installed recipient transferred share management", status, code)
+	}
+	foreign := maps.Clone(share)
+	foreign["idempotency_key"], foreign["management"] = "installed-share-foreign-team", team
+	if status, code := call(developer, "create_share", foreign, nil); status != "error" || code != "ManagementNotHeld" {
+		t.Fatal("installed share named a team the owner does not hold", status, code)
 	}
 	// 4. Revocation ends the recipient's read at its next request.
 	var revoked struct {

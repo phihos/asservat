@@ -831,8 +831,7 @@ paths:
   /api/v1/operations/revoke_share:
     post:
       operationId: revoke_share
-      summary: Revoke one share or an owned sharing instruction and its dependent
-        shares; independent entitlements remain unchanged.
+      summary: Revoke one share or an owned sharing instruction and its dependent shares; independent entitlements remain unchanged. Current managers and installation administrators may revoke; revocation never grants a read.
       tags:
       - Shared browser and MCP
       x-domain-contract: revoke_share
@@ -864,6 +863,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/McpOutput_revoke_share'
+        default:
+          description: Transport/session/validation failure; no evidence in error
+            details.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/operations/transfer_share:
+    post:
+      operationId: transfer_share
+      summary: Replace the managing owner teams of one share or an owned SharingIntent (an audited transfer). Only a current manager may transfer, to teams they currently hold; creator, recipients, artifacts, counts and expiry are unchanged.
+      tags:
+      - Shared browser and MCP
+      x-domain-contract: transfer_share
+      x-effect: command
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpInput_transfer_share'
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: Required on session-authenticated POST; validate origin and session-bound
+          token.
+        schema: *id001
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: Required for commands. Principal/client/operation-bound; same
+          body retries the original operation.
+        schema: *id002
+      responses:
+        '200':
+          description: Existing bounded MCP domain-result envelope; domain errors
+            remain status=error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpOutput_transfer_share'
         default:
           description: Transport/session/validation failure; no evidence in error
             details.
@@ -1839,47 +1880,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/RevisionCommand'
-  /api/v1/console/replace_share_managers:
-    post:
-      operationId: replace_share_managers
-      summary: Replace share managers
-      tags:
-      - Human console
-      x-required-role: current-authorized-owner
-      x-effect: command
-      parameters:
-      - name: X-CSRF-Token
-        in: header
-        required: true
-        description: Required on session-authenticated POST; validate origin and session-bound
-          token.
-        schema: *id001
-      - name: Idempotency-Key
-        in: header
-        required: true
-        description: Required for commands. Principal/client/operation-bound; same
-          body retries the original operation.
-        schema: *id002
-      responses:
-        '200':
-          description: Authorized bounded projection or operation receipt.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandReceipt'
-        default:
-          description: Transport or application failure, nondisclosing before access
-            is established.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ManagerInput'
   /api/v1/console/apply_privacy_action:
     post:
       operationId: apply_privacy_action
@@ -4939,20 +4939,6 @@ components:
       - expected_selection_digest
       - action
       - reason_reference
-    ManagerInput:
-      type: object
-      additionalProperties: false
-      properties:
-        resource_id: *id003
-        expected_revision: *id008
-        managers:
-          type: array
-          items: *id005
-          maxItems: 16
-      required:
-      - resource_id
-      - expected_revision
-      - managers
     DraftTarget:
       type: object
       additionalProperties: false
@@ -8375,6 +8361,140 @@ components:
               required:
               - phase
               - revision
+              oneOf:
+              - required:
+                - share_id
+              - required:
+                - sharing_intent_id
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: pending
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                query_handle:
+                  type: string
+                  minLength: 1
+                  maxLength: 4096
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - query_handle
+              - retry_after_seconds
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: error
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                retryable:
+                  type: boolean
+                navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                responsible_role:
+                  enum:
+                  - maintainer
+                  - approver
+                  - administrator
+                  - none
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - code
+              - message
+              - retryable
+          required:
+          - status
+          - data
+    McpInput_transfer_share:
+      type: object
+      additionalProperties: false
+      properties:
+        share_id:
+          type: string
+          format: uuid
+        expected_revision:
+          type: integer
+          minimum: 1
+          maximum: 1000000000
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 128
+        sharing_intent_id:
+          $ref: https://asservat.io/spec/v1/common.schema.json#/$defs/uuid
+        management:
+          $ref: https://asservat.io/spec/v1/management.schema.json#/$defs/request
+      required:
+      - expected_revision
+      - idempotency_key
+      - management
+      oneOf:
+      - required:
+        - share_id
+      - required:
+        - sharing_intent_id
+    McpOutput_transfer_share:
+      allOf:
+      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
+      - oneOf:
+        - type: object
+          properties:
+            status:
+              const: ok
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                share_id:
+                  type: string
+                  format: uuid
+                phase:
+                  type: string
+                  enum:
+                  - Active
+                  - Suspended
+                revision:
+                  type: integer
+                  minimum: 2
+                  maximum: 1000000000
+                sharing_intent_id:
+                  $ref: https://asservat.io/spec/v1/common.schema.json#/$defs/uuid
+                managed_by:
+                  type: array
+                  items:
+                    $ref: https://asservat.io/spec/v1/common.schema.json#/$defs/recipient
+                  minItems: 1
+                  maxItems: 8
+                  uniqueItems: true
+              required:
+              - phase
+              - revision
+              - managed_by
               oneOf:
               - required:
                 - share_id

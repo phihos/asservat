@@ -170,6 +170,11 @@ func composePublicShares(c PublicContextOperationsConfig, s PublicContextOperati
 		return nil, presentation.ErrOperationsConfiguration
 	}
 	service := sharing.Service{RootID: c.RootID, InstallationID: c.InstallationID, Routes: pc.caseRoutes, Permissions: pc.permissions, Catalog: pc.catalog, Store: pc.shares, Recovery: v.submission.Recovery, NewID: c.NewID, Now: c.Now}
+	// ADR-238: the protected fleet administration's operators may revoke any
+	// share; without it only creators and current managers revoke.
+	if pc.fleet != nil && pc.fleet.Settings != nil {
+		service.Administration = pc.fleet.Settings
+	}
 	return presentation.NewShareOperations(c.PublicOrigin, c.Now, c.NewID, service)
 }
 

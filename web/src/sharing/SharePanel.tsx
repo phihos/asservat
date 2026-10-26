@@ -46,6 +46,26 @@ export function RecipientsEditor({ recipients, onChange }: { recipients: Recipie
   </>;
 }
 
+// Owner teams that manage a share (ADR-238): stable group IDs of the
+// signed-in user's issuer, at most eight. The server accepts only teams the
+// user belongs to that hold evidence-owner for the artifact.
+export function TeamsEditor({ teams, onChange, label }: { teams: string[]; onChange: (next: string[]) => void; label: string }) {
+  const [id, setID] = useState('');
+  const add = () => {
+    const value = id.trim();
+    if (!value || value.length > 256 || teams.length >= maxRecipients || teams.includes(value)) return;
+    onChange([...teams, value]); setID('');
+  };
+  return <>
+    <label>{label}<input value={id} maxLength={256} autoComplete="off" spellCheck={false} onChange={event => setID(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); add(); } }}/></label>
+    <Button className="button secondary" isDisabled={!id.trim() || teams.length >= maxRecipients} onPress={add}>Add team</Button>
+    {teams.length > 0 && <ul className="progress-actions" aria-label={label}>{teams.map(team => <li key={team}>
+      <span className="identifier">Group: {team}</span>
+      <Button className="button secondary" onPress={() => onChange(teams.filter(x => x !== team))}>Remove {team}</Button>
+    </li>)}</ul>}
+  </>;
+}
+
 // Share one artifact (ADR-232). The preview is the recipient's actual view of
 // this artifact; the server decides eligibility, recipients and expiry.
 export function SharePanel({ session, scope, caseID, artifact, preview, controller: injected }: { session: Session; scope: AbortSignal; caseID: string; artifact: { artifact_id: string; digest: string; expires_at: string }; preview: ReactNode; controller?: Shares }) {
@@ -55,13 +75,14 @@ export function SharePanel({ session, scope, caseID, artifact, preview, controll
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [hours, setHours] = useState(24);
   const [reason, setReason] = useState('');
+  const [teams, setTeams] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const validHours = Number.isInteger(hours) && hours >= 1 && hours <= maxHours;
   const requested = Date.now() + (validHours ? hours : 24) * 3_600_000;
   const ends = Math.min(requested, Date.parse(artifact.expires_at));
   const share = async () => {
-    await controller.create(caseID, artifact, recipients, hours, reason.trim());
-    if (controller.snapshot().created) { setRecipients([]); setReason(''); }
+    await controller.create(caseID, artifact, recipients, hours, reason.trim(), teams);
+    if (controller.snapshot().created) { setRecipients([]); setReason(''); setTeams([]); }
   };
   const ready = recipients.length > 0 && validHours && reason.trim().length > 0 && !state.busy;
   // The form and preview render only while open, so the page shows one copy
@@ -77,6 +98,11 @@ export function SharePanel({ session, scope, caseID, artifact, preview, controll
       <label>Share for (hours)<input type="number" min={1} max={maxHours} step={1} value={Number.isNaN(hours) ? '' : hours} onChange={event => setHours(event.target.valueAsNumber)}/></label>
       <label>Reason<input value={reason} maxLength={512} onChange={event => setReason(event.target.value)}/></label>
     </div>
+    <details>
+      <summary>Managed by (optional)</summary>
+      <p className="field-help">By default every owner team you belong to manages this share: its members can see and revoke it, even after you leave. To narrow that, name some of your owner teams here. Managing grants no access to the evidence.</p>
+      <TeamsEditor teams={teams} onChange={setTeams} label="Managing team ID"/>
+    </details>
     </fieldset>
     <p className="field-help">At most seven days. The share never outlasts the artifact's access.</p>
     <section className="review-section" aria-label="What recipients will see">

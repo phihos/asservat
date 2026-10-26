@@ -162,6 +162,13 @@ operations:
   - mcp
   effect: command
   contract: specs/contracts/mcp-tools.json
+- operation: transfer_share
+  path: /api/v1/operations/transfer_share
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
 - operation: request_capture
   path: /api/v1/operations/request_capture
   transport:
@@ -336,13 +343,6 @@ operations:
   - browser
   effect: command
   role: current-sharing-manager
-  contract: docs/interfaces/browser-openapi.yaml
-- operation: replace_share_managers
-  path: /api/v1/console/replace_share_managers
-  transport:
-  - browser
-  effect: command
-  role: current-authorized-owner
   contract: docs/interfaces/browser-openapi.yaml
 - operation: apply_privacy_action
   path: /api/v1/console/apply_privacy_action

@@ -146,3 +146,8 @@ func (s *consoleSyntheticShares) Revoke(_ context.Context, _ app.CurrentIdentity
 	}
 	return authorization.Share{}, false, capture.ErrConflict
 }
+
+// Transfer (ADR-238) is not modeled by this route test.
+func (s *consoleSyntheticShares) Transfer(context.Context, app.CurrentIdentity, sharing.TransferInput) (authorization.Share, bool, error) {
+	return authorization.Share{}, false, capture.ErrDenied
+}

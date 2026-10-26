@@ -51,5 +51,10 @@ ORDER BY created_at DESC, id LIMIT @row_limit;
 SELECT * FROM evidence_share WHERE root_id=$1 AND id=$2 FOR UPDATE;
 
 -- name: RevokeShare :one
-UPDATE evidence_share SET revoked_at=clock_timestamp(), revoke_key=$3, revision=2
+UPDATE evidence_share SET revoked_at=clock_timestamp(), revoke_key=$3, revision=revision+1
 WHERE root_id=$1 AND id=$2 AND revoked_at IS NULL RETURNING *;
+
+-- name: TransferShare :one
+-- ADR-238: replaces the pinned management of a live share; one revision.
+UPDATE evidence_share SET management=sqlc.arg(management)::jsonb, transfer_key=sqlc.arg(transfer_key)::text, transfer_digest=sqlc.arg(transfer_digest)::bytea, revision=revision+1
+WHERE root_id=sqlc.arg(root_id)::uuid AND id=sqlc.arg(id)::uuid AND revoked_at IS NULL AND expires_at>clock_timestamp() AND revision<1000000000 RETURNING *;

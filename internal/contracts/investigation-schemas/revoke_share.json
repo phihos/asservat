@@ -1,6 +1,6 @@
 {
   "name": "revoke_share",
-  "description": "Revoke a share you created or currently manage through a pinned owner team. A share has revision 1 until it is revoked (revision 2). Recipients lose access at their next read; independent rights are unchanged. Repeating with the same idempotency key is harmless.",
+  "description": "Revoke a share you created or currently manage through a pinned owner team; installation administrators may revoke any share. Each transfer and the revocation add one revision (list_shares shows the current one). Recipients lose access at their next read; independent rights are unchanged and revoking never grants a read. Repeating with the same idempotency key is harmless.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": true,
@@ -115,7 +115,9 @@
                     "const": "Revoked"
                   },
                   "revision": {
-                    "const": 2
+                    "type": "integer",
+                    "minimum": 2,
+                    "maximum": 1000000000
                   }
                 },
                 "required": [

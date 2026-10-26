@@ -1,6 +1,6 @@
 {
   "name": "create_share",
-  "description": "Share one stored pod-status artifact (its exact digest from get_case) with up to eight users or groups of your identity provider until expires_at (at most seven days, never past the artifact's retention). Recipients can read it with get_case; download, inspection of other artifacts and capture rights are not shared. Needs the evidence-owner role on the workload and the evidence:share scope. Repeat an uncertain request with the same idempotency key.",
+  "description": "Share one stored pod-status artifact (its exact digest from get_case) with up to eight users or groups of your identity provider until expires_at (at most seven days, never past the artifact's retention). Recipients can read it with get_case; download, inspection of other artifacts and capture rights are not shared. Needs the evidence-owner role on the workload and the evidence:share scope. By default your owner teams manage the share; management may instead name some of the owner teams you belong to (mode teams) or only you (mode creator). Repeat an uncertain request with the same idempotency key.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": false,
@@ -53,6 +53,9 @@
         "type": "string",
         "minLength": 1,
         "maxLength": 128
+      },
+      "management": {
+        "$ref": "#/$defs/d2"
       }
     },
     "required": [
@@ -109,6 +112,64 @@
           "kind",
           "issuer",
           "id"
+        ]
+      },
+      "d2": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "const": "creator"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "const": "teams"
+              },
+              "teams": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "const": "Group"
+                    },
+                    "issuer": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 256
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "issuer",
+                    "id"
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 8,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "mode",
+              "teams"
+            ]
+          }
         ]
       }
     }

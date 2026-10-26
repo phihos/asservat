@@ -36,8 +36,8 @@ scopes are unchanged.
    and exact whole-pod target (copied from the published case locator, never only from the
    caller), the verified artifact version the creator saw, the immutable creator, the pinned
    management assignments, ≤ 8 recipients and their lookup keys, the idempotency key and request
-   digest, `expires_at`, and `revoked_at`/`revoke_key`/`revision` (1, or 2 once revoked). A
-   trigger makes every column immutable except the one revocation. State is derived at read time:
+   digest, `expires_at`, and `revoked_at`/`revoke_key`/`revision` (1, or 2 once revoked; since ADR-238 each management transfer adds one too). A
+   trigger makes every column immutable except the one revocation (and, since ADR-238, a management transfer). State is derived at read time:
    **Active, Expired** (`expires_at`), **Revoked** (`revoked_at`), **Suspended** (no pinned
    management assignment is current). Constants, not configuration: 7-day maximum, 24-hour
    default (service only; the MCP contract requires `expires_at`), 8 recipients, 8 pinned
@@ -93,7 +93,7 @@ scopes are unchanged.
    ordinary `get_case` operations. No notification is sent.
 8. **Privilege.** One new hub-runtime duty `evidence-share` on the existing shared hub credential:
    SELECT on `evidence_share`, `context_case_locator` and `fleet_current_trust`, INSERT on
-   `evidence_share`, UPDATE only of `revoked_at`, `revoke_key`, `revision` (plus the existing
+   `evidence_share`, UPDATE only of `revoked_at`, `revoke_key`, `revision` (ADR-238 adds `management`, `transfer_key`, `transfer_digest`; plus the existing
    recovery row-lock column). No Kubernetes, collector, worker, key-service or network change.
 
 9. **Ownership.** The share service is the C-17 package `internal/application/sharing` (the

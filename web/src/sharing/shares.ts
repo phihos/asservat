@@ -27,6 +27,7 @@ export class Shares {
   private scope?: AbortSignal;
   private pending?: Input<'create_share'>;
   private revokeKeys = new Map<string, string>();
+  private transferKeys = new Map<string, [string, string]>();
   readonly snapshot = () => this.state;
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
   constructor(private client: Operations = operations, private newID: () => string = () => crypto.randomUUID()) {}
@@ -41,7 +42,7 @@ export class Shares {
   }
 
   reset = () => {
-    this.identity = undefined; this.session = undefined; this.scope = undefined; this.pending = undefined; this.revokeKeys.clear();
+    this.identity = undefined; this.session = undefined; this.scope = undefined; this.pending = undefined; this.revokeKeys.clear(); this.transferKeys.clear();
     this.state = { busy: false };
     for (const listener of this.listeners) listener();
   };
@@ -74,13 +75,16 @@ export class Shares {
     this.publish({ busy: false, received: received?.data?.shares, receivedMessage: received?.message, owned: owned?.data?.shares, ownedMessage: owned?.message });
   };
 
-  create = async (caseID: string, artifact: { artifact_id: string; digest: string }, recipients: Recipient[], hours: number, reason: string) => {
+  // teams (ADR-238) optionally names which of the user's own owner teams
+  // manage the share; empty keeps the default (all of them).
+  create = async (caseID: string, artifact: { artifact_id: string; digest: string }, recipients: Recipient[], hours: number, reason: string, teams: string[] = []) => {
     if (this.state.busy || !this.session) return;
     const issuer = this.session.principal.issuer;
     this.pending ??= {
       case_id: caseID, artifacts: [{ artifactID: artifact.artifact_id, digest: artifact.digest }],
       recipients: recipients.map(r => ({ kind: r.kind, issuer, id: r.id })), data_classes: ['metadata'], operations: ['get_case'],
       expires_at: new Date(Date.now() + hours * 3_600_000).toISOString(), reason, idempotency_key: this.newID(),
+      ...(teams.length ? { management: { mode: 'teams' as const, teams: teams.map(id => ({ kind: 'Group' as const, issuer, id })) } } : {}),
     };
     const input = this.pending;
     this.publish({ busy: true, message: undefined, created: undefined });
@@ -100,16 +104,35 @@ export class Shares {
     this.publish({ uncertain: false, message: undefined });
   };
 
-  revoke = async (row: ShareRow) => {
+  revoke = async (row: Pick<ShareRow, 'share_id' | 'revision'>) => {
     if (this.state.busy) return;
     const key = this.revokeKeys.get(row.share_id) ?? this.newID();
     this.revokeKeys.set(row.share_id, key);
     this.publish({ busy: true, message: undefined });
-    // An Active share has revision 1; revocation makes it 2 (ADR-232).
-    const reply = await this.run('revoke_share', { share_id: row.share_id, expected_revision: 1, idempotency_key: key });
+    // The listed revision: 1, plus one per management transfer (ADR-238).
+    const reply = await this.run('revoke_share', { share_id: row.share_id, expected_revision: row.revision ?? 1, idempotency_key: key });
     if (!reply) { this.publish({ busy: false }); return; }
     if (reply.definite) this.revokeKeys.delete(row.share_id);
-    this.publish({ busy: false, message: reply.message });
+    this.publish({ busy: false, message: reply.message ?? (reply.data ? 'Share revoked.' : undefined) });
+    if (reply.data) await this.load();
+  };
+
+  // ADR-238: a current manager hands management to owner teams they belong
+  // to. Recipients, creator and end date are unchanged; the server checks
+  // every team.
+  transfer = async (row: ShareRow, teams: string[]) => {
+    if (this.state.busy || !this.session || teams.length === 0) return;
+    const issuer = this.session.principal.issuer;
+    const request = JSON.stringify([row.share_id, row.revision ?? 1, teams]);
+    const known = this.transferKeys.get(row.share_id);
+    const key = known && known[0] === request ? known[1] : this.newID();
+    this.transferKeys.set(row.share_id, [request, key]);
+    this.publish({ busy: true, message: undefined });
+    const reply = await this.run('transfer_share', { share_id: row.share_id, expected_revision: row.revision ?? 1, idempotency_key: key,
+      management: { mode: 'teams', teams: teams.map(id => ({ kind: 'Group' as const, issuer, id })) } } as Input<'transfer_share'>);
+    if (!reply) { this.publish({ busy: false }); return; }
+    if (reply.definite) this.transferKeys.delete(row.share_id);
+    this.publish({ busy: false, message: reply.message ?? (reply.data ? 'Management transferred.' : undefined) });
     if (reply.data) await this.load();
   };
 }

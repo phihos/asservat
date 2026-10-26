@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "specs/contracts"
 DEST = ROOT / "internal/contracts/investigation-schemas"
 PREFIX = "https://asservat.io/spec/v1/"
-NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change"]
+NAMES = ["list_diagnostics", "preview_capture", "request_capture", "resolve_capture_request", "get_capture", "get_case", "prepare_artifact_download", "get_artifact_download", "cancel_artifact_download", "get_file_excerpt", "get_query_result", "activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share"]
 
 
 def history_subset(name, tool):
@@ -48,9 +48,10 @@ def history_subset(name, tool):
 
 def share_subset(name, tool):
     """ADR-232 increment 1: one concrete pod-status artifact per share, the
-    get_case read only, no sharing intents, management selection, cursors or
-    pending replies; increment 4 adds default team management (owned rows
-    carry revision, created_by and managed_by). Every runtime input/output is
+    get_case read only, no sharing intents, cursors or pending replies;
+    increment 4 adds default team management (owned rows carry revision,
+    created_by and managed_by); ADR-238 adds the management selection and
+    transfer_share. Every runtime input/output is
     valid canonically."""
     description = copy.deepcopy(tool)
     description.pop("enabledByDefault", None)
@@ -61,14 +62,15 @@ def share_subset(name, tool):
     error = next(b for b in branches if b["properties"]["status"].get("const") == "error")
     data = success["properties"]["data"]
     if name == "create_share":
-        props.pop("management")
+        # ADR-238: the optional management selection is the canonical one.
         props["artifacts"]["minItems"] = props["artifacts"]["maxItems"] = 1
         props["recipients"]["maxItems"] = 8
         props["data_classes"] = {"const": ["metadata"]}
         props["operations"] = {"const": ["get_case"]}
         description["description"] = ("Share one stored pod-status artifact (its exact digest from get_case) with up to eight users or groups of your identity provider until expires_at "
                                       "(at most seven days, never past the artifact's retention). Recipients can read it with get_case; download, inspection of other artifacts and capture rights are not shared. "
-                                      "Needs the evidence-owner role on the workload and the evidence:share scope. Repeat an uncertain request with the same idempotency key.")
+                                      "Needs the evidence-owner role on the workload and the evidence:share scope. By default your owner teams manage the share; "
+                                      "management may instead name some of the owner teams you belong to (mode teams) or only you (mode creator). Repeat an uncertain request with the same idempotency key.")
         data["properties"] = {k: v for k, v in data["properties"].items() if k in ("share_id", "phase")}
         data["properties"]["phase"] = {"const": "Active"}
     elif name == "list_shares":
@@ -82,17 +84,30 @@ def share_subset(name, tool):
         row = data["properties"]["shares"]["items"]
         row["properties"].pop("origin")
         row["properties"]["phase"] = {"enum": ["Active", "Expired", "Revoked", "Suspended"]}
-        row["properties"]["revision"] = {"enum": [1, 2]}
-    else:
+        row["properties"]["revision"] = {"type": "integer", "minimum": 1, "maximum": 1000000000}
+    elif name == "revoke_share":
         props.pop("sharing_intent_id")
         schema.pop("oneOf")
         schema["required"] = ["share_id", "expected_revision", "idempotency_key"]
-        description["description"] = ("Revoke a share you created or currently manage through a pinned owner team. A share has revision 1 until it is revoked (revision 2). Recipients lose access at their next read; "
-                                      "independent rights are unchanged. Repeating with the same idempotency key is harmless.")
+        description["description"] = ("Revoke a share you created or currently manage through a pinned owner team; installation administrators may revoke any share. "
+                                      "Each transfer and the revocation add one revision (list_shares shows the current one). Recipients lose access at their next read; "
+                                      "independent rights are unchanged and revoking never grants a read. Repeating with the same idempotency key is harmless.")
         data["properties"].pop("sharing_intent_id")
         data.pop("oneOf")
         data["required"] = ["share_id", "phase", "revision"]
-        data["properties"]["revision"] = {"const": 2}
+        data["properties"]["revision"] = {"type": "integer", "minimum": 2, "maximum": 1000000000}
+    else:
+        # ADR-238: transfer of one concrete share's management.
+        props.pop("sharing_intent_id")
+        schema.pop("oneOf")
+        schema["required"] = ["share_id", "expected_revision", "idempotency_key", "management"]
+        description["description"] = ("Replace the owner teams managing a share you currently manage (an audited transfer). Name owner teams you belong to now (mode teams), "
+                                      "or, as the share's creator, only yourself (mode creator). Creator, recipients, artifact and expiry stay unchanged; the share is suspended "
+                                      "when no new manager keeps the evidence-owner role. Managing grants no read. Repeating with the same idempotency key is harmless.")
+        data["properties"].pop("sharing_intent_id")
+        data.pop("oneOf")
+        data["required"] = ["share_id", "phase", "revision", "managed_by"]
+        data["properties"]["phase"] = {"const": "Active"}
     return description, [success, error]
 
 
@@ -172,7 +187,7 @@ def main():
             description["outputSchema"] = localize(output)
             result[name + ".json"] = (json.dumps(description, indent=2) + "\n").encode()
             continue
-        if name in ("activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change"):
+        if name in ("activate_policy", "get_policy_status", "deactivate_policy", "create_share", "list_shares", "revoke_share", "explain_access", "list_capture_history", "get_capture_settings", "preview_access_change", "transfer_share"):
             # ADR-228: the runtime implements the whole canonical contract.
             # ADR-232: the share tools implement a bounded subset.
             # ADR-234: explain_access implements the whole canonical contract.
@@ -181,7 +196,7 @@ def main():
             description = copy.deepcopy(tool)
             description.pop("enabledByDefault", None)
             branches = copy.deepcopy(tool["outputSchema"]["allOf"][1]["oneOf"])
-            if name in ("create_share", "list_shares", "revoke_share"):
+            if name in ("create_share", "list_shares", "revoke_share", "transfer_share"):
                 description, branches = share_subset(name, tool)
             if name in ("list_capture_history", "get_capture_settings"):
                 description, branches = history_subset(name, tool)

@@ -208,7 +208,7 @@ func (h *InvestigationHandler) ServeHTTP(w http.ResponseWriter, r *http.Request)
 		h.rejectIngress(w, r, current, name, body, 404)
 		return
 	}
-	if name == "request_capture" || name == "resolve_capture_request" || name == "prepare_artifact_download" || name == "cancel_artifact_download" || name == "activate_policy" || name == "deactivate_policy" || name == "create_share" || name == "revoke_share" {
+	if name == "request_capture" || name == "resolve_capture_request" || name == "prepare_artifact_download" || name == "cancel_artifact_download" || name == "activate_policy" || name == "deactivate_policy" || name == "create_share" || name == "revoke_share" || name == "transfer_share" {
 		var input struct {
 			Key string `json:"idempotency_key"`
 		}

@@ -1499,6 +1499,8 @@ type EvidenceShare struct {
 	RevokedAt      pgtype.Timestamptz
 	RevokeKey      pgtype.Text
 	Revision       int64
+	TransferKey    pgtype.Text
+	TransferDigest []byte
 }
 
 type FleetBootstrap struct {

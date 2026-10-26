@@ -6,3 +6,5 @@ export declare function validInput_list_shares(value: unknown): value is compone
 export declare function validOutput_list_shares(value: unknown): value is components['schemas']['McpOutput_list_shares'];
 export declare function validInput_revoke_share(value: unknown): value is components['schemas']['McpInput_revoke_share'];
 export declare function validOutput_revoke_share(value: unknown): value is components['schemas']['McpOutput_revoke_share'];
+export declare function validInput_transfer_share(value: unknown): value is components['schemas']['McpInput_transfer_share'];
+export declare function validOutput_transfer_share(value: unknown): value is components['schemas']['McpOutput_transfer_share'];

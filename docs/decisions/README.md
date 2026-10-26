@@ -16,6 +16,13 @@ and which assignment revisions decide them, using the real evaluator over the cu
 projection; paged within 256 KiB. Unavailable data and unaccepted inheritance are Indeterminate,
 never Allow. Console `/access-preview`. Migration 00090 adds the audit operation name.
 
+[ADR-238 — Explicit share management, transfer and administrator revocation](238-share-management-transfer.md)
+is S-06 increment 9: `create_share` accepts an optional `management` naming the creator's own
+current owner teams (or only the creator); the audited `transfer_share` lets a current manager hand
+management to owner teams they hold, without changing creator, recipients or expiry; operators of
+the protected fleet administration may revoke any share, which grants them no read. Migration 00091
+(revision per change, trigger, audit operation name).
+
 [ADR-234 — Caller-only access explanation](234-access-explanation.md) is S-06 increment 7:
 `explain_access(target_ref, operation)` over MCP and the browser route runs the real ordinary
 evaluator for the caller's own access and reports Allow/Deny/Indeterminate, the unmet condition and

@@ -597,6 +597,7 @@ requirements:
   spec: specs/authorization.md
   scenarios:
   - SC-SHR-008
+  - SC-SHR-011
   tasks:
   - TASK-07
   - TASK-08

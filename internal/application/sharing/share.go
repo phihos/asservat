@@ -42,6 +42,9 @@ type Service struct {
 	Recovery               RecoveryReader
 	NewID                  func() string
 	Now                    func() time.Time
+	// Administration names the installation administrators who may revoke
+	// any share (ADR-238); nil disables administrator revocation.
+	Administration Administrators
 }
 
 // CreateInput is the validated create_share input. A zero ExpiresAt
@@ -53,6 +56,18 @@ type CreateInput struct {
 	ExpiresAt          time.Time
 	Reason             string
 	IdempotencyKey     string
+	// Management is the optional explicit selection (ADR-238); the zero
+	// value selects the default owner teams.
+	Management value.ManagementRequest
+}
+
+// TransferInput is the validated transfer_share input: the complete new
+// management selection (mode creator or teams).
+type TransferInput struct {
+	ShareID          string
+	ExpectedRevision int64
+	Management       value.ManagementRequest
+	IdempotencyKey   string
 }
 
 // View is one listed share with its phase derived now.
@@ -98,7 +113,7 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 		return zero, false, err
 	}
 	now := s.Now()
-	if !value.UUID(in.CaseID) || !value.UUID(in.ArtifactID) || in.Version == (artifact.Digest{}) || !identity.Text(in.Reason, 512) || !identity.Text(in.IdempotencyKey, 128) || len(in.Recipients) < 1 || len(in.Recipients) > value.ShareMaxRecipients {
+	if !value.UUID(in.CaseID) || !value.UUID(in.ArtifactID) || in.Version == (artifact.Digest{}) || !identity.Text(in.Reason, 512) || !identity.Text(in.IdempotencyKey, 128) || len(in.Recipients) < 1 || len(in.Recipients) > value.ShareMaxRecipients || !in.Management.Valid() {
 		return zero, false, capture.ErrInvalid
 	}
 	recipients := slices.Clone(in.Recipients)
@@ -155,25 +170,30 @@ func (s Service) Create(ctx context.Context, current identities.CurrentIdentity,
 		return zero, false, capture.ErrChanged
 	}
 	retained := value.Retained{ArtifactID: route.ArtifactID, Target: route.Target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
-	eligible, owners := value.ShareManagement(i, p, route.Target, &retained, s.Now())
-	if eligible.Reason == "ManagementTooBroad" {
-		return zero, false, ErrManagementTooBroad
-	}
-	if !eligible.Eligible {
-		return zero, false, capture.ErrDenied
+	eligible, owners := value.SelectShareManagement(i, p, route.Target, &retained, in.Management, s.Now())
+	if err := managementError(eligible); err != nil {
+		return zero, false, err
 	}
 	expires = identity.Earlier(expires, r.Effective.ExpiresAt).UTC().Truncate(time.Microsecond)
 	if !expires.After(s.Now()) {
 		return zero, false, capture.ErrDenied
 	}
 	slices.SortFunc(recipients, func(a, b value.ShareRecipient) int { return strings.Compare(a.Key(), b.Key()) })
+	// A default selection keeps the increment 1 request digest.
+	var selection *value.ManagementRequest
+	if in.Management.Mode != "" {
+		m := in.Management
+		m.Teams = slices.Sorted(slices.Values(m.Teams))
+		selection = &m
+	}
 	digest, err := json.Marshal(struct {
 		CaseID, ArtifactID string
 		Version            artifact.Digest
 		Recipients         []value.ShareRecipient
 		ExpiresAt          time.Time
 		Reason             string
-	}{in.CaseID, in.ArtifactID, in.Version, recipients, in.ExpiresAt.UTC(), in.Reason})
+		Management         *value.ManagementRequest `json:",omitempty"`
+	}{in.CaseID, in.ArtifactID, in.Version, recipients, in.ExpiresAt.UTC(), in.Reason, selection})
 	if err != nil {
 		return zero, false, capture.ErrUnavailable
 	}
@@ -289,11 +309,13 @@ func (s Service) List(ctx context.Context, current identities.CurrentIdentity, v
 	return out, identity.Earlier(until, final.ValidUntil), nil
 }
 
-// Revoke revokes one share for its creator or a current manager (ADR-232
+// Revoke revokes one share for its creator, a current manager (ADR-232
 // increment 4: a principal holding one of the pinned management assignments
-// now). Revocation only restricts access, so the creator needs no current
-// owner assignment. A share the caller neither created nor manages is
-// NotAvailable without saying why.
+// now) or an installation administrator (ADR-238: an operator of the
+// protected fleet administration). Revocation only restricts access, so the
+// creator needs no current owner assignment and the administrator no evidence
+// right; the operation audit records the acting principal. A share the
+// caller may not revoke is NotAvailable without saying why.
 func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity, shareID string, expected int64, key string) (value.Share, bool, error) {
 	var zero value.Share
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() {
@@ -321,32 +343,154 @@ func (s Service) Revoke(ctx context.Context, current identities.CurrentIdentity,
 	}
 	revocation := Revocation{ShareID: shareID, Actor: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}
 	if !createdBy(share, i.Principal) {
-		p, err := s.Permissions.Permissions(ctx, share.Target)
-		if err != nil {
-			return zero, false, capture.ErrDenied
-		}
-		held, _ := share.ManagedBy(i, p, s.Now())
-		if len(held) == 0 {
-			return zero, false, capture.ErrDenied
+		var held []artifact.AudienceAssignment
+		if p, err := s.Permissions.Permissions(ctx, share.Target); err == nil {
+			held, _ = share.ManagedBy(i, p, s.Now())
 		}
 		for _, a := range held {
 			revocation.Managers = append(revocation.Managers, a.AssignmentID)
 		}
+		// Without current management only an administrator may revoke; an
+		// unavailable projection does not block that restriction.
+		if len(held) == 0 && !s.administrator(ctx, i) {
+			return zero, false, capture.ErrDenied
+		}
+		revocation.Administrator = len(held) == 0
 	}
 	out, replay, err := s.Store.RevokeShare(ctx, revocation, recovery)
 	if err != nil {
 		return zero, false, err
 	}
-	if out.ID != shareID || out.RevokedAt.IsZero() || out.Revision != 2 {
+	if out.ID != shareID || out.RevokedAt.IsZero() || out.Revision < 2 {
 		return zero, false, capture.ErrUnavailable
 	}
 	return out, replay, nil
+}
+
+// administrator reports whether i is an operator of the current protected
+// fleet administration of this installation.
+func (s Service) administrator(ctx context.Context, i identity.Identity) bool {
+	if s.Administration == nil {
+		return false
+	}
+	a, err := s.Administration.FleetAdministration(ctx)
+	return err == nil && a.InstallationID == s.InstallationID && a.Valid(s.Now()) && i.Valid(s.Now()) && a.Operator(i)
+}
+
+// Transfer replaces the management of one active share (ADR-238,
+// REQ-SHR-008): the caller must be a current manager, and the new set is the
+// caller's own current evidence-owner assignments of the named teams (or,
+// for the creator, their individual ones) inside the artifact's retained
+// audience. Creator, recipients, artifact and expiry are unchanged, so a
+// transfer never extends access; the share is Suspended as soon as no new
+// assignment is current. The operation audit records the decision.
+func (s Service) Transfer(ctx context.Context, current identities.CurrentIdentity, in TransferInput) (value.Share, bool, error) {
+	var zero value.Share
+	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() {
+		return zero, false, capture.ErrUnavailable
+	}
+	if !value.UUID(in.ShareID) || in.ExpectedRevision < 1 || !identity.Text(in.IdempotencyKey, 128) || in.Management.Mode == "" || !in.Management.Valid() {
+		return zero, false, capture.ErrInvalid
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	i, err := s.caller(ctx, current)
+	if err != nil {
+		return zero, false, err
+	}
+	recovery, err := s.recovery(ctx)
+	if err != nil {
+		return zero, false, err
+	}
+	share, err := s.Store.Share(ctx, in.ShareID)
+	if errors.Is(err, capture.ErrDenied) {
+		return zero, false, capture.ErrDenied
+	}
+	if err != nil || share.ID != in.ShareID || share.RootID != s.RootID {
+		return zero, false, capture.ErrUnavailable
+	}
+	if !share.RevokedAt.IsZero() || !s.Now().Before(share.ExpiresAt) {
+		return zero, false, capture.ErrDenied
+	}
+	p, err := s.Permissions.Permissions(ctx, share.Target)
+	if err != nil {
+		return zero, false, capture.ErrDenied
+	}
+	held, _ := share.ManagedBy(i, p, s.Now())
+	if len(held) == 0 {
+		return zero, false, capture.ErrDenied
+	}
+	// Creator mode pins individual assignments, so only the creator may
+	// choose it: management never names another person.
+	if in.Management.Mode == "creator" && !createdBy(share, i.Principal) {
+		return zero, false, ErrManagementNotHeld
+	}
+	// No catalog read without current ordinary target eligibility.
+	if !value.ScopeEligibility(i, p, value.ReadApproved, share.Target, s.Now()).Eligible {
+		return zero, false, capture.ErrDenied
+	}
+	record, err := s.Catalog.ContextDownloadEvidence(ctx, share.ArtifactID)
+	if err != nil {
+		return zero, false, capture.ErrUnavailable
+	}
+	r := record.Retained
+	if !r.Valid() || r.RootID != s.RootID || r.Registration.Location.ArtifactID != share.ArtifactID || r.Input.Target != share.Target || !identity.Fresh(record.ObservedAt, record.ValidUntil, s.Now(), 5*time.Second) {
+		return zero, false, capture.ErrUnavailable
+	}
+	retained := value.Retained{ArtifactID: share.ArtifactID, Target: share.Target, DataClass: "metadata", ExpiresAt: r.Effective.ExpiresAt, Audience: slices.Clone(record.Audience)}
+	eligible, owners := value.SelectShareManagement(i, p, share.Target, &retained, in.Management, s.Now())
+	if err := managementError(eligible); err != nil {
+		return zero, false, err
+	}
+	m := in.Management
+	m.Teams = slices.Sorted(slices.Values(m.Teams))
+	digest, err := json.Marshal(struct {
+		ShareID    string
+		Management value.ManagementRequest
+	}{in.ShareID, m})
+	if err != nil {
+		return zero, false, capture.ErrUnavailable
+	}
+	t := Transfer{ShareID: in.ShareID, Actor: i.Principal, Management: owners, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey, RequestDigest: sha256.Sum256(digest)}
+	for _, a := range held {
+		t.Managers = append(t.Managers, a.AssignmentID)
+	}
+	out, replay, err := s.Store.TransferShare(ctx, t, recovery)
+	if err != nil {
+		return zero, false, err
+	}
+	if out.ID != in.ShareID || !out.RevokedAt.IsZero() || out.Revision < 2 || out.Creator != share.Creator || !out.ExpiresAt.Equal(share.ExpiresAt) || out.ArtifactID != share.ArtifactID {
+		return zero, false, capture.ErrUnavailable
+	}
+	final, err := current.ResolveIdentity(ctx)
+	if err != nil || !final.Valid(s.Now()) || final.Principal != i.Principal || ctx.Err() != nil {
+		return zero, false, capture.ErrDenied
+	}
+	return out, replay, nil
+}
+
+// managementError maps a refused management selection.
+func managementError(r value.Result) error {
+	switch {
+	case r.Eligible:
+		return nil
+	case r.Reason == "ManagementTooBroad":
+		return ErrManagementTooBroad
+	case r.Reason == "ManagementNotHeld":
+		return ErrManagementNotHeld
+	}
+	return capture.ErrDenied
 }
 
 // ErrManagementTooBroad refuses a share whose creator holds more than
 // value.ShareMaxManagers owner-team assignments: management is never
 // silently truncated (REQ-SHR-008).
 var ErrManagementTooBroad = errors.New("share management exceeds eight owner assignments")
+
+// ErrManagementNotHeld refuses an explicit management selection naming a
+// team (or individual assignment) the caller does not hold now for the
+// artifact (ADR-238): management is never assigned to others.
+var ErrManagementNotHeld = errors.New("share management names an assignment the caller does not hold")
 
 func createdBy(s value.Share, p identity.Principal) bool {
 	return s.Creator.Issuer == p.Issuer && s.Creator.Subject == p.Subject
