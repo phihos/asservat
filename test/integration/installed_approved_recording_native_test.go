@@ -54,9 +54,15 @@ func approvedRecordingArguments(cluster, namespace, workload string) map[string]
 	}
 }
 
+// Render only the node collector stage after the real regional installer
+// has prepared its namespace and published the node endpoint.
+func approvedRecordingCollectorRenderArgs(connectorNamespace, valuesPath string) []string {
+	return []string{"template", "asservat", "../../charts/asservat", "--namespace", connectorNamespace, "--show-only", "templates/collector.yaml", "--kube-version", "1.37.0", "-f", valuesPath}
+}
+
 // This focus uses the ordinary product installer and official chart. Its only
 // privileged component runs on a guarded disposable runner, never a workstation.
-func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api kubernetes.Interface, config, image, installation, cluster string) {
+func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api kubernetes.Interface, config, image, installation, cluster, connectorNamespace string) {
 	t.Helper()
 	if _, err := os.Stat("/etc/asservat-disposable-host"); err != nil {
 		t.Fatal("approved collector requires disposable host", err)
@@ -64,7 +70,7 @@ func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api ku
 	if image == "" {
 		t.Fatal("approved collector lacks built image")
 	}
-	source, err := api.CoreV1().ConfigMaps("asservat-connector").Get(ctx, kube.RegionalNodes, meta.GetOptions{})
+	source, err := api.CoreV1().ConfigMaps(connectorNamespace).Get(ctx, kube.RegionalNodes, meta.GetOptions{})
 	if err != nil {
 		t.Fatal("installed collector endpoint", err)
 	}
@@ -74,7 +80,7 @@ func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api ku
 	if err := os.WriteFile(path, raw, 0600); err != nil {
 		t.Fatal(err)
 	}
-	render := exec.CommandContext(ctx, "helm", "template", "asservat", "../../charts/asservat", "--namespace", "asservat-region", "--kube-version", "1.37.0", "-f", path)
+	render := exec.CommandContext(ctx, "helm", approvedRecordingCollectorRenderArgs(connectorNamespace, path)...)
 	manifest, err := render.Output()
 	if err != nil {
 		t.Fatal("official collector chart", err)

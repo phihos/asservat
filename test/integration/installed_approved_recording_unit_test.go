@@ -52,3 +52,29 @@ func TestInstalledApprovedRecordingFixtureShape(t *testing.T) {
 		})
 	}
 }
+
+// The collector stage must never apply the chart's installation-intent
+// ConfigMap into an invented release namespace or mutate connector staging.
+// This checks the exact runtime command builder without requiring Helm/Kind.
+func TestInstalledApprovedRecordingCollectorRenderStage(t *testing.T) {
+	for _, namespace := range []string{"asservat-connector", "connector-selected-by-the-installer"} {
+		args := approvedRecordingCollectorRenderArgs(namespace, "operator-values.json")
+		value := func(flag string) string {
+			for i := range args {
+				if args[i] == flag && i+1 < len(args) {
+					return args[i+1]
+				}
+			}
+			return ""
+		}
+		if value("--show-only") != "templates/collector.yaml" {
+			t.Fatal("collector stage includes unrelated foundation resources")
+		}
+		if value("--namespace") != namespace {
+			t.Fatal("render namespace does not match the actual regional installation")
+		}
+		if value("-f") != "operator-values.json" {
+			t.Fatal("render lost its exact installed endpoint/image values")
+		}
+	}
+}

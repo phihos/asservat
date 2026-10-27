@@ -138,7 +138,7 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		t.Fatal("installer-cluster result")
 	}
 	if executor && installedJourneyFocus() == "approved-recording" && index == 1 {
-		installApprovedRecordingCollector(t, ctx, region, f.Clusters[index].Config, f.CollectorImage, installation, envelope.Binding.ClusterID)
+		installApprovedRecordingCollector(t, ctx, region, f.Clusters[index].Config, f.CollectorImage, installation, envelope.Binding.ClusterID, installed.Namespace.Name)
 	}
 	peer := envelope.Binding.PeerID
 	waitActive := func(except string) string {

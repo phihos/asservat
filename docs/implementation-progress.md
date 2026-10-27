@@ -51,6 +51,16 @@ blobs but supplied no runtime qualification. A privilege-free regression
 reproduces that exact count mismatch, and the consumer now selects two for the
 new focus. Existing topology/fast-fixture cases and the strict service assertion
 are retained.
+Run 40513823733 then reached the actual guarded installer but failed the
+collector apply after 426.139 seconds of Go execution (job 12m22s): the whole
+chart also rendered an unrelated installation-intent ConfigMap into a nonexistent
+release namespace. The collector stage now renders only the official collector
+template and pins its render context to the actual installed connector namespace;
+it creates no regional namespace or extra RBAC outside installer staging. A pure
+command-stage regression fails before the fix, and the Helm render gate verifies
+that the exact original four collector resources remain unchanged. The failed
+run retained unchanged source hashes and complete cleanup; it is not an approved
+recording qualification.
 
 See [the scoped plan and complexity gate](reviews/approved-recording-workflow-2026-10-27.md).
 
