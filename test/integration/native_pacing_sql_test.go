@@ -233,22 +233,55 @@ func TestNativePacingSQLWithRealPostgres(t *testing.T) {
 	if err := admin.QueryRow(ctx, `SELECT oid FROM pg_roles WHERE rolname='fixture_native_pacing_statistics'`).Scan(&role); err != nil {
 		t.Fatal("measurement role identity unavailable")
 	}
-	// A saturated preloaded library survives extension creation. Synthetic SET
-	// utilities exercise default-capacity eviction without adding relations or
-	// changing statistics capacity. This is a deliberate qualification fault,
-	// not proof of which condition ended an earlier installed run.
+	// PostgreSQL 18 normalizes SET literal values. CREATE ROLE's identifier
+	// remains part of its query jumble. First require two distinct numeric
+	// entries inside one transaction; retain no role or query text afterward.
 	var maximum int
 	if err := admin.QueryRow(ctx, `SELECT current_setting('pg_stat_statements.max')::integer`).Scan(&maximum); err != nil || maximum != 5000 {
 		t.Fatal("statistics capacity differs from the pinned default", maximum, err)
 	}
+	preflight, err := admin.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer preflight.Rollback(ctx)
+	const entries = `SELECT count(*)::bigint,count(DISTINCT queryid)::bigint
+ FROM fixture_native_statistics.pg_stat_statements
+ WHERE userid=(current_user::regrole)::oid
+ AND dbid=(SELECT oid FROM pg_database WHERE datname=current_database())`
+	var beforeEntries, beforeIDs, afterEntries, afterIDs int64
+	// Warm this same numeric query before its baseline so it cannot account
+	// for one of the two new entries being tested.
+	for i := 0; i < 2; i++ {
+		if err := preflight.QueryRow(ctx, entries).Scan(&beforeEntries, &beforeIDs); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := preflight.Exec(ctx, `CREATE ROLE fixture_bootstrap_probe_a NOLOGIN; CREATE ROLE fixture_bootstrap_probe_b NOLOGIN`); err != nil {
+		t.Fatal(err)
+	}
+	if err := preflight.QueryRow(ctx, entries).Scan(&afterEntries, &afterIDs); err != nil || afterEntries-beforeEntries != 2 || afterIDs-beforeIDs != 2 {
+		t.Fatal("role identifiers did not produce two distinct tracked entries", beforeEntries, afterEntries, beforeIDs, afterIDs, err)
+	}
+	if err := preflight.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
 	flood := func(ordinal int) {
 		t.Helper()
+		transaction, err := admin.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer transaction.Rollback(ctx)
 		var statements strings.Builder
 		for i := 0; i <= maximum; i++ {
-			fmt.Fprintf(&statements, "SET application_name = 'fixture_bootstrap_%d_%d';\n", ordinal, i)
+			fmt.Fprintf(&statements, "CREATE ROLE fixture_bootstrap_%d_%d NOLOGIN;\n", ordinal, i)
 		}
-		if _, err := admin.Exec(ctx, statements.String()); err != nil {
-			t.Fatal("synthetic bootstrap utility batch failed", err)
+		if _, err := transaction.Exec(ctx, statements.String()); err != nil {
+			t.Fatal("synthetic bootstrap DDL batch failed", err)
+		}
+		if err := transaction.Rollback(ctx); err != nil {
+			t.Fatal(err)
 		}
 	}
 	initial, err := nativePacingSQLSnapshot(ctx, admin)
@@ -258,7 +291,7 @@ func TestNativePacingSQLWithRealPostgres(t *testing.T) {
 	flood(1)
 	inherited, err := nativePacingSQLSnapshot(ctx, admin)
 	if err != nil || inherited.Deallocations <= initial.Deallocations {
-		t.Fatal("utility prefill did not reproduce inherited saturation", initial.Deallocations, inherited.Deallocations, err)
+		t.Fatal("DDL prefill did not reproduce inherited saturation", initial.Deallocations, inherited.Deallocations, err)
 	}
 	flood(2)
 	evicted, err := nativePacingSQLSnapshot(ctx, admin)
@@ -268,6 +301,11 @@ func TestNativePacingSQLWithRealPostgres(t *testing.T) {
 	if _, err := nativePacingSQLDelta(inherited, evicted); err == nil || err.Error() != "SQL snapshot entries evicted" {
 		t.Fatal("eviction inside measured interval was accepted", inherited.Deallocations, evicted.Deallocations, err)
 	}
+	var retainedRoles int
+	if err := admin.QueryRow(ctx, `SELECT count(*)::integer FROM pg_roles WHERE rolname LIKE 'fixture_bootstrap_%'`).Scan(&retainedRoles); err != nil || retainedRoles != 0 {
+		t.Fatal("synthetic bootstrap roles survived rollback", retainedRoles, err)
+	}
+	t.Logf("identifier preflight entries=%d→%d distinct IDs=%d→%d; retained bootstrap roles=%d", beforeEntries, afterEntries, beforeIDs, afterIDs, retainedRoles)
 	// This reset starts the first positive baseline only after the entire
 	// synthetic bootstrap. Lost preflight coverage was refused above, not
 	// represented as zero or retried within one measurement interval.
