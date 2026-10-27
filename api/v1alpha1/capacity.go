@@ -60,10 +60,14 @@ type CapacityNodeLimits struct {
 	MaxQueuedExpensive     int64          `json:"maxQueuedExpensive"`
 	Upload                 CapacityUpload `json:"upload"`
 	MaxSpoolBytes          int64          `json:"maxSpoolBytes"`
-	ImpactProfileRef       string         `json:"impactProfileRef"`
-	UnhealthySamples       int64          `json:"unhealthySamples"`
-	SampleIntervalSeconds  int64          `json:"sampleIntervalSeconds"`
-	RecoveryHealthySeconds int64          `json:"recoveryHealthySeconds"`
+	// ADR-246: optional node ring and frozen-snapshot memory limits; absent
+	// means the collector-wide ceiling alone applies (never multiplied).
+	MaxRingBytes           int64  `json:"maxRingBytes,omitempty"`
+	MaxFrozenBytes         int64  `json:"maxFrozenBytes,omitempty"`
+	ImpactProfileRef       string `json:"impactProfileRef"`
+	UnhealthySamples       int64  `json:"unhealthySamples"`
+	SampleIntervalSeconds  int64  `json:"sampleIntervalSeconds"`
+	RecoveryHealthySeconds int64  `json:"recoveryHealthySeconds"`
 }
 type EvidenceBudgetPolicySpec struct {
 	PoolRef           string                    `json:"poolRef"`

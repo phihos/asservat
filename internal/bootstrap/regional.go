@@ -33,6 +33,7 @@ type Regional struct {
 	bootstrap   regionalBootstrap
 	context     *regionalContext  // nil without the optional ADR-171 input
 	capacity    *regionalCapacity // nil without the optional ADR-197 input
+	nodes       *regionalNodes    // nil without the optional ADR-246 input
 	closers     []func()
 	// API round trips of the shared observer and probe clients, for the
 	// executor's stop line (ADR-196): counts and transport time only.
@@ -130,7 +131,7 @@ func readRegionalDeployment(ctx context.Context, files *os.Root) (contracts.Regi
 			return contracts.RegionalDeployment{}, mounts.ErrUnavailable
 		}
 	}
-	if !validRegionalAPIContext(c) || !validRegionalCapacity(c) {
+	if !validRegionalAPIContext(c) || !validRegionalCapacity(c) || !validRegionalCollector(c) {
 		return contracts.RegionalDeployment{}, mounts.ErrUnavailable
 	}
 	return c, nil
@@ -332,6 +333,12 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 			return r, mounts.ErrUnavailable
 		}
 	}
+	if c.Collector != nil {
+		if r.nodes, err = newRegionalNodes(startup, c, in); err != nil {
+			return r, mounts.ErrUnavailable
+		}
+		r.closers = append(r.closers, r.nodes.close)
+	}
 	return r, nil
 }
 
@@ -367,6 +374,19 @@ func (r *Regional) Run(ctx context.Context) error {
 			<-capacityDone
 		}
 	}()
+	// ADR-246: the node listener runs for the process lifetime; its failure
+	// stops the connector like any other fixed input failure.
+	nodesDone := make(chan error, 1)
+	if r.nodes != nil {
+		go func() { nodesDone <- r.nodes.serve(contextCtx) }()
+	}
+	defer func() {
+		if r.nodes != nil {
+			stopContext()
+			<-nodesDone
+			r.nodes = nil
+		}
+	}()
 	var attemptAt time.Time
 	var observerAt, probeAt int64
 	var observerTime, probeTime time.Duration
@@ -393,6 +413,10 @@ func (r *Regional) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return nil
+		case err := <-nodesDone:
+			r.nodes = nil
+			fmt.Fprintln(os.Stderr, "connector node listener stopped: "+regionalCause(err))
+			return mounts.ErrUnavailable
 		case err := <-capacityDone:
 			capacityRunning = false
 			cause := regionalCause(err)

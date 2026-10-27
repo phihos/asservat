@@ -53,6 +53,65 @@ publication trigger and recorder admission) is increment 4; `tshark -r` was not 
 locally or on the runner); slow clients below about 0.2–0.5 MiB/s per chunk are interrupted and
 must resume.
 
+## S-04 increment 3: node collector role (ADR-246, 2026-10-27)
+
+[ADR-246](decisions/246-node-collector-role.md): `asservat node` DaemonSet (chart
+`collector.yaml`, off by default, disposable-host guard as hostPath `File` plus a process check),
+its own namespace as the only privileged Pod Security exception, root without `privileged` with
+`BPF`/`NET_ADMIN`/`SYS_RESOURCE`, host PID, runtime-default seccomp, four read-only hostPaths, no
+API permission. Enrollment by Pod-bound token (audience `asservat-node:<installation>`) plus
+identity-free CSR; the connector's `NodeAttester` (TokenReview, live Pod/DaemonSet/Node, kubelet
+boot ID) and in-memory `NodeIssuer` (20-minute leaves). Private TLS 1.3 work channel
+`/internal/v1/node/{enroll,poll,status}` with 25-second long poll, closed work kinds (no producer
+yet), 15-second batched status, one current process per node. Capability probe (kernel, BTF,
+cgroup v2, debugfs/tracefs/bpffs, host processes, runtime, one `sched_cls` load and a TCX link
+attempt against a non-existent interface) and the embedded Inspektor Gadget v0.57.0 local runtime
+(build tag `gadget`); every mechanism reports `AdapterUnavailable`/`RecorderNotImplemented`. Node
+`Ceilings`/`Budget` (ring, frozen, upload token bucket); EvidenceBudgetPolicy `node.maxRingBytes`
+and `node.maxFrozenBytes` (optional, ≤ 4 GiB, CRD regenerated). Connector: optional
+`collector` input starts the listener (installer provisioning pending). No migration.
+
+Verification:
+- Unit (`-race`): domain/collector (kernel parsing, assessment for every missing fact, budgets
+  never exceed ceilings, token bucket without refill overflow, cadence, receipts),
+  application/delivery (enrollment validation, restart replacement ends the old poll and
+  certificate, renewal overlap of at most two leaves, long poll woken by enqueue, queue and poll
+  bounds, receipts and expiry, report ordering/spacing/currency), transport/node (closed wire
+  round trip and refusals), adapters/kubernetes (`TestNodeAttester…`: 16 refusal cases incl.
+  case-folded field, replaced DaemonSet, rebooted node), adapters/linux (synthetic root, no host
+  reads), bootstrap (real TLS end-to-end channel, 15-second cadence on a fake clock, prompt
+  receipts, re-enrollment with the same epoch, deployment validation): PASS.
+- `make helm-check` (new `check_collector`: kinds, labels, exact security context, guard
+  hostPath, token audience, no RBAC, refusals) and `make gadget-check`: PASS.
+- Native `collector-packet` on a GitHub-hosted `ubuntu-24.04` runner (native.yml run
+  40445090158, job 5 min 19 s; harness 4 min 14 s, Go test 22 s): kind v0.33.0, Kubernetes
+  v1.37.0, containerd 2.3.4. Measured runner facts: kernel `6.17.0-1022-azure`, BTF supported,
+  cgroup v2, BPF and tc supported, TCX supported, debugfs/tracefs supported (host mounts),
+  bpffs unsupported (not mounted in the kind node), host processes visible, engine linked and
+  initialized (v0.57.0). Both mechanisms: prerequisites met, `AdapterUnavailable`
+  (`RecorderNotImplemented`), packet hook `tcx`. Status interval 15.006 s; restart (Pod deleted)
+  re-enrolled with a new epoch, same boot, in 1.0 s; the Restricted namespace rejected the
+  collector template (hostPID, capabilities, hostPath, runAsUser 0); deleting DaemonSet and
+  namespace left the Restricted workload Pod unchanged (same UID, Running, 0 restarts). The
+  connector side ran the real `NodeChannelServer` and `NodeAttester` in the test process with an
+  account holding only the four attestation reads. First run 40444140764 failed: an explicit
+  `appArmorProfile: RuntimeDefault` made the kubelet refuse the Pod on the AppArmor-less kind
+  node; the field was removed.
+- After rebasing onto main (#82, #84, #85): native run 40445994032 PASS (job 5 min 35 s, Go test
+  143 s incl. waits; status interval 15.014 s; restart re-enrollment 1.0 s; the collector's own
+  log shows the probe line, one `connector unavailable` retry before the test's listener started,
+  then enrollment). `make pre-push` PASS.
+
+PR #87 review fixes: enrollment claims precheck and limits (5/s, burst 20; one per source per
+5 s, burst 3; 8 in flight), receipts match sequence and work ID, poll cursor never passes an
+unbuffered item (backpressure at 256 unreported receipts). Unit tests
+`TestEnrollmentIsBoundedBeforeAnyAPICall`, `TestEnrollmentInFlightBound`,
+`TestReceiptMustMatchSequenceAndWorkID`, `TestNodeReceiptBufferNeverSkipsQueuedWork`,
+`TestNodeAttesterPrecheckNeedsNoAPI`: PASS.
+
+Open: installer provisioning of the connector's `collector` input; work producers and recorders
+(increment 4); budget-policy node limits at admission (increment 6); the full Gadget operator set.
+
 ## Log and resource triggers (ADR-241, 2026-10-27)
 
 [ADR-241](decisions/241-log-resource-detectors.md) implements the `log` and `resource` detectors

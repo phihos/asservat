@@ -47,6 +47,15 @@ On upgrade, a live render-time lookup refuses a nonterminal, node-lost or deleti
 
 With `mode=cluster` and `cluster.enabled`, a hook installs one regional connector from the hub's offer and an operator-created bootstrap Secret. See [add a regional cluster](../../docs/installation/helm.md#add-a-regional-cluster-modecluster). The bootstrap record is never a value.
 
+## Node collector (test hosts only)
+
+With `mode=cluster` or `combined` and `collector.enabled`, the chart creates the collector
+namespace (the only namespace with the privileged Pod Security exception) and the `asservat node`
+DaemonSet ([ADR-246](../../docs/decisions/246-node-collector-role.md)). Every collector Pod
+mounts the host file `/etc/asservat-disposable-host` (hostPath type `File`), so it starts only on
+disposable test hosts that carry it. In this version it probes its node and reports status to the
+connector; it records nothing. See [node collector](../../docs/installation/helm.md#node-collector-test-hosts-only).
+
 ## Upgrade and uninstall
 
 CRDs in `crds/` are installed on a first install but **are not upgraded or deleted by Helm**. Before changing versions, review the new CRD schemas and compatibility notes, preserve existing configuration/local start records, and back up the applicable state. From the unpacked, verified new chart:

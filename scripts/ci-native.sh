@@ -60,6 +60,10 @@ declare -A suites=(
   [regional-journey]="$context --regional-context-start journey"
   [runtime-object-roundtrip]="$context --runtime-object-roundtrip"
   [owner-provider-auth]="$context --owner-provider-auth"
+  # ADR-246 (S-04 increment 3): the node collector skeleton. Loads BPF on the
+  # runner's kernel, so the harness refuses without the disposable-host guard
+  # that native.yml creates on its fresh runner.
+  [collector-packet]="python3 scripts/test-collector.py packet"
 )
 if [[ ${1:-} == --list ]]; then
   printf '%s\n' "${!suites[@]}" | sort | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))'

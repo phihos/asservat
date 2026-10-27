@@ -105,3 +105,36 @@ cluster:
   # http://alertmanager-operated.monitoring.svc:9093. Regional executor only.
   # It is a fixed regional input: changing it needs a connector reinstall.
   alertmanager: ""
+
+# ADR-246 (S-04 increment 3): the `asservat node` collector DaemonSet, with
+# mode=cluster or mode=combined. Its namespace is the only one created with
+# the privileged Pod Security exception; workload namespaces stay restricted.
+# Off by default. Until the collector is qualified, every collector Pod mounts
+# the host file /etc/asservat-disposable-host (hostPath type File) and the
+# process checks it again, so the collector cannot start on a host without it.
+# Only disposable CI runners and VM images create that file. In this version
+# the collector probes its node and reports status; it records nothing.
+collector:
+  enabled: false
+  namespace: asservat-collector
+  # The exact product repository@sha256 digest of the collector image (built
+  # with the gadget tag).
+  image: ""
+  registrySecret: ""
+  installationID: ""
+  clusterID: ""
+  # The connector's node listener (port 8444), the name its server
+  # certificate carries and the PEM roots that issued it.
+  connector:
+    endpoint: ""
+    serverName: ""
+    rootsPEM: ""
+  # The local administrator's collector-wide ceilings per node (bytes):
+  # source rings, frozen snapshots awaiting upload, upload rate and burst. A
+  # budget policy's node limits can only lower them. The container memory
+  # limit is ringBytes + frozenBytes + 128 MiB.
+  ceilings:
+    ringBytes: 268435456
+    frozenBytes: 268435456
+    uploadBytesPerSecond: 33554432
+    uploadBurstBytes: 67108864

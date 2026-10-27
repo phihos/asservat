@@ -275,6 +275,75 @@ def check_cluster(directory):
     render(stray, ok=False)
 
 
+def check_collector(directory):
+    # ADR-246: the node collector DaemonSet, rendered statically. Off by
+    # default; the only privileged Pod Security exception is its namespace.
+    path = Path(directory) / "collector-values.yaml"
+    roots = "-----BEGIN CERTIFICATE-----\nPUBLIC\n-----END CERTIFICATE-----\n"
+    base = {"mode": "cluster", "collector": {"enabled": True, "image": "registry.example/asservat@sha256:" + "a" * 64,
+            "installationID": "10000000-0000-4000-8000-000000000001", "clusterID": "50000000-0000-4000-8000-000000000001",
+            "connector": {"endpoint": "https://asservat-connector-nodes.asservat-connector.svc:8444", "serverName": "asservat-connector-nodes", "rootsPEM": roots}}}
+
+    def render(v, ok=True, namespace="asservat-region"):
+        path.write_text(yaml.safe_dump(v))
+        args = ["template", "asservat", str(CHART), "--namespace", namespace, "--kube-version", "1.37.0", "-f", str(path)]
+        result = run(args, ok=ok)
+        return result if not ok else [r for r in yaml.safe_load_all(result) if r]
+
+    docs = render(base)
+    collector = [r for r in docs if r["metadata"].get("namespace") == "asservat-collector" or r["kind"] == "Namespace"]
+    assert sorted(r["kind"] for r in collector) == ["ConfigMap", "DaemonSet", "Namespace", "ServiceAccount"], [r["kind"] for r in collector]
+    assert not any(r["kind"] in ("Role", "ClusterRole", "RoleBinding", "ClusterRoleBinding", "Secret") for r in docs), "the collector account gets no API permission"
+    namespace = next(r for r in collector if r["kind"] == "Namespace")
+    assert namespace["metadata"]["name"] == "asservat-collector"
+    assert {k: v for k, v in namespace["metadata"]["labels"].items() if k.startswith("pod-security")} == {f"pod-security.kubernetes.io/{m}": "privileged" for m in ("enforce", "audit", "warn")}
+    account = next(r for r in collector if r["kind"] == "ServiceAccount")
+    assert account["automountServiceAccountToken"] is False
+    data = next(r for r in collector if r["kind"] == "ConfigMap")
+    assert data["immutable"] is True
+    node = json.loads(data["data"]["node.json"])
+    assert node["format"] == "asservat-node-deployment/v1" and node["ceilings"] == {"ringBytes": 268435456, "frozenBytes": 268435456, "uploadBytesPerSecond": 33554432, "uploadBurstBytes": 67108864}
+    assert data["metadata"]["name"] == "asservat-node-input." + hashlib.sha256(data["data"]["node.json"].encode()).hexdigest()[:32]
+    ds = next(r for r in collector if r["kind"] == "DaemonSet")
+    pod = ds["spec"]["template"]["spec"]
+    assert pod["hostPID"] is True and pod["hostNetwork"] is False and pod["hostIPC"] is False
+    assert pod["automountServiceAccountToken"] is False and pod["enableServiceLinks"] is False and "imagePullSecrets" not in pod
+    container, = pod["containers"]
+    assert container["command"] == ["/asservat", "node"] and container["image"] == base["collector"]["image"]
+    assert container["securityContext"] == {"privileged": False, "runAsUser": 0, "runAsNonRoot": False, "allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,
+                                             "capabilities": {"drop": ["ALL"], "add": ["BPF", "NET_ADMIN", "SYS_RESOURCE"]},
+                                             "seccompProfile": {"type": "RuntimeDefault"}}
+    assert container["resources"]["limits"]["memory"] == str(268435456 * 2 + 134217728)
+    volumes = {v["name"]: v for v in pod["volumes"]}
+    assert volumes["disposable-host"]["hostPath"] == {"path": "/etc/asservat-disposable-host", "type": "File"}, "disposable-host guard missing"
+    host_paths = {v["hostPath"]["path"] for v in pod["volumes"] if "hostPath" in v}
+    assert host_paths == {"/etc/asservat-disposable-host", "/sys/kernel/debug", "/sys/kernel/tracing", "/sys/fs/bpf"}, host_paths
+    assert all(m["readOnly"] is True for m in container["volumeMounts"])
+    token = volumes["token"]["projected"]["sources"][0]["serviceAccountToken"]
+    assert token == {"path": "token", "audience": "asservat-node:10000000-0000-4000-8000-000000000001", "expirationSeconds": 600}
+    assert pod["serviceAccountName"] == account["metadata"]["name"] == ds["metadata"]["name"] == "asservat-node"
+    # Default: nothing of the collector renders.
+    default = render({"mode": "cluster"})
+    assert not any(r["kind"] in ("DaemonSet", "Namespace") for r in default)
+    combined = json.loads(json.dumps(base))
+    combined["mode"] = "combined"
+    render(combined)
+    for change in [{"mode": "hub"}, {"collector": {"namespace": "kube-system"}}, {"collector": {"namespace": "default"}}, {"collector": {"namespace": "asservat-connector"}},
+                   {"collector": {"image": "registry.example/asservat:latest"}}, {"collector": {"installationID": "not-a-uuid"}}, {"collector": {"clusterID": ""}},
+                   {"collector": {"connector": {"endpoint": "http://connector:8444", "serverName": "x", "rootsPEM": roots}}},
+                   {"collector": {"connector": {"endpoint": "https://connector:8444", "serverName": "x", "rootsPEM": ""}}},
+                   {"collector": {"ceilings": {"ringBytes": 8589934592, "frozenBytes": 1, "uploadBytesPerSecond": 1, "uploadBurstBytes": 1}}},
+                   {"collector": {"privileged": True}}]:
+        v = json.loads(json.dumps(base))
+        for key, value in change.items():
+            if isinstance(value, dict):
+                v[key].update(value)
+            else:
+                v[key] = value
+        render(v, ok=False)
+    render(base, ok=False, namespace="asservat-collector")
+
+
 def main():
     schema = json.loads((CHART / "values.schema.json").read_text())
     jsonschema.Draft7Validator.check_schema(schema)
@@ -310,6 +379,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="helm-check-", dir=cache) as directory:
         check_bootstrap(directory)
         check_cluster(directory)
+        check_collector(directory)
         run(["package", str(CHART), "--destination", directory])
         archive, = Path(directory).glob("*.tgz")
         with tarfile.open(archive) as bundle:
@@ -319,7 +389,7 @@ def main():
                 assert yaml.safe_load(bundle.extractfile("asservat/crds/" + name).read()) == content
         run(["lint", "--strict", str(archive)])
         assert run(["template", "asservat", str(archive), "--include-crds"]) == run(["template", "asservat", str(CHART), "--include-crds"])
-    print("Helm schema/render/package checks passed: 3 foundation modes, 7 canonical CRDs, fixed bootstrap hook/compartments/revisions, the regional installer hook, invalid values and unavailable runtime rejected.")
+    print("Helm schema/render/package checks passed: 3 foundation modes, 7 canonical CRDs, fixed bootstrap hook/compartments/revisions, the regional installer hook, the guarded collector DaemonSet, invalid values and unavailable runtime rejected.")
     print(run(["version", "--short"]).strip())
 
 

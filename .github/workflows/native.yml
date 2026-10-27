@@ -68,7 +68,17 @@ jobs:
           grep -ohE '[a-z0-9./-]+@sha256:[0-9a-f]{64}' scripts/test-*.py | sort -u > /tmp/images
           nohup sh -c 'while read -r i; do docker pull -q "$i" & done < /tmp/images; wait' > /tmp/pulls.log 2>&1 &
       - uses: ./.github/actions/setup
-        with: { console: "true", sql-tools: "true", kind: "true", helm: "${{ startsWith(matrix.suite, 'helm') }}" }
+        with:
+          console: "${{ !startsWith(matrix.suite, 'collector-') }}"
+          sql-tools: "${{ !startsWith(matrix.suite, 'collector-') }}"
+          kind: "true"
+          helm: "${{ startsWith(matrix.suite, 'helm') || startsWith(matrix.suite, 'collector-') }}"
+      # ADR-246: collector suites load BPF programs into the runner's kernel.
+      # This fresh, disposable VM is the only place that creates the guard
+      # file without which the harness and the collector refuse to start.
+      - if: startsWith(matrix.suite, 'collector-')
+        name: Disposable-host guard
+        run: sudo touch /etc/asservat-disposable-host
       - name: Run ${{ matrix.suite }}
         env:
           SUITE: ${{ matrix.suite }}

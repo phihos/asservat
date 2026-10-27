@@ -135,8 +135,8 @@ applications:
   components:
   - C-22
 - id: A-GADGET
-  entrypoint: pinned-gadget
-  deployment: DaemonSet
+  entrypoint: asservat node (linked library)
+  deployment: embedded
   location: node
   privilege: privileged
   components: []
@@ -789,7 +789,7 @@ interfaces:
   name: Gadget observation
   caller: A-NODE
   provider: A-GADGET
-  transport: qualified-node-local
+  transport: in-process
   spec: docs/architecture/interfaces.md
 - id: I-05
   name: Artifact commit

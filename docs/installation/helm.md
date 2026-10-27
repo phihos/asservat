@@ -283,6 +283,27 @@ offer. The hub operator can pin the federation's node port with
 bootstrap expires before the connector enrolls, issue a new one, delete the
 connector namespace and install again.
 
+## Node collector (test hosts only)
+
+[ADR-246](../decisions/246-node-collector-role.md) adds the `collector` values (S-04 increment 3).
+They are off by default and are for the disposable S-04 test environment only:
+
+- `collector.namespace` (default `asservat-collector`) is created with
+  `pod-security.kubernetes.io/enforce|audit|warn: privileged`. It must differ from the release,
+  connector, `default` and `kube-*` namespaces. Workload namespaces are not touched.
+- The DaemonSet runs `/asservat node` from the exact `collector.image` digest (built with the
+  `gadget` tag) as root without `privileged`, with `BPF`, `NET_ADMIN` and `SYS_RESOURCE`, host PID,
+  runtime-default seccomp/AppArmor and read-only mounts of the guard file, debugfs, tracefs and
+  bpffs. The collector account has no RBAC binding; its projected token has the audience
+  `asservat-node:<installationID>`.
+- `collector.connector` names the connector's node listener (port 8444), its certificate server
+  name and PEM roots. The installer does not yet provision that listener (open in ADR-246).
+- `collector.ceilings` are the per-node ring, frozen, upload-rate and burst ceilings; the
+  container memory limit is ring + frozen + 128 MiB.
+
+The kubelet starts a collector Pod only on a host with `/etc/asservat-disposable-host`. Never
+create that file on a workstation or shared cluster node; kind nodes share their host's kernel.
+
 ## Production packaging contract
 
 | Concern | Required behavior when runtime roles are introduced |

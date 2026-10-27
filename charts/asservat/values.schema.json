@@ -715,6 +715,107 @@
           "description": "ADR-231: optional in-cluster Alertmanager base URL that alert DebugPolicies on this cluster read (v2 API, no credentials). Regional executor only."
         }
       }
+    },
+    "collector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "namespace",
+        "image",
+        "registrySecret",
+        "installationID",
+        "clusterID",
+        "connector",
+        "ceilings"
+      ],
+      "description": "ADR-246: the asservat node collector DaemonSet (off by default; disposable-host guard).",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "namespace": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "description": "The collector namespace, the only one with the privileged Pod Security exception; never kube-*, default, the release or connector namespace."
+        },
+        "image": {
+          "type": "string",
+          "maxLength": 456,
+          "pattern": "^$|^[a-z0-9][a-z0-9./:_-]{0,383}@sha256:[a-f0-9]{64}$"
+        },
+        "registrySecret": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+        },
+        "installationID": {
+          "type": "string",
+          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "clusterID": {
+          "type": "string",
+          "pattern": "^$|^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "connector": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "endpoint",
+            "serverName",
+            "rootsPEM"
+          ],
+          "properties": {
+            "endpoint": {
+              "type": "string",
+              "maxLength": 512,
+              "pattern": "^$|^https://[^/@?#\\s]+/?$"
+            },
+            "serverName": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$"
+            },
+            "rootsPEM": {
+              "type": "string",
+              "maxLength": 65536
+            }
+          }
+        },
+        "ceilings": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ringBytes",
+            "frozenBytes",
+            "uploadBytesPerSecond",
+            "uploadBurstBytes"
+          ],
+          "properties": {
+            "ringBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967296
+            },
+            "frozenBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4294967296
+            },
+            "uploadBytesPerSecond": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10737418240
+            },
+            "uploadBurstBytes": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10737418240
+            }
+          }
+        }
+      }
     }
   }
 }
