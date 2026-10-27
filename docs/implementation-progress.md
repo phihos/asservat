@@ -40,9 +40,17 @@ published pinned Gadget, and adds no fixture grant rows. The reference provider
 uses actual fresh password LoA1, not MFA. The operator's existing reserve is sized
 for packet ciphertext while retaining four records/16 objects. Offline harness
 checks and integration compilation pass; this installed flow and its runtime
-remain **unqualified until the first disposable-runner test completes**.
+remain **unqualified until the full flow passes on a disposable runner**.
 Run 40507673537 was cancelled during setup (84 seconds) for fixture review;
-no qualification test ran in that attempt.
+no qualification test ran in that attempt. The next frozen run,
+40511222353, failed before installation in the bootstrap fixture's topology
+assertion: the harness supplied the intended two clusters but the Go focus
+selector still expected three. Sources were unchanged, cleanup was complete and
+build scratch was removed; the 9.9-second collector build verified its pinned
+blobs but supplied no runtime qualification. A privilege-free regression
+reproduces that exact count mismatch, and the consumer now selects two for the
+new focus. Existing topology/fast-fixture cases and the strict service assertion
+are retained.
 
 See [the scoped plan and complexity gate](reviews/approved-recording-workflow-2026-10-27.md).
 

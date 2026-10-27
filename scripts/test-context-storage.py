@@ -314,6 +314,13 @@ def qualify_direct_helper_issuer(env, report):
         raise RuntimeError("Selected direct helper issuer regression failed or did not execute")
 
 
+def qualification_cluster_count(default_count, installer_continuation=False):
+    """Owned topology: one hub plus one workload cluster for these focuses."""
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording"):
+        return 2
+    return default_count
+
+
 def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False, installer_continuation=False):
     if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "approved-recording":
         return "18m"
@@ -336,8 +343,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     # ADR-193 step 6: the Helm registry/chart infrastructure, another test.
     helm_bootstrap = helm_bootstrap or helm_cluster
     test_pattern, cluster_count = qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation)
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording"):
-        cluster_count = 2  # these focused journeys use one workload cluster
+    cluster_count = qualification_cluster_count(cluster_count, installer_continuation)
     helm_test = "TestHelmClusterInstallWithRealServices" if helm_cluster else "TestHelmBootstrapWithRealServices"
     if helm_cluster:
         test_pattern = "^" + helm_test + "$"

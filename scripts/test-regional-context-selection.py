@@ -21,6 +21,26 @@ class RegionalContextSelection(unittest.TestCase):
         with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "approved-recording"}):
             self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "18m")
 
+    def test_installed_focus_topology_and_flags_reach_the_go_consumer(self):
+        for focus, expected in (("approved-recording", 2), ("journey", 2), ("browser", 2),
+                                ("policy", 2), ("alert", 2), ("logresource", 2),
+                                ("restart", 2), ("upgrade", 2), ("share", 2),
+                                ("chain", 2), ("clusters", 3), ("", 3), ("unknown", 3)):
+            with self.subTest(focus=focus), patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": focus}):
+                pattern, base_count = fixture.qualification_selection(
+                    None, False, False, initial_bootstrap_chain=True,
+                    runtime_provider_pair=True, installer_continuation=True)
+                self.assertEqual(pattern, "^TestInitialBootstrapChainWithRealServices$")
+                self.assertEqual(fixture.qualification_cluster_count(base_count, True), expected)
+                self.assertEqual(fixture.qualification_cluster_count(2, False), 2)
+                env = fixture.qualification_environment(
+                    {"ASSERVAT_JOURNEY_FOCUS": focus}, Path("fixture"), Path("work"), False, False,
+                    initial_bootstrap_chain=True, runtime_provider_pair=True, installer_continuation=True)
+                self.assertEqual(env["ASSERVAT_JOURNEY_FOCUS"], focus)
+                for flag in ("ASSERVAT_INSTALLER_CONTINUATION", "ASSERVAT_INITIAL_BOOTSTRAP_CHAIN_NATIVE",
+                             "ASSERVAT_INITIAL_RUNTIME_PROVIDER_PAIR", "ASSERVAT_INITIAL_RUNTIME_BRIDGE"):
+                    self.assertEqual(env[flag], "1")
+
     def test_exact_first_continuation_and_journey_selection(self):
         for mode in ("first", "continuation", "journey"):
             self.assertEqual(
