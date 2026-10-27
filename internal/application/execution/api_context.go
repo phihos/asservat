@@ -237,7 +237,7 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	}
 	r, mayCreate, err := s.Prepare.PrepareAPIExecution(startCtx, check)
 	if err != nil {
-		return zero, executeStep{"PrepareAPIExecution", err}
+		return zero, executeStep{"PrepareAPIExecution[" + check.limit(original, s.Now()) + "]", err}
 	}
 	if !r.Valid() || r.Process != check.Process.Binding || r.ExpectationDigest != evidence.ContextExpectationDigest(w.Accepted.Expectation) {
 		return zero, executeStep{"PrepareAPIExecution", value.ErrConflict}
