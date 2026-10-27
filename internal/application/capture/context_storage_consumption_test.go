@@ -366,7 +366,7 @@ func TestContextStorageConsumptionJoinsCancellation(t *testing.T) {
 	}
 }
 
-func TestContextStorageConsumptionTimerRetainsCallerDeadline(t *testing.T) {
+func TestContextStorageConsumptionTailRetainsCallerDeadline(t *testing.T) {
 	f, facts, owner := consumptionFixture(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
@@ -383,14 +383,12 @@ func TestContextStorageConsumptionTimerRetainsCallerDeadline(t *testing.T) {
 	})
 	f.svc.Refresh = consumptionRefreshFunc(func(call context.Context, _ targets.Request) error {
 		demands++
-		if until, _ := call.Deadline(); !until.Equal(original) {
-			t.Error("demand replaced original caller deadline")
-		}
+		t.Error("tail must not demand refresh")
 		return nil
 	})
 	_, err := f.svc.consumeStorage(ctx, facts, f.intent(), owner)
-	if !errors.Is(err, context.DeadlineExceeded) || reads != 1 || demands != 1 {
-		t.Fatal("timer outlived caller and read again", err, reads, demands)
+	if !errors.Is(err, value.ErrUnavailable) || ctx.Err() != nil || reads != 1 || demands != 0 {
+		t.Fatal("tail exhausted caller or repeated readiness", err, reads, demands)
 	}
 }
 

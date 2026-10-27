@@ -59,6 +59,25 @@ or repeat an effect. Cancel and join hint work on every early return.
 No SQL schema, public response, permission, quota, demand lifetime or
 five-second authority interval changes.
 
+## Response scheduling refinement (2026-10-27)
+
+Installed run 40581901798 exhausted the original public five seconds during
+initial preview storage readiness and returned an HTTP/2 stream reset. The
+optional readiness work now ends at the earlier original authority cutoff or
+one second before the actual parent context deadline. This changes scheduling,
+not an authority interval: a fresh authoritative read remains possible under
+the original context, including short parents; thin storage after the readiness
+cutoff returns the existing retryable unavailability. No hint, demand or polling
+starts in the reserved tail. The already owned hint is joined and a final
+independent read still supplies any usable binding. The one-demand rule,
+selection pin, original observations and final checks remain.
+
+One second is a practical candidate, informed by earlier completed native
+requests with audit Finish below 100 ms and pre-service marks below 250 ms.
+The failed run's immediate failure timing does not measure its Finish duration.
+The reserve does not guarantee audit or response completion and is not yet
+installed-qualified. See [the implementation and cost record](../implementation-progress.md#storage-readiness-response-reserve-2026-10-27).
+
 ## Qualification
 
 The component regression must first reproduce the immediate margin refusal

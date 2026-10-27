@@ -2,7 +2,9 @@ package integration
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
+	"time"
 
 	"asservat.local/asservat/internal/contracts"
 )
@@ -76,5 +78,43 @@ func TestInstalledApprovedRecordingCollectorRenderStage(t *testing.T) {
 		if value("-f") != "operator-values.json" {
 			t.Fatal("render lost its exact installed endpoint/image values")
 		}
+	}
+}
+
+func TestInstalledApprovedRecordingRejectsPlanOnlyBeforeApproval(t *testing.T) {
+	now := time.Now().UTC()
+	for _, tc := range []struct {
+		name, blockers string
+		want           bool
+	}{
+		{"approval-only", `[{"code":"ApprovalRequired"}]`, true},
+		{"plan-only", `[{"code":"ApprovalRequired"},{"code":"RecorderUnavailable"}]`, false},
+		{"collection-disabled", `[{"code":"ApprovalRequired"},{"code":"CollectionDisabled"}]`, false},
+		{"missing-blocker", `[]`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := `{"preview_id":"00000000-0000-4000-8000-000000000001","expires_at":"` + now.Add(time.Minute).Format(time.RFC3339Nano) + `","approval_required":true,"capture_enabled":false,"selected_pods":[{"uid":"exact-pod","name":"api-a"}],"blockers":` + tc.blockers + `}`
+			var p installedApprovedRecordingPreview
+			if json.Unmarshal([]byte(raw), &p) != nil || p.readyForApproval(now) != tc.want {
+				t.Fatal("unrecordable preview passed the initial approval guard", tc.name)
+			}
+		})
+	}
+}
+
+func TestInstalledApprovedRecordingRetriesOnlyTypedTransientReads(t *testing.T) {
+	for _, tc := range []struct {
+		code        string
+		retry, want bool
+	}{
+		{"NotAvailable", true, true}, {"NotAvailable", false, false}, {"RecorderUnavailable", false, false}, {"ReviewChanged", false, false}, {"CapacityUnavailable", true, false}, {"ApprovalRequired", false, false},
+	} {
+		t.Run(tc.code+fmt.Sprint(tc.retry), func(t *testing.T) {
+			raw, _ := json.Marshal(map[string]any{"code": tc.code, "retryable": tc.retry})
+			reply := installedJourneyEnvelope{Status: "error", Data: raw}
+			if installedApprovedRecordingCanRetry(reply, tc.code) != tc.want {
+				t.Fatal("unexpected read retry", tc.code)
+			}
+		})
 	}
 }

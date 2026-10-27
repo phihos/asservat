@@ -94,18 +94,38 @@ each response window retain their separate three one-use unwrap slots.
 
 ## Phase budget for the disposable runner
 
-Once the current installation/approval/history setup qualifies, reuse it rather
-than installing another graph. Reserve twenty seconds for one additional capture:
-its reviewed window is ten seconds, action timeout twenty seconds, and bounded
-traffic phase 8.5 seconds. Preparation keeps its existing fixed deadlines, with a fixture wait
-a 60-second polling cutoff for its acknowledged continuation; an already-started call retains its original 45-second call bound and the whole test retains its 18-minute bound. This is not a hard 60-second effect deadline; no uncertain POST replay.
-Allow 60 seconds total for an unpaced control, paced whole, two resume ranges and
-stale If-Range, each under its original request/session/operation bounds. The
-expected near-full paced body is about 6.4 seconds at 1.25 MiB/s, not a new
-server deadline. Reserve another 60 seconds for joined cleanup and phase
-snapshots. Total extra phase allowance is three minutes twenty seconds after the
-installation/approval journey, with root selecting the complete runner budget.
-No installed run has consumed this budget yet.
+The qualified PR100 baseline is Native run 40586980099; its source tree matches
+canonical main `eed8594020645fe6d10f8c6565e69a6235c7507d`.
+The whole job took 964s, the Go package 620.173s and the approved-recording subtest
+155.60s. It passed actual independent approval, a real preview-expiry wait and
+native PCAPNG validation of a 2,360-byte recording; it did not run pacing, a
+near-full recording or history. All 3,201 source hashes matched the frozen
+source and cleanup failures were empty. The environment report SHA-256 is
+`d86eef8c74434bdb9240530927c3dd0edbbe6d1defb333ce432ff245843063da`.
+
+Reuse that installation and approval flow. In `continuation-native-paced` the
+reviewed ten-second recording replaces the ordinary two-second recording; it
+is not another approval flow or an additive history run. Allow 20s for the
+recording/traffic phase (reviewed ten-second window, action timeout 20s, finite
+traffic 8.5s), 60s for preparation work, 60s for control/paced/range/stale-If-Range
+bodies and the matched idle baseline, and 60s for joined cleanup and measurement
+snapshots. This 200s allowance is a planning estimate, not measured added runtime
+or a per-phase product deadline. Four sessions retain their own preparation
+bounds: each existing 60s polling cutoff can have one already-started 45s call,
+so the allowance is not a worst-case guarantee. No uncertain POST is replayed.
+
+The immutable 20-minute job cap leaves 236s above the observed 964s baseline;
+adding the proposed 200s gives 1,164s and only 36s margin. The immutable 18-minute Go
+cap leaves 459.827s above 620.173s; the same projection gives 820.173s and 259.827s
+margin. Setup variance and aggregate measurement cost are unqualified, so the
+narrow job margin must be reported, not treated as proof that the run will fit.
+The first guarded paced run must retain both caps and produce a terminal test
+result and clean cleanup; timeout/cancellation is not a pass. No phase, request,
+operation, evidence or session deadline is increased to fit this experiment.
+
+The nominal near-full paced body remains about 6.4s at 1.25MiB/s. Neither that
+arithmetic nor the successful small baseline establishes an installed slow-link
+throughput, aggregate-cost result or actual two-version/drained-rollout proof.
 
 ## Count the complete workflow
 

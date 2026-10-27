@@ -99,7 +99,11 @@ collector records nothing. No packet evidence can be captured, stored, published
    status (capability, retention of the `packetCapture` evidence type, storage binding,
    processing coverage) and its plan (`recorder-preview/v1`) carries `acceptance: nodeRecorder`
    instead of `recorderUnavailable` (the value enters the execution digest). Every other plan
-   keeps the ADR-243 blocker. `request_capture` checks the node again, recompiles the reviewed
+   keeps the ADR-243 blocker only for a missing recorder adapter, an unsupported
+   composition or a confirmed unavailable/no-node/unsupported answer. Operational
+   read, transport, cancellation and changed-observation errors instead return the
+   existing preview unavailability before compilation or storing a reviewed scope;
+   they never manufacture a plan-only approval. `request_capture` checks the node again, recompiles the reviewed
    plan from the frozen composition and programs (no compiler is consulted after preview) and
    admits it with expectation native type `pcapng`, the generated action ID, native limit 8 MiB
    and the accepted recording (program, duration, cap); it refuses a request whose recording

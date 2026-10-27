@@ -112,6 +112,20 @@ refreshed binding, while every retained non-storage fact remains current.
 It may use the sole demand attempt only if the hint has not already spent it.
 An early successful hint cannot satisfy the final margin check.
 
+Readiness scheduling stops at the earlier original authority cutoff or one
+second before the actual parent context deadline. That reserve uses the real
+context clock, independently of the injected authority clock. It applies only
+to the optional hint, demand and polling; it does not shorten any returned
+identity or observation, extend authority, or change the public request deadline.
+A call already in that final second skips the hint. Consumption still gets one
+fresh authoritative read under its unchanged original authority context, even
+for a parent shorter than one second. A sufficiently fresh result can succeed;
+a thin result returns the existing retryable unavailability without demand or
+polling. Ending a wait permits one final authoritative read, with the same
+selection and original fact checks. Audit completion, final identity checks and
+response delivery retain the parent context. The reserve gives those steps an
+opportunity to finish; slow reads or audit can still exhaust the request.
+
 Request pins the preview's exact storage selection; Preview and
 CheckDiagnostic pin their first valid authoritative selection. Read errors,
 invalid/expired bindings, changed selections and cancellation refuse
@@ -200,6 +214,15 @@ recovery check. Unsupported composition types still refuse before that query.
 The connector rechecks the Pod's node and collector before enqueueing. Preview
 selection and its plan-only behavior remain unchanged. See the
 [target composition](workload-target-resolution.md#independent-pins-and-deadlines).
+
+Recorder composition previews preserve plan-only blockers for known unsupported
+inputs, no adapter, or a confirmed unavailable/unsupported recorder answer. An
+operational recorder read/transport/cancellation failure returns the existing
+retryable `NotAvailable` result before compilation or preview persistence. The
+installed approved-recording journey requires exactly the `ApprovalRequired`
+blocker before it requests approval, matching the console's requestability gate;
+its existing four reads retry only typed retryable unavailability. Availability
+never upgrades an already stored or approved plan; its original scope stays fixed.
 
 The existing protected approval-settings reader is consulted once per recorder
 submission. A changed administrator approval requirement invalidates the review
