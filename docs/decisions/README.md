@@ -18,6 +18,13 @@ review mints one persistent assignment per source and principal (the capturing p
 audience) and a per-Pod decision of at most `maxDecisionAgeSeconds`; a refusal or SAR outage ends it
 at once; explicit denies still win; reads repeat the recorded review. Migration 00096.
 
+[ADR-251 — Background refresh of the regional connector process proof](251-connector-proof-background-refresh.md)
+keeps a fresh connector process proof ready: while requests read the cache, one background rebuild
+per connector runs the ordinary complete production once the freshest proof has less than 3 s of
+its five seconds left. Each proof keeps its own bounds, requests use the freshest valid one with
+their current recheck and never wait on a rebuild while a valid proof exists. Removes ADR-250's
+remaining short-proof answers (`target@<1s` headroom refusals).
+
 [ADR-250 — Standby residency for regional work and unstarted acquisition](250-standby-residency-and-unstarted-acquisition.md)
 fixes intermittent installed `OutcomeUnknown` starts: the hub router attached regional work to the
 oldest standby exchange, whose 30-second residency cut the region's observations and stream

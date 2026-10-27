@@ -243,6 +243,11 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	if err != nil {
 		return &fixedStepError{"execution-process", err}
 	}
+	// ADR-251: keep a successor proof ready off the request path; joined on return.
+	refresh, stopRefresh := context.WithCancel(ctx)
+	refreshed := make(chan struct{})
+	go func() { defer close(refreshed); protected.RefreshProofs(refresh) }()
+	defer func() { stopRefresh(); <-refreshed }()
 	preparer, err := kube.NewConnectorAPIStartPreparer(process, r.capacity)
 	if err != nil {
 		return &fixedStepError{"start-preparer", err}

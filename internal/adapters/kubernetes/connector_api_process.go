@@ -475,6 +475,8 @@ func (p *ConnectorAPIExecutionProcess) readAPIProcess(ctx context.Context) (valu
 	if call.Err() != nil || p.parent.Err() != nil || !out.Valid(p.guard.attester.client.now()) {
 		return zero, mtls.ConnectorProcessObservation{}, value.ErrUnavailable
 	}
+	// ADR-251: a request still reads the cache, so keep a successor ready.
+	p.guard.reuse.demand()
 	owned := proof.owned
 	owned.Request.ClientCSRDER = bytes.Clone(owned.Request.ClientCSRDER)
 	owned.Request.ServerCSRDER = bytes.Clone(owned.Request.ServerCSRDER)

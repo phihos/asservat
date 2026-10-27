@@ -39,15 +39,128 @@ type connectorAPIProofState struct {
 	generation uint64
 	cached     *connectorAPIProof
 	flight     *connectorAPIProofFlight
+	// ADR-251: the one background rebuild, separate from request flights so a
+	// request holding a valid cached proof never waits on it. demanded records
+	// a request read since that rebuild began; wake nudges the refresh loop.
+	refresh       *connectorAPIProofFlight
+	refreshCancel context.CancelFunc
+	demanded      bool
+	wake          chan struct{}
 }
+
+// ADR-251 constants. A proof lasts at most five seconds from its start and a
+// rebuild takes about one to two, so a successor started with three seconds
+// left arrives while its predecessor still has one to two.
+const (
+	connectorAPIProofRefreshBelow = 3 * time.Second
+	connectorAPIProofRefreshLimit = 5 * time.Second
+)
 
 // Invalidation cannot be undone by an already running producer. Every failed
 // current read uses this boundary, including an independently observed change.
+// It also cancels a background rebuild, whose result could not enter anyway.
 func (s *connectorAPIProofState) invalidate() {
 	s.mu.Lock()
+	s.invalidateLocked()
+	s.mu.Unlock()
+}
+func (s *connectorAPIProofState) invalidateLocked() {
 	s.generation++
 	s.cached = nil
+	if s.refreshCancel != nil {
+		s.refreshCancel()
+	}
+}
+
+// demand records a request's use of the cache: the refresh loop rebuilds a
+// successor only for a proof that requests are still reading.
+func (s *connectorAPIProofState) demand() {
+	s.mu.Lock()
+	s.demanded = true
+	wake := s.wakeLocked()
 	s.mu.Unlock()
+	select {
+	case wake <- struct{}{}:
+	default:
+	}
+}
+func (s *connectorAPIProofState) wakeLocked() chan struct{} {
+	if s.wake == nil {
+		s.wake = make(chan struct{}, 1)
+	}
+	return s.wake
+}
+
+// refreshLoop keeps a fresh proof ready off the request path until ctx ends.
+// One rebuild runs at a time, in this goroutine, only while the freshest
+// cached proof has been read since the previous rebuild began and has less
+// than below left. A rebuilt proof keeps its own original start and end; it
+// never changes the proof it succeeds, which stays usable until its own end.
+// Requests wait for a rebuild only when no valid proof is cached.
+func (s *connectorAPIProofState) refreshLoop(ctx context.Context, now func() time.Time, below time.Duration, produce func(context.Context) (connectorAPIProof, error)) {
+	s.mu.Lock()
+	wake := s.wakeLocked()
+	s.mu.Unlock()
+	timer := time.NewTimer(time.Hour)
+	defer timer.Stop()
+	for ctx.Err() == nil {
+		s.mu.Lock()
+		due, idle := time.Duration(0), true
+		if c := s.cached; c != nil && s.demanded && s.refresh == nil && c.valid(now()) {
+			due, idle = c.validUntil.Sub(now())-below, false
+		}
+		s.mu.Unlock()
+		if idle || due > 0 {
+			if !idle {
+				timer.Reset(due)
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-wake:
+			case <-timer.C:
+			}
+			timer.Stop()
+			continue
+		}
+		s.rebuild(ctx, now, below, produce)
+	}
+}
+
+func (s *connectorAPIProofState) rebuild(ctx context.Context, now func() time.Time, below time.Duration, produce func(context.Context) (connectorAPIProof, error)) {
+	s.mu.Lock()
+	c := s.cached
+	if c == nil || !s.demanded || s.refresh != nil || !c.valid(now()) || c.validUntil.Sub(now()) > below {
+		s.mu.Unlock()
+		return
+	}
+	call, cancel := context.WithTimeout(ctx, connectorAPIProofRefreshLimit)
+	defer cancel()
+	f := &connectorAPIProofFlight{done: make(chan struct{}), generation: s.generation}
+	s.refresh, s.refreshCancel, s.demanded = f, cancel, false
+	s.mu.Unlock()
+	p, err := produce(call)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err != nil || call.Err() != nil || s.generation != f.generation || !p.valid(now()) {
+		// The same boundary as a request's own failed production: an error
+		// may be a change, so no earlier proof stays usable.
+		if s.generation == f.generation {
+			s.invalidateLocked()
+		}
+		f.err = cfg.ErrUnavailable
+		if err != nil {
+			f.err = errors.Join(cfg.ErrUnavailable, err)
+		}
+	} else {
+		f.result = p
+		if s.cached == nil || p.validUntil.After(s.cached.validUntil) {
+			copy := p
+			s.cached = &copy
+		}
+	}
+	s.refresh, s.refreshCancel = nil, nil
+	close(f.done)
 }
 func (s *connectorAPIProofState) finish(ctx context.Context, now func() time.Time, f *connectorAPIProofFlight) (connectorAPIProof, error) {
 	s.mu.Lock()
@@ -71,7 +184,8 @@ func (s *connectorAPIProofState) finish(ctx context.Context, now func() time.Tim
 
 // The initiating caller owns producer/recheck execution synchronously. Waiters
 // may cancel independently, but can neither detach a producer nor prolong its
-// original interval. No goroutine, timer or refresh survives this call.
+// original interval. No goroutine or timer survives this call; the separate
+// ADR-251 refresh loop is the only background producer.
 func (s *connectorAPIProofState) read(ctx context.Context, now func() time.Time, produce func(context.Context) (connectorAPIProof, error), recheck func(context.Context, connectorAPIProof) (connectorAPIProof, error)) (connectorAPIProof, error) {
 	if ctx == nil || ctx.Err() != nil {
 		return connectorAPIProof{}, cfg.ErrUnavailable
@@ -86,13 +200,24 @@ func (s *connectorAPIProofState) read(ctx context.Context, now func() time.Time,
 			return s.finish(ctx, now, f)
 		}
 	}
-	f := &connectorAPIProofFlight{done: make(chan struct{}), generation: s.generation}
-	s.flight = f
 	old := s.cached
 	if old != nil && !old.valid(now()) {
 		s.cached = nil
 		old = nil
 	}
+	// Without a valid cached proof, join a current background rebuild rather
+	// than start a second production.
+	if f := s.refresh; old == nil && f != nil && f.generation == s.generation {
+		s.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			return connectorAPIProof{}, cfg.ErrUnavailable
+		case <-f.done:
+			return s.finish(ctx, now, f)
+		}
+	}
+	f := &connectorAPIProofFlight{done: make(chan struct{}), generation: s.generation}
+	s.flight = f
 	s.mu.Unlock()
 	var p connectorAPIProof
 	var err error
@@ -110,8 +235,7 @@ func (s *connectorAPIProofState) read(ctx context.Context, now func() time.Time,
 	}
 	s.mu.Lock()
 	if err != nil || ctx.Err() != nil || s.generation != f.generation || !p.valid(now()) {
-		s.generation++
-		s.cached = nil
+		s.invalidateLocked()
 		// Still unavailable to every caller; the producer's fixed check stays
 		// attached for the process's diagnostic line.
 		f.err = cfg.ErrUnavailable
@@ -119,8 +243,12 @@ func (s *connectorAPIProofState) read(ctx context.Context, now func() time.Time,
 			f.err = errors.Join(cfg.ErrUnavailable, err)
 		}
 	} else {
-		copy := p
-		s.cached = &copy
+		// A background rebuild may have cached a fresher proof meanwhile; a
+		// recheck of the older one then narrows only this caller's copy.
+		if c := s.cached; c == nil || c.observedAt.Equal(p.observedAt) || p.validUntil.After(c.validUntil) {
+			copy := p
+			s.cached = &copy
+		}
 		f.result = p
 	}
 	s.flight = nil
@@ -133,6 +261,16 @@ func (g *ConnectorAPIExecutionProtection) current(ctx context.Context) (connecto
 		return connectorAPIProof{}, cfg.ErrUnavailable
 	}
 	return g.reuse.read(ctx, g.attester.client.now, g.produceProof, g.recheckProof)
+}
+
+// RefreshProofs runs the ADR-251 background rebuild until ctx ends; the caller
+// joins it on shutdown. It adds no authority: each rebuilt proof is a complete
+// ordinary production, and every reuse still performs its current recheck.
+func (g *ConnectorAPIExecutionProtection) RefreshProofs(ctx context.Context) {
+	if g == nil || g.attester == nil || g.attester.client == nil || ctx == nil {
+		return
+	}
+	g.reuse.refreshLoop(ctx, g.attester.client.now, connectorAPIProofRefreshBelow, g.produceProof)
 }
 
 // Reuse only the expensive independent denial/TokenReview proof, under its

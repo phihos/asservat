@@ -81,7 +81,7 @@ retry or continuation without spent work. Replacing a cached proof that had less
 (40465614024, 40465616722, 40465619449, 40465622240) then exceeded the request bound
 (`request-expired`, starts with `start-left@0`). It was reverted. A remedy needs the proof
 renewed ahead of use, outside the request, which the cache's no-background-refresh contract
-excludes today; that is a separate decision.
+excluded; [ADR-251](251-connector-proof-background-refresh.md) adds that background refresh.
 
 ## Qualification
 
