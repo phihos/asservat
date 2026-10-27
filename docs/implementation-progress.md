@@ -71,6 +71,12 @@ full pre-push passes, including 218 console tests. A fresh installed result is
 still required; the public operation and every capacity proof keep their
 original bounds.
 
+Review follow-up preserves the closed `denied` cause for private owner-lookup
+diagnostics while dropping provider text. An actual TLS peer-binding denial
+regression failed before the correction and passes afterward; the production
+capacity adapter still returns only generic unavailability. Combined
+holder/local/adapter race tests pass (2.927s), with no new I/O or authority.
+
 ## Approved packet request: local target composition correction (2026-10-27)
 
 Native run 40557482326 on 23bf0042 failed before admission with
