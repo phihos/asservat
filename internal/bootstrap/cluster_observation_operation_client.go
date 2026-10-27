@@ -141,7 +141,8 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 		}
 	}()
 	// Fixed step labels name the failing stage for the operator diagnostic
-	// (ADR-197); every cause stays value.ErrUnavailable to callers.
+	// (ADR-197). Only closed unavailable/denied causes survive here; the
+	// capacity adapter converts either to its generic unavailable public port.
 	mark := time.Now()
 	candidates, err := c.candidates.ReadOwnerObservationCandidates(call)
 	auditapp.MarkStep(ctx, "o-candidates", mark)
@@ -290,7 +291,7 @@ func (c *DirectHolderObservationClient) locate(ctx context.Context, q value.Clus
 		// concurrent failure ordering cannot change the diagnostic. This does
 		// not select another candidate or interrupt a pending positive.
 		var step, previous *fixedStepError
-		if errors.As(v.err, &step) && (!errors.As(result.err, &previous) || step.step < previous.step) {
+		if errors.As(v.err, &step) && (!errors.As(result.err, &previous) || step.step < previous.step || step.step == previous.step && errors.Is(step, value.ErrDenied)) {
 			result.err = step
 		}
 		return false
@@ -394,12 +395,16 @@ func (c *DirectHolderObservationClient) current(ctx context.Context, connection 
 }
 func (c *DirectHolderObservationClient) lookup(root, search context.Context, q value.ClusterObservationLocatorQuery, candidates value.APIContextOwnerCandidates, g value.OwnerObservationCandidateGroup, address string) (located *ownerLocalLocated, absent bool, failure error) {
 	// Never retain provider text, tokens, object identities or nested remote
-	// errors. Only this local stage reaches the existing capacity diagnostic;
-	// the public error class remains unavailable.
+	// errors. Only this local stage and a closed denied/unavailable cause reach
+	// the existing private diagnostic; the capacity port stays unavailable.
 	stage := "open"
 	defer func() {
 		if failure != nil {
-			failure = &fixedStepError{stage, value.ErrUnavailable}
+			cause := value.ErrUnavailable
+			if errors.Is(failure, value.ErrDenied) {
+				cause = value.ErrDenied
+			}
+			failure = &fixedStepError{stage, cause}
 		}
 	}()
 	name, err := mtls.OwnerBootstrapServerName(c.pin.Pool)

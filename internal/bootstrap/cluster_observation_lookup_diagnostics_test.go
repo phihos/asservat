@@ -9,9 +9,39 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/mounts"
 	app "asservat.local/asservat/internal/application/fleet"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 )
+
+func TestDirectHolderPeerDenialStaysPrivateToCapacityAdapter(t *testing.T) {
+	// The actual TLS peer's process epoch is excluded from the otherwise
+	// current candidate set. No synthetic provider error supplies the denial.
+	c, f, inputs, native, registry := directHolderFixture(t, "excluded-leaf")
+	ctx, cancel := context.WithTimeout(f.base.root, 5*time.Second)
+	defer cancel()
+	r := f.base.request()
+	_, private := c.ObserveCluster(ctx, r)
+	if got := regionalOutcome(private); got != "locate/peer (denied)" || !errors.Is(private, value.ErrDenied) || errors.Is(private, errHolderNoStandby) {
+		t.Fatal("peer binding denial lost its closed diagnostic", got)
+	}
+	if ctx.Err() != nil || inputs.tokens.Load() != 0 || native.opens.Load() != 0 || registry.reads.Load() != 0 || f.get.Load() != 0 || f.post.Load() != 0 || len(c.sockets) != 0 {
+		t.Fatal("denied peer advanced beyond binding verification or leaked socket")
+	}
+	// Exercise the production capacity-port conversion with that actual error:
+	// its private diagnostic cause is never public capacity authority/output.
+	read, err := newCapacityRemoteObservation(capacityRegionExchange(func(context.Context, value.ClusterObservationRequest) (value.ClusterObservationResult, error) {
+		return value.ClusterObservationResult{}, private
+	}), r.RootID, r.ClusterID, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = read.ReadCapacityGuardedWorkload(ctx, cfg.NamespaceRef{Name: "app", UID: "namespace"}, cfg.WorkloadRef{Kind: "Deployment", Name: "app", UID: "workload"}, []string{"team"})
+	if err != mounts.ErrUnavailable || errors.Is(err, value.ErrDenied) || regionalOutcome(err) != "unavailable" {
+		t.Fatal("private denial escaped capacity-port conversion", err)
+	}
+}
 
 type lookupDiagnosticNative struct {
 	fail func(context.Context) error
