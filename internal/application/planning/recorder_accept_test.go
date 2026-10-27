@@ -130,3 +130,46 @@ func TestRecorderApprovalSurvivesAcceptance(t *testing.T) {
 		t.Fatal("raw byte predicate recordable", err)
 	}
 }
+
+// ADR-252: an approved plan's digest binds its finite action duration and
+// exact target, while admission fixes a separate execution deadline.
+func TestApprovedRecorderPlanSeparatesPreviewFromExecutionDeadline(t *testing.T) {
+	in, now := recorderInput(t, network(text("sample", "packetAfter", "15s"), text("sample", "actionTimeout", "20s")), "packetCapture")
+	in.NodeRecorder, in.RequireApproval = true, true
+	in.Target.ExecutionClass, in.Target.NodeUID, in.Target.NodeBootID, in.Target.Pin.NodeName = artifact.ContextAPIExecution, "", "", ""
+	reviewed, err := CompileRecorder(in, nil, now)
+	if err != nil || !RecorderApprovedAcceptance(reviewed.CanonicalScope) {
+		t.Fatal("unmarked approval plan", err)
+	}
+	later := now.Add(10 * time.Minute)
+	in.Deadline = later.Add(4 * time.Minute)
+	in.Target.ObservedAt, in.Target.FreshUntil = later, later.Add(5*time.Second)
+	in.Retention.ValidUntil = later.Add(5 * time.Second)
+	// Retention is relative in the review; current policy/proof is separately read.
+	in.Retention.AnchorAt = later
+	in.Retention.ExpiresAt = later.Add(time.Duration(min(in.Retention.RequestedSeconds, in.Retention.MaximumSeconds-in.Retention.DeletionBudgetSeconds)) * time.Second)
+	in.Retention.DeleteBy = in.Retention.ExpiresAt.Add(time.Duration(in.Retention.DeletionBudgetSeconds) * time.Second)
+	ctxIn, _ := contextInput(t)
+	ctxIn.CaptureID, ctxIn.CaseID, ctxIn.Executor, ctxIn.Deadline, ctxIn.Target, ctxIn.Retention = in.CaptureID, "", in.Executor, in.Deadline, in.Target, in.Retention
+	ctxIn.Capability.ExecutionClass = artifact.ContextAPIExecution
+	ctxIn.Capability.ObservedAt, ctxIn.Capability.FreshUntil = later, later.Add(5*time.Second)
+	ctxIn.Recorder, err = RecorderContextFromScope(in.Composition, reviewed.CanonicalScope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	accepted, err := CompileContext(ctxIn, later)
+	if err != nil || accepted.ScopeDigest != reviewed.ScopeDigest || !bytes.Equal(accepted.CanonicalScope, reviewed.CanonicalScope) || !VerifyContextPlan(accepted, later) {
+		t.Fatal("approved plan did not survive review wait", err)
+	}
+	if !accepted.Input.Recorder.RequireApproval {
+		t.Fatal("clone lost the approval requirement")
+	}
+	scope, err := ReadContextScopeIdentity(accepted.CanonicalScope, accepted.ScopeDigest)
+	if err != nil || !scope.ApprovedAcceptance || !scope.Deadline.IsZero() {
+		t.Fatal("scope timing", err)
+	}
+	ctxIn.Target.Request.PodUID = "replacement"
+	if changed, err := CompileContext(ctxIn, later); err == nil && changed.ScopeDigest == reviewed.ScopeDigest {
+		t.Fatal("a replacement Pod inherited approval")
+	}
+}

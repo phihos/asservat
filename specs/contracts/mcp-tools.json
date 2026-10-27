@@ -3492,10 +3492,6 @@
                         "type": "string",
                         "format": "date-time"
                       },
-                      "plan_deadline": {
-                        "type": "string",
-                        "format": "date-time"
-                      },
                       "lifetime_seconds": {
                         "type": "integer",
                         "minimum": 60,
@@ -3800,6 +3796,23 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 1099511627776
+                      },
+                      "preview_deadline": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans."
+                      },
+                      "capture_deadline_rule": {
+                        "enum": [
+                          "previewDeadline",
+                          "acceptanceWithinGrant"
+                        ],
+                        "description": "Whether the frozen plan uses its preview deadline, or fixes one capture window at acceptance under the original approval expiry."
+                      },
+                      "capture_window_seconds": {
+                        "type": "integer",
+                        "const": 300,
+                        "description": "Maximum window fixed once at acceptance, never beyond original approval expiry."
                       }
                     },
                     "required": [
@@ -3817,12 +3830,36 @@
                       "requested_by",
                       "requested_at",
                       "review_until",
-                      "plan_deadline",
+                      "preview_deadline",
                       "lifetime_seconds",
                       "can_decide",
                       "can_revoke",
                       "approval_navigation_uri",
-                      "actions"
+                      "actions",
+                      "capture_deadline_rule"
+                    ],
+                    "allOf": [
+                      {
+                        "if": {
+                          "properties": {
+                            "capture_deadline_rule": {
+                              "const": "acceptanceWithinGrant"
+                            }
+                          }
+                        },
+                        "then": {
+                          "required": [
+                            "capture_window_seconds"
+                          ]
+                        },
+                        "else": {
+                          "not": {
+                            "required": [
+                              "capture_window_seconds"
+                            ]
+                          }
+                        }
+                      }
                     ]
                   }
                 },
@@ -4154,10 +4191,6 @@
                               "type": "string",
                               "format": "date-time"
                             },
-                            "plan_deadline": {
-                              "type": "string",
-                              "format": "date-time"
-                            },
                             "lifetime_seconds": {
                               "type": "integer",
                               "minimum": 60,
@@ -4279,6 +4312,23 @@
                               "type": "string",
                               "format": "uri",
                               "maxLength": 2048
+                            },
+                            "preview_deadline": {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans."
+                            },
+                            "capture_deadline_rule": {
+                              "enum": [
+                                "previewDeadline",
+                                "acceptanceWithinGrant"
+                              ],
+                              "description": "Whether the frozen plan uses its preview deadline, or fixes one capture window at acceptance under the original approval expiry."
+                            },
+                            "capture_window_seconds": {
+                              "type": "integer",
+                              "const": 300,
+                              "description": "Maximum window fixed once at acceptance, never beyond original approval expiry."
                             }
                           },
                           "required": [
@@ -4296,11 +4346,35 @@
                             "requested_by",
                             "requested_at",
                             "review_until",
-                            "plan_deadline",
+                            "preview_deadline",
                             "lifetime_seconds",
                             "can_decide",
                             "can_revoke",
-                            "approval_navigation_uri"
+                            "approval_navigation_uri",
+                            "capture_deadline_rule"
+                          ],
+                          "allOf": [
+                            {
+                              "if": {
+                                "properties": {
+                                  "capture_deadline_rule": {
+                                    "const": "acceptanceWithinGrant"
+                                  }
+                                }
+                              },
+                              "then": {
+                                "required": [
+                                  "capture_window_seconds"
+                                ]
+                              },
+                              "else": {
+                                "not": {
+                                  "required": [
+                                    "capture_window_seconds"
+                                  ]
+                                }
+                              }
+                            }
                           ]
                         }
                       }
@@ -7642,7 +7716,7 @@
     },
     {
       "name": "preview_capture",
-      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human’s selected result inspection/download; never an issued grant.",
+      "description": "Validate and resolve a pod capture without arming sensors, reserving execution authority or reading application evidence. A preview is not permission. Alternatively restore an authorized immutable history_capture_id into a fresh preview, with current checks and no acquisition. A recording-save history entry returns RecordingSelectionRequired; use fresh list_recordings and preview_recording_save instead of compiling a recipe. Optional result_access requests one bounded review of collection and the same human\u2019s selected result inspection/download; never an issued grant.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -11858,7 +11932,7 @@
     },
     {
       "name": "cancel_artifact_download",
-      "description": "Stop this caller and client’s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
+      "description": "Stop this caller and client\u2019s existing download using one stable idempotency key. Stop remains available after evidence-read rights disappear. A minimal receipt reveals no artifact or finer terminal state; local copies already received cannot be recalled. Retry uncertain replies with the original key. Status and cancellation do not delete source evidence.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,

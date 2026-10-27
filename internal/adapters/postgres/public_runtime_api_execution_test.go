@@ -14,6 +14,7 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		t.Fatal("missing consolidated execution credential")
 	}
 	want := []publicRuntimeGrant{
+		{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"},
 		{"schema", "public", "", "USAGE"},
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},
@@ -74,7 +75,7 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 		}
 	}
 	for _, grant := range got {
-		if grant.privilege == "DELETE" || grant.kind == "function" || grant.object == "custody_copy" || grant.object == "context_catalog" || strings.HasPrefix(grant.object, "download_") {
+		if grant.privilege == "DELETE" || grant.kind == "function" && grant.object != "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)" || grant.object == "custody_copy" || grant.object == "context_catalog" || strings.HasPrefix(grant.object, "download_") {
 			t.Fatal("execution gained excluded deletion, publication, evidence-copy or download privilege", grant)
 		}
 	}

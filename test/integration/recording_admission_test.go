@@ -121,6 +121,7 @@ func syntheticRecording(t *testing.T, started time.Time) []byte {
 // read of the exact bytes.
 func qualifyRecordingTransactions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T) captureAdmissionScenario) {
 	t.Helper()
+	qualifyApprovedRecording(t, ctx, admin, poolFor, create)
 	t.Run("recording-admission-collect-publish-native-read", func(t *testing.T) {
 		s := create(t)
 		if s.a.Registration.NativeLimit != artifact.RecordingNativeLimit {

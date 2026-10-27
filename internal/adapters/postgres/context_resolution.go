@@ -64,7 +64,7 @@ func requestRecordScope(row custodydb.ContextCapture) (planning.ContextScopeIden
 	}
 	e := a.Expectation
 	target := authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}
-	if s.CaptureID != a.CaptureID || s.Target != target || s.ExecutionClass != e.ExecutionClass || !s.Deadline.Equal(a.Deadline) {
+	if s.CaptureID != a.CaptureID || s.Target != target || s.ExecutionClass != e.ExecutionClass || !(s.ApprovedAcceptance && e.Recording != nil && e.Recording.RequireApproval || s.Deadline.Equal(a.Deadline)) {
 		return planning.ContextScopeIdentity{}, value.ErrUnavailable
 	}
 	return s, nil

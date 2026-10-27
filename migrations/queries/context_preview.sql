@@ -7,7 +7,7 @@ SELECT * FROM context_preview WHERE root_id=$1 AND id=$2 AND actor_key=$3;
 
 -- name: CountContextPreviews :one
 SELECT count(*) FROM (
- SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND p.deadline>clock_timestamp()
+ SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND context_preview_read_until(p.root_id,p.id)>clock_timestamp()
  UNION ALL
  SELECT f.preview_id FROM context_preview_fence AS f WHERE f.root_id=$1 AND f.expires_at>clock_timestamp()
  LIMIT 1000
@@ -15,7 +15,7 @@ SELECT count(*) FROM (
 
 -- name: CountPrincipalContextPreviews :one
 SELECT count(*) FROM (
- SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND p.principal_key=$2 AND p.deadline>clock_timestamp()
+ SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND p.principal_key=$2 AND context_preview_read_until(p.root_id,p.id)>clock_timestamp()
  UNION ALL
  SELECT f.preview_id FROM context_preview_fence AS f WHERE f.root_id=$1 AND f.principal_key=$2 AND f.expires_at>clock_timestamp()
  LIMIT 10
@@ -23,7 +23,7 @@ SELECT count(*) FROM (
 
 -- name: DeleteExpiredContextPreviews :execrows
 DELETE FROM context_preview WHERE id IN (
- SELECT expired.id FROM context_preview AS expired WHERE expired.root_id=$1 AND expired.deadline<=clock_timestamp()
+ SELECT expired.id FROM context_preview AS expired WHERE expired.root_id=$1 AND context_preview_read_until(expired.root_id,expired.id)<=clock_timestamp()
  ORDER BY expired.deadline,expired.id LIMIT 1000
 );
 
@@ -46,3 +46,9 @@ DELETE FROM context_preview_fence WHERE (root_id,preview_id,actor_key) IN (
 
 -- name: DemandCapacityRefresh :exec
 SELECT demand_capacity_refresh(sqlc.arg(root_id)::uuid,sqlc.arg(cluster_id)::uuid,sqlc.arg(namespace_uid)::text,sqlc.arg(namespace_name)::text,sqlc.arg(workload_kind)::text,sqlc.arg(workload_name)::text,sqlc.arg(workload_uid)::text);
+
+-- name: ContextPreviewReadUntil :one
+SELECT context_preview_read_until(sqlc.arg(root_id)::uuid,sqlc.arg(preview_id)::uuid)::timestamptz;
+
+-- name: LockApprovedContextGrant :one
+SELECT lock_approved_context_grant(sqlc.arg(root_id)::uuid,sqlc.arg(preview_id)::uuid,sqlc.arg(capture_id)::uuid,sqlc.arg(issuer)::text,sqlc.arg(subject)::text,sqlc.arg(client_id)::text,sqlc.arg(execution_digest)::bytea)::timestamptz;

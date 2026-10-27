@@ -761,6 +761,7 @@ type recorderScope struct {
 	Filters    []compiledFilterRecord `json:"filters"`
 	Retention  []effectiveRetention   `json:"effectiveRetention"`
 	Deadline   string                 `json:"deadline"`
+	Timing     string                 `json:"timing,omitempty"`
 	Interim    string                 `json:"acceptance"`
 	Approval   *approvalRecord        `json:"approval,omitempty"`
 }
@@ -882,6 +883,11 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 	}
 	if len(approval.Reasons) > 0 {
 		scope.Approval = approval
+		// ADR-252: review expiry and execution time are independent.
+		// The marked plan binds finite action durations; admission fixes its
+		// one execution deadline under the current grant. Older plans retain
+		// their original absolute deadline and cannot gain this interpretation.
+		scope.Timing, scope.Deadline = "approvedAcceptance/v1", ""
 		out.Approval = &value.RecorderApproval{DataClass: approval.DataClass}
 		for _, r := range approval.Reasons {
 			out.Approval.Reasons = append(out.Approval.Reasons, authorization.SensitiveReason{ActionID: r.ActionID, Code: r.Code})

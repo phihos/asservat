@@ -12,7 +12,7 @@ const principal = (subject: string) => ({ issuer: 'https://identity.invalid', su
 const row = {
   grant_id: id(41), phase: 'Pending', revision: 1, kind: 'adHocCapture', capture_id: id(42), preview_id: id(43), execution_digest: 'ab'.repeat(32), review_digest: 'cd'.repeat(32),
   target: { cluster_id: id(1), namespace: 'payments', workload_kind: 'Deployment', workload_name: 'api', pod_name: 'api-a' }, data_class: 'extract',
-  reasons: [{ action_id: 'a1', code: 'rawBytePredicate' }], requested_by: principal('synthetic-developer'), requested_at: iso(-60_000), review_until: iso(3_540_000), plan_deadline: iso(240_000),
+  reasons: [{ action_id: 'a1', code: 'rawBytePredicate' }], requested_by: principal('synthetic-developer'), requested_at: iso(-60_000), review_until: iso(3_540_000), preview_deadline: iso(-240_000), capture_deadline_rule: 'acceptanceWithinGrant', capture_window_seconds: 300,
   lifetime_seconds: 3600, can_decide: true, can_revoke: true, approval_navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41),
 };
 const grant = { ...row, observation_limits: { max_session_seconds: 15, max_observed_bytes: 1 << 30, max_bytes_per_second: 16 << 20, max_concurrent_sessions: 1 },
@@ -55,6 +55,8 @@ it('shows the exact plan and records one decision with a reason', async () => {
   expect(screen.getByText(/raw byte comparison/)).toBeTruthy();
   expect(screen.getByRole('link', { name: 'Sign in with step-up' }).getAttribute('href')).toBe('/auth/step-up?return_to=' + encodeURIComponent('/approvals/' + id(41)));
   expect(screen.getByText(/Observation limits bound by this approval/)).toBeTruthy();
+  expect(screen.getByText(/submitting this plan starts a capture window of at most 5 minutes/)).toBeTruthy();
+  expect(screen.queryByText(/plan's start deadline/)).toBeNull();
   const approve = screen.getByRole('button', { name: 'Approve' });
   expect(approve.getAttribute('data-disabled')).not.toBeNull();
   fireEvent.change(screen.getByLabelText(/Reason/), { target: { value: 'incident 42' } });

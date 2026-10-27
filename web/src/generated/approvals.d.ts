@@ -77,8 +77,6 @@ export interface components {
                 requested_at: string;
                 /** Format: date-time */
                 review_until: string;
-                /** Format: date-time */
-                plan_deadline: string;
                 lifetime_seconds: number;
                 decision?: {
                     /** @enum {unknown} */
@@ -142,7 +140,22 @@ export interface components {
                 remaining_bytes?: number;
                 remaining_executions?: number;
                 remaining_observation_bytes?: number;
-            };
+                /**
+                 * Format: date-time
+                 * @description Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
+                 */
+                preview_deadline: string;
+                /**
+                 * @description Whether the frozen plan uses its preview deadline, or fixes one capture window at acceptance under the original approval expiry.
+                 * @enum {unknown}
+                 */
+                capture_deadline_rule: "previewDeadline" | "acceptanceWithinGrant";
+                /**
+                 * @description Maximum window fixed once at acceptance, never beyond original approval expiry.
+                 * @constant
+                 */
+                capture_window_seconds?: 300;
+            } & unknown;
         } | {
             /** @constant */
             status: "pending";
@@ -173,7 +186,7 @@ export interface components {
             /** @constant */
             status: "ok";
             data: {
-                approvals: {
+                approvals: ({
                     /** Format: uuid */
                     grant_id: string;
                     /** @enum {unknown} */
@@ -218,8 +231,6 @@ export interface components {
                     requested_at: string;
                     /** Format: date-time */
                     review_until: string;
-                    /** Format: date-time */
-                    plan_deadline: string;
                     lifetime_seconds: number;
                     decision?: {
                         /** @enum {unknown} */
@@ -251,7 +262,22 @@ export interface components {
                     can_revoke: boolean;
                     /** Format: uri */
                     approval_navigation_uri: string;
-                }[];
+                    /**
+                     * Format: date-time
+                     * @description Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
+                     */
+                    preview_deadline: string;
+                    /**
+                     * @description Whether the frozen plan uses its preview deadline, or fixes one capture window at acceptance under the original approval expiry.
+                     * @enum {unknown}
+                     */
+                    capture_deadline_rule: "previewDeadline" | "acceptanceWithinGrant";
+                    /**
+                     * @description Maximum window fixed once at acceptance, never beyond original approval expiry.
+                     * @constant
+                     */
+                    capture_window_seconds?: 300;
+                } & unknown)[];
             };
         } | {
             /** @constant */

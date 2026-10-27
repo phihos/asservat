@@ -1,5 +1,75 @@
 # Sustained implementation progress
 
+## Approved capture acceptance (ADR-252, 2026-10-27)
+
+Approval-required recordings now retain their exact passive review blueprint
+through the original grant's finite review/expiry bounds, under the existing
+preview quotas. The explicitly marked approved scope binds finite action
+durations; submission fixes one capture deadline within five minutes and the
+original grant expiry. SQL admission and execution check the exact current grant
+under a shared row lock; revocation is serialized. The original Pod, IDs, frozen
+filters, audience, storage, relative retention and approval digest are preserved.
+Old absolute-deadline scopes need fresh review. Submission checks the existing
+cached administrator approval setting once, with an exact issuer match; toggling
+the requirement in either direction requires a new preview. Approval presentation
+now separates preview expiry from the acceptance window.
+
+The compiler timing regression fails with the original absolute-deadline code;
+both administrator-toggle regressions also fail before the cached setting check.
+Fixed affected Go package tests and the five affected package race suites pass
+(capture, planning, presentation, PostgreSQL and planning domain).
+`make pre-push` passes, including the final exact-issuer refinement. `console-check`
+passes 19 test files / 209 tests; `console-browser-check` (including build) passes
+20 journeys / 17 accessibility scans and the native-restart suite's four
+boundaries / two scans. These use synthetic application data.
+
+Targeted actual PostgreSQL qualification is
+`test/results/approved-recording-sql-4-environment.json`: exit 0, exactly
+`TestContextAdmissionWithRealServices/recording-approved-plan-after-preview-expiry`,
+unchanged source hashes and empty cleanup failures. It covers retained pending
+review, cleanup after actual preview expiry, reviewed admission with the original
+approved digest, grant-lock/revocation ordering and original-operation replay.
+The grant decision/bootstrap is explicitly synthetic; this is SQL/component
+qualification, not an installed independent-review journey. Runs 1–2 failed on a
+new fixture's timestamp ordering (the first attempted edit matched no bytes);
+run 3 correctly rejected a migration/admin pool supplied to a runtime adapter.
+Run 4 uses the compiled product hub-runtime grants. SQL facets are unchanged by
+the subsequent cached-settings and timing-presentation refinements.
+
+All six final native suites passed on frozen candidate
+`bb3570fe6a926b423e1ee4598dcf9b2680d655f3`: custody-1
+[40496786663](https://github.com/phihos/asservat/actions/runs/40496786663),
+custody-2 [40496790331](https://github.com/phihos/asservat/actions/runs/40496790331),
+custody-3 [40496793797](https://github.com/phihos/asservat/actions/runs/40496793797),
+custody-4 [40496797373](https://github.com/phihos/asservat/actions/runs/40496797373),
+initial-installation
+[40496800540](https://github.com/phihos/asservat/actions/runs/40496800540), and
+continuation-journey
+[40496803811](https://github.com/phihos/asservat/actions/runs/40496803811).
+All downloaded reports have actual test exit zero, unchanged source hashes and
+empty cleanup failures; 3140 custody/installer and 3170 journey source hashes
+were independently compared with that frozen tree. Custody-3 includes the exact
+new delayed-approved-recording regression; the installer includes the public
+runtime roles matrix. The journey runs actual pod-status capture/publication/
+expiry/deletion and explicitly skips its separate second-cluster/replay focus;
+it does **not** qualify an installed independent approval plus real packet
+recording. Custody/installer record 593 passed named tests in total; journey's
+three named passes took 674.5 seconds of Go execution.
+
+Rebasing onto the already-qualified ADR-253 step-up change and the documentation
+correction in #99 required only documentation conflict resolution. Every source
+change versus the native candidate is exactly the upstream #97 change; both
+shared approval UI files match clean automatic three-way composition. The
+approved-capture Go/SQL/schema/fixtures remain byte-identical. Composed
+`make pre-push` and the rebuilt console browser/native-restart gates pass. This reuses the scoped native evidence and #97 identity
+qualification; it does not claim identical whole-tree native hashes after rebase.
+Final regular CI/Gitar read-back remains required before merge.
+
+Policy grants, observation spend, result-access child composition and an actual
+installed approval-required recording journey remain separate work. No broader
+S-04 completion is claimed.
+
+
 ## Approval step-up sign-in (ADR-253, 2026-10-27)
 
 The approval detail now links to `/auth/step-up` and returns to that exact plan.

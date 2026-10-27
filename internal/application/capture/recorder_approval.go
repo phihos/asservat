@@ -3,6 +3,7 @@ package capture
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	authapp "asservat.local/asservat/internal/application/authorization"
@@ -30,12 +31,12 @@ type ApprovalSettings interface {
 // requireRecordingApproval reads the installation's REQ-SYS-002 switch for
 // the caller's issuer. Without a configured reader the installation adds no
 // requirement; a failing reader refuses the preview.
-func (s ContextInvestigation) requireRecordingApproval(ctx context.Context, i identity.Identity) (bool, error) {
+func (s ContextInvestigation) requireRecordingApproval(ctx context.Context, issuer string) (bool, error) {
 	if s.Approvals == nil {
 		return false, nil
 	}
-	p, err := s.Approvals.IdentityPolicy(ctx, i.Principal.Issuer)
-	if err != nil || p.Validate(s.Now()) != nil {
+	p, err := s.Approvals.IdentityPolicy(ctx, issuer)
+	if err != nil || p.Issuer != issuer || p.Validate(s.Now()) != nil {
 		return false, value.ErrUnavailable
 	}
 	return p.RequireRecordingApproval, nil
@@ -72,7 +73,7 @@ func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, sourc
 	if p.Intent.Composition == nil {
 		return zero, value.ErrInvalid
 	}
-	if err := s.recorderRequest(ctx, source, p, key, access); err != nil {
+	if _, err := s.recorderRequest(ctx, source, p, key, access); err != nil {
 		return zero, err
 	}
 	// ADR-248: the node recorder does not deliver results under a result-access
@@ -89,19 +90,27 @@ func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, sourc
 // (ADR-248). A plan with REQ-AUT-006 observation limits (a raw byte
 // predicate) stays RecorderUnavailable: the node recorder does not charge
 // observation spend. Nothing is armed, reserved or charged here.
-func (s ContextInvestigation) recorderRequest(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, access *authorization.ResultAccess) error {
+func (s ContextInvestigation) recorderRequest(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, access *authorization.ResultAccess) (authorization.Grant, error) {
 	actions, approval, err := compiler.RecorderScopeSummary(p.CanonicalScope)
 	if err != nil {
-		return value.ErrUnavailable
+		return authorization.Grant{}, value.ErrUnavailable
+	}
+	required, err := s.requireRecordingApproval(ctx, p.Actor.Issuer)
+	if err != nil {
+		return authorization.Grant{}, err
+	}
+	frozen := approval != nil && slices.ContainsFunc(approval.Reasons, func(r authorization.SensitiveReason) bool { return r.Code == "recordingApprovalRequired" })
+	if required != frozen {
+		return authorization.Grant{}, s.requestChanged("approval/settings")
 	}
 	if approval == nil {
 		if access != nil {
-			return value.ErrInvalid
+			return authorization.Grant{}, value.ErrInvalid
 		}
-		return nil
+		return authorization.Grant{}, nil
 	}
 	if s.Grants == nil {
-		return authorization.ErrApprovalRequired
+		return authorization.Grant{}, authorization.ErrApprovalRequired
 	}
 	t := authorization.Target{ClusterID: p.Target.ClusterID, NamespaceUID: p.Target.Namespace.UID, WorkloadUID: p.Target.Workload.UID, PodUID: p.Target.PodUID}
 	var wanted artifact.Digest
@@ -114,22 +123,22 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 		// An existing request binds its result access; another instruction
 		// needs a fresh preview and review, never a silent replacement.
 		if access != nil && g.ResultAccessDigest != wanted {
-			return value.ErrConflict
+			return authorization.Grant{}, value.ErrConflict
 		}
 		if err != nil {
-			return authorization.ApprovalPendingError{GrantID: g.ID}
+			return authorization.Grant{}, authorization.ApprovalPendingError{GrantID: g.ID}
 		}
 		if approval.ObservationLimits != nil {
-			return value.ErrRecorderUnavailable
+			return authorization.Grant{}, value.ErrRecorderUnavailable
 		}
-		return nil
+		return g, nil
 	case errors.Is(err, authorization.ErrApprovalRequired):
 		// No request exists yet: only a current preview can open one.
 	default:
-		return err
+		return authorization.Grant{}, err
 	}
 	if !p.Current(s.Now()) {
-		return value.ErrPreviewExpired
+		return authorization.Grant{}, value.ErrPreviewExpired
 	}
 	review := authapp.GrantReview{Namespace: p.Target.Namespace.Name, WorkloadKind: p.Target.Workload.Kind, WorkloadName: p.Target.Workload.Name, PodName: p.Target.PodName, Deadline: p.Deadline}
 	for _, a := range actions {
@@ -142,7 +151,7 @@ func (s ContextInvestigation) recorderRequest(ctx context.Context, source identi
 	created, _, err := s.Grants.Request(ctx, source, authapp.GrantRequestInput{PreviewID: p.ID, CaptureID: p.CaptureID, Actor: p.Actor, Target: t, Scope: p.CanonicalScope, ExecutionDigest: p.ScopeDigest,
 		DataClass: approval.DataClass, Reasons: approval.Reasons, Review: review, Lifetime: authorization.GrantDefaultLifetime, ResultAccess: access, IdempotencyKey: key})
 	if err != nil {
-		return err
+		return authorization.Grant{}, err
 	}
-	return authorization.ApprovalPendingError{GrantID: created.ID}
+	return authorization.Grant{}, authorization.ApprovalPendingError{GrantID: created.ID}
 }

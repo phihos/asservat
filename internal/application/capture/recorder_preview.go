@@ -95,7 +95,7 @@ func (s ContextInvestigation) PreviewComposition(ctx context.Context, source ide
 	p.Intent.Composition = intent.Composition.Clone()
 	p.ExecutionClass = target.ExecutionClass
 	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.RecorderAssessmentRulesDigest()
-	required, err := s.requireRecordingApproval(ctx, i)
+	required, err := s.requireRecordingApproval(ctx, i.Principal.Issuer)
 	if err != nil {
 		return zero, previewFailure("approvals", err)
 	}

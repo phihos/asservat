@@ -167,3 +167,24 @@ finite idempotency retirement and fair admission; passive preview cleanup does
 not fix that separate limitation. Native/provider and full repository gates are
 run by the parent task after a coordinated source freeze, with results recorded
 in `docs/implementation-progress.md`.
+
+## Approved recorder acceptance (ADR-252)
+
+An approval review may outlive its passive preview. Its exact immutable blueprint
+is retained, with the existing preview quotas, through the grant's original
+review window/expiry. That permits locating the reviewed plan; it grants no
+collection authority. A new review still requires a current preview.
+
+Marked `approvedAcceptance/v1` recorder scopes bind action durations rather than
+an absolute preview deadline. Same-requester submission fixes one capture deadline
+within five minutes and the grant's original expiry, then performs the existing
+current target/eligibility/storage/retention/incarnation/assessment checks against
+the original identities and digest. Admission and API execution serialize current
+grant use with revocation in SQL. Accepted retries recover their original deadline.
+Legacy absolute-deadline plans cannot gain this interpretation; they require a
+new preview/review. See [ADR-252](../decisions/252-approved-capture-acceptance.md).
+
+The existing protected approval-settings reader is consulted once per recorder
+submission. A changed administrator approval requirement invalidates the review
+in either direction. Approval presentation separates passive preview expiry from
+the bounded execution window assigned at acceptance.

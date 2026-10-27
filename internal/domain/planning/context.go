@@ -64,7 +64,7 @@ func (r *RecorderContext) Clone() *RecorderContext {
 	if r == nil {
 		return nil
 	}
-	out := RecorderContext{Composition: *r.Composition.Clone()}
+	out := RecorderContext{Composition: *r.Composition.Clone(), RequireApproval: r.RequireApproval}
 	for _, f := range r.Filters {
 		f.Filter.Program = append([]BPFInstruction(nil), f.Filter.Program...)
 		out.Filters = append(out.Filters, f)

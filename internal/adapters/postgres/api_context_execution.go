@@ -142,6 +142,9 @@ func (s *APIContextExecutions) ReadAPIContextWork(ctx context.Context, captureID
 		if err != nil {
 			return fail("capture", value.ErrDenied)
 		}
+		if err = currentRecordingGrant(ctx, q, row); err != nil {
+			return fail("approval", err)
+		}
 		out, err = apiWork(row)
 		if err != nil {
 			return fail("work", err)
@@ -211,6 +214,9 @@ func (s *APIContextExecutions) checked(ctx context.Context, q *custodydb.Queries
 		return sqlStep{"attempt-state", value.ErrDenied}
 	}
 	check := func() error {
+		if err := currentRecordingGrant(ctx, q, accepted); err != nil {
+			return sqlStep{"approval", err}
+		}
 		if err := s.guards.Recovery.check(ctx, q, trust, s.root, c.Recovery); err != nil {
 			return sqlStep{"recovery-check", err}
 		}
@@ -588,4 +594,36 @@ func (e sqlStep) FixedStep() string {
 		return e.step + "/" + inner.FixedStep()
 	}
 	return e.step
+}
+
+// Approval is rechecked around execution effects as well as admission. The
+// shared grant lock serializes revocation; elapsed time is checked after locks.
+func currentRecordingGrant(ctx context.Context, q *custodydb.Queries, row custodydb.ContextCapture) error {
+	a, err := admittedRecord(row)
+	if err != nil {
+		return err
+	}
+	if a.Expectation.Recording == nil || !a.Expectation.Recording.RequireApproval {
+		return nil
+	}
+	if !row.PreviewID.Valid {
+		return value.ErrDenied
+	}
+	intent, err := captureIntent(row)
+	if err != nil {
+		return err
+	}
+	actor := intent.Actor
+	until, err := q.LockApprovedContextGrant(ctx, custodydb.LockApprovedContextGrantParams{RootID: row.RootID, PreviewID: row.PreviewID, CaptureID: row.ID, Issuer: actor.Issuer, Subject: actor.Subject, ClientID: actor.ClientID, ExecutionDigest: row.ScopeDigest})
+	if err != nil {
+		return err
+	}
+	now, err := q.CurrentTime(ctx)
+	if err != nil {
+		return err
+	}
+	if !until.Valid || !now.Time.Before(until.Time) || a.Deadline.After(until.Time) {
+		return value.ErrDenied
+	}
+	return ctx.Err()
 }

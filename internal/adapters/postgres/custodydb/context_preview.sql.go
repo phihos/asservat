@@ -38,9 +38,25 @@ func (q *Queries) CloseContextPreview(ctx context.Context, arg CloseContextPrevi
 	return result.RowsAffected(), nil
 }
 
+const contextPreviewReadUntil = `-- name: ContextPreviewReadUntil :one
+SELECT context_preview_read_until($1::uuid,$2::uuid)::timestamptz
+`
+
+type ContextPreviewReadUntilParams struct {
+	RootID    pgtype.UUID
+	PreviewID pgtype.UUID
+}
+
+func (q *Queries) ContextPreviewReadUntil(ctx context.Context, arg ContextPreviewReadUntilParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, contextPreviewReadUntil, arg.RootID, arg.PreviewID)
+	var column_1 pgtype.Timestamptz
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countContextPreviews = `-- name: CountContextPreviews :one
 SELECT count(*) FROM (
- SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND p.deadline>clock_timestamp()
+ SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND context_preview_read_until(p.root_id,p.id)>clock_timestamp()
  UNION ALL
  SELECT f.preview_id FROM context_preview_fence AS f WHERE f.root_id=$1 AND f.expires_at>clock_timestamp()
  LIMIT 1000
@@ -56,7 +72,7 @@ func (q *Queries) CountContextPreviews(ctx context.Context, rootID pgtype.UUID) 
 
 const countPrincipalContextPreviews = `-- name: CountPrincipalContextPreviews :one
 SELECT count(*) FROM (
- SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND p.principal_key=$2 AND p.deadline>clock_timestamp()
+ SELECT p.id FROM context_preview AS p WHERE p.root_id=$1 AND p.principal_key=$2 AND context_preview_read_until(p.root_id,p.id)>clock_timestamp()
  UNION ALL
  SELECT f.preview_id FROM context_preview_fence AS f WHERE f.root_id=$1 AND f.principal_key=$2 AND f.expires_at>clock_timestamp()
  LIMIT 10
@@ -92,7 +108,7 @@ func (q *Queries) DeleteExpiredContextPreviewFences(ctx context.Context, rootID 
 
 const deleteExpiredContextPreviews = `-- name: DeleteExpiredContextPreviews :execrows
 DELETE FROM context_preview WHERE id IN (
- SELECT expired.id FROM context_preview AS expired WHERE expired.root_id=$1 AND expired.deadline<=clock_timestamp()
+ SELECT expired.id FROM context_preview AS expired WHERE expired.root_id=$1 AND context_preview_read_until(expired.root_id,expired.id)<=clock_timestamp()
  ORDER BY expired.deadline,expired.id LIMIT 1000
 )
 `
@@ -258,4 +274,33 @@ func (q *Queries) InsertContextPreviewFence(ctx context.Context, arg InsertConte
 		&i.ExpiresAt,
 	)
 	return i, err
+}
+
+const lockApprovedContextGrant = `-- name: LockApprovedContextGrant :one
+SELECT lock_approved_context_grant($1::uuid,$2::uuid,$3::uuid,$4::text,$5::text,$6::text,$7::bytea)::timestamptz
+`
+
+type LockApprovedContextGrantParams struct {
+	RootID          pgtype.UUID
+	PreviewID       pgtype.UUID
+	CaptureID       pgtype.UUID
+	Issuer          string
+	Subject         string
+	ClientID        string
+	ExecutionDigest []byte
+}
+
+func (q *Queries) LockApprovedContextGrant(ctx context.Context, arg LockApprovedContextGrantParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, lockApprovedContextGrant,
+		arg.RootID,
+		arg.PreviewID,
+		arg.CaptureID,
+		arg.Issuer,
+		arg.Subject,
+		arg.ClientID,
+		arg.ExecutionDigest,
+	)
+	var column_1 pgtype.Timestamptz
+	err := row.Scan(&column_1)
+	return column_1, err
 }
