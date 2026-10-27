@@ -1,6 +1,6 @@
 # ADR-252 — Start an approved capture after its preview expires
 
-Date: 2026-10-27. Status: implemented; targeted SQL qualification passed; final candidate gates pending.
+Date: 2026-10-27. Status: implemented; component/native qualification recorded in implementation progress.
 Requirements: REQ-AUT-003/004, REQ-INV-001–003; S-04 increment 12a follow-up.
 Migration: 00099. Supersedes ADR-249's preview-lifetime limitation.
 
