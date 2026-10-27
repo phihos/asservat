@@ -1,5 +1,14 @@
 # Decision records
 
+[ADR-239 — Bounded recurring-policy sharing](239-recurring-policy-sharing.md) is S-06 increment 8:
+a DebugPolicy's `spec.sharing` (≤ 8 recipients, `maxCaptures` 1–100, absolute `notAfter` ≤ 7 days)
+is accepted by `activate_policy` only with `evidence:share` and an evidence-owner group of the
+automation AccessBinding (the pinned management) and stored in the acceptance record; each admitted
+capture claims one slot of a counter on the acceptance (migration 00092) and receives an ADR-235
+instruction while under both limits and the policy unchanged. Stop = policy edit (no backfill);
+revoke-all = `revoke_share(sharing_intent_id = acceptance ID)`; activation states "Repeated
+collections will be shared" and `get_policy_status` reports the sharing state.
+
 [ADR-236 — Recent captures and Collect again](236-capture-history-collect-again.md) is S-06
 increment 6: migration 00089 records each accepted capture's cluster, namespace UID, workload UID
 and origin at acceptance (no backfill); `list_capture_history` lists the last seven days of a

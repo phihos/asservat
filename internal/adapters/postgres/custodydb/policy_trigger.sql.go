@@ -214,7 +214,7 @@ func (q *Queries) InsertPolicyOccurrence(ctx context.Context, arg InsertPolicyOc
 }
 
 const latestPolicyAcceptance = `-- name: LatestPolicyAcceptance :one
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent FROM policy_acceptance WHERE root_id=$1 AND policy_uid=$2 ORDER BY accepted_at DESC, id DESC LIMIT 1
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key FROM policy_acceptance WHERE root_id=$1 AND policy_uid=$2 ORDER BY accepted_at DESC, id DESC LIMIT 1
 `
 
 type LatestPolicyAcceptanceParams struct {
@@ -239,6 +239,9 @@ func (q *Queries) LatestPolicyAcceptance(ctx context.Context, arg LatestPolicyAc
 		&i.AcknowledgedAt,
 		&i.ReceiptJson,
 		&i.ExecutionsSpent,
+		&i.SharesSpent,
+		&i.SharingRevokedAt,
+		&i.SharingRevokeKey,
 	)
 	return i, err
 }

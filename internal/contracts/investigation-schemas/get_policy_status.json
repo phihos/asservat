@@ -1,6 +1,6 @@
 {
   "name": "get_policy_status",
-  "description": "Explain an activated or deactivated restart-, probe- or alert-trigger policy (ADR-228/230/231) without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing.",
+  "description": "Explain an activated or deactivated restart-, probe- or alert-trigger policy (ADR-228/230/231) without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing. With recurring sharing (ADR-239) it also reports the sharing state, recipients count, captures shared so far, the limit and the end.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -340,6 +340,52 @@
                     },
                     "required": [
                       "kind"
+                    ]
+                  },
+                  "sharing": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "description": "Recurring sharing of the acceptance (ADR-239). stopped: the DebugPolicy changed after acceptance; activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id).",
+                    "properties": {
+                      "state": {
+                        "enum": [
+                          "active",
+                          "limitReached",
+                          "expired",
+                          "revoked",
+                          "stopped"
+                        ]
+                      },
+                      "recipients": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 8
+                      },
+                      "shared_captures": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "max_captures": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      },
+                      "not_after": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "revoked_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "state",
+                      "recipients",
+                      "shared_captures",
+                      "max_captures",
+                      "not_after"
                     ]
                   }
                 },

@@ -7,6 +7,7 @@ import (
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -85,4 +86,36 @@ type ShareCursor struct {
 // evidence read: the share service uses it only to let them revoke.
 type Administrators interface {
 	FleetAdministration(context.Context) (fleet.Administration, error)
+}
+
+// PolicySharing is one policy acceptance's recurring sharing (ADR-239): its
+// immutable instruction and the policy's whole-workload target, for the
+// revoke-all authorization. It grants nothing.
+type PolicySharing struct {
+	AcceptanceID string
+	Instruction  capture.PolicyShareInstruction
+	Target       authorization.Target
+	RevokedAt    time.Time
+}
+
+// PolicyRevocation revokes every share of one acceptance and its future
+// sharing. Actor is the instruction's creator or, with Managers, a current
+// manager (the pinned assignment IDs the service found the actor holding).
+type PolicyRevocation struct {
+	AcceptanceID     string
+	Actor            identity.Principal
+	Managers         []string
+	ExpectedRevision int64
+	IdempotencyKey   string
+	// Administrator marks an installation administrator (ADR-238), who
+	// revokes without a pinned assignment.
+	Administrator bool
+}
+
+// PolicySharingStore reads and revokes recurring policy sharing (ADR-239).
+// RevokePolicySharing returns the number of shares the revocation revoked;
+// the same key after success is a replay.
+type PolicySharingStore interface {
+	PolicySharing(ctx context.Context, acceptanceID string) (PolicySharing, error)
+	RevokePolicySharing(context.Context, PolicyRevocation, artifact.RecoveryProof) (revoked int, replay bool, err error)
 }

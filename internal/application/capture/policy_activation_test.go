@@ -35,6 +35,8 @@ type activationFixture struct {
 	previous    *value.PolicyAcceptance
 	status      value.PolicyStatus
 	noDelegates bool
+	// edit changes the observed DebugPolicy spec (ADR-239 sharing tests).
+	edit func(map[string]any)
 }
 
 func newActivationFixture(t *testing.T) *activationFixture {
@@ -58,6 +60,9 @@ func (f *activationFixture) RecoveryState(context.Context) (artifact.RecoveryPro
 func (f *activationFixture) ReadPolicy(context.Context, string, string) (value.PolicySource, []byte, error) {
 	spec := restartSpec()
 	spec["target"].(map[string]any)["cluster"] = activationCluster
+	if f.edit != nil {
+		f.edit(spec)
+	}
 	b, _ := json.Marshal(spec)
 	return value.PolicySource{InstallationID: activationInstallation, ClusterID: activationHub, NamespaceUID: "control-uid", Name: "restarts", Revision: identity.Revision{UID: "policy-uid", Generation: 1, Digest: artifact.Digest{7}}, ResourceVersion: "1", ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), CollectionDigest: artifact.Digest{8}}, b, nil
 }
@@ -116,7 +121,7 @@ func (f *activationFixture) AcceptPolicy(_ context.Context, in value.PolicyAdmis
 		return value.AcceptedPolicy{}, value.ErrDenied
 	}
 	f.accepted = append(f.accepted, in)
-	return value.AcceptedPolicy{Record: value.PolicyAcceptance{ID: "99999999-9999-4999-8999-999999999999", Authority: in.Authority, Submitter: in.Author.Principal}}, nil
+	return value.AcceptedPolicy{Record: value.PolicyAcceptance{ID: "99999999-9999-4999-8999-999999999999", Authority: in.Authority, Submitter: in.Author.Principal, Sharing: in.Sharing}}, nil
 }
 func (f *activationFixture) PublishPolicyAcceptances(context.Context) error { return nil }
 
@@ -237,5 +242,74 @@ func TestPolicyDeactivationIsIdempotentAndBlocksReactivationOfTheSameScope(t *te
 	g := newActivationFixture(t)
 	if _, err := g.deactivation().Deactivate(context.Background(), g, "restarts"); !errors.Is(err, value.ErrUnavailable) {
 		t.Fatal("never-accepted policy deactivated", err)
+	}
+}
+
+// withPolicySharing gives the fixture a spec.sharing block, an evidence-owner
+// assignment of the automation binding for the sponsoring group and the
+// evidence:share scope: the ADR-239 activation prerequisites.
+func (f *activationFixture) withPolicySharing(end time.Time) artifact.AudienceAssignment {
+	f.edit = func(s map[string]any) {
+		sharingSpec(s)["notAfter"] = end.UTC().Format(time.RFC3339)
+	}
+	f.author.Scopes = append(f.author.Scopes, authorization.ShareScope)
+	owner := f.projection.Allows[0].Audience
+	owner.Role, owner.AssignmentID = "evidence-owner", "56565656-5656-4565-8565-565656565656"
+	f.projection.Allows = append(f.projection.Allows, authorization.CurrentAssignment{Audience: owner, ObservedAt: f.now, FreshUntil: f.now.Add(20 * time.Second)})
+	return owner
+}
+
+func TestPolicyActivationAcceptsBoundedSharingWithTheOwnerTeams(t *testing.T) {
+	f := newActivationFixture(t)
+	end := time.Now().UTC().Add(48 * time.Hour).Truncate(time.Second)
+	owner := f.withPolicySharing(end)
+	f.author.Principal.Issuer = "https://id.example.invalid"
+	r, err := f.activation().Activate(context.Background(), f, "restarts", "key-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(f.accepted) != 1 || r.Sharing == nil {
+		t.Fatal("sharing not accepted", r, len(f.accepted))
+	}
+	s := f.accepted[0].Sharing
+	if s == nil || s.Creator != f.author.Principal || s.MaxCaptures != 10 || !s.NotAfter.Equal(end) || len(s.Management) != 1 || s.Management[0] != owner || len(s.Recipients) != 1 || s.Recipients[0].ID != "incident-response" {
+		t.Fatalf("accepted sharing %+v", s)
+	}
+}
+
+func TestPolicyActivationRefusesSharingWithoutOwnerAuthority(t *testing.T) {
+	for _, name := range []string{"no-share-scope", "owner-on-another-binding", "owner-of-another-group", "end-past", "end-beyond-seven-days", "foreign-issuer"} {
+		t.Run(name, func(t *testing.T) {
+			f := newActivationFixture(t)
+			end := time.Now().UTC().Add(48 * time.Hour)
+			f.withPolicySharing(end)
+			want := value.ErrSharingDenied
+			owner := &f.projection.Allows[len(f.projection.Allows)-1]
+			switch name {
+			case "no-share-scope":
+				f.author.Scopes = []string{"evidence:read", "evidence:capture"}
+			case "owner-on-another-binding":
+				owner.Audience.BasisUID = "other-binding"
+			case "owner-of-another-group":
+				owner.Audience.SubjectID = "team-c"
+				f.author.Groups = append(f.author.Groups, "team-c")
+			case "end-past":
+				f.edit = func(s map[string]any) { sharingSpec(s)["notAfter"] = "2001-01-01T00:00:00Z" }
+				want = value.ErrInvalid
+			case "end-beyond-seven-days":
+				f.edit = func(s map[string]any) {
+					sharingSpec(s)["notAfter"] = time.Now().UTC().Add(8 * 24 * time.Hour).Format(time.RFC3339)
+				}
+				want = value.ErrInvalid
+			case "foreign-issuer":
+				f.edit = func(s map[string]any) {
+					sharingSpec(s)["recipients"] = []any{map[string]any{"kind": "User", "issuer": "https://other.example.invalid", "id": "someone"}}
+				}
+				want = value.ErrInvalid
+			}
+			if _, err := f.activation().Activate(context.Background(), f, "restarts", "key"); !errors.Is(err, want) || len(f.accepted) != 0 {
+				t.Fatal("sharing activation not refused", err, len(f.accepted))
+			}
+		})
 	}
 }

@@ -1,6 +1,7 @@
 import type { Session } from '../auth/session';
 import { OperationFailure, operationMessage } from '../capture/http';
 import { operations, type Data, type Input, type Operation, type Operations, type Output, type Status } from './http';
+import { operations as shareOperations, type Operations as ShareOperations } from '../sharing/http';
 
 export type Entry = { name: string; status?: Status; message?: string; busy: boolean };
 export type State = { entries: Entry[] };
@@ -19,7 +20,7 @@ export class Policies {
   private keys = new Map<string, string>();
   readonly snapshot = () => this.state;
   readonly subscribe = (listener: () => void) => { this.listeners.add(listener); return () => { this.listeners.delete(listener); }; };
-  constructor(private client: Operations = operations, private newID: () => string = () => crypto.randomUUID()) {}
+  constructor(private client: Operations = operations, private newID: () => string = () => crypto.randomUUID(), private shares: ShareOperations = shareOperations) {}
 
   private update(name: string, patch: Partial<Entry>) {
     this.state = { entries: this.state.entries.map(entry => entry.name === name ? { ...entry, ...patch } : entry) };
@@ -83,5 +84,31 @@ export class Policies {
     await this.refresh(name);
   }
   activate = (name: string) => this.command(name, 'activate_policy');
+
+  // ADR-239: revoke every share of the acceptance's recurring sharing and
+  // stop its future sharing (revoke_share with sharing_intent_id). The server
+  // checks that the caller created or currently manages it.
+  revokeSharing = async (name: string) => {
+    const session = this.session, scope = this.scope;
+    const acceptance = this.state.entries.find(entry => entry.name === name)?.status?.acceptance_id;
+    if (!session || !scope || scope.aborted || !acceptance) return;
+    const slot = 'revoke_share\n' + acceptance;
+    const key = this.keys.get(slot) ?? this.newID();
+    this.keys.set(slot, key);
+    this.update(name, { busy: true, message: undefined });
+    try {
+      const reply = await this.shares.call('revoke_share', { sharing_intent_id: acceptance, expected_revision: 1, idempotency_key: key }, session.csrf_token, scope);
+      if (scope.aborted) return;
+      if (reply.status !== 'ok') throw new OperationFailure(503, reply.status === 'error' ? reply.data.code : 'Pending', reply.status === 'error' ? reply.data.message : 'This operation is still pending.');
+      this.keys.delete(slot);
+    } catch (error) {
+      if (!scope.aborted) {
+        if (error instanceof OperationFailure && error.detail) this.keys.delete(slot);
+        this.update(name, { message: operationMessage(error) });
+      }
+      return;
+    } finally { if (!scope.aborted) this.update(name, { busy: false }); }
+    await this.refresh(name);
+  };
   deactivate = (name: string) => this.command(name, 'deactivate_policy');
 }

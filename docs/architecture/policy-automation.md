@@ -87,3 +87,13 @@ The later source-adapter continuation passes unit/race/schema/architecture check
 Current automation eligibility requires the exact acknowledged current envelope receipt as well as the separately audited ordinary assignments. Policy execution also requires the retained policy-acceptance receipt. Both require a nonempty non-`null` immutable version and complete original receipt metadata. An older ordinary assignment audit cannot substitute for the current envelope's audit. Exact nonce replay remains historical provenance and cannot reactivate a policy whose retained receipt is unavailable.
 
 The checks use existing bounded/full-row reads and preserve current source, recovery, identity and post-lock deadlines. They do not rewrite old records or grant runtime history-repair privileges. Actual qualification and remaining policy execution composition are tracked in [implementation progress](../implementation-progress.md).
+
+## Recurring sharing (ADR-239)
+
+A hub-held DebugPolicy may declare bounded `spec.sharing`. Activation needs the activating human's
+`evidence:share` and an evidence-owner Group assignment of the automation AccessBinding for a
+sponsoring group; those assignments become the pinned management, and the immutable acceptance
+record (and its encrypted audit) carries the instruction. The policy principal still supplies no
+sharing right of its own: each capture only consumes a slot of the reviewed instruction. `sharing`
+stays outside the collection-intent digest, so editing it stops sharing (a new generation) without
+interrupting collection. See [ADR-239](../decisions/239-recurring-policy-sharing.md).

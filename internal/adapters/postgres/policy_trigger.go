@@ -340,6 +340,12 @@ func (s *PolicyTriggers) Status(ctx context.Context, policy string) (value.Polic
 		}
 		out.Authority, out.ExecutionsSpent, out.MaxExecutions, out.NotAfter, out.AcceptedIntentVersion, out.AcceptedGeneration = a, accepted.ExecutionsSpent, a.Limits.MaxExecutions, a.NotAfter.UTC(), record.IntentVersion, record.Source.Revision.Generation
 		out.ClusterID, out.NamespaceUID, out.WorkloadUID = a.ClusterID, a.NamespaceUID, a.WorkloadUID
+		if record.Sharing != nil {
+			out.Sharing = &value.PolicySharingStatus{Instruction: *record.Sharing, Spent: int64(accepted.SharesSpent)}
+			if accepted.SharingRevokedAt.Valid {
+				out.Sharing.RevokedAt = accepted.SharingRevokedAt.Time.UTC()
+			}
+		}
 		if out.WatchedPods, err = q.CountPolicyWatermarks(ctx, custodydb.CountPolicyWatermarksParams{RootID: id(s.root), PolicyUid: policy}); err != nil {
 			return err
 		}

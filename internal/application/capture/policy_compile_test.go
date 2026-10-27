@@ -134,7 +134,30 @@ func TestRestartPolicyRejectsUnsupportedFieldsWithPath(t *testing.T) {
 		}},
 		{"spec.evaluation.fireOnActivation", func(s map[string]any) { s["evaluation"].(map[string]any)["fireOnActivation"] = true }},
 		{"spec.evaluation.scope", func(s map[string]any) { s["evaluation"].(map[string]any)["scope"] = "workload" }},
-		{"spec.sharing", func(s map[string]any) { s["sharing"] = map[string]any{} }},
+		{"spec.sharing.recipients", func(s map[string]any) { s["sharing"] = map[string]any{} }},
+		{"spec.sharing.futureCaptures.maxCaptures", func(s map[string]any) {
+			sharingSpec(s)["futureCaptures"] = map[string]any{"enabled": true, "maxCaptures": 101}
+		}},
+		{"spec.sharing.futureCaptures.maxCaptures", func(s map[string]any) {
+			sharingSpec(s)["futureCaptures"] = map[string]any{"enabled": true, "maxCaptures": 0}
+		}},
+		{"spec.sharing.notAfter", func(s map[string]any) { sharingSpec(s)["notAfter"] = "tomorrow" }},
+		{"spec.sharing.recipients", func(s map[string]any) {
+			var r []any
+			for i := 0; i < 9; i++ {
+				r = append(r, map[string]any{"kind": "User", "issuer": "https://id.example.invalid", "id": strings.Repeat("u", i+1)})
+			}
+			sharingSpec(s)["recipients"] = r
+		}},
+		{"spec.sharing.recipients[1].issuer", func(s map[string]any) {
+			sharingSpec(s)["recipients"] = []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "a"}, map[string]any{"kind": "Group", "issuer": "https://other.example.invalid", "id": "b"}}
+		}},
+		{"spec.sharing.recipients[1]", func(s map[string]any) {
+			sharingSpec(s)["recipients"] = []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "a"}, map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "a"}}
+		}},
+		{"spec.sharing.management", func(s map[string]any) { sharingSpec(s)["management"] = map[string]any{"mode": "personal"} }},
+		{"spec.sharing.outputSelection", func(s map[string]any) { sharingSpec(s)["outputSelection"] = map[string]any{"mode": "approvedExtracts"} }},
+		{"spec.sharing.reason", func(s map[string]any) { sharingSpec(s)["reason"] = "incident" }},
 		{"spec.grantRef", func(s map[string]any) { s["grantRef"] = "22222222-2222-4222-8222-222222222222" }},
 		{"spec.recordingSaves", func(s map[string]any) { s["recordingSaves"] = map[string]any{"enabled": true} }},
 		{"spec.profileComposition", func(s map[string]any) { delete(s, "recipeRef"); s["profileComposition"] = map[string]any{} }},
@@ -149,5 +172,45 @@ func TestRestartPolicyRejectsUnsupportedFieldsWithPath(t *testing.T) {
 				t.Fatalf("got %v, want rejection at %s", err, c.path)
 			}
 		})
+	}
+}
+
+// sharingSpec adds a valid ADR-239 spec.sharing block and returns it.
+func sharingSpec(s map[string]any) map[string]any {
+	sharing := map[string]any{
+		"recipients":     []any{map[string]any{"kind": "Group", "issuer": "https://id.example.invalid", "id": "incident-response"}},
+		"futureCaptures": map[string]any{"enabled": true, "maxCaptures": 10},
+		"notAfter":       "2026-10-30T18:00:00Z",
+	}
+	s["sharing"] = sharing
+	return sharing
+}
+
+func TestPolicySharingCompilesShapeOnly(t *testing.T) {
+	s := restartSpec()
+	sharingSpec(s)
+	p, err := compileSpec(t, s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := time.Date(2026, 10, 30, 18, 0, 0, 0, time.UTC)
+	if p.Sharing == nil || p.Sharing.MaxCaptures != 10 || !p.Sharing.NotAfter.Equal(want) || len(p.Sharing.Recipients) != 1 || p.Sharing.Recipients[0].Kind != "Group" || p.Sharing.Recipients[0].ID != "incident-response" {
+		t.Fatalf("compiled sharing %+v", p.Sharing)
+	}
+	// An end in the past still compiles: a running policy's poll never fails
+	// on it; activation refuses it and the counter claim stops at it.
+	sharingSpec(s)["notAfter"] = "2001-01-01T00:00:00Z"
+	if _, err := compileSpec(t, s); err != nil {
+		t.Fatal("past end refused by the compiler", err)
+	}
+	// Sharing changes the compiled policy, so the scope digest of an otherwise
+	// equal policy differs; without sharing the digest input is unchanged.
+	plain, err := compileSpec(t, restartSpec())
+	if err != nil || plain.Sharing != nil {
+		t.Fatal(err, plain.Sharing)
+	}
+	b, _ := json.Marshal(plain)
+	if strings.Contains(string(b), "Sharing") {
+		t.Fatal("a policy without sharing serializes a sharing field", string(b))
 	}
 }

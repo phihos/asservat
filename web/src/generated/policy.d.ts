@@ -42,6 +42,15 @@ export interface components {
                 expires_at: string;
                 max_executions: number;
                 replay: boolean;
+                /** @description Recurring sharing of this acceptance (ADR-239): repeated collections will be shared with these recipients, at most max_captures captures, until not_after. */
+                sharing?: {
+                    /** @constant */
+                    statement: "Repeated collections will be shared";
+                    recipients: number;
+                    max_captures: number;
+                    /** Format: date-time */
+                    not_after: string;
+                };
             };
         } | {
             /** @constant */
@@ -145,6 +154,18 @@ export interface components {
                     probe_type?: "Liveness" | "Readiness" | "Startup";
                     minimum_failures?: number;
                     window_seconds?: number;
+                };
+                /** @description Recurring sharing of the acceptance (ADR-239). stopped: the DebugPolicy changed after acceptance; activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id). */
+                sharing?: {
+                    /** @enum {unknown} */
+                    state: "active" | "limitReached" | "expired" | "revoked" | "stopped";
+                    recipients: number;
+                    shared_captures: number;
+                    max_captures: number;
+                    /** Format: date-time */
+                    not_after: string;
+                    /** Format: date-time */
+                    revoked_at?: string;
                 };
             };
         } | {

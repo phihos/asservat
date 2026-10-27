@@ -79,6 +79,8 @@ type PolicyActivationResult struct {
 	NotAfter                time.Time
 	MaxExecutions           int64
 	Replay, Audited         bool
+	// Sharing is the accepted recurring sharing (ADR-239), if any.
+	Sharing *value.PolicyShareInstruction
 }
 
 // refused reports the failed step and the error's fixed class; never text.
@@ -166,7 +168,7 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 			return zero, value.ErrConflict
 		}
 		audited := s.Audit.PublishPolicyAcceptances(ctx) == nil
-		return PolicyActivationResult{PolicyUID: previous.Authority.PolicyUID, AcceptanceID: previous.ID, NotAfter: previous.Authority.NotAfter, MaxExecutions: previous.Authority.Limits.MaxExecutions, Replay: true, Audited: audited}, nil
+		return PolicyActivationResult{PolicyUID: previous.Authority.PolicyUID, AcceptanceID: previous.ID, NotAfter: previous.Authority.NotAfter, MaxExecutions: previous.Authority.Limits.MaxExecutions, Replay: true, Audited: audited, Sharing: previous.Sharing}, nil
 	}
 	if source.Suspended || source.Deleted {
 		return zero, value.ErrChanged
@@ -250,7 +252,11 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 		// This exact revision and delegation is already accepted; an unchanged
 		// source can never be accepted again to reset its spend or expiry.
 		audited := s.Audit.PublishPolicyAcceptances(ctx) == nil
-		return PolicyActivationResult{PolicyUID: authority.PolicyUID, AcceptanceID: status.ActiveID, NotAfter: status.NotAfter, MaxExecutions: status.MaxExecutions, Replay: true, Audited: audited}, nil
+		out := PolicyActivationResult{PolicyUID: authority.PolicyUID, AcceptanceID: status.ActiveID, NotAfter: status.NotAfter, MaxExecutions: status.MaxExecutions, Replay: true, Audited: audited}
+		if status.Sharing != nil {
+			out.Sharing = &status.Sharing.Instruction
+		}
+		return out, nil
 	}
 	if status.DeactivatedID != "" && status.Authority.ScopeDigest == authority.ScopeDigest {
 		// Reactivation is a fresh acceptance of a changed scope (ADR-229): a
@@ -262,6 +268,10 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	if check := authorization.ValidatePolicyAcceptance(author, authority, envelope, use, s.Now()); !check.Eligible {
 		return zero, s.delegationRefused("validate")
 	}
+	sharing, err := s.sharing(author, compiled.Sharing, projection, target, delegation.UID, owners, issued)
+	if err != nil {
+		return zero, s.refused("sharing", err)
+	}
 	now := s.Now().UTC().Truncate(time.Microsecond)
 	submission := value.VerifiedPolicySubmission{ReplacesID: status.ActiveID, Nonce: nonce, Actor: author.Principal, Source: source.Revision, ClusterID: source.ClusterID, NamespaceUID: source.NamespaceUID, Name: source.Name, ScopeDigest: authority.ScopeDigest, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)}
 	submitted, _ := json.Marshal(submission)
@@ -270,7 +280,7 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	check := value.SubmissionCheck{Submission: submission, RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, KeyID: "hub-api-authenticated-session", TrustRevision: author.Policy, VerifiedAt: now, ValidUntil: until.UTC().Truncate(time.Microsecond)}
 	call, cancel := context.WithDeadline(ctx, check.ValidUntil)
 	defer cancel()
-	accepted, err := s.Acceptor.AcceptPolicy(call, value.PolicyAdmission{RootID: s.RootID, Submission: submission, Verification: check, Author: author, Authority: authority, Target: target, Recovery: recovery})
+	accepted, err := s.Acceptor.AcceptPolicy(call, value.PolicyAdmission{RootID: s.RootID, Submission: submission, Verification: check, Author: author, Authority: authority, Target: target, Recovery: recovery, Sharing: sharing})
 	if err != nil {
 		return zero, s.refused("accept", err)
 	}
@@ -278,5 +288,37 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	// failure here leaves it pending for the trigger loop's publisher.
 	audited := s.Audit.PublishPolicyAcceptances(ctx) == nil
 	r := accepted.Record
-	return PolicyActivationResult{PolicyUID: r.Authority.PolicyUID, AcceptanceID: r.ID, NotAfter: r.Authority.NotAfter, MaxExecutions: r.Authority.Limits.MaxExecutions, Replay: accepted.Replay, Audited: audited}, nil
+	return PolicyActivationResult{PolicyUID: r.Authority.PolicyUID, AcceptanceID: r.ID, NotAfter: r.Authority.NotAfter, MaxExecutions: r.Authority.Limits.MaxExecutions, Replay: accepted.Replay, Audited: audited, Sharing: r.Sharing}, nil
+}
+
+// sharing resolves a policy's spec.sharing into the accepted instruction
+// (ADR-239). The activating human needs the create_share authority on the
+// workload (evidence:share, no deny) through an evidence-owner Group
+// assignment of the automation AccessBinding for a sponsoring group: those
+// assignments are the policy's owner teams and manage every share. The end
+// must be in the future and at most seven days after activation, as for any
+// share. Without sharing, nothing is resolved.
+func (s PolicyActivation) sharing(author identity.Identity, in *value.PolicySharing, p authorization.Projection, target authorization.Target, delegation string, sponsors []artifact.AudienceAssignment, issued time.Time) (*value.PolicyShareInstruction, error) {
+	if in == nil {
+		return nil, nil
+	}
+	if in.Recipients[0].Issuer != author.Principal.Issuer || !in.NotAfter.After(s.Now()) || in.NotAfter.After(issued.Add(authorization.ShareMaxLifetime)) {
+		return nil, value.PolicyFieldError{Path: "spec.sharing.notAfter", Reason: "must be in the future and at most seven days after activation, with recipients of your issuer"}
+	}
+	var groups []string
+	for _, o := range sponsors {
+		groups = append(groups, o.SubjectID)
+	}
+	result, management := authorization.PolicyShareManagement(author, p, target, delegation, groups, s.Now())
+	if !result.Eligible {
+		if s.Report != nil {
+			s.Report("sharing/" + result.Reason)
+		}
+		return nil, value.ErrSharingDenied
+	}
+	out := value.PolicyShareInstruction{Creator: author.Principal, Management: management, Recipients: slices.Clone(in.Recipients), MaxCaptures: in.MaxCaptures, NotAfter: in.NotAfter.UTC()}
+	if !out.Valid() {
+		return nil, value.ErrInvalid
+	}
+	return &out, nil
 }

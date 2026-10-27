@@ -88,15 +88,13 @@ def share_subset(name, tool):
         row["properties"]["phase"] = {"enum": ["Active", "Expired", "Revoked", "Suspended"]}
         row["properties"]["revision"] = {"type": "integer", "minimum": 1, "maximum": 1000000000}
     elif name == "revoke_share":
-        props.pop("sharing_intent_id")
-        schema.pop("oneOf")
-        schema["required"] = ["share_id", "expected_revision", "idempotency_key"]
+        # ADR-239: sharing_intent_id names a recurring policy acceptance
+        # (get_policy_status acceptance_id); revoking it revokes exactly that
+        # acceptance's shares and stops its future sharing (revision 1 -> 2).
         description["description"] = ("Revoke a share you created or currently manage through a pinned owner team; installation administrators may revoke any share. "
-                                      "Each transfer and the revocation add one revision (list_shares shows the current one). Recipients lose access at their next read; "
+                                      "Each transfer and the revocation add one revision (list_shares shows the current one). With sharing_intent_id (a policy's acceptance_id, "
+                                      "expected_revision 1) revoke every share of that policy acceptance's recurring sharing and its future sharing. Recipients lose access at their next read; "
                                       "independent rights are unchanged and revoking never grants a read. Repeating with the same idempotency key is harmless.")
-        data["properties"].pop("sharing_intent_id")
-        data.pop("oneOf")
-        data["required"] = ["share_id", "phase", "revision"]
         data["properties"]["revision"] = {"type": "integer", "minimum": 2, "maximum": 1000000000}
     else:
         # ADR-238: transfer of one concrete share's management.

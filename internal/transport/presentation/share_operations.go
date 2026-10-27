@@ -27,6 +27,13 @@ type ShareUseCase interface {
 	ListAdministered(context.Context, identities.CurrentIdentity, string, int) ([]sharing.View, string, time.Time, error)
 }
 
+// PolicySharingRevoker revokes a policy acceptance's recurring sharing
+// (ADR-239, revoke_share with sharing_intent_id). A share service without it
+// refuses that form as unavailable.
+type PolicySharingRevoker interface {
+	RevokePolicySharing(context.Context, identities.CurrentIdentity, string, int64, string) (sharing.PolicyRevokeResult, error)
+}
+
 // ShareOperations serves create_share, list_shares and revoke_share to MCP
 // (and the browser operation route) through the same audited path.
 type ShareOperations struct {
@@ -112,6 +119,7 @@ type ShareOperationInput struct {
 	Limit            int                   `json:"limit,omitempty"`
 	Cursor           string                `json:"cursor,omitempty"`
 	ShareID          string                `json:"share_id,omitempty"`
+	SharingIntentID  string                `json:"sharing_intent_id,omitempty"`
 	ExpectedRevision int64                 `json:"expected_revision,omitempty"`
 	IdempotencyKey   string                `json:"idempotency_key,omitempty"`
 }
@@ -138,9 +146,10 @@ type shareListData struct {
 	Shares []shareListItem `json:"shares"`
 }
 type shareRevokeData struct {
-	ShareID  string `json:"share_id"`
-	Phase    string `json:"phase"`
-	Revision int64  `json:"revision"`
+	ShareID         string `json:"share_id,omitempty"`
+	SharingIntentID string `json:"sharing_intent_id,omitempty"`
+	Phase           string `json:"phase"`
+	Revision        int64  `json:"revision"`
 }
 type shareTransferData struct {
 	ShareID   string                `json:"share_id"`
@@ -274,6 +283,19 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 				out.Data = data
 			}
 		case "revoke_share":
+			if in.SharingIntentID != "" {
+				revoker, ok := s.shares.(PolicySharingRevoker)
+				if !ok {
+					operationErr = value.ErrUnavailable
+					break
+				}
+				var r sharing.PolicyRevokeResult
+				r, operationErr = revoker.RevokePolicySharing(ctx, current, in.SharingIntentID, in.ExpectedRevision, in.IdempotencyKey)
+				if operationErr == nil {
+					out.Data = shareRevokeData{SharingIntentID: r.AcceptanceID, Phase: string(authorization.ShareRevoked), Revision: 2}
+				}
+				break
+			}
 			var share authorization.Share
 			share, _, operationErr = s.shares.Revoke(ctx, current, in.ShareID, in.ExpectedRevision, in.IdempotencyKey)
 			if operationErr == nil {

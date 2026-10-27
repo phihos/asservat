@@ -51,6 +51,9 @@ type RestartPolicy struct {
 	// AlertLabels are an alert detector's (ADR-231) label matchers besides
 	// namespace and pod; empty for every other detector.
 	AlertLabels map[string]string `json:",omitempty"`
+	// Sharing is the optional spec.sharing block (ADR-239). It is nil for a
+	// policy without one, so such a policy's scope digest is unchanged.
+	Sharing *PolicySharing `json:",omitempty"`
 }
 
 // Detector kinds stored with watermarks and occurrences (migrations 00084
@@ -97,7 +100,7 @@ func (p RestartPolicy) Valid() bool {
 	if !authorization.UUID(p.ClusterID) || !identity.Text(p.Namespace, 63) || (p.WorkloadKind != "Deployment" && p.WorkloadKind != "StatefulSet") || !identity.Text(p.WorkloadName, 253) || p.Interval < time.Second || p.Interval > 24*time.Hour || p.Burst < 1 || p.Burst > 10 || p.RetentionSeconds < 1 || p.RetentionSeconds > privacy.MaxAgeSeconds || p.ObservedPods < 1 || p.ObservedPods > targets.MaxRestartPods {
 		return false
 	}
-	if p.Detector != DetectorAlert && len(p.AlertLabels) != 0 {
+	if p.Detector != DetectorAlert && len(p.AlertLabels) != 0 || p.Sharing != nil && !p.Sharing.Valid() {
 		return false
 	}
 	switch p.Detector {
@@ -276,6 +279,8 @@ type PolicyStatus struct {
 	SourceObservedAt, SourceFreshUntil   time.Time
 	// Detector describes the current DebugPolicy's detector, if it compiles.
 	Detector *PolicyDetector
+	// Sharing is the acceptance's recurring sharing (ADR-239), if any.
+	Sharing *PolicySharingStatus
 }
 
 // PolicyDetector is a compiled detector's configuration for status display

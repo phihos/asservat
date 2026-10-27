@@ -1,5 +1,64 @@
 # Sustained implementation progress
 
+## S-06 increment 8: recurring-policy sharing (ADR-239, 2026-10-27)
+
+[ADR-239](decisions/239-recurring-policy-sharing.md): a hub-held DebugPolicy's `spec.sharing`
+(1–8 User/Group recipients of one issuer, `futureCaptures.maxCaptures` 1–100, absolute `notAfter`)
+is compiled (shape only; `outputSelection`, `maxArtifactsPerCapture`, `reason`, `management`
+refused with their path) and kept by the CRD. `activate_policy` requires `evidence:share` and an
+evidence-owner Group assignment of the automation AccessBinding for a sponsoring group (the
+pinned management) and `notAfter` within seven days; the SQL acceptance re-derives the management
+after its locks and stores the instruction in the immutable acceptance record (and so its
+encrypted audit). Migration 00092 (schema 92, floor 81): `policy_acceptance.shares_spent`
+(monotonic, ≤ `maxCaptures`), terminal `sharing_revoked_at/key`,
+`evidence_share.policy_acceptance_id`; the owner-privileged `claim_policy_capture_share` BEFORE
+INSERT trigger on `context_capture` claims one slot per admitted policy capture (under the limit,
+before the end, unrevoked, DebugPolicy at the accepted generation) and copies an ADR-235
+instruction; the replaced `materialize_capture_share` names the acceptance and skips a revoked
+one. Revoke-all: `revoke_share(sharing_intent_id = acceptance_id, expected_revision 1)` (creator or
+current manager). Activation reply `sharing` statement plus warning; `get_policy_status.sharing`
+(active/limitReached/expired/stopped/revoked, shared captures). Console: the policy page's sharing
+line and "Revoke all shares". The operation-name functions are not redefined (no new operation).
+
+Migration numbering: 00090 (ADR-237) and 00091 (ADR-238) are on unmerged branches; this branch was
+tested with uncommitted no-op placeholders for them, and the schema/upgrade checks fail on the gap
+until both merge. ADR-238 changes the share revision rule to "+1 per change"; revoke-all already
+writes `revision = revision + 1`, which is 2 under the current rule.
+
+Verification (tracked test/results files restored after each run; migrations 00090/00091 present
+locally as uncommitted no-op placeholders):
+- Unit: domain/capture (sharing state derivation, instruction validity), domain/authorization
+  (`PolicyShareManagement`: owner team of the automation binding only, sponsoring groups,
+  `evidence:share`; `PolicySharingManagedBy` team member yes, recipient no), application/capture
+  (compiler accepts the block and refuses >8/duplicate/foreign-issuer recipients, maxCaptures 0/101,
+  non-absolute end, management/outputSelection/reason with path; activation pins the owner team and
+  refuses without scope, owner on another binding/group, past or >7-day end, foreign recipients),
+  transport/presentation (activation statement and warning, `SharingNotPermitted`, status
+  `stopped`, `revoke_share(sharing_intent_id)` reply, both targets rejected). `go test ./internal/...
+  ./cmd/...`: all packages PASS except `internal/adapters/kubernetes`, which hit the 10-minute
+  default timeout on this loaded host (CI shards it into nine parts; unchanged by this increment);
+  its `-run Polic` subset PASS. Web vitest `src/policy`: 7 PASS. `make pre-push`: PASS.
+- Custody (real PostgreSQL), `--run '^(TestContextAdmissionWithRealServices|TestPermissionAuthorityPoliciesWithRealServices|TestCustodyUpgradeSchemaWithRealPostgres)$/^(policy-share-…|capture-time-share-…|evidence-share-…|progress-revisions-…|.*restart-trigger.*|.*policy.*|.*acceptance.*|.*upgrade.*|.*schema.*)$'`:
+  30 PASS, 0 FAIL. New `policy-share-counter-limit-end-stop-and-revoke-all` (29 s): genuine
+  acceptance A (maxCaptures 3) and policy-executor admissions through the compiled `capture-admit`
+  grants; captures 1–2 then, on a new admission adapter and pool (restarted hub), capture 3 are
+  shared and capture 4 is not; a replayed admission claims nothing; counter 3. Generation 2
+  activated as B: captures 5–6 shared under B, capture 4 stays unshared (no backfill), A's counter
+  unchanged. Generation 3 not activated: capture 7 unshared with B under its limit (Stop). Capture
+  6 published after B's `notAfter`: no share. Revoke-all of A through the compiled hub grants: a
+  recipient is refused, a current owner-team member (not the creator) revokes exactly A's 2 shares,
+  replay with the key returns 2, another key Conflict; B's share stays active; A's pending capture 3
+  publishes without a share; decreasing the counter, clearing the revocation or the share's
+  acceptance is refused. Upgrade 91 → 92 by the schema owner: PASS. Existing ADR-232/235 share
+  tests and the ADR-228 policy tests: PASS.
+- Installed `ASSERVAT_JOURNEY_FOCUS=policy` (`scripts/ci-native.sh continuation-policy`, fast
+  fixture), extended: the automation binding also holds evidence-owner, the restart DebugPolicy
+  shares one capture with the unrelated principal; activation (with `evidence:share`) states the
+  sharing; the first restart capture reports `sharing.state` Shared, the recipient's `get_case`
+  returns it with access `shared`, status `limitReached` with 1 shared capture (1m38s after start).
+  PASS, go test 710.5 s, harness wall 14 min, no cleanup failures.
+- Not run: the full custody and context suites; console browser test.
+
 ## Real-time connector retirement removed as a gate (2026-10-26)
 
 `connector-retirement` was removed from the native CI matrix and the Makefile: its single test waits

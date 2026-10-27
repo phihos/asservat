@@ -46,6 +46,9 @@ type Service struct {
 	// Administration names the installation administrators who may revoke
 	// any share (ADR-238); nil disables administrator revocation.
 	Administration Administrators
+	// Policies revokes recurring policy sharing (ADR-239); nil leaves
+	// revoke-all unavailable.
+	Policies PolicySharingStore
 }
 
 // CreateInput is the validated create_share input. A zero ExpiresAt
@@ -618,4 +621,67 @@ func createdBy(s value.Share, p identity.Principal) bool {
 // identity-free phase derivation.
 func projectionCurrentFor(p value.Projection, t value.Target, now time.Time) bool {
 	return p.Target == t && p.DeniesComplete && identity.Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) && identity.Fresh(p.DeniesObservedAt, p.DeniesFreshUntil, now, value.PermissionObservationInterval)
+}
+
+// PolicyRevokeResult is the outcome of revoking one acceptance's recurring
+// sharing (ADR-239).
+type PolicyRevokeResult struct {
+	AcceptanceID string
+	Revoked      int
+	Replay       bool
+}
+
+// RevokePolicySharing revokes every share of one policy acceptance's
+// recurring sharing and stops its future sharing (ADR-239, REQ-SHR-007), for
+// the instruction's creator, a current manager (a principal holding one of
+// the pinned owner-team assignments now on the policy's workload) or an
+// installation administrator (ADR-238). Revocation only restricts access.
+// Expected is the sharing's revision: 1 before revocation; the same key after
+// success is a replay. An acceptance without sharing, or one the caller may
+// not revoke, is NotAvailable.
+func (s Service) RevokePolicySharing(ctx context.Context, current identities.CurrentIdentity, acceptanceID string, expected int64, key string) (PolicyRevokeResult, error) {
+	var zero PolicyRevokeResult
+	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() || s.Policies == nil {
+		return zero, capture.ErrUnavailable
+	}
+	if !value.UUID(acceptanceID) || expected < 1 || !identity.Text(key, 128) {
+		return zero, capture.ErrInvalid
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	i, err := s.caller(ctx, current)
+	if err != nil {
+		return zero, err
+	}
+	recovery, err := s.recovery(ctx)
+	if err != nil {
+		return zero, err
+	}
+	sharing, err := s.Policies.PolicySharing(ctx, acceptanceID)
+	if errors.Is(err, capture.ErrDenied) {
+		return zero, capture.ErrDenied
+	}
+	if err != nil || sharing.AcceptanceID != acceptanceID {
+		return zero, capture.ErrUnavailable
+	}
+	revocation := PolicyRevocation{AcceptanceID: acceptanceID, Actor: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}
+	in := sharing.Instruction
+	if in.Creator.Issuer != i.Principal.Issuer || in.Creator.Subject != i.Principal.Subject {
+		var held []artifact.AudienceAssignment
+		if p, err := s.Permissions.Permissions(ctx, sharing.Target); err == nil {
+			held, _ = value.PolicySharingManagedBy(in.Creator, in.Management, sharing.Target, i, p, s.Now())
+		}
+		if len(held) == 0 && !s.administrator(ctx, i) {
+			return zero, capture.ErrDenied
+		}
+		revocation.Administrator = len(held) == 0
+		for _, a := range held {
+			revocation.Managers = append(revocation.Managers, a.AssignmentID)
+		}
+	}
+	revoked, replay, err := s.Policies.RevokePolicySharing(ctx, revocation, recovery)
+	if err != nil {
+		return zero, err
+	}
+	return PolicyRevokeResult{AcceptanceID: acceptanceID, Revoked: revoked, Replay: replay}, nil
 }
