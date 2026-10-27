@@ -2,6 +2,27 @@
 
 ## Encrypted capture history (ADR-255, implementation checkpoint)
 
+The isolated schema-101 composition at `11806a29` combines clean history
+checkpoint `c36d6452` with committed approved-recording candidate `f3a1fb60`.
+Funding remains migration 00100; encrypted history follows as 00101 and the
+compiled schema guard is 101. The later capture-target work in PR100 is not
+included and must be merged before publication. Both sets of approval/history
+contracts and prior qualification records are retained.
+
+Local full pre-push, pinned SQL generation, all 12 affected Go race packages and
+227 console tests passed. Focused real PostgreSQL/S3
+`history101-parameters-native-1` then passed with actual exit 0: selected
+`history-parameters-custody` 7.36 s, parent 7.81 s, Go 8.874 s, and harness phase
+33.022 s including compilation. All 3,200 source hashes independently matched,
+cleanup failures were empty, and both owned containers were independently absent.
+The run measured 4,208 ciphertext bytes against 1,671,168 reserved bytes and
+retained the existing synthetic authority/process boundaries. Its environment
+report SHA-256 is
+`1fd8289ae2778ef0eb94e62c9693253dc73fd240f68b0bfc3361a093a7dbbee3`;
+logs/report remain in the local qualification cache. No collector or Kubernetes
+fixture ran. This is composed custody evidence, not installed browser/full
+history qualification, publication or completion of the full goal.
+
 Migration 00101 and the typed history service add bounded encrypted parameter
 snapshots on the existing regional store, separate history-prefix capabilities,
 keyed selector/settings lookup, independent case-metadata retention, quota

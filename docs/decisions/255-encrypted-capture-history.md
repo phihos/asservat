@@ -217,3 +217,20 @@ Pod refusal, original filter/window/composition restoration, edited retention,
 collector/compiler drift refusal, policy current-Pod selection, final authority
 and expiry shortening during reads, and cursor audience/target/deadline binding.
 Full installed browser/MCP capture→settings→repeat qualification remains pending.
+
+## Schema-101 composition checkpoint
+
+The history migration is 00101 after ADR-257's 00100 funding correction; the
+compiled SQL adapter requires schema 101. Isolated composition `11806a29` retains
+history checkpoint `c36d6452` and committed approved-recording `f3a1fb60`, including
+original-owner cancellation checks. No history crypto, quota, retention,
+capability, regional unwrap restriction or fallback contract changes.
+
+Local pre-push, affected race and console checks passed. Focused real
+PostgreSQL/S3 `history101-parameters-native-1` passed the existing
+`history-parameters-custody` case (actual exit 0, 7.36 s selected / 8.874 s Go).
+All 3,200 captured source hashes matched and cleanup was empty, with owned
+containers independently absent. Physical ciphertext was 4,208 bytes against the
+unchanged 1,671,168-byte reservation. Authority/process inputs remain synthetic;
+installed console/history and later PR100 capture-target composition remain
+pending. Prior native results above retain their original source provenance.
