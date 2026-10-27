@@ -260,7 +260,7 @@ BEGIN
  ELSIF NEW.policy_not_after IS DISTINCT FROM OLD.policy_not_after THEN
   IF OLD.kind<>'policy' OR NEW.policy_not_after IS NULL OR NEW.policy_not_after>=OLD.policy_not_after
    OR (after_row-ARRAY['policy_not_after','expires_at'])<>(before_row-ARRAY['policy_not_after','expires_at'])
-   OR NEW.expires_at IS DISTINCT FROM CASE WHEN OLD.decision='approved' THEN NEW.policy_not_after ELSE NULL END THEN
+   OR NEW.expires_at IS DISTINCT FROM (CASE WHEN OLD.decision='approved' THEN NEW.policy_not_after ELSE NULL END) THEN
    RAISE EXCEPTION 'access grant deadline only shortens' USING ERRCODE='23514';
   END IF;
  ELSIF spent THEN

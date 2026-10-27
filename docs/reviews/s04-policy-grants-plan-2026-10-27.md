@@ -569,3 +569,12 @@ A multibyte golden is exercised in both languages; boundary/client/kind changes
 remain distinct and caller-selected mismatches must refuse. Attachment keys use
 an ordinary insertion-checked column too. Actual CHECK behavior remains pending
 another coordinated owned SQL run; generation/unit passes alone do not prove it.
+
+
+Smoke 2 (`fa5d053b`) passed the ordinary key-definition stage, then failed before
+Go tests while compiling the new grant trigger (42601): PL/pgSQL parsed an
+unparenthesized CASE inside an IF comparison as an incomplete condition. The
+correction explicitly groups that CASE; other new IF expressions were reviewed.
+No data/check/role proof resulted. Report SHA-256
+`7ab5b1df971dcc4ab113791634a5d33ba5c3cd35af87c9c94c5a3f6b0c268961`,
+unchanged sources, no cleanup failures, and both owned containers absent.
