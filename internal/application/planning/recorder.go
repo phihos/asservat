@@ -766,6 +766,51 @@ type recorderScope struct {
 	Approval   *approvalRecord        `json:"approval,omitempty"`
 }
 
+// normalizedRecorderAction is shared by manual and policy compilation. It
+// resolves immutable profile edits and compiled filter bytes without inventing
+// a capture identity, Pod, retention decision or caller authority.
+func normalizedRecorderAction(x expandedAction, componentID string) (recipeAction, value.RecorderAction, *compiledFilterRecord, error) {
+	var filter *compiledFilterRecord
+	id := generatedID("a", componentID, x.localID)
+	a := x.action
+	a.ID = id
+	var params any
+	summary := value.RecorderAction{ID: id, ComponentID: componentID, LocalID: x.localID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, EvidenceType: evidenceType(a.Kind), Timeout: a.Limits.Timeout, MaxBytes: a.Limits.MaxBytes}
+	var rr ring
+	if x.packet != nil {
+		params = x.packet
+		var kind struct {
+			Kind string `json:"kind"`
+		}
+		_ = json.Unmarshal(x.packet.Profile, &kind)
+		summary.Before, summary.After, summary.MaxFrozenBytes, summary.MaxConcurrentSnapshots, summary.PacketProfile, summary.Filter = x.packet.Before, x.packet.After, x.packet.MaxFrozenBytes, x.packet.MaxConcurrentSnapshots, kind.Kind, x.packet.Filter
+		rr = x.packet.Ring
+	} else {
+		s := x.syscall
+		params = s
+		summary.Before, summary.After, summary.MaxFrozenBytes, summary.MaxConcurrentSnapshots = s.Before, s.After, s.MaxFrozenBytes, s.MaxConcurrentSnapshots
+		summary.SyscallMode, summary.SyscallSelection, summary.SyscallNames, summary.Result = s.Mode, s.Syscalls.Mode, len(s.Syscalls.Names), s.Result
+		summary.MaxEvents, summary.MaxEventsPerSecond, summary.MaxTrackedThreads = s.MaxEvents, s.MaxEventsPerSecond, s.MaxTrackedThreads
+		rr = s.Ring
+	}
+	summary.RingMaxAge, summary.RingMaxBytes, summary.SegmentBytes, summary.MaxSegments = rr.MaxAge, rr.MaxBytes, rr.SegmentBytes, rr.MaxSegments
+	if encoded, err := json.Marshal(params); err != nil {
+		return recipeAction{}, value.RecorderAction{}, nil, value.ErrInvalid
+	} else {
+		a.Parameters = encoded
+	}
+	if x.filter != nil {
+		program := make([][4]uint32, 0, len(x.filter.Program))
+		for _, ins := range x.filter.Program {
+			program = append(program, [4]uint32{uint32(ins.Code), uint32(ins.Jt), uint32(ins.Jf), ins.K})
+		}
+		d := FilterProgramDigest(x.filter.Program)
+		summary.FilterInstructions, summary.FilterDigest = len(x.filter.Program), d
+		filter = &compiledFilterRecord{id, x.packet.Filter, x.filter.LinkType, x.filter.Snaplen, value.FilterProgramEncoding, program, hexDigest(d)}
+	}
+	return a, summary, filter, nil
+}
+
 // CompileRecorder compiles a one-component packet or syscall composition into
 // the reviewable recorder-preview/v1 plan (ADR-243). Only independently
 // resolved target, executor and retention facts enter it; reason, sharing and
@@ -813,40 +858,13 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 	scope.Filters = []compiledFilterRecord{}
 	out := value.RecorderPlan{Input: in, Profiles: []value.ResolvedProfile{{ComponentID: component.ID, Ref: component.Profile, DefinitionDigest: profile.Digest}}, CompiledAt: now}
 	for _, x := range actions {
-		id := generatedID("a", component.ID, x.localID)
-		a := x.action
-		a.ID = id
-		var params any
-		summary := value.RecorderAction{ID: id, ComponentID: component.ID, LocalID: x.localID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, EvidenceType: evidenceType(a.Kind), Timeout: a.Limits.Timeout, MaxBytes: a.Limits.MaxBytes}
-		var rr ring
-		if x.packet != nil {
-			params = x.packet
-			var kind struct {
-				Kind string `json:"kind"`
-			}
-			_ = json.Unmarshal(x.packet.Profile, &kind)
-			summary.Before, summary.After, summary.MaxFrozenBytes, summary.MaxConcurrentSnapshots, summary.PacketProfile, summary.Filter = x.packet.Before, x.packet.After, x.packet.MaxFrozenBytes, x.packet.MaxConcurrentSnapshots, kind.Kind, x.packet.Filter
-			rr = x.packet.Ring
-		} else {
-			s := x.syscall
-			params = s
-			summary.Before, summary.After, summary.MaxFrozenBytes, summary.MaxConcurrentSnapshots = s.Before, s.After, s.MaxFrozenBytes, s.MaxConcurrentSnapshots
-			summary.SyscallMode, summary.SyscallSelection, summary.SyscallNames, summary.Result = s.Mode, s.Syscalls.Mode, len(s.Syscalls.Names), s.Result
-			summary.MaxEvents, summary.MaxEventsPerSecond, summary.MaxTrackedThreads = s.MaxEvents, s.MaxEventsPerSecond, s.MaxTrackedThreads
-			rr = s.Ring
-		}
-		summary.RingMaxAge, summary.RingMaxBytes, summary.SegmentBytes, summary.MaxSegments = rr.MaxAge, rr.MaxBytes, rr.SegmentBytes, rr.MaxSegments
-		if a.Parameters, err = json.Marshal(params); err != nil {
+		a, summary, filter, err := normalizedRecorderAction(x, component.ID)
+		if err != nil {
 			return bad()
 		}
-		if x.filter != nil {
-			program := make([][4]uint32, 0, len(x.filter.Program))
-			for _, ins := range x.filter.Program {
-				program = append(program, [4]uint32{uint32(ins.Code), uint32(ins.Jt), uint32(ins.Jf), ins.K})
-			}
-			d := FilterProgramDigest(x.filter.Program)
-			summary.FilterInstructions, summary.FilterDigest = len(x.filter.Program), d
-			scope.Filters = append(scope.Filters, compiledFilterRecord{id, x.packet.Filter, x.filter.LinkType, x.filter.Snaplen, value.FilterProgramEncoding, program, hexDigest(d)})
+		id := a.ID
+		if filter != nil {
+			scope.Filters = append(scope.Filters, *filter)
 		}
 		if summary.EvidenceType != r.EvidenceType {
 			return bad()

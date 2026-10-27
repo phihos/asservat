@@ -6,6 +6,7 @@ import (
 
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -58,7 +59,10 @@ type RestartPolicy struct {
 	Resource *targets.ResourceCondition `json:",omitempty"`
 	// Sharing is the optional spec.sharing block (ADR-239). It is nil for a
 	// policy without one, so such a policy's scope digest is unchanged.
-	Sharing *PolicySharing `json:",omitempty"`
+	Sharing  *PolicySharing                        `json:",omitempty"`
+	Recorder *planning.PolicyRecorderConfiguration `json:",omitempty"`
+	// GrantRef is explicit control outside collection identity; it never resets spend.
+	GrantRef string `json:"-"`
 }
 
 // Detector kinds stored with watermarks and occurrences (migrations 00084
@@ -115,6 +119,9 @@ func (p RestartPolicy) Request() targets.RestartRequest {
 }
 
 func (p RestartPolicy) Valid() bool {
+	if p.Recorder != nil && !p.Recorder.Valid() || p.GrantRef != "" && !authorization.UUID(p.GrantRef) {
+		return false
+	}
 	if !authorization.UUID(p.ClusterID) || !identity.Text(p.Namespace, 63) || (p.WorkloadKind != "Deployment" && p.WorkloadKind != "StatefulSet") || !identity.Text(p.WorkloadName, 253) || p.Interval < time.Second || p.Interval > 24*time.Hour || p.Burst < 1 || p.Burst > 10 || p.RetentionSeconds < 1 || p.RetentionSeconds > privacy.MaxAgeSeconds || p.ObservedPods < 1 || p.ObservedPods > targets.MaxRestartPods {
 		return false
 	}

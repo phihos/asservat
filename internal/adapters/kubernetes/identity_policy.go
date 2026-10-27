@@ -156,6 +156,10 @@ func cloneIdentityPolicy(p value.Policy) value.Policy {
 	p.EligibleSubjects = slices.Clone(p.EligibleSubjects)
 	p.EligibleGroups = slices.Clone(p.EligibleGroups)
 	p.StepUp.ACRValues = slices.Clone(p.StepUp.ACRValues)
+	if p.PolicyGrants != nil {
+		periods := *p.PolicyGrants
+		p.PolicyGrants = &periods
+	}
 	return p
 }
 
@@ -174,6 +178,9 @@ func (c *IdentityPolicyClient) readPolicy(ctx context.Context, issuer string) (v
 	out = value.Policy{Revision: value.Revision{UID: ref.UID, Generation: wire.Revision, Digest: digest}, Issuer: wire.Issuer, ObservedAt: start, FreshUntil: start.Add(30 * time.Second), EligibleGroups: wire.EligibleGroups, GroupsAtIssueQualified: wire.GroupsAtIssueQualified, GroupMaxAge: time.Duration(wire.GroupMaxAgeSeconds) * time.Second}
 	if a := wire.Approvals; a != nil {
 		out.RequireRecordingApproval = a.RequireRecordingApproval
+		if v := a.PolicyGrants; v != nil {
+			out.PolicyGrants = &value.PolicyGrantApproval{DefaultAge: time.Duration(v.DefaultAgeSeconds) * time.Second, MaxAge: time.Duration(v.MaxAgeSeconds) * time.Second, RenewalNotice: time.Duration(v.RenewalNoticeSeconds) * time.Second}
+		}
 		if a.StepUp != nil {
 			out.StepUp = value.StepUpPolicy{ACRValues: slices.Clone(a.StepUp.ACRValues), MaxAge: time.Duration(a.StepUp.MaxAgeSeconds) * time.Second}
 		}

@@ -12,6 +12,13 @@ import (
 type ProjectionReader interface {
 	Permissions(context.Context, value.Target) (value.Projection, error)
 }
+
+// WorkloadProjectionReader is the separate management/review projection for
+// future policy replicas; it cannot supply concrete-Pod execution authority.
+type WorkloadProjectionReader interface {
+	WorkloadPermissions(context.Context, value.WorkloadTarget) (value.WorkloadProjection, error)
+}
+
 type AudienceReader interface {
 	RetainedAudience(context.Context, string) (value.Retained, error)
 }

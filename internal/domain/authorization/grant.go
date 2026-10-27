@@ -74,11 +74,12 @@ func (e ApprovalPendingError) Unwrap() error { return ErrApprovalRequired }
 type GrantPhase string
 
 const (
-	GrantPending  GrantPhase = "Pending"
-	GrantApproved GrantPhase = "Approved"
-	GrantDenied   GrantPhase = "Denied"
-	GrantRevoked  GrantPhase = "Revoked"
-	GrantExpired  GrantPhase = "Expired"
+	GrantPending   GrantPhase = "Pending"
+	GrantApproved  GrantPhase = "Approved"
+	GrantDenied    GrantPhase = "Denied"
+	GrantRevoked   GrantPhase = "Revoked"
+	GrantExpired   GrantPhase = "Expired"
+	GrantExhausted GrantPhase = "Exhausted"
 )
 
 // SensitiveReason names why a plan needs individual approval: one action
@@ -143,23 +144,27 @@ type Grant struct {
 	RequestedAt, ReviewUntil                          time.Time
 	Lifetime                                          time.Duration
 	ResultAccess                                      *ResultAccess
-	Decision                                          *GrantDecision
-	ExpiresAt                                         time.Time
-	RevokedAt                                         time.Time
-	Revoker                                           identity.Principal
-	Revision                                          int64
-	Spent                                             GrantSpend
+	Policy                                            *PolicyGrantScope
+	// PolicyNotAfter is the monotonic accepted-settings overlay, also for pending requests.
+	PolicyNotAfter time.Time
+	Decision       *GrantDecision
+	ExpiresAt      time.Time
+	RevokedAt      time.Time
+	Revoker        identity.Principal
+	Revision       int64
+	Spent          GrantSpend
+	PolicySpend    PolicyGrantSpend `json:",omitzero"`
 }
 
 func validDataClass(c string) bool { return c == "metadata" || c == "extract" || c == "raw" }
 
 func (g Grant) Valid() bool {
-	if !UUID(g.ID) || !UUID(g.RootID) || g.Kind != GrantAdHocCapture || !UUID(g.PreviewID) || !UUID(g.CaptureID) || !g.Target.Valid() ||
+	if !UUID(g.ID) || !UUID(g.RootID) || !g.validKindScope() ||
 		g.ExecutionDigest == (artifact.Digest{}) || g.ReviewDigest == (artifact.Digest{}) || !validDataClass(g.DataClass) ||
 		len(g.Reasons) < 1 || len(g.Reasons) > GrantMaxReasons || len(g.Scope) < 2 || len(g.Scope) > GrantMaxScopeBytes || len(g.Review) < 2 || len(g.Review) > GrantMaxReviewBytes ||
-		!g.Requester.Valid() || g.Requester.Kind != identity.Human ||
+		!g.Requester.Valid() ||
 		g.RequestedAt.IsZero() || !g.ReviewUntil.After(g.RequestedAt) || g.ReviewUntil.Sub(g.RequestedAt) > GrantReviewWindow ||
-		g.Lifetime < time.Minute || g.Lifetime > GrantMaxLifetime || g.Revision < 1 || g.Revision > GrantMaxRevision {
+		g.Revision < 1 || g.Revision > GrantMaxRevision {
 		return false
 	}
 	if (g.ResultAccess == nil) != (g.ResultAccessDigest == (artifact.Digest{})) || g.ResultAccess != nil && (!g.ResultAccess.Valid() || !g.ResultAccess.NotAfter.After(g.RequestedAt) || g.ResultAccess.NotAfter.After(g.RequestedAt.Add(GrantMaxLifetime))) {
@@ -175,13 +180,19 @@ func (g Grant) Valid() bool {
 		if !d.Approver.Valid() || d.Approver.Kind != identity.Human || sameHuman(d.Approver, g.Requester) || !identity.Text(d.Reason, 512) || d.DecidedAt.Before(g.RequestedAt) || d.DecidedAt.After(g.ReviewUntil) {
 			return false
 		}
-		if d.Approved != !g.ExpiresAt.IsZero() || d.Approved && !g.ExpiresAt.Equal(g.expiryAt(d.DecidedAt)) || d.Approved && (d.ACR == "" || d.AuthenticatedAt.IsZero() || d.AuthenticatedAt.After(d.DecidedAt)) {
+		if d.Approved != !g.ExpiresAt.IsZero() || d.Approved && !g.validApprovedExpiry(d.DecidedAt) || d.Approved && (d.ACR == "" || d.AuthenticatedAt.IsZero() || d.AuthenticatedAt.After(d.DecidedAt)) {
 			return false
 		}
 	} else if !g.ExpiresAt.IsZero() {
 		return false
 	}
 	if !g.RevokedAt.IsZero() && !g.Revoker.Valid() {
+		return false
+	}
+	if g.Kind == GrantPolicy && (!g.PolicySpend.valid(g.Policy) || (g.Decision == nil || !g.Decision.Approved) && g.PolicySpend != (PolicyGrantSpend{}) || g.Spent != (GrantSpend{})) {
+		return false
+	}
+	if g.Kind != GrantPolicy && g.PolicySpend != (PolicyGrantSpend{}) {
 		return false
 	}
 	return g.Spent.Artifacts >= 0 && g.Spent.Bytes >= 0 && g.Spent.Operations >= 0
@@ -191,6 +202,9 @@ func (g Grant) Valid() bool {
 // lifetime from the decision, never past the result-access NotAfter.
 func (g Grant) expiryAt(decided time.Time) time.Time {
 	end := decided.Add(g.Lifetime)
+	if g.Kind == GrantPolicy && g.Policy != nil {
+		end = g.PolicyNotAfter
+	}
 	if g.ResultAccess != nil {
 		end = identity.Earlier(end, g.ResultAccess.NotAfter)
 	}
@@ -205,7 +219,7 @@ func (g Grant) Phase(now time.Time) GrantPhase {
 	switch {
 	case !g.RevokedAt.IsZero():
 		return GrantRevoked
-	case g.Decision == nil && !now.Before(g.ReviewUntil):
+	case g.Decision == nil && (!now.Before(g.ReviewUntil) || g.Kind == GrantPolicy && !now.Before(g.PolicyNotAfter)):
 		return GrantExpired
 	case g.Decision == nil:
 		return GrantPending
@@ -213,6 +227,8 @@ func (g Grant) Phase(now time.Time) GrantPhase {
 		return GrantDenied
 	case !now.Before(g.ExpiresAt):
 		return GrantExpired
+	case g.Kind == GrantPolicy && g.PolicySpend.Exhausted(g.Policy):
+		return GrantExhausted
 	}
 	return GrantApproved
 }
@@ -227,6 +243,8 @@ func phaseError(p GrantPhase) error {
 		return ErrGrantDenied
 	case GrantExpired:
 		return ErrGrantExpired
+	case GrantExhausted:
+		return ErrPolicyGrantBudgetExhausted
 	}
 	return ErrApprovalRequired
 }
@@ -277,7 +295,7 @@ func CheckCaptureUse(g Grant, caller identity.Identity, captureID string, execut
 	if !caller.Valid(now) || caller.Principal != g.Requester {
 		return ErrGrantPrincipal
 	}
-	if g.CaptureID != captureID || g.ExecutionDigest != execution || g.ReviewDigest != review {
+	if g.Kind != GrantAdHocCapture || g.CaptureID != captureID || g.ExecutionDigest != execution || g.ReviewDigest != review {
 		return ErrGrantScope
 	}
 	return nil
@@ -369,5 +387,30 @@ func CanRevoke(g Grant, actor identity.Identity, approver Result, now time.Time)
 	if !actor.Valid(now) || actor.Principal.Kind != identity.Human || !g.RevokedAt.IsZero() {
 		return false
 	}
-	return sameHuman(actor.Principal, g.Requester) || approver.Eligible && approver.Principal == actor.Principal && now.Before(approver.ValidUntil)
+	return g.Kind == GrantAdHocCapture && sameHuman(actor.Principal, g.Requester) || approver.Eligible && approver.Principal == actor.Principal && now.Before(approver.ValidUntil)
+}
+
+// validKindScope keeps policy team authority disjoint from personal capture
+// authority. Policy fields may never be smuggled into an old ad hoc scope.
+func (g Grant) validKindScope() bool {
+	switch g.Kind {
+	case GrantAdHocCapture:
+		return g.Policy == nil && g.PolicyNotAfter.IsZero() && g.Requester.Kind == identity.Human && UUID(g.PreviewID) && UUID(g.CaptureID) && g.Target.Valid() && g.Lifetime >= time.Minute && g.Lifetime <= GrantMaxLifetime
+	case GrantPolicy:
+		_, _, executorRequester := PolicyExecutor(g.Requester)
+		return !executorRequester && g.Policy != nil && g.Policy.valid(g.RequestedAt) && g.PolicyNotAfter.After(g.RequestedAt) && !g.PolicyNotAfter.After(identity.Earlier(g.RequestedAt.Add(g.Lifetime), g.Policy.Authority.NotAfter)) && g.ExecutionDigest == g.Policy.Authority.ScopeDigest && g.PreviewID == "" && g.CaptureID == "" && g.Target == (Target{}) && g.ResultAccess == nil && g.ResultAccessDigest == (artifact.Digest{}) && g.Lifetime >= time.Second && g.Lifetime <= g.Policy.ApprovalMaxAge
+	default:
+		return false
+	}
+}
+
+func (g Grant) validApprovedExpiry(decided time.Time) bool {
+	end := g.expiryAt(decided)
+	if g.Kind == GrantPolicy {
+		// Accepted lower policy maxima shorten this overlay under SQL locks. The
+		// original scope/lifetime remain immutable and raising a maximum cannot
+		// lengthen the persisted expiry.
+		return g.ExpiresAt.Equal(end)
+	}
+	return g.ExpiresAt.Equal(end)
 }

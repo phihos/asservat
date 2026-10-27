@@ -9,6 +9,15 @@
       "const": "approval-policy/v1"
     },
     "policyGrants": {
+      "$ref": "https://asservat.io/spec/v1/approval-policy.schema.json#/$defs/policyGrants"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "policyGrants"
+  ],
+  "$defs": {
+    "policyGrants": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -34,9 +43,5 @@
         "renewalNoticeSeconds"
       ]
     }
-  },
-  "required": [
-    "schemaVersion",
-    "policyGrants"
-  ]
+  }
 }

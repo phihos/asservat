@@ -450,6 +450,15 @@ func (s *PolicyTriggers) DeactivatePolicy(ctx context.Context, policy, acceptanc
 // covers the workload (ADR-059: a sole qualifying binding is chosen
 // automatically; none or several requires a visible operator choice).
 func (s *PolicyTriggers) Delegation(ctx context.Context, target authorization.Target) (identity.Revision, error) {
+	if !target.Valid() {
+		return identity.Revision{}, value.ErrInvalid
+	}
+	return s.WorkloadDelegation(ctx, authorization.WorkloadTarget{ClusterID: target.ClusterID, NamespaceUID: target.NamespaceUID, WorkloadUID: target.WorkloadUID})
+}
+
+// WorkloadDelegation selects the sole current automation basis without
+// inventing a Pod identity for policy activation.
+func (s *PolicyTriggers) WorkloadDelegation(ctx context.Context, target authorization.WorkloadTarget) (identity.Revision, error) {
 	var out identity.Revision
 	if s == nil || !target.Valid() {
 		return out, value.ErrInvalid

@@ -1,5 +1,9 @@
 # Decision records
 
+[ADR-259 — Policy grants and observation spend](259-policy-grants-and-observation-spend.md)
+records the accepted team-policy grant and single authority/credit renewal design.
+Implementation and installed qualification remain in progress.
+
 [ADR-253 — Approval step-up sign-in](253-approval-stepup-login.md) adds an explicit console
 sign-in path using current protected ACR settings and fresh authentication. The
 existing signed-claim check still decides assurance; real-provider LoA qualification

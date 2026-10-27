@@ -1,7 +1,9 @@
 package presentation
 
 import (
+	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/transport/conversion"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,70 +26,10 @@ type RecorderPreviewUseCase interface {
 
 // CompositionInput is the runtime subset of capture-composition.schema.json.
 // The input schema has already fixed each override's value shape by field.
-type CompositionInput struct {
-	Components []struct {
-		ID         string `json:"id"`
-		ProfileRef struct {
-			Catalog string `json:"catalog"`
-			Name    string `json:"name"`
-			Version string `json:"version"`
-		} `json:"profileRef"`
-		Overrides []struct {
-			ActionID string          `json:"actionID"`
-			Field    string          `json:"field"`
-			Value    json.RawMessage `json:"value"`
-		} `json:"overrides"`
-	} `json:"components"`
-	MaxTotalBytes int64  `json:"maxTotalBytes"`
-	MaxDuration   string `json:"maxDuration"`
-}
+type CompositionInput contracts.CaptureComposition
 
-type ringInput struct {
-	MaxAge            string `json:"maxAge"`
-	MaxBytes          int64  `json:"maxBytes"`
-	SegmentBytes      int64  `json:"segmentBytes"`
-	MaxSegments       int    `json:"maxSegments"`
-	Medium            string `json:"medium"`
-	StorageProfileRef string `json:"storageProfileRef"`
-}
-
-// composition converts typed literal values. Fields whose value types this
-// release does not model stay Unmodeled; the compiler refuses them by path.
 func (in *CompositionInput) composition() (*planning.ProfileComposition, error) {
-	out := &planning.ProfileComposition{MaxTotalBytes: in.MaxTotalBytes, MaxDuration: in.MaxDuration}
-	for _, c := range in.Components {
-		component := planning.ProfileComponent{ID: c.ID, Profile: planning.ProfileRef{Catalog: c.ProfileRef.Catalog, Name: c.ProfileRef.Name, Version: c.ProfileRef.Version}}
-		for _, o := range c.Overrides {
-			e := planning.ProfileEdit{ActionID: o.ActionID, Field: o.Field}
-			var err error
-			switch o.Field {
-			case "packetFilter", "packetBefore", "packetAfter", "syscallMode", "syscallBefore", "syscallAfter", "actionTimeout", "actionExecutionMode", "filePath", "profileDuration":
-				err = json.Unmarshal(o.Value, &e.Text)
-				e.TextSet = err == nil && e.Text == "" // present but empty: the field validator gives the remedy
-			case "syscallMaxEvents", "syscallRate", "actionMaxBytes":
-				err = json.Unmarshal(o.Value, &e.Number)
-			case "packetRing", "syscallRing":
-				var r ringInput
-				err = json.Unmarshal(o.Value, &r)
-				e.Ring = &planning.RingSettings{MaxAge: r.MaxAge, MaxBytes: r.MaxBytes, SegmentBytes: r.SegmentBytes, MaxSegments: r.MaxSegments, Medium: r.Medium, StorageProfileRef: r.StorageProfileRef}
-			case "syscallFilter":
-				var f struct {
-					Mode  string   `json:"mode"`
-					Names []string `json:"names"`
-				}
-				err = json.Unmarshal(o.Value, &f)
-				e.Syscalls = &planning.SyscallSelection{Mode: f.Mode, Names: f.Names}
-			default:
-				e.Unmodeled = true
-			}
-			if err != nil {
-				return nil, err
-			}
-			component.Edits = append(component.Edits, e)
-		}
-		out.Components = append(out.Components, component)
-	}
-	return out, nil
+	return conversion.CompositionFromWire(contracts.CaptureComposition(*in))
 }
 
 // RecorderPreviewData is preview_capture's composition reply (ADR-243). The

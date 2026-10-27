@@ -16,13 +16,28 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	planvalue "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 )
 
+// PolicyRecorderCompiler converts/compiles a source composition at the
+// composition root. Shared DTO decoding stays outside application/domain layers.
+type PolicyRecorderCompiler func(json.RawMessage) (planvalue.PolicyRecorderConfiguration, error)
+
 // CompileRestartPolicy compiles a schema-valid DebugPolicy spec. The recipe
 // is the installation's exact context recipe, supplied by the caller.
 func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.Digest) (value.RestartPolicy, error) {
+	return compilePolicy(spec, recipeName, recipeDigest, nil, false)
+}
+
+// CompilePolicyWithRecorders accepts only the finite onTrigger recording path;
+// ongoing sources remain unavailable until their separate arming implementation.
+func CompilePolicyWithRecorders(spec []byte, recipeName string, recipeDigest artifact.Digest, compileRecorder PolicyRecorderCompiler) (value.RestartPolicy, error) {
+	return compilePolicy(spec, recipeName, recipeDigest, compileRecorder, true)
+}
+
+func compilePolicy(spec []byte, recipeName string, recipeDigest artifact.Digest, compileRecorder PolicyRecorderCompiler, recorders bool) (value.RestartPolicy, error) {
 	var out value.RestartPolicy
 	reject := func(path, reason string) (value.RestartPolicy, error) {
 		return value.RestartPolicy{}, value.PolicyFieldError{Path: "spec" + path, Reason: reason}
@@ -35,7 +50,16 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 		switch key {
 		case "target", "detectors", "when", "recipeRef", "budgets", "retention", "suspended", "observation", "evaluation", "recordingSaves", "sharing":
 		case "profileComposition":
-			return reject(policyComposition(s[key]))
+			if !recorders {
+				return reject(policyComposition(s[key]))
+			}
+		case "grantRef":
+			if !recorders {
+				return reject(".grantRef", "policy grants are unavailable on this path")
+			}
+			if strict(s[key], &out.GrantRef) != nil || !authorization.UUID(out.GrantRef) {
+				return reject(".grantRef", "must name an exact grant UUID")
+			}
 		default:
 			return reject("."+key, "unsupported in this release (ADR-228)")
 		}
@@ -120,16 +144,35 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 	if when.Detector != detector.ID {
 		return reject(".when.detector", "names no detector")
 	}
-	var recipe struct{ Name, Digest string }
-	if strict(s["recipeRef"], &recipe) != nil {
-		return reject(".recipeRef", "invalid")
+	if raw := s["profileComposition"]; raw != nil {
+		if s["recipeRef"] != nil {
+			return reject(".recipeRef", "select exactly one recipe or profile composition")
+		}
+		if compileRecorder == nil {
+			return reject(".profileComposition", "recorder compiler unavailable")
+		}
+		compiled, err := compileRecorder(raw)
+		if err != nil {
+			return value.RestartPolicy{}, err
+		}
+		if !compiled.Valid() {
+			return reject(".profileComposition", "invalid resolved recording")
+		}
+
+		out.Recorder = &compiled
+	} else {
+		var recipe struct{ Name, Digest string }
+		if strict(s["recipeRef"], &recipe) != nil {
+			return reject(".recipeRef", "invalid")
+		}
+		if recipe.Name != recipeName {
+			return reject(".recipeRef.name", "only "+recipeName+" is supported in this release")
+		}
+		if recipe.Digest != hex.EncodeToString(recipeDigest[:]) {
+			return reject(".recipeRef.digest", "does not match the installed recipe")
+		}
 	}
-	if recipe.Name != recipeName {
-		return reject(".recipeRef.name", "only "+recipeName+" is supported in this release")
-	}
-	if recipe.Digest != hex.EncodeToString(recipeDigest[:]) {
-		return reject(".recipeRef.digest", "does not match the installed recipe")
-	}
+
 	var budgets struct {
 		Cooldown              string
 		Burst                 int

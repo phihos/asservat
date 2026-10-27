@@ -39,9 +39,7 @@ type GrantReviewAction struct {
 }
 
 // GrantObservationLimits are the plan's REQ-AUT-006 limits.
-type GrantObservationLimits struct {
-	MaxSessionSeconds, MaxObservedBytes, MaxBytesPerSecond, MaxConcurrentSessions int64
-}
+type GrantObservationLimits = value.ObservationLimits
 
 // GrantReview is the bounded review summary stored with the request. The
 // frozen Scope remains the authority; this is its presentation.
@@ -135,6 +133,10 @@ type GrantRecovery interface {
 type GrantService struct {
 	RootID, InstallationID string
 	Permissions            ProjectionReader
+	WorkloadPermissions    WorkloadProjectionReader
+	PolicyPlans            PolicyGrantPlanReader
+	PolicyRequests         PolicyGrantRequestReader
+	ApprovalSettings       PolicyApprovalSettingsReader
 	Store                  GrantStore
 	Recovery               GrantRecovery
 	NewID                  func() string
@@ -154,18 +156,29 @@ func (s GrantService) ready() bool {
 	return s.Permissions != nil && s.Store != nil && s.Recovery != nil && s.NewID != nil && s.Now != nil && value.UUID(s.RootID) && value.UUID(s.InstallationID)
 }
 
-func (s GrantService) human(ctx context.Context, current identities.CurrentIdentity, scopes ...string) (identity.Identity, error) {
+func (s GrantService) actor(ctx context.Context, current identities.CurrentIdentity, scopes ...string) (identity.Identity, error) {
 	if current == nil {
 		return identity.Identity{}, identity.ErrDenied
 	}
 	i, err := current.ResolveIdentity(ctx)
-	if err != nil || !i.Valid(s.Now()) || i.Principal.Kind != identity.Human || !slices.Contains(i.Scopes, "evidence:read") {
+	if err != nil || !i.Valid(s.Now()) || !slices.Contains(i.Scopes, "evidence:read") {
 		return identity.Identity{}, identity.ErrDenied
 	}
 	for _, scope := range scopes {
 		if !slices.Contains(i.Scopes, scope) {
 			return identity.Identity{}, identity.ErrDenied
 		}
+	}
+	return i, nil
+}
+
+func (s GrantService) human(ctx context.Context, current identities.CurrentIdentity, scopes ...string) (identity.Identity, error) {
+	i, err := s.actor(ctx, current, scopes...)
+	if err != nil {
+		return identity.Identity{}, err
+	}
+	if i.Principal.Kind != identity.Human {
+		return identity.Identity{}, identity.ErrDenied
 	}
 	return i, nil
 }
@@ -209,6 +222,19 @@ func ResultAccessDigest(captureID string, execution artifact.Digest, r value.Res
 // result-access digests, target, data class, reasons, lifetime and the
 // review summary. Every use recomputes it from the stored row.
 func ReviewDigest(g value.Grant, review []byte) artifact.Digest {
+	if g.Kind == value.GrantPolicy {
+		b, _ := json.Marshal(struct {
+			Kind            string
+			Policy          *value.PolicyGrantScope
+			ExecutionDigest artifact.Digest
+			DataClass       string
+			Reasons         []value.SensitiveReason
+			LifetimeSeconds int64
+			Review          json.RawMessage
+		}{g.Kind, g.Policy, g.ExecutionDigest, g.DataClass, g.Reasons, int64(g.Lifetime / time.Second), review})
+		return sha256.Sum256(b)
+	}
+
 	b, _ := json.Marshal(struct {
 		Kind, PreviewID, CaptureID          string
 		Target                              value.Target
@@ -372,7 +398,7 @@ func (s GrantService) Decide(ctx context.Context, current identities.CurrentIden
 	if err != nil {
 		return zero, false, err
 	}
-	eligible, err := s.collector(ctx, i, g.Target, value.ApproveAction)
+	eligible, err := s.grantEligibility(ctx, i, g, value.ApproveAction)
 	if err != nil {
 		return zero, false, err
 	}
@@ -431,14 +457,14 @@ func (s GrantService) Revoke(ctx context.Context, current identities.CurrentIden
 		return zero, false, err
 	}
 	approver := value.Result{}
-	if !sameHuman(g.Requester, i.Principal) {
-		if approver, err = s.collector(ctx, i, g.Target, value.ApproveAction); err != nil {
+	if g.Kind == value.GrantPolicy || !sameHuman(g.Requester, i.Principal) {
+		if approver, err = s.revocationEligibility(ctx, i, g); err != nil {
 			return zero, false, err
 		}
 	}
 	// Who may revoke is settled before any state of the grant is disclosed.
 	currentApprover := approver.Eligible && approver.Principal == i.Principal && s.Now().Before(approver.ValidUntil)
-	if !sameHuman(g.Requester, i.Principal) && !currentApprover {
+	if (g.Kind == value.GrantPolicy || !sameHuman(g.Requester, i.Principal)) && !currentApprover {
 		return zero, false, value.ErrNotApprover
 	}
 	if !g.RevokedAt.IsZero() {
@@ -468,7 +494,7 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	i, err := s.human(ctx, current)
+	i, err := s.actor(ctx, current)
 	if err != nil {
 		return GrantView{}, time.Time{}, err
 	}
@@ -482,10 +508,13 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 	if err != nil {
 		return GrantView{}, time.Time{}, ErrGrantUnavailable
 	}
+	if i.Principal.Kind != identity.Human && (g.Kind != value.GrantPolicy || g.Requester != i.Principal) {
+		return GrantView{}, time.Time{}, ErrGrantNotFound
+	}
 	until := i.ValidUntil
 	v := GrantView{Grant: g, Phase: g.Phase(s.Now())}
 	if !sameHuman(g.Requester, i.Principal) {
-		r, err := s.collector(ctx, i, g.Target, value.ApproveAction)
+		r, err := s.grantEligibility(ctx, i, g, value.ApproveAction)
 		if err != nil || !r.Eligible {
 			return GrantView{}, time.Time{}, ErrGrantNotFound
 		}
@@ -509,9 +538,12 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	i, err := s.human(ctx, current)
+	i, err := s.actor(ctx, current)
 	if err != nil {
 		return nil, time.Time{}, err
+	}
+	if view == "pending" && i.Principal.Kind != identity.Human {
+		return nil, time.Time{}, identity.ErrDenied
 	}
 	var rows []value.Grant
 	if view == "pending" {
@@ -524,6 +556,7 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 	}
 	until := i.ValidUntil
 	results := map[value.Target]value.Result{}
+	workloadResults := map[value.WorkloadTarget]value.Result{}
 	out := make([]GrantView, 0, min(limit, len(rows)))
 	for _, g := range rows {
 		if len(out) == limit {
@@ -535,17 +568,24 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 				continue
 			}
 			r, ok := results[g.Target]
+			if g.Kind == value.GrantPolicy && g.Policy != nil {
+				r, ok = workloadResults[g.Policy.Workload()]
+			}
 			if !ok {
-				if r, err = s.collector(ctx, i, g.Target, value.ApproveAction); err != nil {
+				if r, err = s.grantEligibility(ctx, i, g, value.ApproveAction); err != nil {
 					r = value.Result{}
 				}
-				results[g.Target] = r
+				if g.Kind == value.GrantPolicy && g.Policy != nil {
+					workloadResults[g.Policy.Workload()] = r
+				} else {
+					results[g.Target] = r
+				}
 			}
 			if !r.Eligible {
 				continue
 			}
 			v.Approver, until = true, identity.Earlier(until, r.ValidUntil)
-		} else if !sameHuman(g.Requester, i.Principal) {
+		} else if !sameHuman(g.Requester, i.Principal) || i.Principal.Kind != identity.Human && (g.Kind != value.GrantPolicy || g.Requester != i.Principal) {
 			return nil, time.Time{}, ErrGrantUnavailable
 		}
 		if json.Unmarshal(g.Review, &v.Review) != nil {

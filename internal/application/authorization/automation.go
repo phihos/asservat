@@ -50,3 +50,10 @@ func (e AutomationEvaluator) Eligibility(ctx context.Context, use value.PolicyUs
 	}
 	return result
 }
+
+// WorkloadAutomationAuthorityReader reads an envelope before accepted authority
+// exists. It uses a real workload and delegation, with no placeholder Pod or
+// invented positive execution/byte limits merely to select an envelope.
+type WorkloadAutomationAuthorityReader interface {
+	PolicyWorkloadAutomation(context.Context, value.WorkloadTarget, identity.Revision) (value.WorkloadAutomationProjection, error)
+}

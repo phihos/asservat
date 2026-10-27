@@ -65,10 +65,14 @@ type PolicyActivation struct {
 	Ledger                 PolicyActivationLedger
 	Permissions            PolicyPermissions
 	Automation             authapp.AutomationAuthorityReader
-	Acceptor               PolicyAcceptor
-	Audit                  PolicyAuditPublisher
-	Recovery               fleetapp.RecoveryReader
-	Now                    func() time.Time
+	// Recorder activation reads real workload delegation directly; it never
+	// creates a placeholder Pod or draft authority to select an envelope.
+	WorkloadAutomation authapp.WorkloadAutomationAuthorityReader
+	CompileRecorder    PolicyRecorderCompiler
+	Acceptor           PolicyAcceptor
+	Audit              PolicyAuditPublisher
+	Recovery           fleetapp.RecoveryReader
+	Now                func() time.Time
 	// Report receives a fixed refusal stage; diagnostics only.
 	Report func(string)
 }
@@ -190,6 +194,9 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 		return zero, value.ErrChanged
 	}
 	compiled, err := CompileRestartPolicy(spec, s.RecipeName, s.RecipeDigest)
+	if s.CompileRecorder != nil {
+		compiled, err = CompilePolicyWithRecorders(spec, s.RecipeName, s.RecipeDigest, s.CompileRecorder)
+	}
 	if err != nil {
 		return zero, s.refused("compile", err)
 	}
@@ -200,7 +207,6 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	if err != nil {
 		return zero, s.refused("workload", err)
 	}
-	target := authorization.Target{ClusterID: compiled.ClusterID, NamespaceUID: observed.Namespace.UID, WorkloadUID: observed.Workload.UID, PodUID: observed.Workload.UID}
 	if active, err := s.Ledger.ActiveClusterPolicies(ctx, compiled.ClusterID, source.Revision.UID); err != nil {
 		return zero, s.refused("count", err)
 	} else if active >= value.MaxActivePoliciesPerCluster {
@@ -210,6 +216,10 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	if err != nil {
 		return zero, s.refused("status", err)
 	}
+	if compiled.Recorder != nil {
+		return s.activateRecorderPolicy(ctx, author, recovery, source, compiled, observed, status, nonce, sharingReviewed)
+	}
+	target := authorization.Target{ClusterID: compiled.ClusterID, NamespaceUID: observed.Namespace.UID, WorkloadUID: observed.Workload.UID, PodUID: observed.Workload.UID}
 	delegation, err := s.Ledger.Delegation(ctx, target)
 	if err != nil {
 		return zero, s.delegationRefused("basis")
