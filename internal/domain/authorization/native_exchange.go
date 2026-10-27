@@ -86,6 +86,16 @@ func NativeLeaseWindow(kind NativeOperationKind) time.Duration {
 	return 5 * time.Second
 }
 
+// NativeConversationWindow bounds transport ownership independently of a
+// current SQL/peer observation. A response may obtain new short observations
+// inside this fixed interval; none can extend the original operation.
+func NativeConversationWindow(kind NativeOperationKind) time.Duration {
+	if kind == NativeResponse {
+		return identity.EvidenceReadRequestWindow
+	}
+	return NativeLeaseWindow(kind)
+}
+
 // Accepted qualification/backing is supplied by protected installation input,
 // never estimated by a runtime or inferred from available SQL disk space.
 // Exact bounds cover heap/TOAST/index and full transaction/rollback WAL within
