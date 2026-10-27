@@ -69,6 +69,8 @@ type RegionalCapacity struct {
 	ProbeNamespace   WorkerObjectReference    `json:"probeNamespace"`
 	ProbeAccount     WorkerObjectReference    `json:"probeAccount"`
 	ProbeAudience    string                   `json:"probeAudience"`
+	// WorkloadGuard is the region's workload metadata guard (ADR-247).
+	WorkloadGuard *WorkloadMetadataGuard `json:"workloadGuard,omitempty"`
 }
 
 // RegionalAPIContext pins the regional context-start inputs. The capacity

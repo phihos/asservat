@@ -837,7 +837,7 @@ func (k *InstallerContinuation) Owner(ctx context.Context, resources *kube.Initi
 			}
 			c, s := caller.Pin, k.capacity.sources
 			input.Observation.LocalCapacity = &contracts.OwnerLocalCapacityObservation{Guard: s.NamespaceGuard, Keys: slices.Sorted(slices.Values(k.input.Public.Capacity.NamespaceKeys)),
-				ProbeNamespace: s.ProbeNamespace, ProbeAccount: s.ProbeAccount, ProbeAudience: k.plan.Plan.ProbeAudience,
+				ProbeNamespace: s.ProbeNamespace, ProbeAccount: s.ProbeAccount, ProbeAudience: k.plan.Plan.ProbeAudience, WorkloadGuard: s.WorkloadGuard,
 				Caller: contracts.OwnerObservationCaller{Account: c.Account, AccountUID: c.AccountUID, Deployment: c.Deployment, DeploymentUID: c.DeploymentUID,
 					TemplateDigest: hex.EncodeToString(c.TemplateDigest[:]), ImageDigest: hex.EncodeToString(c.ImageDigest[:]), ProtectionDigest: hex.EncodeToString(c.ProtectionDigest[:])}}
 		}
@@ -1315,7 +1315,7 @@ func (k *InstallerContinuation) Permission(ctx context.Context, resources *kube.
 			if projection == nil {
 				deployment := contracts.PermissionDeployment{Format: contracts.PermissionDeploymentFormat, InstallationID: k.record.Scope.InstallationID, RootID: owner.PermissionRootID,
 					RoleRootUID: verified.UID, RoleSetupID: verified.State.OperationID, Postgres: owner.Postgres, Control: control,
-					Retention: &contracts.RetentionDeployment{Guard: retention}, WorkerConfiguration: workers, ContextDeletion: k.contextDeletionEnabled(), Browser: k.browserSection()}
+					Retention: &contracts.RetentionDeployment{Guard: retention}, WorkerConfiguration: workers, ContextDeletion: k.contextDeletionEnabled(), Browser: k.browserSection(), Identity: k.identitySection()}
 				if projection, e = kube.NewPermissionRuntimeProjection(bridge, resources, k.publicRoot, deployment); e != nil {
 					return e
 				}
@@ -1333,6 +1333,15 @@ func (k *InstallerContinuation) browserSection() *contracts.PermissionBrowserSet
 		return nil
 	}
 	return &contracts.PermissionBrowserSettings{RootID: k.sources.BrowserRootID, Settings: k.sources.BrowserSettings}
+}
+
+// identitySection is the installed identity settings whose eligibleGroups
+// groupID PermissionSources validate against (ADR-247), or nil.
+func (k *InstallerContinuation) identitySection() *contracts.PermissionIdentitySettings {
+	if k.sources == nil || k.sources.IdentitySettings.Name == "" || k.input.Public == nil {
+		return nil
+	}
+	return &contracts.PermissionIdentitySettings{Settings: k.sources.IdentitySettings, Issuer: k.input.Public.Issuer}
 }
 
 // installedCapacity is what the capacity projection needs after the launch.
@@ -1374,6 +1383,12 @@ func (k *InstallerContinuation) Capacity(ctx context.Context, inventory kube.Ini
 	sources, err := kube.EnsureCapacitySources(ctx, admin, control, installation, admins, inventory.WorkerAccount, inventory.OwnerAccount, keys, k.processingSettings(owner.PermissionRootID))
 	if err != nil {
 		return err
+	}
+	if w := p.WorkloadKeys; w != nil {
+		k.at("capacity/workload-guard")
+		if sources.WorkloadGuard, err = kube.EnsureCapacityWorkloadGuard(ctx, admin, installation, admins, sources, *w); err != nil {
+			return err
+		}
 	}
 	k.at("capacity/proofs")
 	selector, err := kube.NewPermissionClient(k.in.kubernetesToken(accountTokens(admin, sources.ProbeNamespace.Name, sources.ProbeAccount.Name, k.plan.Plan.ProbeAudience)), cluster, cfg.NamespaceRef{Name: sources.ProbeNamespace.Name, UID: sources.ProbeNamespace.UID}, time.Now)
@@ -1649,7 +1664,7 @@ func (k *InstallerContinuation) FederationWorkload(ctx context.Context, inventor
 		if o == nil || owners == nil {
 			return mounts.ErrUnavailable
 		}
-		capacity = &contracts.RegionalCapacityOffer{OperationAddress: settings.OwnerOperationAddress, Keys: slices.Sorted(slices.Values(k.input.Public.Capacity.NamespaceKeys)),
+		capacity = &contracts.RegionalCapacityOffer{OperationAddress: settings.OwnerOperationAddress, Keys: slices.Sorted(slices.Values(k.input.Public.Capacity.NamespaceKeys)), WorkloadKeys: k.input.Public.Capacity.WorkloadKeys,
 			Owner: contracts.RegionalOwnerObservation{SourceUID: owner.ConfigurationUID, TemplateDigest: o.TemplateDigest, ImageDigest: o.ImageDigest, ProtectionDigest: o.ProtectionDigest}}
 	}
 	return kube.PublishRegionalOffer(ctx, admin, namespace, contracts.RegionalOffer{Format: contracts.RegionalOfferFormat, InstallationID: installation, HubClusterID: k.record.Scope.ClusterID, Owners: owners, KeyService: keys, WorkKey: work, EvidenceStore: evidence, Capacity: capacity,

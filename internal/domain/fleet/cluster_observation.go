@@ -2,6 +2,7 @@ package fleet
 
 import (
 	"slices"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
@@ -20,7 +21,18 @@ const (
 	// ObserveCapacityGuardedWorkload observes the namespace guard and then
 	// the workload under the request's keys, which must be the guard's
 	// (ADR-197): two observations do not fit one five-second window.
-	ObserveCapacityGuardedWorkload  ClusterObservationPurpose = "capacity-guarded-workload"
+	ObserveCapacityGuardedWorkload ClusterObservationPurpose = "capacity-guarded-workload"
+	// ObservePermissionNamespaces pages the connector's continuous namespace
+	// journal of the requested label and annotation keys (ADR-247): each
+	// namespace carrying a key, its key values as digests and a version that
+	// changes only when an observed key value changes.
+	ObservePermissionNamespaces ClusterObservationPurpose = "permission-namespace-metadata"
+	// ObservePermissionWorkloads pages the connector's workload journal of
+	// one selection (Selector, Keys as labels, AnnotationKeys), and
+	// ObservePermissionWorkloadGuard proves its workload metadata guard
+	// (ADR-247).
+	ObservePermissionWorkloads      ClusterObservationPurpose = "permission-workload-metadata"
+	ObservePermissionWorkloadGuard  ClusterObservationPurpose = "permission-workload-guard"
 	ClusterObservationMaximumKeys                             = 256
 	ClusterObservationMaximumItems                            = 64
 	ClusterObservationMaximumCursor                           = 8192
@@ -37,7 +49,12 @@ type ClusterObservationRequest struct {
 	Workload                         cfg.WorkloadRef
 	Kind                             string
 	Keys                             []string
-	Continue                         string
+	// AnnotationKeys are the observed annotation keys of a permission
+	// namespace observation; Keys are its label keys.
+	AnnotationKeys []string `json:",omitempty"`
+	// Selector is a permission workload observation's label selector.
+	Selector map[string]string `json:",omitempty"`
+	Continue string
 }
 
 // Restrict returns an independent result whose every usable child interval is
@@ -53,7 +70,7 @@ func (v ClusterObservationResult) Restrict(notBefore, notAfter time.Time) Cluste
 	end := v.Interval.FreshUntil
 	if v.Guard != nil {
 		g := *v.Guard
-		g.Keys = slices.Clone(g.Keys)
+		g.Keys, g.AnnotationKeys = slices.Clone(g.Keys), slices.Clone(g.AnnotationKeys)
 		g.Interval.FreshUntil = identity.Earlier(g.Interval.FreshUntil, end)
 		v.Guard = &g
 	}
@@ -61,6 +78,16 @@ func (v ClusterObservationResult) Restrict(notBefore, notAfter time.Time) Cluste
 		p := *v.Namespaces
 		p.Items = slices.Clone(p.Items)
 		v.Namespaces = &p
+	}
+	if v.PermissionNamespaces != nil {
+		p := *v.PermissionNamespaces
+		p.Items = slices.Clone(p.Items)
+		v.PermissionNamespaces = &p
+	}
+	if v.PermissionWorkloads != nil {
+		p := *v.PermissionWorkloads
+		p.Items = slices.Clone(p.Items)
+		v.PermissionWorkloads = &p
 	}
 	if v.Workloads != nil {
 		p := *v.Workloads
@@ -113,19 +140,32 @@ func (r ClusterObservationRequest) Valid(now time.Time) bool {
 	}
 	emptyNamespace, emptyWorkload := r.Namespace == (cfg.NamespaceRef{}), r.Workload == (cfg.WorkloadRef{})
 	switch r.Purpose {
-	case ObserveCapacityNamespaceGuard:
-		return emptyNamespace && emptyWorkload && r.Kind == "" && len(r.Keys) == 0 && r.Continue == ""
+	case ObserveCapacityNamespaceGuard, ObservePermissionWorkloadGuard:
+		return emptyNamespace && emptyWorkload && r.Kind == "" && len(r.Keys) == 0 && len(r.AnnotationKeys) == 0 && len(r.Selector) == 0 && r.Continue == ""
+	case ObservePermissionWorkloads:
+		return emptyNamespace && emptyWorkload && r.Kind == "" && cfg.WorkloadSelection{Selector: r.Selector, Keys: cfg.NamespaceKeys{Labels: r.Keys, Annotations: r.AnnotationKeys}}.Valid()
 	case ObserveCapacityNamespaces:
 		return emptyNamespace && emptyWorkload && r.Kind == "" && len(r.Keys) == 0
 	case ObserveCapacityWorkloads:
 		return observationNamespace(r.Namespace) && emptyWorkload && observationKind(r.Kind) && len(r.Keys) == 0
 	case ObserveCapacityWorkload, ObserveCapacityGuardedWorkload:
-		return observationNamespace(r.Namespace) && observationWorkload(r.Workload) && r.Kind == "" && observationKeys(r.Keys) && r.Continue == ""
+		return observationNamespace(r.Namespace) && observationWorkload(r.Workload) && r.Kind == "" && observationKeys(r.Keys) && r.Continue == "" && len(r.AnnotationKeys) == 0
+	case ObservePermissionNamespaces:
+		keys := cfg.NamespaceKeys{Labels: r.Keys, Annotations: r.AnnotationKeys}
+		return emptyNamespace && emptyWorkload && r.Kind == "" && keys.Valid() && len(r.Keys)+len(r.AnnotationKeys) > 0
 	}
 	return false
 }
 func (r ClusterObservationRequest) Clone() ClusterObservationRequest {
 	r.Keys = slices.Clone(r.Keys)
+	r.AnnotationKeys = slices.Clone(r.AnnotationKeys)
+	if r.Selector != nil {
+		selector := make(map[string]string, len(r.Selector))
+		for k, v := range r.Selector {
+			selector[k] = v
+		}
+		r.Selector = selector
+	}
 	return r
 }
 
@@ -136,14 +176,41 @@ func (i ClusterObservationInterval) Valid(now time.Time) bool {
 }
 
 type ClusterNamespaceGuardObservation struct {
-	Digest   artifact.Digest
-	Keys     []string
-	Interval ClusterObservationInterval
+	Digest artifact.Digest
+	Keys   []string
+	// AnnotationKeys are a workload guard's annotation keys (ADR-247).
+	AnnotationKeys []string `json:",omitempty"`
+	Interval       ClusterObservationInterval
+}
+
+// ClusterPermissionWorkloadPage is one page of a connector workload journal
+// at one (Journal, Sequence) state (ADR-247), like
+// ClusterPermissionNamespacePage.
+type ClusterPermissionWorkloadPage struct {
+	Journal    string
+	Sequence   int64
+	ObservedAt time.Time
+	Continue   string
+	Items      []cfg.ObservedWorkload
 }
 type ClusterNamespaceCandidatePage struct {
 	ResourceVersion, Continue string
 	Items                     []cfg.NamespaceRef
 }
+
+// ClusterPermissionNamespacePage is one page of a connector's namespace
+// journal at one (Journal, Sequence) state (ADR-247). ObservedAt is the start
+// of the journal's latest complete LIST or cleanly ended watch session: the
+// age of what it reports. Each item's ResourceVersion is the journal version
+// "<journal>:<changes>", unchanged unless an observed key value changed.
+type ClusterPermissionNamespacePage struct {
+	Journal    string
+	Sequence   int64
+	ObservedAt time.Time
+	Continue   string
+	Items      []cfg.ObservedNamespace
+}
+
 type ClusterWorkloadCandidatePage struct {
 	ResourceVersion, Continue string
 	Items                     []cfg.WorkloadRef
@@ -170,6 +237,8 @@ type ClusterObservationResult struct {
 	Namespaces                              *ClusterNamespaceCandidatePage
 	Workloads                               *ClusterWorkloadCandidatePage
 	Workload                                *ClusterExactWorkloadObservation
+	PermissionNamespaces                    *ClusterPermissionNamespacePage `json:",omitempty"`
+	PermissionWorkloads                     *ClusterPermissionWorkloadPage  `json:",omitempty"`
 }
 
 func (v ClusterObservationResult) Matches(r ClusterObservationRequest, digest artifact.Digest, now time.Time) bool {
@@ -177,7 +246,7 @@ func (v ClusterObservationResult) Matches(r ClusterObservationRequest, digest ar
 		return false
 	}
 	members := 0
-	for _, present := range []bool{v.Guard != nil, v.Namespaces != nil, v.Workloads != nil, v.Workload != nil} {
+	for _, present := range []bool{v.Guard != nil, v.Namespaces != nil, v.Workloads != nil, v.Workload != nil, v.PermissionNamespaces != nil, v.PermissionWorkloads != nil} {
 		if present {
 			members++
 		}
@@ -197,7 +266,21 @@ func (v ClusterObservationResult) Matches(r ClusterObservationRequest, digest ar
 	}
 	switch r.Purpose {
 	case ObserveCapacityNamespaceGuard:
-		return v.Guard != nil && v.Guard.Digest != (artifact.Digest{}) && observationKeys(v.Guard.Keys) && within(v.Guard.Interval)
+		return v.Guard != nil && v.Guard.Digest != (artifact.Digest{}) && observationKeys(v.Guard.Keys) && len(v.Guard.AnnotationKeys) == 0 && within(v.Guard.Interval)
+	case ObservePermissionWorkloadGuard:
+		return v.Guard != nil && v.Guard.Digest != (artifact.Digest{}) && cfg.NamespaceKeys{Labels: v.Guard.Keys, Annotations: v.Guard.AnnotationKeys}.Valid() && len(v.Guard.Keys)+len(v.Guard.AnnotationKeys) > 0 && within(v.Guard.Interval)
+	case ObservePermissionWorkloads:
+		p := v.PermissionWorkloads
+		if p == nil || !authorization.UUID(p.Journal) || p.Sequence < 0 || p.ObservedAt.IsZero() || p.ObservedAt.After(v.Interval.FreshUntil) || !observationCursor(p.Continue) || len(p.Items) > ClusterObservationMaximumItems || p.Items == nil {
+			return false
+		}
+		keys := cfg.NamespaceKeys{Labels: r.Keys, Annotations: r.AnnotationKeys}
+		for i, item := range p.Items {
+			if !item.Valid(keys, true) || !strings.HasPrefix(item.ResourceVersion, p.Journal+":") || i > 0 && p.Items[i-1].UID >= item.UID {
+				return false
+			}
+		}
+		return true
 	case ObserveCapacityNamespaces:
 		p := v.Namespaces
 		if p == nil || !identity.Text(p.ResourceVersion, 128) || !observationCursor(p.Continue) || len(p.Items) > ClusterObservationMaximumItems || p.Items == nil {
@@ -209,6 +292,18 @@ func (v ClusterObservationResult) Matches(r ClusterObservationRequest, digest ar
 				return false
 			}
 			seen[item.UID] = true
+		}
+		return true
+	case ObservePermissionNamespaces:
+		p := v.PermissionNamespaces
+		if p == nil || !authorization.UUID(p.Journal) || p.Sequence < 0 || p.ObservedAt.IsZero() || p.ObservedAt.After(v.Interval.FreshUntil) || !observationCursor(p.Continue) || len(p.Items) > ClusterObservationMaximumItems || p.Items == nil {
+			return false
+		}
+		keys := cfg.NamespaceKeys{Labels: r.Keys, Annotations: r.AnnotationKeys}
+		for i, item := range p.Items {
+			if !item.Valid(keys, true) || !strings.HasPrefix(item.ResourceVersion, p.Journal+":") || i > 0 && p.Items[i-1].UID >= item.UID {
+				return false
+			}
 		}
 		return true
 	case ObserveCapacityWorkloads:

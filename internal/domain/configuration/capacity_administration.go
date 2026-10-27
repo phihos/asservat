@@ -1,6 +1,10 @@
 package configuration
 
-import "asservat.local/asservat/internal/domain/identity"
+import (
+	"slices"
+
+	"asservat.local/asservat/internal/domain/identity"
+)
 
 // These plans are protected installation inputs. EvidenceBudgetPolicy authors,
 // status writers and capture callers cannot choose administrator/probe identities.
@@ -59,4 +63,24 @@ func (p CapacityNamespaceAdministration) Valid() bool {
 		}
 	}
 	return true
+}
+
+// WorkloadAdministration is the workload metadata guard (ADR-247): only
+// Administrators may create Deployments/StatefulSets carrying these label or
+// annotation keys or change their presence or values. Its probe account
+// shares the namespace selector guard's empty probe namespace.
+type WorkloadAdministration struct {
+	Name                      string
+	Administrators            []KubernetesActor
+	LabelKeys, AnnotationKeys []string
+	ProbeNamespace            NamespaceRef
+	ProbeAccount              NamespaceRef
+}
+
+func (p WorkloadAdministration) Valid() bool {
+	keys := NamespaceKeys{Labels: p.LabelKeys, Annotations: p.AnnotationKeys}
+	if !keys.Valid() || len(p.LabelKeys)+len(p.AnnotationKeys) == 0 {
+		return false
+	}
+	return CapacityNamespaceAdministration{Name: p.Name, Administrators: p.Administrators, Keys: append(slices.Clone(p.LabelKeys), p.AnnotationKeys...), ProbeNamespace: p.ProbeNamespace, ProbeAccount: p.ProbeAccount}.Valid()
 }

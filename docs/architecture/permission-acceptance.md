@@ -58,6 +58,16 @@ With a `NamespaceObserver` for the hub cluster, `BindingReconciler` also accepts
 `PermissionStore` treats a PermissionSource basis as equivalent when its generation/spec digest show at most one spec transition (its resourceVersion alone does not matter) and its namespace resourceVersion is unchanged or the batch claims a continuous watch. Batch fields `UnavailableSources`/`SourcesUnavailable` keep a source's assignments without renewing their basis; the projection skips a PermissionSource allow whose basis lags the stream sequence, and capacity SQL already requires the current sequence. The batch's minimized `Namespaces` observation (no resourceVersions) is part of the projection digest and of the authority audit event; the impact preview reads it from the record of the stream's current sequence. The first acceptance of a new stream carries the reviewed explicit baseline only.
 
 
+## Guarded, group-ID, remote and workload sources (ADR-247)
+
+Before each one-second refresh, and before the trust window opens, the reconciler rereads (at most
+every 10 s, concurrently, 3 s budget) the namespace journals of joined clusters and the workload
+journals of workload selections from their connectors over the cluster-observation channel, then
+renews namespace/workload guard proofs and group directories with less than two seconds left.
+Remote and workload bases carry journal versions (`<journal>:<changes>`) and never claim
+continuity; their minimized observations are recorded per batch (`RemoteNamespaces`,
+`Workloads`). Missing or stale evidence makes a source unavailable (kept, granting nothing).
+
 ## Decision-time sources (ADR-245)
 
 The reconciler also accepts supported `kubernetesExec`/`kubernetesAccessReview` sources of every cluster as `PermissionBatch.ReviewSources` (no subjects; at most four per cluster). `AcceptPermissions` keeps them in `permission_review_source` (epoch, `seen_sequence`, generation, spec and authority digests, minimized parameters, the accepting audit event): an equivalent version — one spec transition, same authority digest — keeps its row's original accepting event and the per-principal assignments; any other change, a generation jump or removal retires every `permission_review_assignment` of the source in the same transaction and records `ReviewRetirements` in the audit event; `SourcesUnavailable` keeps rows without renewing them. A trust change retires them with all other assignments.

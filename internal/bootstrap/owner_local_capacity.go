@@ -6,6 +6,7 @@ import (
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
+	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/contracts"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/fleet"
@@ -51,6 +52,23 @@ func ownerLocalCapacity(in *ownerInputs, observer *kube.PermissionClient, guard 
 		if err != nil {
 			return nil, mounts.ErrUnavailable
 		}
+		// ADR-247: the hub cluster's permission workload journals and, when
+		// installed, its workload metadata guard proven by the same probe.
+		var workloadGuard *kube.WorkloadGuard
+		if w := l.WorkloadGuard; w != nil {
+			wa := make([]cfg.KubernetesActor, 0, len(w.Guard.Administrators))
+			for _, a := range w.Guard.Administrators {
+				wa = append(wa, cfg.KubernetesActor{Kind: a.Kind, Name: a.Name})
+			}
+			workloadGuard, err = kube.NewWorkloadGuard(read, probe, cfg.WorkloadAdministration{Name: w.Guard.Name, Administrators: wa, LabelKeys: w.LabelKeys, AnnotationKeys: w.AnnotationKeys, ProbeNamespace: probeNS, ProbeAccount: cfg.NamespaceRef{Name: l.ProbeAccount.Name, UID: l.ProbeAccount.UID}},
+				kube.GuardPin{PolicyUID: w.Guard.PolicyUID, PolicyGeneration: w.Guard.PolicyGeneration, BindingUID: w.Guard.BindingUID, BindingResourceVersion: w.Guard.BindingResourceVersion})
+			if err != nil {
+				return nil, mounts.ErrUnavailable
+			}
+		}
+		workloads := &configapp.WorkloadJournalService{Observer: read, Now: time.Now}
+		*closers = append(*closers, workloads.Close)
+		metadata = metadata.WithPermissionWorkloads(workloads, workloadGuard)
 		pin := ownerCapacityCaller(c)
 		callers, err := kube.NewClusterObservationCallerAdmission(observer, guard, pin)
 		if err != nil {

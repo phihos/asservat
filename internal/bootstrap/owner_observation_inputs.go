@@ -10,6 +10,7 @@ import (
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 )
 
@@ -50,6 +51,13 @@ func validateOwnerObservationInputs(c *contracts.OwnerObservationBootstrap, proj
 			!authorization.UUID(l.Caller.AccountUID) || !authorization.UUID(l.Caller.DeploymentUID) || l.Caller.Account == "" || l.Caller.Deployment == "" ||
 			ownerObservationDigest(l.Caller.TemplateDigest) == (artifact.Digest{}) || ownerObservationDigest(l.Caller.ImageDigest) == (artifact.Digest{}) || ownerObservationDigest(l.Caller.ProtectionDigest) == (artifact.Digest{}) {
 			return mounts.ErrUnavailable
+		}
+		if w := l.WorkloadGuard; w != nil {
+			g := w.Guard
+			if !authorization.UUID(g.PolicyUID) || !authorization.UUID(g.BindingUID) || g.PolicyGeneration < 1 || g.BindingResourceVersion == "" || len(g.Administrators) == 0 || g.Name == "" ||
+				!(cfg.WorkloadAdministration{Name: g.Name, Administrators: []cfg.KubernetesActor{{Kind: "Group", Name: "-"}}, LabelKeys: w.LabelKeys, AnnotationKeys: w.AnnotationKeys, ProbeNamespace: cfg.NamespaceRef{Name: l.ProbeNamespace.Name, UID: l.ProbeNamespace.UID}, ProbeAccount: cfg.NamespaceRef{Name: l.ProbeAccount.Name, UID: l.ProbeAccount.UID}}).Valid() {
+				return mounts.ErrUnavailable
+			}
 		}
 	}
 	return nil

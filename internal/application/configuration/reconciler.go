@@ -1,9 +1,13 @@
 package configuration
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"io"
+	"maps"
+	"slices"
+	"sync"
 	"time"
 
 	"asservat.local/asservat/internal/domain/authorization"
@@ -28,8 +32,83 @@ type BindingReconciler struct {
 	// assignments are kept but grant nothing.
 	Namespaces         NamespaceObserver
 	NamespaceClusterID string
-	Now                func() time.Time
-	NewID              func() string
+	// Guards proves a cluster's namespace admission guard for
+	// admissionEnforced sources and Directory supplies the configured group
+	// directory for groupID mapping (ADR-247). Without them such sources are
+	// unavailable: kept, granting nothing.
+	Guards    NamespaceGuardReader
+	Directory GroupDirectoryReader
+	// Remote reads the namespace journal of another joined cluster from its
+	// connector (ADR-247). Without it namespaceMetadata sources of clusters
+	// other than NamespaceClusterID are unavailable.
+	Remote RemoteNamespaceReader
+	// Workloads reads a cluster's connector workload journal and
+	// WorkloadGuards its workload metadata guard proof (ADR-247), the hub
+	// cluster's included. Without them workloadMetadata sources are
+	// unavailable.
+	Workloads      RemoteWorkloadReader
+	WorkloadGuards WorkloadGuardReader
+	Now            func() time.Time
+	NewID          func() string
+}
+
+// NamespaceGuardReader proves, within its original interval, that one
+// cluster's namespace metadata guard currently enforces its keys (ADR-247).
+type NamespaceGuardReader interface {
+	NamespaceGuard(context.Context, string) (value.NamespaceGuardProof, error)
+}
+
+// GroupDirectoryReader returns the administrator-configured stable group IDs
+// of one issuer (ADR-247); it reads protected configuration, no directory.
+type GroupDirectoryReader interface {
+	GroupDirectory(context.Context, string) (value.GroupDirectory, error)
+}
+
+// RemoteNamespaceReader returns a joined cluster's connector namespace
+// journal of keys (ADR-247): ResourceVersion is the journal ID, each
+// namespace's ResourceVersion its journal version and ObservedAt the
+// journal's own freshness.
+type RemoteNamespaceReader interface {
+	RemoteNamespaces(context.Context, string, value.NamespaceKeys) (value.NamespaceList, error)
+}
+
+// RemoteNamespaceRefresh is how often the reconciler rereads a joined
+// cluster's namespace journal (ADR-247); MaxRemoteNamespaceClusters bounds
+// the clusters read.
+const (
+	RemoteNamespaceRefresh     = 10 * time.Second
+	MaxRemoteNamespaceClusters = 8
+)
+
+// RemoteWorkloadReader returns a cluster's connector workload journal of one
+// selection (ADR-247), with journal versions.
+type RemoteWorkloadReader interface {
+	RemoteWorkloads(context.Context, string, value.WorkloadSelection) (value.WorkloadList, error)
+}
+
+// WorkloadGuardReader proves a cluster's workload metadata guard (ADR-247).
+type WorkloadGuardReader interface {
+	WorkloadGuard(context.Context, string) (value.NamespaceGuardProof, error)
+}
+
+// MaxWorkloadSelections bounds the workload journals the reconciler reads.
+const MaxWorkloadSelections = 32
+
+type remoteWorkloads struct {
+	live       *value.WorkloadObservation
+	observedAt time.Time
+	fetchedAt  time.Time
+}
+
+func workloadKey(cluster string, sel value.WorkloadSelection) string {
+	return cluster + "|" + value.SelectionKey(sel)
+}
+
+type remoteNamespaces struct {
+	keys       value.NamespaceKeys
+	live       *value.NamespaceObservation
+	observedAt time.Time
+	fetchedAt  time.Time
 }
 
 type bindingRun struct {
@@ -47,6 +126,190 @@ type bindingRun struct {
 	continuity      int
 	included        map[string]int
 	lastInheritance [32]byte
+	// guards and directories are the last current evidence per cluster and
+	// issuer (ADR-247), refreshed before they lapse.
+	guards      map[string]*value.NamespaceGuardProof
+	directories map[string]*value.GroupDirectory
+	// remote is the last journal read per joined cluster (ADR-247).
+	remote map[string]*remoteNamespaces
+	// workloads is the last workload journal read per (cluster, selection)
+	// and workloadGuards the last workload guard proof per cluster.
+	workloads      map[string]*remoteWorkloads
+	workloadGuards map[string]*value.NamespaceGuardProof
+}
+
+// refreshWorkloads rereads, like refreshRemote, the workload journals the
+// current workloadMetadata sources select.
+func (s *bindingRun) refreshWorkloads(ctx context.Context) {
+	if s.r.Workloads == nil || !s.sourcesComplete {
+		return
+	}
+	type want struct {
+		cluster string
+		sel     value.WorkloadSelection
+	}
+	wanted := map[string]want{}
+	for _, src := range s.sources {
+		if src.Type != "workloadMetadata" || !src.Enabled || !authorization.UUID(src.ClusterID) {
+			continue
+		}
+		if sel := WorkloadSelectionOf(src); sel.Valid() {
+			wanted[workloadKey(src.ClusterID, sel)] = want{src.ClusterID, sel}
+		}
+	}
+	keys := slices.Sorted(maps.Keys(wanted))
+	// ponytail: selections beyond the bound stay unavailable.
+	keys = keys[:min(len(keys), MaxWorkloadSelections)]
+	now := s.r.Now()
+	next := map[string]*remoteWorkloads{}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, key := range keys {
+		old := s.workloads[key]
+		if old != nil {
+			next[key] = old
+			if now.Sub(old.fetchedAt) < RemoteNamespaceRefresh {
+				continue
+			}
+		}
+		w := wanted[key]
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			call, cancel := context.WithTimeout(ctx, 3*time.Second)
+			defer cancel()
+			l, err := s.r.Workloads.RemoteWorkloads(call, w.cluster, w.sel)
+			if err != nil || l.ClusterID != w.cluster || !l.Selection.Equal(w.sel) || l.ObservedAt.After(s.r.Now().Add(time.Second)) || len(l.Workloads) > value.MaxObservedWorkloads {
+				return
+			}
+			o := &value.WorkloadObservation{ClusterID: w.cluster, Selection: w.sel, Workloads: slices.Clone(l.Workloads)}
+			slices.SortFunc(o.Workloads, func(a, b value.ObservedWorkload) int { return cmp.Compare(a.UID, b.UID) })
+			for i, x := range o.Workloads {
+				if !x.Valid(w.sel.Keys, true) || i > 0 && o.Workloads[i-1].UID == x.UID {
+					return
+				}
+			}
+			mu.Lock()
+			next[key] = &remoteWorkloads{live: o, observedAt: l.ObservedAt, fetchedAt: now}
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	s.workloads = next
+}
+
+// refreshRemote rereads, concurrently and within three seconds, the journals
+// of the joined clusters the current sources name that are missing, have
+// other keys or are older than RemoteNamespaceRefresh. A failed read keeps
+// the previous journal state; its sources lapse with its ObservedAt.
+func (s *bindingRun) refreshRemote(ctx context.Context) {
+	if s.r.Remote == nil || !s.sourcesComplete {
+		return
+	}
+	var clusters []string
+	for _, src := range s.sources {
+		if src.Type == "namespaceMetadata" && src.Enabled && src.ClusterID != s.r.NamespaceClusterID && authorization.UUID(src.ClusterID) && !slices.Contains(clusters, src.ClusterID) {
+			clusters = append(clusters, src.ClusterID)
+		}
+	}
+	slices.Sort(clusters)
+	// ponytail: clusters beyond the bound stay unavailable; raise with the regional cluster cap.
+	clusters = clusters[:min(len(clusters), MaxRemoteNamespaceClusters)]
+	now := s.r.Now()
+	next := map[string]*remoteNamespaces{}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, cluster := range clusters {
+		keys := SourceKeys(s.sources, cluster)
+		old := s.remote[cluster]
+		if old != nil && !sameKeys(old.keys, keys) {
+			old = nil
+		}
+		if old != nil && now.Sub(old.fetchedAt) < RemoteNamespaceRefresh {
+			next[cluster] = old
+			continue
+		}
+		if old != nil {
+			next[cluster] = old
+		}
+		if len(keys.Labels)+len(keys.Annotations) == 0 || !keys.Valid() {
+			continue
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			call, cancel := context.WithTimeout(ctx, 3*time.Second)
+			defer cancel()
+			l, err := s.r.Remote.RemoteNamespaces(call, cluster, keys)
+			if err != nil || l.ClusterID != cluster || !sameKeys(l.Keys, keys) || l.ObservedAt.After(s.r.Now().Add(time.Second)) {
+				return
+			}
+			j, err := NewNamespaceJournal(l)
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			next[cluster] = &remoteNamespaces{keys: keys, live: j.Observation(true), observedAt: l.ObservedAt, fetchedAt: now}
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+	s.remote = next
+}
+
+func sameKeys(a, b value.NamespaceKeys) bool {
+	return slices.Equal(a.Labels, b.Labels) && slices.Equal(a.Annotations, b.Annotations)
+}
+
+// refreshEvidence renews the guard proofs and group directories the current
+// sources need when they are missing or about to lapse. A failure only
+// leaves the evidence missing: those sources become unavailable.
+func (s *bindingRun) refreshEvidence(ctx context.Context) {
+	now := s.r.Now()
+	if s.guards == nil {
+		s.guards, s.directories = map[string]*value.NamespaceGuardProof{}, map[string]*value.GroupDirectory{}
+	}
+	if s.workloadGuards == nil {
+		s.workloadGuards = map[string]*value.NamespaceGuardProof{}
+	}
+	for _, src := range s.sources {
+		if src.Type != "namespaceMetadata" && src.Type != "workloadMetadata" || !src.Enabled {
+			continue
+		}
+		if src.Type == "namespaceMetadata" && src.Protection.Mode == "admissionEnforced" && s.r.Guards != nil {
+			if g := s.guards[src.ClusterID]; g == nil || g.FreshUntil.Sub(now) < 2*time.Second {
+				call, cancel := context.WithTimeout(ctx, 5*time.Second)
+				proof, err := s.r.Guards.NamespaceGuard(call, src.ClusterID)
+				cancel()
+				s.guards[src.ClusterID] = nil
+				if err == nil && proof.ClusterID == src.ClusterID && proof.Current(s.r.Now()) {
+					s.guards[src.ClusterID] = &proof
+				}
+			}
+		}
+		if src.Type == "workloadMetadata" && s.r.WorkloadGuards != nil {
+			if g := s.workloadGuards[src.ClusterID]; g == nil || g.FreshUntil.Sub(now) < 2*time.Second {
+				call, cancel := context.WithTimeout(ctx, 5*time.Second)
+				proof, err := s.r.WorkloadGuards.WorkloadGuard(call, src.ClusterID)
+				cancel()
+				s.workloadGuards[src.ClusterID] = nil
+				if err == nil && proof.ClusterID == src.ClusterID && proof.Current(s.r.Now()) {
+					s.workloadGuards[src.ClusterID] = &proof
+				}
+			}
+		}
+		if issuer := src.Mapping.Issuer; src.Mapping.Mode == "groupID" && s.r.Directory != nil {
+			if d := s.directories[issuer]; d == nil || d.FreshUntil.Sub(now) < 2*time.Second {
+				call, cancel := context.WithTimeout(ctx, 5*time.Second)
+				dir, err := s.r.Directory.GroupDirectory(call, issuer)
+				cancel()
+				s.directories[issuer] = nil
+				if err == nil && dir.Issuer == issuer && dir.Current(s.r.Now()) {
+					s.directories[issuer] = &dir
+				}
+			}
+		}
+	}
 }
 
 func (r BindingReconciler) valid() bool {
@@ -162,6 +425,11 @@ func (s *bindingRun) start(ctx context.Context) error {
 var errWatchBehind = errors.New("permission watch has not reached current complete list")
 
 func (s *bindingRun) refresh(ctx context.Context) error {
+	// Before the trust window opens: a slow connector cannot consume it.
+	s.refreshRemote(ctx)
+	s.refreshWorkloads(ctx)
+	// Proofs last: closest to the acceptance that uses them.
+	s.refreshEvidence(ctx)
 	first, err := s.r.trust(ctx)
 	if err != nil {
 		return reconcileStep("trust", err)

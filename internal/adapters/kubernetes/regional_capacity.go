@@ -29,8 +29,9 @@ func regionalCapacityRBAC(namespace string) []rbac.PolicyRule {
 	_, guard := RegionalCapacityNames(namespace)
 	return []rbac.PolicyRule{
 		{APIGroups: []string{""}, Resources: []string{"namespaces", "pods"}, Verbs: []string{"get", "list"}},
-		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets"}, Verbs: []string{"get", "list"}},
-		{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{guard}, Verbs: []string{"get"}},
+		// ADR-247: watched by the permission workload journal.
+		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets"}, Verbs: []string{"get", "list", "watch"}},
+		{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{guard, RegionalWorkloadGuardName(namespace)}, Verbs: []string{"get"}},
 	}
 }
 
@@ -50,9 +51,21 @@ func ensureRegionalCapacity(call context.Context, api kubernetes.Interface, p Re
 	if err != nil {
 		return out, err
 	}
-	out.NamespaceGuard, err = ensureAdmissionGuard(call, api, policy, binding, admins)
-	return out, err
+	if out.NamespaceGuard, err = ensureAdmissionGuard(call, api, policy, binding, admins); err != nil || o.WorkloadKeys == nil {
+		return out, err
+	}
+	labels, annotations := slices.Sorted(slices.Values(o.WorkloadKeys.Labels)), slices.Sorted(slices.Values(o.WorkloadKeys.Annotations))
+	g, err := EnsureWorkloadGuard(call, api, cfg.WorkloadAdministration{Name: RegionalWorkloadGuardName(p.Namespace), Administrators: admins, LabelKeys: labels, AnnotationKeys: annotations,
+		ProbeNamespace: cfg.NamespaceRef{Name: out.ProbeNamespace.Name, UID: out.ProbeNamespace.UID}, ProbeAccount: cfg.NamespaceRef{Name: out.ProbeAccount.Name, UID: out.ProbeAccount.UID}})
+	if err != nil {
+		return out, err
+	}
+	out.WorkloadGuard = &contracts.WorkloadMetadataGuard{Guard: g, LabelKeys: labels, AnnotationKeys: annotations}
+	return out, nil
 }
+
+// RegionalWorkloadGuardName is a region's workload metadata guard (ADR-247).
+func RegionalWorkloadGuardName(namespace string) string { return namespace + "-workload-guard" }
 
 func regionalCapacityPlan(c contracts.RegionalCapacity, guard string, admins []cfg.KubernetesActor) cfg.CapacityNamespaceAdministration {
 	return cfg.CapacityNamespaceAdministration{Name: guard, Administrators: admins, Keys: c.Keys,

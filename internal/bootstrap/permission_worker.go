@@ -210,7 +210,14 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	w.reconciler = app.BindingReconciler{RootID: c.RootID, Reader: observer, Watcher: observer, Trust: guard, Store: store, Namespaces: namespaces, NamespaceClusterID: c.Control.ClusterID, Now: time.Now, NewID: uuid.NewString}
+	w.reconciler = app.BindingReconciler{RootID: c.RootID, Reader: observer, Watcher: observer, Trust: guard, Store: store, Namespaces: namespaces, NamespaceClusterID: c.Control.ClusterID, Guards: &b.guards, Remote: &b.guards, Workloads: &b.guards, WorkloadGuards: &b.guards, Now: time.Now, NewID: uuid.NewString}
+	if id := c.Identity; id != nil {
+		settings, e := kube.NewIdentityPolicyClient(observer, id.Settings.Name, id.Settings.UID, id.Issuer)
+		if e != nil {
+			return nil, &fixedStepError{"identity/directory", e}
+		}
+		w.reconciler.Directory = identityDirectory{settings}
+	}
 	if r := c.Review; r != nil {
 		review, e := kube.NewBootstrapReviewClient(observer, r.Name, r.UID)
 		if e != nil {
@@ -273,7 +280,8 @@ func readPermissionWorkerInputs(ctx context.Context, files *os.Root) (contracts.
 	clear(b)
 	if err != nil || c.Format != contracts.PermissionDeploymentFormat || !authorization.UUID(c.InstallationID) || !authorization.UUID(c.RootID) ||
 		!authorization.UUID(c.RoleRootUID) || !authorization.UUID(c.RoleSetupID) || c.Control.Guard.Name != contracts.PermissionGuardName(c.InstallationID) ||
-		c.Retention != nil && c.Retention.Guard.Name != contracts.RetentionGuardName(c.InstallationID) || !kube.WorkerConfigurationSectionValid(c) {
+		c.Retention != nil && c.Retention.Guard.Name != contracts.RetentionGuardName(c.InstallationID) || !kube.WorkerConfigurationSectionValid(c) ||
+		c.Identity != nil && (c.Identity.Settings.Name != contracts.OwnerIdentitySettingsName(c.InstallationID) || !authorization.UUID(c.Identity.Settings.UID)) {
 		return c, m, mounts.ErrUnavailable
 	}
 	b, err = mounts.Read(ctx, files, contracts.PermissionCredentialManifestFile, contracts.PermissionCredentialManifestMaxBytes)

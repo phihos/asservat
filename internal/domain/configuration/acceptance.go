@@ -29,6 +29,12 @@ type PermissionBatch struct {
 	// Namespaces is the minimized namespace observation the source bases were
 	// derived from; nil while none is current.
 	Namespaces *NamespaceObservation `json:",omitempty"`
+	// RemoteNamespaces are the minimized observations of other joined
+	// clusters' namespaces (ADR-247), one per cluster in cluster order.
+	RemoteNamespaces []NamespaceObservation `json:",omitempty"`
+	// Workloads are the minimized workload observations the workloadMetadata
+	// bases were derived from (ADR-247).
+	Workloads []WorkloadObservation `json:",omitempty"`
 	// ReviewSources are the accepted decision-time sources (ADR-245). They
 	// carry no subject; per-principal assignments are minted only by a
 	// recorded allowed review. A source missing from a batch retires its
@@ -68,14 +74,19 @@ type PermissionAcceptance struct {
 }
 
 func (p PermissionBasis) Key() string {
-	return p.Resource.Kind + ":" + strconv.Itoa(len(p.Resource.UID)) + ":" + p.Resource.UID + ":" + p.Scope.ClusterID + ":" + p.Scope.Namespace.UID
+	k := p.Resource.Kind + ":" + strconv.Itoa(len(p.Resource.UID)) + ":" + p.Resource.UID + ":" + p.Scope.ClusterID + ":" + p.Scope.Namespace.UID
+	// ADR-247: a workloadMetadata source has one basis per workload.
+	if p.Resource.Kind == "PermissionSource" && len(p.Scope.Workloads) == 1 {
+		k += ":" + p.Scope.Workloads[0].UID
+	}
+	return k
 }
 
 func (b PermissionBatch) Validate(now time.Time) error {
 	if !authorization.UUID(b.RootID) || !authorization.UUID(b.Epoch) || !authorization.UUID(b.RequestID) || b.ExpectedSequence < 0 || b.TrustDigest == (artifact.Digest{}) || b.InputDigest == (artifact.Digest{}) || !identity.Fresh(b.ObservedAt, b.FreshUntil, now, 5*time.Second) || len(b.Bases) > 1024 {
 		return ErrInvalid
 	}
-	if b.Namespaces != nil && !b.Namespaces.Valid() || !identity.Strings(b.UnavailableSources, 1024, 64) || b.SourcesUnavailable && len(b.UnavailableSources) > 0 {
+	if b.Namespaces != nil && !b.Namespaces.Valid() || !identity.Strings(b.UnavailableSources, 1024, 64) || b.SourcesUnavailable && len(b.UnavailableSources) > 0 || !RemoteNamespacesValid(b.Namespaces, b.RemoteNamespaces) || !WorkloadObservationsValid(b.Workloads) {
 		return ErrInvalid
 	}
 	if len(b.ReviewSources) > 64 || b.SourcesUnavailable && len(b.ReviewSources) > 0 {
@@ -109,8 +120,9 @@ func (b PermissionBatch) Validate(now time.Time) error {
 			return ErrInvalid
 		}
 		// A namespaceMetadata source grants one role to groups over a whole
-		// namespace (REQ-PER-003); it names no workloads and never denies.
-		if r.Kind == "PermissionSource" && (!identity.Text(p.ObservationVersion, 128) || len(p.Scope.Workloads) != 0 || len(p.Roles) != 1 || slices.ContainsFunc(p.Subjects, func(s Subject) bool { return s.Kind != "Group" })) {
+		// namespace (REQ-PER-003), a workloadMetadata source over one workload
+		// (REQ-PER-005, ADR-247); neither denies.
+		if r.Kind == "PermissionSource" && (!identity.Text(p.ObservationVersion, 128) || len(p.Scope.Workloads) > 1 || len(p.Roles) != 1 || slices.ContainsFunc(p.Subjects, func(s Subject) bool { return s.Kind != "Group" })) {
 			return ErrInvalid
 		}
 		if p.Automation != nil {
@@ -151,4 +163,18 @@ func (b PermissionBatch) Validate(now time.Time) error {
 		return ErrLimit
 	}
 	return nil
+}
+
+// RemoteNamespacesValid bounds remote observations to eight valid ones in
+// strictly ascending cluster order, none for the hub observation's cluster.
+func RemoteNamespacesValid(hub *NamespaceObservation, remote []NamespaceObservation) bool {
+	if len(remote) > 8 {
+		return false
+	}
+	for i, o := range remote {
+		if !o.Valid() || i > 0 && remote[i-1].ClusterID >= o.ClusterID || hub != nil && hub.ClusterID == o.ClusterID {
+			return false
+		}
+	}
+	return true
 }

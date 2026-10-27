@@ -416,6 +416,8 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 			}
 		}
 		record.Namespaces = b.Namespaces
+		record.RemoteNamespaces = b.RemoteNamespaces
+		record.Workloads = b.Workloads
 		retained := map[memberKey]bool{}
 		retired := 0
 		for _, a := range rows {

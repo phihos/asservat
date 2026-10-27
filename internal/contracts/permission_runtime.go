@@ -58,6 +58,17 @@ type PermissionDeployment struct {
 	// ADR-210): the hub-worker's browser-settings login follows the deletion
 	// logins. Without it no installed console login can begin.
 	Browser *PermissionBrowserSettings `json:"browser,omitempty"`
+	// Identity is the installed identity settings ConfigMap and its issuer:
+	// its eligibleGroups are the configured group directory that groupID
+	// PermissionSources validate against (ADR-247). Without it such sources
+	// grant nothing.
+	Identity *PermissionIdentitySettings `json:"identity,omitempty"`
+}
+
+// PermissionIdentitySettings pins the identity settings by name and UID.
+type PermissionIdentitySettings struct {
+	Settings WorkerObjectReference `json:"settings"`
+	Issuer   string                `json:"issuer"`
 }
 
 // PermissionBrowserSettings is the installed browser settings ConfigMap,

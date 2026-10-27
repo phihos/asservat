@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"maps"
 	"slices"
+	"strconv"
 	"time"
 
 	"asservat.local/asservat/internal/domain/authorization"
@@ -23,6 +24,27 @@ type NamespaceJournal struct {
 	byUID    map[string]value.ObservedNamespace
 	observed time.Time
 	poisoned bool
+	// changes counts, per namespace UID, the transitions of its observed
+	// key values (or deletion state) within this journal, including to and
+	// from carrying no key; sequence counts every such transition (ADR-247).
+	changes  map[string]int64
+	sequence int64
+}
+
+// sameObserved reports whether two reductions carry the same observed values.
+func sameObserved(a, b value.ObservedNamespace, aok, bok bool) bool {
+	if aok != bok {
+		return false
+	}
+	return !aok || a.Deleting == b.Deleting && maps.Equal(a.Labels, b.Labels) && maps.Equal(a.Annotations, b.Annotations)
+}
+
+func (j *NamespaceJournal) changed(uid string) {
+	if j.changes == nil {
+		j.changes = map[string]int64{}
+	}
+	j.changes[uid]++
+	j.sequence++
 }
 
 func cloneNamespace(n value.ObservedNamespace) value.ObservedNamespace {
@@ -75,6 +97,9 @@ func (j *NamespaceJournal) Apply(e value.NamespaceEvent) error {
 	switch e.Type {
 	case "ADDED", "MODIFIED":
 		if len(n.Labels)+len(n.Annotations) == 0 {
+			if exists {
+				j.changed(n.UID)
+			}
 			delete(j.byUID, n.UID)
 			return nil
 		}
@@ -89,9 +114,16 @@ func (j *NamespaceJournal) Apply(e value.NamespaceEvent) error {
 		if !exists && len(j.byUID) >= value.MaxObservedNamespaces {
 			return fail()
 		}
+		if !sameObserved(old, *n, exists, true) {
+			j.changed(n.UID)
+		}
 		j.byUID[n.UID] = cloneNamespace(*n)
 	case "DELETED":
+		if exists {
+			j.sequence++
+		}
 		delete(j.byUID, n.UID)
+		delete(j.changes, n.UID)
 	default:
 		return fail()
 	}
@@ -124,5 +156,25 @@ func (j *NamespaceJournal) Observation(live bool) *value.NamespaceObservation {
 		o.Namespaces = append(o.Namespaces, n)
 	}
 	slices.SortFunc(o.Namespaces, func(a, b value.ObservedNamespace) int { return cmp.Compare(a.UID, b.UID) })
+	return o
+}
+
+// Sequence counts the observed-value transitions this journal applied.
+func (j *NamespaceJournal) Sequence() int64 { return j.sequence }
+
+// VersionedObservation is the current state with each namespace's
+// ResourceVersion replaced by "<journal>:<changes>": a version that stays
+// equal across writes that leave every observed key value unchanged and
+// changes with any transition of one (A -> B -> A included), for as long as
+// this journal lives (ADR-247). A new journal has a new ID, so a relist
+// never claims continuity.
+func (j *NamespaceJournal) VersionedObservation(journal string) *value.NamespaceObservation {
+	o := j.Observation(true)
+	if o == nil {
+		return nil
+	}
+	for i := range o.Namespaces {
+		o.Namespaces[i].ResourceVersion = journal + ":" + strconv.FormatInt(j.changes[o.Namespaces[i].UID], 10)
+	}
 	return o
 }

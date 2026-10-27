@@ -140,7 +140,7 @@ func (c ClusterObservationClaim) shape() bool {
 		return false
 	}
 	switch r.Purpose {
-	case ClusterObservationNamespaceGuard, ClusterObservationNamespaces, ClusterObservationWorkloads, ClusterObservationWorkload, ClusterObservationGuardedWorkload:
+	case ClusterObservationNamespaceGuard, ClusterObservationNamespaces, ClusterObservationWorkloads, ClusterObservationWorkload, ClusterObservationGuardedWorkload, ClusterObservationPermissionNamespaces, ClusterObservationPermissionWorkloads, ClusterObservationPermissionWorkloadGuard:
 	default:
 		return false
 	}

@@ -35,6 +35,8 @@ type CapacitySources struct {
 	ProbeAccount     contracts.WorkerObjectReference
 	ProcessingSource contracts.WorkerObjectReference
 	ProcessingGuard  contracts.OwnerDeploymentGuard
+	// WorkloadGuard is the optional workload metadata guard (ADR-247).
+	WorkloadGuard *contracts.WorkloadMetadataGuard
 }
 
 // CapacitySourceNames are the fixed names derived from the installation.

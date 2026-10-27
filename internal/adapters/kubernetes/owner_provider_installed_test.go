@@ -75,10 +75,13 @@ func TestProviderInstalledOwnerSeparatesSQLStorageAndNativeAuthentication(t *tes
 		t.Fatal("unexpected provider cluster privileges")
 	}
 	// ADR-190 decision 7: metadata reads for the hub cluster's capacity
-	// observation and get on its selector guard; never a write.
+	// observation and get on its selector guard; never a write. ADR-247: the
+	// permission workload journal also watches Deployments/StatefulSets and
+	// the workload metadata guard is read like the selector guard.
 	_, selector, _, _, _ := CapacitySourceNames(p.InstallationID)
 	for _, r := range cluster[base+1:] {
-		if !reflect.DeepEqual(r.Verbs, []string{"get", "list"}) && !(reflect.DeepEqual(r.Verbs, []string{"get"}) && reflect.DeepEqual(r.ResourceNames, []string{selector})) {
+		workloads := reflect.DeepEqual(r.Resources, []string{"deployments", "statefulsets"}) && reflect.DeepEqual(r.Verbs, []string{"get", "list", "watch"})
+		if !workloads && !reflect.DeepEqual(r.Verbs, []string{"get", "list"}) && !(reflect.DeepEqual(r.Verbs, []string{"get"}) && reflect.DeepEqual(r.ResourceNames, []string{selector, WorkloadGuardName(p.InstallationID)})) {
 			t.Fatal("capacity observation grants more than reads", r)
 		}
 	}

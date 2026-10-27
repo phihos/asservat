@@ -27,6 +27,17 @@ type OwnerLocalCapacityObservation struct {
 	// ProbeAudience is the API audience of the probe account's minted tokens.
 	ProbeAudience string                 `json:"probeAudience"`
 	Caller        OwnerObservationCaller `json:"caller"`
+	// WorkloadGuard is the hub cluster's workload metadata guard (ADR-247),
+	// proven with the same probe account; absent, workloadMetadata sources
+	// of the hub cluster grant nothing.
+	WorkloadGuard *WorkloadMetadataGuard `json:"workloadGuard,omitempty"`
+}
+
+// WorkloadMetadataGuard pins a workload metadata guard and its keys.
+type WorkloadMetadataGuard struct {
+	Guard          OwnerDeploymentGuard `json:"guard"`
+	LabelKeys      []string             `json:"labelKeys"`
+	AnnotationKeys []string             `json:"annotationKeys"`
 }
 
 // OwnerObservationCaller is the original hub-worker caller pin; the owner

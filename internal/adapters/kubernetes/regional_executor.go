@@ -57,7 +57,9 @@ func regionalExecutorRBAC(namespace string) (cluster []rbac.PolicyRule, connecto
 		// ADR-179: delegated preview/request target resolution in this cluster
 		// reads the namespace, workload, Pods by selector and the Pod →
 		// ReplicaSet → Deployment chain (installed native 59: denied without).
-		{APIGroups: []string{""}, Resources: []string{"namespaces"}, Verbs: []string{"get"}},
+		// ADR-247: the permission namespace journal lists and watches namespace
+		// metadata; only digests of the requested keys leave the region.
+		{APIGroups: []string{""}, Resources: []string{"namespaces"}, Verbs: []string{"get", "list", "watch"}},
 		{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get", "list"}},
 		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets", "replicasets"}, Verbs: []string{"get"}},
 		// ADR-230: a probe policy's poll lists the namespace's kubelet

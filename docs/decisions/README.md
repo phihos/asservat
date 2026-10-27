@@ -1,5 +1,14 @@
 # Decision records
 
+[ADR-247 — Guarded, group-ID, remote-cluster and workload permission sources](247-guarded-and-workload-permission-sources.md)
+completes REQ-PER-003/005: `admissionEnforced` namespace sources need a live proof of the capacity
+namespace label guard covering their keys; `groupID` values are validated against the identity
+settings' configured `eligibleGroups`; namespaces of joined clusters are read from each
+connector's continuous LIST+watch journal over the cluster-observation channel with versions that
+change only with an observed value (unrelated writes keep assignments, A → B → A re-mints); and
+`workloadMetadata` sources grant over single Deployments/StatefulSets under an opt-in workload
+metadata admission guard. No migration.
+
 [ADR-245 — Decision-time permission sources](245-decision-time-permission-sources.md) implements
 REQ-PER-004: `kubernetesExec` and `kubernetesAccessReview` PermissionSources are accepted as
 subject-free configuration, and before a capture, explanation or read hub-api asks the target

@@ -136,6 +136,7 @@ func (d *CapacityHubWorkerDeployment) runProviderCapacityChild(ctx context.Conte
 	if err != nil {
 		return &fixedStepError{"source", err}
 	}
+	defer d.guards.share(child.reconciler.Clusters)()
 	err = child.run(ctx, func(call context.Context) error {
 		return child.watchClusters(call, func(c context.Context) error { return child.reconciler.RunWithSourceInvocation(c, source) })
 	})

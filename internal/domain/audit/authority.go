@@ -28,6 +28,10 @@ type AuthorityRecord struct {
 	// PermissionSource assignments were derived from (ADR-242): keys, names,
 	// UIDs and value digests only.
 	Namespaces *configuration.NamespaceObservation `json:",omitempty"`
+	// RemoteNamespaces are other joined clusters' observations (ADR-247).
+	RemoteNamespaces []configuration.NamespaceObservation `json:",omitempty"`
+	// Workloads are the workload observations of the batch (ADR-247).
+	Workloads []configuration.WorkloadObservation `json:",omitempty"`
 	// ReviewSources are the accepted decision-time sources of a
 	// permission-change (ADR-245); ReviewRetirements name the sources whose
 	// per-principal assignments this event retired, and how many.
@@ -119,7 +123,7 @@ func (r AuthorityRecord) Valid() bool {
 	if (r.Kind == "permission-review") != (r.Review != nil) || r.Review != nil && (!r.Review.valid() || len(r.Changes) > 0 || r.Bootstrap != nil || len(r.ReviewRetirements) > 0) {
 		return false
 	}
-	if len(r.Automation) > 1024 || (len(r.Automation) > 0 || r.Namespaces != nil || len(r.ReviewSources) > 0) && r.Kind != "permission-change" || r.Namespaces != nil && !r.Namespaces.Valid() {
+	if len(r.Automation) > 1024 || (len(r.Automation) > 0 || r.Namespaces != nil || len(r.RemoteNamespaces) > 0 || len(r.Workloads) > 0 || len(r.ReviewSources) > 0) && r.Kind != "permission-change" || r.Namespaces != nil && !r.Namespaces.Valid() || !configuration.RemoteNamespacesValid(r.Namespaces, r.RemoteNamespaces) || !configuration.WorkloadObservationsValid(r.Workloads) {
 		return false
 	}
 	if len(r.ReviewSources) > 64 || len(r.ReviewRetirements) > 128 {

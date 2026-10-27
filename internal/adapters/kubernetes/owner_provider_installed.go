@@ -87,7 +87,9 @@ func BuildProviderOwnerWorkload(p OwnerWorkloadPlan, clusterID string, selection
 	_, selector, _, _, _ := CapacitySourceNames(p.InstallationID)
 	w.ClusterRole.Rules = append(w.ClusterRole.Rules,
 		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"namespaces", "pods"}, Verbs: []string{"get", "list"}},
-		rbac.PolicyRule{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets"}, Verbs: []string{"get", "list"}},
-		rbac.PolicyRule{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{selector}, Verbs: []string{"get"}})
+		// ADR-247: the permission workload journal also watches them, and
+		// the workload metadata guard is read like the selector guard.
+		rbac.PolicyRule{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets"}, Verbs: []string{"get", "list", "watch"}},
+		rbac.PolicyRule{APIGroups: []string{"admissionregistration.k8s.io"}, Resources: []string{"validatingadmissionpolicies", "validatingadmissionpolicybindings"}, ResourceNames: []string{selector, WorkloadGuardName(p.InstallationID)}, Verbs: []string{"get"}})
 	return w, nil
 }

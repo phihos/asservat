@@ -274,6 +274,8 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 	batch.UnavailableSources = slices.Clone(inherited.UnavailableSources)
 	batch.SourcesUnavailable = inherited.SourcesUnavailable
 	batch.Namespaces = inherited.Namespaces
+	batch.RemoteNamespaces = slices.Clone(inherited.RemoteNamespaces)
+	batch.Workloads = slices.Clone(inherited.Workloads)
 	batch.ReviewSources = slices.Clone(inherited.ReviewSources)
 	if err = batch.Validate(now); err != nil {
 		return value.PermissionBatch{}, err
