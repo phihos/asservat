@@ -115,3 +115,23 @@ func TestAcceptedLowerMaximumClampsUnusedPendingRequest(t *testing.T) {
 		t.Fatal("raising maximum silently renewed pending grant")
 	}
 }
+
+func TestPolicyGrantHistoricalDecisionSurvivesEarlierEffectiveClamp(t *testing.T) {
+	g, issued := policyGrantFixture()
+	decided := issued.Add(20 * time.Minute)
+	lead := reviewer(decided, "lead", "console", true)
+	g.Decision = &GrantDecision{Approved: true, Approver: lead.Principal, Reason: "reviewed", ACR: "1", AuthenticatedAt: decided, DecidedAt: decided}
+	g.Revision = 2
+	g.PolicyNotAfter = issued.Add(time.Second)
+	g.ExpiresAt = g.PolicyNotAfter
+	if !g.Valid() || g.Phase(decided) != GrantExpired {
+		t.Fatal("accepted lower maximum invalidated historical approval instead of expiring it")
+	}
+	pending := g
+	pending.Decision = nil
+	pending.ExpiresAt = time.Time{}
+	pending.Revision = 1
+	if err := CheckDecision(pending, lead, eligibleFor(lead, decided), true, decided); !errors.Is(err, ErrGrantNotPending) {
+		t.Fatal("new approval revived expired request anchor", err)
+	}
+}

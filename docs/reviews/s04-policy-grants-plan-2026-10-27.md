@@ -3,9 +3,11 @@
 Status: architecture decisions accepted by maintainer through the root coordinator; implementation in progress. No runtime qualification yet.
 Scope: S-04 increment 12b, REQ-AUT-003/004/006, SC-AUT-003/004/006,
 REQ-EXE-001 and the accepted team-policy authority contract. ADR-259 and migration
-00102 are reserved after the packet funding correction and history. Base is fetched main c70ae164; compose merged
-PR100 and history migration 00101 before SQL schema work. PR100 remains a separate
-frozen candidate and supplies no policy-grant qualification.
+00102 follows packet funding 00100 and history 00101. Local composition
+`822e79b5` now includes the reviewed history cc2 and approved-recording 218 source;
+SQL implementation on that local schema 101 base is authorized. Canonical PR100/main
+composition remains required before publication or an installed campaign. PR100
+supplies no policy-grant qualification.
 
 ## Observed boundary
 
@@ -432,3 +434,95 @@ current denies, unavailable/wrong projections, expiry after blocking reads, serv
 client separation, one read for multiple grants on one workload, and unchanged
 ad hoc/current-approver behavior. Policy scope/period/max/recipe and original request
 journal recovery remain frozen; SQL 00102/public/node/bootstrap are still unwired.
+
+## Migration 00102: reviewed composition and SQL plan
+
+Base: local merge `822e79b5` composes history
+`cc2ccae0b73fc7179a296f529e9aa8ae583ab547`, with approved-recording
+`21806d0d2612d33bb039b6daf2971849796a999d` independently verified as an ancestor.
+Packet funding remains 00100, encrypted history 00101, policy grants 00102.
+Later 100 diagnostics are intentionally excluded until their canonical result.
+The one code conflict preserved both current policy metadata rights and ad hoc
+continuation hints; policy grants explicitly offer no personal resume/resolve.
+No SQL 00102 file or runtime/public/node wiring exists at this checkpoint.
+
+1. Extend the existing AccessGrant row with a closed discriminated policy shape.
+   Preserve legacy ad hoc required preview/capture/Pod IDs, human requester,
+   decision-anchored eight-hour maximum and result-access pools. Policy grants
+   instead require real workload/policy identity, authenticated human/service
+   requester kind, frozen accepted authority/scope/recipe/original maximum,
+   original RequestedAt anchor and separate finite execution/output/observation
+   spend. Forbid fake preview/capture/Pod IDs and all personal result access.
+   Resolve current accepted execution by collection identity/intent version,
+   not equality to every latest whole-source resourceVersion/spec revision.
+   Keep original source/acceptance provenance immutable.
+
+2. Keep the request journal in that existing grant row, separate from encrypted
+   operation audit. Preserve the old partial ad hoc uniqueness/read semantics.
+   Policy request keys include root, full issuer/subject/client/kind and closed
+   operation plus idempotency key; use a fixed-size unambiguous actor digest for
+   the index and recheck all full fields and caller-input digest. Lookup precedes
+   current plan/default resolution. Original lifetime-zero/default choice,
+   scope/max/recipe, periods and spent pools survive lost replies/replay.
+   Hash collision can refuse, never alias another request. No new journal table.
+
+3. Add a protected policy-period projection distinct from browser settings and
+   their five-second lifecycle. The already reviewed ten-second joined observer
+   accepts an original bounded protected observation. Publish it and apply any
+   lower maximum to all older pending/approved policy grants in one transaction,
+   using indexed set-based min(existing, RequestedAt+maxAge). Later raises never
+   extend earlier deadlines. Approved historical rows remain valid records when
+   a later clamp moves effective expiry before DecisionAt; new approval after
+   effective expiry refuses. No revision history, paging machinery, invented
+   global grant cap or unseen raw ConfigMap ABA guarantee.
+
+4. Reserve policy grant and accepted-authority shared spend atomically under
+   existing current recovery/delegation/source guards and lock order. Replays,
+   restart, grant replacement and attachment cannot refill either aggregate.
+   Unknown possibly-started effects remain charged. New admission resolves a
+   real current Pod of the reviewed workload; no grant lifetime follows the
+   historical requester's login. Current requester metadata rights stay separate.
+   Add only the durable session/fence/sequence state needed for cumulative
+   observation credit on the required authority renewal; do not add a quota-only
+   renewal stream or fix its quantum before composed cost measurement.
+
+5. Persist explicit attachment control receipts on the existing activate-policy
+   boundary. They are semantic/idempotency state, not durable object audit:
+   encrypted intent must already be acknowledged before mutation, with the
+   existing outcome/replay handling. Bind exact original acceptance/grant and
+   current authored grantRef; no newest-grant selection or Kubernetes writes.
+   Do not let sharing/control-only changes replace accepted authority or spend.
+   Separate authorized sharing control remains an explicit workflow dependency.
+
+6. Update only necessary closed role facets, SQL queries/generated models and
+   installer schema inventory. Reuse existing credentials and protected source
+   producer; record any narrow added SQL execution privilege explicitly. Raise
+   the binary compatibility floor to 102 because older grant readers conflate
+   the new kinds/client keys. Up validates old rows before changing constraints.
+   Down refuses incompatible policy/session/attachment survivors or old-key
+   collisions; it never deletes/rekeys grants, refunds uncertainty or resets
+   spend to force rollback. Keep the old ad hoc contract exactly testable.
+
+Before any local external run, coordinate the owned fixture slot with root,
+freeze all relevant sources, retain actual selected tests/exits, source hashes
+and terminal cleanup, and cap the run at twenty minutes. No collector locally.
+Planned real PostgreSQL cases (new test names will be added with implementation):
+conditional row negatives and role denial; same-key full-client/operation
+separation plus exact lost replies/default changes; requester/independent reviewer
+versus policy executor; current-scope/refusal after lock waits; pending and
+approved original-anchor lower/raise including expiry before historical decision;
+concurrent grant/policy spend and revocation, restart and attachment no-refill;
+Up/Down/floor and incompatible-survivor refusal. Reuse the existing
+`TestContextAdmissionWithRealServices/access-grant-approval-children-pool-revocation-and-expiry`
+regression (parent and subtest verified in source), plus affected purpose/installer
+roles. `scripts/test-custody.py --run` is the existing bounded targeted runner;
+new policy test selectors are not claimed to exist yet. Run sql-check and affected
+Go/race/spec/architecture gates before qualification. No public runtime wiring or
+hosted campaign until SQL review and real SQL gates pass.
+
+
+Public-composition follow-up: a current sponsoring team manager who may attach or
+revoke must be able to inspect the attached grant's finite state/expiry after the
+original requester leaves. Existing nonrequester Get is approver-only; decide a
+minimal current-manager view when composing those controls, without a grant-head
+service or broader collection/disclosure authority. This does not block SQL scope.
