@@ -41,6 +41,15 @@ type retentionEffectFixture struct {
 }
 
 func (f *retentionEffectFixture) observe(ctx context.Context) error {
+	// Like the source owner, keep the 30-second source lease while observing;
+	// a scenario used longer than that (policy-share takes about 30 seconds)
+	// otherwise fails with ErrChanged on the original fence. Renewal requires
+	// the lease to be still live, so it never revives an expired source.
+	renewed, err := f.sources.RenewRetention(ctx, f.fence)
+	if err != nil {
+		return err
+	}
+	f.fence = renewed
 	now := time.Now().UTC().Truncate(time.Microsecond)
 	list := f.checkpoint.Transition.List
 	list.Snapshot.ObservedAt, list.Snapshot.FreshUntil = now, now.Add(5*time.Second)

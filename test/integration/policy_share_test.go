@@ -345,7 +345,18 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if err = admin.QueryRow(ctx, "SELECT (record#>>'{Sharing,NotAfter}')::timestamptz FROM policy_acceptance WHERE id=$1", second).Scan(&end); err != nil {
 		t.Fatal(err)
 	}
+	// The scenario's synthetic recovery observation lives 30 seconds, which
+	// this wait (about 25 seconds) would otherwise cross for the publications
+	// below. Renew it as its producer would, once before and once after.
+	renewRecovery := func() {
+		t.Helper()
+		if err := renewSyntheticFleetObservation(ctx, admin, s.recovery.observation, 30*time.Second, true); err != nil {
+			t.Fatal("renew synthetic recovery observation", err)
+		}
+	}
+	renewRecovery()
 	time.Sleep(time.Until(end) + time.Second)
+	renewRecovery()
 	publish(f6)
 	if _, exists := shares()["capture:"+c6.CaptureID]; exists {
 		t.Fatal("a capture published after notAfter was shared")

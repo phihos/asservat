@@ -26,6 +26,20 @@ OWNER_AUDIT_INVENTORY_TEST = "TestOwnerAuditInventoryWithRealServices"
 OWNER_AUDIT_INVENTORY_BUCKET = "synthetic-owner-inventory"
 INSTALLED_EVIDENCE_DELETE_TEST = "TestInstalledEvidenceDeleteCredentialWithRealServices"
 INSTALLED_EVIDENCE_DELETE_BUCKET = "synthetic-installed-evidence-delete"
+# The complete custody suite (make custody-integration) takes about 15 minutes,
+# so CI runs it as these disjoint shards (scripts/ci-native.sh custody-N).
+# TestContextAdmissionWithRealServices alone takes about 13 minutes; its
+# first-level subtests are split by first character, so a new subtest always
+# lands in exactly one shard. scripts/test-custody-shard-selection.py checks
+# that every selected top-level test and subtest runs in exactly one shard.
+CUSTODY_PATTERN = "Test(Custody|PermissionAuthority|ContextAdmission|PeerRegistry|Enrollment)"
+CONTEXT_ADMISSION_TEST = "^TestContextAdmissionWithRealServices$"
+CUSTODY_SHARDS = {
+    "1": CONTEXT_ADMISSION_TEST + "/^[a-c]",
+    "2": CONTEXT_ADMISSION_TEST + "/^d",
+    "3": CONTEXT_ADMISSION_TEST + "/^[^a-d]",
+    "4": "Test(Custody|PermissionAuthority|PeerRegistry|Enrollment)",
+}
 
 def installed_evidence_delete_selection(test_pattern):
     """Only the exact focused selection receives the deletion IAM fixture."""
@@ -89,7 +103,7 @@ def passed_test_elapsed(output, name):
     matches = re.findall(r"^\s*--- PASS: " + re.escape(name) + r" \(([0-9]+(?:\.[0-9]+)?)s\)$", output, re.MULTILINE)
     return float(matches[0]) if len(matches) == 1 else None
 
-def main(fleet=False, test_pattern=None, database_recovery=False, initial_installation=False, connector_retirement=False, scoped_audit=False, owner_audit_inventory=False):
+def main(fleet=False, test_pattern=None, database_recovery=False, initial_installation=False, connector_retirement=False, scoped_audit=False, owner_audit_inventory=False, result_name=None):
     installed_evidence_delete = installed_evidence_delete_selection(test_pattern)
     if installed_evidence_delete and (fleet or database_recovery or initial_installation or connector_retirement or scoped_audit or owner_audit_inventory):
         raise ValueError("Installed evidence deletion owns its exact fixture/test selection")
@@ -108,7 +122,7 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
         containers = []
         created_network = False
         pgname = None
-        result_name="installed-evidence-delete" if installed_evidence_delete else "owner-audit-inventory" if owner_audit_inventory else "scoped-audit-storage" if scoped_audit else "initial-installation" if initial_installation else ("database-recovery" if database_recovery else ("fleet" if fleet else "custody"))
+        result_name=result_name or ("installed-evidence-delete" if installed_evidence_delete else "owner-audit-inventory" if owner_audit_inventory else "scoped-audit-storage" if scoped_audit else "initial-installation" if initial_installation else ("database-recovery" if database_recovery else ("fleet" if fleet else "custody")))
         log_path = ROOT/("test/results/"+result_name+".log")
         log_path.write_text("")
         report = {"scope": "storage custody, permission acceptance and bounded context admission components; synthetic control provenance only; no public acquisition or disclosure", "images": {}, "sourceHashes": hashes(), "passedTestNames": []}
@@ -199,7 +213,7 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
                 env["ASSERVAT_INITIAL_INSTALLATION"] = "1"
                 report["scope"] = "first-installation SQL eligibility, witness composition and encrypted S3/OpenBao audit; synthetic protected Kubernetes inputs; no restore or installer deployment qualification"
             report["goVersion"] = run(["go", "version"])
-            pattern = "^TestInitialInstallationWithRealServices$" if initial_installation else ("^TestDatabaseRecoveryAfterRestartAndRestore$" if database_recovery else (test_pattern or ("Test(Enrollment|PeerRegistry|ConnectorPKI|BootstrapChannel|InitialProviderIssuer)" if fleet else "Test(Custody|PermissionAuthority|ContextAdmission|PeerRegistry|Enrollment)")))
+            pattern = "^TestInitialInstallationWithRealServices$" if initial_installation else ("^TestDatabaseRecoveryAfterRestartAndRestore$" if database_recovery else (test_pattern or ("Test(Enrollment|PeerRegistry|ConnectorPKI|BootstrapChannel|InitialProviderIssuer)" if fleet else CUSTODY_PATTERN)))
             if scoped_audit:
                 pattern = "^TestScopedVersionedAuditStorageWithRealServices$"
                 report["scope"] = "real prefix-scoped versioned audit SDK/TLS writes and version reads, runtime deletion/configuration denial and separate exact-version retirement; synthetic storage administration and wrapping keys, no installed accounting, recovery or production key qualification"
@@ -224,8 +238,13 @@ def main(fleet=False, test_pattern=None, database_recovery=False, initial_instal
             # 650 seconds), 900 seconds (960 including harness cleanup). Fleet,
             # initial and recovery runs keep their 300-second limit. No
             # individual authority/provider/retention deadline changes.
+            # The unselected local full suite then reached 900 seconds as well
+            # (context admission 806.77 seconds, the 256 MiB custody case still
+            # running; 2026-10-27). CI runs CUSTODY_SHARDS (each at most about
+            # 520 seconds of tests) under the 900-second limit; only the local
+            # full run gets 1050 seconds, keeping it within 20 minutes.
             full_custody = not (fleet or initial_installation or database_recovery or connector_retirement or scoped_audit or owner_audit_inventory)
-            test_timeout = 2400 if connector_retirement else (900 if full_custody else 300)
+            test_timeout = 2400 if connector_retirement else ((900 if test_pattern else 1050) if full_custody else 300)
             report["connectorRetirementRealtime"] = connector_retirement
             report["goTestTimeoutSeconds"] = test_timeout
             report["harnessTestTimeoutSeconds"] = test_timeout + 60
@@ -326,10 +345,16 @@ if __name__ == "__main__":
     parser.add_argument("--scoped-audit", action="store_true", help="Qualify prefix-scoped immutable audit versions and independent retirement")
     parser.add_argument("--owner-audit-inventory", action="store_true", help="Qualify read-only historical owner audit version/marker/upload inventory")
     parser.add_argument("--run", help="Go test name regex for an owned targeted fixture; default runs the complete suite")
+    parser.add_argument("--shard", choices=sorted(CUSTODY_SHARDS), help="Run one CI shard of the complete custody suite (CUSTODY_SHARDS)")
+    parser.add_argument("--result-name", help="test/results file prefix, so two local runs (for example two shards) do not share a log")
     args=parser.parse_args()
+    if args.shard:
+        if args.run or args.fleet or args.database_recovery or args.initial_installation or args.connector_retirement or args.scoped_audit or args.owner_audit_inventory: parser.error("--shard owns its exact test selection")
+        args.run, args.result_name = CUSTODY_SHARDS[args.shard], args.result_name or "custody-" + args.shard
+    if args.result_name and not re.fullmatch(r"[a-z0-9][a-z0-9-]*", args.result_name): parser.error("--result-name must be lowercase letters, digits and hyphens")
     if args.database_recovery and (args.fleet or args.run): parser.error("--database-recovery owns its exact phase/test selection")
     if args.initial_installation and (args.fleet or args.run or args.database_recovery): parser.error("--initial-installation owns its exact fresh-fixture selection")
     if args.connector_retirement and (args.fleet or args.run or args.database_recovery or args.initial_installation): parser.error("--connector-retirement owns its exact long-fixture selection")
     if args.scoped_audit and (args.fleet or args.run or args.database_recovery or args.initial_installation or args.connector_retirement): parser.error("--scoped-audit owns its exact fixture/test selection")
     if args.owner_audit_inventory and (args.fleet or args.run or args.database_recovery or args.initial_installation or args.connector_retirement or args.scoped_audit): parser.error("--owner-audit-inventory owns its exact fixture/test selection")
-    raise SystemExit(main(args.fleet or args.initial_installation, args.run, args.database_recovery, args.initial_installation, args.connector_retirement, args.scoped_audit, args.owner_audit_inventory))
+    raise SystemExit(main(args.fleet or args.initial_installation, args.run, args.database_recovery, args.initial_installation, args.connector_retirement, args.scoped_audit, args.owner_audit_inventory, args.result_name))

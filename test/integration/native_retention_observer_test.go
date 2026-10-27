@@ -70,14 +70,13 @@ func startNativeScenarioSources(t *testing.T, parent context.Context, admin *pgx
 		if _, err := s.p.RenewPermissions(call, cfg.PermissionFence{RootID: s.batch.RootID, Epoch: s.batch.Epoch, TrustDigest: s.batch.TrustDigest}); err != nil {
 			return err
 		}
-		// This is the sole writer of this native scenario's retention fence.
-		// Accepted readers below perform no observation or ownership writes.
-		fence, err := s.retention.sources.RenewRetention(call, s.retention.fence)
+		// observe renews and replaces this scenario's retention fence under the
+		// fixture lock. Accepted readers below perform no observation or
+		// ownership writes.
+		s.retention.mu.Lock()
+		err := s.retention.observe(call)
+		s.retention.mu.Unlock()
 		if err != nil {
-			return err
-		}
-		s.retention.fence = fence
-		if err = s.retention.observe(call); err != nil {
 			return err
 		}
 		batch := s.batch
