@@ -290,3 +290,55 @@ proxy helper race passes in 1.072s. Canonical pre-push passes with the existing
 spec virtualenv and pinned sqlc, including 227 console tests. The initial
 sequencing RED and a subsequent diagnostic-test duplicate-field compile failure
 are retained separately. No external fixture or collector ran for this fix.
+
+## Retained receiver and private exchange cost
+
+The next frozen installed run, 40601041862 on `c267cde7`, again failed at the
+first settings read. Its new diagnostics establish required history with
+`header=write_claimed`, visible=true, custody=reserved, no writer completion and
+zero acknowledged copies, followed by `write/execute/deadline` and
+`read/storage/live`. Those SQL facts do not establish absence of physical
+objects. Execute includes receiver rechecking, signing and the frame/object
+exchange; that run did not distinguish the failing inner phase. Go was 618.860s,
+selected subtest 159.45s; source stayed unchanged and cleanup was empty across
+3,251 recorded sources. Report SHA-256
+`63886dbb9427659877c0bbe41a11e140412defc117346e1ff5a734ae04929593`.
+The complete installed history workflow remains unqualified.
+
+A local composition now invokes the actual RegionalHistoryDispatch through the
+existing actual process-owned mTLS/H2 fixture, handler/router/source frames,
+real history JWS and regional history protocol. Current source/SQL authority and
+object effects remain synthetic; no external service or collector runs. Fast
+write/read calibration took about 6ms with three source reads. A controlled
+200ms regional source latency under one original 500ms parent reproduced a
+failure after 500ms, before any object effect. Preparation and the duplicate
+Execute Receiver call each took about 202ms; local signing was 0.2ms, leaving
+insufficient time for the work frame's own mandatory source read. This is a
+reproduced composed cost defect, not a measurement of native S3 or proof that
+it alone caused the installed failure.
+
+Execute now consumes the checked receiver already retained by Prepare, within
+that receiver's original ValidUntil and unchanged minimum NotAfter. Its exact
+channel/executor cannot change. RunHistory still checks the live attachment,
+original owner context and standby membership; the actual first work frame still
+pulls/validates the current regional source and peer before any effect. Current
+signing trust and final-peer checks remain. This removes one redundant source
+round trip and its existing checks: three source reads become two, not zero.
+The same controlled-delay write succeeds in 406ms normally (434ms under parent
+race) inside the unchanged 500ms parent. Positive reads preserve all four exact
+ciphertexts/receipts; changed source, closed attachment, canceled caller and
+expired original bound all refuse with zero object effects.
+
+Finite elapsed/remaining buckets for attach, initial receiver, sign and exchange
+use the existing bounded logger and step timings. Existing stream diagnostics
+also report the first closed exchange stage/reason after failure, without another
+read, payload, provider error or authority. No timeout, renewal, retry, detached
+context, KMS/object capability, durable state or background task is added.
+Fresh exact-source installed timing is still required to establish the original
+native inner failure and qualify the complete browser/repeat workflow.
+
+Final local affected races pass: mTLS 38.143s, context-start 10.800s, bootstrap
+56.057s and capture application 11.082s. Canonical pre-push passes, including
+227 console tests. Independent read-only review found no blocker in retained
+proof/current-frame separation, joined ownership, finite diagnostics or the
+actual-adapter TLS test. No external qualification is implied by these gates.
