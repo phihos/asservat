@@ -1,7 +1,7 @@
 # Complete the approved recording workflow
 
 Scope: REQ-INV-001–003, REQ-AUT-003, REQ-UI-001/003/005, S-04 increment 12a.
-Follow-up to ADR-249/252/253; no new capture profile editor or migration.
+Follow-up to ADR-249/252/253; no new capture profile editor. ADR-257 and migration 00100 correct authored packet custody funding.
 
 ## Observed gaps and changes
 
@@ -182,3 +182,15 @@ Encrypted intent acknowledgement remains before dispatch and failed outcome audi
 suppresses a response without erasing an acknowledged effect. No migration, API
 request, credential, watch, background task or deadline change is introduced.
 Future browser-operation failures also collect the existing bounded diagnostics.
+
+## Installed capacity correction and compatibility
+
+Run 40538171521 on c5db1e11 reached self-approval refusal, independent fresh
+approval and the real 120-second preview wait, then refused submission with
+CapacityUnavailable. A failing pure regression reproduced the exact 39,714,816
+source bytes becoming a 6,176,768-byte child while one packet reservation needs
+9,928,704 bytes. This is not evidence of a physically exhausted administrator
+quota. ADR-257 records the bounded formula, atomic legacy backfill, exact
+pre/post graph checks, unchanged IDs/spend/deadlines and rollback refusal.
+Migration 00100 belongs to this correction; history moves to 00101 and policy
+grants to 00102. No installed packet result has passed yet.
