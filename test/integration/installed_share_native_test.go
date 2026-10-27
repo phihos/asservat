@@ -220,7 +220,7 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 		PreviewID string   `json:"preview_id"`
 		Warnings  []string `json:"warnings"`
 	}
-	if status, code, err := installedJourneyPreview(ctx, func() (string, string, error) { return try(developer, "preview_capture", arguments, &previewed) }); err != nil || status != "ok" || previewed.PreviewID == "" || len(previewed.Warnings) != 1 {
+	if status, code, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) { return try(developer, "preview_capture", arguments, &previewed) }); err != nil || status != "ok" || previewed.PreviewID == "" || len(previewed.Warnings) != 1 {
 		diagnose()
 		t.Fatal("installed sharing preview", status, code, err, previewed)
 	}

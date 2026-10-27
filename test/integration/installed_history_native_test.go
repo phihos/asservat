@@ -130,7 +130,7 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 	// before the others are read ("facts/current"), e.g. while the workload's
 	// storage binding is refreshed after the capture-time-share capture just
 	// used it. Like the journey's own preview, retry up to four reviews.
-	status, code, err := installedJourneyPreview(ctx, func() (string, string, error) {
+	status, code, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) {
 		return try(developer, "preview_capture", map[string]string{"history_capture_id": captureID}, &preview)
 	})
 	if err != nil || status != "ok" || preview.PreviewID == "" || preview.Repeated != captureID || !preview.Enabled || len(preview.SelectedPods) != 1 {
@@ -169,7 +169,7 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 		}
 	}
 	var after page
-	if status, _ := call(developer, "list_capture_history", list, &after); status != "ok" || len(after.History) != len(before.History)+1 || after.History[0].CaptureID != accepted.CaptureID || after.History[listed+1].CaptureID != captureID {
+	if status, _, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) { return try(developer, "list_capture_history", list, &after) }); err != nil || status != "ok" || len(after.History) != len(before.History)+1 || after.History[0].CaptureID != accepted.CaptureID || after.History[listed+1].CaptureID != captureID {
 		t.Fatal("installed history after repeat", after)
 	}
 	t.Logf("installed history: listed capture %s, refused the unrelated principal, collected again as capture %s", captureID, accepted.CaptureID)

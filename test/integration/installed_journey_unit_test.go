@@ -685,13 +685,13 @@ func TestInstalledJourneySubmitContinuesAcceptedRefusedStart(t *testing.T) {
 	}
 }
 
-func TestInstalledJourneyPreviewRetriesOnlyRetryableUnavailability(t *testing.T) {
+func TestInstalledJourneyRetriesOnlyRetryableUnavailability(t *testing.T) {
 	replies := []struct {
 		code string
 		err  error
 	}{{"", errors.New("Service Unavailable")}, {"NotAvailable", nil}, {"", nil}}
 	n := 0
-	status, code, err := installedJourneyPreview(t.Context(), func() (string, string, error) {
+	status, code, err := installedJourneyRetryUnavailable(t.Context(), func() (string, string, error) {
 		r := replies[n]
 		n++
 		if r.code == "" && r.err == nil {
@@ -703,7 +703,7 @@ func TestInstalledJourneyPreviewRetriesOnlyRetryableUnavailability(t *testing.T)
 		t.Fatal(status, code, err, n)
 	}
 	n = 0
-	if status, code, err = installedJourneyPreview(t.Context(), func() (string, string, error) { n++; return "error", "UnsupportedRequest", nil }); code != "UnsupportedRequest" || err != nil || n != 1 {
+	if status, code, err = installedJourneyRetryUnavailable(t.Context(), func() (string, string, error) { n++; return "error", "UnsupportedRequest", nil }); code != "UnsupportedRequest" || err != nil || n != 1 {
 		t.Fatal(status, code, err, n)
 	}
 }

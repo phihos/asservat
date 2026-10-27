@@ -897,11 +897,12 @@ func installedJourneySubmit(ctx context.Context, call func(name string, argument
 	return acceptedID, nil
 }
 
-// installedJourneyPreview retries a preview, as the journey's own call does,
-// while it is retryably unavailable: a NotAvailable reply (a gathered fact
-// lapsed, "facts/current") or a bare 503 whose reply metadata expired before
-// delivery ("reply-expired"). attempt reports a transport error as err.
-func installedJourneyPreview(ctx context.Context, attempt func() (status, code string, err error)) (status, code string, err error) {
+// installedJourneyRetryUnavailable retries a read or preview, as the journey's
+// own call does, while it is retryably unavailable: a NotAvailable reply (a
+// gathered fact lapsed, "facts/current") or a bare 503 whose reply metadata
+// expired before delivery ("reply-expired"). attempt reports a transport error
+// as err. Only an operation expected to succeed may use it.
+func installedJourneyRetryUnavailable(ctx context.Context, attempt func() (status, code string, err error)) (status, code string, err error) {
 	for i := 1; i <= 4; i++ {
 		if status, code, err = attempt(); err == nil && code != "NotAvailable" {
 			return status, code, nil
