@@ -50,7 +50,15 @@ capture was admitted and nothing had started; a plain same-key retry only replay
    `AcquisitionNotStarted`, naming the explicit continuation (`continue_acquisition: true`) with
    the same preview and key. Any refusal after the preparation was entered stays
    `OutcomeUnknown`/`AcquisitionUncertain`.
-4. A refused preparation's diagnostic line names the earliest bound of its check interval
+4. **Reuse a connector process proof only with 2.5 s left.** The region checks its receiver for
+   every pre-work target query and every work against the connector's cached process proof, and
+   cuts the answer and the work to that proof's original end. The cache reused a proof until its
+   last instant, so an answer could arrive already expired (`result/resolution-expired`, preview
+   `facts/current`) or a work could miss the one-second preparation floor with the caller still
+   holding seconds (`PrepareAPIExecution[target@<1s]/effect/headroom`, run 40461388398). A cached
+   proof with less than 2.5 s left is now replaced by a fresh one; no proof is extended. Cost: at
+   most one extra full proof per read that falls in the last 2.5 s, not per workload.
+5. A refused preparation's diagnostic line names the earliest bound of its check interval
    (`PrepareAPIExecution[<bound>@<remaining>]`), for example `target@0` or `process@<1s`.
 
 ## Consequences

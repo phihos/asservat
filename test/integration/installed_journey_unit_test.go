@@ -685,6 +685,31 @@ func TestInstalledJourneySubmitContinuesAcceptedRefusedStart(t *testing.T) {
 	}
 }
 
+func TestInstalledJourneyReviewsAgainOnlyAfterAcknowledgedClosure(t *testing.T) {
+	var keys []any
+	id, err := installedJourneyReviewAndSubmit(t.Context(), func(name string, arguments any, data any) (string, string) {
+		switch name {
+		case "request_capture":
+			keys = append(keys, arguments.(map[string]any)["idempotency_key"])
+			if len(keys) == 1 {
+				return "error", "OutcomeUnknown"
+			}
+			data.(*struct {
+				CaptureID string `json:"capture_id"`
+			}).CaptureID = "second"
+			return "ok", ""
+		case "resolve_capture_request":
+			*data.(*installedJourneyDisposition) = installedJourneyDisposition{State: "closed"}
+		}
+		return "ok", ""
+	}, func(attempt int) (map[string]any, error) {
+		return map[string]any{"preview_id": "preview", "idempotency_key": attempt}, nil
+	})
+	if err != nil || id != "second" || !reflect.DeepEqual(keys, []any{1, 2}) {
+		t.Fatal(id, err, keys)
+	}
+}
+
 func TestInstalledJourneyRetriesOnlyRetryableUnavailability(t *testing.T) {
 	replies := []struct {
 		code string

@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -130,19 +131,23 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 	// before the others are read ("facts/current"), e.g. while the workload's
 	// storage binding is refreshed after the capture-time-share capture just
 	// used it. Like the journey's own preview, retry up to four reviews.
-	status, code, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) {
-		return try(developer, "preview_capture", map[string]string{"history_capture_id": captureID}, &preview)
-	})
-	if err != nil || status != "ok" || preview.PreviewID == "" || preview.Repeated != captureID || !preview.Enabled || len(preview.SelectedPods) != 1 {
-		diagnose()
-		t.Fatal("installed repeat preview", status, code, err, preview)
-	}
 	var accepted struct {
 		CaptureID string
 	}
-	accepted.CaptureID, err = installedJourneySubmit(ctx, func(name string, arguments any, data any) (string, string) {
+	var err error
+	accepted.CaptureID, err = installedJourneyReviewAndSubmit(ctx, func(name string, arguments any, data any) (string, string) {
 		return call(developer, name, arguments, data)
-	}, map[string]any{"preview_id": preview.PreviewID, "idempotency_key": "installed-history-repeat"})
+	}, func(attempt int) (map[string]any, error) {
+		preview.PreviewID, preview.Repeated, preview.Enabled, preview.SelectedPods = "", "", false, nil
+		status, code, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) {
+			return try(developer, "preview_capture", map[string]string{"history_capture_id": captureID}, &preview)
+		})
+		if err != nil || status != "ok" || preview.PreviewID == "" || preview.Repeated != captureID || !preview.Enabled || len(preview.SelectedPods) != 1 {
+			diagnose()
+			t.Fatal("installed repeat preview", status, code, err, preview)
+		}
+		return map[string]any{"preview_id": preview.PreviewID, "idempotency_key": fmt.Sprintf("installed-history-repeat-%d", attempt)}, nil
+	})
 	if err != nil {
 		diagnose()
 		t.Fatal("installed repeat request", err)

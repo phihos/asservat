@@ -3,6 +3,7 @@ package integration
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"maps"
 	"net/http"
@@ -220,16 +221,19 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 		PreviewID string   `json:"preview_id"`
 		Warnings  []string `json:"warnings"`
 	}
-	if status, code, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) { return try(developer, "preview_capture", arguments, &previewed) }); err != nil || status != "ok" || previewed.PreviewID == "" || len(previewed.Warnings) != 1 {
-		diagnose()
-		t.Fatal("installed sharing preview", status, code, err, previewed)
-	}
 	var accepted struct {
 		CaptureID string `json:"capture_id"`
 	}
-	accepted.CaptureID, err = installedJourneySubmit(ctx, func(name string, arguments any, data any) (string, string) {
+	accepted.CaptureID, err = installedJourneyReviewAndSubmit(ctx, func(name string, arguments any, data any) (string, string) {
 		return call(developer, name, arguments, data)
-	}, map[string]any{"preview_id": previewed.PreviewID, "idempotency_key": "installed-capture-share-1"})
+	}, func(attempt int) (map[string]any, error) {
+		previewed.PreviewID, previewed.Warnings = "", nil
+		if status, code, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) { return try(developer, "preview_capture", arguments, &previewed) }); err != nil || status != "ok" || previewed.PreviewID == "" || len(previewed.Warnings) != 1 {
+			diagnose()
+			t.Fatal("installed sharing preview", status, code, err, previewed)
+		}
+		return map[string]any{"preview_id": previewed.PreviewID, "idempotency_key": fmt.Sprintf("installed-capture-share-%d", attempt)}, nil
+	})
 	if err != nil {
 		diagnose()
 		t.Fatal("installed sharing request_capture", err)

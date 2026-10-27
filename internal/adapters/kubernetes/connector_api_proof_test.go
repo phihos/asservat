@@ -253,6 +253,38 @@ func TestConnectorAPIProofRecheckCannotReanchorOrRenew(t *testing.T) {
 	}
 }
 
+// A cached proof is reused only while it keeps the reuse floor; a reader in
+// its last seconds gets a fresh proof instead of an interval too short to use.
+func TestConnectorAPIProofReplacedBeforeItsLastSeconds(t *testing.T) {
+	start := time.Now().UTC()
+	clock := start
+	now := func() time.Time { return clock }
+	var state connectorAPIProofState
+	produced, rechecked := 0, 0
+	produce := func(context.Context) (connectorAPIProof, error) {
+		produced++
+		return connectorCachedProof(t, clock), nil
+	}
+	check := func(_ context.Context, p connectorAPIProof) (connectorAPIProof, error) { rechecked++; return p, nil }
+	read := func() connectorAPIProof {
+		t.Helper()
+		p, e := state.read(context.Background(), now, produce, check)
+		if e != nil {
+			t.Fatal(e)
+		}
+		return p
+	}
+	read()
+	clock = start.Add(2 * time.Second)
+	if p := read(); produced != 1 || rechecked != 1 || !p.observedAt.Equal(start) {
+		t.Fatal("proof with ample remaining interval was not reused", produced, rechecked)
+	}
+	clock = start.Add(3 * time.Second)
+	if p := read(); produced != 2 || rechecked != 1 || !p.observedAt.Equal(clock) || p.validUntil.Sub(clock) < connectorProofReuseFloor {
+		t.Fatal("proof in its last seconds was reused", produced, rechecked)
+	}
+}
+
 // Done is first consulted after the in-flight proof has been selected. Tests
 // use this handshake to prove a waiter actually joined, without timed sleeps.
 type connectorProofWaitContext struct {

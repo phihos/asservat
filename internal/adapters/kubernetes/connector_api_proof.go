@@ -28,6 +28,14 @@ func (p connectorAPIProof) valid(now time.Time) bool {
 	return p.proof.Valid(now) && p.owned.Request.Process == p.proof.Process && identity.Fresh(p.observedAt, p.validUntil, now, 5*time.Second) && !p.validUntil.After(p.proof.FreshUntil) && !p.validUntil.After(p.owned.ValidUntil)
 }
 
+// connectorProofReuseFloor is the least remaining interval a cached proof must
+// keep to be reused; a shorter one is replaced by a fresh proof. Every reader
+// is bounded by the proof's original end: a work verified on a proof in its
+// last second could not reach the one-second ADR-212 preparation floor
+// (installed native: headroom refusals with seconds of caller time left).
+// It shortens reuse, never extends a proof.
+const connectorProofReuseFloor = 2500 * time.Millisecond
+
 type connectorAPIProofFlight struct {
 	done       chan struct{}
 	generation uint64
@@ -89,7 +97,7 @@ func (s *connectorAPIProofState) read(ctx context.Context, now func() time.Time,
 	f := &connectorAPIProofFlight{done: make(chan struct{}), generation: s.generation}
 	s.flight = f
 	old := s.cached
-	if old != nil && !old.valid(now()) {
+	if old != nil && (!old.valid(now()) || old.validUntil.Sub(now()) < connectorProofReuseFloor) {
 		s.cached = nil
 		old = nil
 	}
