@@ -50,15 +50,7 @@ capture was admitted and nothing had started; a plain same-key retry only replay
    `AcquisitionNotStarted`, naming the explicit continuation (`continue_acquisition: true`) with
    the same preview and key. Any refusal after the preparation was entered stays
    `OutcomeUnknown`/`AcquisitionUncertain`.
-4. **Reuse a connector process proof only with 2.5 s left.** The region checks its receiver for
-   every pre-work target query and every work against the connector's cached process proof, and
-   cuts the answer and the work to that proof's original end. The cache reused a proof until its
-   last instant, so an answer could arrive already expired (`result/resolution-expired`, preview
-   `facts/current`) or a work could miss the one-second preparation floor with the caller still
-   holding seconds (`PrepareAPIExecution[target@<1s]/effect/headroom`, run 40461388398). A cached
-   proof with less than 2.5 s left is now replaced by a fresh one; no proof is extended. Cost: at
-   most one extra full proof per read that falls in the last 2.5 s, not per workload.
-5. A refused preparation's diagnostic line names the earliest bound of its check interval
+4. A refused preparation's diagnostic line names the earliest bound of its check interval
    (`PrepareAPIExecution[<bound>@<remaining>]`), for example `target@0` or `process@<1s`.
 
 ## Consequences
@@ -69,6 +61,21 @@ or background task beyond one timer per standby; an idle standby is replaced abo
 seconds instead of 30 (one extra TLS opening per region per ~22 s). A request in the reopening gap
 (about one to two seconds) is refused before any effect and is retried. The installed share and
 history focuses now resolve and continue a request like the journey and retry retryable previews.
+
+## Remaining limitation and rejected alternative
+
+The region also bounds every pre-work target answer and every work by its receiver check, which
+reads the connector's cached process proof and cuts the answer and the work to that proof's
+original end. A proof reused near its end still yields short answers: after decision 1, run
+40461388398 recorded `PrepareAPIExecution[target@<1s]/effect/headroom` with the caller holding
+seconds, and admission refusals `result/resolution-expired`. These now surface as the retryable
+`AcquisitionNotStarted`, preview `NotAvailable` or a closed request, all recovered by an ordinary
+retry or continuation without spent work. Replacing a cached proof that had less than 2.5 s left
+(tried in 8fa6b469) moved the full proof's production into requests: all four share runs
+(40465614024, 40465616722, 40465619449, 40465622240) then exceeded the request bound
+(`request-expired`, starts with `start-left@0`). It was reverted. A remedy needs the proof
+renewed ahead of use, outside the request, which the cache's no-background-refresh contract
+excludes today; that is a separate decision.
 
 ## Qualification
 

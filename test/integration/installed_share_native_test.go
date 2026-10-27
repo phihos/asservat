@@ -225,6 +225,13 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 		CaptureID string `json:"capture_id"`
 	}
 	accepted.CaptureID, err = installedJourneyReviewAndSubmit(ctx, func(name string, arguments any, data any) (string, string) {
+		// A lost request reply is an unknown outcome, resolved like the journey's.
+		if name == "request_capture" {
+			if status, code, err := try(developer, name, arguments, data); err == nil {
+				return status, code
+			}
+			return "error", "OutcomeUnknown"
+		}
 		return call(developer, name, arguments, data)
 	}, func(attempt int) (map[string]any, error) {
 		previewed.PreviewID, previewed.Warnings = "", nil
