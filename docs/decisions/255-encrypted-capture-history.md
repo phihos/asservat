@@ -2,7 +2,7 @@
 
 Date: 2026-10-27. Status: implementation in progress; qualification below.
 Requirements: REQ-HIS-001–004, REQ-PRV-008; S-04 increment 5, S-06 increment 12.
-Migration 00100 follows approved-plan acceptance (00099).
+Migration 00101 follows approved-recording funding (00100) and approved-plan acceptance (00099).
 
 ## Requirement and observed gap
 

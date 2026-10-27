@@ -2,7 +2,7 @@
 
 ## Encrypted capture history (ADR-255, implementation checkpoint)
 
-Migration 00100 and the typed history service add bounded encrypted parameter
+Migration 00101 and the typed history service add bounded encrypted parameter
 snapshots on the existing regional store, separate history-prefix capabilities,
 keyed selector/settings lookup, independent case-metadata retention, quota
 eviction and typed physical retirement. New captures cannot reconstruct missing

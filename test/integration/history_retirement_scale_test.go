@@ -175,7 +175,7 @@ func TestCustodyHistoryRetirementQueryScaleWithRealSQL(t *testing.T) {
 	}
 	churn("without-active-indexes", 100001)
 	// The plans must demonstrate the need before these proposed active-only
-	// indexes are accepted into migration100; no model/state change is needed.
+	// indexes are accepted into migration101; no model/state change is needed.
 	if fullScans(before) == 0 {
 		t.Fatal("active-index proposal has no demonstrated scan benefit; remove unnecessary indexes")
 	}
