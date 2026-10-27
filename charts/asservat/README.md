@@ -34,6 +34,7 @@ For GitOps, use the same chart and checked-in nonsecret values. Give one adminis
 | `bootstrap.registrySecret` | empty | Optional explicit image-registry Docker auth Secret |
 | `bootstrap.kubernetes`, `postgres`, `auditStore`, `keyService` | See values.yaml | Public endpoints, PEM roots and external provider choices |
 | `bootstrap.fleet`, `providers`, `probeAudience` | See values.yaml | Explicit initial fleet scope/ceilings, fixed provider names and optional API audience |
+| `bootstrap.continuation.public.permissionDelegations` | `[]` | Trusted initial AccessBinding writer envelopes and browser previewers; [configuration and scope](../../docs/installation/helm.md#delegate-permission-management) |
 
 Unknown values are rejected to catch typos and avoid accepting ineffective security settings. Future runtime configuration will use existing Secret references. Never put passwords, tokens, client secrets, private keys or evidence in Helm values: Helm retains release state.
 

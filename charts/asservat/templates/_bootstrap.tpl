@@ -82,11 +82,13 @@ limits:
 {{- define "asservat.bootstrap.continuation" -}}
 {{- $c := .Values.bootstrap.continuation -}}
 {{- $v := dict "format" "asservat-installer-continuation/v1" "namespace" .Release.Namespace "workerProvider" $c.workerProvider "ownerProvider" $c.ownerProvider "ownerIssuerRootsPEM" $c.ownerIssuerRootsPEM "ownerPKIMount" $c.ownerPKIMount "ownerConnections" (int $c.ownerConnections) "ownerConcurrency" (int $c.ownerConcurrency) -}}
+{{- if and $c.public.permissionDelegations (not $c.public.origin) }}{{ fail "bootstrap.continuation.public.permissionDelegations requires public.origin" }}{{ end -}}
 {{- if $c.public.origin -}}
 {{- $p := $c.public -}}
 {{- $clients := list -}}
 {{- range $p.clients }}{{ $clients = append $clients (dict "id" .id "kind" .kind "classQualified" true) }}{{ end -}}
 {{- $_ := set $v "public" (dict "origin" $p.origin "issuer" $p.issuer "clientID" $p.clientID "maxLifetimeSeconds" (int $p.maxLifetimeSeconds) "maxLogins" (int $p.maxLogins) "maxSessions" (int $p.maxSessions) "maxLogoutEvents" (int $p.maxLogoutEvents) "clients" $clients "eligibleSubjects" $p.eligibleSubjects "eligibleGroups" $p.eligibleGroups "groupMaxAgeSeconds" (int $p.groupMaxAgeSeconds)) -}}
+{{- if $p.permissionDelegations }}{{ $_ := set (get $v "public") "permissionDelegations" $p.permissionDelegations }}{{ end -}}
 {{- end -}}
 {{- toJson $v -}}
 {{- end -}}

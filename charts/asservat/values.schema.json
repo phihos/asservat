@@ -564,6 +564,181 @@
                   "type": "integer",
                   "minimum": 1,
                   "maximum": 300
+                },
+                "permissionDelegations": {
+                  "type": "array",
+                  "minItems": 0,
+                  "maxItems": 64,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "writers",
+                      "clusterID",
+                      "namespace",
+                      "workloads",
+                      "roles",
+                      "issuers",
+                      "previewers"
+                    ],
+                    "properties": {
+                      "writers": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 32,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "kind",
+                            "name"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "User",
+                                "Group"
+                              ]
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256,
+                              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                            }
+                          }
+                        }
+                      },
+                      "clusterID": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                        "not": {
+                          "const": "00000000-0000-0000-0000-000000000000"
+                        }
+                      },
+                      "namespace": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "name",
+                          "uid"
+                        ],
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 63,
+                            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                          },
+                          "uid": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64,
+                            "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                          }
+                        }
+                      },
+                      "workloads": {
+                        "type": "array",
+                        "minItems": 0,
+                        "maxItems": 64,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "kind",
+                            "name",
+                            "uid"
+                          ],
+                          "properties": {
+                            "kind": {
+                              "enum": [
+                                "Deployment",
+                                "StatefulSet"
+                              ]
+                            },
+                            "name": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 253,
+                              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                            },
+                            "uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64,
+                              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                            }
+                          }
+                        }
+                      },
+                      "roles": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 4,
+                        "uniqueItems": true,
+                        "items": {
+                          "enum": [
+                            "workload-maintainer",
+                            "evidence-reader",
+                            "evidence-owner",
+                            "action-approver"
+                          ]
+                        }
+                      },
+                      "issuers": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 8,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 2048,
+                          "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                        }
+                      },
+                      "previewers": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 64,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": [
+                            "issuer",
+                            "kind",
+                            "id"
+                          ],
+                          "properties": {
+                            "issuer": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 2048,
+                              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                            },
+                            "kind": {
+                              "enum": [
+                                "User",
+                                "Group"
+                              ]
+                            },
+                            "id": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 256,
+                              "pattern": "^[^\\x00-\\x1f\\x7f]+$"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "description": "Trusted initial permission guard envelopes and matching browser previewers; empty grants no delegated authority."
                 }
               }
             }

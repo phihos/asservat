@@ -187,6 +187,44 @@ def check_bootstrap(directory):
     settings = json.loads(pinput["data"]["continuation.json"])["public"]
     assert settings["clients"] == [{"id": "console", "kind": "human", "classQualified": True}] and settings["eligibleGroups"] == ["stable-group-id"]
     assert settings["origin"] == "https://asservat.example" and settings["groupMaxAgeSeconds"] == 300
+    assert "permissionDelegations" not in settings, "empty delegations changed existing installer identities"
+    delegated = copy.deepcopy(public)
+    envelope = {"writers": [{"kind": "Group", "name": "payments-admins"}],
+                "clusterID": "10000000-0000-4000-8000-000000000001",
+                "namespace": {"name": "payments", "uid": "namespace-uid"},
+                "workloads": [{"kind": "Deployment", "name": "api", "uid": "workload-uid"}],
+                "roles": ["evidence-reader"], "issuers": ["https://id.example/realms/org"],
+                "previewers": [{"issuer": "https://id.example/realms/org", "kind": "Group", "id": "payments-leads"}]}
+    delegated["bootstrap"]["continuation"]["public"]["permissionDelegations"] = [envelope]
+    ddocs = render(delegated)
+    dinput, = [r for r in ddocs if "continuation.json" in r.get("data", {})]
+    assert json.loads(dinput["data"]["continuation.json"])["public"]["permissionDelegations"] == [envelope]
+    # Delegation is protected installer input, so changing it must change
+    # both immutable continuation identity and the original runner digest.
+    assert dinput["metadata"]["name"] != pinput["metadata"]["name"]
+    dpod, = [r for r in ddocs if r["kind"] == "Pod"]
+    ppod, = [r for r in pdocs if r["kind"] == "Pod"]
+    assert dpod["metadata"]["annotations"]["asservat.io/bootstrap-input"] != ppod["metadata"]["annotations"]["asservat.io/bootstrap-input"]
+    assert [r for r in ddocs if r["kind"] in ("ClusterRole", "ClusterRoleBinding")] == [r for r in pdocs if r["kind"] in ("ClusterRole", "ClusterRoleBinding")], "delegations broadened installer RBAC"
+    namespace_wide = copy.deepcopy(delegated)
+    namespace_wide["bootstrap"]["continuation"]["public"]["permissionDelegations"][0]["workloads"] = []
+    ndocs = render(namespace_wide)
+    ninput, = [r for r in ndocs if "continuation.json" in r.get("data", {})]
+    assert json.loads(ninput["data"]["continuation.json"])["public"]["permissionDelegations"][0]["workloads"] == []
+    for field, value in [("writers", []), ("writers", [{"kind": "ServiceAccount", "name": "controller"}]),
+                         ("clusterID", "not-a-uuid"), ("clusterID", "00000000-0000-0000-0000-000000000000"),
+                         ("namespace", {"name": "payments", "uid": ""}),
+                         ("roles", ["permission-administrator"]), ("roles", ["evidence-reader", "evidence-reader"]),
+                         ("issuers", []), ("previewers", []),
+                         ("previewers", [{"issuer": "https://id.example", "kind": "Workload", "id": "lead"}]),
+                         ("workloads", [{"kind": "Pod", "name": "api", "uid": "pod-uid"}]),
+                         ("extraAuthority", True)]:
+        bad = copy.deepcopy(delegated)
+        bad["bootstrap"]["continuation"]["public"]["permissionDelegations"][0][field] = value
+        render(bad, ok=False)
+    no_public = copy.deepcopy(delegated)
+    no_public["bootstrap"]["continuation"]["public"]["origin"] = ""
+    assert "permissionDelegations requires public.origin" in render(no_public, ok=False)
     for field in ["workerProvider", "ownerProvider"]:
         bad = copy.deepcopy(continued)
         bad["bootstrap"]["continuation"][field]["authMount"] = ""
