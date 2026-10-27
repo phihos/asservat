@@ -91,12 +91,11 @@ spec:
             - name: ASSERVAT_NODE_NAME
               valueFrom: { fieldRef: { fieldPath: spec.nodeName } }
           securityContext:
-            # Root with exactly these capabilities, not a privileged container,
-            # under the runtime's default seccomp and AppArmor profiles:
-            # BPF/PERFMON load and inspect programs, NET_ADMIN attaches
-            # traffic hooks, SYS_ADMIN is required by the engine's namespace
-            # operations, SYS_RESOURCE lifts the memlock limit on kernels
-            # before 5.11.
+            # Root with exactly the capabilities the probe needs, not a
+            # privileged container, under the runtime's default seccomp
+            # profile: BPF loads programs, NET_ADMIN is required for
+            # sched_cls programs and TCX links, SYS_RESOURCE lifts the memlock
+            # limit on kernels before 5.11. Recorders add what attaching needs.
             privileged: false
             runAsUser: 0
             runAsNonRoot: false
@@ -104,10 +103,11 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
-              add: ["BPF", "PERFMON", "NET_ADMIN", "SYS_ADMIN", "SYS_RESOURCE"]
+              add: ["BPF", "NET_ADMIN", "SYS_RESOURCE"]
+            # The runtime's default AppArmor profile applies where the node
+            # enables AppArmor; requesting it explicitly would refuse the Pod
+            # on nodes without AppArmor.
             seccompProfile:
-              type: RuntimeDefault
-            appArmorProfile:
               type: RuntimeDefault
           resources:
             requests:

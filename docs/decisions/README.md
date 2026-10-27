@@ -10,6 +10,17 @@ with less than two seconds left. A 200 MiB synthetic PCAPNG is stored, verified 
 whole and resumed on real PostgreSQL/S3; the installed worker path stays pod-status-only until
 increment 4.
 
+[ADR-246 — Node collector role and work channel](246-node-collector-role.md) is S-04 increment 3:
+the `asservat node` DaemonSet in its own namespace (the only privileged Pod Security exception;
+root, not privileged, `BPF`/`NET_ADMIN`/`SYS_RESOURCE`, host PID, four read-only hostPaths, no API
+permission), off by default and guarded by the host file `/etc/asservat-disposable-host`. A
+Pod-bound token with its own audience and an identity-free CSR enroll the process with the
+connector (TokenReview plus live Pod/DaemonSet/Node and kubelet boot ID), which signs a 20-minute
+leaf from an in-memory issuer. Long-poll work and 15-second status over TLS 1.3; one current
+process per node; a capability probe (kernel, BTF, cgroup v2, BPF, TCX/tc, tracefs, host PID,
+runtime, embedded Inspektor Gadget v0.57.0 runtime) reports `AdapterUnavailable` truthfully; node
+ring/frozen/upload ceilings, with optional EvidenceBudgetPolicy `maxRingBytes`/`maxFrozenBytes`.
+
 [ADR-241 — Log and resource triggers](241-log-resource-detectors.md) implements the detectors
 ADR-230 paused, after the maintainer's 2026-10-26 decision that every specified feature ships: a
 log policy's regional poll reads its Pods' containers through bounded `pods/log` GETs (≤ 32

@@ -198,6 +198,11 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 	start := time.Now()
 	wait("collector Pod Running", 4*time.Minute, func() bool {
 		p := collectorPods()
+		for _, pod := range p {
+			if pod.Status.Phase == core.PodFailed {
+				t.Fatalf("collector Pod failed: %s: %s", pod.Status.Reason, pod.Status.Message)
+			}
+		}
 		return len(p) == 1 && p[0].Status.Phase == core.PodRunning
 	})
 	first := collectorPods()[0]

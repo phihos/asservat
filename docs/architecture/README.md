@@ -328,3 +328,5 @@ The [current download recovery fence](download-recovery.md) composes primary-dat
 [Hub owner discovery](hub-owner-discovery.md) supplies bounded pinned Kubernetes endpoint observations and exact hub Pod/process TLS verification. Protected pool/issuer bootstrap, activation and private forwarding remain pending.
 
 [Protected owner configuration](owner-configuration.md) supplies independently pinned, admission-qualified pool/root observations and current route composition. Durable acceptance/recovery and credential activation remain required before forwarding.
+
+[Node collector role and work channel](node-collector.md) adds the A-NODE `asservat node` DaemonSet, the I-02 enrollment/poll/status channel to the connector, the capability probe and node budgets under ADR-246. No recorder exists yet.

@@ -44,6 +44,8 @@ Routes under `/internal/v1/node/` support negotiate/poll/receipts/heartbeat/reso
 
 The initial [local start journal](local-start.md) implements the internal single-start `CapacityReservation` profile and non-retrying CAS adapter. These node routes, signed ticket issuance, current-reference resolver and local process exclusion are still pending. An adapter disposition is not a reusable network execution credential.
 
+[ADR-246](../decisions/246-node-collector-role.md) implements the first three routes, `enroll`, `poll` and `status` ([node collector](node-collector.md)): Pod-bound token plus identity-free CSR enrollment attested by TokenReview and live Pod/DaemonSet/Node reads (node UID and kubelet boot ID), a 20-minute client leaf from the connector's in-memory issuer, long-poll work of the closed kinds `armSource`/`stopSource`/`snapshot`/`peerGeneration` (identity only, no producer yet), and a 15-second batched status. One current collector process per node; a replaced process loses authentication at once. The remaining routes (reservations, references, checkpoints, spend) are still pending.
+
 Sensors/sources may continue within existing leases when disconnected. Ordinary intrusive starts need the durable reservation and remaining permit. Natural-core acceptance is the prepared special path in I-03. Losing the local journal, boot identity or collector epoch makes past unproven starts unavailable/Indeterminate; a new leader cannot authorize replay by advancing only a delivery fence. Multi-node admission is conservative and may produce partial outcomes; it is not an atomic Kubernetes transaction.
 
 ### I-03 — Host core handoff
@@ -54,7 +56,7 @@ A fixed-version header of at most 4 KiB carries numeric IDs, node boot/process s
 
 ### I-04 — Gadget observation
 
-The C-23 adapter drives only pinned approved gadget definitions via the selected build's qualified node-local API. Its public port is `Attach(VerifiedSource, Limits) → Session`, bounded event reads, atomic membership-generation replacement and `Stop`. No user gadget registry, script, path or arbitrary BPF program is accepted. It reports attach/restart/map-overflow/filter-update and entry/exit-pairing gaps. Qualification must establish the actual private transport and supported ABI for the pinned build before enabling it; the diagram is not proof that every Gadget version supports this topology.
+The C-23 adapter drives only pinned approved gadget definitions via the engine linked into the collector process (ADR-246, S-04 plan S1); there is no separate engine Pod or node-local transport. Its public port is `Attach(VerifiedSource, Limits) → Session`, bounded event reads, atomic membership-generation replacement and `Stop`. No user gadget registry, script, path or arbitrary BPF program is accepted. It reports attach/restart/map-overflow/filter-update and entry/exit-pairing gaps. Qualification must establish the actual private transport and supported ABI for the pinned build before enabling it; the diagram is not proof that every Gadget version supports this topology.
 
 ### I-07 and I-12 — Transient live delivery and owner routing
 

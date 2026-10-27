@@ -311,8 +311,8 @@ def check_collector(directory):
     container, = pod["containers"]
     assert container["command"] == ["/asservat", "node"] and container["image"] == base["collector"]["image"]
     assert container["securityContext"] == {"privileged": False, "runAsUser": 0, "runAsNonRoot": False, "allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,
-                                             "capabilities": {"drop": ["ALL"], "add": ["BPF", "PERFMON", "NET_ADMIN", "SYS_ADMIN", "SYS_RESOURCE"]},
-                                             "seccompProfile": {"type": "RuntimeDefault"}, "appArmorProfile": {"type": "RuntimeDefault"}}
+                                             "capabilities": {"drop": ["ALL"], "add": ["BPF", "NET_ADMIN", "SYS_RESOURCE"]},
+                                             "seccompProfile": {"type": "RuntimeDefault"}}
     assert container["resources"]["limits"]["memory"] == str(268435456 * 2 + 134217728)
     volumes = {v["name"]: v for v in pod["volumes"]}
     assert volumes["disposable-host"]["hostPath"] == {"path": "/etc/asservat-disposable-host", "type": "File"}, "disposable-host guard missing"
