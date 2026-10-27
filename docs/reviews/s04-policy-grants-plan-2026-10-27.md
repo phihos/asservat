@@ -636,3 +636,18 @@ architecture 67 packages/393 imports. The first spec invocation used the system
 Python without development dependencies and failed; the retained second run uses
 the existing canonical spec virtual environment and passed. Actual role/ABA
 cases remain pending a frozen-source PostgreSQL/S3 run.
+
+
+Attachment smoke 1 (`b17c4c50`) passed the expanded selected real PostgreSQL/S3
+case (subtest 3.44s; Go 5.905s; runner phase 8.676s), runner and qualification
+exit 0. All 3,247 source hashes matched, sources were unchanged during the run,
+cleanup failures were empty, and both exact owned containers were absent.
+Report SHA-256
+`640ccbc0ed808d2d823b1845f16a97da39d28f1e3b1f86289ad0204d5ce48508`;
+report/log archived under
+`approved-workflow/policy102-attachment-smoke-1-artifacts/` in the local build
+cache. This proves the role-bounded current-manager attachment, full-client
+journal/conflict, immutable reply and accepted-source A → B → A clearing cases,
+with synthetic protected identity/authority inputs. It does not qualify the
+public encrypted-intent boundary, node execution, or cumulative accounting.
+The earlier smoke-4 evidence remains bound only to `56e132a4`.
