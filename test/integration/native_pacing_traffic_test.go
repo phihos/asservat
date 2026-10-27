@@ -28,6 +28,17 @@ const nativeTrafficRecordsPerBatch = nativeTrafficRecords / nativeTrafficBatches
 const nativeTrafficInterval = 500 * time.Millisecond
 const nativeTrafficPhase = 8500 * time.Millisecond
 
+// The child owns exactly these eight receipt fields. Parent wall time,
+// receipt validity and derived client timing are never accepted from JSON.
+type nativeTrafficReceipt struct {
+	Batches, Records, Bytes int64
+	Elapsed                 time.Duration
+	Failure                 string
+	LastStatus              int
+	LastBodyBytes           int64
+	LastAcknowledged        bool
+}
+
 type nativeTrafficResult struct {
 	Batches, Records, Bytes int64
 	Elapsed                 time.Duration
@@ -106,23 +117,23 @@ func nativePacingNodeTraffic(ctx context.Context, helper nativeTrafficHelper, no
 	stop()
 	decoder := json.NewDecoder(bytes.NewReader(output.Bytes()))
 	decoder.DisallowUnknownFields()
-	if err = decoder.Decode(&out); err != nil {
+	var receipt nativeTrafficReceipt
+	if err = decoder.Decode(&receipt); err != nil {
 		out.Failure = "receipt"
 		return out, errors.New("owned traffic receipt unavailable")
 	}
-	out.ClientElapsed = out.Elapsed
-	if out.Batches < 0 || out.Batches > nativeTrafficBatches || out.Records != out.Batches*nativeTrafficRecordsPerBatch || out.Bytes < 0 || out.Bytes > nativeTrafficPayload+1 || out.LastBodyBytes < 0 || out.LastBodyBytes > nativeTrafficRecordsPerBatch*nativeTrafficRecordBytes+1 || out.Elapsed < 0 || !slices.Contains([]string{"", "deadline", "request", "acknowledgement"}, out.Failure) {
-		out.ReceiptValid = false
+	if receipt.Batches < 0 || receipt.Batches > nativeTrafficBatches || receipt.Records != receipt.Batches*nativeTrafficRecordsPerBatch || receipt.Bytes < 0 || receipt.Bytes > nativeTrafficPayload+1 || receipt.LastBodyBytes < 0 || receipt.LastBodyBytes > nativeTrafficRecordsPerBatch*nativeTrafficRecordBytes+1 || receipt.Elapsed < 0 || !slices.Contains([]string{"", "deadline", "request", "acknowledgement"}, receipt.Failure) {
 		out.Failure = "receipt_shape"
 		return out, errors.New("owned traffic receipt exceeds finite shape")
 	}
 	var extra any
 	if decoder.Decode(&extra) != io.EOF {
-		out.ReceiptValid = false
 		out.Failure = "receipt_extra"
 		return out, errors.New("owned traffic receipt has extra output")
 	}
-	out.ReceiptValid = true
+	out = nativeTrafficResult{Batches: receipt.Batches, Records: receipt.Records, Bytes: receipt.Bytes,
+		Failure: receipt.Failure, LastStatus: receipt.LastStatus, LastBodyBytes: receipt.LastBodyBytes,
+		LastAcknowledged: receipt.LastAcknowledged, ClientElapsed: receipt.Elapsed, ReceiptValid: true}
 	if processErr != nil && out.Failure == "" {
 		out.Failure = "process"
 	}
@@ -181,6 +192,9 @@ func TestNativePacingNodeTrafficRequiresClosedCompleteReceipt(t *testing.T) {
 		{"missing acknowledgement", strings.Replace(complete, `"LastAcknowledged":true`, `"LastAcknowledged":false`, 1), false},
 		{"extra JSON", complete + `{}`, false},
 		{"unknown field", strings.TrimSuffix(complete, "}") + `,"unknown":1}`, false},
+		{"parent receipt validity", strings.TrimSuffix(complete, "}") + `,"ReceiptValid":true}`, false},
+		{"parent client elapsed", strings.TrimSuffix(complete, "}") + `,"ClientElapsed":77}`, false},
+		{"decode failure after injected parent fields", strings.TrimSuffix(complete, "}") + `,"ReceiptValid":true,"ClientElapsed":77,"unknown":1}`, false},
 		{"unbounded output", strings.Repeat("x", 2049), false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -193,6 +207,12 @@ func TestNativePacingNodeTrafficRequiresClosedCompleteReceipt(t *testing.T) {
 			}
 			if tc.valid && !result.ReceiptValid {
 				t.Fatal("complete synthetic receipt not marked valid")
+			}
+			if strings.Contains(tc.name, "parent") && (result.ReceiptValid || result.ClientElapsed != 0) {
+				t.Fatal("invalid child receipt changed parent-owned fields", result)
+			}
+			if tc.name == "partial" && (result.Batches != 7 || result.Records != 28672 || result.Bytes != 1863232 || !result.ReceiptValid || result.Failure != "deadline") {
+				t.Fatal("valid partial diagnostics lost", result)
 			}
 		})
 	}

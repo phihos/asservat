@@ -25,6 +25,14 @@ size and aggregate costs remain pending installed qualification. Full retained
 reports, hashes, costs and limitations are in the
 [qualification record](research/native-response-qualification.md#serialized-traffic-route-failure-and-direct-fixture-client-2026-10-28).
 
+The review follow-up separates the child's exact eight-field receipt from
+parent-owned report validity/timing. Injected parent fields now refuse without
+tainting error artifacts; valid partial receipt diagnostics remain available.
+The local regression reproduced the defect (Go 0.035s, exit 1); affected parent
+races pass in 1.134s and canonical pre-push including vet/218 console checks
+exits 0. The traffic
+client, authority/capture limits, process lifecycle and network path are unchanged.
+
 ## Paced measurement failure retained and PostgreSQL mechanism checked (2026-10-28)
 
 Native 40595384061 on `76bae03c` failed after accepted-capture resolution,

@@ -66,6 +66,18 @@ also refuses partial/missing acknowledgements, extra JSON, unknown fields and
 more than 2 KiB of helper output. Static binary inspection and these local tests
 do not establish the installed node route.
 
+Review follow-up: the child receipt now decodes into a dedicated eight-field
+value before validated fields are copied to the report. Child JSON cannot set
+parent-owned ReceiptValid or ClientElapsed, including before a later decode
+failure. The injected-field regressions reproduced both acceptance and tainted
+error artifacts (RED exit 1, Go 0.035s; affected parent race GREEN exit 0,
+1.134s). Final canonical pre-push including vet and all 218 console checks
+exited 0. Valid partial receipts still preserve
+their acknowledged counts, received bytes and closed failure. This is one fixed
+receipt value per phase, with zero additional API/process calls, timers or
+privileges. The actual traffic client and its measured synthetic proof are
+unchanged; no external or installed run accompanied this correction.
+
 ## Incomplete SQL measurement and owned PostgreSQL proof (2026-10-28)
 
 Paced Native 40595384061 on `76bae03c` exited 1 after an uncertain submission
