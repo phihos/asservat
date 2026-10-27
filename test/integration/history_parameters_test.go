@@ -232,7 +232,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		charges := func() historyCharges {
 			t.Helper()
 			var c historyCharges
-			if e := admin.QueryRow(ctx, `SELECT a.charged_bytes,a.charged_objects,p.charged_bytes,p.charged_objects,(SELECT count(*) FROM custody_attempt WHERE allocation_id=a.id) FROM custody_allocation a JOIN custody_pool p ON p.id=a.pool_id WHERE a.id=$1`, h.Expectation.Registration.AllocationID).Scan(&c.allocationBytes, &c.allocationObjects, &c.poolBytes, &c.poolObjects, &c.attempts); e != nil {
+			if e := admin.QueryRow(ctx, `SELECT a.charged_bytes,a.charged_objects,p.allocated_bytes,p.allocated_objects,(SELECT count(*) FROM custody_attempt WHERE allocation_id=a.id) FROM custody_allocation a JOIN custody_pool p ON p.id=a.pool_id WHERE a.id=$1`, h.Expectation.Registration.AllocationID).Scan(&c.allocationBytes, &c.allocationObjects, &c.poolBytes, &c.poolObjects, &c.attempts); e != nil {
 				t.Fatal(e)
 			}
 			return c
