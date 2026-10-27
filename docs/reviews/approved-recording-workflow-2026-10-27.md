@@ -203,3 +203,18 @@ regression covers identity/recovery/target/capability/retention refusal followed
 by explicit closure. No replacement preview, grant retry, longer operation or
 per-step authority refresh is introduced. Assess the aggregate current reads
 against the actual expired bound before proposing an efficiency change.
+
+Diagnostic run 40551543601 on cdcbb4fe was cancelled at the existing 20-minute
+job limit without a terminal Go result or environment report. Package setup
+took 10m17s (17:34:49–17:45:06 UTC), leaving less time than the preceding
+585-second native suite needed. This is an incomplete infrastructure run, not
+another facts/current result or cleanup pass. Its available logs remain archived.
+
+The same existing tshark setup now has a three-minute step bound and a single
+170-second apt bound with five seconds of termination grace. Acquisition retries
+are disabled, network and lock waits are bounded, partial index failures fail,
+and package errors remain visible. Working preinstalled tshark/capinfos skip apt;
+both versions are recorded. capinfos is supplied by tshark's existing required
+wireshark-common dependency. No package cache, extra image, test retry, product
+deadline change or longer job is introduced. A setup failure cannot start the
+native suite. The diagnostic capture result remains pending.
