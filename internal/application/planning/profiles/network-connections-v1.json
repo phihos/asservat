@@ -1,0 +1,93 @@
+{
+  "name": "network-connections",
+  "version": "v1",
+  "definition": {
+    "displayName": "Incoming and outgoing transport traffic",
+    "description": "Network headers in both directions on qualified pod paths; no application payload.",
+    "recipe": {
+      "description": "Network headers in both directions on qualified pod paths; no application payload.",
+      "actions": [
+        {
+          "id": "sample",
+          "kind": "packetCapture",
+          "parameters": {
+            "profile": {
+              "kind": "networkHeaders"
+            },
+            "before": "30s",
+            "after": "10s",
+            "ring": {
+              "maxAge": "30s",
+              "maxBytes": 16777216,
+              "segmentBytes": 4194304,
+              "maxSegments": 4,
+              "medium": "memory"
+            },
+            "peers": {
+              "entries": [
+                {
+                  "cidrs": [
+                    "0.0.0.0/0",
+                    "::/0"
+                  ]
+                }
+              ],
+              "protocol": "any",
+              "resolution": "frozen",
+              "maxEndpoints": 1,
+              "maxStaleness": "5s"
+            },
+            "maxFrozenBytes": 16777216,
+            "maxConcurrentSnapshots": 1
+          },
+          "required": true,
+          "impact": "observe",
+          "limits": {
+            "maxBytes": 16777216,
+            "timeout": "15s"
+          },
+          "executionMode": "ongoing"
+        }
+      ],
+      "maxTotalBytes": 16777216,
+      "maxDuration": "20s"
+    },
+    "editableFields": [
+      {
+        "actionID": "sample",
+        "field": "packetPeers",
+        "label": "Peers"
+      },
+      {
+        "actionID": "sample",
+        "field": "packetFilter",
+        "label": "Pcap filter"
+      },
+      {
+        "actionID": "sample",
+        "field": "packetBefore",
+        "label": "History window"
+      },
+      {
+        "actionID": "sample",
+        "field": "packetAfter",
+        "label": "Next interval"
+      },
+      {
+        "actionID": "sample",
+        "field": "packetRing",
+        "label": "Ring allocation"
+      },
+      {
+        "actionID": "sample",
+        "field": "actionTimeout",
+        "label": "Completion deadline"
+      },
+      {
+        "actionID": "sample",
+        "field": "actionExecutionMode",
+        "label": "When recording starts"
+      }
+    ]
+  }
+}

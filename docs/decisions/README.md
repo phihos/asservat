@@ -10,6 +10,13 @@ an unprovable Pod is Unknown for the poll. Regional connector RBAC: `get pods/lo
 `list pods.metrics.k8s.io`. Migration 00094 widens the detector CHECKs and adds the `overlong`
 suppression reason. Cgroup-only metrics and stream filters stay rejected capability gaps.
 
+[ADR-243 — Packet and syscall plans in preview](243-packet-syscall-plans-in-preview.md) is S-04
+increment 1: `preview_capture` accepts one release-embedded builtin capture profile
+(`network-connections/v1`, `syscall-activity/v1`) with typed edits and returns its
+`action-lifecycle/v1` plan, hub-compiled libpcap filter program and digest, composition provenance
+and `recorder-assessment/v1` assessment. Every such plan carries `RecorderUnavailable`;
+`request_capture` refuses it before any reservation, and a composed DebugPolicy is refused at
+compile time. libpcap 1.11.0 is a static archive linked only into the hub build (`libpcap` tag).
 
 [ADR-240 — Retention impact preview](240-retention-impact-preview.md) is S-06 increment 11: the
 browser-only `preview_retention_change` lets a current fleet operator submit proposed

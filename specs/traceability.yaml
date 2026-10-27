@@ -573,6 +573,7 @@ requirements:
   spec: specs/packets.md
   scenarios:
   - SC-NET-001
+  - SC-NET-007
   tasks: &id002
   - TASK-06
   - TASK-08
@@ -770,6 +771,7 @@ requirements:
   spec: specs/capture-profiles.md
   scenarios:
   - SC-CPR-002
+  - SC-CPR-006
   tasks: *id005
 - requirement: REQ-CPR-003
   spec: specs/capture-profiles.md

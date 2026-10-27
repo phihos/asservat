@@ -34,6 +34,8 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 	for key := range s {
 		switch key {
 		case "target", "detectors", "when", "recipeRef", "budgets", "retention", "suspended", "observation", "evaluation", "recordingSaves", "sharing":
+		case "profileComposition":
+			return reject(policyComposition(s[key]))
 		default:
 			return reject("."+key, "unsupported in this release (ADR-228)")
 		}
@@ -669,4 +671,23 @@ func RestartScopeDigest(source identity.Revision, collection artifact.Digest, p 
 		Limits                    authorization.AutomationLimits
 	}{"policy-scope/restart/v1", source, collection, p, namespaceUID, workloadUID, delegation, owners, actions, limits})
 	return artifact.Digest(sha256.Sum256(b))
+}
+
+// policyComposition names the refused part of a composed policy (ADR-243).
+// Packet and syscall recordings are previewable manually but cannot be armed
+// by a policy until policy-armed sources exist (S-04 increment 6).
+func policyComposition(raw json.RawMessage) (string, string) {
+	var c struct {
+		Components []struct {
+			ProfileRef struct{ Catalog, Name string }
+		}
+	}
+	if json.Unmarshal(raw, &c) == nil {
+		for i, component := range c.Components {
+			if component.ProfileRef.Catalog == "builtin" && (component.ProfileRef.Name == "network-connections" || component.ProfileRef.Name == "syscall-activity") {
+				return ".profileComposition.components[" + strconv.Itoa(i) + "].profileRef", "packet and syscall recordings cannot be armed by a policy in this release (ADR-243); preview them manually, or use recipeRef builtin-pod-status-v1"
+			}
+		}
+	}
+	return ".profileComposition", "capture profile compositions are not available in policies in this release (ADR-243); use recipeRef builtin-pod-status-v1"
 }

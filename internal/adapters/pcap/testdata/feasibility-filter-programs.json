@@ -1,0 +1,1177 @@
+[
+  {
+    "Filter": "tcp dst port 443",
+    "Packet": "AAECAwQGAAECAwQFCABFAAA2AAAAAEAG9r7AAAIBwAACAjA5AbsAAAAAAAAAAFACAGTcZwAAU1lOVEhFVElDLU9OTFk=",
+    "Instructions": [
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 4,
+        "K": 34525
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 11,
+        "K": 6
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 56
+      },
+      {
+        "Op": 21,
+        "Jt": 8,
+        "Jf": 9,
+        "K": 443
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 8,
+        "K": 2048
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 23
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 6,
+        "K": 6
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 69,
+        "Jt": 4,
+        "Jf": 0,
+        "K": 8191
+      },
+      {
+        "Op": 177,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 16
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 1,
+        "K": 443
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      }
+    ],
+    "Want": true
+  },
+  {
+    "Filter": "tcp dst port 443",
+    "Packet": "AAECAwQGAAECAwQFht1gAAAAACIGQCABDbgAAAAAAAAAAAAAAAEgAQ24AAAAAAAAAAAAAAACMDkBuwAAAAAAAAAAUAIAZAT3AABTWU5USEVUSUMtT05MWQ==",
+    "Instructions": [
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 4,
+        "K": 34525
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 11,
+        "K": 6
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 56
+      },
+      {
+        "Op": 21,
+        "Jt": 8,
+        "Jf": 9,
+        "K": 443
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 8,
+        "K": 2048
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 23
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 6,
+        "K": 6
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 69,
+        "Jt": 4,
+        "Jf": 0,
+        "K": 8191
+      },
+      {
+        "Op": 177,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 16
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 1,
+        "K": 443
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      }
+    ],
+    "Want": true
+  },
+  {
+    "Filter": "udp port 53",
+    "Packet": "AAECAwQGAAECAwQFCABFAAAqAAAAAEAR9r/AAAIBwAACAjA5ADUAFi4/U1lOVEhFVElDLU9OTFkAAAAA",
+    "Instructions": [
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 6,
+        "K": 34525
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 15,
+        "K": 17
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 54
+      },
+      {
+        "Op": 21,
+        "Jt": 12,
+        "Jf": 0,
+        "K": 53
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 56
+      },
+      {
+        "Op": 21,
+        "Jt": 10,
+        "Jf": 11,
+        "K": 53
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 10,
+        "K": 2048
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 23
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 8,
+        "K": 17
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 69,
+        "Jt": 6,
+        "Jf": 0,
+        "K": 8191
+      },
+      {
+        "Op": 177,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 21,
+        "Jt": 2,
+        "Jf": 0,
+        "K": 53
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 16
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 1,
+        "K": 53
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      }
+    ],
+    "Want": true
+  },
+  {
+    "Filter": "udp port 53",
+    "Packet": "AAECAwQGAAECAwQFht1gAAAAABYRQCABDbgAAAAAAAAAAAAAAAEgAQ24AAAAAAAAAAAAAAACMDkANQAWVs5TWU5USEVUSUMtT05MWQ==",
+    "Instructions": [
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 6,
+        "K": 34525
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 15,
+        "K": 17
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 54
+      },
+      {
+        "Op": 21,
+        "Jt": 12,
+        "Jf": 0,
+        "K": 53
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 56
+      },
+      {
+        "Op": 21,
+        "Jt": 10,
+        "Jf": 11,
+        "K": 53
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 10,
+        "K": 2048
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 23
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 8,
+        "K": 17
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 69,
+        "Jt": 6,
+        "Jf": 0,
+        "K": 8191
+      },
+      {
+        "Op": 177,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 21,
+        "Jt": 2,
+        "Jf": 0,
+        "K": 53
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 16
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 1,
+        "K": 53
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      }
+    ],
+    "Want": true
+  },
+  {
+    "Filter": "tcp and host 192.0.2.2",
+    "Packet": "AAECAwQGAAECAwQFCABFAAA2AAAAAEAG9r7AAAIBwAACAjA5AbsAAAAAAAAAAFACAGTcZwAAU1lOVEhFVElDLU9OTFk=",
+    "Instructions": [
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 7,
+        "K": 2048
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 23
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 5,
+        "K": 6
+      },
+      {
+        "Op": 32,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 26
+      },
+      {
+        "Op": 21,
+        "Jt": 2,
+        "Jf": 0,
+        "K": 3221225986
+      },
+      {
+        "Op": 32,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 30
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 1,
+        "K": 3221225986
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      }
+    ],
+    "Want": true
+  },
+  {
+    "Filter": "ip6 and dst host 2001:db8::2",
+    "Packet": "AAECAwQGAAECAwQFht1gAAAAACIGQCABDbgAAAAAAAAAAAAAAAEgAQ24AAAAAAAAAAAAAAACMDkBuwAAAAAAAAAAUAIAZAT3AABTWU5USEVUSUMtT05MWQ==",
+    "Instructions": [
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 9,
+        "K": 34525
+      },
+      {
+        "Op": 32,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 38
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 7,
+        "K": 536939960
+      },
+      {
+        "Op": 32,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 42
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 5,
+        "K": 0
+      },
+      {
+        "Op": 32,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 46
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 3,
+        "K": 0
+      },
+      {
+        "Op": 32,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 50
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 1,
+        "K": 2
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      }
+    ],
+    "Want": true
+  },
+  {
+    "Filter": "tcp[tcpflags] \u0026 tcp-syn != 0",
+    "Packet": "AAECAwQGAAECAwQFCABFAAA2AAAAAEAG9r7AAAIBwAACAjA5AbsAAAAAAAAAAFACAGTcZwAAU1lOVEhFVElDLU9OTFk=",
+    "Instructions": [
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 8,
+        "K": 2048
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 23
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 6,
+        "K": 6
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 69,
+        "Jt": 4,
+        "Jf": 0,
+        "K": 8191
+      },
+      {
+        "Op": 177,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 80,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 27
+      },
+      {
+        "Op": 69,
+        "Jt": 0,
+        "Jf": 1,
+        "K": 2
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      }
+    ],
+    "Want": true
+  },
+  {
+    "Filter": "udp dst portrange 50-60",
+    "Packet": "AAECAwQGAAECAwQFht1gAAAAABYRQCABDbgAAAAAAAAAAAAAAAEgAQ24AAAAAAAAAAAAAAACMDkANQAWVs5TWU5USEVUSUMtT05MWQ==",
+    "Instructions": [
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 4,
+        "K": 34525
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 12,
+        "K": 17
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 56
+      },
+      {
+        "Op": 53,
+        "Jt": 8,
+        "Jf": 10,
+        "K": 50
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 9,
+        "K": 2048
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 23
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 7,
+        "K": 17
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 69,
+        "Jt": 5,
+        "Jf": 0,
+        "K": 8191
+      },
+      {
+        "Op": 177,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 16
+      },
+      {
+        "Op": 53,
+        "Jt": 0,
+        "Jf": 2,
+        "K": 50
+      },
+      {
+        "Op": 37,
+        "Jt": 1,
+        "Jf": 0,
+        "K": 60
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      }
+    ],
+    "Want": true
+  },
+  {
+    "Filter": "tcp port 80 or udp port 53",
+    "Packet": "AAECAwQGAAECAwQFCABFAAAqAAAAAEAR9r/AAAIBwAACAjA5ADUAFi4/U1lOVEhFVElDLU9OTFkAAAAA",
+    "Instructions": [
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 11,
+        "K": 34525
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 4,
+        "K": 6
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 54
+      },
+      {
+        "Op": 21,
+        "Jt": 25,
+        "Jf": 0,
+        "K": 80
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 56
+      },
+      {
+        "Op": 21,
+        "Jt": 23,
+        "Jf": 24,
+        "K": 80
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 23,
+        "K": 17
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 54
+      },
+      {
+        "Op": 21,
+        "Jt": 20,
+        "Jf": 0,
+        "K": 53
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 56
+      },
+      {
+        "Op": 21,
+        "Jt": 18,
+        "Jf": 19,
+        "K": 53
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 18,
+        "K": 2048
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 23
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 7,
+        "K": 6
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 69,
+        "Jt": 14,
+        "Jf": 0,
+        "K": 8191
+      },
+      {
+        "Op": 177,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 21,
+        "Jt": 10,
+        "Jf": 0,
+        "K": 80
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 16
+      },
+      {
+        "Op": 21,
+        "Jt": 8,
+        "Jf": 9,
+        "K": 80
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 8,
+        "K": 17
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 69,
+        "Jt": 6,
+        "Jf": 0,
+        "K": 8191
+      },
+      {
+        "Op": 177,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 21,
+        "Jt": 2,
+        "Jf": 0,
+        "K": 53
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 16
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 1,
+        "K": 53
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      }
+    ],
+    "Want": true
+  },
+  {
+    "Filter": "not udp",
+    "Packet": "AAECAwQGAAECAwQFCABFAAA2AAAAAEAG9r7AAAIBwAACAjA5AbsAAAAAAAAAAFACAGTcZwAAU1lOVEhFVElDLU9OTFk=",
+    "Instructions": [
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 2,
+        "K": 2048
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 23
+      },
+      {
+        "Op": 21,
+        "Jt": 6,
+        "Jf": 7,
+        "K": 17
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 6,
+        "K": 34525
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 21,
+        "Jt": 3,
+        "Jf": 0,
+        "K": 17
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 3,
+        "K": 44
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 54
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 1,
+        "K": 17
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      }
+    ],
+    "Want": true
+  },
+  {
+    "Filter": "tcp dst port 80",
+    "Packet": "AAECAwQGAAECAwQFCABFAAA2AAAAAEAG9r7AAAIBwAACAjA5AbsAAAAAAAAAAFACAGTcZwAAU1lOVEhFVElDLU9OTFk=",
+    "Instructions": [
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 12
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 4,
+        "K": 34525
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 11,
+        "K": 6
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 56
+      },
+      {
+        "Op": 21,
+        "Jt": 8,
+        "Jf": 9,
+        "K": 80
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 8,
+        "K": 2048
+      },
+      {
+        "Op": 48,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 23
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 6,
+        "K": 6
+      },
+      {
+        "Op": 40,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 20
+      },
+      {
+        "Op": 69,
+        "Jt": 4,
+        "Jf": 0,
+        "K": 8191
+      },
+      {
+        "Op": 177,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 14
+      },
+      {
+        "Op": 72,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 16
+      },
+      {
+        "Op": 21,
+        "Jt": 0,
+        "Jf": 1,
+        "K": 80
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 65535
+      },
+      {
+        "Op": 6,
+        "Jt": 0,
+        "Jf": 0,
+        "K": 0
+      }
+    ],
+    "Want": false
+  }
+]

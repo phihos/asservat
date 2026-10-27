@@ -67,6 +67,27 @@ go-vuln-check:
 ASSERVAT_TOOL_BIN ?= $(HOME)/.cache/asservat-build/bin
 ASSERVAT_BUILD_TMP ?= $(HOME)/.cache/asservat-build/tmp
 SQLC ?= $(ASSERVAT_TOOL_BIN)/sqlc
+# ADR-243 (S2): the hub's pcap filter compiler links a pinned, dependency-free
+# static libpcap through cgo (build tag libpcap). Every other build, including
+# the default cgo-free product binary, uses a stub that compiles no filter.
+LIBPCAP_VERSION := 1.11.0
+LIBPCAP_SHA256 := 9237f5bae9dcf3a91823d9963ec43b7c0e2e3374ef2ad57d92c8cd39530f4723
+LIBPCAP_PREFIX ?= $(HOME)/.cache/asservat-build/libpcap-$(LIBPCAP_VERSION)
+PCAP_ENV = CGO_ENABLED=1 CGO_CFLAGS="-I$(LIBPCAP_PREFIX)/include" CGO_LDFLAGS="-L$(LIBPCAP_PREFIX)/lib" TMPDIR="$(ASSERVAT_BUILD_TMP)"
+.PHONY: libpcap pcap-check
+libpcap:
+	mkdir -p "$(ASSERVAT_BUILD_TMP)"
+	LIBPCAP_VERSION=$(LIBPCAP_VERSION) LIBPCAP_SHA256=$(LIBPCAP_SHA256) LIBPCAP_PREFIX="$(LIBPCAP_PREFIX)" TMPDIR="$(ASSERVAT_BUILD_TMP)" scripts/build-libpcap.sh
+
+# Real libpcap compilation tests plus the fully static hub build a FROM-scratch
+# image needs (netgo/osusergo; the linker's NSS warnings concern libpcap name
+# lookups the planner never reaches). User space only: no capture or BPF load.
+pcap-check: libpcap
+	$(PCAP_ENV) go test -tags libpcap -count=1 ./internal/adapters/pcap/
+	$(PCAP_ENV) go build -tags libpcap,netgo,osusergo -trimpath -buildvcs=false -ldflags '-extldflags "-static"' -o "$(ASSERVAT_BUILD_TMP)/asservat-hub" ./cmd/asservat 2>/dev/null
+	file "$(ASSERVAT_BUILD_TMP)/asservat-hub" | grep -q 'statically linked'
+	rm -f "$(ASSERVAT_BUILD_TMP)/asservat-hub"
+
 .PHONY: sql-tools sql-check custody-integration
 sql-tools:
 	mkdir -p "$(ASSERVAT_TOOL_BIN)" "$(ASSERVAT_BUILD_TMP)"

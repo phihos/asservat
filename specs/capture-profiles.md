@@ -6,7 +6,7 @@ The fixed `pod-status/v1` preset described in [ergonomics](ergonomics.md) is sel
 
 ## REQ-CPR-001 — Shipped, organization and namespace catalogs
 
-Introduce the namespaced `CaptureProfile` configuration CRD. Its definition contains a name/version, display name, description, a complete bounded expanded recipe and an explicit list of editable fields. Definitions are data, never scripts, arbitrary BPF, shell templates, plugins or remote include URLs. Existing typed actions and endpoint/engine qualification remain authoritative. Shipped definitions are installed from the release's offline bundle in a protected builtin-catalog namespace; organization definitions live in a protected hub catalog namespace; namespace definitions live in the target workload namespace. These locations are installation configuration, not caller-controlled search paths.
+Introduce the namespaced `CaptureProfile` configuration CRD. Its definition contains a name/version, display name, description, a complete bounded expanded recipe and an explicit list of editable fields. Definitions are data, never scripts, arbitrary BPF, shell templates, plugins or remote include URLs. Existing typed actions and endpoint/engine qualification remain authoritative. Shipped (builtin) definitions are embedded in the release binary ([ADR-243](../docs/decisions/243-packet-syscall-plans-in-preview.md)): immutable, identified by their definition digest and versioned with the release, so no namespace, installation step or Kubernetes object can edit or impersonate them; their resolved provenance and `captureProfile` dependency carry no source object. Organization definitions live in a protected hub catalog namespace; namespace definitions live in the target workload namespace. These locations are installation configuration, not caller-controlled search paths.
 
 The reference `(catalog: builtin|organization|namespace, name, version)` has no implicit precedence or shadowing. Namespace lookup is confined to the selected workload cluster/namespace. The resolver binds source cluster, namespace/profile UIDs, immutable definition digest and dependencies. A resource claiming a builtin name in a workload namespace cannot impersonate the shipped profile. Publication/read permissions are enforced through Kubernetes RBAC, authenticated submission and existing source trust, with current target eligibility. Catalog visibility does not grant collection authority, node privileges, action approval or secret access.
 
@@ -31,6 +31,10 @@ Editable fields are convenience controls, not a substitute for authorization. An
 ### SC-CPR-002
 
 Given a profile exposes packet peers, after-duration and action timeout, when a user narrows peers and extends duration, then all values are type-checked and preview reports the resulting cost and approval. An unexposed field, duplicate override, `$(...)` interpolation attempt or an attempted impact change cannot execute code or evade validation; command argv remains literal under the existing command rules.
+
+### SC-CPR-006
+
+Given `builtin/network-connections/v1` with a packetFilter and an onTrigger mode edit, when previewed in browser or MCP, then both compile the same embedded definition digest, action IDs, lifecycle plan and execution digest. An edit of a field the version does not expose, a duplicate edit, onTrigger with a positive before window or an aggregate output above the authored maxTotalBytes is refused with its field path; the compiler never raises the authored bounds.
 
 ## REQ-CPR-003 — Compose into one bounded recipe
 

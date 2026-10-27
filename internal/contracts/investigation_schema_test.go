@@ -47,8 +47,15 @@ func TestInvestigationInputsRejectUnsupportedOrAmbiguousValues(t *testing.T) {
 			t.Fatal("runtime network schema reference")
 		}
 		b, _ := json.Marshal(d)
-		if len(b) > 24<<10 {
-			t.Fatal("tool description exceeds bounded discovery budget")
+		// ADR-243: the composition branch adds the typed edit, provenance and
+		// lifecycle schemas to preview_capture; it stays within the 32 KiB
+		// hard result limit of specs/mcp.md.
+		budget := 24 << 10
+		if name == "preview_capture" {
+			budget = 32 << 10
+		}
+		if len(b) > budget {
+			t.Fatalf("tool description exceeds bounded discovery budget: %d bytes", len(b))
 		}
 		d.InputSchema[0] = 'x'
 		again, _ := s.Tool(name)

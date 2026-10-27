@@ -263,15 +263,16 @@ export interface components {
                     actionID: string;
                     deduplicated: boolean;
                 };
+                /** @description Pinned resolved profile. A builtin definition is embedded in the release binary (ADR-243) and is identified by its definition digest alone; organization and namespace definitions name their source cluster, namespace and object. */
                 resolvedProfile: {
                     componentID: string;
                     profileRef: components["schemas"]["Contract_capture_composition_f1d3ea703d6af495"];
-                    sourceUID: string;
+                    sourceUID?: string;
                     definitionDigest: string;
                     /** Format: uuid */
-                    sourceClusterID: string;
-                    sourceNamespaceUID: string;
-                };
+                    sourceClusterID?: string;
+                    sourceNamespaceUID?: string;
+                } & unknown;
                 provenance: {
                     authored: components["schemas"]["Contract_capture_composition"];
                     resolvedProfiles: components["schemas"]["Contract_capture_composition_d3d99d35a2742711"][];
@@ -474,15 +475,16 @@ export interface components {
             /** @enum {unknown} */
             value: "onTrigger" | "ongoing";
         };
+        /** @description Pinned resolved profile. A builtin definition is embedded in the release binary (ADR-243) and is identified by its definition digest alone; organization and namespace definitions name their source cluster, namespace and object. */
         Contract_capture_composition_d3d99d35a2742711: {
             componentID: string;
             profileRef: components["schemas"]["Contract_capture_composition_f1d3ea703d6af495"];
-            sourceUID: string;
+            sourceUID?: string;
             definitionDigest: string;
             /** Format: uuid */
-            sourceClusterID: string;
-            sourceNamespaceUID: string;
-        };
+            sourceClusterID?: string;
+            sourceNamespaceUID?: string;
+        } & unknown;
         Contract_capture_composition_6256ac1ffa3775a5: {
             componentID: string;
             localActionID: string;

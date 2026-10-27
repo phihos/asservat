@@ -892,10 +892,51 @@
       "required": [
         "componentID",
         "profileRef",
-        "sourceUID",
-        "definitionDigest",
-        "sourceClusterID",
-        "sourceNamespaceUID"
+        "definitionDigest"
+      ],
+      "description": "Pinned resolved profile. A builtin definition is embedded in the release binary (ADR-243) and is identified by its definition digest alone; organization and namespace definitions name their source cluster, namespace and object.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "profileRef": {
+                "properties": {
+                  "catalog": {
+                    "const": "builtin"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "sourceUID"
+                  ]
+                },
+                {
+                  "required": [
+                    "sourceClusterID"
+                  ]
+                },
+                {
+                  "required": [
+                    "sourceNamespaceUID"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "required": [
+              "sourceUID",
+              "sourceClusterID",
+              "sourceNamespaceUID"
+            ]
+          }
+        }
       ]
     },
     "provenance": {

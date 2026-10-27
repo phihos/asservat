@@ -15,6 +15,7 @@ import (
 	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 )
 
@@ -133,9 +134,11 @@ type ContextOperationInput struct {
 	Sharing *ContextSharingInput `json:"sharing,omitempty"`
 	// ADR-236: the preview_capture history branch and list_capture_history.
 	HistoryCaptureID string `json:"history_capture_id,omitempty"`
-	Origin           string `json:"origin,omitempty"`
-	Cursor           string `json:"cursor,omitempty"`
-	Limit            int    `json:"limit,omitempty"`
+	// ADR-243: one builtin packet or syscall capture profile with typed edits.
+	Composition *CompositionInput `json:"profile_composition,omitempty"`
+	Origin      string            `json:"origin,omitempty"`
+	Cursor      string            `json:"cursor,omitempty"`
+	Limit       int               `json:"limit,omitempty"`
 }
 
 // ContextSharingInput is the implemented subset of the canonical capture
@@ -278,7 +281,15 @@ func collectionBlockers(enabled bool) []OperationBlocker {
 	return []OperationBlocker{{Code: "CollectionDisabled", Message: "Collection is not enabled for this service. The preview has not started a capture.", ResponsibleRole: "administrator", Retryable: false}}
 }
 func publicCaptureFailure(err error, request bool) OperationFailure {
+	// ADR-243: composition refusals are reported only after current target
+	// eligibility and name the authored field and a remedy, never target state.
+	var refusal planning.CompositionError
+	if errors.As(err, &refusal) {
+		return OperationFailure{refusal.Code, boundedText(refusal.Path+": "+refusal.Reason, 1024), false}
+	}
 	switch {
+	case errors.Is(err, value.ErrRecorderUnavailable):
+		return OperationFailure{"RecorderUnavailable", "Packet and syscall recorders are not installed in this release. The reviewed plan cannot be submitted; no capture was started and nothing was reserved.", false}
 	case errors.Is(err, value.ErrSharingDenied):
 		// Decided from the caller's own scope (preview) or after the
 		// caller's capture eligibility on the target (request): no oracle.
@@ -322,7 +333,7 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied), errors.Is(err, targets.ErrDenied):
 		return OperationFailure{"NotAvailable", "This operation is not available with your current access.", false}
 	case errors.Is(err, value.ErrInvalid), errors.Is(err, value.ErrDiagnosticUnavailable):
-		return OperationFailure{"UnsupportedRequest", "This runtime supports the pod-status preset and submission of its reviewed previews.", false}
+		return OperationFailure{"UnsupportedRequest", "This runtime supports the pod-status preset, submission of its reviewed previews and plan-only previews of the builtin network-connections and syscall-activity capture profiles.", false}
 	}
 	// Resolution happens before target eligibility. Never relay API object names,
 	// not-found/unsupported-owner distinctions, SQL errors or provider details.
@@ -359,7 +370,7 @@ func captureAuditDecision(err error) operationAuditDecision {
 	switch {
 	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied), errors.Is(err, targets.ErrDenied):
 		return operationAuditDenied
-	case errors.Is(err, value.ErrInvalid), errors.Is(err, value.ErrDiagnosticUnavailable):
+	case errors.Is(err, value.ErrInvalid), errors.Is(err, value.ErrDiagnosticUnavailable), errors.As(err, new(planning.CompositionError)):
 		return operationAuditInvalid
 	default:
 		return operationAuditUnspecified
@@ -414,6 +425,17 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 	case "preview_capture":
 		var result app.ContextPreviewResult
 		target, repeated := in.Target, ""
+		if in.Composition != nil {
+			// ADR-243: a reviewed packet/syscall plan, blocked by RecorderUnavailable.
+			var data RecorderPreviewData
+			var previewUntil time.Time
+			data, previewUntil, operationErr = s.recorderPreview(ctx, current, in)
+			if operationErr == nil {
+				until = identity.Earlier(until, previewUntil)
+				out.Data, out.DataClass = data, "extract" // full composition settings are a protected extract
+			}
+			break
+		}
 		if in.HistoryCaptureID != "" {
 			// "Collect again" (ADR-236): the history entry supplies the target
 			// and requested retention; the preview runs every current check.

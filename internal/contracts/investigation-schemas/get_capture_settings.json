@@ -2557,104 +2557,6 @@
             ]
           }
         ],
-        "$defs": {
-          "processSelector": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "match": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "executablePath": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 4096,
-                    "pattern": "^/"
-                  },
-                  "executableName": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255,
-                    "pattern": "^[^/]+$"
-                  },
-                  "runtime": {
-                    "enum": [
-                      "native",
-                      "go",
-                      "dotnet",
-                      "python",
-                      "node",
-                      "jvm"
-                    ]
-                  },
-                  "buildIDs": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128
-                    },
-                    "minItems": 1,
-                    "maxItems": 16,
-                    "uniqueItems": true
-                  }
-                },
-                "required": [],
-                "minProperties": 1
-              },
-              "includeDescendants": {
-                "type": "boolean"
-              },
-              "maxDepth": {
-                "type": "integer",
-                "minimum": 0,
-                "maximum": 32
-              },
-              "resolve": {
-                "const": "atDispatch"
-              }
-            },
-            "required": [
-              "match",
-              "includeDescendants",
-              "maxDepth",
-              "resolve"
-            ]
-          },
-          "batch": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "maxProcesses": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 64
-              },
-              "maxBytesPerProcess": {
-                "type": "integer",
-                "minimum": 1,
-                "maximum": 8589934592
-              },
-              "maxStopPerProcess": {
-                "$ref": "#/$defs/d8"
-              },
-              "maxTotalStop": {
-                "$ref": "#/$defs/d8"
-              },
-              "consistency": {
-                "const": "sequential"
-              }
-            },
-            "required": [
-              "maxProcesses",
-              "maxBytesPerProcess",
-              "maxStopPerProcess",
-              "maxTotalStop",
-              "consistency"
-            ]
-          }
-        },
         "x-execution-modes": {
           "kubernetesSnapshot": {
             "default": "onTrigger",
@@ -2871,241 +2773,62 @@
               "pattern": "^[a-f0-9]{64}$"
             },
             "source": {
-              "$ref": "#/$defs/d14"
+              "$ref": "#/$defs/d14",
+              "description": "Source object of an organization or namespace captureProfile dependency. A release-embedded builtin profile (ADR-243) has none; its profileComposition provenance names the builtin catalog."
             }
           },
           "required": [
             "role",
             "digest"
-          ],
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "role": {
-                    "const": "captureProfile"
-                  }
-                }
-              },
-              "then": {
-                "required": [
-                  "source"
-                ]
-              }
-            }
           ]
         },
         "minItems": 1,
         "maxItems": 64
       },
-      "d17": {
+      "d18": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "entries": {
-            "type": "array",
-            "items": {
-              "oneOf": [
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "cidrs": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64
-                      },
-                      "minItems": 1,
-                      "maxItems": 128,
-                      "uniqueItems": true
-                    }
-                  },
-                  "required": [
-                    "cidrs"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "podSelector": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "properties": {
-                        "namespace": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 63
-                        },
-                        "matchLabels": {
-                          "type": "object",
-                          "minProperties": 1,
-                          "maxProperties": 16,
-                          "additionalProperties": {
-                            "type": "string",
-                            "minLength": 1,
-                            "maxLength": 63
-                          }
-                        }
-                      },
-                      "required": [
-                        "namespace",
-                        "matchLabels"
-                      ]
-                    }
-                  },
-                  "required": [
-                    "podSelector"
-                  ]
-                },
-                {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "properties": {
-                    "resourceRef": {
-                      "type": "object",
-                      "additionalProperties": false,
-                      "properties": {
-                        "kind": {
-                          "enum": [
-                            "Pod",
-                            "Deployment",
-                            "StatefulSet",
-                            "Service"
-                          ]
-                        },
-                        "namespace": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 63
-                        },
-                        "name": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 253
-                        },
-                        "serviceMode": {
-                          "enum": [
-                            "backends",
-                            "virtualIP",
-                            "both"
-                          ]
-                        },
-                        "readyOnly": {
-                          "type": "boolean"
-                        }
-                      },
-                      "required": [
-                        "kind",
-                        "namespace",
-                        "name"
-                      ],
-                      "allOf": [
-                        {
-                          "if": {
-                            "properties": {
-                              "kind": {
-                                "const": "Service"
-                              }
-                            }
-                          },
-                          "then": {
-                            "required": [
-                              "serviceMode",
-                              "readyOnly"
-                            ]
-                          },
-                          "else": {
-                            "not": {
-                              "anyOf": [
-                                {
-                                  "required": [
-                                    "serviceMode"
-                                  ]
-                                },
-                                {
-                                  "required": [
-                                    "readyOnly"
-                                  ]
-                                }
-                              ]
-                            }
-                          }
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "resourceRef"
-                  ]
-                }
-              ]
-            },
-            "minItems": 1,
-            "maxItems": 16,
-            "uniqueItems": true
-          },
-          "protocol": {
+          "catalog": {
             "enum": [
-              "tcp",
-              "udp",
-              "icmp",
-              "any"
+              "builtin",
+              "organization",
+              "namespace"
             ]
           },
-          "ports": {
-            "type": "array",
-            "items": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 65535
-            },
-            "minItems": 1,
-            "maxItems": 32,
-            "uniqueItems": true
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
           },
-          "resolution": {
-            "enum": [
-              "frozen",
-              "follow"
-            ]
-          },
-          "maxEndpoints": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 4096
-          },
-          "maxStaleness": {
-            "$ref": "#/$defs/d8"
+          "version": {
+            "type": "string",
+            "pattern": "^v[1-9][0-9]*$",
+            "maxLength": 32
           }
         },
         "required": [
-          "entries",
-          "protocol",
-          "resolution",
-          "maxEndpoints",
-          "maxStaleness"
+          "catalog",
+          "name",
+          "version"
         ]
       },
-      "d18": {
+      "d20": {
         "type": "string",
         "minLength": 1,
         "maxLength": 4096,
         "pattern": "\\S"
       },
-      "d19": {
-        "type": "string",
-        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-        "maxLength": 16
-      },
-      "d20": {
-        "type": "string",
-        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
-        "maxLength": 16
-      },
       "d21": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+        "maxLength": 16
+      },
+      "d22": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+        "maxLength": 16
+      },
+      "d23": {
         "oneOf": [
           {
             "type": "object",
@@ -3144,114 +2867,47 @@
           }
         ]
       },
-      "d22": {
+      "d24": {
         "enum": [
           "metadata",
           "arguments"
         ]
       },
-      "d23": {
-        "anyOf": [
-          {
-            "const": "0s"
-          },
-          {
-            "$ref": "#/$defs/d8"
-          }
-        ]
-      },
-      "d24": {
-        "anyOf": [
-          {
-            "const": "0s"
-          },
-          {
-            "$ref": "#/$defs/d8"
-          }
-        ]
-      },
       "d25": {
-        "$ref": "#/$defs/d12"
+        "anyOf": [
+          {
+            "const": "0s"
+          },
+          {
+            "$ref": "#/$defs/d8"
+          }
+        ]
       },
       "d26": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "maxBytesPerEvent": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 4096
+        "anyOf": [
+          {
+            "const": "0s"
           },
-          "captureBuffers": {
-            "type": "boolean"
+          {
+            "$ref": "#/$defs/d8"
           }
-        },
-        "required": [
-          "maxBytesPerEvent",
-          "captureBuffers"
         ]
       },
       "d27": {
-        "type": "integer",
-        "minimum": 1,
-        "maximum": 1000000
+        "$ref": "#/$defs/d12"
       },
       "d28": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 100000
+        "maximum": 1000000
       },
       "d29": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "catalog": {
-            "enum": [
-              "builtin",
-              "organization",
-              "namespace"
-            ]
-          },
-          "name": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9-]{0,62}$"
-          },
-          "version": {
-            "type": "string",
-            "pattern": "^v[1-9][0-9]*$",
-            "maxLength": 32
-          }
-        },
-        "required": [
-          "catalog",
-          "name",
-          "version"
-        ]
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100000
       },
-      "d30": {
+      "d19": {
         "oneOf": [
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
-              },
-              "field": {
-                "const": "packetPeers"
-              },
-              "value": {
-                "$ref": "#/$defs/d17"
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
           {
             "type": "object",
             "additionalProperties": false,
@@ -3265,7 +2921,7 @@
                 "const": "packetFilter"
               },
               "value": {
-                "$ref": "#/$defs/d18"
+                "$ref": "#/$defs/d20"
               }
             },
             "required": [
@@ -3287,7 +2943,7 @@
                 "const": "packetBefore"
               },
               "value": {
-                "$ref": "#/$defs/d19"
+                "$ref": "#/$defs/d21"
               }
             },
             "required": [
@@ -3309,7 +2965,7 @@
                 "const": "packetAfter"
               },
               "value": {
-                "$ref": "#/$defs/d20"
+                "$ref": "#/$defs/d22"
               }
             },
             "required": [
@@ -3350,117 +3006,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "processSelector"
-              },
-              "value": {
-                "$ref": "#/$defs/d9"
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
-              },
-              "field": {
-                "const": "processBatch"
-              },
-              "value": {
-                "$ref": "#/$defs/d10"
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
-              },
-              "field": {
-                "const": "profileDuration"
-              },
-              "value": {
-                "$ref": "#/$defs/d8"
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
-              },
-              "field": {
                 "const": "syscallFilter"
-              },
-              "value": {
-                "$ref": "#/$defs/d21"
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
-              },
-              "field": {
-                "const": "syscallMode"
-              },
-              "value": {
-                "$ref": "#/$defs/d22"
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
-              },
-              "field": {
-                "const": "syscallBefore"
               },
               "value": {
                 "$ref": "#/$defs/d23"
@@ -3482,7 +3028,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "syscallAfter"
+                "const": "syscallMode"
               },
               "value": {
                 "$ref": "#/$defs/d24"
@@ -3504,7 +3050,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "syscallRing"
+                "const": "syscallBefore"
               },
               "value": {
                 "$ref": "#/$defs/d25"
@@ -3526,7 +3072,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "syscallArguments"
+                "const": "syscallAfter"
               },
               "value": {
                 "$ref": "#/$defs/d26"
@@ -3548,7 +3094,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "syscallMaxEvents"
+                "const": "syscallRing"
               },
               "value": {
                 "$ref": "#/$defs/d27"
@@ -3570,7 +3116,7 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "syscallRate"
+                "const": "syscallMaxEvents"
               },
               "value": {
                 "$ref": "#/$defs/d28"
@@ -3592,41 +3138,10 @@
                 "maxLength": 63
               },
               "field": {
-                "const": "filePath"
+                "const": "syscallRate"
               },
               "value": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 4096
-              }
-            },
-            "required": [
-              "actionID",
-              "field",
-              "value"
-            ]
-          },
-          {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "actionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
-              },
-              "field": {
-                "const": "commandArgv"
-              },
-              "value": {
-                "type": "array",
-                "items": {
-                  "type": "string",
-                  "minLength": 1,
-                  "maxLength": 4096
-                },
-                "maxItems": 64,
-                "minItems": 1
+                "$ref": "#/$defs/d29"
               }
             },
             "required": [
@@ -3708,7 +3223,60 @@
           }
         ]
       },
-      "d31": {
+      "d17": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,23}$"
+          },
+          "profileRef": {
+            "$ref": "#/$defs/d18"
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d19"
+            },
+            "minItems": 0,
+            "maxItems": 32
+          }
+        },
+        "required": [
+          "id",
+          "profileRef"
+        ]
+      },
+      "d16": {
+        "title": "Flat bounded capture profile composition",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d17"
+            },
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "maxTotalBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          },
+          "maxDuration": {
+            "$ref": "#/$defs/d8"
+          }
+        },
+        "required": [
+          "components",
+          "maxTotalBytes",
+          "maxDuration"
+        ]
+      },
+      "d30": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -3718,7 +3286,7 @@
             "maxLength": 24
           },
           "profileRef": {
-            "$ref": "#/$defs/d29"
+            "$ref": "#/$defs/d18"
           },
           "sourceUID": {
             "type": "string",
@@ -3742,13 +3310,54 @@
         "required": [
           "componentID",
           "profileRef",
-          "sourceUID",
-          "definitionDigest",
-          "sourceClusterID",
-          "sourceNamespaceUID"
+          "definitionDigest"
+        ],
+        "description": "Pinned resolved profile. A builtin definition is embedded in the release binary (ADR-243) and is identified by its definition digest alone; organization and namespace definitions name their source cluster, namespace and object.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "profileRef": {
+                  "properties": {
+                    "catalog": {
+                      "const": "builtin"
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "sourceUID"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "sourceClusterID"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "sourceNamespaceUID"
+                    ]
+                  }
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "sourceUID",
+                "sourceClusterID",
+                "sourceNamespaceUID"
+              ]
+            }
+          }
         ]
       },
-      "d32": {
+      "d31": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -3777,986 +3386,6 @@
           "deduplicated"
         ]
       },
-      "d33": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9-]{0,23}$"
-          },
-          "profileRef": {
-            "$ref": "#/$defs/d29"
-          },
-          "overrides": {
-            "type": "array",
-            "items": {
-              "$ref": "#/$defs/d30"
-            },
-            "minItems": 0,
-            "maxItems": 32
-          }
-        },
-        "required": [
-          "id",
-          "profileRef"
-        ]
-      },
-      "d16": {
-        "title": "Flat bounded capture profile composition",
-        "x-field-bindings": {
-          "packetPeers": {
-            "actionKinds": [
-              "packetCapture"
-            ],
-            "path": [
-              "parameters",
-              "peers"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d17"
-            }
-          },
-          "packetFilter": {
-            "actionKinds": [
-              "packetCapture"
-            ],
-            "path": [
-              "parameters",
-              "filter"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d18"
-            }
-          },
-          "packetBefore": {
-            "actionKinds": [
-              "packetCapture"
-            ],
-            "path": [
-              "parameters",
-              "before"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d19"
-            }
-          },
-          "packetAfter": {
-            "actionKinds": [
-              "packetCapture"
-            ],
-            "path": [
-              "parameters",
-              "after"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d20"
-            }
-          },
-          "packetRing": {
-            "actionKinds": [
-              "packetCapture"
-            ],
-            "path": [
-              "parameters",
-              "ring"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d12"
-            }
-          },
-          "processSelector": {
-            "actionKinds": [
-              "liveCore"
-            ],
-            "path": [
-              "parameters",
-              "processSelector"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d9"
-            }
-          },
-          "processBatch": {
-            "actionKinds": [
-              "liveCore"
-            ],
-            "path": [
-              "parameters",
-              "batch"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d10"
-            }
-          },
-          "profileDuration": {
-            "actionKinds": [
-              "profile"
-            ],
-            "path": [
-              "parameters",
-              "duration"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d8"
-            }
-          },
-          "syscallFilter": {
-            "actionKinds": [
-              "syscallTrace"
-            ],
-            "path": [
-              "parameters",
-              "syscalls"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d21"
-            }
-          },
-          "syscallMode": {
-            "actionKinds": [
-              "syscallTrace"
-            ],
-            "path": [
-              "parameters",
-              "mode"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d22"
-            }
-          },
-          "syscallBefore": {
-            "actionKinds": [
-              "syscallTrace"
-            ],
-            "path": [
-              "parameters",
-              "before"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d23"
-            }
-          },
-          "syscallAfter": {
-            "actionKinds": [
-              "syscallTrace"
-            ],
-            "path": [
-              "parameters",
-              "after"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d24"
-            }
-          },
-          "syscallRing": {
-            "actionKinds": [
-              "syscallTrace"
-            ],
-            "path": [
-              "parameters",
-              "ring"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d25"
-            }
-          },
-          "syscallArguments": {
-            "actionKinds": [
-              "syscallTrace"
-            ],
-            "path": [
-              "parameters",
-              "arguments"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d26"
-            }
-          },
-          "syscallMaxEvents": {
-            "actionKinds": [
-              "syscallTrace"
-            ],
-            "path": [
-              "parameters",
-              "maxEvents"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d27"
-            }
-          },
-          "syscallRate": {
-            "actionKinds": [
-              "syscallTrace"
-            ],
-            "path": [
-              "parameters",
-              "maxEventsPerSecond"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d28"
-            }
-          },
-          "filePath": {
-            "actionKinds": [
-              "fileRead"
-            ],
-            "path": [
-              "parameters",
-              "path"
-            ],
-            "valueSchema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 4096
-            }
-          },
-          "commandArgv": {
-            "actionKinds": [
-              "command"
-            ],
-            "path": [
-              "parameters",
-              "argv"
-            ],
-            "valueSchema": {
-              "type": "array",
-              "items": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 4096
-              },
-              "maxItems": 64,
-              "minItems": 1
-            }
-          },
-          "actionMaxBytes": {
-            "actionKinds": [
-              "kubernetesSnapshot",
-              "logs",
-              "processSnapshot",
-              "fileRead",
-              "packetCapture",
-              "networkSnapshot",
-              "runtimeDiagnostic",
-              "kernelCore",
-              "liveCore",
-              "command",
-              "httpDiagnostic",
-              "artifactCollect",
-              "profile",
-              "syscallTrace"
-            ],
-            "path": [
-              "limits",
-              "maxBytes"
-            ],
-            "valueSchema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 1099511627776
-            }
-          },
-          "actionTimeout": {
-            "actionKinds": [
-              "kubernetesSnapshot",
-              "logs",
-              "processSnapshot",
-              "fileRead",
-              "packetCapture",
-              "networkSnapshot",
-              "runtimeDiagnostic",
-              "kernelCore",
-              "liveCore",
-              "command",
-              "httpDiagnostic",
-              "artifactCollect",
-              "profile",
-              "syscallTrace"
-            ],
-            "path": [
-              "limits",
-              "timeout"
-            ],
-            "valueSchema": {
-              "$ref": "#/$defs/d8"
-            }
-          },
-          "actionExecutionMode": {
-            "actionKinds": [
-              "packetCapture",
-              "syscallTrace"
-            ],
-            "path": [
-              "executionMode"
-            ],
-            "valueSchema": {
-              "enum": [
-                "onTrigger",
-                "ongoing"
-              ]
-            }
-          }
-        },
-        "$defs": {
-          "profileRef": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "catalog": {
-                "enum": [
-                  "builtin",
-                  "organization",
-                  "namespace"
-                ]
-              },
-              "name": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9-]{0,62}$"
-              },
-              "version": {
-                "type": "string",
-                "pattern": "^v[1-9][0-9]*$",
-                "maxLength": 32
-              }
-            },
-            "required": [
-              "catalog",
-              "name",
-              "version"
-            ]
-          },
-          "override": {
-            "oneOf": [
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "packetPeers"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d17"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "packetFilter"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d18"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "packetBefore"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d19"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "packetAfter"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d20"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "packetRing"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d12"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "processSelector"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d9"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "processBatch"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d10"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "profileDuration"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d8"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "syscallFilter"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d21"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "syscallMode"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d22"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "syscallBefore"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d23"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "syscallAfter"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d24"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "syscallRing"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d25"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "syscallArguments"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d26"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "syscallMaxEvents"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d27"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "syscallRate"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d28"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "filePath"
-                  },
-                  "value": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 4096
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "commandArgv"
-                  },
-                  "value": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 4096
-                    },
-                    "maxItems": 64,
-                    "minItems": 1
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "actionMaxBytes"
-                  },
-                  "value": {
-                    "type": "integer",
-                    "minimum": 1,
-                    "maximum": 1099511627776
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "actionTimeout"
-                  },
-                  "value": {
-                    "$ref": "#/$defs/d8"
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              },
-              {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "actionID": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 63
-                  },
-                  "field": {
-                    "const": "actionExecutionMode"
-                  },
-                  "value": {
-                    "enum": [
-                      "onTrigger",
-                      "ongoing"
-                    ]
-                  }
-                },
-                "required": [
-                  "actionID",
-                  "field",
-                  "value"
-                ]
-              }
-            ]
-          },
-          "component": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "id": {
-                "type": "string",
-                "pattern": "^[a-z][a-z0-9-]{0,23}$"
-              },
-              "profileRef": {
-                "$ref": "#/$defs/d29"
-              },
-              "overrides": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/$defs/d30"
-                },
-                "minItems": 0,
-                "maxItems": 32
-              }
-            },
-            "required": [
-              "id",
-              "profileRef"
-            ]
-          },
-          "actionAlias": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "componentID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 24
-              },
-              "localActionID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 63
-              },
-              "actionID": {
-                "type": "string",
-                "pattern": "^a[a-f0-9]{24}$"
-              },
-              "deduplicated": {
-                "type": "boolean"
-              }
-            },
-            "required": [
-              "componentID",
-              "localActionID",
-              "actionID",
-              "deduplicated"
-            ]
-          },
-          "resolvedProfile": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "componentID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 24
-              },
-              "profileRef": {
-                "$ref": "#/$defs/d29"
-              },
-              "sourceUID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 64
-              },
-              "definitionDigest": {
-                "type": "string",
-                "pattern": "^[a-f0-9]{64}$"
-              },
-              "sourceClusterID": {
-                "type": "string",
-                "format": "uuid"
-              },
-              "sourceNamespaceUID": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 64
-              }
-            },
-            "required": [
-              "componentID",
-              "profileRef",
-              "sourceUID",
-              "definitionDigest",
-              "sourceClusterID",
-              "sourceNamespaceUID"
-            ]
-          },
-          "provenance": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "authored": {
-                "$ref": "#/$defs/d16"
-              },
-              "resolvedProfiles": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/$defs/d31"
-                },
-                "minItems": 1,
-                "maxItems": 8
-              },
-              "actionMap": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/$defs/d32"
-                },
-                "minItems": 1,
-                "maxItems": 128
-              }
-            },
-            "required": [
-              "authored",
-              "resolvedProfiles",
-              "actionMap"
-            ]
-          }
-        },
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "components": {
-            "type": "array",
-            "items": {
-              "$ref": "#/$defs/d33"
-            },
-            "minItems": 1,
-            "maxItems": 8
-          },
-          "maxTotalBytes": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 1099511627776
-          },
-          "maxDuration": {
-            "$ref": "#/$defs/d8"
-          }
-        },
-        "required": [
-          "components",
-          "maxTotalBytes",
-          "maxDuration"
-        ]
-      },
       "d15": {
         "type": "object",
         "additionalProperties": false,
@@ -4767,7 +3396,7 @@
           "resolvedProfiles": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d31"
+              "$ref": "#/$defs/d30"
             },
             "minItems": 1,
             "maxItems": 8
@@ -4775,7 +3404,7 @@
           "actionMap": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d32"
+              "$ref": "#/$defs/d31"
             },
             "minItems": 1,
             "maxItems": 128

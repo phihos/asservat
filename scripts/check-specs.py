@@ -371,13 +371,15 @@ def compile_composition_fixture(composition, catalog):
         for binding in recipe.get("endpointBindings", []):
             binding["name"] = endpoint_ids[binding["name"]]
             bindings.append(binding)
-        resolved.append({"componentID": component["id"], "profileRef": reference,
-                         "sourceUID": profile["metadata"].get("uid", "fixture-" + profile["metadata"]["name"]),
-                         "sourceClusterID": "00000000-0000-4000-8000-000000000001" if reference["catalog"] == "namespace" else "00000000-0000-4000-8000-000000000010",
-                         "sourceNamespaceUID": "fixture-namespace-" + profile["metadata"]["namespace"],
-                         "definitionDigest": capture_profile_definition_digest(profile)})
+        entry = {"componentID": component["id"], "profileRef": reference, "definitionDigest": capture_profile_definition_digest(profile)}
+        if reference["catalog"] != "builtin":
+            # ADR-243 (S6): builtins are embedded in the release binary and have no source object.
+            entry.update({"sourceUID": profile["metadata"].get("uid", "fixture-" + profile["metadata"]["name"]),
+                          "sourceClusterID": "00000000-0000-4000-8000-000000000001" if reference["catalog"] == "namespace" else "00000000-0000-4000-8000-000000000010",
+                          "sourceNamespaceUID": "fixture-namespace-" + profile["metadata"]["namespace"]})
+        resolved.append(entry)
     require(len(actions) <= 16 and len(bindings) <= 16, "Expanded composition exceeds recipe cardinality")
-    recipe = {"description": "Expanded capture profile composition fixture.", "actions": actions,
+    recipe = {"description": "Expanded capture profile composition.", "actions": actions,
               "maxTotalBytes": composition["maxTotalBytes"], "maxDuration": composition["maxDuration"]}
     if bindings:
         recipe["endpointBindings"] = bindings
@@ -501,7 +503,7 @@ def semantic_checks(doc: dict) -> None:
         provenance = doc.get("profileComposition")
         require(bool(pins) == bool(provenance), "Composition source pins/provenance mismatch")
         if provenance:
-            expected = [{"role": "captureProfile", "digest": p["definitionDigest"], "source": {"clusterID": p["sourceClusterID"], "namespaceUID": p["sourceNamespaceUID"], "resourceUID": p["sourceUID"]}} for p in provenance["resolvedProfiles"]]
+            expected = [{"role": "captureProfile", "digest": p["definitionDigest"]} | ({} if p["profileRef"]["catalog"] == "builtin" else {"source": {"clusterID": p["sourceClusterID"], "namespaceUID": p["sourceNamespaceUID"], "resourceUID": p["sourceUID"]}}) for p in provenance["resolvedProfiles"]]
             require(all(p in pins for p in expected) and all(p in expected for p in pins), "Composition dependency identity mismatch")
     lifecycle = doc if doc.get("schemaVersion") == "action-lifecycle/v1" else doc.get("data", {}).get("lifecycle_plan")
     if lifecycle:
@@ -927,6 +929,21 @@ def main() -> None:
     require(composed_scope["profileComposition"] == composition_provenance, "Resolved composition provenance drift")
     require(composed_scope["collection"]["spec"]["recipeRef"]["digest"] == canonical_digest(expanded), "Composed scope recipe digest drift")
     require(canonical_digest(composed_scope) == examples["mcp-composition-preview-result.json"]["data"]["execution_digest"], "Composed preview scope digest drift")
+    # ADR-243: the Go recorder compiler's cross-language fixture. Expansion,
+    # provenance, lifecycle and the cBPF program digest are recomputed here.
+    recorder = examples["resolved-recorder-preview.json"]
+    recorder_recipe, recorder_provenance = compile_checked(recorder["profileComposition"]["authored"])
+    require(recorder["recipe"] == recorder_recipe and recorder["profileComposition"] == recorder_provenance, "Recorder preview expansion drift")
+    require(recorder["recipeRef"] == {"name": "composition-" + canonical_digest(recorder_recipe)[:24], "digest": canonical_digest(recorder_recipe)}, "Recorder preview recipe digest drift")
+    require(recorder["lifecycle"] == action_lifecycle_plan_fixture(recorder_recipe, "DebugCapture"), "Recorder preview lifecycle drift")
+    recorder_actions = {a["id"]: a for a in recorder_recipe["actions"]}
+    require(all(recorder_actions[r["actionID"]]["kind"] == r["evidenceType"] for r in recorder["effectiveRetention"]) and len(recorder["effectiveRetention"]) == len(recorder_actions), "Recorder retention/action drift")
+    for compiled in recorder["filters"]:
+        action = recorder_actions[compiled["actionID"]]
+        require(action["kind"] == "packetCapture" and action["parameters"].get("filter") == compiled["expression"], "Compiled filter is not the plan's filter")
+        packed = b"".join(__import__("struct").pack("<HBBI", *ins) for ins in compiled["program"])
+        require(hashlib.sha256(packed).hexdigest() == compiled["programDigest"], "Filter program digest drift")
+    require(all(a["kind"] in {"packetCapture", "syscallTrace"} and a["parameters"].get("profile", {"kind": "networkHeaders"})["kind"] == "networkHeaders" and a["parameters"].get("mode", "metadata") == "metadata" for a in recorder_recipe["actions"]), "Recorder preview needs a sensitive grant")
     history = examples["mcp-composed-settings-result.json"]["data"]["settings"]
     require(history["profile_composition"] == composition_provenance and history["recipe_spec"] == expanded, "Composed history snapshot drift")
     profile_detail = examples["mcp-profile-definition-result.json"]["data"]
@@ -2054,8 +2071,13 @@ def main() -> None:
     changed_profile["spec"]["definition"]["recipe"]["actions"][0]["parameters"]["duration"] = "11s"
     require(capture_profile_definition_digest(changed_profile) != prior_digest, "Action edit leaves definition identity unchanged")
     rejects(composed_scope, "collection-scope", lambda d: d.pop("profileComposition"), True)
-    rejects(composed_scope, "collection-scope", lambda d: next(p for p in d["dependencies"] if p["role"] == "captureProfile").pop("source"))
-    rejects(composed_scope, "collection-scope", lambda d: next(p for p in d["dependencies"] if p["role"] == "captureProfile")["source"].update({"namespaceUID": "replacement-namespace"}), True)
+    recorder = examples["resolved-recorder-preview.json"]
+    rejects(recorder, "recorder-preview", lambda d: d.update({"acceptance": "accepted"}))
+    rejects(recorder, "recorder-preview", lambda d: d["filters"][0].update({"linkType": "RAW"}))
+    rejects(recorder, "recorder-preview", lambda d: d["filters"][0]["program"].extend([[6, 0, 0, 0]] * 256))
+    # ADR-243: an embedded builtin has no source object; inventing one is refused.
+    rejects(composed_scope, "collection-scope", lambda d: next(p for p in d["dependencies"] if p["role"] == "captureProfile").update({"source": {"clusterID": "00000000-0000-4000-8000-000000000010", "namespaceUID": "replacement-namespace", "resourceUID": "fixture-http-headers-v1"}}), True)
+    rejects(composed_scope, "collection-scope", lambda d: d["profileComposition"]["resolvedProfiles"][0].update({"sourceUID": "fixture-http-headers-v1", "sourceClusterID": "00000000-0000-4000-8000-000000000010", "sourceNamespaceUID": "replacement-namespace"}))
     # Both approved metadata projections are permitted in explicit extract selections.
     share_request = copy.deepcopy(examples["capture-with-sharing.yaml"])
     share_request["spec"]["sharing"]["outputSelection"] = {"mode": "explicit", "outputs": [{"actionID": "syscalls", "dataClass": "extract", "projectionRef": {"name": "syscall-metadata", "version": "v1"}, "operations": ["get_syscall_summary", "get_syscall_events"]}]}

@@ -105,6 +105,16 @@ jobs:
           go test -race -count=1 -run '^$' ./... >/dev/null
           go test -count=1 -run '^$' ./test/integration ./internal/adapters/kms ./internal/adapters/kubernetes >/dev/null
           CGO_ENABLED=0 go build -trimpath -buildvcs=false -o /dev/null ./cmd/asservat
+      # ADR-243: the hub's pcap filter compiler links a pinned static libpcap
+      # (cgo, build tag libpcap). User space only: no capture or BPF load.
+      - id: libpcap
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/asservat-build/libpcap-1.11.0
+          key: libpcap-1.11.0-${{ runner.os }}-${{ hashFiles('scripts/build-libpcap.sh') }}
+      - if: steps.libpcap.outputs.cache-hit != 'true'
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends flex bison
+      - run: make pcap-check
       - if: github.ref == 'refs/heads/main'
         run: find ~/.cache/go-build -type f -mmin +90 -delete
       - if: github.ref == 'refs/heads/main'

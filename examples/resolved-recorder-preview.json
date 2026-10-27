@@ -1,0 +1,194 @@
+{
+  "acceptance": "recorderUnavailable",
+  "deadline": "2026-10-10T12:01:00Z",
+  "effectiveRetention": [
+    {
+      "actionID": "a39e06242677ef6472b264308",
+      "deletionBudgetSeconds": 300,
+      "evidenceType": "packetCapture",
+      "maximumAgeSeconds": 86400,
+      "policyRefs": [
+        {
+          "digest": "0400000000000000000000000000000000000000000000000000000000000000",
+          "generation": 1,
+          "uid": "baseline"
+        }
+      ],
+      "privacyClass": "potentialPersonalData",
+      "purposeRef": "diagnostics",
+      "requestedAgeSeconds": 3600
+    }
+  ],
+  "executor": {
+    "clientID": "asservat-browser",
+    "identityType": "human",
+    "issuer": "https://identity.example.invalid/realms/company",
+    "subject": "developer-123"
+  },
+  "filters": [
+    {
+      "actionID": "a39e06242677ef6472b264308",
+      "encoding": "pcap-cbpf/v1",
+      "expression": "tcp port 8080 and host 10.0.0.12",
+      "linkType": "EN10MB",
+      "program": [
+        [40, 0, 0, 12],
+        [21, 15, 0, 34525],
+        [21, 0, 14, 2048],
+        [48, 0, 0, 23],
+        [21, 0, 12, 6],
+        [40, 0, 0, 20],
+        [69, 10, 0, 8191],
+        [177, 0, 0, 14],
+        [72, 0, 0, 14],
+        [21, 2, 0, 8080],
+        [72, 0, 0, 16],
+        [21, 0, 5, 8080],
+        [32, 0, 0, 26],
+        [21, 2, 0, 167772172],
+        [32, 0, 0, 30],
+        [21, 0, 1, 167772172],
+        [6, 0, 0, 65535],
+        [6, 0, 0, 0]
+      ],
+      "programDigest": "b7d75a424ddc6befb867e7d09f6905faeb5e1f15f58545a9469fbc96b41ade05",
+      "snaplen": 65535
+    }
+  ],
+  "lifecycle": {
+    "actions": [
+      {
+        "actionID": "a39e06242677ef6472b264308",
+        "activation": "manualSession",
+        "after": "15s",
+        "executionMode": "ongoing",
+        "kind": "packetCapture",
+        "requestedBefore": "30s"
+      }
+    ],
+    "ongoingPodScope": "acceptedCapturePods",
+    "requestKind": "DebugCapture",
+    "schemaVersion": "action-lifecycle/v1"
+  },
+  "profileComposition": {
+    "actionMap": [
+      {
+        "actionID": "a39e06242677ef6472b264308",
+        "componentID": "net",
+        "deduplicated": false,
+        "localActionID": "sample"
+      }
+    ],
+    "authored": {
+      "components": [
+        {
+          "id": "net",
+          "overrides": [
+            {
+              "actionID": "sample",
+              "field": "packetFilter",
+              "value": "tcp port 8080 and host 10.0.0.12"
+            },
+            {
+              "actionID": "sample",
+              "field": "packetAfter",
+              "value": "15s"
+            },
+            {
+              "actionID": "sample",
+              "field": "actionTimeout",
+              "value": "20s"
+            }
+          ],
+          "profileRef": {
+            "catalog": "builtin",
+            "name": "network-connections",
+            "version": "v1"
+          }
+        }
+      ],
+      "maxDuration": "20s",
+      "maxTotalBytes": 16777216
+    },
+    "resolvedProfiles": [
+      {
+        "componentID": "net",
+        "definitionDigest": "ad67f4f61778a3595166fd91cbfdb45e0642a27a35b9eb329d40092fb0c78c17",
+        "profileRef": {
+          "catalog": "builtin",
+          "name": "network-connections",
+          "version": "v1"
+        }
+      }
+    ]
+  },
+  "recipe": {
+    "actions": [
+      {
+        "executionMode": "ongoing",
+        "id": "a39e06242677ef6472b264308",
+        "impact": "observe",
+        "kind": "packetCapture",
+        "limits": {
+          "maxBytes": 16777216,
+          "timeout": "20s"
+        },
+        "parameters": {
+          "after": "15s",
+          "before": "30s",
+          "filter": "tcp port 8080 and host 10.0.0.12",
+          "maxConcurrentSnapshots": 1,
+          "maxFrozenBytes": 16777216,
+          "peers": {
+            "entries": [
+              {
+                "cidrs": [
+                  "0.0.0.0/0",
+                  "::/0"
+                ]
+              }
+            ],
+            "maxEndpoints": 1,
+            "maxStaleness": "5s",
+            "protocol": "any",
+            "resolution": "frozen"
+          },
+          "profile": {
+            "kind": "networkHeaders"
+          },
+          "ring": {
+            "maxAge": "30s",
+            "maxBytes": 16777216,
+            "maxSegments": 4,
+            "medium": "memory",
+            "segmentBytes": 4194304
+          }
+        },
+        "required": true
+      }
+    ],
+    "description": "Expanded capture profile composition.",
+    "maxDuration": "20s",
+    "maxTotalBytes": 16777216
+  },
+  "recipeRef": {
+    "digest": "1b1cda1a1600107d0fc4bd36ccff06af6188fbd9940529222e8ff2515af6cc85",
+    "name": "composition-1b1cda1a1600107d0fc4bd36"
+  },
+  "schemaVersion": "recorder-preview/v1",
+  "source": {
+    "clusterID": "00000000-0000-4000-8000-000000000001",
+    "namespaceUID": "namespace-payments-uid",
+    "resourceUID": "00000000-0000-4000-8000-000000000045"
+  },
+  "target": {
+    "namespace": "payments",
+    "podUID": "pod-uid",
+    "workloadRef": {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "name": "api",
+      "uid": "deployment-api-uid"
+    }
+  }
+}

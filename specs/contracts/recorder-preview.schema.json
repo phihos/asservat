@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://asservat.io/spec/v1/recorder-preview.schema.json",
+  "title": "Reviewed packet/syscall recorder plan (interim, ADR-243)",
+  "description": "Canonical plan whose SHA-256 is the execution_digest of a composition preview. It is never an accepted collection scope: acceptance is refused (acceptance recorderUnavailable) until a node recorder exists. The libpcap program is compiled on the hub with the pinned link type and snapshot length; the node never compiles.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {
+      "const": "recorder-preview/v1"
+    },
+    "acceptance": {
+      "const": "recorderUnavailable"
+    },
+    "source": {
+      "$ref": "https://asservat.io/spec/v1/collection-scope.schema.json#/properties/source"
+    },
+    "executor": {
+      "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/principal"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "workloadRef": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "apiVersion": {
+              "enum": [
+                "apps/v1",
+                "v1"
+              ]
+            },
+            "kind": {
+              "enum": [
+                "Deployment",
+                "StatefulSet",
+                "Pod"
+              ]
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253
+            },
+            "uid": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          "required": [
+            "apiVersion",
+            "kind",
+            "name",
+            "uid"
+          ]
+        },
+        "podUID": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "required": [
+        "namespace",
+        "workloadRef",
+        "podUID"
+      ]
+    },
+    "recipeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^composition-[a-f0-9]{24}$"
+        },
+        "digest": {
+          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash"
+        }
+      },
+      "required": [
+        "name",
+        "digest"
+      ]
+    },
+    "recipe": {
+      "$ref": "https://asservat.io/spec/v1/recipe.schema.json#/properties/spec"
+    },
+    "profileComposition": {
+      "$ref": "https://asservat.io/spec/v1/capture-composition.schema.json#/$defs/provenance"
+    },
+    "lifecycle": {
+      "$ref": "https://asservat.io/spec/v1/action-lifecycle.schema.json#/$defs/plan"
+    },
+    "filters": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "actionID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "expression": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "linkType": {
+            "const": "EN10MB"
+          },
+          "snaplen": {
+            "const": 65535
+          },
+          "encoding": {
+            "const": "pcap-cbpf/v1"
+          },
+          "program": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 256,
+            "items": {
+              "type": "array",
+              "prefixItems": [
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                },
+                {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              ],
+              "minItems": 4,
+              "maxItems": 4
+            },
+            "description": "Classic BPF instructions (code, jt, jf, k) as emitted by libpcap pcap_compile."
+          },
+          "programDigest": {
+            "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/hash",
+            "description": "SHA-256 over the instructions as little-endian struct sock_filter bytes."
+          }
+        },
+        "required": [
+          "actionID",
+          "expression",
+          "linkType",
+          "snaplen",
+          "encoding",
+          "program",
+          "programDigest"
+        ]
+      }
+    },
+    "effectiveRetention": {
+      "$ref": "https://asservat.io/spec/v1/collection-scope.schema.json#/properties/effectiveRetention"
+    },
+    "deadline": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "acceptance",
+    "source",
+    "executor",
+    "target",
+    "recipeRef",
+    "recipe",
+    "profileComposition",
+    "lifecycle",
+    "filters",
+    "effectiveRetention",
+    "deadline"
+  ]
+}
