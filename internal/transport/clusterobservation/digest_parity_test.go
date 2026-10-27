@@ -33,7 +33,7 @@ func TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose(t *t
 	base := localRequest()
 	base.RequestedAt = time.Date(2026, 10, 13, 10, 12, 30, 123456000, time.FixedZone("offset", 3600))
 	base.NotAfter = base.RequestedAt.Add(4500 * time.Millisecond)
-	for _, purpose := range []fleet.ClusterObservationPurpose{fleet.ObserveCapacityNamespaceGuard, fleet.ObserveCapacityNamespaces, fleet.ObserveCapacityWorkloads, fleet.ObserveCapacityWorkload} {
+	for _, purpose := range []fleet.ClusterObservationPurpose{fleet.ObserveCapacityNamespaceGuard, fleet.ObserveCapacityNamespaces, fleet.ObserveCapacityWorkloads, fleet.ObserveCapacityWorkload, fleet.ObservePermissionNamespaces} {
 		r := base.Clone()
 		r.Purpose = purpose
 		switch purpose {
@@ -47,6 +47,8 @@ func TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose(t *t
 			r.Namespace = cfg.NamespaceRef{Name: "service", UID: localID(31)}
 			r.Workload = cfg.WorkloadRef{Kind: "Deployment", Name: "api", UID: localID(32)}
 			r.Keys = []string{"team", "a.example/key"}
+		case fleet.ObservePermissionNamespaces:
+			r.Keys, r.AnnotationKeys, r.Continue = []string{"a.example/key", "team"}, []string{"owner"}, "journal/1/64"
 		}
 		t.Run(string(purpose), func(t *testing.T) {
 			want := originalObservationDigest(t, r)
@@ -59,17 +61,18 @@ func TestClusterObservationApplicationDigestPreservesEveryClosedWirePurpose(t *t
 				t.Fatal("transport wrapper changed digest", err)
 			}
 			for name, mutate := range map[string]func(*fleet.ClusterObservationRequest){
-				"request":   func(x *fleet.ClusterObservationRequest) { x.ID = localID(70) },
-				"challenge": func(x *fleet.ClusterObservationRequest) { x.Challenge = localID(71) },
-				"root":      func(x *fleet.ClusterObservationRequest) { x.RootID = localID(72) },
-				"cluster":   func(x *fleet.ClusterObservationRequest) { x.ClusterID = localID(73) },
-				"start":     func(x *fleet.ClusterObservationRequest) { x.RequestedAt = x.RequestedAt.Add(time.Microsecond) },
-				"end":       func(x *fleet.ClusterObservationRequest) { x.NotAfter = x.NotAfter.Add(-time.Microsecond) },
-				"namespace": func(x *fleet.ClusterObservationRequest) { x.Namespace.UID = localID(74) },
-				"workload":  func(x *fleet.ClusterObservationRequest) { x.Workload.UID = localID(75) },
-				"kind":      func(x *fleet.ClusterObservationRequest) { x.Kind = "StatefulSet" },
-				"cursor":    func(x *fleet.ClusterObservationRequest) { x.Continue = "different-page" },
-				"keys":      func(x *fleet.ClusterObservationRequest) { x.Keys = append(x.Keys, "other") },
+				"request":     func(x *fleet.ClusterObservationRequest) { x.ID = localID(70) },
+				"challenge":   func(x *fleet.ClusterObservationRequest) { x.Challenge = localID(71) },
+				"root":        func(x *fleet.ClusterObservationRequest) { x.RootID = localID(72) },
+				"cluster":     func(x *fleet.ClusterObservationRequest) { x.ClusterID = localID(73) },
+				"start":       func(x *fleet.ClusterObservationRequest) { x.RequestedAt = x.RequestedAt.Add(time.Microsecond) },
+				"end":         func(x *fleet.ClusterObservationRequest) { x.NotAfter = x.NotAfter.Add(-time.Microsecond) },
+				"namespace":   func(x *fleet.ClusterObservationRequest) { x.Namespace.UID = localID(74) },
+				"workload":    func(x *fleet.ClusterObservationRequest) { x.Workload.UID = localID(75) },
+				"kind":        func(x *fleet.ClusterObservationRequest) { x.Kind = "StatefulSet" },
+				"cursor":      func(x *fleet.ClusterObservationRequest) { x.Continue = "different-page" },
+				"keys":        func(x *fleet.ClusterObservationRequest) { x.Keys = append(x.Keys, "other") },
+				"annotations": func(x *fleet.ClusterObservationRequest) { x.AnnotationKeys = append(x.AnnotationKeys, "zz") },
 			} {
 				x := r.Clone()
 				mutate(&x)

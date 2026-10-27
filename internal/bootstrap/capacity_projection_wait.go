@@ -115,5 +115,6 @@ func (d *CapacityHubWorkerDeployment) openCapacity(ctx context.Context, claim co
 	// No Run call can occur before both actual SQL scope verifications and the
 	// final exact native receipt/workload observation. Cancellation joins the
 	// concrete child before its scoped pools or mounted root are closed.
+	defer d.guards.share(capacity.reconciler.Clusters)()
 	return capacity.Run(ctx)
 }

@@ -1,5 +1,41 @@
 # Sustained implementation progress
 
+## Guarded, group-ID, remote-cluster and workload permission sources (ADR-247, 2026-10-27)
+
+[ADR-247](decisions/247-guarded-and-workload-permission-sources.md) completes REQ-PER-003/005
+inheritance forms without a migration: `admissionEnforced` namespace sources need a live proof of
+the cluster's capacity namespace label guard covering their keys (labels only); `groupID` values
+are validated against the identity settings' configured `eligibleGroups` (hub-worker `get` on the
+pinned ConfigMap); joined clusters' namespaces come from each connector's continuous LIST+watch
+journal (`permission-namespace-metadata`, versions change only with an observed value); and
+`workloadMetadata` sources grant per Deployment/StatefulSet UID from connector workload journals
+(`permission-workload-metadata`) under the opt-in workload metadata admission guard
+(`permission-workload-guard`, installed only with the capacity profile's `workloadKeys`; probe
+`create deployments` in a quota-zero probe namespace). Connector/owner RBAC gains `watch` on
+namespaces, Deployments and StatefulSets and `get` on the workload guard.
+
+Verification (tracked test/results files restored after each run):
+- Unit: domain/configuration and fleet (workload selection, observation, request/page validation),
+  application/configuration (guarded/group-ID grants, remote namespace journal versions incl.
+  A → B → A, journal service, remote reconciler path incl. failed reread and lapse, workload grants
+  incl. guard/selector/scope cases, workload journal service versions, workload reconciler path and
+  lost guard), adapters/kubernetes (journal paging and cursor changes, workload pages, missing
+  guard, owner RBAC), transport digest parity incl. annotation keys: PASS.
+  `go test ./internal/domain/... ./internal/application/... ./internal/transport/...
+  ./internal/contracts/ ./internal/adapters/postgres/ ./internal/bootstrap/`: PASS;
+  `./internal/adapters/kubernetes/` full package: one failure, the owner RBAC expectation (deliberately updated for the new `watch` and workload guard `get`), which passes in the targeted rerun.
+- Permission (`make permission-integration`, owned Kind + PostgreSQL + S3): exit 0;
+  `.../guarded-and-group-id-inheritance-with-real-guard-and-identity-settings` PASS (33.07 s, of
+  which 12 s is a deliberate wait): real namespace guard proof, unprivileged guarded-key write
+  denied, groupID grant and revocation of an unlisted group, guard unavailable keeps the
+  assignment ungranted and restores the same ID, removed binding stops the source; real workload
+  guard: proof, quota refuses a real probe Deployment, unprivileged keyed Deployment creation and
+  owner change denied, grant only on the owned workload UID (not the other workload of the
+  namespace), unrelated workload write keeps the assignment ID across a journal reread, owner
+  A → B → A re-mints it. SQL acceptance and encrypted audit of workload bases are real.
+- Remote (non-hub) namespace and workload reads have unit and adapter tests only; no multi-cluster
+  native run of the new purposes yet. No installed qualification.
+
 ## Decision-time permission sources: pod exec and access review (ADR-245, 2026-10-27)
 
 [ADR-245](decisions/245-decision-time-permission-sources.md) implements REQ-PER-004. The hub-worker

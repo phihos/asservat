@@ -45,9 +45,21 @@ rules:
   - apiGroups: [""]
     resources: [namespaces, pods]
     verbs: [list]
+  # ADR-247: the connector's permission namespace journal watches namespaces.
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [watch]
   - apiGroups: [apps]
     resources: [deployments, statefulsets]
     verbs: [list]
+  # ADR-247: the connector's permission workload journal watches them; the
+  # workload guard's probe namespace gets a ResourceQuota admitting nothing.
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets]
+    verbs: [watch]
+  - apiGroups: [""]
+    resources: [resourcequotas]
+    verbs: [get, create]
   - apiGroups: [apps]
     resources: [statefulsets]
     verbs: [get]

@@ -261,3 +261,51 @@ func ProposeBinding(b Binding, target Target, now time.Time) Proposal {
 	}
 	return Proposal{Candidates: out, Reason: "RequiresAcceptance"}
 }
+
+// Why a guarded or group-ID source grants nothing for now (ADR-247): its
+// admission guard proof or the configured group directory is not current.
+// Like MetadataUnavailable, the source's accepted assignments are kept but
+// grant nothing until a current observation is accepted.
+const (
+	GuardUnavailable     = "GuardUnavailable"
+	DirectoryUnavailable = "DirectoryUnavailable"
+)
+
+// NamespaceGuardProof is a current proof that an enforcing admission guard
+// protects these namespace label and annotation keys of one cluster against
+// writers other than its administrators (ADR-247): a live dry-run denial of
+// an unprivileged probe, within its original interval. It says nothing about
+// historical values: the source's reviewRef attests their review.
+type NamespaceGuardProof struct {
+	ClusterID, Name           string
+	LabelKeys, AnnotationKeys []string
+	ObservedAt, FreshUntil    time.Time
+}
+
+// GroupDirectory is the administrator-configured set of stable group IDs of
+// one issuer (the protected identity settings' eligibleGroups) that groupID
+// mapping validates values against (ADR-247). It is not a directory reader.
+type GroupDirectory struct {
+	Issuer                 string
+	Groups                 []string
+	ObservedAt, FreshUntil time.Time
+}
+
+// SourceEvidence is what a guarded or group-ID source needs at evaluation
+// time; nil fields are unknown.
+type SourceEvidence struct {
+	Guard *NamespaceGuardProof
+	// WorkloadGuard proves the workload metadata guard of a
+	// workloadMetadata source's cluster (ADR-247).
+	WorkloadGuard *NamespaceGuardProof
+	Directory     *GroupDirectory
+	Now           time.Time
+}
+
+func (p *NamespaceGuardProof) Current(now time.Time) bool {
+	return p != nil && !now.Before(p.ObservedAt) && now.Before(p.FreshUntil) && p.FreshUntil.Sub(p.ObservedAt) <= 30*time.Second
+}
+
+func (d *GroupDirectory) Current(now time.Time) bool {
+	return d != nil && !now.Before(d.ObservedAt) && now.Before(d.FreshUntil) && d.FreshUntil.Sub(d.ObservedAt) <= 5*time.Minute
+}

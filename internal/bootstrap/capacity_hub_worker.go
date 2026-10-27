@@ -39,6 +39,9 @@ type CapacityHubWorkerDeployment struct {
 	evidenceStoreID string
 	owners          sync.WaitGroup
 	once            sync.Once
+	// guards lends the running capacity child's namespace guard readers to
+	// the permission reconciler (ADR-247).
+	guards sharedNamespaceGuards
 }
 
 func NewProvisionedCapacityHubWorkerDeployment(ctx context.Context, files *os.Root) (*CapacityHubWorkerDeployment, error) {

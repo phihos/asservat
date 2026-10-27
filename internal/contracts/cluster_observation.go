@@ -22,6 +22,14 @@ const (
 	// guard and then one workload under its keys (ADR-197): a regional
 	// reconcile's guard and workload in one five-second window.
 	ClusterObservationGuardedWorkload = "capacity-guarded-workload"
+	// ClusterObservationPermissionNamespaces pages the connector's namespace
+	// journal of the requested keys (ADR-247).
+	ClusterObservationPermissionNamespaces = "permission-namespace-metadata"
+	// ClusterObservationPermissionWorkloads pages a workload journal and
+	// ClusterObservationPermissionWorkloadGuard proves the workload metadata
+	// guard (ADR-247).
+	ClusterObservationPermissionWorkloads     = "permission-workload-metadata"
+	ClusterObservationPermissionWorkloadGuard = "permission-workload-guard"
 )
 
 var ErrClusterObservationProtocol = errors.New("invalid cluster observation message")
@@ -53,7 +61,12 @@ type ClusterObservationRequest struct {
 	Workload    *ClusterObservationWorkloadRef `json:"workload,omitempty"`
 	Kind        string                         `json:"kind,omitempty"`
 	Keys        []string                       `json:"keys,omitempty"`
-	Continue    string                         `json:"continue,omitempty"`
+	// AnnotationKeys are a permission namespace observation's annotation
+	// keys (ADR-247); its Keys are label keys.
+	AnnotationKeys []string `json:"annotationKeys,omitempty"`
+	// Selector is a permission workload observation's label selector.
+	Selector map[string]string `json:"selector,omitempty"`
+	Continue string            `json:"continue,omitempty"`
 }
 
 type ClusterObservationInterval struct {
@@ -65,12 +78,33 @@ type ClusterObservationGuard struct {
 	Digest   string                     `json:"digest"`
 	Keys     []string                   `json:"keys"`
 	Interval ClusterObservationInterval `json:"interval"`
+	// AnnotationKeys are a workload guard's annotation keys (ADR-247).
+	AnnotationKeys []string `json:"annotationKeys,omitempty"`
 }
 
 type ClusterObservationNamespacePage struct {
 	ResourceVersion string                        `json:"resourceVersion"`
 	Continue        string                        `json:"continue"`
 	Items           []ClusterObservationNamespace `json:"items"`
+}
+
+// ClusterObservationPermissionNamespacePage is one journal page (ADR-247):
+// value digests and journal versions only, never a value or other metadata.
+type ClusterObservationPermissionNamespacePage struct {
+	Journal    string                                  `json:"journal"`
+	Sequence   int64                                   `json:"sequence"`
+	ObservedAt string                                  `json:"observedAt"`
+	Continue   string                                  `json:"continue"`
+	Items      []ClusterObservationPermissionNamespace `json:"items"`
+}
+
+type ClusterObservationPermissionNamespace struct {
+	Name        string            `json:"name"`
+	UID         string            `json:"uid"`
+	Version     string            `json:"version"`
+	Deleting    bool              `json:"deleting,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type ClusterObservationWorkloadPage struct {
@@ -106,6 +140,26 @@ type ClusterObservationResult struct {
 	Namespaces    *ClusterObservationNamespacePage `json:"namespaces,omitempty"`
 	Workloads     *ClusterObservationWorkloadPage  `json:"workloads,omitempty"`
 	Workload      *ClusterObservationExactWorkload `json:"workload,omitempty"`
+	// PermissionNamespaces answers a permission namespace observation.
+	PermissionNamespaces *ClusterObservationPermissionNamespacePage `json:"permissionNamespaces,omitempty"`
+	// PermissionWorkloads answers a permission workload observation.
+	PermissionWorkloads *ClusterObservationPermissionWorkloadPage `json:"permissionWorkloads,omitempty"`
+}
+
+// ClusterObservationPermissionWorkloadPage is one workload journal page
+// (ADR-247): value digests and journal versions only.
+type ClusterObservationPermissionWorkloadPage struct {
+	Journal    string                                 `json:"journal"`
+	Sequence   int64                                  `json:"sequence"`
+	ObservedAt string                                 `json:"observedAt"`
+	Continue   string                                 `json:"continue"`
+	Items      []ClusterObservationPermissionWorkload `json:"items"`
+}
+
+type ClusterObservationPermissionWorkload struct {
+	Kind      string                                `json:"kind"`
+	Namespace ClusterObservationNamespace           `json:"namespace"`
+	Workload  ClusterObservationPermissionNamespace `json:"workload"`
 }
 
 func EncodeClusterObservationRequest(v ClusterObservationRequest) ([]byte, error) {

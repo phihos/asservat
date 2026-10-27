@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	app "asservat.local/asservat/internal/application/capacity"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -191,4 +192,77 @@ func (s *capacityRemoteObservation) ReadCapacityGuardedWorkload(ctx context.Cont
 		return app.CapacityNamespaceProtection{}, app.CapacityWorkloadObservation{}, mounts.ErrUnavailable
 	}
 	return guard, out, nil
+}
+
+// ObservePermissionNamespaces reads the connector's complete namespace
+// journal of keys page by page at one journal state (ADR-247). The list's
+// ResourceVersion is the journal ID and its ObservedAt the journal's own
+// freshness; each namespace carries its journal version.
+func (s *capacityRemoteObservation) ObservePermissionNamespaces(ctx context.Context, keys cfg.NamespaceKeys) (cfg.NamespaceList, error) {
+	var out cfg.NamespaceList
+	cursor, journal, sequence := "", "", int64(-1)
+	for page := 0; page < 80; page++ {
+		v, err := s.observe(ctx, fleet.ClusterObservationRequest{Purpose: fleet.ObservePermissionNamespaces, Keys: slices.Clone(keys.Labels), AnnotationKeys: slices.Clone(keys.Annotations), Continue: cursor})
+		if err != nil {
+			return cfg.NamespaceList{}, err
+		}
+		p := v.PermissionNamespaces
+		if page > 0 && (p.Journal != journal || p.Sequence != sequence) {
+			return cfg.NamespaceList{}, mounts.ErrUnavailable
+		}
+		journal, sequence = p.Journal, p.Sequence
+		if page == 0 {
+			out = cfg.NamespaceList{ClusterID: s.clusterID, ResourceVersion: journal, Keys: keys, ObservedAt: p.ObservedAt}
+		}
+		if len(out.Namespaces)+len(p.Items) > cfg.MaxObservedNamespaces {
+			return cfg.NamespaceList{}, mounts.ErrUnavailable
+		}
+		out.Namespaces = append(out.Namespaces, p.Items...)
+		if p.Continue == "" {
+			return out, nil
+		}
+		cursor = p.Continue
+	}
+	return cfg.NamespaceList{}, mounts.ErrUnavailable
+}
+
+// ObservePermissionWorkloads reads a connector workload journal page by page
+// at one journal state (ADR-247), like ObservePermissionNamespaces.
+func (s *capacityRemoteObservation) ObservePermissionWorkloads(ctx context.Context, sel cfg.WorkloadSelection) (cfg.WorkloadList, error) {
+	var out cfg.WorkloadList
+	cursor, journal, sequence := "", "", int64(-1)
+	for page := 0; page < 80; page++ {
+		v, err := s.observe(ctx, fleet.ClusterObservationRequest{Purpose: fleet.ObservePermissionWorkloads, Selector: maps.Clone(sel.Selector), Keys: slices.Clone(sel.Keys.Labels), AnnotationKeys: slices.Clone(sel.Keys.Annotations), Continue: cursor})
+		if err != nil {
+			return cfg.WorkloadList{}, err
+		}
+		p := v.PermissionWorkloads
+		if page > 0 && (p.Journal != journal || p.Sequence != sequence) {
+			return cfg.WorkloadList{}, mounts.ErrUnavailable
+		}
+		journal, sequence = p.Journal, p.Sequence
+		if page == 0 {
+			out = cfg.WorkloadList{ClusterID: s.clusterID, Journal: journal, Selection: sel, ObservedAt: p.ObservedAt}
+		}
+		if len(out.Workloads)+len(p.Items) > cfg.MaxObservedWorkloads {
+			return cfg.WorkloadList{}, mounts.ErrUnavailable
+		}
+		out.Workloads = append(out.Workloads, p.Items...)
+		if p.Continue == "" {
+			return out, nil
+		}
+		cursor = p.Continue
+	}
+	return cfg.WorkloadList{}, mounts.ErrUnavailable
+}
+
+// ObservePermissionWorkloadGuard is the connector's current workload
+// metadata guard proof (ADR-247).
+func (s *capacityRemoteObservation) ObservePermissionWorkloadGuard(ctx context.Context) (cfg.NamespaceGuardProof, error) {
+	v, err := s.observe(ctx, fleet.ClusterObservationRequest{Purpose: fleet.ObservePermissionWorkloadGuard})
+	if err != nil {
+		return cfg.NamespaceGuardProof{}, err
+	}
+	g := v.Guard
+	return cfg.NamespaceGuardProof{ClusterID: s.clusterID, Name: kube.WorkloadGuardProfile, LabelKeys: slices.Clone(g.Keys), AnnotationKeys: slices.Clone(g.AnnotationKeys), ObservedAt: g.Interval.ObservedAt, FreshUntil: g.Interval.FreshUntil}, nil
 }

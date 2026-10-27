@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"encoding/json/jsontext"
+	"maps"
 	"slices"
 	"time"
 
@@ -27,20 +28,22 @@ func ClusterObservationRequestDigest(r value.ClusterObservationRequest) (artifac
 		UID  string `json:"uid"`
 	}
 	wire := struct {
-		Format      string     `json:"format"`
-		RequestID   string     `json:"requestId"`
-		Challenge   string     `json:"challenge"`
-		RootID      string     `json:"rootId"`
-		ClusterID   string     `json:"clusterId"`
-		Purpose     string     `json:"purpose"`
-		RequestedAt string     `json:"requestedAt"`
-		NotAfter    string     `json:"notAfter"`
-		Namespace   *namespace `json:"namespace,omitempty"`
-		Workload    *workload  `json:"workload,omitempty"`
-		Kind        string     `json:"kind,omitempty"`
-		Keys        []string   `json:"keys,omitempty"`
-		Continue    string     `json:"continue,omitempty"`
-	}{Format: "cluster-observation/v1", RequestID: r.ID, Challenge: r.Challenge, RootID: r.RootID, ClusterID: r.ClusterID, Purpose: string(r.Purpose), RequestedAt: r.RequestedAt.UTC().Format(time.RFC3339Nano), NotAfter: r.NotAfter.UTC().Format(time.RFC3339Nano), Kind: r.Kind, Keys: slices.Clone(r.Keys), Continue: r.Continue}
+		Format      string            `json:"format"`
+		RequestID   string            `json:"requestId"`
+		Challenge   string            `json:"challenge"`
+		RootID      string            `json:"rootId"`
+		ClusterID   string            `json:"clusterId"`
+		Purpose     string            `json:"purpose"`
+		RequestedAt string            `json:"requestedAt"`
+		NotAfter    string            `json:"notAfter"`
+		Namespace   *namespace        `json:"namespace,omitempty"`
+		Workload    *workload         `json:"workload,omitempty"`
+		Kind        string            `json:"kind,omitempty"`
+		Keys        []string          `json:"keys,omitempty"`
+		Annotations []string          `json:"annotationKeys,omitempty"`
+		Selector    map[string]string `json:"selector,omitempty"`
+		Continue    string            `json:"continue,omitempty"`
+	}{Format: "cluster-observation/v1", RequestID: r.ID, Challenge: r.Challenge, RootID: r.RootID, ClusterID: r.ClusterID, Purpose: string(r.Purpose), RequestedAt: r.RequestedAt.UTC().Format(time.RFC3339Nano), NotAfter: r.NotAfter.UTC().Format(time.RFC3339Nano), Kind: r.Kind, Keys: slices.Clone(r.Keys), Annotations: slices.Clone(r.AnnotationKeys), Selector: maps.Clone(r.Selector), Continue: r.Continue}
 	if r.Namespace != (cfg.NamespaceRef{}) {
 		wire.Namespace = &namespace{r.Namespace.Name, r.Namespace.UID}
 	}

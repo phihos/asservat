@@ -13,6 +13,7 @@ import (
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
+	configapp "asservat.local/asservat/internal/application/configuration"
 	fleetapp "asservat.local/asservat/internal/application/fleet"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -110,6 +111,24 @@ func newRegionalCapacity(ctx context.Context, c contracts.RegionalDeployment, in
 	if out.metadata, err = kube.NewClusterObservationMetadata(read, selector, c.PermissionRootID); err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
+	// ADR-247: the continuous namespace journal behind the hub's permission
+	// namespace observations of this cluster; idle without a reader.
+	journal := &configapp.NamespaceJournalService{Observer: read, Now: time.Now}
+	closers = append(closers, journal.Close)
+	out.metadata = out.metadata.WithPermissionNamespaces(journal)
+	var workloadGuard *kube.WorkloadGuard
+	if w := k.WorkloadGuard; w != nil {
+		if w.Guard.Name != kube.RegionalWorkloadGuardName(c.Namespace.Name) {
+			return nil, closers, mounts.ErrUnavailable
+		}
+		if workloadGuard, err = kube.NewWorkloadGuard(read, selectorProbe, cfg.WorkloadAdministration{Name: w.Guard.Name, Administrators: regionalActors(w.Guard.Administrators), LabelKeys: w.LabelKeys, AnnotationKeys: w.AnnotationKeys,
+			ProbeNamespace: probeNS, ProbeAccount: cfg.NamespaceRef{Name: k.ProbeAccount.Name, UID: k.ProbeAccount.UID}}, regionalPin(w.Guard)); err != nil {
+			return nil, closers, mounts.ErrUnavailable
+		}
+	}
+	workloads := &configapp.WorkloadJournalService{Observer: read, Now: time.Now}
+	closers = append(closers, workloads.Close)
+	out.metadata = out.metadata.WithPermissionWorkloads(workloads, workloadGuard)
 	pool, err := regionalOwnerPool(c, c.APIContext.Owners.Configuration)
 	if err != nil || pool.OperationPort == 0 {
 		return nil, closers, mounts.ErrUnavailable

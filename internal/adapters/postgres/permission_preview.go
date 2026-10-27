@@ -103,7 +103,7 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 		// observation of the current accepted batch, and the namespaces they
 		// grant join the cells read.
 		if len(r.Sources) > 0 {
-			observation, err := currentNamespaceObservation(ctx, q, s)
+			observations, err := currentNamespaceObservations(ctx, q, s)
 			if err != nil {
 				return err
 			}
@@ -112,10 +112,24 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 					out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Unevaluated: cfg.DecisionTimeSource})
 					continue
 				}
+				if src.Type == "workloadMetadata" {
+					// ADR-247: a workload source needs a current workload guard
+					// proof, which the preview does not read.
+					out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Unevaluated: cfg.MetadataUnavailable})
+					continue
+				}
+				var observation *cfg.NamespaceObservation
+				if i := slices.IndexFunc(observations, func(o cfg.NamespaceObservation) bool { return o.ClusterID == src.ClusterID }); i >= 0 {
+					observation = &observations[i]
+				}
 				grants, reason := configapp.NamespaceGrants(src, "", observation)
 				switch reason {
 				case cfg.MetadataUnavailable, cfg.MetadataNotObserved:
 					out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Unevaluated: reason})
+					continue
+				case cfg.GuardUnavailable, cfg.DirectoryUnavailable:
+					// The preview reads no guard proof or group directory.
+					out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Unevaluated: cfg.MetadataUnavailable})
 					continue
 				}
 				out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Grants: grants})
@@ -180,11 +194,12 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 	return out, nil
 }
 
-// currentNamespaceObservation returns the namespace observation of the
+// currentNamespaceObservations returns the namespace observations, hub and
+// remote (ADR-247), of the
 // stream's current acceptance, or nil when the stream is not current or that
 // acceptance holds none (ADR-242). Identical refreshes keep the stream's
 // sequence, so a current stream's observation is the current one.
-func currentNamespaceObservation(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream) (*cfg.NamespaceObservation, error) {
+func currentNamespaceObservations(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream) ([]cfg.NamespaceObservation, error) {
 	n, err := q.CurrentTime(ctx)
 	if err != nil {
 		return nil, err
@@ -199,11 +214,18 @@ func currentNamespaceObservation(ctx context.Context, q *custodydb.Queries, s cu
 	if err != nil {
 		return nil, err
 	}
-	var record struct{ Namespaces *cfg.NamespaceObservation }
-	if json.Unmarshal(raw, &record) != nil || record.Namespaces != nil && !record.Namespaces.Valid() {
+	var record struct {
+		Namespaces       *cfg.NamespaceObservation
+		RemoteNamespaces []cfg.NamespaceObservation
+	}
+	if json.Unmarshal(raw, &record) != nil || record.Namespaces != nil && !record.Namespaces.Valid() || !cfg.RemoteNamespacesValid(record.Namespaces, record.RemoteNamespaces) {
 		return nil, cfg.ErrUnavailable
 	}
-	return record.Namespaces, nil
+	out := record.RemoteNamespaces
+	if record.Namespaces != nil {
+		out = append(out, *record.Namespaces)
+	}
+	return out, nil
 }
 
 // previewReviews adds a deleted or edited decision-time source's assignments

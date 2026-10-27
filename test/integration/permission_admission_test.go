@@ -295,6 +295,9 @@ func TestPermissionAdmissionWithRealKubernetes(t *testing.T) {
 		t.Run("namespace-inheritance-with-real-namespaces-SQL-and-audit", func(t *testing.T) {
 			testInheritedReconciliation(t, c, observer, guard, plan, fixture.Postgres, fixture.S3)
 		})
+		t.Run("guarded-and-group-id-inheritance-with-real-guard-and-identity-settings", func(t *testing.T) {
+			testGuardedAndGroupInheritance(t, c, observer, guard, plan, fixture.Postgres, fixture.S3)
+		})
 		t.Run("decision-time-reviews-with-real-subject-access-reviews-SQL-and-audit", func(t *testing.T) {
 			testDecisionTimeReviews(t, c, fixture.Postgres, fixture.S3)
 		})

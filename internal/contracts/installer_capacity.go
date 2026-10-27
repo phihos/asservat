@@ -5,9 +5,13 @@ package contracts
 // identities and derives the root, account version, pool UID, guard digests,
 // processing source and slot arithmetic; it invents no measured value.
 type InstallerCapacitySettings struct {
-	Pool                string                      `json:"pool"`
-	Policy              string                      `json:"policy"`
-	NamespaceKeys       []string                    `json:"namespaceKeys"`
+	Pool          string   `json:"pool"`
+	Policy        string   `json:"policy"`
+	NamespaceKeys []string `json:"namespaceKeys"`
+	// WorkloadKeys are the Deployment/StatefulSet label and annotation keys
+	// the workload metadata guard protects (ADR-247); absent, no guard is
+	// installed and workloadMetadata sources grant nothing.
+	WorkloadKeys        *InstallerWorkloadKeys      `json:"workloadKeys,omitempty"`
 	Accounts            int64                       `json:"accounts"`
 	Records             int64                       `json:"recordsPerAccount"`
 	AdmissionSeconds    int64                       `json:"admissionSeconds"`
@@ -92,4 +96,9 @@ type InstallerCapacityEnvelope struct {
 type InstallerCapacityBackend struct {
 	StorageProfile string                  `json:"storageProfile"`
 	Usable         InstallerCapacityAmount `json:"usable"`
+}
+
+type InstallerWorkloadKeys struct {
+	Labels      []string `json:"labels"`
+	Annotations []string `json:"annotations"`
 }

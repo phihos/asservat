@@ -168,6 +168,10 @@ def check_bootstrap(directory):
     assert jobs == {"apiGroups": ["batch"], "resources": ["jobs"], "verbs": ["get", "create", "delete"]}
     binding_delete, = [rule for rule in crole["rules"] if "accessbindings" in rule["resources"] and "delete" in rule["verbs"]]
     assert binding_delete == {"apiGroups": ["asservat.io"], "resources": ["accessbindings"], "verbs": ["delete"]}
+    # ADR-247: the owner workload role it creates watches workloads, so the
+    # continuation must hold exactly that watch (RBAC escalation prevention).
+    workload_watch, = [rule for rule in crole["rules"] if "statefulsets" in rule["resources"] and "watch" in rule["verbs"]]
+    assert workload_watch == {"apiGroups": ["apps"], "resources": ["deployments", "statefulsets"], "verbs": ["watch"]}
     pool_update, = [rule for rule in crole["rules"] if "evidencestoragepools" in rule["resources"] and "update" in rule["verbs"]]
     assert pool_update == {"apiGroups": ["asservat.io"], "resources": ["evidencestoragepools"], "verbs": ["update"]}
     cverbs = {v for rule in crole["rules"] if rule is not jobs and rule is not binding_delete for v in rule["verbs"]}

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"slices"
 	"time"
 
@@ -20,6 +21,12 @@ type Inheritance struct {
 	UnavailableSources []string
 	SourcesUnavailable bool
 	Namespaces         *value.NamespaceObservation
+	// RemoteNamespaces are the minimized current observations of joined
+	// clusters other than the hub's (ADR-247), sorted by cluster.
+	RemoteNamespaces []value.NamespaceObservation `json:",omitempty"`
+	// Workloads are the minimized current workload observations (ADR-247),
+	// in (cluster, selection) order.
+	Workloads []value.WorkloadObservation `json:",omitempty"`
 	// ReviewSources are the accepted decision-time sources (ADR-245), for
 	// every cluster: their reviews run in the target cluster's connector.
 	ReviewSources []value.ReviewSource `json:",omitempty"`
@@ -225,14 +232,45 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 	bases, rows := s.journal.Budget(now)
 	sources := slices.Clone(s.sources)
 	slices.SortFunc(sources, func(a, b value.Source) int { return cmp.Compare(a.Resource.UID, b.Resource.UID) })
+	remote := slices.Sorted(maps.Keys(s.remote))
+	for _, cluster := range remote {
+		if r := s.remote[cluster]; now.Before(r.observedAt.Add(authorization.PermissionObservationInterval)) {
+			out.RemoteNamespaces = append(out.RemoteNamespaces, minimizedObservation(*r.live))
+		}
+	}
+	for _, key := range slices.Sorted(maps.Keys(s.workloads)) {
+		if w := s.workloads[key]; now.Before(w.observedAt.Add(authorization.PermissionObservationInterval)) {
+			out.Workloads = append(out.Workloads, minimizedWorkloads(*w.live))
+		}
+	}
 	for _, src := range sources {
-		grants, reason := NamespaceGrants(src, s.r.NamespaceClusterID, live)
-		if reason == "" && s.namespaces != nil && !now.Before(s.namespaces.ObservedAt().Add(src.MaxDecisionAge)) {
+		if src.Type == "workloadMetadata" {
+			s.inheritWorkloads(&out, src, now, &bases, &rows)
+			continue
+		}
+		cluster, observed := s.r.NamespaceClusterID, live
+		var observedAt time.Time
+		if s.namespaces != nil {
+			observedAt = s.namespaces.ObservedAt()
+		}
+		// ADR-247: another joined cluster's source is evaluated against its
+		// connector's journal. Its versions change only with an observed
+		// value, so exact comparison keeps assignments across unrelated
+		// writes; continuity is never claimed across reads.
+		other := src.ClusterID != s.r.NamespaceClusterID
+		if other {
+			cluster, observed, observedAt = src.ClusterID, nil, time.Time{}
+			if r := s.remote[src.ClusterID]; r != nil {
+				observed, observedAt = r.live, r.observedAt
+			}
+		}
+		grants, reason := NamespaceGrantsWith(src, cluster, observed, value.SourceEvidence{Guard: s.guards[src.ClusterID], Directory: s.directories[src.Mapping.Issuer], Now: now})
+		if reason == "" && observed != nil && !now.Before(observedAt.Add(src.MaxDecisionAge)) {
 			reason = value.MetadataUnavailable
 		}
 		switch reason {
 		case "":
-		case value.MetadataUnavailable, value.MetadataNotObserved:
+		case value.MetadataUnavailable, value.MetadataNotObserved, value.GuardUnavailable, value.DirectoryUnavailable:
 			out.UnavailableSources = append(out.UnavailableSources, src.Resource.UID)
 			if n, ok := s.included[src.Resource.UID]; ok {
 				out.included[src.Resource.UID] = n
@@ -250,7 +288,7 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 		}
 		bases, rows = bases+len(grants), rows+added
 		previous, ok := s.included[src.Resource.UID]
-		continuous := ok && previous == s.continuity
+		continuous := ok && previous == s.continuity && !other
 		for _, g := range grants {
 			out.Bases = append(out.Bases, SourceBasis(src, g, continuous))
 		}
@@ -269,4 +307,58 @@ func inheritanceDigest(i inheritanceState) [32]byte {
 	}
 	b, _ := json.Marshal(v)
 	return sha256.Sum256(b)
+}
+
+// minimizedObservation drops the versions, as the accepted form does.
+func minimizedObservation(o value.NamespaceObservation) value.NamespaceObservation {
+	o.Namespaces = slices.Clone(o.Namespaces)
+	for i := range o.Namespaces {
+		o.Namespaces[i] = cloneNamespace(o.Namespaces[i])
+		o.Namespaces[i].ResourceVersion = ""
+	}
+	return o
+}
+
+func minimizedWorkloads(o value.WorkloadObservation) value.WorkloadObservation {
+	o.Workloads = slices.Clone(o.Workloads)
+	for i := range o.Workloads {
+		o.Workloads[i].ObservedNamespace = cloneNamespace(o.Workloads[i].ObservedNamespace)
+		o.Workloads[i].ResourceVersion = ""
+	}
+	return o
+}
+
+// inheritWorkloads adds one workloadMetadata source's bases (ADR-247): its
+// connector journal's exact versions, never continuity; unavailable while
+// the journal, guard proof or directory is unknown or older than the
+// source's maxDecisionAgeSeconds.
+func (s *bindingRun) inheritWorkloads(out *inheritanceState, src value.Source, now time.Time, bases, rows *int) {
+	var observed *value.WorkloadObservation
+	var observedAt time.Time
+	if w := s.workloads[workloadKey(src.ClusterID, WorkloadSelectionOf(src))]; w != nil {
+		observed, observedAt = w.live, w.observedAt
+	}
+	grants, reason := WorkloadGrantsWith(src, observed, value.SourceEvidence{WorkloadGuard: s.workloadGuards[src.ClusterID], Directory: s.directories[src.Mapping.Issuer], Now: now})
+	if reason == "" && !now.Before(observedAt.Add(src.MaxDecisionAge)) {
+		reason = value.MetadataUnavailable
+	}
+	switch reason {
+	case "":
+	case value.MetadataUnavailable, value.MetadataNotObserved, value.GuardUnavailable, value.DirectoryUnavailable:
+		out.UnavailableSources = append(out.UnavailableSources, src.Resource.UID)
+		return
+	default:
+		return
+	}
+	added := 0
+	for _, g := range grants {
+		added += len(g.Subjects)
+	}
+	if *bases+len(grants) > 1024 || *rows+added > 4096 {
+		return
+	}
+	*bases, *rows = *bases+len(grants), *rows+added
+	for _, g := range grants {
+		out.Bases = append(out.Bases, WorkloadBasis(src, g))
+	}
 }

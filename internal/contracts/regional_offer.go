@@ -56,6 +56,8 @@ type RegionalCapacityOffer struct {
 	OperationAddress string                   `json:"operationAddress"`
 	Owner            RegionalOwnerObservation `json:"owner"`
 	Keys             []string                 `json:"keys"`
+	// WorkloadKeys are the workload metadata guard's keys (ADR-247).
+	WorkloadKeys *InstallerWorkloadKeys `json:"workloadKeys,omitempty"`
 }
 
 // RegionalOwnerObservation is the hub owner's observation pin: its accepted

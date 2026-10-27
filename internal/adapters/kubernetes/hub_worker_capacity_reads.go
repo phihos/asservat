@@ -38,6 +38,9 @@ func augmentInstalledWorkerPermissionReads(w *HubWorkerWorkload, installationID 
 		rbac.PolicyRule{APIGroups: []string{"asservat.io"}, Resources: []string{"evidenceretentionpolicies"}, Verbs: []string{"get", "list", "watch", "create"}},
 		// ADR-210: the browser settings, read by name for their SQL projection.
 		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{contracts.OwnerBrowserSettingsName(installationID)}, Verbs: []string{"get"}},
+		// ADR-247: the identity settings' eligibleGroups are the configured
+		// group directory of groupID PermissionSources.
+		rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{contracts.OwnerIdentitySettingsName(installationID)}, Verbs: []string{"get"}},
 	)
 	w.ClusterRole.Rules = append(w.ClusterRole.Rules,
 		// ADR-242: namespace inheritance lists and watches the hub cluster's
