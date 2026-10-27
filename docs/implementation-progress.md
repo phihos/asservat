@@ -95,6 +95,31 @@ identity/readiness/resource-version checks; it does not prove an EndpointSlice
 HTTP error, kernel problem or expired authority. No deadline or endpoint
 consistency check is being relaxed on this evidence.
 
+The recorder availability port already distinguishes explicit unsupported
+answers from operational errors. Preview now preserves that distinction:
+known unsupported/no-adapter cases stay plan-only, while operational errors
+return existing retryable `NotAvailable` before compilation or blueprint storage.
+The installed journey requires exactly the approval blocker before its first
+request; its existing four read attempts retry only typed transient refusals.
+It never refreshes or upgrades an approved scope. Controlled RED/GREEN,
+native guard tests, full capture/presentation races (10.468s/72.579s) and
+wire/contract checks pass. No request, deadline, authority or stored format is
+added.
+
+Endpoint diagnostics now distinguish closed read, identity/readiness and final
+resource-version stages. Actual TLS fake-API regressions distinguish a final
+Pod-version change from an EndpointSlice HTTP 503, preserving nine/five GETs
+and the live original five-second parent. Expanded Kubernetes/fleet races pass
+(13.788s/1.016s). A separate source review found no changed validation, I/O or
+public error class; arbitrary provider diagnostic methods remain unread.
+These tests reproduce the diagnostic ambiguity, not the native failure's exact
+cause. Fresh installed qualification remains pending.
+
+The combined recorder/endpoint candidate passes full pre-push (218 console
+tests) and fresh full affected races: capture 10.495s, fleet 15.969s,
+presentation 73.796s and composed context-start 10.766s. The installed result
+remains a separate required gate.
+
 ## Approved packet request: local target composition correction (2026-10-27)
 
 Native run 40557482326 on 23bf0042 failed before admission with
