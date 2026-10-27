@@ -3,6 +3,7 @@ package capture
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -124,5 +125,42 @@ func TestRecorderPolicyActivationPreservesCurrentDelegationAndDeniedWorkload(t *
 				t.Fatal("unavailable current authority accepted", err)
 			}
 		})
+	}
+}
+
+func TestRecorderPolicySharingControlDoesNotReissueCollectionOrResetSpend(t *testing.T) {
+	f, s := newWorkloadActivationFixture(t)
+	collectionEdit := f.edit
+	f.withPolicySharing(f.now.Add(time.Hour))
+	sharingEdit := f.edit
+	f.edit = func(spec map[string]any) { collectionEdit(spec); sharingEdit(spec) }
+	out, err := s.Activate(t.Context(), f, "restarts", "first", true)
+	if err != nil || len(f.accepted) != 1 || f.accepted[0].Sharing == nil {
+		t.Fatal("initial shared recorder", out, err)
+	}
+	first := f.accepted[0]
+	f.status.ActiveID, f.status.Authority, f.status.NotAfter, f.status.MaxExecutions = out.AcceptanceID, first.Authority, first.Authority.NotAfter, first.Authority.Limits.MaxExecutions
+	f.status.ExecutionsSpent = 3
+	f.status.Sharing = &value.PolicySharingStatus{Instruction: *first.Sharing, Spent: 2}
+	originalEdit := f.edit
+	f.edit = func(spec map[string]any) {
+		originalEdit(spec)
+		sharing := spec["sharing"].(map[string]any)
+		sharing["notAfter"] = f.now.Add(2 * time.Hour).UTC().Format(time.RFC3339)
+		sharing["futureCaptures"].(map[string]any)["maxCaptures"] = 9
+		sharing["recipients"] = []any{map[string]any{"kind": "Group", "issuer": f.author.Principal.Issuer, "id": "new-team"}}
+	}
+	f.now = f.now.Add(time.Second)
+	replay, err := s.Activate(t.Context(), f, "restarts", "sharing-control", true)
+	if err != nil || !replay.Replay || len(f.accepted) != 1 || replay.AcceptanceID != out.AcceptanceID || !replay.NotAfter.Equal(first.Authority.NotAfter) || !reflect.DeepEqual(f.status.Authority, first.Authority) {
+		t.Fatal("sharing edit reissued collection authority/spend pool", replay, len(f.accepted), err)
+	}
+	// The admission-port count above is the observable no-reissue guarantee.
+	// Retained counters are modeled; this is not SQL spend qualification.
+	if f.status.ExecutionsSpent != 3 || f.status.Sharing.Spent != 2 {
+		t.Fatal("retained spend changed")
+	}
+	if replay.Sharing == nil || replay.Sharing.NotAfter != first.Sharing.NotAfter || replay.Sharing.MaxCaptures != first.Sharing.MaxCaptures {
+		t.Fatal("activation silently applied an unaccepted sharing control")
 	}
 }

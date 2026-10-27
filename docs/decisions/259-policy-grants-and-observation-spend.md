@@ -95,3 +95,17 @@ deadline overlays; no historical settings lookup is required. Recovery returns o
 result under current workload rights/final identity and accepted lower deadlines;
 it never issues authority or refills budgets. Changed inputs conflict. This adds
 one indexed point read and no new table, credential or worker.
+
+
+Policy requester metadata requires current collection rights on the exact reviewed
+workload, plus current identity and original observation bounds after reads.
+Former requester provenance cannot reveal grant detail or requested-list rows.
+Ad hoc metadata and independent current approver views remain unchanged. Service
+requester identity includes client and kind. This uses one existing workload read
+per Get or distinct workload in the bounded list and the existing final identity
+read; no observer or extra credential is added.
+
+Recorder scope projects collection fields only. Sharing and grantRef controls do
+not change collection authority, original issue/expiry or spend. Activation replay
+keeps the accepted sharing instruction until a separate authorized sharing control
+applies; it does not silently apply newly authored recipients or limits.

@@ -57,6 +57,18 @@ Creator logout, access-token expiry, team departure or disabled personal account
 
 A policy AccessGrant keeps requester and reviewer provenance and separately binds `policyExecutor` and the exact `policyAuthority`. Self-approval uses the authenticated human requester, not the machine executor. Effective scope/lifetime is the intersection of delegation and review. Automation/workload identities cannot review themselves. Existing personal manual collection plus result-access approval remains unchanged and cannot be transferred to recurring automation.
 
+Policy-grant requester metadata is also subject to current authorization: get and
+requested-list require current whole-workload collection rights on the exact
+approved workload, as request/replay already do. A former requester without those
+rights receives no grant detail and no requested-list row. Independent current
+approvers retain their review/inbox access. Service requester matching includes
+issuer, subject, client and principal kind; same-human metadata access across
+clients does not transfer a request journal or policy execution authority. Check
+identity/permission validity after blocking reads. Losing personal metadata access
+does not revoke or renew independently accepted team authority, expiry or spend.
+Ad hoc requester metadata behavior is unchanged.
+
+
 The policy principal supplies no human download, raw-query, live-view or sharing rights. Evidence retains its real audience assignments and source acquisition deadlines; do not add the creator or machine merely because it created the capture. A current viewer or recording-save initiator is authorized separately from the source's policy. Creator departure can leave collection running while their personal SharingIntent is suspended; team-managed sharing follows its own pinned-manager rules. Both outcomes must be visible without broadening access.
 
 ## User-facing explanation and acceptance cases

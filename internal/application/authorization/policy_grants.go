@@ -247,9 +247,32 @@ func (s GrantService) revocationEligibility(ctx context.Context, i identity.Iden
 	if err != nil {
 		return value.Result{}, ErrGrantUnavailable
 	}
-	r := value.WorkloadScopeEligibility(i, p, value.ApproveAction, p.Target, s.Now())
+	r := value.WorkloadScopeEligibility(i, p, value.ApproveAction, g.Policy.Workload(), s.Now())
 	if r.Eligible {
 		return r, nil
 	}
 	return value.PolicyGrantManagementEligibility(i, p, g.Policy.Authority, s.Now()), nil
+}
+
+// A service principal has no cross-client same-human identity. Its original
+// actor/client must match exactly before requester metadata paths apply.
+func grantRequesterMatches(g value.Grant, p identity.Principal) bool {
+	if g.Kind == value.GrantPolicy && (g.Requester.Kind != identity.Human || p.Kind != identity.Human) {
+		return g.Requester == p
+	}
+	return sameHuman(g.Requester, p)
+}
+
+// finalGrantMetadata reuses C03's existing current-identity comparison after
+// blocking metadata reads. It performs the same final identity read as before;
+// no second workload read or historical requester authority is introduced.
+func (s GrantService) finalGrantMetadata(ctx context.Context, current identities.CurrentIdentity, i identity.Identity, policy bool) error {
+	if !policy {
+		return s.final(ctx, current, i)
+	}
+	last, err := current.ResolveIdentity(ctx)
+	if err != nil || ctx.Err() != nil || !sameProjectionIdentity(cloneProjectionIdentity(i), last, s.Now()) {
+		return identity.ErrDenied
+	}
+	return nil
 }

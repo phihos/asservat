@@ -396,3 +396,39 @@ layout admits multiple full-client keys that the old query would conflate. Down
 must refuse when surviving rows cannot satisfy the old unique key; it must never
 delete a reviewed grant or rewrite its idempotency key to force rollback. This is
 a pending migration design check, not implemented SQL or a tested upgrade claim.
+
+
+## Source review corrections before SQL composition
+
+Policy revocation evaluates the returned workload projection against the grant's
+expected workload, never against the returned projection's self-selected target.
+This corrects one argument in the existing read/evaluator path: zero added reads,
+credentials, watches or state. A wrong-target projection now refuses without
+calling grant mutation.
+
+Recorder collection scope explicitly projects collection fields. Sharing and
+grantRef stay separate controls; changing recipients, sharing deadline or sharing
+capture count cannot reissue collection authority or reset its accepted spend.
+The activation regression observes that no second acceptance is dispatched and
+original issue/expiry, authority and modeled counters remain. SQL spend preservation
+is not qualified by this unit test. Activation replay returns the existing sharing
+instruction, not the newly authored control; separately authorized sharing control
+composition remains required before the complete workflow is enabled.
+
+Policy requester Get/requested-list require current CollectContext on the exact
+workload. Historical requester provenance is insufficient: absent/denied/wrong
+or unavailable rights yield NotFound or an omitted row. Independent current
+approvers keep their existing ApproveAction view. Ad hoc requester visibility is
+unchanged. Service identities match the entire original principal/client; same-human
+metadata across clients never changes full-client request idempotency.
+
+This adds one current workload read per policy Get and at most one per distinct
+workload in a bounded list (existing maximum 100 candidate rows), using the existing
+request-local result map. The existing final identity read now reuses C03's canonical
+identity comparison for visible policy metadata; changed groups/scopes/policy and
+expired original bounds refuse delivery. No extra final identity read, background
+cache, watcher, configuration or credential is added. Tests cover departed groups,
+current denies, unavailable/wrong projections, expiry after blocking reads, service
+client separation, one read for multiple grants on one workload, and unchanged
+ad hoc/current-approver behavior. Policy scope/period/max/recipe and original request
+journal recovery remain frozen; SQL 00102/public/node/bootstrap are still unwired.

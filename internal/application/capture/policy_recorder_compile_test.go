@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	value "asservat.local/asservat/internal/domain/capture"
@@ -142,5 +143,20 @@ func TestRecorderPolicyScopeRefusesUnreviewableConfigurationExpansion(t *testing
 	}
 	if d := RecorderPolicyScopeDigest("policy-uid", 1, artifact.Digest{1}, p, "namespace-uid", "workload-uid", delegation, nil, []string{"packetCapture"}, authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: 1 << 20, MaxObservedBytes: 1 << 20}); d != (artifact.Digest{}) {
 		t.Fatal("oversized scope obtained an acceptance digest")
+	}
+}
+
+func TestRecorderPolicyUnsharedScopeDigestBaseline(t *testing.T) {
+	raw, _ := json.Marshal(recorderPolicySpec())
+	p, err := CompilePolicyWithRecorders(raw, "builtin-pod-status-v1", testRecipe, testPolicyRecorderCompiler)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := RecorderPolicyScopeDigest("policy-uid", 1, artifact.Digest{1}, p, "namespace-uid", "workload-uid", identity.Revision{UID: "binding", Generation: 1, Digest: artifact.Digest{2}}, nil, []string{"packetCapture"}, authorization.AutomationLimits{MaxExecutions: 10, MaxBytes: 1 << 20, MaxObservedBytes: 1 << 20})
+	// Captured with the original fc02 serializer through a Go source overlay.
+	// This scope has no sharing; control exclusion must preserve its exact bytes.
+	const want = "d473410e70800be5d8b93c1f201d0fecd7c323df859c60ee82de1c9cb0090aba"
+	if fmt.Sprintf("%x", got) != want {
+		t.Fatalf("unshared recorder collection digest changed: got %x want %s", got, want)
 	}
 }

@@ -306,3 +306,200 @@ func TestPolicyGrantRequestReplayKeepsCurrentRightsAndAcceptedLowerDeadline(t *t
 		})
 	}
 }
+
+func TestPolicyGrantRevocationRejectsWrongWorkloadProjection(t *testing.T) {
+	f, in := newPolicyGrantFixture(t)
+	g, _, err := f.svc.RequestPolicy(t.Context(), grantIdentity{f.requester, &f.now}, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	original := f.svc.WorkloadPermissions
+	f.svc.WorkloadPermissions = workloadProjectionFunc(func(ctx context.Context, target value.WorkloadTarget) (value.WorkloadProjection, error) {
+		p, e := original.WorkloadPermissions(ctx, target)
+		p.Target.WorkloadUID = "unrelated-workload"
+		return p, e
+	})
+	if _, _, err = f.svc.Revoke(t.Context(), grantIdentity{f.approver, &f.now}, g.ID, g.Revision, "wrong-workload"); !errors.Is(err, value.ErrNotApprover) {
+		t.Fatal("unrelated projection revoked grant", err)
+	}
+	if !f.store.rows[g.ID].RevokedAt.IsZero() || f.store.rows[g.ID].Revision != g.Revision {
+		t.Fatal("refused revocation changed grant")
+	}
+}
+
+func TestPolicyGrantRequesterMetadataRequiresCurrentWorkloadRights(t *testing.T) {
+	f, in := newPolicyGrantFixture(t)
+	current := grantIdentity{f.requester, &f.now}
+	g, _, err := f.svc.RequestPolicy(t.Context(), current, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if view, _, err := f.svc.Get(t.Context(), current, g.ID); err != nil || view.Grant.ID != g.ID {
+		t.Fatal("current requester cannot inspect", err)
+	}
+	if rows, _, err := f.svc.List(t.Context(), current, "requested", 10); err != nil || len(rows) != 1 {
+		t.Fatal("current requests missing", rows, err)
+	}
+	f.requester.Groups = nil
+	current = grantIdentity{f.requester, &f.now}
+	if view, _, err := f.svc.Get(t.Context(), current, g.ID); !errors.Is(err, ErrGrantNotFound) || view.Grant.ID != "" {
+		t.Fatal("departed requester read frozen team metadata", view.Grant.ID, err)
+	}
+	if rows, _, err := f.svc.List(t.Context(), current, "requested", 10); err != nil || len(rows) != 0 {
+		t.Fatal("departed requester listed team metadata", len(rows), err)
+	}
+}
+
+func TestPolicyGrantMetadataRechecksIdentityAndOriginalRightsDeadline(t *testing.T) {
+	for _, view := range []string{"get", "requested"} {
+		for _, change := range []string{"groups-withdrawn", "projection-expired"} {
+			t.Run(view+"/"+change, func(t *testing.T) {
+				f, in := newPolicyGrantFixture(t)
+				g, _, err := f.svc.RequestPolicy(t.Context(), grantIdentity{f.requester, &f.now}, in)
+				if err != nil {
+					t.Fatal(err)
+				}
+				original := f.svc.WorkloadPermissions
+				f.svc.WorkloadPermissions = workloadProjectionFunc(func(ctx context.Context, target value.WorkloadTarget) (value.WorkloadProjection, error) {
+					p, e := original.WorkloadPermissions(ctx, target)
+					p.FreshUntil = f.now.Add(time.Second)
+					return p, e
+				})
+				calls := 0
+				current := policyReplayIdentityFunc(func(ctx context.Context) (identity.Identity, error) {
+					calls++
+					i, e := (grantIdentity{f.requester, &f.now}).ResolveIdentity(ctx)
+					if calls > 1 {
+						if change == "groups-withdrawn" {
+							i.Groups = nil
+						} else {
+							f.now = f.now.Add(2 * time.Second)
+							i, e = (grantIdentity{f.requester, &f.now}).ResolveIdentity(ctx)
+						}
+					}
+					return i, e
+				})
+				if view == "get" {
+					v, _, e := f.svc.Get(t.Context(), current, g.ID)
+					if e == nil || v.Grant.ID != "" {
+						t.Fatal("metadata disclosed after blocking identity/rights check", v.Grant.ID, e)
+					}
+				} else {
+					rows, _, e := f.svc.List(t.Context(), current, "requested", 10)
+					if e == nil || len(rows) != 0 {
+						t.Fatal("list disclosed after blocking identity/rights check", len(rows), e)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestPolicyGrantServiceRequesterMetadataDoesNotTransferClient(t *testing.T) {
+	f, in := newPolicyGrantFixture(t)
+	f.requester.Principal.Kind = identity.Workload
+	f.requester.Principal.Subject = "service-requester"
+	f.requester.Principal.ClientID = "service-a"
+	original := grantIdentity{f.requester, &f.now}
+	a, _, err := f.svc.RequestPolicy(t.Context(), original, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	caller := f.requester
+	caller.Principal.ClientID = "service-b"
+	other := grantIdentity{caller, &f.now}
+	if v, _, e := f.svc.Get(t.Context(), other, a.ID); !errors.Is(e, ErrGrantNotFound) || v.Grant.ID != "" {
+		t.Fatal("other service client inherited metadata", v.Grant.ID, e)
+	}
+	if rows, _, e := f.svc.List(t.Context(), other, "requested", 10); e != nil || len(rows) != 0 {
+		t.Fatal("other service client inherited request", len(rows), e)
+	}
+	b, replay, err := f.svc.RequestPolicy(t.Context(), other, in)
+	if err != nil || replay || b.ID == a.ID {
+		t.Fatal("other client reused original journal", b.ID, replay, err)
+	}
+	for _, tc := range []struct {
+		source grantIdentity
+		id     string
+	}{{original, a.ID}, {other, b.ID}} {
+		if rows, _, e := f.svc.List(t.Context(), tc.source, "requested", 10); e != nil || len(rows) != 1 || rows[0].Grant.ID != tc.id {
+			t.Fatal("full service actor/client filter lost", rows, e)
+		}
+	}
+}
+func TestPolicyGrantRequesterListReadsEachWorkloadOnce(t *testing.T) {
+	f, in := newPolicyGrantFixture(t)
+	current := grantIdentity{f.requester, &f.now}
+	if _, _, e := f.svc.RequestPolicy(t.Context(), current, in); e != nil {
+		t.Fatal(e)
+	}
+	in.IdempotencyKey = "next-review"
+	if _, _, e := f.svc.RequestPolicy(t.Context(), current, in); e != nil {
+		t.Fatal(e)
+	}
+	original := f.svc.WorkloadPermissions
+	reads := 0
+	f.svc.WorkloadPermissions = workloadProjectionFunc(func(ctx context.Context, target value.WorkloadTarget) (value.WorkloadProjection, error) {
+		reads++
+		return original.WorkloadPermissions(ctx, target)
+	})
+	if rows, _, e := f.svc.List(t.Context(), current, "requested", 10); e != nil || len(rows) != 2 || reads != 1 {
+		t.Fatal("policy requester metadata repeated workload read", len(rows), reads, e)
+	}
+}
+func TestPolicyGrantRequesterMetadataRefusesWrongUnavailableOrDeniedProjection(t *testing.T) {
+	for _, mode := range []string{"wrong-target", "unavailable", "denied"} {
+		t.Run(mode, func(t *testing.T) {
+			f, in := newPolicyGrantFixture(t)
+			current := grantIdentity{f.requester, &f.now}
+			g, _, e := f.svc.RequestPolicy(t.Context(), current, in)
+			if e != nil {
+				t.Fatal(e)
+			}
+			original := f.svc.WorkloadPermissions
+			f.svc.WorkloadPermissions = workloadProjectionFunc(func(ctx context.Context, target value.WorkloadTarget) (value.WorkloadProjection, error) {
+				p, e := original.WorkloadPermissions(ctx, target)
+				switch mode {
+				case "wrong-target":
+					p.Target.WorkloadUID = "other-workload"
+				case "unavailable":
+					e = ErrGrantUnavailable
+				case "denied":
+					p.Denies = append(p.Denies, p.Allows[0])
+				}
+				return p, e
+			})
+			if v, _, err := f.svc.Get(t.Context(), current, g.ID); !errors.Is(err, ErrGrantNotFound) || v.Grant.ID != "" {
+				t.Fatal("unavailable current rights exposed metadata", v.Grant.ID, err)
+			}
+			if rows, _, err := f.svc.List(t.Context(), current, "requested", 10); err != nil || len(rows) != 0 {
+				t.Fatal("unavailable current rights exposed request list", len(rows), err)
+			}
+		})
+	}
+}
+func TestPolicyGrantMetadataKeepsCurrentApproverAndLegacyAdHocPaths(t *testing.T) {
+	f, in := newPolicyGrantFixture(t)
+	g, _, e := f.svc.RequestPolicy(t.Context(), grantIdentity{f.requester, &f.now}, in)
+	if e != nil {
+		t.Fatal(e)
+	}
+	approver := grantIdentity{f.approver, &f.now}
+	if v, _, err := f.svc.Get(t.Context(), approver, g.ID); err != nil || !v.Approver {
+		t.Fatal("current independent approver lost metadata", err)
+	}
+	if rows, _, err := f.svc.List(t.Context(), approver, "pending", 10); err != nil || len(rows) != 1 || !rows[0].Approver {
+		t.Fatal("current approver inbox changed", rows, err)
+	}
+	legacy := newGrantFixture(t)
+	old := legacy.request(t, 1, nil)
+	legacy.requester.Groups = nil
+	legacy.svc.Permissions = projectionFunc(func(value.Target) value.Projection { panic("legacy requester metadata acquired a new permission read") })
+	requester := grantIdentity{legacy.requester, &legacy.now}
+	if v, _, err := legacy.svc.Get(t.Context(), requester, old.ID); err != nil || v.Grant.ID != old.ID {
+		t.Fatal("legacy requester metadata changed", err)
+	}
+	if rows, _, err := legacy.svc.List(t.Context(), requester, "requested", 10); err != nil || len(rows) != 1 {
+		t.Fatal("legacy requester list changed", len(rows), err)
+	}
+}

@@ -486,8 +486,10 @@ func (s GrantService) Revoke(ctx context.Context, current identities.CurrentIden
 
 func sameHuman(a, b identity.Principal) bool { return a.Issuer == b.Issuer && a.Subject == b.Subject }
 
-// Get returns one grant to its requesting human or a current approver for
-// its target; anyone else gets ErrGrantNotFound (no existence disclosure).
+// Get returns grant metadata to its requester or a current target approver.
+// Policy requesters additionally need current collection rights on the exact
+// workload; historical provenance is not perpetual visibility. Ad hoc behavior
+// remains unchanged. Others get ErrGrantNotFound (no existence disclosure).
 func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentity, grantID string) (GrantView, time.Time, error) {
 	if ctx == nil || ctx.Err() != nil || !s.ready() {
 		return GrantView{}, time.Time{}, ErrGrantUnavailable
@@ -513,7 +515,13 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 	}
 	until := i.ValidUntil
 	v := GrantView{Grant: g, Phase: g.Phase(s.Now())}
-	if !sameHuman(g.Requester, i.Principal) {
+	if grantRequesterMatches(g, i.Principal) && g.Kind == value.GrantPolicy {
+		r, err := s.grantEligibility(ctx, i, g, value.CollectContext)
+		if err != nil || !r.Eligible {
+			return GrantView{}, time.Time{}, ErrGrantNotFound
+		}
+		until = identity.Earlier(until, r.ValidUntil)
+	} else if !grantRequesterMatches(g, i.Principal) {
 		r, err := s.grantEligibility(ctx, i, g, value.ApproveAction)
 		if err != nil || !r.Eligible {
 			return GrantView{}, time.Time{}, ErrGrantNotFound
@@ -523,15 +531,19 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 	if json.Unmarshal(g.Review, &v.Review) != nil {
 		return GrantView{}, time.Time{}, ErrGrantUnavailable
 	}
-	if err = s.final(ctx, current, i); err != nil {
+	if err = s.finalGrantMetadata(ctx, current, i, g.Kind == value.GrantPolicy); err != nil {
 		return GrantView{}, time.Time{}, err
+	}
+	if g.Kind == value.GrantPolicy && !s.Now().Before(until) {
+		return GrantView{}, time.Time{}, ErrGrantNotFound
 	}
 	return v, until, nil
 }
 
 // List returns the approver inbox (view "pending": reviewable requests of
 // other people on targets where the caller is a current approver) or the
-// caller's own requests (view "requested").
+// caller's own requests (view "requested"). Policy requester rows require
+// current collection rights on their exact workload and are omitted otherwise.
 func (s GrantService) List(ctx context.Context, current identities.CurrentIdentity, view string, limit int) ([]GrantView, time.Time, error) {
 	if ctx == nil || ctx.Err() != nil || !s.ready() || limit < 1 || limit > 100 || view != "pending" && view != "requested" {
 		return nil, time.Time{}, value.ErrGrantInvalid
@@ -585,16 +597,43 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 				continue
 			}
 			v.Approver, until = true, identity.Earlier(until, r.ValidUntil)
-		} else if !sameHuman(g.Requester, i.Principal) || i.Principal.Kind != identity.Human && (g.Kind != value.GrantPolicy || g.Requester != i.Principal) {
-			return nil, time.Time{}, ErrGrantUnavailable
+		} else {
+			if !grantRequesterMatches(g, i.Principal) || i.Principal.Kind != identity.Human && (g.Kind != value.GrantPolicy || g.Requester != i.Principal) {
+				if g.Kind == value.GrantPolicy {
+					continue
+				}
+				return nil, time.Time{}, ErrGrantUnavailable
+			}
+			if g.Kind == value.GrantPolicy {
+				if g.Policy == nil {
+					return nil, time.Time{}, ErrGrantUnavailable
+				}
+				target := g.Policy.Workload()
+				r, ok := workloadResults[target]
+				if !ok {
+					r, err = s.grantEligibility(ctx, i, g, value.CollectContext)
+					if err != nil {
+						r = value.Result{}
+					}
+					workloadResults[target] = r
+				}
+				if !r.Eligible {
+					continue
+				}
+				until = identity.Earlier(until, r.ValidUntil)
+			}
 		}
 		if json.Unmarshal(g.Review, &v.Review) != nil {
 			return nil, time.Time{}, ErrGrantUnavailable
 		}
 		out = append(out, v)
 	}
-	if err = s.final(ctx, current, i); err != nil {
+	policyMetadata := slices.ContainsFunc(out, func(v GrantView) bool { return v.Grant.Kind == value.GrantPolicy })
+	if err = s.finalGrantMetadata(ctx, current, i, policyMetadata); err != nil {
 		return nil, time.Time{}, err
+	}
+	if policyMetadata && !s.Now().Before(until) {
+		return nil, time.Time{}, ErrGrantUnavailable
 	}
 	return out, until, nil
 }
