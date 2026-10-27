@@ -197,7 +197,7 @@
             "unknownContent": false
           },
           "retention": {
-            "anchorRule": "firstAcquisitionOrEarlierSource",
+            "anchorRule": "submissionPreparation",
             "accessAgeSeconds": 86100,
             "maximumAgeSeconds": 86400,
             "deletionBudgetSeconds": 300,
@@ -264,7 +264,7 @@
             "unknownContent": false
           },
           "retention": {
-            "anchorRule": "firstAcquisitionOrEarlierSource",
+            "anchorRule": "submissionPreparation",
             "accessAgeSeconds": 86100,
             "maximumAgeSeconds": 86400,
             "deletionBudgetSeconds": 300,
@@ -330,7 +330,7 @@
             "unknownContent": false
           },
           "retention": {
-            "anchorRule": "firstAcquisitionOrEarlierSource",
+            "anchorRule": "submissionPreparation",
             "accessAgeSeconds": 86100,
             "maximumAgeSeconds": 86400,
             "deletionBudgetSeconds": 300,
@@ -376,7 +376,7 @@
             "unknownContent": false
           },
           "retention": {
-            "anchorRule": "firstAcquisitionOrEarlierSource",
+            "anchorRule": "submissionPreparation",
             "accessAgeSeconds": 86100,
             "maximumAgeSeconds": 86400,
             "deletionBudgetSeconds": 300,

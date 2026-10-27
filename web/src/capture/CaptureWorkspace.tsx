@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
-import { Investigation, type State } from './investigation';
+import { Investigation, requestablePreview, type State } from './investigation';
 import type { HistoryEntry, Preview, Progress, Target } from './http';
 import { captureIDFromPath } from '../routes';
 import { WhyAccess } from '../access/WhyAccess';
@@ -28,12 +28,12 @@ function exposures(values: string[]) { return values.map(value => exposureNames[
 function Assessment({ preview }: { preview: Preview }) {
   const assessment = preview.capture_assessment;
   const pod = preview.selected_pods![0];
-  const action = assessment.actions[0];
+  const recording = preview.profile_composition !== undefined;
   return <>
     <section className="review-section" aria-labelledby="scope-heading">
       <h2 id="scope-heading">Selected pod</h2>
       <p className="selected-name">{pod.namespace} / {pod.name}</p>
-      <p>{preview.pod_selection === 'explicitPod' ? 'This is the pod you selected.' : 'The first eligible pod by name was selected. This snapshots one pod, not every replica.'} It will not be replaced silently if it disappears.</p>
+      <p>{preview.pod_selection === 'explicitPod' ? 'This is the pod you selected.' : !recording ? 'The first eligible pod by name was selected. This snapshots one pod, not every replica.' : 'This is the exact pod selected for the reviewed plan.'} It will not be replaced silently if it disappears.</p>
       <details><summary>Exact identity</summary><dl className="facts">
         <dt>Cluster</dt><dd>{pod.cluster_id}</dd><dt>Pod UID</dt><dd>{pod.uid}</dd>
         <dt>Owning workload</dt><dd>{pod.workload.kind} {pod.workload.name}</dd><dt>Workload UID</dt><dd>{pod.workload.uid}</dd>
@@ -42,15 +42,20 @@ function Assessment({ preview }: { preview: Preview }) {
     <section className="review-section" aria-labelledby="impact-heading">
       <h2 id="impact-heading">Workload impact</h2>
       <p>{assessment.combinedImpact.explanation}</p>
-      <p>Saved status is limited to 4 KiB. This is an output limit, not a prediction of memory use or overhead. No application process is started.</p>
+      {recording ? <p>Saved evidence is limited to {Math.ceil(preview.max_bytes / 1024).toLocaleString()} KiB. This is an output limit, not a prediction of memory use or overhead.</p> : <p>Saved status is limited to 4 KiB. This is an output limit, not a prediction of memory use or overhead. No application process is started.</p>}
     </section>
     <section className="review-section" aria-labelledby="handling-heading">
       <h2 id="handling-heading">Data and deletion</h2>
-      <p>Saved metadata may include {exposures(action.data.retainedPossible)}. Treat it as potentially sensitive user data.</p>
-      {action.data.transientOnly.length > 0 && <p>The API response can also expose {exposures(action.data.transientOnly)} to the collector during processing. These fields are excluded from the saved status projection.</p>}
-      <dl className="facts"><dt>Evidence access</dt><dd>Up to {duration(action.retention.accessAgeSeconds)} after submission. Time waiting for collection counts toward this limit.</dd>
-        <dt>Managed deletion</dt><dd>Within {duration(action.retention.deleteAgeSeconds)} of that same submission.</dd></dl>
-      <p>Administrator limits may shorten access. {action.retention.preservationException !== 'none' && 'An authorized preservation exception may apply. '}Asservat cannot delete copies downloaded to local tools. Restrict access and review evidence before sharing.</p>
+      {assessment.actions.map(action => <div key={action.actionID}>
+        {assessment.actions.length > 1 && <h3>Action <span className="identifier">{action.actionID}</span></h3>}
+        <p>Saved {recording ? 'evidence' : 'metadata'} may include {exposures(action.data.retainedPossible)}. Treat it as potentially sensitive user data.</p>
+        {action.data.transientOnly.length > 0 && (recording
+          ? <p>Collection can also expose {exposures(action.data.transientOnly)} transiently during processing. The approved profile controls what is retained.</p>
+          : <p>The API response can also expose {exposures(action.data.transientOnly)} to the collector during processing. These fields are excluded from the saved status projection.</p>)}
+        <dl className="facts"><dt>Evidence access</dt><dd>Up to {duration(action.retention.accessAgeSeconds)} after submission. Time waiting for collection counts toward this limit.</dd>
+          <dt>Managed deletion</dt><dd>Within {duration(action.retention.deleteAgeSeconds)} of that same submission.</dd></dl>
+      </div>)}
+      <p>Administrator limits may shorten access. {assessment.actions.some(action => action.retention.preservationException !== 'none') && 'An authorized preservation exception may apply. '}Asservat cannot delete copies downloaded to local tools. Restrict access and review evidence before sharing.</p>
     </section>
   </>;
 }
@@ -137,10 +142,10 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
       {state.preview.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
       {state.preview.blockers.length > 0 && <WhyAccess key={JSON.stringify(draft.target)} session={session} scope={scope} target={draft.target} operation="capture"/>}
       {!state.preview.capture_enabled && state.preview.blockers.length === 0 && <p className="notice">Collection is not enabled for this client. An administrator can check the installation settings.</p>}
-      {state.preview.approval_required && <p className="notice">This collection needs approval. Approval requests are not available in this console yet.</p>}
+      {state.preview.approval_required && <p className="notice">This collection needs independent approval. Request a review of this exact plan; collection starts only after approval and a further submission.</p>}
       {state.preview.warnings.map((warning, index) => <p key={index}>{warning}</p>)}
       <p role="status">{state.expired ? 'This preview has expired. Refreshing may select a different pod; check the updated selection.' : state.stale ? 'The impact assessment is older. Collection will recheck current conditions and these exact identities, and stop if the reviewed scope changed.' : 'The assessment is current. Collection rechecks your access and these exact identities.'}</p>
-      <div className="actions"><Button className="button" isDisabled={state.busy || (!state.expired && (!state.preview.capture_enabled || state.preview.blockers.length > 0 || state.preview.approval_required))} onPress={() => void (state.expired ? controller.preview() : controller.submit())}>{state.busy ? 'Checking…' : state.expired ? 'Refresh review' : 'Collect pod status'}</Button>
+      <div className="actions"><Button className="button" isDisabled={state.busy || (!state.expired && !requestablePreview(state.preview))} onPress={() => void (state.expired ? controller.preview() : controller.submit())}>{state.busy ? 'Checking…' : state.expired ? 'Refresh review' : state.preview.approval_required ? 'Request approval' : state.preview.profile_composition ? 'Collect evidence' : 'Collect pod status'}</Button>
         <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>Edit request</Button></div>
     </section>}
     {state.stage === 'reviewed' && <section>
@@ -148,6 +153,13 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
       <p role="status">{state.expired ? 'That preview has expired. Prepare a new review before collecting.' : 'Continue to submit that same reviewed request. Asservat rechecks current access, limits and the exact selected pod before accepting it.'}</p>
       <div className="actions">{!state.expired && <Button className="button" isDisabled={state.busy} onPress={() => void controller.submit()}>Continue reviewed request</Button>}
         <Button className="button secondary" isDisabled={state.busy} onPress={controller.edit}>{state.expired ? 'Prepare new review' : 'Edit request'}</Button></div>
+    </section>}
+    {state.stage === 'approval' && <section aria-busy={state.busy}>
+      <p role="status">The independent review is pending. Collection has not been accepted.</p>
+      <p>After approval, continue this exact request through the client that created it. Asservat checks the original Pod, your current access and the grant again.</p>
+      {state.approvalURI && <a className="button secondary" href={state.approvalURI}>View approval</a>}
+      <Button className="button" isDisabled={state.busy} onPress={() => void controller.retrySubmission()}>Continue after approval</Button>
+      <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.resolveBeforeEditing()}>Close request before editing</Button>
     </section>}
     {state.stage === 'uncertain' && <section aria-busy={state.busy}>
       <p role="status">{state.busy ? state.resolving ? 'Resolving the original request…' : 'Submitting the same bounded request…' : 'The request may have been accepted, but its outcome is not confirmed. Retrying checks the same request; it does not create another capture.'}</p>

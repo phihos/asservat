@@ -148,6 +148,14 @@ type GrantView struct {
 	Review GrantReview
 	// Approver reports that the caller may decide or revoke it now.
 	Approver bool
+	// CanResume is an advisory hint for the current original requester/client.
+	// Capture admission remains authoritative.
+	CanResume bool
+	// CanResolve permits offering passive lookup/closure, never a new start.
+	CanResolve bool
+	// ResumeRequiresOriginalClient is guidance for this same human on a
+	// different client, only while the marked approval remains Approved.
+	ResumeRequiresOriginalClient bool
 }
 
 func (s GrantService) ready() bool {
@@ -483,13 +491,31 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 		return GrantView{}, time.Time{}, ErrGrantUnavailable
 	}
 	until := i.ValidUntil
-	v := GrantView{Grant: g, Phase: g.Phase(s.Now())}
+	v := GrantView{Grant: g, Phase: g.Phase(s.Now()), CanResolve: i.Principal == g.Requester && g.Decision != nil && g.Decision.Approved}
 	if !sameHuman(g.Requester, i.Principal) {
 		r, err := s.collector(ctx, i, g.Target, value.ApproveAction)
 		if err != nil || !r.Eligible {
 			return GrantView{}, time.Time{}, ErrGrantNotFound
 		}
 		v.Approver, until = true, identity.Earlier(until, r.ValidUntil)
+	}
+	// Resume is a UI hint only. The original client must still have current
+	// ordinary collection rights; this never transfers the grant to another
+	// browser/MCP client or replaces the request's admission checks.
+	var timing struct {
+		Timing string `json:"timing"`
+	}
+	marked := json.Unmarshal(g.Scope, &timing) == nil && timing.Timing == "approvedAcceptance/v1"
+	v.ResumeRequiresOriginalClient = marked && v.Phase == value.GrantApproved && sameHuman(g.Requester, i.Principal) && i.Principal != g.Requester && slices.Contains(i.Scopes, "evidence:capture")
+	if i.Principal == g.Requester && slices.Contains(i.Scopes, "evidence:capture") && marked &&
+		ReviewDigest(g, g.Review) == g.ReviewDigest &&
+		value.CheckCaptureUse(g, i, g.CaptureID, g.ExecutionDigest, g.ReviewDigest, s.Now()) == nil {
+		eligible, e := s.collector(ctx, i, g.Target, value.CollectContext)
+		if e == nil && eligible.Eligible {
+			v.CanResume = true
+			until = identity.Earlier(until, eligible.ValidUntil)
+			until = identity.Earlier(until, g.ExpiresAt)
+		}
 	}
 	if json.Unmarshal(g.Review, &v.Review) != nil {
 		return GrantView{}, time.Time{}, ErrGrantUnavailable

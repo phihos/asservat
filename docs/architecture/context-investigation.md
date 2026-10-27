@@ -188,3 +188,35 @@ The existing protected approval-settings reader is consulted once per recorder
 submission. A changed administrator approval requirement invalidates the review
 in either direction. Approval presentation separates passive preview expiry from
 the bounded execution window assigned at acceptance.
+
+
+The browser controller can submit an already-reviewed approval-required recorder
+composition. A known `ApprovalRequired` response links the existing approval and
+retains the original preview-bound intent key; it does not report capture
+acceptance. Detailed `get_grant` outputs provide advisory `can_resume` and
+`can_resolve` flags for the original full requester/client. Resume requires
+capture scope; passive resolution requires the current read scope and a
+previous approved decision, so pending/denied reviews have no close-by-lookup
+control. An explicit button names the close-if-unstarted effect.
+Resume additionally requires a currently usable marked approval and ordinary
+collection rights. Only a user action invokes the existing request operation;
+admission remains authoritative. Passive resolution can still find a previously
+accepted capture after approval expiry without starting acquisition. The server emits `resume_requires_original_client` guidance only for the same
+requesting human on another client while the marked plan is Approved; independent
+reviewers and pending/denied reviews receive no such instruction. No grant is
+transferred. The preview-bound key is stable across pending review, page remount
+and lost replies; no browser credential or private authority is persisted.
+
+Manual recorder assessment rules are `recorder-assessment/v2`: retention starts
+at submission preparation, never preview creation. This changes the reviewed
+rules digest so an unsubmitted older review must be refreshed. Existing-source
+snapshot timing remains a distinct contract and is not implemented by this UI.
+The page renders the actual supplied assessment actions, categories and output
+limits; unknown overhead remains unknown.
+
+
+The preview-derived intent key is public correlation. The current authenticated
+actor and OAuth client scope SQL lookup; the submission digest binds the preview.
+Knowing the key supplies no authority, another preview conflicts under that key,
+and a closed preview cannot start under either the same or a different key.
+A deliberate new intent requires a new review and preview ID.

@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { Investigation } from './investigation';
-import { SyntheticOperations, session, target, id, previewResult, acceptedResult, progressResult, catalogResult, resolvedAcceptedResult, resolvedClosedResult } from './test-fixtures';
+import { SyntheticOperations, session, target, id, previewResult, acceptedResult, progressResult, catalogResult, resolvedAcceptedResult, resolvedClosedResult, recordingPreviewResult, approvalPendingResult } from './test-fixtures';
 
 const controllers: Investigation[] = [];
 afterEach(() => { for (const c of controllers) c.reset(); controllers.length = 0; vi.useRealTimers(); window.history.replaceState(null, '', '/'); });
@@ -293,4 +293,27 @@ it.each(['AcquisitionClosed', 'AcquisitionUncertain'])('stops continuation after
   expect(controller.snapshot().captureID).toBe(id(8)); expect(controller.snapshot().canContinue).toBe(false);
   client.responder = () => progressResult(); await controller.refreshProgress(); await controller.continueAcquisition();
   expect(client.calls.filter(call => call.name === 'request_capture')).toHaveLength(2);
+});
+
+it('requests independent approval for an exact recording review and resumes its original intent after expiry', async () => {
+  vi.useFakeTimers();
+  const { controller, client, scope } = await ready();
+  client.responder = name => name === 'preview_capture' ? recordingPreviewResult() : approvalPendingResult();
+  const recording = recordingPreviewResult(); if (recording.status !== 'ok') throw new Error();
+  await controller.previewComposition(recording.data.profile_composition!.authored);
+  expect(controller.snapshot().preview?.approval_required).toBe(true);
+  await controller.submit();
+  expect(controller.snapshot()).toMatchObject({ stage: 'approval', approvalURI: '/approvals/' + id(41), captureID: undefined });
+  expect(client.calls.some(c => c.name === 'get_capture')).toBe(false);
+  const submitted = client.calls.filter(c => c.name === 'request_capture');
+  expect(submitted).toHaveLength(1);
+  const first = submitted[0].input;
+  scope.abort(); controller.attach(session, new AbortController().signal);
+  expect(controller.snapshot()).toMatchObject({ stage: 'approval', preview: undefined, approvalURI: '/approvals/' + id(41) });
+  await vi.advanceTimersByTimeAsync(120_001);
+  client.responder = name => name === 'request_capture' ? acceptedResult() : progressResult();
+  await controller.retrySubmission();
+  expect(client.calls.filter(c => c.name === 'request_capture').map(c => c.input)).toEqual([first, first]);
+  expect(client.calls.filter(c => c.name === 'preview_capture')).toHaveLength(2);
+  expect(controller.snapshot().captureID).toBe(id(8));
 });

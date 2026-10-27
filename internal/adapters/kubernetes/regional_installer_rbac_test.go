@@ -42,7 +42,7 @@ func TestChartClusterInstallerHoldsRegionalGrants(t *testing.T) {
 	cluster, connector, capacity := regionalExecutorRBAC(ns)
 	granted := slices.Concat(clusterRole.Rules, role.Rules, cluster, connector, capacity.Rules, regionalCapacityRBAC(ns),
 		// ADR-246: the collector attestation reads.
-		[]rbac.PolicyRule{regionalNodeReadRule()}, regionalCollectorRBAC(ns, RegionalCollectorPlan{Namespace: "collector", Name: "node"}).Rules,
+		[]rbac.PolicyRule{regionalNodeReadRule(), regionalNodeInputReadRule()}, regionalCollectorRBAC(ns, RegionalCollectorPlan{Namespace: "collector", Name: "node"}).Rules,
 		// ensureCapacityProbe's probe ClusterRole and token Role.
 		[]rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{ns}, Verbs: []string{"get", "update"}},
 			{APIGroups: []string{""}, Resources: []string{"serviceaccounts/token"}, ResourceNames: []string{CapacityProbeAccount}, Verbs: []string{"create"}},
@@ -71,6 +71,24 @@ func TestChartClusterInstallerHoldsRegionalGrants(t *testing.T) {
 					}
 				}
 			}
+		}
+	}
+}
+
+func TestRegionalNodeInputReadRuleIsOneExistingSecret(t *testing.T) {
+	rule := regionalNodeInputReadRule()
+	if !slices.Equal(rule.APIGroups, []string{""}) || !slices.Equal(rule.Resources, []string{"secrets"}) || !slices.Equal(rule.ResourceNames, []string{RegionalNodes}) || !slices.Equal(rule.Verbs, []string{"get"}) || len(rule.NonResourceURLs) != 0 {
+		t.Fatal("listener input metadata permission widened", rule)
+	}
+	// Kubernetes RBAC authorizes a resource request only when every attribute
+	// matches a rule. The added rule supplies no other name/list/watch/update.
+	for _, tc := range []struct {
+		name, verb string
+		allowed    bool
+	}{{RegionalNodes, "get", true}, {"another-secret", "get", false}, {RegionalNodes, "list", false}, {RegionalNodes, "watch", false}, {RegionalNodes, "update", false}} {
+		allowed := slices.Contains(rule.ResourceNames, tc.name) && slices.Contains(rule.Verbs, tc.verb)
+		if allowed != tc.allowed {
+			t.Fatal("unexpected listener Secret permission", tc)
 		}
 	}
 }
