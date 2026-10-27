@@ -67,6 +67,9 @@ type RegionalInstallPlan struct {
 	// and only with them does the connector account get SubjectAccessReview
 	// create.
 	IdentityMappings []contracts.RegionalIdentityMapping
+	// Collector, when set, provisions the connector's ADR-246 node listener
+	// for the chart's collector DaemonSet in that (existing) namespace.
+	Collector *RegionalCollectorPlan
 }
 
 // RegionalInstallation records the created objects by UID.
@@ -75,13 +78,16 @@ type RegionalInstallation struct {
 	WorkloadGuard, SourceGuard                             contracts.OwnerDeploymentGuard
 	// Join is the public join record of an installed executor (ADR-196).
 	Join *contracts.RegionalJoin
+	// Nodes is the collector's public connector endpoint, server name and
+	// root (ADR-246), also published in the ConfigMap RegionalNodes.
+	Nodes *RegionalNodeEndpoint
 }
 
 func (p RegionalInstallPlan) valid() bool {
 	o, b := p.Offer, p.Bootstrap.Binding
 	return o.Format == contracts.RegionalOfferFormat && p.Bootstrap.Valid() && b.InstallationID == o.InstallationID && b.IssuerEpoch == o.IssuerEpoch &&
 		authorization.UUID(o.PermissionRootID) && identity.Text(o.Image, 512) && len(o.Federation.Roots) > 0 && len(o.ConnectorIssuerRoots) > 0 && len(o.ConnectorBacking) > 0 &&
-		identity.Text(p.Namespace, 63) && !strings.HasPrefix(p.Namespace, "kube-") && p.executorValid()
+		identity.Text(p.Namespace, 63) && !strings.HasPrefix(p.Namespace, "kube-") && p.Collector.valid(p.Namespace) && p.executorValid()
 }
 
 // executorValid requires the evidence credential exactly with a complete
@@ -198,6 +204,9 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 	}
 	step = "rbac"
 	clusterRole, role := regionalRBAC(p.Namespace)
+	if p.Collector != nil {
+		clusterRole.Rules = append(clusterRole.Rules, regionalNodeReadRule())
+	}
 	if executor {
 		cluster, connector, capacityRole := regionalExecutorRBAC(p.Namespace)
 		clusterRole.Rules = append(clusterRole.Rules, cluster...)
@@ -228,8 +237,19 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 	if _, err = ensureRegional(call, api.RbacV1().RoleBindings(p.Namespace), &rbac.RoleBinding{ObjectMeta: meta.ObjectMeta{Name: RegionalAccount}, RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: RegionalAccount}, Subjects: subject}, marker); err != nil {
 		return out, err
 	}
+	// ADR-246 decision 9: the node listener's Secret precedes the Deployment
+	// that projects it.
+	var collector *contracts.RegionalCollector
+	if p.Collector != nil {
+		step = "collector"
+		c, nodes, err := ensureRegionalCollector(call, api, p, marker)
+		if err != nil {
+			return out, err
+		}
+		collector, out.Nodes = &c, &nodes
+	}
 	step = "deployment"
-	deployment, err := ensureRegional(call, api.AppsV1().Deployments(p.Namespace), RegionalWorkload(p.Offer, executor), marker)
+	deployment, err := ensureRegional(call, api.AppsV1().Deployments(p.Namespace), RegionalWorkload(p.Offer, executor, collector != nil), marker)
 	if err != nil {
 		return out, err
 	}
@@ -347,7 +367,7 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 	}
 	inputs, err := json.Marshal(contracts.RegionalDeployment{Format: contracts.RegionalDeploymentFormat, InstallationID: b.InstallationID, ClusterID: b.ClusterID, PermissionRootID: p.Offer.PermissionRootID, IssuerEpoch: b.IssuerEpoch, PeerID: b.PeerID,
 		Namespace: out.Namespace, Kubernetes: contracts.OwnerProviderEndpoint{Endpoint: "https://kubernetes.default.svc", Roots: roots}, Deployment: out.Deployment, WorkloadGuard: out.WorkloadGuard, ConfigurationProbes: probes,
-		Source: out.Source, SourceGuard: out.SourceGuard, ClusterCredential: out.Secret, ClusterCredentialAccount: RegionalAccount, Hub: p.Offer.Federation, APIContext: apiContext, Capacity: capacity})
+		Source: out.Source, SourceGuard: out.SourceGuard, ClusterCredential: out.Secret, ClusterCredentialAccount: RegionalAccount, Hub: p.Offer.Federation, APIContext: apiContext, Capacity: capacity, Collector: collector})
 	if err != nil {
 		return out, cfg.ErrInvalid
 	}
@@ -497,8 +517,10 @@ func regionalAPIRoots(ctx context.Context, api kubernetes.Interface, namespace s
 
 // RegionalWorkload is the connector Deployment, gated at zero replicas: the
 // product image from the offer, the fixed projected inputs and Restricted
-// security. It mounts no Secret; the credential is read through the API.
-func RegionalWorkload(o contracts.RegionalOffer, executor bool) *apps.Deployment {
+// security. It mounts no Secret; the credential is read through the API. The
+// executor mounts its evidence credential, a collector connector its node
+// listener's server certificate and key.
+func RegionalWorkload(o contracts.RegionalOffer, executor, collector bool) *apps.Deployment {
 	labels := map[string]string{"app.kubernetes.io/name": "asservat-connector"}
 	projection := []core.VolumeProjection{
 		{ConfigMap: &core.ConfigMapProjection{LocalObjectReference: core.LocalObjectReference{Name: RegionalInputs}, Items: []core.KeyToPath{{Key: "regional.json", Path: "regional.json"}}, Optional: ptr.To(false)}},
@@ -509,6 +531,10 @@ func RegionalWorkload(o contracts.RegionalOffer, executor bool) *apps.Deployment
 	if executor {
 		// The executor's write-only evidence credential (ADR-196 decision 7).
 		projection = append(projection, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: RegionalEvidence}, Items: []core.KeyToPath{{Key: "evidence-storage.json", Path: "evidence-storage.json"}}, Optional: ptr.To(false)}})
+	}
+	if collector {
+		projection = append(projection, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: RegionalNodes},
+			Items: []core.KeyToPath{{Key: contracts.RegionalNodeServerFile, Path: contracts.RegionalNodeServerFile}, {Key: contracts.RegionalNodeServerKeyFile, Path: contracts.RegionalNodeServerKeyFile}}, Optional: ptr.To(false)}})
 	}
 	spec := core.PodSpec{ServiceAccountName: RegionalAccount, AutomountServiceAccountToken: ptr.To(false), EnableServiceLinks: ptr.To(false), RestartPolicy: core.RestartPolicyAlways, TerminationGracePeriodSeconds: ptr.To(int64(10)),
 		SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), RunAsGroup: ptr.To(int64(65532)), FSGroup: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}},

@@ -31,7 +31,7 @@ func NewRegionalApprovedResult(ctx context.Context, worker value.WorkerCredentia
 
 func (r *RegionalContextResult) ReadApproved(ctx context.Context, o value.NativeOperation, source NativeContextSource, scope query.ContextProjectionScope) (query.PodStatusProjection, error) {
 	var zero query.PodStatusProjection
-	if o.Kind != value.NativeProjection || !scope.Valid() || scope.Version != o.SourceVersion || o.Generation < 1 || o.Generation > query.ContextMaxReadBatches || !source.Valid(scope.Version) || o.Processing.Location != source.Expectation.Registration.Location || o.Path.StoreID != source.Expectation.Registration.StoreID {
+	if o.Kind != value.NativeProjection || !scope.Valid() || scope.Version != o.SourceVersion || o.Generation < 1 || o.Generation > query.ContextMaxReadBatches || !source.Valid(scope.Version) || !source.podStatus() || o.Processing.Location != source.Expectation.Registration.Location || o.Path.StoreID != source.Expectation.Registration.StoreID {
 		return zero, query.ErrUnavailable
 	}
 	call, leave, e := r.enter(ctx, o)

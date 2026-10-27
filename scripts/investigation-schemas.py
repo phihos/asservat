@@ -310,8 +310,12 @@ def main():
             data["oneOf"] = [
                 {"required": ["preset_ref", "pod_selection"], "not": {"required": ["profile_composition"]}},
                 {"required": ["profile_composition"], "not": {"anyOf": [{"required": ["preset_ref"]}, {"required": ["pod_selection"]}, {"required": ["repeated_from_capture_id"]}]},
-                 "properties": {"capture_enabled": {"const": False}, "pod_count": {"const": 1}, "max_process_starts": {"const": 0},
-                                "blockers": {"contains": {"properties": {"code": {"const": "RecorderUnavailable"}}, "required": ["code"]}}}},
+                 # ADR-248: a manual network-header plan whose node recorder is
+                 # available and that needs no approval can be requested; every
+                 # other plan stays blocked (ApprovalRequired, RecorderUnavailable).
+                 "anyOf": [{"properties": {"capture_enabled": {"const": True}, "approval_required": {"const": False}, "blockers": {"maxItems": 0}}},
+                           {"properties": {"capture_enabled": {"const": False}, "blockers": {"minItems": 1}}}],
+                 "properties": {"pod_count": {"const": 1}, "max_process_starts": {"const": 0}}},
             ]
             # Full composition settings are a protected extract (specs/capture-profiles.md).
             success["if"] = {"properties": {"data": {"required": ["profile_composition"]}}}
@@ -338,7 +342,7 @@ def main():
             artifacts = data["properties"]["artifacts"]
             artifacts["minItems"] = 1
             row = artifacts["items"]["properties"]
-            row["kind"] = {"const": "pod-status"}
+            row["kind"] = {"enum": ["pod-status", "packetCapture"]}
             row["data_class"] = {"const": "metadata"}
             row["completeness"] = {"const": "complete"}
             notice = copy.deepcopy(documents["capture-assessment.schema.json"]["$defs"]["artifactNotice"])
@@ -363,7 +367,7 @@ def main():
             "name": name,
             "description": {
                 "list_diagnostics": "List the supported pod-status preset for a currently authorized named workload. No evidence collection.",
-                "preview_capture": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 can be collected by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately. Collect again: pass history_capture_id from list_capture_history (optionally with sharing) to restore its target and requested retention into a fresh preview with every current check. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Recorders are not installed yet: such a preview has the RecorderUnavailable blocker and request_capture refuses it.",
+                "preview_capture": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 can be collected by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately. Collect again: pass history_capture_id from list_capture_history (optionally with sharing) to restore its target and requested retention into a fresh preview with every current check. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. A manual network-header capture (packet headers only, at most 8 MiB, recorded by the target node's collector) can be requested when that node's recorder is available; a plan that needs approval first has the ApprovalRequired blocker, and every plan no recorder can run has the RecorderUnavailable blocker.",
                 "request_capture": "Submit the reviewed pod-status preview using a stable idempotency key. Acceptance is not collection or evidence success. Retry an uncertain result with the same key and preview. Ordinary accepted replay is passive; continue_acquisition:true explicitly attempts the original accepted acquisition with current rights, without new keys or another attempt. A packet/syscall plan whose preview has the ApprovalRequired blocker opens one review request for an independent approver (error ApprovalRequired with its approval page; read it with get_grant), optionally with result_access for your own later downloads; submit the same preview again after approval.",
                 "resolve_capture_request": tool["description"],
                 "get_capture": "Read authorized pod-status capture progress. No evidence bytes. Finalizing is not publication; Indeterminate must not be automatically recaptured.",

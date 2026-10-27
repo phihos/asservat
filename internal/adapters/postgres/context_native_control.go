@@ -40,7 +40,7 @@ func (c contextNativeControl) canRespond() bool {
 // key/read effects. A local close, emitted byte count or unacknowledged result
 // cannot establish even that eligibility after an attempted first-context read.
 func firstContextResponseOutcome(r artifact.DownloadResponse, windows []artifact.DownloadWindow) bool {
-	if !r.Valid() || !r.Closed || r.Plan.Selection.Length > artifact.MaxContextBytes || r.Plan.Windows() != 1 || r.WindowCount != 1 || r.CompletedWindows != 1 || r.ActiveWindowID != "" || r.EmittedBytes != r.Plan.Selection.Length || len(windows) != 1 {
+	if !r.Valid() || !r.Closed || r.Plan.Selection.Length > artifact.RemoteNativeLimit || r.Plan.Windows() != 1 || r.WindowCount != 1 || r.CompletedWindows != 1 || r.ActiveWindowID != "" || r.EmittedBytes != r.Plan.Selection.Length || len(windows) != 1 {
 		return false
 	}
 	w := windows[0]

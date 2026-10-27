@@ -1,0 +1,239 @@
+package evidence
+
+import (
+	"bytes"
+	"context"
+	"crypto/sha256"
+	"testing"
+	"time"
+
+	"asservat.local/asservat/internal/domain/artifact"
+	value "asservat.local/asservat/internal/domain/authorization"
+)
+
+// windowNativePorts admit every exchange synthetically; they count
+// registrations and releases so a window can be shown to use one conversation.
+type windowNativePorts struct {
+	unusedActiveNativePorts
+	exchange      *windowExchange
+	registrations int
+	releases      int
+}
+
+func (p *windowNativePorts) NextNativeFence(context.Context, string) (int64, error) { return 1, nil }
+func (p *windowNativePorts) ClaimNativeOperation(_ context.Context, _ value.WorkerEnrollment, _ artifact.DownloadAuthority, o value.NativeOperation) (value.NativeOperation, error) {
+	return o, nil
+}
+func (p *windowNativePorts) ReleaseNativeOperation(context.Context, value.NativeOperation) error {
+	p.releases++
+	return nil
+}
+func (p *windowNativePorts) RegisterNativeExchange(_ context.Context, r NativeExchangeRegistration, _ func(context.Context, NativeOrigin) error, _ func(context.Context, NativeOrigin) (value.NativeLease, error)) (NativePendingExchange, error) {
+	p.registrations++
+	p.exchange.delivery = r.Delivery
+	return windowPending{p.exchange}, nil
+}
+
+type windowPending struct{ e *windowExchange }
+
+func (p windowPending) Wait(context.Context) (NativeExchange, error) { return p.e, nil }
+func (windowPending) Close()                                         {}
+
+// windowExchange serves exact chunks of body inside its delivery window and
+// records the final-sink acknowledgements it receives.
+type windowExchange struct {
+	body     []byte
+	delivery artifact.DownloadDeliveryLease
+	reads    []int64
+	acks     []int64
+	failAck  bool
+}
+
+func (e *windowExchange) Commit(context.Context) error { return nil }
+func (e *windowExchange) Close() error                 { return nil }
+func (e *windowExchange) Prepared(context.Context) (artifact.NativeDownloadMetadata, error) {
+	return artifact.NativeDownloadMetadata{}, artifact.ErrDownloadUnavailable
+}
+func (e *windowExchange) ReadChunk(_ context.Context, l artifact.DownloadDeliveryLease, offset, length int64) (NativeResponseChunk, error) {
+	if l != e.delivery || offset+length > int64(len(e.body)) {
+		return NativeResponseChunk{}, artifact.ErrDownloadUnavailable
+	}
+	e.reads = append(e.reads, offset)
+	return NativeResponseChunk{Bytes: append([]byte(nil), e.body[offset:offset+length]...), FinalVerified: true}, nil
+}
+func (e *windowExchange) AcknowledgeNativeChunk(_ context.Context, l artifact.DownloadDeliveryLease, offset, length int64) error {
+	if l != e.delivery || e.failAck {
+		return artifact.ErrDownloadUnavailable
+	}
+	e.acks = append(e.acks, offset+length)
+	return nil
+}
+
+// One delivery lease window is read as several chunks through one remote
+// conversation: each chunk needs the previous chunk's acknowledgement, only
+// the window's last acknowledgement (or a failed one) closes it, and a new
+// lease opens a new conversation.
+func TestRemoteContextSourceServesWindowChunksThroughOneConversation(t *testing.T) {
+	for _, mode := range []string{"complete", "failed-ack"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newActiveEnrollmentFixture(t)
+			body := []byte("0123456789abcdefg") // a 17-byte window read as 10+7
+			ports := &windowNativePorts{exchange: &windowExchange{body: body, failAck: mode == "failed-ack"}}
+			en := *f.lookup.value.Enrollment
+			f.r.config.Native = NativeAttachmentConfig{HubPodUID: en.Worker.Binding.PodUID, HubProcessEpoch: en.Worker.Intent.ID, KeyScope: value.KeyScope{InstallationID: en.Worker.Binding.InstallationID, Purpose: "artifact", KeyID: "synthetic"}, Owners: ports, Fences: ports, Origins: NativeOrigins{Operations: ports, Now: f.r.config.Now}, Registrar: ports, PreparationKeys: ports, WindowKeys: ports}
+			attachment, err := f.r.native(en)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := ContextDownloadRequest{SessionID: f.f.s.ID, Scope: f.f.s.Scope, Expectation: f.source.Expectation, Copies: f.source.Copies}
+			source, err := NewRemoteContextSource(t.Context(), attachment, request, artifact.DownloadPreparation{SessionID: f.f.s.ID, BatchID: "30000000-0000-4000-8000-000000000001", Generation: 1})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer source.Close()
+			id := f.f.s.ID
+			lease := artifact.DownloadDeliveryLease{ResponseID: id, WindowID: id, OwnerID: id, Generation: 1, Sequence: 1, Offset: 0, Length: int64(len(body)), StartedAt: f.f.now, Until: f.f.a.ValidUntil, Authority: f.f.a}
+			if !lease.Valid(f.f.now) {
+				t.Fatal("synthetic lease invalid")
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+			defer cancel()
+			if _, err = source.ReadChunkCurrent(ctx, f.f, lease, 3, 7); err == nil {
+				t.Fatal("window opened away from its offset")
+			}
+			first, err := source.ReadChunkCurrent(ctx, f.f, lease, 0, 10)
+			if err != nil || !bytes.Equal(first.Bytes, body[:10]) {
+				t.Fatal("first chunk", err)
+			}
+			if _, err = source.ReadChunkCurrent(ctx, f.f, lease, 10, 7); err == nil {
+				t.Fatal("next chunk read before the final-sink acknowledgement")
+			}
+			err = source.AcknowledgeNativeChunk(ctx, lease, 0, 10)
+			if mode == "failed-ack" {
+				if err == nil || ports.releases != 1 {
+					t.Fatal("failed acknowledgement kept the conversation", err, ports.releases)
+				}
+				if _, err = source.ReadChunkCurrent(ctx, f.f, lease, 10, 7); err == nil {
+					t.Fatal("failed window continued")
+				}
+				return
+			}
+			if err != nil || ports.releases != 0 {
+				t.Fatal("intermediate acknowledgement", err, ports.releases)
+			}
+			if _, err = source.ReadChunkCurrent(ctx, f.f, lease, 11, 6); err == nil {
+				t.Fatal("gap admitted")
+			}
+			last, err := source.ReadChunkCurrent(ctx, f.f, lease, 10, 7)
+			if err != nil || !bytes.Equal(last.Bytes, body[10:]) {
+				t.Fatal("last chunk", err)
+			}
+			if err = source.AcknowledgeNativeChunk(ctx, lease, 10, 7); err != nil {
+				t.Fatal("last acknowledgement", err)
+			}
+			if ports.registrations != 1 || ports.releases != 1 || len(ports.exchange.reads) != 2 || len(ports.exchange.acks) != 2 {
+				t.Fatal("window did not use exactly one joined conversation", ports.registrations, ports.releases, ports.exchange.reads, ports.exchange.acks)
+			}
+			// The next lease (a resumed window) opens its own conversation.
+			next := lease
+			next.Sequence, next.Offset, next.Length = 2, 10, 7
+			if _, err = source.ReadChunkCurrent(ctx, f.f, next, 10, 7); err != nil || ports.registrations != 2 {
+				t.Fatal("next window", err, ports.registrations)
+			}
+		})
+	}
+}
+
+// Worker-side window reads: pod status is served from its single checked
+// buffer; another type is opened once per window and delivered in delivery
+// chunks; a reader without the framed port, or relabelled metadata, refuses.
+func TestRegionalResultFramedWindowChunks(t *testing.T) {
+	r, _, source, o := nativeResultFixture(t)
+	e := &source.Expectation
+	now := e.TriggeredAt
+	e.ExecutionClass = artifact.ContextNodeExecution
+	e.NativeType = artifact.PCAPNGArtifact
+	e.NodeUID, e.NodeBootID = "synthetic-node-uid", o.Reference.InstallationID
+	e.ActionID = "a0123456789abcdef01234567"
+	e.Registration.NativeLimit = artifact.RemoteNativeLimit
+	e.TriggeredAt = now.Add(-20 * time.Second)
+	e.Lifecycle = &artifact.OngoingLifecycle{TriggerKind: "policy", SourceSessionID: o.Reference.InstallationID, SourceStartedAt: now.Add(-2 * time.Minute), SnapshotID: o.Reference.InstallationID, RequestedBefore: 30 * time.Second, After: 10 * time.Second, HistoryCoverage: "full", GapReasons: []string{}, WindowCoverage: "full"}
+	if !source.Valid(o.SourceVersion) {
+		t.Fatal("synthetic pcapng source invalid", e.Validate())
+	}
+	body := bytes.Repeat([]byte{0x0a, 0x0d, 0x0d, 0x0a}, (2*artifact.DeliveryBytes+12345)/4)
+	framed := &framedReadFixture{body: body, m: expectedNativeMetadata(source, int64(len(body)), sha256.Sum256(body))}
+	r.reader = framed
+	ctx, stop := context.WithDeadline(context.Background(), o.Until)
+	defer stop()
+	m, err := r.Prepare(ctx, o, source)
+	if err != nil || m.Filename != "artifact-"+e.Registration.Location.ArtifactID+".pcapng" || m.Format != artifact.PCAPNGFormat || m.Size != int64(len(body)) || !ValidNativeSourceMetadata(source, m) {
+		t.Fatalf("pcapng preparation %v %+v", err, m)
+	}
+	if err = r.Commit(ctx, o); err != nil {
+		t.Fatal(err)
+	}
+	response := o
+	response.Kind = value.NativeResponse
+	response.Reference.Fence += 2
+	var chunks []int
+	var got []byte
+	err = r.ReadWindow(ctx, response, source, o.ParentID, 0, m.Size, func(_ context.Context, b []byte) error {
+		chunks = append(chunks, len(b))
+		got = append(got, b...)
+		return nil
+	})
+	if err != nil || !bytes.Equal(got, body) || len(chunks) != 3 || chunks[0] != int(artifact.DeliveryBytes) || framed.opens != 2 {
+		t.Fatal("framed window", err, chunks, framed.opens)
+	}
+	// A partial window (resume) starts at its own offset.
+	got = got[:0]
+	if err = r.ReadWindow(ctx, response, source, o.ParentID, artifact.DeliveryBytes+1, 100, func(_ context.Context, b []byte) error { got = append(got, b...); return nil }); err != nil || !bytes.Equal(got, body[artifact.DeliveryBytes+1:artifact.DeliveryBytes+101]) {
+		t.Fatal("partial framed window", err)
+	}
+	// A worker reader that reports another type's metadata is refused.
+	r2, _, _, o2 := nativeResultFixture(t)
+	relabel := expectedNativeMetadata(source, int64(len(body)), sha256.Sum256(body))
+	relabel.Filename = "artifact-" + e.Registration.Location.ArtifactID + ".json"
+	r2.reader = &framedReadFixture{body: body, m: relabel}
+	o2.SourceVersion = o.SourceVersion
+	if _, err = r2.Prepare(ctx, o2, source); err == nil {
+		t.Fatal("relabelled metadata accepted")
+	}
+	// A pod-status-only reader cannot serve another type.
+	r3, _, _, o3 := nativeResultFixture(t)
+	o3.SourceVersion = o.SourceVersion
+	if _, err = r3.Prepare(ctx, o3, source); err == nil {
+		t.Fatal("pod-status reader served pcapng")
+	}
+}
+
+type framedReadFixture struct {
+	nativeReadFixture
+	body  []byte
+	m     artifact.NativeDownloadMetadata
+	opens int
+}
+
+func (f *framedReadFixture) OpenNativeArtifact(ctx context.Context, s NativeContextSource, o value.NativeOperation, window string, until time.Time) (NativeArtifactSource, error) {
+	if ctx.Err() != nil || s.podStatus() {
+		return nil, artifact.ErrInvalid
+	}
+	f.opens++
+	return &framedSourceFixture{f: f, next: -1}, nil
+}
+
+type framedSourceFixture struct {
+	f    *framedReadFixture
+	next int64
+}
+
+func (s *framedSourceFixture) Metadata() artifact.NativeDownloadMetadata { return s.f.m }
+func (s *framedSourceFixture) ReadNext(_ context.Context, offset, length int64) ([]byte, bool, error) {
+	if s.next >= 0 && offset != s.next || offset+length > int64(len(s.f.body)) {
+		return nil, false, artifact.ErrDownloadUnavailable
+	}
+	s.next = offset + length
+	return append([]byte(nil), s.f.body[offset:offset+length]...), true, nil
+}
+func (*framedSourceFixture) Close() {}

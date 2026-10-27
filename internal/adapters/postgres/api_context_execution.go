@@ -61,20 +61,26 @@ func apiWork(c custodydb.ContextCapture) (app.APIContextWork, error) {
 	if err != nil {
 		return out, err
 	}
+	type scopeTarget struct {
+		Namespace string                           `json:"namespace"`
+		Workload  struct{ Kind, Name, UID string } `json:"workloadRef"`
+	}
 	var scope struct {
 		Collection struct {
 			Spec struct {
-				Target struct {
-					Namespace string                           `json:"namespace"`
-					Workload  struct{ Kind, Name, UID string } `json:"workloadRef"`
-				} `json:"target"`
+				Target scopeTarget `json:"target"`
 			} `json:"spec"`
 		} `json:"collection"`
+		// ADR-248: a recorder-preview/v1 scope names its target at the top.
+		Target scopeTarget `json:"target"`
 	}
 	if json.Unmarshal(c.ScopeJson, &scope) != nil {
 		return out, value.ErrUnavailable
 	}
 	t := scope.Collection.Spec.Target
+	if e.Recording != nil {
+		t = scope.Target
+	}
 	request := targets.Request{ClusterID: e.Registration.Location.ClusterID, Namespace: configuration.NamespaceRef{Name: t.Namespace, UID: e.NamespaceUID}, Workload: configuration.WorkloadRef{Kind: t.Workload.Kind, Name: t.Workload.Name, UID: t.Workload.UID}, PodName: accepted.Pin.Name, PodUID: e.PodUID}
 	if !request.Valid() || request.Workload.UID != e.WorkloadUID || request.Namespace.Name != e.Namespace || accepted.Pin.NodeName != "" {
 		return out, value.ErrUnavailable
@@ -265,7 +271,7 @@ func (s *APIContextExecutions) PrepareAPIExecution(ctx context.Context, c app.AP
 			if errors.Is(err, pgx.ErrNoRows) {
 				e := c.Work.Accepted.Expectation
 				p := c.Process.Binding
-				b := value.Binding{ExecutionClass: artifact.ContextAPIExecution, ExecutorPodUID: p.PodUID, ExecutorAccountUID: p.AccountUID, OperationID: e.CaptureUID, CaptureID: e.CaptureUID, ActionID: e.ActionID, AttemptID: e.Registration.Location.AttemptID, ClusterID: p.ClusterID, IssuerEpoch: p.IssuerEpoch, PodUID: e.PodUID, CollectorEpoch: p.ProcessEpoch, ScopeDigest: e.PlanDigest, AuditDigest: c.Work.IntentDigest, NativeBytes: artifact.MaxContextBytes, NotBefore: c.CheckedAt.UTC(), NotAfter: c.ValidUntil.UTC()}
+				b := value.Binding{ExecutionClass: artifact.ContextAPIExecution, ExecutorPodUID: p.PodUID, ExecutorAccountUID: p.AccountUID, OperationID: e.CaptureUID, CaptureID: e.CaptureUID, ActionID: e.ActionID, AttemptID: e.Registration.Location.AttemptID, ClusterID: p.ClusterID, IssuerEpoch: p.IssuerEpoch, PodUID: e.PodUID, CollectorEpoch: p.ProcessEpoch, ScopeDigest: e.PlanDigest, AuditDigest: c.Work.IntentDigest, NativeBytes: e.Registration.NativeLimit, NotBefore: c.CheckedAt.UTC(), NotAfter: c.ValidUntil.UTC()}
 				copy(b.BudgetDigest[:], digest(normalized(e.Registration)))
 				copy(b.AuthorityDigest[:], digest(struct {
 					Process    value.APIProcessBinding

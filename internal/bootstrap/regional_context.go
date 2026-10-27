@@ -25,6 +25,7 @@ import (
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	value "asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/targets"
 	"asservat.local/asservat/internal/transport/contextstart"
 	"github.com/aws/aws-sdk-go-v2/aws"
 )
@@ -251,7 +252,10 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 	if err != nil {
 		return &fixedStepError{"start-client", err}
 	}
-	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer")}, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
+	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings}, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
+	if r.output.recordings != nil {
+		local.Recordings = r.output.recordings
+	}
 	fmt.Fprintln(os.Stderr, "regional context start active")
 	return RegionalContextStartConnections{Candidates: r.owners, Client: client, Verifier: reportedWorkVerifier{r.verifier, eventLog(os.Stderr, "regional work refused")}, Local: local, Report: eventLog(os.Stderr, "regional context standby refused"), ReportOpening: contextStartOpeningLog(os.Stderr)}.Run(ctx)
 }
@@ -264,12 +268,31 @@ type regionalArtifactOutput struct {
 	scope    authorization.KeyScope
 	client   *http.Client
 	now      func() time.Time
+	// recordings holds started manual recordings (ADR-248); nil without the
+	// collector input, which refuses every recording.
+	recordings *ConnectorRecordings
 }
 
 func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.ContextExpectation) (evidence.PreparedContext, error) {
 	seal, err := kms.NewRemoteSealer(o.endpoint, o.scope, e.Registration.Location.AttemptID, o.client)
 	if err != nil {
 		return nil, err
+	}
+	if e.Recording != nil {
+		// ADR-248: one frame at most, so the artifact producer never needs
+		// the SQL streaming journal the connector does not hold.
+		if o.recordings == nil {
+			return nil, value.ErrUnavailable
+		}
+		producer, err := objectstore.NewArtifactProducer(o.store, seal, noJournal{}, o.now)
+		if err != nil {
+			return nil, err
+		}
+		prepared, err := producer.Prepare(ctx, e, "")
+		if err != nil {
+			return nil, err
+		}
+		return o.recordings.Prepare(prepared, e), nil
 	}
 	producer, err := objectstore.NewContextProducer(o.store, seal, o.now)
 	if err != nil {
@@ -281,7 +304,17 @@ func (o regionalArtifactOutput) PrepareContext(ctx context.Context, e artifact.C
 // reportedTargets logs the region's target-answer step durations.
 type reportedTargets struct {
 	*kube.PodTargets
-	report func(string, string)
+	report     func(string, string)
+	recordings *ConnectorRecordings
+}
+
+// PacketRecorder answers the hub's ADR-248 availability query; a connector
+// without the collector input answers unavailable.
+func (t reportedTargets) PacketRecorder(ctx context.Context, r targets.RecorderRequest) (targets.RecorderAnswer, error) {
+	if t.recordings == nil {
+		return targets.RecorderAnswer{Outcome: targets.RecorderUnavailable}, nil
+	}
+	return t.recordings.PacketRecorder(ctx, r)
 }
 
 func (t reportedTargets) ReportAnswer(steps string) { t.report("answer", steps) }

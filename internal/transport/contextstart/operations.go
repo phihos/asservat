@@ -32,6 +32,10 @@ const (
 	opAcquire       = "acquire-context"
 	opComplete      = "complete-stored"
 	opFinish        = "finish"
+	// ADR-248: a recording is started within the committed start and
+	// collected by a later exchange for the same verified capture.
+	opStartRecording = "start-recording"
+	opCollect        = "collect-recording"
 )
 
 // Closed failure labels; raw errors never cross the exchange.
@@ -78,6 +82,9 @@ type acquireRequest struct {
 type acquireReply struct {
 	Acquired time.Time
 	Copies   artifact.Copies
+}
+type recordingReply struct {
+	Queued time.Time
 }
 
 // HubOperations implements the runner's cluster-local ports by sending one
@@ -205,7 +212,26 @@ type remoteOutput struct{ h *HubOperations }
 var (
 	_ evidence.StoredContextCloser = (*remoteOutput)(nil)
 	_ evidence.ContextAcquirer     = (*remoteOutput)(nil)
+	_ evidence.ContextRecorder     = (*remoteOutput)(nil)
+	_ evidence.RecordingCollector  = (*HubOperations)(nil)
 )
+
+// StartRecording asks the region to queue the recording on the pinned Pod's
+// node within the committed start (ADR-248).
+func (o *remoteOutput) StartRecording(ctx context.Context, pin artifact.PinnedPod, started, until time.Time) (time.Time, error) {
+	var out recordingReply
+	err := o.h.call(ctx, opStartRecording, acquireRequest{pin, started, until}, &out)
+	return out.Queued, err
+}
+
+// CollectRecording asks the region for the held outcome of this exchange's
+// verified capture (ADR-248). No evidence byte crosses: only the state and
+// the writer completion.
+func (h *HubOperations) CollectRecording(ctx context.Context) (evidence.RecordingCollection, error) {
+	var out evidence.RecordingCollection
+	err := h.call(ctx, opCollect, struct{}{}, &out)
+	return out, err
+}
 
 func (o *remoteOutput) StoreContext(context.Context, []byte, time.Time, time.Time) (artifact.Copies, error) {
 	return artifact.Copies{}, value.ErrUnavailable // native bytes never reach the hub
@@ -297,7 +323,16 @@ type RegionalLocal struct {
 	Collector executionapp.ContextCollector
 	// Source is this region's own connector source reader (ADR-178).
 	Source fleetapp.ConnectorIdentitySourceReader
-	Now    func() time.Time
+	// Recordings answers collects of held recordings (ADR-248); optional.
+	Recordings RegionalRecordings
+	Now        func() time.Time
+}
+
+// RegionalRecordings is the connector's holder of started recordings.
+type RegionalRecordings interface {
+	// Collect returns the held outcome of the work's capture, bound to its
+	// attempt and expectation digest.
+	Collect(w fleet.APIContextWork) (evidence.RecordingCollection, error)
 }
 
 func (l RegionalLocal) valid() bool {
@@ -446,6 +481,29 @@ func (s *regionalSession) handle(ctx context.Context, q contracts.APIContextOper
 			return nil, value.ErrDenied
 		}
 		return closer.CompleteStored()
+	case opStartRecording:
+		var r acquireRequest
+		if err := decodeOperationBody(q.Body, &r); err != nil {
+			return nil, err
+		}
+		d := s.consumed
+		recorder, ok := s.prepared.(evidence.ContextRecorder)
+		if s.acquired || !ok || s.resolved == nil || d == nil || !d.MayStart || d.Phase != value.StartCommitted || r.Until.After(d.ValidUntil) || r.Pin != s.resolved.Pin {
+			return nil, value.ErrDenied
+		}
+		s.acquired = true
+		queued, err := recorder.StartRecording(ctx, r.Pin, r.Started, r.Until)
+		if err != nil {
+			return nil, err
+		}
+		return recordingReply{Queued: queued}, nil
+	case opCollect:
+		// Collecting needs no start: the verified work names the capture
+		// whose held outcome is returned. Nothing is acquired or spent.
+		if l.Recordings == nil || s.prepared != nil || s.consumed != nil {
+			return nil, value.ErrUnavailable
+		}
+		return l.Recordings.Collect(s.work)
 	}
 	return nil, value.ErrInvalid
 }

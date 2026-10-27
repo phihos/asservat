@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://asservat.io/spec/v1/recorder-preview.schema.json",
   "title": "Reviewed packet/syscall recorder plan (interim, ADR-243)",
-  "description": "Canonical plan whose SHA-256 is the execution_digest of a composition preview. It is never an accepted collection scope: acceptance is refused (acceptance recorderUnavailable) until a node recorder exists. The libpcap program is compiled on the hub with the pinned link type and snapshot length; the node never compiles.",
+  "description": "Canonical plan whose SHA-256 is the execution_digest of a composition preview. Acceptance is refused (acceptance recorderUnavailable) unless the plan is a manual networkHeaders packet capture whose target node's collector reports the packet recorder (acceptance nodeRecorder, ADR-248). The libpcap program is compiled on the hub with the pinned link type and snapshot length; the node never compiles.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -10,7 +10,8 @@
       "const": "recorder-preview/v1"
     },
     "acceptance": {
-      "const": "recorderUnavailable"
+      "enum": ["recorderUnavailable", "nodeRecorder"],
+      "description": "recorderUnavailable: no node recorder can run the plan (ADR-243). nodeRecorder: a manual networkHeaders plan whose target node's collector reported the packet recorder at preview; request_capture may accept it (ADR-248)."
     },
     "source": {
       "$ref": "https://asservat.io/spec/v1/collection-scope.schema.json#/properties/source"

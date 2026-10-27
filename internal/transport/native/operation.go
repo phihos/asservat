@@ -7,7 +7,6 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"sync"
 	"time"
@@ -32,14 +31,18 @@ type HubOperation struct {
 	cancel                           context.CancelFunc
 	mu                               sync.Mutex
 	reserved, attached, closed, used bool
-	stream                           Stream
-	metadata                         chan artifact.NativeDownloadMetadata
-	projection                       chan query.PodStatusProjection
-	projectionScope                  query.ContextProjectionScope
-	body                             chan []byte
-	action                           chan nativeAction
-	done                             chan struct{}
-	doneOnce                         sync.Once
+	// A response window is served chunk by chunk (ADR-248): next is the next
+	// native offset, pending the length of a chunk handed to the consumer
+	// whose final-sink acknowledgement has not yet been submitted.
+	next, pending   int64
+	stream          Stream
+	metadata        chan artifact.NativeDownloadMetadata
+	projection      chan query.PodStatusProjection
+	projectionScope query.ContextProjectionScope
+	body            chan []byte
+	action          chan nativeAction
+	done            chan struct{}
+	doneOnce        sync.Once
 }
 
 func NewHubOperation(gate *evidence.NativeFrameGate, c contracts.NativeCommand, expected evidence.NativeContextSource, complete evidence.NativeCompletion) (*HubOperation, error) {
@@ -85,7 +88,8 @@ func newHubOperationChecked(gate *evidence.NativeFrameGate, checked *checkedNati
 		return nil, artifact.ErrInvalid
 	}
 	if o.Kind == value.NativeResponse {
-		if !value.UUID(c.WindowID) || c.Offset < 0 || c.Length < 1 || c.Offset > artifact.MaxContextBytes || c.Length > artifact.MaxContextBytes-c.Offset {
+		limit := expected.Expectation.Type().DownloadLimit()
+		if !value.UUID(c.WindowID) || c.Offset < 0 || c.Length < 1 || c.Offset > limit || c.Length > limit-c.Offset {
 			return nil, artifact.ErrInvalid
 		}
 	} else if c.WindowID != "" || c.Offset != 0 || c.Length != 0 {
@@ -123,8 +127,8 @@ func newHubOperationChecked(gate *evidence.NativeFrameGate, checked *checkedNati
 		return nil, artifact.ErrDownloadUnavailable
 	}
 	ctx, cancel := context.WithDeadline(gate.Context(), until)
-	result := &HubOperation{gate: gate, complete: complete, command: c, expected: cloned, delivery: delivery, ctx: ctx, cancel: cancel, metadata: make(chan artifact.NativeDownloadMetadata, 1), projection: make(chan query.PodStatusProjection, 1), projectionScope: projectionScope, body: make(chan []byte), action: make(chan nativeAction), done: make(chan struct{})}
-	if o.Kind == value.NativeResponse && !result.matchChunk(delivery, c.Offset, c.Length) {
+	result := &HubOperation{gate: gate, complete: complete, command: c, expected: cloned, delivery: delivery, ctx: ctx, cancel: cancel, metadata: make(chan artifact.NativeDownloadMetadata, 1), projection: make(chan query.PodStatusProjection, 1), projectionScope: projectionScope, body: make(chan []byte), action: make(chan nativeAction), done: make(chan struct{}), next: c.Offset}
+	if o.Kind == value.NativeResponse && !result.matchChunk(delivery, c.Offset, min(nativeChunkBytes, c.Length)) {
 		cancel()
 		return nil, artifact.ErrInvalid
 	}
@@ -233,8 +237,29 @@ func (o *HubOperation) Commit(ctx context.Context) error {
 	}
 	return o.submit(ctx, "prepared", 0)
 }
+
+// nativeChunkBytes is the response chunk of the private exchange: one data
+// frame carries one delivery chunk (artifact.DeliveryBytes, equal to
+// contracts.NativeDataBytes), so a window of at most RemoteNativeLimit is at
+// most eight data frames and eight acknowledgements, within the per-stream
+// frame cap. The worker and the transfer split a window identically.
+const nativeChunkBytes = artifact.DeliveryBytes
+
+// claimChunk admits the window's next chunk only: in order, exactly the
+// expected length, and after the previous chunk's acknowledgement.
+func (o *HubOperation) claimChunk(offset, length int64) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	end := o.command.Offset + o.command.Length
+	if o.closed || o.pending != 0 || o.gate.Context().Err() != nil || offset != o.next || o.next >= end || length != min(nativeChunkBytes, end-o.next) {
+		return false
+	}
+	o.used = true
+	o.pending = length
+	return true
+}
 func (o *HubOperation) ReadChunk(ctx context.Context, l artifact.DownloadDeliveryLease, offset, length int64) (evidence.NativeResponseChunk, error) {
-	if o == nil || ctx == nil || !o.matchChunk(l, offset, length) || !o.claim() {
+	if o == nil || ctx == nil || !o.matchChunk(l, offset, length) || !o.claimChunk(offset, length) {
 		return evidence.NativeResponseChunk{}, artifact.ErrDownloadUnavailable
 	}
 	select {
@@ -243,7 +268,12 @@ func (o *HubOperation) ReadChunk(ctx context.Context, l artifact.DownloadDeliver
 			clear(b)
 			return evidence.NativeResponseChunk{}, e
 		}
-		return evidence.NativeResponseChunk{Bytes: b, ReadWork: evidence.ContextDownloadReadWork, FinalVerified: true}, nil
+		// The window's read work is reported once, with its first chunk.
+		var work int64
+		if offset == o.command.Offset {
+			work = evidence.NativeWindowReadWork(o.expected.Expectation.Type())
+		}
+		return evidence.NativeResponseChunk{Bytes: b, ReadWork: work, FinalVerified: true}, nil
 	case <-ctx.Done():
 		o.cancel()
 		return evidence.NativeResponseChunk{}, ctx.Err()
@@ -251,14 +281,28 @@ func (o *HubOperation) ReadChunk(ctx context.Context, l artifact.DownloadDeliver
 		return evidence.NativeResponseChunk{}, artifact.ErrDownloadUnavailable
 	}
 }
+
+// matchChunk binds a chunk to the operation's exact original delivery lease
+// and window; the chunk lies inside the window.
 func (o *HubOperation) matchChunk(l artifact.DownloadDeliveryLease, offset, length int64) bool {
-	return o.command.Kind == "read-context-response" && l == o.delivery && l.Valid(time.Now()) && l.ResponseID == o.command.ParentID && l.WindowID == o.command.WindowID && l.Generation == o.command.Generation && l.Sequence == o.command.LeaseSequence && offset == o.command.Offset && length == o.command.Length && l.Authority.Scope.Version == o.expectedVersion() && l.Allows(offset, length, time.Now())
+	c := o.command
+	return c.Kind == "read-context-response" && l == o.delivery && l.Valid(time.Now()) && l.ResponseID == c.ParentID && l.WindowID == c.WindowID && l.Generation == c.Generation && l.Sequence == c.LeaseSequence && l.Offset == c.Offset && l.Length == c.Length && length >= 1 && offset >= c.Offset && length <= c.Offset+c.Length-offset && l.Authority.Scope.Version == o.expectedVersion() && l.Allows(offset, length, time.Now())
 }
 func (o *HubOperation) expectedVersion() artifact.Digest {
 	return evidence.ContextCopiesDigest(o.expected.Copies)
 }
 func (o *HubOperation) AcknowledgeNativeChunk(ctx context.Context, l artifact.DownloadDeliveryLease, offset, length int64) error {
 	if o == nil || !o.matchChunk(l, offset, length) {
+		return artifact.ErrDownloadUnavailable
+	}
+	o.mu.Lock()
+	ok := o.pending == length && offset == o.next
+	if ok {
+		o.pending = 0
+		o.next += length
+	}
+	o.mu.Unlock()
+	if !ok {
 		return artifact.ErrDownloadUnavailable
 	}
 	return o.submit(ctx, "delivered", length)
@@ -278,9 +322,9 @@ func (o *HubOperation) readMetadata(ctx context.Context, s Stream) (artifact.Nat
 	if nativeDecode(m.Metadata, &native) != nil {
 		return zero, contracts.ErrNativeProtocol
 	}
-	version := o.expectedVersion()
-	expected := o.expected.Expectation.Registration
-	if native.Filename != "artifact-"+expected.Location.ArtifactID+".json" || native.Format != artifact.ContextFormat || native.ETag != `"v1-`+hex.EncodeToString(version[:])+`"` || native.Size < 1 || native.Size > artifact.MaxContextBytes || native.SHA256 == (artifact.Digest{}) || !native.ReadUntil.Equal(expected.ExpiresAt) || !native.DeleteBy.Equal(expected.DeleteBy) || native.Coverage != "Selected pod-status fields only; no logs, messages or workload configuration." {
+	// The facts follow the hub's own expectation: type filename, format,
+	// coverage and size bound, the copies ETag and the registered dates.
+	if !evidence.ValidNativeSourceMetadata(o.expected, native) {
 		return zero, contracts.ErrNativeProtocol
 	}
 	return native, nil
@@ -344,23 +388,7 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 	}
 	stage = "result"
 	if o.command.Kind == "read-context-response" {
-		f, e := s.Receive(work)
-		if e != nil {
-			return e
-		}
-		if f.Kind != contracts.NativeDataFrame || int64(len(f.Payload)) != o.command.Length {
-			clear(f.Payload)
-			return contracts.ErrNativeProtocol
-		}
-		// Ownership transfers to the final sink's caller. It clears only after its
-		// own write has joined; cancellation here must not race with that write.
-		select {
-		case o.body <- f.Payload:
-			f.Payload = nil
-		case <-work.Done():
-			clear(f.Payload)
-			return work.Err()
-		}
+		return o.serveResponse(work, s, &stage)
 	} else if o.command.Kind == string(value.NativeProjection) {
 		p, e := o.readProjection(work, s)
 		if e != nil {
@@ -432,20 +460,69 @@ func (o *HubOperation) Serve(ctx context.Context, s Stream) (err error) {
 		}
 		return step("finish", o.finish(work, s, "joined"))
 	}
-	if action.phase != "delivered" || action.n != o.command.Length {
-		return contracts.ErrNativeProtocol
+	return contracts.ErrNativeProtocol
+}
+
+// serveResponse relays one window: per chunk one data frame of exactly the
+// chunk length, handed to the consumer, then its final-sink acknowledgement.
+// After the last chunk the worker closes and the operation finishes; a single
+// chunk (pod status) is exactly the historical frame sequence.
+func (o *HubOperation) serveResponse(work context.Context, s Stream, stage *string) (err error) {
+	end := o.command.Offset + o.command.Length
+	for at := o.command.Offset; at < end; {
+		n := min(nativeChunkBytes, end-at)
+		f, e := s.Receive(work)
+		if e != nil {
+			return e
+		}
+		if f.Kind != contracts.NativeDataFrame || int64(len(f.Payload)) != n {
+			clear(f.Payload)
+			return contracts.ErrNativeProtocol
+		}
+		// Ownership transfers to the final sink's caller. It clears only after its
+		// own write has joined; cancellation here must not race with that write.
+		select {
+		case o.body <- f.Payload:
+			f.Payload = nil
+		case <-work.Done():
+			clear(f.Payload)
+			return work.Err()
+		}
+		*stage = "consumer"
+		var action nativeAction
+		select {
+		case action = <-o.action:
+		case <-work.Done():
+			return work.Err()
+		}
+		*stage = "close"
+		if action.phase != "delivered" || action.n != n {
+			action.done <- contracts.ErrNativeProtocol
+			return contracts.ErrNativeProtocol
+		}
+		e = sendControl(work, s, contracts.NativeAcknowledgeFrame, ack(o.command, "delivered", n))
+		if at += n; at < end {
+			action.done <- e
+			if e != nil {
+				return e
+			}
+			*stage = "result"
+			continue
+		}
+		defer func() { action.done <- err }()
+		if e != nil {
+			return e
+		}
+		f, e = s.Receive(work)
+		if e != nil {
+			return e
+		}
+		if err = exactAck(f, contracts.NativeDoneFrame, o.command, "closed", 0); err != nil {
+			return err
+		}
+		return o.finish(work, s, "joined")
 	}
-	if err = sendControl(work, s, contracts.NativeAcknowledgeFrame, ack(o.command, "delivered", action.n)); err != nil {
-		return err
-	}
-	f, e := s.Receive(work)
-	if e != nil {
-		return e
-	}
-	if err = exactAck(f, contracts.NativeDoneFrame, o.command, "closed", 0); err != nil {
-		return err
-	}
-	return o.finish(work, s, "joined")
+	return contracts.ErrNativeProtocol
 }
 
 // Attach binds the worker's fresh nonce only after the ingress independently

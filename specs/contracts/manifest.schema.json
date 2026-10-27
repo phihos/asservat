@@ -725,41 +725,83 @@
         }
       },
       "then": {
-        "properties": {
-          "target": {
+        "description": "Pod status (4 KiB), or a manual networkHeaders packet recording delivered through the connector (ADR-248, at most 8 MiB).",
+        "anyOf": [
+          {
             "properties": {
-              "scope": {
-                "const": "pod"
+              "target": {
+                "properties": {
+                  "scope": {
+                    "const": "pod"
+                  }
+                }
+              },
+              "kind": {
+                "const": "kubernetesSnapshot"
+              },
+              "format": {
+                "const": "asservat-pod-status/v1"
+              },
+              "mediaType": {
+                "const": "application/json"
+              },
+              "dataClass": {
+                "const": "metadata"
+              },
+              "collectionProvenance": {
+                "properties": {
+                  "actionID": {
+                    "const": "pod-status"
+                  }
+                }
+              },
+              "sizes": {
+                "properties": {
+                  "plaintextBytes": {
+                    "maximum": 4096
+                  }
+                }
               }
             }
           },
-          "kind": {
-            "const": "kubernetesSnapshot"
-          },
-          "format": {
-            "const": "asservat-pod-status/v1"
-          },
-          "mediaType": {
-            "const": "application/json"
-          },
-          "dataClass": {
-            "const": "metadata"
-          },
-          "collectionProvenance": {
+          {
             "properties": {
-              "actionID": {
-                "const": "pod-status"
-              }
-            }
-          },
-          "sizes": {
-            "properties": {
-              "plaintextBytes": {
-                "maximum": 4096
+              "target": {
+                "properties": {
+                  "scope": {
+                    "const": "pod"
+                  }
+                }
+              },
+              "kind": {
+                "const": "packetCapture"
+              },
+              "format": {
+                "const": "pcapng"
+              },
+              "mediaType": {
+                "const": "application/x-pcapng"
+              },
+              "dataClass": {
+                "const": "metadata"
+              },
+              "collectionProvenance": {
+                "properties": {
+                  "actionID": {
+                    "pattern": "^a[0-9a-f]{24}$"
+                  }
+                }
+              },
+              "sizes": {
+                "properties": {
+                  "plaintextBytes": {
+                    "maximum": 8388608
+                  }
+                }
               }
             }
           }
-        }
+        ]
       }
     }
   ]

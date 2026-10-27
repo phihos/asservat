@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 can be collected by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately. Collect again: pass history_capture_id from list_capture_history (optionally with sharing) to restore its target and requested retention into a fresh preview with every current check. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Recorders are not installed yet: such a preview has the RecorderUnavailable blocker and request_capture refuses it.",
+  "description": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 can be collected by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately. Collect again: pass history_capture_id from list_capture_history (optionally with sharing) to restore its target and requested retention into a fresh preview with every current check. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. A manual network-header capture (packet headers only, at most 8 MiB, recorded by the target node's collector) can be requested when that node's recorder is available; a plan that needs approval first has the ApprovalRequired blocker, and every plan no recorder can run has the RecorderUnavailable blocker.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -1193,27 +1193,37 @@
                         }
                       ]
                     },
-                    "properties": {
-                      "capture_enabled": {
-                        "const": false
+                    "anyOf": [
+                      {
+                        "properties": {
+                          "capture_enabled": {
+                            "const": true
+                          },
+                          "approval_required": {
+                            "const": false
+                          },
+                          "blockers": {
+                            "maxItems": 0
+                          }
+                        }
                       },
+                      {
+                        "properties": {
+                          "capture_enabled": {
+                            "const": false
+                          },
+                          "blockers": {
+                            "minItems": 1
+                          }
+                        }
+                      }
+                    ],
+                    "properties": {
                       "pod_count": {
                         "const": 1
                       },
                       "max_process_starts": {
                         "const": 0
-                      },
-                      "blockers": {
-                        "contains": {
-                          "properties": {
-                            "code": {
-                              "const": "RecorderUnavailable"
-                            }
-                          },
-                          "required": [
-                            "code"
-                          ]
-                        }
                       }
                     }
                   }

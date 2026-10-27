@@ -17,6 +17,26 @@ type ContextVerifier struct {
 	store     *CustodyStore
 	keys      evidence.KeyOpener
 	contracts *manifest.Validator
+	// extra are additional streaming checks per native type, run on the
+	// same authenticated read (ADR-248: the networkHeaders recheck).
+	extra map[string]func() StreamCheck
+}
+
+// StreamCheck sees every authenticated native byte of one verification and
+// returns its verdict on Close.
+type StreamCheck interface {
+	Write([]byte) error
+	Close() error
+}
+
+// WithStreamCheck adds a verification check for one native type. It runs in
+// the same read as the type's own check: no second unwrap or download.
+func (v *ContextVerifier) WithStreamCheck(nativeType string, check func() StreamCheck) *ContextVerifier {
+	if v.extra == nil {
+		v.extra = map[string]func() StreamCheck{}
+	}
+	v.extra[nativeType] = check
+	return v
 }
 
 var _ evidence.ContextVerifier = (*ContextVerifier)(nil)
@@ -29,7 +49,7 @@ func NewContextVerifier(store *CustodyStore, keys evidence.KeyOpener) (*ContextV
 	if err != nil {
 		return nil, err
 	}
-	return &ContextVerifier{store, keys, v}, nil
+	return &ContextVerifier{store: store, keys: keys, contracts: v}, nil
 }
 
 func object(loc artifact.Location, role int, c artifact.CopyReceipt) Object {
@@ -94,11 +114,26 @@ func (v *ContextVerifier) verifyStream(ctx context.Context, e artifact.ContextEx
 	if err != nil {
 		return readStage(ctx, "validate", err)
 	}
-	if err = reader.Read(ctx, 0, m.Layout.NativeBytes, checkSink{check}); err != nil {
+	var extra StreamCheck
+	if factory := v.extra[e.NativeType]; factory != nil {
+		extra = factory()
+	}
+	if err = reader.Read(ctx, 0, m.Layout.NativeBytes, checkSink{check, extra}); err != nil {
+		if extra != nil {
+			_ = extra.Close()
+		}
 		return readStage(ctx, "data-read", err)
 	}
 	if err = check.Close(); err != nil {
+		if extra != nil {
+			_ = extra.Close()
+		}
 		return readStage(ctx, "validate", err)
+	}
+	if extra != nil {
+		if err = extra.Close(); err != nil {
+			return readStage(ctx, "validate", errors.Join(artifact.ErrIntegrity, err))
+		}
 	}
 	if err = ctx.Err(); err != nil {
 		return readStage(ctx, "cancelled", err)
@@ -109,13 +144,22 @@ func (v *ContextVerifier) verifyStream(ctx context.Context, e artifact.ContextEx
 	return nil
 }
 
-type checkSink struct{ check manifest.NativeCheck }
+type checkSink struct {
+	check manifest.NativeCheck
+	extra StreamCheck
+}
 
 func (s checkSink) Send(ctx context.Context, p []byte) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	return s.check.Write(p)
+	if err := s.check.Write(p); err != nil {
+		return err
+	}
+	if s.extra != nil {
+		return s.extra.Write(p)
+	}
+	return nil
 }
 
 func (v *ContextVerifier) readContext(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, cutoff time.Time) ([]byte, error) {

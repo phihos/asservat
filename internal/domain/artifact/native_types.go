@@ -1,5 +1,11 @@
 package artifact
 
+import (
+	"strings"
+
+	"asservat.local/asservat/internal/domain/identity"
+)
+
 // Native artifact types (ADR-244). A type fixes the recorded native
 // representation: manifest kind/evidence type, native media type and format,
 // the server-generated filename extension and the coverage sentence shown with
@@ -75,3 +81,31 @@ func (t NativeType) AllowsClass(class string) bool {
 // Filename is server-generated from the opaque artifact UUID; no target name,
 // label or user text enters it.
 func (t NativeType) Filename(artifactID string) string { return "artifact-" + artifactID + t.Extension }
+
+// RemoteNativeLimit is the largest native artifact the installed regional
+// download exchange serves (ADR-248 interim, equal to the per-capture
+// recording cap): one 8 MiB storage frame, so one response window is one
+// 64 MiB accounting window, one remote conversation with one key binding and
+// at most eight 1 MiB data frames. Larger recordings need the named streaming
+// follow-up, not a raised constant.
+const RemoteNativeLimit = FrameBytes
+
+// DownloadLimit is the type's native size bound on the installed download path.
+func (t NativeType) DownloadLimit() int64 { return min(t.MaxBytes, RemoteNativeLimit) }
+
+// DownloadEvidenceType reports an evidence type the installed download path
+// serves (ADR-248): pod-status context and packet captures (PCAPNG). Syscall
+// traces have no producer yet and stay refused until their own increment.
+func DownloadEvidenceType(evidenceType string) bool {
+	return evidenceType == "context" || evidenceType == "packetCapture"
+}
+
+// ValidNativeDownloadMetadata checks the fixed, type-derived facts of prepared
+// native download metadata for artifactID: the type follows the recorded
+// format, and the filename, size bound and a single-line coverage follow the
+// type. Callers holding the expectation compare exact coverage and dates too.
+// It is not authority to disclose anything.
+func ValidNativeDownloadMetadata(artifactID string, m NativeDownloadMetadata) bool {
+	t, ok := NativeTypeForFormat(m.Format)
+	return ok && m.Filename == t.Filename(artifactID) && m.Size >= 1 && m.Size <= t.DownloadLimit() && m.SHA256 != (Digest{}) && identity.Text(m.Coverage, 1024) && !strings.ContainsAny(m.Coverage, "\r\n")
+}

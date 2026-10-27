@@ -74,6 +74,9 @@ type ContextCaseArtifact struct {
 	ExpiresAt, DeleteBy time.Time
 	// Shared marks an artifact admitted through a recipient's share (ADR-232).
 	Shared bool
+	// Recording marks a headers-only PCAPNG packet recording (ADR-248)
+	// instead of a pod-status snapshot.
+	Recording bool
 }
 
 func (c ContextCase) Valid(now time.Time) bool {

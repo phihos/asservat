@@ -2,7 +2,6 @@ package artifact
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/domain/identity"
@@ -84,7 +83,7 @@ type PreparedDownload struct {
 
 func (p PreparedDownload) Valid() bool {
 	m := p.Native
-	if !p.Preparation.Valid() || !p.Scope.Valid() || m.Size < 1 || m.Size > MaxContextBytes || m.SHA256 == (Digest{}) || m.Format != ContextFormat || m.Filename != "artifact-"+p.Scope.ArtifactID+".json" || m.ETag != fmt.Sprintf(`"v1-%x"`, p.Scope.Version) || !identity.Text(m.Coverage, 1024) || strings.ContainsAny(m.Coverage, "\r\n") {
+	if !p.Preparation.Valid() || !p.Scope.Valid() || !ValidNativeDownloadMetadata(p.Scope.ArtifactID, m) || m.ETag != fmt.Sprintf(`"v1-%x"`, p.Scope.Version) {
 		return false
 	}
 	// Cached dates are not authority. The coordinator overwrites both with the

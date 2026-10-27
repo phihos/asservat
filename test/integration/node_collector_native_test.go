@@ -43,6 +43,9 @@ type collectorFixture struct {
 	ServerCertificate  string `json:"serverCertificate"`
 	ServerKey          string `json:"serverKey"`
 	Pause              string `json:"pause"`
+	Busybox            string `json:"busybox"`
+	S3                 string `json:"s3"`
+	Work               string `json:"work"`
 	Results            string `json:"results"`
 	Runner             struct {
 		KernelRelease string `json:"kernelRelease"`
@@ -257,9 +260,18 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 	if facts.HostProcesses != collector.Supported || facts.Runtime != collector.RuntimeContainerd || !facts.Engine.Linked || facts.Engine.Version != "v0.57.0" {
 		t.Fatalf("host processes %s, runtime %s, engine %+v", facts.HostProcesses, facts.Runtime, facts.Engine)
 	}
+	// ADR-248: the packet recorder (the gadget's tc hook) is available; the
+	// syscall recorder is not implemented yet.
 	for _, m := range view.Report.Mechanisms {
-		if m.Adapter != collector.AdapterUnavailable || m.Reasons[len(m.Reasons)-1] != collector.ReasonRecorderNotImplemented {
-			t.Fatalf("no recorder exists yet: %+v", m)
+		switch m.Mechanism {
+		case collector.MechanismPacket:
+			if m.Adapter != collector.AdapterAvailable || m.Hook != collector.HookTC || len(m.Reasons) != 0 {
+				t.Fatalf("packet recorder: %+v", m)
+			}
+		default:
+			if m.Adapter != collector.AdapterUnavailable || m.Reasons[len(m.Reasons)-1] != collector.ReasonRecorderNotImplemented {
+				t.Fatalf("no syscall recorder exists yet: %+v", m)
+			}
 		}
 	}
 	if view.Report.Budget.Ceilings != (collector.Ceilings{RingBytes: 256 << 20, FrozenBytes: 256 << 20, UploadBytesPerSecond: 32 << 20, UploadBurstBytes: 64 << 20}) || view.Report.Budget.RingReserved != 0 {
@@ -281,6 +293,9 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 	if interval < collector.StatusInterval-time.Second || interval > collector.StatusInterval+3*time.Second || !second.Current {
 		t.Fatalf("status interval %v", interval)
 	}
+
+	// 3b. ADR-248: manual networkHeaders captures through the real gadget.
+	packetCaptureNative(t, ctx, k, admin, s.Channel, second, workload, f.Busybox, f.Work, f.S3, results)
 
 	if b, err := k.CoreV1().Pods(f.CollectorNamespace).GetLogs(first.Name, &core.PodLogOptions{LimitBytes: ptr.To[int64](8 << 10)}).DoRaw(ctx); err == nil {
 		results["collectorLog"] = strings.Split(strings.TrimSpace(string(b)), "\n")

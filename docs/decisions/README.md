@@ -12,6 +12,14 @@ exact children for published artifacts of the approved capture; Migration 00097;
 the browser-only `list_reviews`, `decide_review`, `revoke_grant` with a console inbox. Policy
 grants (12b) and observation spend remain open.
 
+[ADR-248 — Manual packet capture end to end, network headers only](248-manual-packet-capture.md)
+is S-04 increment 4: Inspektor Gadget's published tcpdump gadget, pinned by digest and loaded from
+the collector image, records one Pod; the collector runs the hub-compiled libpcap program on each
+frame (`x/net/bpf`), cuts frames at the transport header (gopacket) and uploads a bounded PCAPNG
+(8 MiB) over its mTLS channel; the connector encrypts it with the ADR-244 producer and holds the
+completion until the hub's collect exchange records it; publication rechecks headers-only.
+Requests are accepted only when the target node reports the recorder. Migration 00098.
+
 [ADR-247 — Guarded, group-ID, remote-cluster and workload permission sources](247-guarded-and-workload-permission-sources.md)
 completes REQ-PER-003/005: `admissionEnforced` namespace sources need a live proof of the capacity
 namespace label guard covering their keys; `groupID` values are validated against the identity

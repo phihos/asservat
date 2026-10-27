@@ -18,7 +18,7 @@ import (
 func TestRegionalInstallShape(t *testing.T) {
 	offer := contracts.RegionalOffer{Format: contracts.RegionalOfferFormat, InstallationID: ownerID(1), PermissionRootID: ownerID(2), IssuerEpoch: ownerID(3), Image: "registry.invalid/asservat@sha256:" + "ab",
 		Federation: contracts.RegionalHubEndpoint{Endpoint: "https://federation.invalid:443", ServerName: "federation.invalid", Roots: [][]byte{{1}}}, ConnectorIssuerRoots: [][]byte{{2}}, ConnectorBacking: []byte(`{}`)}
-	d := RegionalWorkload(offer, false)
+	d := RegionalWorkload(offer, false, false)
 	spec := d.Spec.Template.Spec
 	c := spec.Containers[0]
 	if *d.Spec.Replicas != 0 || *spec.AutomountServiceAccountToken || !*spec.SecurityContext.RunAsNonRoot || *c.SecurityContext.AllowPrivilegeEscalation || !*c.SecurityContext.ReadOnlyRootFilesystem || len(c.SecurityContext.Capabilities.Drop) != 1 {
@@ -93,7 +93,7 @@ func TestRegionalInstallShape(t *testing.T) {
 		t.Fatal("Alertmanager accepted without an executor offer")
 	}
 	mounted := 0
-	for _, s := range RegionalWorkload(executor.Offer, true).Spec.Template.Spec.Volumes[0].Projected.Sources {
+	for _, s := range RegionalWorkload(executor.Offer, true, false).Spec.Template.Spec.Volumes[0].Projected.Sources {
 		if s.Secret != nil {
 			if s.Secret.Name != RegionalEvidence || len(s.Secret.Items) != 1 || s.Secret.Items[0].Path != "evidence-storage.json" {
 				t.Fatal("executor mounts another Secret", s.Secret.Name)

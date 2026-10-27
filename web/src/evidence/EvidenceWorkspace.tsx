@@ -13,7 +13,7 @@ const bytes = (value: number) => new Intl.NumberFormat().format(value) + ' bytes
 const states: Record<Download['state'], string> = { Preparing: 'Preparing the native file', Ready: 'Ready to download', Streaming: 'Sending the file', Completed: 'Transfer recorded', Interrupted: 'Download interrupted', Cancelled: 'Download cancelled', Expired: 'Download expired', Denied: 'Download access unavailable', Failed: 'Download failed' };
 const contentNames: Record<string, string> = { userContent: 'user content', credentials: 'credentials', personalIdentifiers: 'personal identifiers', networkAddresses: 'network addresses', paths: 'paths', profileLabels: 'profile labels', unknownApplicationData: 'other application data' };
 const terminal = new Set(['Completed', 'Cancelled', 'Expired', 'Denied', 'Failed']);
-const kindName = (kind: string) => ['context', 'pod-status'].includes(kind) ? 'Pod status' : kind;
+const kindName = (kind: string) => ['context', 'pod-status'].includes(kind) ? 'Pod status' : kind === 'packetCapture' ? 'Packet capture (headers only)' : kind;
 const classLine = (artifact: Artifact) => `${artifact.data_class === 'raw' ? 'Raw evidence' : artifact.data_class === 'extract' ? 'Approved extract' : 'Approved metadata'} · ${artifact.completeness}`;
 function SavedPodStatus({ session, scope, caseID, artifactID }: { session: Session; scope: AbortSignal; caseID: string; artifactID: string }) {
   // Each visible artifact owns its view. Mounting reads nothing; the existing

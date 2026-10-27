@@ -170,6 +170,9 @@ type nodeEntry struct {
 	work       []collector.Work
 	nextSeq    uint64
 	wake       chan struct{}
+	// captures are packetCapture items still awaiting their result, by work
+	// ID; a receipt does not remove them, delivery or the deadline does.
+	captures map[string]pendingCapture
 }
 
 type NodeChannel struct {
@@ -181,6 +184,7 @@ type NodeChannel struct {
 	certs    map[[32]byte]string
 	onChange func(NodeView)
 	limit    *enrollLimiter
+	sink     PacketSink
 }
 
 // NewNodeChannel composes the channel. onChange, when set, is called outside
@@ -280,7 +284,7 @@ func (c *NodeChannel) Enroll(ctx context.Context, source string, token, csr []by
 			}
 			close(e.wake)
 		}
-		e = &nodeEntry{id: id, enrolledAt: now, certs: map[[32]byte]time.Time{}, wake: make(chan struct{})}
+		e = &nodeEntry{id: id, enrolledAt: now, certs: map[[32]byte]time.Time{}, wake: make(chan struct{}), captures: map[string]pendingCapture{}}
 		c.nodes[id.NodeUID] = e
 	}
 	e.certs[digest] = notAfter
@@ -427,12 +431,16 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 	return nil
 }
 
-// Enqueue queues one work item for the node's current process and wakes its
-// poll. Later increments are the producers; this increment has none.
+// Enqueue queues one work item without payload for the node's current
+// process and wakes its poll. Packet captures use EnqueuePacket.
 func (c *NodeChannel) Enqueue(nodeUID string, kind collector.WorkKind, notAfter time.Time) (collector.Work, error) {
-	if !kind.Valid() {
+	if !kind.Valid() || kind == collector.WorkPacketCapture {
 		return collector.Work{}, ErrNodeInvalid
 	}
+	return c.enqueue(nodeUID, kind, notAfter, nil)
+}
+
+func (c *NodeChannel) enqueue(nodeUID string, kind collector.WorkKind, notAfter time.Time, packet *collector.PacketCapture) (collector.Work, error) {
 	var raw [16]byte
 	if _, err := rand.Read(raw[:]); err != nil {
 		return collector.Work{}, ErrNodeUnavailable
@@ -444,12 +452,20 @@ func (c *NodeChannel) Enqueue(nodeUID string, kind collector.WorkKind, notAfter 
 	if e == nil || !now.Before(notAfter) {
 		return collector.Work{}, ErrNodeUnavailable
 	}
-	if len(e.work) >= collector.MaxQueuedWork {
+	for id, p := range e.captures {
+		if !now.Before(p.until) {
+			delete(e.captures, id)
+		}
+	}
+	if len(e.work) >= collector.MaxQueuedWork || packet != nil && len(e.captures) >= collector.MaxQueuedWork {
 		return collector.Work{}, ErrNodeLimit
 	}
 	e.nextSeq++
 	h := hex.EncodeToString(raw[:])
-	w := collector.Work{ID: h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:], Sequence: e.nextSeq, Kind: kind, NotAfter: notAfter}
+	w := collector.Work{ID: h[:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:], Sequence: e.nextSeq, Kind: kind, NotAfter: notAfter, Packet: packet}
+	if packet != nil {
+		e.captures[w.ID] = pendingCapture{captureID: packet.CaptureID, until: notAfter.Add(packet.Duration + PacketUploadMargin)}
+	}
 	e.work = append(e.work, w)
 	close(e.wake)
 	e.wake = make(chan struct{})

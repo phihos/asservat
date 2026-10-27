@@ -34,6 +34,7 @@ import (
 	"sync"
 	"unsafe"
 
+	"asservat.local/asservat/internal/adapters/packets"
 	value "asservat.local/asservat/internal/domain/planning"
 )
 
@@ -69,6 +70,11 @@ func (c *Compiler) CompileFilter(expression string) (value.CompiledFilter, error
 	out := value.CompiledFilter{LinkType: value.FilterLinkType, Snaplen: value.FilterSnaplen, Program: make([]value.BPFInstruction, n)}
 	for i, ins := range insns {
 		out.Program[i] = value.BPFInstruction{Code: uint16(ins.code), Jt: uint8(ins.jt), Jf: uint8(ins.jf), K: uint32(ins.k)}
+	}
+	// ADR-248: the node runs the program in the user-space evaluator, so a
+	// program it cannot run exactly is refused here, at preview.
+	if len(out.Program) <= value.MaxFilterInstructions && packets.CheckProgram(out.Program) != nil {
+		return value.CompiledFilter{}, errors.New("the compiled program uses an instruction the node's packet evaluator does not run (ldx len, neg or an ancillary load); simplify the filter")
 	}
 	return out, nil
 }

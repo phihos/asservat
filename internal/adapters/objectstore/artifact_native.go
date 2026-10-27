@@ -92,9 +92,40 @@ func (s *FramedNativeSource) Describe(ctx context.Context, _ artifact.DownloadSe
 // contiguous within one response; a gap or rewind is refused rather than
 // silently re-read. ReadWork is the ciphertext this call read.
 func (s *FramedNativeSource) ReadChunk(ctx context.Context, lease artifact.DownloadDeliveryLease, offset, length int64) (evidence.NativeResponseChunk, error) {
+	if !lease.Allows(offset, length, time.Now()) {
+		return evidence.NativeResponseChunk{}, artifact.ErrDownloadUnavailable
+	}
+	return s.read(ctx, offset, length)
+}
+
+// Metadata returns the facts authenticated by the manifest when the source
+// opened, with the artifact's own access and deletion dates.
+func (s *FramedNativeSource) Metadata() artifact.NativeDownloadMetadata {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.metadata
+}
+
+// ReadNext serves the regional download worker (ADR-248), whose admitted
+// native operation and window key binding bound this source instead of a hub
+// delivery lease: the same sequential, authenticated read as ReadChunk, at
+// most one delivery chunk at a time. final reports the end-of-file check.
+func (s *FramedNativeSource) ReadNext(ctx context.Context, offset, length int64) ([]byte, bool, error) {
+	if length < 1 || length > artifact.DeliveryBytes {
+		return nil, false, artifact.ErrInvalid
+	}
+	chunk, err := s.read(ctx, offset, length)
+	if err != nil {
+		clear(chunk.Bytes)
+		return nil, false, err
+	}
+	return chunk.Bytes, chunk.FinalVerified, nil
+}
+
+func (s *FramedNativeSource) read(ctx context.Context, offset, length int64) (evidence.NativeResponseChunk, error) {
 	var out evidence.NativeResponseChunk
 	s.mu.Lock()
-	if s.closed || s.busy || ctx == nil || !lease.Allows(offset, length, time.Now()) || offset < 0 || length < 0 || offset > s.metadata.Size || length > s.metadata.Size-offset {
+	if s.closed || s.busy || ctx == nil || offset < 0 || length < 0 || offset > s.metadata.Size || length > s.metadata.Size-offset {
 		s.mu.Unlock()
 		return out, artifact.ErrDownloadUnavailable
 	}

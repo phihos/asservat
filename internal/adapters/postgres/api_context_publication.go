@@ -68,7 +68,7 @@ func (s *APIContextPublicationGate) CheckContextPublication(ctx context.Context,
 	defer cancel()
 	target := authorization.Target{ClusterID: e.Registration.Location.ClusterID, NamespaceUID: e.NamespaceUID, WorkloadUID: e.WorkloadUID, PodUID: e.PodUID}
 	d := privacyvalue.Deadlines{AnchorAt: e.Registration.AnchorAt, ExpiresAt: e.Registration.ExpiresAt, DeleteBy: e.Registration.DeleteBy}
-	retained, err := s.retention.ResolveRetained(ctx, privacyvalue.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "context", RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: d.AnchorAt}, d, e.RetentionRules)
+	retained, err := s.retention.ResolveRetained(ctx, privacyvalue.Input{Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: e.Type().EvidenceType, RequestedSeconds: e.RequestedAgeSeconds, AnchorAt: d.AnchorAt}, d, e.RetentionRules)
 	if err != nil {
 		return out, err
 	}

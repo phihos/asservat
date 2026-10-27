@@ -2,6 +2,7 @@ package capture
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"time"
 
@@ -22,6 +23,9 @@ type RecorderPreviewResult struct {
 	Plan       planning.RecorderPlan
 	Assessment planning.RecorderAssessment
 	ValidUntil time.Time // Original metadata-delivery authority; never persisted.
+	// Recordable marks an acceptable plan for an available node recorder
+	// (ADR-248): request_capture can accept it.
+	Recordable bool
 }
 
 // PreviewComposition compiles a one-component builtin capture profile
@@ -59,6 +63,12 @@ func (s ContextInvestigation) PreviewComposition(ctx context.Context, source ide
 	}
 	if !target.Valid(s.Now()) {
 		return zero, previewFailure("facts/target", value.ErrChanged)
+	}
+	if s.packetRecorderAvailable(ctx, intent, target) {
+		r, err := s.previewRecording(ctx, source, intent, i, recovery, target, created)
+		if !errors.Is(err, errRecordingNotAcceptable) {
+			return r, err
+		}
 	}
 	t := target.Target()
 	eligibility := s.Eligibility.ContextEligibilityCurrent(ctx, source, t)

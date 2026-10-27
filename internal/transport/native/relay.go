@@ -3,6 +3,7 @@ package native
 import (
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/authorization"
 	"context"
 	"time"
@@ -11,7 +12,8 @@ import (
 // RelayConversation forwards a single admitted operation. Upstream must already
 // be connected to the exact current hub process; this type performs no address
 // discovery or peer admission. It cannot acknowledge output on the hub's behalf.
-// Sequential forwarding bounds each direction to one application frame.
+// Sequential forwarding bounds each direction to one application frame at a
+// time.
 type RelayConversation struct {
 	gate     *evidence.NativeFrameGate
 	upstream Stream
@@ -123,8 +125,11 @@ func (r *RelayConversation) Serve(ctx context.Context, worker Stream) error {
 		}
 		return nil
 	}
+	// A response window is relayed as one data frame and one final-sink
+	// acknowledgement per delivery chunk, in order (ADR-248).
+	var chunk int64
 	data := func(frame contracts.NativeFrame) error {
-		if command.Length < 1 || int64(len(frame.Payload)) != command.Length {
+		if chunk < 1 || int64(len(frame.Payload)) != chunk {
 			return contracts.ErrNativeProtocol
 		}
 		return nil
@@ -164,15 +169,19 @@ func (r *RelayConversation) Serve(ctx context.Context, worker Stream) error {
 		}
 		return r.forward(ctx, r.upstream, worker, contracts.NativeDoneFrame, control(contracts.NativeDoneFrame, "joined", 0))
 	case "read-context-response":
-		e := r.forward(ctx, worker, r.upstream, contracts.NativeDataFrame, data)
-		if e != nil {
-			return e
+		if command.Length < 1 || command.Length > artifact.RemoteNativeLimit {
+			return contracts.ErrNativeProtocol
 		}
-		e = r.forward(ctx, r.upstream, worker, contracts.NativeAcknowledgeFrame, control(contracts.NativeAcknowledgeFrame, "delivered", command.Length))
-		if e != nil {
-			return e
+		for left := command.Length; left > 0; left -= chunk {
+			chunk = min(nativeChunkBytes, left)
+			if e := r.forward(ctx, worker, r.upstream, contracts.NativeDataFrame, data); e != nil {
+				return e
+			}
+			if e := r.forward(ctx, r.upstream, worker, contracts.NativeAcknowledgeFrame, control(contracts.NativeAcknowledgeFrame, "delivered", chunk)); e != nil {
+				return e
+			}
 		}
-		e = r.forward(ctx, worker, r.upstream, contracts.NativeDoneFrame, control(contracts.NativeDoneFrame, "closed", 0))
+		e := r.forward(ctx, worker, r.upstream, contracts.NativeDoneFrame, control(contracts.NativeDoneFrame, "closed", 0))
 		if e != nil {
 			return e
 		}

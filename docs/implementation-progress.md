@@ -195,6 +195,71 @@ Verification (tracked test/results files restored after each run):
   loaded workstation; PASS in 4.26 s).
 - Gates: `make pre-push` PASS; `make permission-schema-check`, `helm-check`, `spec-check`, `architecture-check` PASS. All fixture runs after the rebase onto main with the final sources (unchanged during each run, no cleanup failures). The timing test `TestDownloadPolicyObservationNewRequestNearExpiry` failed in two parallel whole-tree runs and passed alone (`-count=3`); it does not use the review port. The sharded `go-check` (race) was not run locally. No installed qualification.
 
+## S-04 increment 4: manual packet capture (ADR-248, 2026-10-27)
+
+[ADR-248](decisions/248-manual-packet-capture.md): manual networkHeaders packet capture end to
+end. Node: Inspektor Gadget's published `tcpdump` gadget (v0.57.0, four digest-pinned blobs in the
+collector image, `scripts/fetch-gadget.sh`) through the linked runtime with the `oci-handler`,
+`ebpf` and `SocketEnricher` operators, attached to the target Pod's veth pairs (tc `clsact`, no
+host network); the hub-compiled libpcap program runs on each frame (`golang.org/x/net/bpf`, `len`
+as wire length); frames are cut at the transport header (gopacket, `internal/adapters/packets`);
+a bounded PCAPNG (≤ 8 MiB, frozen budget) is uploaded once over the mTLS channel
+(`packetCapture` work kind, `/internal/v1/node/capture`). Hub: a composition preview becomes
+requestable (`acceptance: nodeRecorder`) when the region's `packet-recorder` query reports the
+recorder on the Pod's node; admission stores the frozen program, duration and cap in the
+expectation (`pcapng`, generated action ID, 8 MiB); the ADR-171 start ends with
+`start-recording`; the connector's recording holder encrypts the node's PCAPNG with the ADR-244
+producer and holds the completion; hub-api's collect loop (`ListStartedRecordings`, every 3 s)
+runs `collect-recording` and records the stored completion; publication rechecks headers-only in
+the same verification read. Migration 00098 (processing lineage), local-start CRD rule, manifest
+schema (API class may be a pcapng recording), installer provisioning of the connector's node
+listener (Secret, Service, ConfigMap `connector-nodes`, four reads) and the installed hub image
+built with static libpcap (`make hub-binary`).
+
+Verification:
+- Native `collector-packet` (GitHub-hosted `ubuntu-24.04`, kernel `6.17.0-1022-azure`, 4 vCPUs,
+  kind v0.33.0, Kubernetes v1.37.0, containerd 2.3.4):
+  - run 40473896717: failed as designed to learn: the gadget's classifier needs the socket
+    enricher's map layout (`bad CO-RE relocation: invalid func unknown#195896080`); the result
+    upload path worked (`CaptureFailed` delivered).
+  - run 40475029674: PASS (Go test 97 s). Synthetic busybox `httpd`/`wget` traffic between
+    Restricted Pods. Filtered capture with the libpcap 1.11.0 program of `tcp port 8080`
+    (20 instructions): 82,380 frames seen in 10.43 s, 41,186 retained, 41,194 filtered, 0 lost
+    samples, 4,169,788 bytes, 9,549 truncated packets (HTTP payload cut), every packet on port
+    8080 (gopacket and `tshark -T fields -e tcp.port`: 41,186 packets), the payload marker absent,
+    the headers-only recheck passed; queued-to-delivered 10.44 s. Unfiltered: 85,190 frames in
+    10.41 s (8,187 frames/s, 929,913 wire bytes/s), 0 lost samples, output cap reached
+    (8,388,532 bytes, 2,332 frames not retained), queued-to-delivered 10.42 s. A Pod that is not
+    on the node: `TargetNotFound`. Collector binary 155,548,103 bytes.
+  - run 40480456557: failed: the connector-path test read only the first 1 MiB chunk of the
+    encrypted recording (the source's per-chunk verification flag was taken for end of file);
+    the test loops now read to the verified size. Filtered 75,349 seen / 37,671 retained;
+    unfiltered 7,555 frames/s, cap 7,973,256 bytes.
+  - run 40481241336: PASS (Go test 54 s, suite 58 s). Filtered 84,574 seen / 42,275 retained,
+    4,280,080 bytes, 0 lost, tshark 42,275; unfiltered 8,426 frames/s, cap reached (8,388,472
+    bytes, 82,857 of 87,773 frames); `TargetNotFound`. Connector path (real node, gadget,
+    connector holder, ADR-244 producer, SeaweedFS): a 5 s filtered recording of 21,576 frames
+    (2,184,580 bytes) was encrypted and stored 5.77 s after it was queued, then fully verified
+    with the headers-only recheck and read back whole (tshark 21,576 packets).
+- get_case lists a published recording with `kind: packetCapture` (browser label "Packet
+  capture (headers only)"); `make pre-push` PASS.
+- Real PostgreSQL/S3 (`scripts/test-custody.py --run
+  '^TestContextAdmissionWithRealServices$/^recording-admission'`): PASS — admission of the
+  accepted recorder plan (frozen program, 8 MiB), execution preparation with the recording's
+  action and limit, committed start, connector holder (queue, pending collect, delivery of a
+  headers-only PCAPNG, single delivery), `StartedRecordings`/`ReadRecordingWork`,
+  `CollectRecording` recording the stored completion, publication through the real verify,
+  audit and publish roles with the headers-only recheck, native read of the exact bytes
+  (`artifact-<id>.pcapng`).
+- Unit: packets (filter verdicts equal the kernel verdicts of the 11-program feasibility corpus,
+  wire length for `len`, refused instructions, header cuts, recorder limits, verifier refusal of
+  payload, fuzzing 30 s / 2.4 M inputs), collector domain, delivery (only the queued process
+  delivers, once, in time), transport/node (closed wire), bootstrap (node capture flow with a
+  fake engine, holder), planning (acceptance, round trip through the context plan),
+  contextstart (start/collect guards), manifest (manual recording manifest): PASS.
+  `adapters/postgres` initial-schema bundle tests fail on this branch alone: the bundle needs
+  contiguous migrations and 00097 is ADR-249's (as for ADR-244).
+
 ## Installed transient start failures: standby residency (ADR-250, 2026-10-27)
 
 [ADR-250](decisions/250-standby-residency-and-unstarted-acquisition.md): intermittent installed

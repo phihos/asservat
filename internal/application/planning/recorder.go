@@ -804,6 +804,9 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 	component := in.Composition.Components[0]
 	expanded := recipeSpec{Description: ExpandedRecipeDescription, MaxTotalBytes: in.Composition.MaxTotalBytes, MaxDuration: in.Composition.MaxDuration}
 	scope := recorderScope{Version: value.RecorderPlanVersion, Deadline: in.Deadline.UTC().Format(time.RFC3339Nano), Interim: "recorderUnavailable"}
+	if in.NodeRecorder {
+		scope.Interim = "nodeRecorder"
+	}
 	scope.Provenance = wireProvenance{Authored: authored(in.Composition), ResolvedProfiles: []wireResolved{{component.ID, wireRef{"builtin", profile.Name, profile.Version}, hexDigest(profile.Digest)}}}
 	scope.Lifecycle = lifecyclePlan{SchemaVersion: "action-lifecycle/v1", RequestKind: "DebugCapture", OngoingPodScope: "none"}
 	scope.Filters = []compiledFilterRecord{}

@@ -113,6 +113,9 @@ func ProjectionDigest() artifact.Digest {
 // as reason, sharing, approval references and idempotency keys cannot enter this
 // execution digest. The capture identity and original deadline always do.
 func CompileContext(in value.ContextInput, now time.Time) (value.ContextPlan, error) {
+	if in.Recorder != nil {
+		return compileRecorderContext(in, now)
+	}
 	bad := func() (value.ContextPlan, error) { return value.ContextPlan{}, value.ErrInvalid }
 	if !authorization.UUID(in.CaptureID) || (in.CaseID != "" && !authorization.UUID(in.CaseID)) || !in.Executor.Valid() || !in.Target.Valid(now) || !in.Capability.Valid(now) || in.Target.ExecutionClass != in.Capability.ExecutionClass || in.Capability.ProjectionDigest != ProjectionDigest() || in.Deadline.Nanosecond()%1000 != 0 || !now.Before(in.Deadline) || in.Deadline.After(now.Add(5*time.Minute)) {
 		return bad()

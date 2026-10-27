@@ -73,12 +73,31 @@ jobs:
           sql-tools: "${{ !startsWith(matrix.suite, 'collector-') }}"
           kind: "true"
           helm: "${{ startsWith(matrix.suite, 'helm') || startsWith(matrix.suite, 'collector-') }}"
+      # ADR-243 decision 4: the harness's product image links the pinned
+      # static libpcap (make hub-binary), shared with ci.yml's pcap-check
+      # cache; building it needs flex and bison. The collector image does not.
+      - if: "!startsWith(matrix.suite, 'collector-')"
+        id: libpcap
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/asservat-build/libpcap-1.11.0
+          key: libpcap-1.11.0-${{ runner.os }}-${{ hashFiles('scripts/build-libpcap.sh') }}
+      - if: "!startsWith(matrix.suite, 'collector-') && steps.libpcap.outputs.cache-hit != 'true'"
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends flex bison
       # ADR-246: collector suites load BPF programs into the runner's kernel.
       # This fresh, disposable VM is the only place that creates the guard
       # file without which the harness and the collector refuse to start.
       - if: startsWith(matrix.suite, 'collector-')
         name: Disposable-host guard
         run: sudo touch /etc/asservat-disposable-host
+      # ADR-248: the collector suites open the downloaded PCAPNG with tshark
+      # (offline file read only; nothing captures on the runner itself).
+      - if: startsWith(matrix.suite, 'collector-')
+        name: tshark
+        run: |
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends tshark >/dev/null
+          tshark --version | head -1
       - name: Run ${{ matrix.suite }}
         env:
           SUITE: ${{ matrix.suite }}

@@ -131,11 +131,15 @@ func (s *ContextCaseOperations) CallWithContext(ctx context.Context, current ide
 		until = identity.Earlier(until, view.ValidUntil)
 		data := ContextCaseData{Case: ContextCaseSummary{CaseID: view.CaseID, Status: "Ready", Access: "ordinary"}, Artifacts: make([]ContextCaseArtifactData, 0, len(view.Artifacts)), Timeline: []any{}}
 		for _, a := range view.Artifacts {
+			kind := "pod-status"
+			if a.Recording {
+				kind = "packetCapture"
+			}
 			if a.Shared {
 				// ADR-232: the view contains an artifact admitted by a share.
 				data.Case.Access = "shared"
 			}
-			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: "pod-status", DataClass: "metadata", Completeness: "complete", ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: []string{"personalIdentifiers", "networkAddresses", "paths"}, ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
+			data.Artifacts = append(data.Artifacts, ContextCaseArtifactData{ArtifactID: a.ArtifactID, Digest: hash(a.Version), Kind: kind, DataClass: "metadata", Completeness: "complete", ExpiresAt: a.ExpiresAt, HandlingNotice: ArtifactHandlingNotice{Classification: "potentialPersonalData", MayContain: []string{"personalIdentifiers", "networkAddresses", "paths"}, ExpiresAt: a.ExpiresAt, DeleteBy: a.DeleteBy, DeletionState: "scheduled", AutomaticDeletion: true, ManagedCopiesOnly: true, ExternalCopiesRecallable: false, HandlingCodes: []string{"minimizeCapture", "restrictAccess", "preferApprovedExtracts", "reviewBeforeSharing", "approvedClientsOnly", "externalCopiesNotRecalled"}, PreservationException: false, AsOf: view.ObservedAt}})
 		}
 		out.Data = data
 	}

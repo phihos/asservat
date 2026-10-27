@@ -21,9 +21,14 @@ type RemoteContextSource struct {
 	request      ContextDownloadRequest
 	preparation  artifact.DownloadPreparation
 	closed, busy bool
-	active       *attachedExchange
-	activeStop   func()
-	lease        artifact.DownloadDeliveryLease
+	// One remote conversation serves one whole delivery lease window, chunk
+	// by chunk (ADR-248): next is the next native offset, pending a chunk
+	// returned but not yet acknowledged by the final sink.
+	active     *attachedExchange
+	activeStop func()
+	lease      artifact.DownloadDeliveryLease
+	next       int64
+	pending    bool
 }
 
 var _ CurrentNativeResponseSource = (*RemoteContextSource)(nil)
@@ -52,6 +57,9 @@ func (s *RemoteContextSource) enter() bool {
 	if s.closed || s.owner.Err() != nil || s.busy || s.active != nil {
 		return false
 	}
+	return s.enterLocked()
+}
+func (s *RemoteContextSource) enterLocked() bool {
 	s.busy = true
 	s.idle = make(chan struct{})
 	return true
@@ -88,50 +96,98 @@ func (s *RemoteContextSource) DescribeCurrent(ctx context.Context, current ident
 	}
 	m.ReadUntil = latest.AccessUntil
 	m.DeleteBy = latest.DeleteBy
-	return m, ContextDownloadReadWork, nil
+	return m, NativeWindowReadWork(s.request.Expectation.Type()), nil
 }
+
+// ReadChunkCurrent returns the next chunk of the lease's window. The first
+// chunk (at the window offset) opens one private conversation for the whole
+// window under the current identity and the lease's own deadline; every later
+// chunk must follow the previous one's final-sink acknowledgement in the same
+// window and lease. A failed chunk ends the conversation; the window is not
+// retried here.
 func (s *RemoteContextSource) ReadChunkCurrent(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease, offset, length int64) (NativeResponseChunk, error) {
-	if s == nil || ctx == nil || !lease.Valid(s.attachment.config.Now()) || lease.Authority.Scope != s.request.Scope || offset != lease.Offset || length != lease.Length || length < 1 || length > artifact.MaxContextBytes || !s.enter() {
+	if s == nil || ctx == nil || !lease.Valid(s.attachment.config.Now()) || lease.Authority.Scope != s.request.Scope || length < 1 || length > artifact.DeliveryBytes || !lease.Allows(offset, length, s.attachment.config.Now()) {
+		return NativeResponseChunk{}, artifact.ErrDownloadUnavailable
+	}
+	s.mu.Lock()
+	ok := !s.closed && s.owner.Err() == nil && !s.busy && (s.active == nil && offset == lease.Offset || s.active != nil && !s.pending && lease == s.lease && offset == s.next)
+	if ok {
+		ok = s.enterLocked()
+	}
+	exchange := s.active
+	s.mu.Unlock()
+	if !ok {
 		return NativeResponseChunk{}, artifact.ErrDownloadUnavailable
 	}
 	defer s.leave()
+	if exchange == nil {
+		var e error
+		if exchange, e = s.openWindow(ctx, current, lease); e != nil {
+			return NativeResponseChunk{}, e
+		}
+	}
 	call, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(s.owner, cancel)
-	keep := false
-	defer func() {
-		if !keep {
-			stop()
-			cancel()
-		}
-	}()
-	ctx = call
-	check, e := s.attachment.current(ctx, current, s.request)
-	if e != nil {
-		return NativeResponseChunk{}, e
+	defer func() { stop(); cancel() }()
+	chunk, e := exchange.ReadChunk(call, lease, offset, length)
+	s.mu.Lock()
+	if e == nil && s.closed {
+		e = artifact.ErrDownloadUnavailable
 	}
-	exchange, e := s.attachment.open(ctx, s.request, value.NativeResponse, lease.ResponseID, lease.Generation, lease, check)
 	if e != nil {
-		return NativeResponseChunk{}, e
-	}
-	chunk, e := exchange.ReadChunk(ctx, lease, offset, length)
-	if e != nil {
+		finish := s.activeStop
+		s.active, s.activeStop, s.pending = nil, nil, false
+		s.mu.Unlock()
+		clear(chunk.Bytes)
 		exchange.Close()
+		if finish != nil {
+			finish()
+		}
 		return NativeResponseChunk{}, e
+	}
+	s.pending, s.next = true, offset+length
+	s.mu.Unlock()
+	return chunk, nil
+}
+
+// openWindow opens the window's conversation. It belongs to this source and
+// the lease (cancelled by Close and ending at the lease deadline), not to the
+// first chunk's call, whose cancellation still stops the opening itself.
+func (s *RemoteContextSource) openWindow(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease) (*attachedExchange, error) {
+	window, cancel := context.WithDeadline(context.WithoutCancel(ctx), lease.Until)
+	stopOwner := context.AfterFunc(s.owner, cancel)
+	finish := func() { stopOwner(); cancel() }
+	stopCall := context.AfterFunc(ctx, cancel)
+	check, e := s.attachment.current(window, current, s.request)
+	var exchange *attachedExchange
+	if e == nil {
+		exchange, e = s.attachment.open(window, s.request, value.NativeResponse, lease.ResponseID, lease.Generation, lease, check)
+	}
+	if !stopCall() && e == nil {
+		e = artifact.ErrDownloadUnavailable // the first chunk's call ended while opening
+	}
+	if e != nil {
+		if exchange != nil {
+			exchange.Close()
+		}
+		finish()
+		return nil, e
 	}
 	s.mu.Lock()
 	if s.closed {
 		s.mu.Unlock()
-		clear(chunk.Bytes)
 		exchange.Close()
-		return NativeResponseChunk{}, artifact.ErrDownloadUnavailable
+		finish()
+		return nil, artifact.ErrDownloadUnavailable
 	}
-	s.active = exchange
-	s.activeStop = func() { stop(); cancel() }
-	keep = true
-	s.lease = lease
+	s.active, s.activeStop, s.lease, s.next, s.pending = exchange, finish, lease, lease.Offset, false
 	s.mu.Unlock()
-	return chunk, nil
+	return exchange, nil
 }
+
+// AcknowledgeNativeChunk acknowledges the pending chunk's final-sink write.
+// The window's last chunk (or a failed acknowledgement) joins and closes the
+// conversation; earlier chunks keep it open for the next chunk.
 func (s *RemoteContextSource) AcknowledgeNativeChunk(ctx context.Context, lease artifact.DownloadDeliveryLease, offset, length int64) error {
 	if s == nil {
 		return artifact.ErrInvalid
@@ -139,21 +195,28 @@ func (s *RemoteContextSource) AcknowledgeNativeChunk(ctx context.Context, lease 
 	s.mu.Lock()
 	active := s.active
 	finish := s.activeStop
-	if s.closed || s.busy || active == nil || s.lease != lease {
+	if s.closed || s.busy || active == nil || !s.pending || s.lease != lease || offset+length != s.next {
 		s.mu.Unlock()
 		return artifact.ErrDownloadUnavailable
 	}
+	last := s.next == lease.Offset+lease.Length
 	s.busy = true
 	s.idle = make(chan struct{})
 	s.mu.Unlock()
 	e := active.AcknowledgeNativeChunk(ctx, lease, offset, length)
-	closeErr := active.Close()
-	if finish != nil {
-		finish()
+	var closeErr error
+	if e != nil || last {
+		closeErr = active.Close()
+		if finish != nil {
+			finish()
+		}
 	}
 	s.mu.Lock()
-	s.active = nil
-	s.activeStop = nil
+	s.pending = false
+	if e != nil || last {
+		s.active = nil
+		s.activeStop = nil
+	}
 	s.busy = false
 	close(s.idle)
 	s.mu.Unlock()

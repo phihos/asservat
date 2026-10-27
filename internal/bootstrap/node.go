@@ -156,7 +156,20 @@ func RunNode(ctx context.Context, podUID string) error {
 	defer client.CloseIdle()
 	p := &nodeProcess{client: client, creds: creds, token: readNodeToken, bootID: boot, epoch: uuid.NewString(), facts: facts, mechanisms: mechanisms,
 		budget: budget, now: time.Now, sleep: nodeSleep, log: os.Stderr}
-	return p.Run(ctx)
+	p.packets = &nodePackets{engine: gadget.CapturePackets, upload: client.UploadCapture, available: packetAvailable(mechanisms), version: facts.Engine.Version,
+		now: time.Now, log: func(line string) { fmt.Fprintln(os.Stderr, line) }, budget: func() *collector.Budget { return p.budget }, budgetMu: &p.mu}
+	err = p.Run(ctx)
+	p.packets.wg.Wait()
+	return err
+}
+
+func packetAvailable(m []collector.Availability) bool {
+	for _, a := range m {
+		if a.Mechanism == collector.MechanismPacket {
+			return a.Adapter == collector.AdapterAvailable
+		}
+	}
+	return false
 }
 
 func nodeSleep(ctx context.Context, d time.Duration, kick <-chan struct{}) error {
@@ -178,6 +191,7 @@ type nodeChannel interface {
 	Enroll(context.Context, contracts.NodeEnrollRequest) (contracts.NodeEnrollResponse, error)
 	Poll(ctx context.Context, epoch string, after uint64) ([]collector.Work, error)
 	Status(ctx context.Context, epoch string, r collector.Report) error
+	UploadCapture(ctx context.Context, epoch string, r collector.PacketResult, pcapng []byte) error
 	CloseIdle()
 }
 
@@ -199,6 +213,10 @@ type nodeProcess struct {
 	now        func() time.Time
 	sleep      func(context.Context, time.Duration, <-chan struct{}) error
 	log        io.Writer
+	// packets runs packet captures (ADR-248); nil refuses every item.
+	packets *nodePackets
+	// root is the process context: captures outlive a re-enrollment.
+	root context.Context
 
 	mu       sync.Mutex
 	budget   *collector.Budget
@@ -354,17 +372,32 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 			}
 			continue
 		}
-		p.mu.Lock()
 		for _, w := range work {
 			if w.Sequence <= after {
 				continue
 			}
-			if len(p.receipts) >= nodeReceiptBuffer {
+			p.mu.Lock()
+			full := len(p.receipts) >= nodeReceiptBuffer
+			p.mu.Unlock()
+			if full {
 				break
 			}
-			p.receipts = append(p.receipts, collector.Decide(w, p.now()))
+			// Starting a capture takes the lock for the budget, so decide
+			// without holding it.
+			r := collector.Decide(w, p.now())
+			if w.Kind == collector.WorkPacketCapture && p.packets != nil {
+				root := p.root
+				if root == nil {
+					root = ctx
+				}
+				r = p.packets.start(root, p.epoch, w)
+			}
+			p.mu.Lock()
+			p.receipts = append(p.receipts, r)
+			p.mu.Unlock()
 			after = w.Sequence
 		}
+		p.mu.Lock()
 		p.cadence.Urgent()
 		p.mu.Unlock()
 		select {
@@ -400,6 +433,7 @@ func (p *nodeProcess) renewLoop(ctx context.Context, notAfter time.Time) error {
 // A connector that no longer knows the process (connector restart) leads to
 // a fresh enrollment with the same key and epoch.
 func (p *nodeProcess) Run(ctx context.Context) error {
+	p.root = ctx
 	for {
 		notAfter, err := p.enroll(ctx)
 		if err != nil {

@@ -41,6 +41,8 @@ func TestChartClusterInstallerHoldsRegionalGrants(t *testing.T) {
 	clusterRole, role := regionalRBAC(ns)
 	cluster, connector, capacity := regionalExecutorRBAC(ns)
 	granted := slices.Concat(clusterRole.Rules, role.Rules, cluster, connector, capacity.Rules, regionalCapacityRBAC(ns),
+		// ADR-246: the collector attestation reads.
+		[]rbac.PolicyRule{regionalNodeReadRule()}, regionalCollectorRBAC(ns, RegionalCollectorPlan{Namespace: "collector", Name: "node"}).Rules,
 		// ensureCapacityProbe's probe ClusterRole and token Role.
 		[]rbac.PolicyRule{{APIGroups: []string{""}, Resources: []string{"namespaces"}, ResourceNames: []string{ns}, Verbs: []string{"get", "update"}},
 			{APIGroups: []string{""}, Resources: []string{"serviceaccounts/token"}, ResourceNames: []string{CapacityProbeAccount}, Verbs: []string{"create"}},

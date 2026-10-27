@@ -54,7 +54,9 @@ namespace (the only namespace with the privileged Pod Security exception) and th
 DaemonSet ([ADR-246](../../docs/decisions/246-node-collector-role.md)). Every collector Pod
 mounts the host file `/etc/asservat-disposable-host` (hostPath type `File`), so it starts only on
 disposable test hosts that carry it. In this version it probes its node and reports status to the
-connector; it records nothing. See [node collector](../../docs/installation/helm.md#node-collector-test-hosts-only).
+connector; it records nothing. With `cluster.enabled` and an empty `collector.connector`, the
+connector installer provisions the node listener and the chart reads its endpoint and root on the
+next `helm upgrade`. See [node collector](../../docs/installation/helm.md#node-collector-test-hosts-only).
 
 ## Upgrade and uninstall
 

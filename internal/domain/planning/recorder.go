@@ -97,6 +97,10 @@ type RecorderInput struct {
 	// RequireApproval is the protected installation setting that every
 	// recording needs approval (ADR-249); never a caller option.
 	RequireApproval bool
+	// NodeRecorder marks a plan whose target's node collector reported the
+	// packet recorder at preview (ADR-248): acceptance "nodeRecorder" instead
+	// of the interim "recorderUnavailable". It enters the plan digest.
+	NodeRecorder bool `json:",omitempty"`
 }
 
 // RecorderAction is the normalized review summary of one expanded action.
@@ -124,8 +128,9 @@ type ResolvedProfile struct {
 	DefinitionDigest artifact.Digest
 }
 
-// RecorderPlan is a compiled, reviewable packet/syscall plan. It is not an
-// accepted execution scope: no node recorder exists to accept it (ADR-243).
+// RecorderPlan is a compiled, reviewable packet/syscall plan (ADR-243). Only a
+// manual networkHeaders plan compiled for an available node recorder can be
+// accepted, through the context plan (ADR-248).
 type RecorderPlan struct {
 	Input          RecorderInput
 	Actions        []RecorderAction

@@ -338,6 +338,13 @@ func NewRegional(ctx context.Context, files *os.Root, podUID string) (r *Regiona
 			return r, mounts.ErrUnavailable
 		}
 		r.closers = append(r.closers, r.nodes.close)
+		// ADR-248: manual packet recordings need both the node channel and
+		// the context start's output and Pod reads.
+		if r.context != nil {
+			recordings := NewConnectorRecordings(r.nodes.server.Channel, r.context.collector, time.Now, func(line string) { fmt.Fprintln(os.Stderr, line) })
+			r.nodes.server.Channel.SetPacketSink(recordings)
+			r.context.output.recordings = recordings
+		}
 	}
 	return r, nil
 }

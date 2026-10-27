@@ -333,7 +333,7 @@ def check_collector(directory):
     container, = pod["containers"]
     assert container["command"] == ["/asservat", "node"] and container["image"] == base["collector"]["image"]
     assert container["securityContext"] == {"privileged": False, "runAsUser": 0, "runAsNonRoot": False, "allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,
-                                             "capabilities": {"drop": ["ALL"], "add": ["BPF", "NET_ADMIN", "SYS_RESOURCE"]},
+                                             "capabilities": {"drop": ["ALL"], "add": ["BPF", "NET_ADMIN", "SYS_RESOURCE", "PERFMON", "SYS_ADMIN", "SYS_PTRACE"]},
                                              "seccompProfile": {"type": "RuntimeDefault"}}
     assert container["resources"]["limits"]["memory"] == str(268435456 * 2 + 134217728)
     volumes = {v["name"]: v for v in pod["volumes"]}
@@ -364,6 +364,34 @@ def check_collector(directory):
                 v[key] = value
         render(v, ok=False)
     render(base, ok=False, namespace="asservat-collector")
+    # ADR-246 decision 9: with this release's cluster installer and an empty
+    # collector.connector, the installer provisions the connector's node
+    # listener and publishes the values in the connector-nodes ConfigMap.
+    # helm template cannot look it up, so only the namespace and account
+    # render (the installer needs the namespace); a later upgrade renders the
+    # DaemonSet. The installer gets the collector names and the reads it grants.
+    offer = json.dumps({"format": "asservat-regional-offer/v1", "installationID": "10000000-0000-4000-8000-000000000001"})
+    joint = json.loads(json.dumps(base))
+    joint["cluster"] = {"enabled": True, "namespace": "asservat-connector", "image": "registry.example/asservat@sha256:" + "a" * 64, "offer": offer, "bootstrapSecret": "operator-bootstrap"}
+    joint["collector"]["connector"] = {"endpoint": "", "serverName": "", "rootsPEM": ""}
+    docs = render(joint)
+    collector = [r for r in docs if r["metadata"].get("namespace") == "asservat-collector" or r["kind"] == "Namespace"]
+    assert sorted(r["kind"] for r in collector) == ["Namespace", "ServiceAccount"], [r["kind"] for r in collector]
+    command = next(r for r in docs if r["kind"] == "Job")["spec"]["template"]["spec"]["containers"][0]["command"]
+    assert command[-4:] == ["--collector-namespace", "asservat-collector", "--collector-name", "asservat-node"], command
+    rules = next(r for r in docs if r["kind"] == "ClusterRole")["rules"]
+    for rule in [{"apiGroups": [""], "resources": ["services"], "verbs": ["get", "create"]}, {"apiGroups": [""], "resources": ["nodes"], "verbs": ["get"]},
+                 {"apiGroups": ["apps"], "resources": ["daemonsets"], "verbs": ["get"]}]:
+        assert rule in rules, rule
+    without = json.loads(json.dumps(joint))
+    without["collector"]["enabled"] = False
+    rules = next(r for r in render(without) if r["kind"] == "ClusterRole")["rules"]
+    assert not any("nodes" in r["resources"] or "services" in r["resources"] for r in rules)
+    # Explicit values still render the DaemonSet; partial values are refused.
+    joint["collector"]["connector"] = base["collector"]["connector"]
+    assert any(r["kind"] == "DaemonSet" for r in render(joint))
+    joint["collector"]["connector"] = {"endpoint": "https://connector:8444", "serverName": "", "rootsPEM": ""}
+    render(joint, ok=False)
 
 
 def main():

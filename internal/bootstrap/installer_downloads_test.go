@@ -152,7 +152,7 @@ func TestDownloadEnvironmentSettingsWithDownloads(t *testing.T) {
 		t.Fatal("download settings", s)
 	}
 	c := s.Clients[0]
-	if c.Issuer != public.Issuer || c.ID != "console" || c.Kind != "human" || !reflect.DeepEqual(c.Purposes, []string{"synthetic-baseline"}) || !reflect.DeepEqual(c.EvidenceTypes, []string{"context"}) || c.PathIDs == nil || len(c.PathIDs) != 0 {
+	if c.Issuer != public.Issuer || c.ID != "console" || c.Kind != "human" || !reflect.DeepEqual(c.Purposes, []string{"synthetic-baseline"}) || !reflect.DeepEqual(c.EvidenceTypes, []string{"context", "packetCapture"}) || c.PathIDs == nil || len(c.PathIDs) != 0 {
 		t.Fatal("download client", c)
 	}
 	policy := privacy.DownloadPolicy{RootID: runtimeID, InstallationID: runtimeID, RecoveryEpoch: runtimeID, Revision: identity.Revision{UID: runtimeID, Generation: 1, Digest: [32]byte{1}}, PermittedRegions: s.PermittedRegions, Paths: []privacy.DownloadPath{},

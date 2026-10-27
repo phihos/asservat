@@ -22,8 +22,11 @@ const NativeControlBytes = 64 << 10
 const NativeCommandBytes = 640 << 10
 const NativeDataBytes = 1 << 20
 
-// This first qualified mechanism needs one context read, not an unbounded RPC
-// session. Generic large-response accounting does not broaden this frame cap.
+// This first qualified mechanism needs one bounded read, not an unbounded RPC
+// session. A response window of at most artifact.RemoteNativeLimit (8 MiB,
+// ADR-248) is at most eight 1 MiB data frames plus their acknowledgements and
+// the closing frames per direction. Generic large-response accounting does not
+// broaden this frame cap.
 const NativeMaximumFrames = 32
 
 var ErrNativeProtocol = errors.New("native exchange unavailable")

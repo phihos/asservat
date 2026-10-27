@@ -133,11 +133,18 @@ const (
 	// Work receipts only.
 	ReasonWorkExpired Reason = "WorkExpired"
 	ReasonWorkUnknown Reason = "WorkUnknown"
+	// Packet capture receipts and results (ADR-248).
+	ReasonTargetNotFound    Reason = "TargetNotFound"
+	ReasonTargetHostNet     Reason = "TargetHostNetwork"
+	ReasonFilterUnsupported Reason = "FilterUnsupported"
+	ReasonCaptureBusy       Reason = "CaptureBusy"
+	ReasonCaptureFailed     Reason = "CaptureFailed"
 )
 
 func (r Reason) Valid() bool {
 	switch r {
-	case ReasonKernelTooOld, ReasonBTFMissing, ReasonCgroupV1, ReasonBPFUnavailable, ReasonNoTrafficHook, ReasonTracingUnavailable, ReasonHostProcessesHidden, ReasonRuntimeUnknown, ReasonEngineUnavailable, ReasonRecorderNotImplemented, ReasonWorkExpired, ReasonWorkUnknown:
+	case ReasonKernelTooOld, ReasonBTFMissing, ReasonCgroupV1, ReasonBPFUnavailable, ReasonNoTrafficHook, ReasonTracingUnavailable, ReasonHostProcessesHidden, ReasonRuntimeUnknown, ReasonEngineUnavailable, ReasonRecorderNotImplemented, ReasonWorkExpired, ReasonWorkUnknown,
+		ReasonTargetNotFound, ReasonTargetHostNet, ReasonFilterUnsupported, ReasonCaptureBusy, ReasonCaptureFailed:
 		return true
 	}
 	return false
@@ -182,9 +189,11 @@ type Availability struct {
 	Reasons       []Reason
 }
 
-// implemented lists recorders this build provides. Increment 3 provides none:
-// a node whose probe passes still reports AdapterUnavailable.
-var implemented = map[Mechanism]bool{}
+// implemented lists recorders this build provides. Increment 4 (ADR-248)
+// provides the manual networkHeaders packet recorder; it still needs a linked
+// and initialized engine (ReasonEngineUnavailable otherwise). Syscall
+// recording arrives with increment 10.
+var implemented = map[Mechanism]bool{MechanismPacket: true}
 
 // Assess derives each mechanism's availability from the facts. A fact that
 // is unknown or denied counts as missing; nothing is assumed.
@@ -211,13 +220,13 @@ func Assess(f Facts) []Availability {
 	if !f.Engine.Linked || !f.Engine.Initialized {
 		common = append(common, ReasonEngineUnavailable)
 	}
+	// The packet recorder is Inspektor Gadget's tcpdump gadget (ADR-248),
+	// which attaches classic tc (clsact) classifiers; TCX alone is not
+	// enough for it.
 	packet := Availability{Mechanism: MechanismPacket, Reasons: append([]Reason{}, common...)}
-	switch {
-	case f.TCX == Supported:
-		packet.Hook = HookTCX
-	case f.TC == Supported:
+	if f.TC == Supported {
 		packet.Hook = HookTC
-	default:
+	} else {
 		packet.Reasons = append(packet.Reasons, ReasonNoTrafficHook)
 	}
 	syscall := Availability{Mechanism: MechanismSyscall, Reasons: append([]Reason{}, common...)}

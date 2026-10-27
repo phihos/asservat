@@ -152,6 +152,32 @@ func (t Targets) ReviewAccess(ctx context.Context, r targets.AccessReviewRequest
 	return out, nil
 }
 
+// PacketRecorder asks the target Pod's region whether its node collector
+// offers the packet recorder now (ADR-248). Anything but an "available"
+// answer, including an unsupported region, refuses.
+func (t Targets) PacketRecorder(ctx context.Context, p targets.PodResolution) error {
+	r := targets.RecorderRequest{Target: p.Request, Pin: p.Pin}
+	if !r.Valid() || t.Router == nil || t.Now == nil || ctx == nil || ctx.Err() != nil {
+		return targets.ErrInvalid
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	call, diagnostics := NewStreamDiagnosticContext(call)
+	var out targets.RecorderAnswer
+	if _, err := t.Router.Query(call, r.Target.ClusterID, queryPacketRecorder, r, &out); err != nil {
+		t.report("recorder/"+queryStep(err, diagnostics), "")
+		return err
+	}
+	if !out.Valid() {
+		t.report("recorder/result", "")
+		return targets.ErrUnavailable
+	}
+	if out.Outcome != targets.RecorderAvailable {
+		return targets.ErrUnsupported
+	}
+	return nil
+}
+
 func (t Targets) report(step, timing string) {
 	if t.Report != nil {
 		t.Report(step, timing)

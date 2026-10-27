@@ -5,10 +5,12 @@
 package node
 
 import (
+	"encoding/hex"
 	"time"
 
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/collector"
+	"asservat.local/asservat/internal/domain/planning"
 )
 
 // WireStatus converts one report into its wire form.
@@ -96,7 +98,7 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 		return collector.Report{}, false
 	}
 	for _, m := range s.Mechanisms {
-		a := collector.Availability{Mechanism: collector.Mechanism(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: collector.Adapter(m.Adapter), Hook: collector.Hook(m.Hook)}
+		a := collector.Availability{Mechanism: collector.Mechanism(m.Mechanism), Prerequisites: m.Prerequisites, Adapter: collector.Adapter(m.Adapter), Hook: collector.Hook(m.Hook), Reasons: []collector.Reason{}}
 		if (a.Mechanism != collector.MechanismPacket && a.Mechanism != collector.MechanismSyscall) || (a.Adapter != collector.AdapterAvailable && a.Adapter != collector.AdapterUnavailable) ||
 			(a.Hook != collector.HookNone && a.Hook != collector.HookTCX && a.Hook != collector.HookTC) || len(m.Reasons) > 16 {
 			return collector.Report{}, false
@@ -120,14 +122,83 @@ func DomainStatus(s contracts.NodeStatus) (collector.Report, bool) {
 }
 
 func WireWork(w collector.Work) contracts.NodeWork {
-	return contracts.NodeWork{ID: w.ID, Sequence: w.Sequence, Kind: string(w.Kind), NotAfter: w.NotAfter.UTC()}
+	out := contracts.NodeWork{ID: w.ID, Sequence: w.Sequence, Kind: string(w.Kind), NotAfter: w.NotAfter.UTC()}
+	if p := w.Packet; p != nil {
+		c := &contracts.NodePacketCapture{CaptureID: p.CaptureID, PodUID: p.PodUID, Program: make([]contracts.NodeBPFInstruction, len(p.Program)),
+			DurationMillis: p.Duration.Milliseconds(), MaxBytes: p.MaxBytes}
+		for i, ins := range p.Program {
+			c.Program[i] = contracts.NodeBPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
+		}
+		if p.ProgramDigest != ([32]byte{}) {
+			c.ProgramDigest = hex.EncodeToString(p.ProgramDigest[:])
+		}
+		out.PacketCapture = c
+	}
+	return out
+}
+
+func digestHex(s string) ([32]byte, bool) {
+	var d [32]byte
+	if s == "" {
+		return d, true
+	}
+	b, err := hex.DecodeString(s)
+	if err != nil || len(b) != 32 || hex.EncodeToString(b) != s {
+		return d, false
+	}
+	copy(d[:], b)
+	return d, d != [32]byte{}
 }
 
 // DomainWork keeps the kind as received: the node answers an unknown kind
-// with a WorkUnknown receipt instead of dropping the item.
+// with a WorkUnknown receipt instead of dropping the item. A payload that is
+// not exactly a valid packet capture is kept invalid for the same answer.
 func DomainWork(w contracts.NodeWork) (collector.Work, bool) {
 	if !text(w.ID, 36) || w.ID == "" || w.Sequence == 0 || !text(w.Kind, 32) || w.NotAfter.IsZero() {
 		return collector.Work{}, false
 	}
-	return collector.Work{ID: w.ID, Sequence: w.Sequence, Kind: collector.WorkKind(w.Kind), NotAfter: w.NotAfter.UTC().Truncate(time.Microsecond)}, true
+	out := collector.Work{ID: w.ID, Sequence: w.Sequence, Kind: collector.WorkKind(w.Kind), NotAfter: w.NotAfter.UTC().Truncate(time.Microsecond)}
+	if c := w.PacketCapture; c != nil {
+		// An unusable payload stays an invalid item, answered WorkUnknown.
+		if len(c.Program) > planning.MaxFilterInstructions || c.DurationMillis < 0 || c.DurationMillis > collector.MaxPacketCaptureDuration.Milliseconds() || !text(c.CaptureID, 36) || !text(c.PodUID, 36) {
+			out.Packet = &collector.PacketCapture{}
+			return out, true
+		}
+		p := &collector.PacketCapture{CaptureID: c.CaptureID, PodUID: c.PodUID, Program: make([]planning.BPFInstruction, len(c.Program)),
+			Duration: time.Duration(c.DurationMillis) * time.Millisecond, MaxBytes: c.MaxBytes}
+		for i, ins := range c.Program {
+			p.Program[i] = planning.BPFInstruction{Code: ins.Code, Jt: ins.Jt, Jf: ins.Jf, K: ins.K}
+		}
+		d, ok := digestHex(c.ProgramDigest)
+		if !ok && c.ProgramDigest != "" {
+			out.Packet = &collector.PacketCapture{}
+			return out, true
+		}
+		p.ProgramDigest = d
+		out.Packet = p
+	}
+	return out, true
+}
+
+// WirePacketResult heads a capture upload.
+func WirePacketResult(epoch string, r collector.PacketResult) contracts.NodePacketResult {
+	out := contracts.NodePacketResult{Format: contracts.NodeCaptureFormat, Epoch: epoch, WorkID: r.WorkID, CaptureID: r.CaptureID, StartedAt: r.StartedAt.UTC(), EndedAt: r.EndedAt.UTC(),
+		Seen: r.Seen, Retained: r.Retained, Filtered: r.Filtered, Unsupported: r.Unsupported, Fragment: r.Fragment, Extension: r.Extension, Malformed: r.Malformed,
+		OutputFull: r.OutputFull, LostSamples: r.LostSamples, WireBytes: r.WireBytes, CapturedBytes: r.CapturedBytes, Snaplen: r.Snaplen, EngineVersion: r.EngineVersion, Failure: string(r.Failure)}
+	if r.ProgramDigest != ([32]byte{}) {
+		out.ProgramDigest = hex.EncodeToString(r.ProgramDigest[:])
+	}
+	return out
+}
+
+// DomainPacketResult validates an upload header.
+func DomainPacketResult(w contracts.NodePacketResult) (collector.PacketResult, bool) {
+	d, ok := digestHex(w.ProgramDigest)
+	if w.Format != contracts.NodeCaptureFormat || !ok && w.ProgramDigest != "" || !text(w.EngineVersion, 64) {
+		return collector.PacketResult{}, false
+	}
+	r := collector.PacketResult{WorkID: w.WorkID, CaptureID: w.CaptureID, StartedAt: w.StartedAt.UTC().Truncate(time.Microsecond), EndedAt: w.EndedAt.UTC().Truncate(time.Microsecond),
+		Seen: w.Seen, Retained: w.Retained, Filtered: w.Filtered, Unsupported: w.Unsupported, Fragment: w.Fragment, Extension: w.Extension, Malformed: w.Malformed,
+		OutputFull: w.OutputFull, LostSamples: w.LostSamples, WireBytes: w.WireBytes, CapturedBytes: w.CapturedBytes, Snaplen: w.Snaplen, EngineVersion: w.EngineVersion, ProgramDigest: d, Failure: collector.Reason(w.Failure)}
+	return r, r.Valid()
 }

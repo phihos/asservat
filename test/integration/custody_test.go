@@ -585,6 +585,9 @@ func TestCustodyWithRealServices(t *testing.T) {
 	t.Run("native artifact types and 256 MiB streaming (ADR-244)", func(t *testing.T) {
 		qualifyNativeArtifacts(t, ctx, admin, ledger, store, charge)
 	})
+	t.Run("remote native window within one frame (ADR-248)", func(t *testing.T) {
+		qualifyRemoteNativeWindow(t, ctx, store)
+	})
 }
 
 func qualifySchemaCompatibility(t *testing.T, ctx context.Context, admin, pool *pgxpool.Pool) {

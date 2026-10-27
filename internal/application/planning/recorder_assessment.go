@@ -66,6 +66,9 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 		Combined:    value.AssessmentImpact{Level: "unknown", HasUnknowns: true, Explanation: "Recorder overhead depends on traffic, call rate and placement and is not measured; no recorder runs in this release. Limits are not predictions."},
 		Interaction: "Current node and upload pressure and other recorders on the same node are not measured by this preview.",
 	}
+	if plan.Input.NodeRecorder {
+		out.Combined.Explanation = "Recorder overhead depends on traffic and placement and is not measured by this preview. This manual capture runs on the target node's collector and saves at most 8 MiB. Limits are not predictions."
+	}
 	var ringArmed, ringIncident, frozen, output int64
 	effects := map[string]bool{}
 	for _, a := range plan.Actions {
@@ -80,7 +83,11 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 			ringIncident += a.RingMaxBytes
 		}
 		frozen += a.MaxFrozenBytes
-		output += a.MaxBytes
+		limit := a.MaxBytes
+		if plan.Input.NodeRecorder && a.Kind == "packetCapture" {
+			limit = min(limit, artifact.RecordingNativeLimit) // ADR-248 interim cap
+		}
+		output += limit
 		switch a.Kind {
 		case "packetCapture":
 			assessed.Impact = value.AssessmentImpact{Level: "unknown", HasUnknowns: true, Effects: []string{"nodeCPU", "collectorMemory", "storageIO", "uploadContention"},
@@ -106,7 +113,7 @@ func AssessRecorder(plan value.RecorderPlan, assessmentID string, now time.Time)
 			effects[e] = true
 		}
 		assessed.Quantities = []value.AssessmentQuantity{
-			quantity("outputBytes", "perIncident", "perIncidentPod", "action:"+a.ID+":maxBytes", outputCoverage, a.MaxBytes),
+			quantity("outputBytes", "perIncident", "perIncidentPod", "action:"+a.ID+":maxBytes", outputCoverage, limit),
 			quantity("collectorMemoryBytes", ringPhase, ringScope, "action:"+a.ID+":ring.maxBytes", ringCoverage, a.RingMaxBytes),
 			quantity("collectorMemoryBytes", "perIncident", "perIncidentPod", "action:"+a.ID+":maxFrozenBytes", frozenCoverage, a.MaxFrozenBytes),
 		}

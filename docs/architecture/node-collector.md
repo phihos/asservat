@@ -37,8 +37,9 @@ nothing yet; increment 4 adds the first recorder.
    and receipts. The connector keeps only the latest report per node, in memory; a node without a
    report for 45 s is not current.
 5. Work: the collector long-polls (25 s hold) for work after its last sequence. Kinds are
-   `armSource`, `stopSource`, `snapshot`, `peerGeneration`; this build has no producer and the
-   collector refuses every item with `RecorderNotImplemented` (or `WorkExpired`/`WorkUnknown`).
+   `armSource`, `stopSource`, `snapshot`, `peerGeneration` (no producer; refused with
+   `RecorderNotImplemented`, `WorkExpired` or `WorkUnknown`) and `packetCapture`
+   ([ADR-248](../decisions/248-manual-packet-capture.md), the only kind with a typed payload).
 6. Renewal at one minute before expiry, with the same key and epoch. A 401 (connector restarted
    or process replaced) leads to a fresh enrollment with the same key and epoch.
 7. One current process per node: any enrollment for the node by another Pod, boot or epoch
@@ -50,19 +51,36 @@ nothing yet; increment 4 adds the first recorder.
 `Assess` requires, for both mechanisms: kernel ≥ 5.15, BTF, cgroup v2, BPF program load, host
 processes visible (host PID namespace), a known runtime (containerd or CRI-O daemon observed) and
 an initialized engine; packet additionally TCX (preferred) or tc, syscall additionally tracefs.
-`Prerequisites` reports whether they hold. `Adapter` is `AdapterUnavailable` with
-`RecorderNotImplemented` for every mechanism in this build, whatever the probe says.
+`Prerequisites` reports whether they hold. ADR-248: the packet recorder is `Available` when they
+hold (hook `tc`: the gadget attaches tc `clsact` classifiers; TCX alone is not enough); syscall
+recording stays `AdapterUnavailable` with `RecorderNotImplemented`.
+
+## Manual packet capture (ADR-248)
+
+1. The hub asks the target's region (`packet-recorder` pre-work query) whether the Pod's node
+   offers the recorder; only then is a manual networkHeaders plan requestable.
+2. The ADR-171 start prepares the attempt's keys at the connector and, instead of acquiring,
+   `start-recording` queues `packetCapture` on the Pod's node (program, digest, duration, cap)
+   and hands the keys to the connector's recording holder.
+3. The node runs the pinned tcpdump gadget on the Pod's veth pairs for the duration, runs the
+   hub-compiled program on each frame, cuts frames at the transport header and uploads one
+   bounded PCAPNG to `/internal/v1/node/capture`.
+4. The holder encrypts and stores it with the artifact producer (four write-only objects) and
+   keeps the writer completion; the hub-api collect loop runs a `collect-recording` exchange and
+   records the stored completion; publication verifies with the headers-only recheck.
 
 ## Limits
 
 Enrollment: claims precheck without API calls, then 5/s globally (burst 20), one per source
 address per 5 s (burst 3), 8 attestations in flight; refused with 429. At most 5,000 nodes per connector, 64 queued items and 16 per poll, 64 receipts per report, 64 KiB
-per message, two connections per node (10,016 in total), 20-minute leaves with at most two per
+per message (256 KiB per poll answer), three connections per node (15,016 in total), 20-minute leaves with at most two per
 process. Node ceilings default to 256 MiB ring, 256 MiB frozen, 32 MiB/s upload with a 64 MiB
 burst, and bound the container memory limit (ring + frozen + 128 MiB).
 
 ## Not yet
 
-The installer does not yet provision the connector's `collector` input (server Secret, Service,
-the four attestation reads); no work producer, recorder or budget reservation path exists; budget
-policy node limits are accepted by the schema but not yet intersected at admission. See the ADR.
+The regional installer provisions the connector's `collector` input (Secret, Service and public
+ConfigMap `connector-nodes`, the four attestation reads; ADR decision 9), but no native run has
+installed it yet. Only manual packet captures exist (no rings, policy arming or snapshots);
+budget policy node limits are accepted by the schema but not yet intersected at admission. See the
+ADRs.

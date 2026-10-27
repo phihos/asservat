@@ -7,10 +7,13 @@ programs, so the harness refuses to start unless the host carries the
 disposable-host guard file that only those environments create. Never run it
 on a workstation, not even with kind.
 
-  test-collector.py packet   the collector-packet skeleton (increment 3):
+  test-collector.py packet   the collector-packet suite (increments 3-4):
                              chart-rendered DaemonSet, enrollment, real
-                             probe facts, status cadence, restart epoch,
-                             Restricted negative, uninstall leaves workloads
+                             probe facts, status cadence, manual
+                             networkHeaders captures through the pinned
+                             tcpdump gadget with a libpcap-compiled filter
+                             (ADR-248), restart epoch, Restricted negative,
+                             uninstall leaves workloads
 """
 import json
 import os
@@ -22,12 +25,40 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
+import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 GUARD = Path("/etc/asservat-disposable-host")
 # The context harness's pinned kind node and pause images.
 NODE = "kindest/node@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5"
 PAUSE = "registry.k8s.io/pause@sha256:ee6521f290b2168b6e0935a181d4cff9be1ac3f505666ef0e3c98fae8199917a"
+# ADR-248: synthetic HTTP traffic between Restricted Pods (busybox httpd/wget).
+BUSYBOX = "docker.io/library/busybox@sha256:bdf57e528e45e4433820e045b29b4597825a1c9e38353532d90a01445013f82e"
+# The evidence store of the connector path (the custody fixture's pinned image).
+SEAWEED = "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d"
+
+
+def seaweed(run_id):
+    """A synthetic S3 store for the connector's encrypted recordings."""
+    name = "asservat-collector-s3-" + run_id
+    run(["docker", "run", "-d", "--name", name, "--label", "asservat.test=" + run_id, "--user", "1000:1000", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m",
+         "-v", "/data", "-e", "AWS_ACCESS_KEY_ID=synthetic-only", "-e", "AWS_SECRET_ACCESS_KEY=synthetic-only-secret", "--cap-drop", "ALL", "--security-opt", "no-new-privileges",
+         "--entrypoint", "/usr/bin/weed", SEAWEED, "mini", "-dir=/data", "-ip.bind=0.0.0.0", "-admin.ui=false", "-s3.port=8333"])
+    ip = json.loads(run(["docker", "inspect", name]))[0]["NetworkSettings"]["IPAddress"]
+    for _ in range(120):
+        try:
+            urllib.request.urlopen("http://" + ip + ":8333", timeout=1).close()
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code in (403, 404):
+                break
+        except OSError:
+            pass
+        time.sleep(.25)
+    else:
+        raise RuntimeError("S3 fixture not ready")
+    return name, "http://" + ip + ":8333"
 INSTALLATION = "10000000-0000-4000-8000-000000000001"
 CLUSTER = "50000000-0000-4000-8000-000000000001"
 PORT = 18444
@@ -85,7 +116,13 @@ def packet(work, report):
     image_dir.mkdir()
     started = time.monotonic()
     subprocess.run(["go", "build", "-tags", "gadget,netgo,osusergo", "-trimpath", "-buildvcs=false", "-o", str(image_dir / "asservat"), "./cmd/asservat"], cwd=ROOT, env=env, check=True)
-    (image_dir / "Dockerfile").write_text("FROM scratch\nCOPY asservat /asservat\n")
+    # The pinned tcpdump gadget blobs (digest-checked) at the collector's
+    # fixed path; nothing is pulled at runtime.
+    subprocess.run([str(ROOT / "scripts/fetch-gadget.sh"), str(image_dir / "gadgets/tcpdump")], check=True)
+    (image_dir / "Dockerfile").write_text("FROM scratch\nCOPY asservat /asservat\nCOPY gadgets /usr/lib/asservat/gadgets\n")
+    # The hub's filter compiler for the test process: static libpcap 1.11.0.
+    subprocess.run(["make", "libpcap"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
+    prefix = Path.home() / ".cache/asservat-build/libpcap-1.11.0"
     tag = "asservat-collector:" + run_id
     run(["docker", "build", "--network=none", "--label", "asservat.test=" + run_id, "-t", tag, str(image_dir)])
     report["build"] = {"seconds": round(time.monotonic() - started, 1), "binaryBytes": (image_dir / "asservat").stat().st_size, "tags": "gadget,netgo,osusergo"}
@@ -93,7 +130,9 @@ def packet(work, report):
     config.write_text(json.dumps({"kind": "Cluster", "apiVersion": "kind.x-k8s.io/v1alpha4",
                                   "nodes": [{"role": "control-plane", "extraMounts": [{"hostPath": str(GUARD), "containerPath": str(GUARD), "readOnly": True}]}]}))
     kubeconfig = work / "kubeconfig"
+    s3name = None
     try:
+        s3name, s3url = seaweed(run_id)
         started = time.monotonic()
         run(["kind", "create", "cluster", "--name", name, "--image", NODE, "--config", str(config), "--kubeconfig", str(kubeconfig), "--wait", "120s"])
         run(["kind", "load", "docker-image", tag, "--name", name])
@@ -114,11 +153,14 @@ def packet(work, report):
         run(["kubectl", "--kubeconfig", str(kubeconfig), "apply", "-f", str(manifests)])
         fixture = {"kubeconfig": str(kubeconfig), "collectorNamespace": "asservat-collector", "daemonSet": "asservat-node", "serviceAccount": "asservat-node",
                    "installationID": INSTALLATION, "clusterID": CLUSTER, "listen": f"{gateway}:{PORT}", "serverCertificate": str(cert), "serverKey": str(key),
-                   "pause": PAUSE, "runner": report["runner"], "results": str(work / "native-results.json")}
+                   "pause": PAUSE, "busybox": BUSYBOX, "s3": s3url, "work": str(work), "runner": report["runner"], "results": str(work / "native-results.json")}
         (work / "fixture.json").write_text(json.dumps(fixture))
         started = time.monotonic()
-        test = subprocess.run(["go", "test", "-count=1", "-v", "-timeout", "12m", "-run", "^TestNodeCollectorWithRealKubernetes$", "./test/integration"],
-                              cwd=ROOT, env=dict(env, ASSERVAT_COLLECTOR_FIXTURES=str(work / "fixture.json")))
+        test = subprocess.run(["go", "test", "-tags", "libpcap", "-count=1", "-v", "-timeout", "12m", "-run", "^TestNodeCollectorWithRealKubernetes$", "./test/integration"],
+                              cwd=ROOT, env=dict(env, CGO_ENABLED="1", CGO_CFLAGS=f"-I{prefix}/include", CGO_LDFLAGS=f"-L{prefix}/lib", ASSERVAT_COLLECTOR_FIXTURES=str(work / "fixture.json")))
+        for name in ("filtered", "unfiltered", "encrypted"):
+            if (work / (name + ".pcapng")).exists():
+                shutil.copy(work / (name + ".pcapng"), ROOT / "test/results" / ("collector-packet-" + name + ".pcapng"))
         report["testSeconds"] = round(time.monotonic() - started, 1)
         if (work / "native-results.json").exists():
             report["native"] = json.loads((work / "native-results.json").read_text())
@@ -130,6 +172,8 @@ def packet(work, report):
             raise SystemExit("collector-packet failed")
     finally:
         subprocess.run(["kind", "delete", "cluster", "--name", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if s3name:
+            subprocess.run(["docker", "rm", "-f", "-v", s3name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         subprocess.run(["docker", "image", "rm", "-f", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         report["cleanup"] = {"cluster": name not in run(["kind", "get", "clusters"]).split(), "image": subprocess.run(["docker", "image", "inspect", tag], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0}
 

@@ -16,11 +16,13 @@ import (
 	"asservat.local/asservat/internal/adapters/mounts"
 	"asservat.local/asservat/internal/adapters/mtls"
 	"asservat.local/asservat/internal/adapters/objectstore"
+	"asservat.local/asservat/internal/adapters/packets"
 	"asservat.local/asservat/internal/adapters/postgres"
 	"asservat.local/asservat/internal/adapters/providerconfig"
 	"asservat.local/asservat/internal/application/evidence"
 	privacyapp "asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/contracts"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
@@ -371,6 +373,9 @@ func (p *Publisher) publish(ctx context.Context, item postgres.PendingContextPub
 	if err != nil {
 		return err
 	}
+	// ADR-248: a networkHeaders PCAPNG is rechecked packet by packet in the
+	// same verification read (packets.CheckHeadersOnly).
+	verifier.WithStreamCheck(artifact.PCAPNGArtifact, func() objectstore.StreamCheck { return packets.NewHeadersCheck() })
 	_, err = evidence.ContextPublisher{Ledger: p.ledger, Authority: p.gate, Verifier: verifier, Audit: p.audit, Now: time.Now}.Publish(ctx, item.CaptureID, item.Copies)
 	return err
 }

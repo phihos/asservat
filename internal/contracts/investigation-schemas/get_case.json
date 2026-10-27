@@ -135,7 +135,10 @@
                           "description": "Immutable verified artifact version. For the current pod-status artifact this is SHA-256 of the existing serialized verified ciphertext copy receipts, not the native file checksum. The prepared download supplies the native SHA-256 separately."
                         },
                         "kind": {
-                          "const": "pod-status"
+                          "enum": [
+                            "pod-status",
+                            "packetCapture"
+                          ]
                         },
                         "data_class": {
                           "const": "metadata"

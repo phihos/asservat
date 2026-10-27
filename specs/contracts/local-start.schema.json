@@ -155,14 +155,28 @@
               "executorPodUID",
               "executorAccountUID"
             ],
-            "properties": {
-              "actionID": {
-                "const": "pod-status"
+            "oneOf": [
+              {
+                "properties": {
+                  "actionID": {
+                    "const": "pod-status"
+                  },
+                  "nativeBytes": {
+                    "const": 4096
+                  }
+                }
               },
-              "nativeBytes": {
-                "const": 4096
+              {
+                "properties": {
+                  "actionID": {
+                    "pattern": "^a[0-9a-f]{24}$"
+                  },
+                  "nativeBytes": {
+                    "const": 8388608
+                  }
+                }
               }
-            },
+            ],
             "not": {
               "anyOf": [
                 {

@@ -138,7 +138,7 @@ func validAdmission(a value.Admission) bool {
 	p := a.Plan.Input
 	t := p.Target.Target()
 	e := a.Eligibility
-	return authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && r.NativeLimit == artifact.MaxContextBytes && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
+	return authorization.UUID(a.RootID) && identity.Text(a.IdempotencyKey, 128) && a.SubmissionDigest != (artifact.Digest{}) && planning.VerifyFrozenContextPlan(a.Plan) && a.Storage.RootID == a.RootID && a.Storage.Matches(t) && a.Storage.AllocationID == r.AllocationID && a.Storage.Valid(a.Storage.ObservedAt) && r.Validate() == nil && r.Location.ClusterID == t.ClusterID && (p.Recorder == nil && r.NativeLimit == artifact.MaxContextBytes || p.Recorder != nil && r.NativeLimit == artifact.RecordingNativeLimit) && r.AnchorAt.Equal(p.Retention.AnchorAt) && r.ExpiresAt.Equal(p.Retention.ExpiresAt) && r.DeleteBy.Equal(p.Retention.DeleteBy) && !r.WriteUntil.After(p.Deadline) && authorization.UUID(a.CaseID) && authorization.UUID(a.OccurrenceID) && (p.CaseID == "" || p.CaseID == a.CaseID) && e.Eligible && e.Target == t && e.Principal == p.Executor && e.VerifiedIdentity.Principal == p.Executor && e.IdentityRevision == e.VerifiedIdentity.Policy && e.PermissionRevision.Valid()
 }
 
 func requestKey(a value.Admission) []byte {
@@ -459,6 +459,15 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 		target := in.Target
 		retention := in.Retention
 		expected := artifact.ContextExpectation{ExecutionClass: target.ExecutionClass, Registration: r, CaseID: a.CaseID, OccurrenceID: a.OccurrenceID, NodeUID: target.NodeUID, NodeBootID: target.NodeBootID, PodUID: target.Request.PodUID, Namespace: target.Request.Namespace.Name, NamespaceUID: target.Request.Namespace.UID, WorkloadUID: target.Request.Workload.UID, CollectorVersion: in.Capability.CollectorVersion, CollectorImageDigest: in.Capability.CollectorImageDigest, RecipeDigest: a.Plan.RecipeDigest, PlanDigest: a.Plan.ScopeDigest, CaptureUID: in.CaptureID, ActionID: "pod-status", DataClass: "metadata", PurposeRef: retention.PurposeRef, Audience: fresh.DefaultAudience, RequestedAgeSeconds: retention.RequestedSeconds, MaximumAgeSeconds: retention.MaximumSeconds, DeletionBudgetSeconds: retention.DeletionBudgetSeconds, RetentionRules: retention.Policies, TriggeredAt: r.AnchorAt}
+		if in.Recorder != nil {
+			// ADR-248: the accepted recording (frozen program, duration,
+			// output cap) is part of the expectation and its digest.
+			recording, actionID, err := planning.RecordingForContext(a.Plan)
+			if err != nil {
+				return value.ErrInvalid
+			}
+			expected.NativeType, expected.ActionID, expected.Recording = artifact.PCAPNGArtifact, actionID, &recording
+		}
 		if expected.Validate() != nil {
 			return value.ErrInvalid
 		}

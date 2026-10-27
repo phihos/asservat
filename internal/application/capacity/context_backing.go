@@ -14,8 +14,10 @@ const ContextBackingFormat = "protected-context-backing/v1"
 // capture-caller knobs. Two finite responses permit the initial content request
 // and one continuation; they are not a promise to refill an exhausted session.
 const (
-	contextDownloadResponses  = int64(2)
-	contextDownloadReadBytes  = int64(12 << 20)
+	contextDownloadResponses = int64(2)
+	// ADR-248: one 8 MiB recording response with its window read work and
+	// one resume (migration 00098; pod status needed 12 MiB).
+	contextDownloadReadBytes  = int64(24 << 20)
 	contextDownloadRequests   = int64(3)
 	contextNativeTransitions  = int64(10)
 	contextCaptureKeyAttempts = int64(13)
@@ -126,7 +128,7 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 		dst       *int64
 		perRecord int64
 	}{
-		{&out.OutputBytes, 2 * artifact.MaxContextBytes}, {&out.ReadBytes, contextDownloadReadBytes},
+		{&out.OutputBytes, 2 * artifact.RecordingNativeLimit}, {&out.ReadBytes, contextDownloadReadBytes},
 		{&out.Responses, contextDownloadResponses}, {&out.Windows, contextDownloadResponses}, {&out.NativeRows, 1}, {&out.NativeKeys, contextDownloadResponses},
 		// Per original phase: one seal, one self-open, two reconciliations.
 		// Certificate: sign/seal/self-open and two independent verifier opens.

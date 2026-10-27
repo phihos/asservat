@@ -206,6 +206,8 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		defer requireOnlySQLRoles(t, ctx, admin, "postgres", "authority_runtime", "capture_runtime", "custody_runtime", "context_control_config_runtime", "capture_audit_runtime", "retention_source_runtime", "retention_source_read_runtime", "peer_read_runtime")
 	}
 	type scenario = captureAdmissionScenario
+	// ADR-248: a recording scenario registers the 8 MiB per-capture limit.
+	scenarioNativeLimit := int64(4096)
 	createForTargetWithControl := func(t *testing.T, slots, full, replay int64, source func(context.Context) (targets.PodResolution, error), image artifact.Digest) scenario {
 		t.Helper()
 		now := time.Now().UTC().Truncate(time.Microsecond)
@@ -302,7 +304,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 			t.Fatal(err)
 		}
 		poolID, storeID, allocationID := custodyID(), custodyID(), custodyID()
-		r := artifact.Registration{Location: artifact.Location{ClusterID: cluster, ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: storeID, AllocationID: allocationID, PoolRevision: 1, AllocationRevision: 1, NativeLimit: 4096, AnchorAt: now, WriteUntil: plan.Input.Deadline, ExpiresAt: retention.ExpiresAt, DeleteBy: retention.DeleteBy}
+		r := artifact.Registration{Location: artifact.Location{ClusterID: cluster, ArtifactID: custodyID(), AttemptID: custodyID()}, StoreID: storeID, AllocationID: allocationID, PoolRevision: 1, AllocationRevision: 1, NativeLimit: scenarioNativeLimit, AnchorAt: now, WriteUntil: plan.Input.Deadline, ExpiresAt: retention.ExpiresAt, DeleteBy: retention.DeleteBy}
 		if _, err = admin.Exec(ctx, "INSERT INTO custody_pool(id,store_id,revision,valid_until,byte_limit,object_limit) VALUES($1,$2,1,clock_timestamp()+interval '1 hour',$3,$4)", poolID, storeID, r.ReservedBytes()*max(slots, 1)*2, max(slots, 1)*8); err != nil {
 			t.Fatal(err)
 		}
@@ -395,6 +397,11 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	qualifyContextPreviews(t, ctx, admin, poolFor, create)
 	qualifyContextProgress(t, ctx, admin, poolFor, create)
 	qualifyAPIExecutionTransactions(t, ctx, admin, poolFor, store, keys, create)
+	qualifyRecordingTransactions(t, ctx, admin, poolFor, store, keys, func(t *testing.T) scenario {
+		scenarioNativeLimit = artifact.RecordingNativeLimit
+		defer func() { scenarioNativeLimit = 4096 }()
+		return create(t, 1)
+	})
 	qualifyContextPublications(t, ctx, admin, poolFor, store, keys, create, authorityPool.Reset)
 	qualifyRetentionCatchup(t, ctx, admin, poolFor, store, keys, create)
 	qualifyRetentionPreview(t, ctx, admin, poolFor, store, keys, create)
