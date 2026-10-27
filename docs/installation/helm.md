@@ -200,6 +200,76 @@ writes a ten-minute read-only inspection token and your credential to the
 inbox Secret. The continuation verifies the provider through that token
 before it publishes or launches anything, then deletes the inbox.
 
+## Delegate permission management
+
+Set `bootstrap.continuation.public.permissionDelegations` before the initial
+runtime continuation to let selected Kubernetes identities author AccessBindings
+within a fixed envelope. The same entry names browser identities allowed to
+preview those changes. The default `[]` delegates nothing. This packages the
+existing [permission guard](../architecture/permission-acceptance.md) and
+[access preview](../decisions/237-permission-impact-preview.md) configuration;
+it adds no runtime component or automatic grant.
+
+For example, inside the rest of your bootstrap values:
+
+```yaml
+bootstrap:
+  continuation:
+    public:
+      # Also configure origin, issuer, clients and eligibility as above.
+      permissionDelegations:
+        - writers:
+            - kind: Group
+              name: payments-admins
+          clusterID: 10000000-0000-4000-8000-000000000001
+          namespace:
+            name: payments
+            uid: replace-with-the-existing-namespace-uid
+          workloads: []
+          roles: [evidence-reader, workload-maintainer]
+          issuers: [https://identity.example/realms/company]
+          previewers:
+            - issuer: https://identity.example/realms/company
+              kind: Group
+              id: payments-leads-stable-group-id
+```
+
+Use the installation's actual enrolled cluster ID and current target namespace
+UID. An empty `workloads` list covers that namespace; otherwise name each exact
+`Deployment` or `StatefulSet` with `kind`, `name` and `uid`. Namespace or workload
+recreation requires a new qualified envelope. `roles` may contain only
+`workload-maintainer`, `evidence-reader`, `evidence-owner` and `action-approver`;
+`issuers` limits which subject issuers the writer may bind. At most 64 envelopes
+are accepted. Every envelope requires at least one writer and one previewer.
+
+`writers` uses the Kubernetes API server's authenticated username or group
+(`kind: User` or `Group`); a service account is represented by its exact `User`
+name, `system:serviceaccount:NAMESPACE:NAME`. `previewers` uses the browser
+issuer's stable subject or group ID, independently of Kubernetes identity
+mapping. A previewer gains no Kubernetes write permission. Writers still need
+ordinary Kubernetes RBAC to write AccessBindings in the hub control namespace;
+the admission guard additionally enforces the envelope's scope, roles and
+issuers. This does not delegate PermissionSource trust administration or
+retention administration.
+
+These are public, immutable installation inputs. Nonempty delegations require
+`public.origin`, and enter the continuation and original runner digests. Empty
+lists are omitted from the wire to preserve existing installation identities.
+A completed installation cannot change its guard through a chart-only replay:
+changing these values creates a different input and requires a separately
+qualified guard revision. This chart change does not implement that migration.
+Do not delete the protected guard or installation records to force a changed
+envelope.
+
+Packaging complexity assessment: the observed omission blocks every Helm user
+who needs delegation; the capability is already implemented and required by
+REQ-PER-002. This change adds **0** API calls, watches, credentials, runtime
+components, background tasks, fallback states or default grants. It passes
+nonsecret values through the existing protected installer path, with the same
+finite bounds. Leaving the field unavailable would require hand-editing the
+installer input outside the official Helm path. No new runtime mechanism or
+configuration for tuning machinery is introduced.
+
 ## Add a regional cluster (`mode=cluster`)
 
 [ADR-193](../decisions/193-installed-federation-and-regional-enrollment.md)

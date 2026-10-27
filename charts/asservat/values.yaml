@@ -78,6 +78,14 @@ bootstrap:
       eligibleSubjects: []
       eligibleGroups: []
       groupMaxAgeSeconds: 300
+      # Trusted initial AccessBinding writer envelopes and their browser
+      # permission previewers (stable issuer subject/group IDs). These are
+      # independent identities; preview access never grants Kubernetes writes.
+      # Empty by default. Each envelope pins a cluster ID and namespace UID;
+      # workloads: [] covers that namespace, otherwise pin each workload UID.
+      # Changing a completed install's envelope needs a qualified guard revision,
+      # not a chart-only replay; see docs/installation/helm.md.
+      permissionDelegations: []
   providers:
     issuerPolicy: asservat-install-issuer
     wrapRole: asservat-install-wrap

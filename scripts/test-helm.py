@@ -53,6 +53,25 @@ def check_legacy_continuation_lookup(k, h, archive, work, report):
     dry_run = h + ["install", "runner-check", str(archive), "-n", namespace, "--skip-crds",
                    "--dry-run=server", "-f", str(values_path)]
     run(dry_run)  # An absent legacy Pod does not block a first installation.
+    # Persist the exact nonsecret permission envelope from the chart in the
+    # real API. This checks packaged Helm projection, not guard activation.
+    public = b["continuation"]["public"]
+    envelope = {"writers": [{"kind": "Group", "name": "payments-admins"}],
+                "clusterID": "10000000-0000-4000-8000-000000000001",
+                "namespace": {"name": "payments", "uid": "namespace-uid"}, "workloads": [],
+                "roles": ["evidence-reader"], "issuers": ["https://id.invalid/realms/org"],
+                "previewers": [{"issuer": "https://id.invalid/realms/org", "kind": "Group", "id": "payments-leads"}]}
+    public.update(origin="https://asservat.invalid", issuer="https://id.invalid/realms/org", clientID="console",
+                  clients=[{"id": "console", "kind": "human"}], eligibleGroups=["payments-leads"], permissionDelegations=[envelope])
+    values_path.write_text(yaml.safe_dump(values))
+    manifests = list(yaml.safe_load_all(run(h + ["template", "runner-check", str(archive), "-n", namespace, "--kube-version", report["kubernetesVersion"], "-f", str(values_path)])))
+    projection, = [r for r in manifests if r and "continuation.json" in r.get("data", {})]
+    created_projection = json.loads(run(k + ["create", "-f", "-", "-o", "json"], json.dumps(projection)))
+    persisted = json.loads(run(k + ["get", "configmap", projection["metadata"]["name"], "-n", namespace, "-o", "json"]))
+    assert persisted["metadata"]["uid"] == created_projection["metadata"]["uid"] and persisted["immutable"] is True
+    assert json.loads(persisted["data"]["continuation.json"])["public"]["permissionDelegations"] == [envelope]
+    run(k + ["delete", "configmap", projection["metadata"]["name"], "-n", namespace, "--wait=true", "--timeout=15s"])
+    report["checks"].append("packaged permission delegations persist exactly in immutable continuation input; no runtime activation")
     name = b["name"] + "-continuation"
     cases = [("pending", "Pending", "", False, False),
              ("running", "Running", "", False, False),
