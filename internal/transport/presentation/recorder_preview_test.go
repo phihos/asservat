@@ -199,3 +199,21 @@ func (f *recorderFixture) RequestWithResultAccess(ctx context.Context, current i
 	f.access = access
 	return f.Request(ctx, current, preview, key)
 }
+
+func TestRecorderPreviewOperationalFailureIsTypedUnavailable(t *testing.T) {
+	s, f := recorderOperations(t, true)
+	f.compileErr = targets.ErrUnavailable
+	reply, err := s.Call(t.Context(), f, "preview_capture", []byte(wireComposition))
+	var envelope struct {
+		Status string `json:"status"`
+		Data   struct {
+			Code      string `json:"code"`
+			Retryable bool   `json:"retryable"`
+			PreviewID string `json:"preview_id"`
+			Approval  bool   `json:"approval_required"`
+		} `json:"data"`
+	}
+	if err != nil || json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "error" || envelope.Data.Code != "NotAvailable" || !envelope.Data.Retryable || envelope.Data.PreviewID != "" || envelope.Data.Approval {
+		t.Fatal("operational failure became a reviewable or terminal preview", err, string(reply.Body))
+	}
+}

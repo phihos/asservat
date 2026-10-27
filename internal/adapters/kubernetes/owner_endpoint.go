@@ -63,48 +63,88 @@ func ownerResource[T any](s *OwnerEndpoints, ctx context.Context, path, version,
 }
 
 func (s *OwnerEndpoints) service(ctx context.Context) (core.Service, error) {
+	return s.endpointService(ctx, "") // Other native readers retain their original errors.
+}
+
+func (s *OwnerEndpoints) endpointService(ctx context.Context, phase string) (core.Service, error) {
+	refusal := func(step string, cause error) error {
+		if phase == "" {
+			return cause
+		}
+		return app.OwnerEndpointFailure(ctx, phase+"-"+step, cause)
+	}
 	p := s.pool
 	v, err := ownerResource[core.Service](s, ctx, "/api/v1/namespaces/"+p.Namespace+"/services/"+p.Service, "v1", "Service")
-	if err != nil || !ownerMetadata(v.ObjectMeta, p.Namespace, p.Service, p.ServiceUID) || v.Spec.Type != core.ServiceTypeClusterIP || v.Spec.PublishNotReadyAddresses || len(v.Spec.Selector) < 1 || len(v.Spec.Selector) > 32 || len(v.Spec.ExternalIPs) != 0 || v.Spec.ExternalName != "" || v.Spec.LoadBalancerIP != "" || !ownerServicePorts(p, v.Spec.Ports) {
-		return v, value.ErrUnavailable
+	if err != nil {
+		return v, refusal("read", value.ErrUnavailable)
+	}
+	if !ownerMetadata(v.ObjectMeta, p.Namespace, p.Service, p.ServiceUID) || v.Spec.Type != core.ServiceTypeClusterIP || v.Spec.PublishNotReadyAddresses || len(v.Spec.Selector) < 1 || len(v.Spec.Selector) > 32 || len(v.Spec.ExternalIPs) != 0 || v.Spec.ExternalName != "" || v.Spec.LoadBalancerIP != "" || !ownerServicePorts(p, v.Spec.Ports) {
+		return v, refusal("identity", value.ErrUnavailable)
 	}
 	if _, err = labels.ValidatedSelectorFromSet(v.Spec.Selector); err != nil {
-		return v, value.ErrInvalid
+		cause := value.ErrInvalid
+		if phase == "service-final" {
+			cause = value.ErrUnavailable // Preserve the final-read caller's original class.
+		}
+		return v, refusal("selector", cause)
 	}
 	return v, nil
 }
 
-func (s *OwnerEndpoints) OwnerEndpoint(ctx context.Context, binding value.OwnerBinding) (value.OwnerEndpoint, error) {
-	var out value.OwnerEndpoint
+func (s *OwnerEndpoints) OwnerEndpoint(ctx context.Context, binding value.OwnerBinding) (out value.OwnerEndpoint, failure error) {
 	if s == nil || ctx == nil || !binding.Valid() || binding.InstallationID != s.pool.InstallationID || binding.ClusterID != s.pool.ClusterID || binding.IssuerEpoch != s.pool.IssuerEpoch {
 		return out, value.ErrInvalid
 	}
 	ctx, end := context.WithTimeout(ctx, 5*time.Second)
 	defer end()
+	stage := "namespace"
+	defer func() {
+		if failure != nil {
+			failure = app.OwnerEndpointFailure(ctx, stage, failure)
+		}
+	}()
 	start, p := s.client.now(), s.pool
 	if _, err := s.client.namespace(ctx, s.client.control); err != nil {
 		return out, err
 	}
-	service, err := s.service(ctx)
+	stage = "service-first-read"
+	service, err := s.endpointService(ctx, "service-first")
 	if err != nil {
 		return out, err
 	}
+	stage = "account-read"
 	account, err := ownerResource[core.ServiceAccount](s, ctx, "/api/v1/namespaces/"+p.Namespace+"/serviceaccounts/"+p.ServiceAccount, "v1", "ServiceAccount")
-	if err != nil || !ownerMetadata(account.ObjectMeta, p.Namespace, p.ServiceAccount, p.AccountUID) {
+	if err != nil {
 		return out, value.ErrUnavailable
 	}
+	stage = "account-identity"
+	if !ownerMetadata(account.ObjectMeta, p.Namespace, p.ServiceAccount, p.AccountUID) {
+		return out, value.ErrUnavailable
+	}
+	stage = "deployment-read"
 	deployment, err := ownerResource[apps.Deployment](s, ctx, "/apis/apps/v1/namespaces/"+p.Namespace+"/deployments/"+p.Deployment, "apps/v1", "Deployment")
-	if err != nil || !ownerMetadata(deployment.ObjectMeta, p.Namespace, p.Deployment, p.DeploymentUID) || deployment.Spec.Selector == nil {
+	if err != nil {
 		return out, value.ErrUnavailable
 	}
+	stage = "deployment-identity"
+	if !ownerMetadata(deployment.ObjectMeta, p.Namespace, p.Deployment, p.DeploymentUID) || deployment.Spec.Selector == nil {
+		return out, value.ErrUnavailable
+	}
+	stage = "slices-read"
 	podName, nodeName, addresses, err := s.endpoints(ctx, binding.PodUID)
 	if err != nil {
 		return out, err
 	}
+	stage = "pod-read"
 	pod, err := ownerResource[core.Pod](s, ctx, "/api/v1/namespaces/"+p.Namespace+"/pods/"+podName, "v1", "Pod")
-	if err != nil || !ownerMetadata(pod.ObjectMeta, p.Namespace, podName, binding.PodUID) || pod.Spec.ServiceAccountName != p.ServiceAccount || pod.Spec.HostNetwork || pod.Spec.HostPID || pod.Spec.HostIPC || pod.Status.Phase != core.PodRunning || pod.Spec.NodeName != nodeName || len(pod.Status.PodIPs) < 1 || len(pod.Status.PodIPs) > 2 {
+	if err != nil {
 		return out, value.ErrUnavailable
 	}
+	stage = "pod-identity"
+	if !ownerMetadata(pod.ObjectMeta, p.Namespace, podName, binding.PodUID) || pod.Spec.ServiceAccountName != p.ServiceAccount || pod.Spec.HostNetwork || pod.Spec.HostPID || pod.Spec.HostIPC || pod.Status.Phase != core.PodRunning || pod.Spec.NodeName != nodeName || len(pod.Status.PodIPs) < 1 || len(pod.Status.PodIPs) > 2 {
+		return out, value.ErrUnavailable
+	}
+	stage = "pod-readiness"
 	ready, readyConditions := false, 0
 	for _, c := range pod.Status.Conditions {
 		if c.Type == core.PodReady {
@@ -116,55 +156,94 @@ func (s *OwnerEndpoints) OwnerEndpoint(ctx context.Context, binding value.OwnerB
 	if err != nil || !selector.Matches(labels.Set(pod.Labels)) || !labels.SelectorFromSet(service.Spec.Selector).Matches(labels.Set(pod.Labels)) || !ready || readyConditions != 1 {
 		return out, value.ErrUnavailable
 	}
+	stage = "pod-addresses"
 	for _, address := range addresses {
 		if !slices.ContainsFunc(pod.Status.PodIPs, func(ip core.PodIP) bool { return ip.IP == address }) {
 			return out, value.ErrUnavailable
 		}
 	}
+	stage = "replicaset-owner"
 	rs, ok := ownerController(pod.OwnerReferences, "ReplicaSet", "apps/v1")
 	if !ok {
 		return out, value.ErrUnavailable
 	}
+	stage = "replicaset-read"
 	replica, err := ownerResource[apps.ReplicaSet](s, ctx, "/apis/apps/v1/namespaces/"+p.Namespace+"/replicasets/"+rs.Name, "apps/v1", "ReplicaSet")
-	if err != nil || !ownerMetadata(replica.ObjectMeta, p.Namespace, rs.Name, string(rs.UID)) {
+	if err != nil {
 		return out, value.ErrUnavailable
 	}
+	stage = "replicaset-identity"
+	if !ownerMetadata(replica.ObjectMeta, p.Namespace, rs.Name, string(rs.UID)) {
+		return out, value.ErrUnavailable
+	}
+	stage = "deployment-owner"
 	d, ok := ownerController(replica.OwnerReferences, "Deployment", "apps/v1")
 	if !ok || d.Name != p.Deployment || string(d.UID) != p.DeploymentUID {
 		return out, value.ErrUnavailable
 	}
 	// Do not return an endpoint from a changed Service or Pod read earlier in
 	// the sequence. TLS must still prove the exact process on connection.
-	latest, err := s.service(ctx)
-	if err != nil || latest.ResourceVersion != service.ResourceVersion {
+	stage = "service-final-read"
+	latest, err := s.endpointService(ctx, "service-final")
+	if err != nil {
+		return out, err
+	}
+	stage = "service-final-rv"
+	if latest.ResourceVersion != service.ResourceVersion {
 		return out, value.ErrUnavailable
 	}
+	stage = "pod-final-read"
 	current, err := ownerResource[core.Pod](s, ctx, "/api/v1/namespaces/"+p.Namespace+"/pods/"+podName, "v1", "Pod")
-	if err != nil || current.ResourceVersion != pod.ResourceVersion || !ownerMetadata(current.ObjectMeta, p.Namespace, podName, binding.PodUID) || s.client.current(ctx, start, 5*time.Second) != nil {
+	if err != nil {
+		return out, value.ErrUnavailable
+	}
+	stage = "pod-final-rv"
+	if current.ResourceVersion != pod.ResourceVersion {
+		return out, value.ErrUnavailable
+	}
+	stage = "pod-final-identity"
+	if !ownerMetadata(current.ObjectMeta, p.Namespace, podName, binding.PodUID) {
+		return out, value.ErrUnavailable
+	}
+	stage = "observation-current"
+	if s.client.current(ctx, start, 5*time.Second) != nil {
 		return out, value.ErrUnavailable
 	}
 	out = value.OwnerEndpoint{Binding: binding, Pool: p, Pod: podName, ReplicaSetUID: string(rs.UID), Addresses: addresses, ObservedAt: start, FreshUntil: start.Add(5 * time.Second)}
+	stage = "result"
 	if !out.Valid(s.client.now()) {
 		return value.OwnerEndpoint{}, value.ErrUnavailable
 	}
 	return out, nil
 }
 
-func (s *OwnerEndpoints) endpoints(ctx context.Context, uid string) (string, string, []string, error) {
+func (s *OwnerEndpoints) endpoints(ctx context.Context, uid string) (podName, nodeName string, ips []string, failure error) {
+	stage := "slices-read"
+	defer func() {
+		if failure != nil {
+			failure = app.OwnerEndpointFailure(ctx, stage, failure)
+		}
+	}()
 	p := s.pool
 	continuation, version, pod, node := "", "", "", ""
 	seen := map[string]bool{}
 	addresses := map[string]bool{}
 	total, count, endpoints := 0, 0, 0
 	for page := 0; page < 64; page++ {
+		stage = "slices-read"
 		b, err := s.client.raw(ctx, "/apis/discovery.k8s.io/v1/namespaces/"+p.Namespace+"/endpointslices", map[string]string{"labelSelector": labels.Set{"kubernetes.io/service-name": p.Service}.AsSelector().String(), "limit": "64", "continue": continuation})
+		if err != nil {
+			return "", "", nil, value.ErrUnavailable
+		}
+		stage = "slices-list"
 		total += len(b)
 		var list discovery.EndpointSliceList
-		if err != nil || total > 8<<20 || json.Unmarshal(b, &list) != nil || list.APIVersion != "discovery.k8s.io/v1" || list.Kind != "EndpointSliceList" || !identity.Text(list.ResourceVersion, 128) || len(list.Items) > 64 || count+len(list.Items) > 64 || len(list.Continue) > 4096 || version != "" && version != list.ResourceVersion {
+		if total > 8<<20 || json.Unmarshal(b, &list) != nil || list.APIVersion != "discovery.k8s.io/v1" || list.Kind != "EndpointSliceList" || !identity.Text(list.ResourceVersion, 128) || len(list.Items) > 64 || count+len(list.Items) > 64 || len(list.Continue) > 4096 || version != "" && version != list.ResourceVersion {
 			return "", "", nil, value.ErrUnavailable
 		}
 		version, count = list.ResourceVersion, count+len(list.Items)
 		for _, item := range list.Items {
+			stage = "slice-identity"
 			endpoints += len(item.Endpoints)
 			owner, ok := ownerController(item.OwnerReferences, "Service", "v1")
 			if !ok || owner.Name != p.Service || string(owner.UID) != p.ServiceUID || item.Namespace != p.Namespace || item.DeletionTimestamp != nil || item.Labels["kubernetes.io/service-name"] != p.Service || item.Labels["endpointslice.kubernetes.io/managed-by"] != "endpointslice-controller.k8s.io" || endpoints > 1024 || !ownerSlicePorts(p, item.Ports) || (item.AddressType != discovery.AddressTypeIPv4 && item.AddressType != discovery.AddressTypeIPv6) {
@@ -178,10 +257,12 @@ func (s *OwnerEndpoints) endpoints(ctx context.Context, uid string) (string, str
 				// The standard EndpointSlice controller omits ObjectReference's
 				// optional apiVersion. Independently GET the exact core/v1 Pod;
 				// an explicitly foreign version is still not acceptable.
+				stage = "slice-endpoint"
 				if (ref.APIVersion != "" && ref.APIVersion != "v1") || ref.Kind != "Pod" || ref.Namespace != p.Namespace || ref.Name == "" || len(validation.IsDNS1123Subdomain(ref.Name)) != 0 || endpoint.NodeName == nil || !identity.Text(*endpoint.NodeName, 253) || endpoint.Conditions.Ready == nil || !*endpoint.Conditions.Ready || endpoint.Conditions.Serving != nil && !*endpoint.Conditions.Serving || endpoint.Conditions.Terminating != nil && *endpoint.Conditions.Terminating || len(endpoint.Addresses) < 1 || len(endpoint.Addresses) > 2 || pod != "" && (pod != ref.Name || node != *endpoint.NodeName) {
 					return "", "", nil, value.ErrUnavailable
 				}
 				pod, node = ref.Name, *endpoint.NodeName
+				stage = "slice-addresses"
 				for _, address := range endpoint.Addresses {
 					a, err := netip.ParseAddr(address)
 					if err != nil || !value.OwnerAddress(address) || a.Is4() != (item.AddressType == discovery.AddressTypeIPv4) {
@@ -195,6 +276,7 @@ func (s *OwnerEndpoints) endpoints(ctx context.Context, uid string) (string, str
 			}
 		}
 		if list.Continue == "" {
+			stage = "slices-empty"
 			out := make([]string, 0, len(addresses))
 			for a := range addresses {
 				out = append(out, a)
@@ -205,11 +287,13 @@ func (s *OwnerEndpoints) endpoints(ctx context.Context, uid string) (string, str
 			}
 			return pod, node, out, nil
 		}
+		stage = "slices-pagination"
 		if seen[list.Continue] {
 			return "", "", nil, value.ErrUnavailable
 		}
 		seen[list.Continue] = true
 		continuation = list.Continue
 	}
+	stage = "slices-pagination"
 	return "", "", nil, value.ErrUnavailable
 }

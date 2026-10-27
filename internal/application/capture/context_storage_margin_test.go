@@ -134,7 +134,8 @@ func TestContextStorageMarginCancellationJoinsAuthoritativeRead(t *testing.T) {
 	originalUntil, _ := ctx.Deadline()
 	entered, cancelled, release, exited := make(chan struct{}), make(chan struct{}), make(chan struct{}), make(chan struct{})
 	var advance atomic.Int64
-	storage := &marginStorageRead{investigationFixture: f, advance: &advance, until: f.now.Add(time.Second),
+	// This short parent skips the hint; its first read is authoritative.
+	storage := &marginStorageRead{investigationFixture: f, advance: &advance, until: f.now.Add(time.Second), readAt: 1,
 		finalRead: func(call context.Context) error {
 			until, ok := call.Deadline()
 			if !ok || until.After(originalUntil) {
@@ -173,7 +174,7 @@ func TestContextStorageMarginCancellationJoinsAuthoritativeRead(t *testing.T) {
 	unblock()
 	err := <-done
 	overlapSignal(t, exited, "joined authoritative read")
-	if !errors.Is(err, context.Canceled) || storage.reads.Load() != 2 || refresh.demands.Load() != 0 ||
+	if !errors.Is(err, context.Canceled) || storage.reads.Load() != 1 || refresh.demands.Load() != 0 ||
 		f.admissions.Load() != 0 || len(f.accepted) != 0 {
 		t.Fatal("cancellation performed admission or repeated readiness", err, storage.reads.Load(), refresh.demands.Load())
 	}

@@ -115,7 +115,7 @@ type RecorderPreviewData struct {
 
 // RecorderUnavailableBlocker is the interim blocker of every packet/syscall
 // plan, including the explicit onTrigger before:0s variant.
-var RecorderUnavailableBlocker = OperationBlocker{Code: "RecorderUnavailable", Message: "Packet and syscall recorders are not installed in this release. This preview shows the reviewed plan only and cannot be submitted.", ResponsibleRole: "administrator", Retryable: false}
+var RecorderUnavailableBlocker = OperationBlocker{Code: "RecorderUnavailable", Message: "No recorder is available for this reviewed plan. This preview shows the plan only and cannot be submitted.", ResponsibleRole: "administrator", Retryable: false}
 
 func recorderWarnings(plan planning.RecorderPlan) []string {
 	out := []string{}
