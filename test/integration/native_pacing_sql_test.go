@@ -90,8 +90,23 @@ func (c nativeSQLCounters) valid() bool {
 // Snapshot edges span actual reads while background work continues; these are
 // background-inclusive intervals, not an atomic trace of one HTTP request.
 func nativePacingSQLDelta(before, after nativeSQLSnapshot) (map[uint32]nativeSQLCounters, error) {
-	if before.ResetAt.IsZero() || !before.ResetAt.Equal(after.ResetAt) || before.Deallocations != after.Deallocations || before.Deallocations < 0 || before.StartedAt.After(before.FinishedAt) || after.StartedAt.Before(before.FinishedAt) || after.StartedAt.After(after.FinishedAt) || len(before.Roles) > 512 || len(after.Roles) > 512 {
-		return nil, errors.New("SQL snapshots are not comparable")
+	if before.ResetAt.IsZero() || after.ResetAt.IsZero() {
+		return nil, errors.New("SQL snapshot reset timestamp missing")
+	}
+	if !before.ResetAt.Equal(after.ResetAt) {
+		return nil, errors.New("SQL snapshot reset timestamp changed")
+	}
+	if before.Deallocations < 0 || after.Deallocations < 0 {
+		return nil, errors.New("SQL snapshot deallocation count invalid")
+	}
+	if before.Deallocations != after.Deallocations {
+		return nil, errors.New("SQL snapshot entries evicted")
+	}
+	if before.StartedAt.After(before.FinishedAt) || after.StartedAt.Before(before.FinishedAt) || after.StartedAt.After(after.FinishedAt) {
+		return nil, errors.New("SQL snapshot time intervals overlap or moved backwards")
+	}
+	if len(before.Roles) > 512 || len(after.Roles) > 512 {
+		return nil, errors.New("SQL snapshot role count exceeds bound")
 	}
 	for id := range before.Roles {
 		if _, ok := after.Roles[id]; !ok {
