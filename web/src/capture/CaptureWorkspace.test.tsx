@@ -2,12 +2,34 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, expect, it, vi } from 'vitest';
 import { CaptureWorkspace } from './CaptureWorkspace';
 import { Investigation } from './investigation';
-import { SyntheticOperations, session, target, previewResult, progressResult, id, resolvedClosedResult, resolvedAcceptedResult } from './test-fixtures';
+import { SyntheticOperations, session, target, previewResult, progressResult, id, resolvedClosedResult, resolvedAcceptedResult, recordingPreviewResult, approvalPendingResult, historyResult, settingsResult, catalogResult } from './test-fixtures';
 import { returnPath } from '../routes';
 import { BrowserSession } from '../auth/session';
 import { SessionGate } from '../auth/SessionGate';
 
 const controllers: Investigation[] = [];
+it('opens saved recorder settings, edits the filter and window, and prepares a fresh review without collecting', async () => {
+  const { client } = mount();
+  const recording = recordingPreviewResult(); const saved = settingsResult();
+  if (recording.status !== 'ok' || saved.status !== 'ok' || !('recipe_spec' in saved.data.settings)) throw new Error();
+  saved.data.settings.profile_composition = recording.data.profile_composition;
+  saved.data.settings.profile_composition!.authored.components[0].overrides!.push({ actionID: 'http', field: 'packetAfter', value: '3s' });
+  client.responder = name => name === 'list_diagnostics' ? catalogResult() : name === 'list_capture_history' ? historyResult([id(41)]) : name === 'get_capture_settings' ? saved : recordingPreviewResult(id(41));
+  fireEvent.change(screen.getByLabelText('Cluster ID'), { target: { value: target.cluster_id } });
+  fireEvent.change(screen.getByLabelText('Namespace'), { target: { value: target.namespace } });
+  fireEvent.change(screen.getByLabelText('Workload or pod name'), { target: { value: target.name } });
+  fireEvent.click(screen.getByRole('button', { name: 'Find diagnostics' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'View settings' }));
+  await screen.findByRole('heading', { name: 'Saved settings' });
+  fireEvent.change(screen.getByLabelText('http / http / packetFilter'), { target: { value: 'tcp port 8443' } });
+  fireEvent.change(screen.getByLabelText('http / http / packetAfter'), { target: { value: '5s' } });
+  fireEvent.change(screen.getByLabelText('Maximum duration'), { target: { value: '20s' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Review these settings' }));
+  await screen.findByRole('heading', { name: 'Review collection' });
+  const sent = client.calls.find(call => call.name === 'preview_capture')!.input;
+  expect(sent).toMatchObject({ repeated_from_capture_id: id(41), profile_composition: { maxDuration: '20s', components: [{ id: 'http', profileRef: { version: 'v1' }, overrides: [{ field: 'packetFilter', value: 'tcp port 8443' }, { field: 'packetAfter', value: '5s' }] }, {}, {}] } });
+  expect(client.calls.some(call => call.name === 'request_capture')).toBe(false);
+});
 afterEach(() => { cleanup(); for (const controller of controllers) controller.reset(); controllers.length = 0; vi.useRealTimers(); vi.unstubAllGlobals(); window.history.replaceState(null, '', '/'); });
 function mount() {
   const client = new SyntheticOperations(); const controller = new Investigation(client, () => id(6)); controllers.push(controller);
@@ -173,4 +195,18 @@ it('offers explicit acquisition continuation without claiming acceptance means i
   await waitFor(() => expect(client.calls.filter(call => call.name === 'request_capture')).toHaveLength(2));
   expect(client.calls.filter(call => call.name === 'request_capture')[1].input).toEqual({ preview_id: id(173), idempotency_key: id(6), continue_acquisition: true });
   expect(screen.getByRole('link', { name: 'Start a new investigation' }).getAttribute('href')).toBe('/captures/new');
+});
+
+it('renders the reviewed recorder assessment and requests approval without claiming collection', async () => {
+  const { controller, client } = await review();
+  const recording = recordingPreviewResult(); if (recording.status !== 'ok') throw new Error();
+  client.responder = name => name === 'preview_capture' ? recording : approvalPendingResult();
+  await act(async () => { await controller.previewComposition(recording.data.profile_composition!.authored); });
+  expect(screen.getByText(/Saved evidence is limited to/).textContent).toContain((recording.data.max_bytes / 1024).toLocaleString());
+  expect(screen.queryByText(/Saved status is limited to 4 KiB/)).toBeNull();
+  expect(screen.queryByText(/No application process is started/)).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Request approval' }));
+  expect(await screen.findByRole('link', { name: 'View approval' })).toHaveProperty('pathname', '/approvals/' + id(41));
+  expect(screen.getByRole('button', { name: 'Continue after approval' })).toBeTruthy();
+  expect(controller.snapshot().captureID).toBeUndefined();
 });

@@ -29,7 +29,12 @@ type ContextAcceptedStart interface {
 // action. Both retain the actual caller and their original current interval.
 // Downstream failures return the accepted receipt plus an error. That receipt
 // never authorizes disclosure after MetadataValidUntil.
+type ContextHistoryPersistence interface {
+	Persist(context.Context, value.Accepted, identity.Identity, value.HistoryParameters, *value.HistoryLineage) error
+}
+
 type ContextSubmission struct {
+	History ContextHistoryPersistence
 	ContextInvestigation
 	Intents ContextIntentPublication
 	Start   ContextAcceptedStart
@@ -46,7 +51,7 @@ func (s ContextSubmission) Continue(ctx context.Context, current identities.Curr
 	return s.submit(ctx, current, preview, key, true)
 }
 
-func (s ContextSubmission) submit(ctx context.Context, current identities.CurrentIdentity, preview, key string, continuation bool) (value.Accepted, error) {
+func (s ContextSubmission) submit(ctx context.Context, current identities.CurrentIdentity, preview, key string, continuation bool) (result value.Accepted, failure error) {
 	var zero value.Accepted
 	if ctx == nil || ctx.Err() != nil || current == nil || s.Intents == nil || s.Start == nil || !s.ContextInvestigation.configured() {
 		return zero, value.ErrUnavailable
@@ -128,6 +133,30 @@ func (s ContextSubmission) submit(ctx context.Context, current identities.Curren
 			return a, err
 		}
 	}
+	// Run optional persistence after the start path (including a failed start),
+	// within the original invocation. No history outage changes its outcome.
+	defer func() {
+		if a.Replay {
+			return
+		}
+		result.HistoryUnavailable = a.HistoryUnavailable
+		if a.HistoryParameters == nil {
+			return
+		}
+		began := time.Now()
+		e := value.ErrHistoryUnavailable
+		if s.History != nil {
+			e = s.History.Persist(call, a, i, *a.HistoryParameters, a.HistorySource)
+		}
+		auditapp.MarkStep(call, "s-history", began)
+		if e != nil {
+			result.HistoryUnavailable = true
+		} else {
+			result.HistoryRecorded = true
+		}
+		result.HistoryParameters = nil
+		result.HistorySource = nil
+	}()
 	if err = check(); err != nil {
 		return a, err
 	}

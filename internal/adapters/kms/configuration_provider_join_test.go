@@ -12,13 +12,21 @@ import (
 // login/lookup and the concrete lifetime/HTTP-body owner, not installed setup.
 func configurationJoinFixture(t *testing.T) (*InstalledConfigurationProviderEffects, *ownerProviderControlFixture) {
 	t.Helper()
+	return configurationJoinFixtureWithClock(t, time.Now)
+}
+
+func configurationJoinFixtureWithClock(t *testing.T, now func() time.Time) (*InstalledConfigurationProviderEffects, *ownerProviderControlFixture) {
+	t.Helper()
 	f, in, profile := configurationControlFixture(t, "audit-wrap")
+	f.mu.Lock()
+	f.clock = now
+	f.mu.Unlock()
 	root, cancel := context.WithCancel(context.Background())
 	effects, err := newConfigurationProviderEffects(root, in, profile,
 		func(context.Context) ([]byte, error) {
-			return ownerProviderTestJWT(time.Now().Add(600 * time.Second)), nil
+			return ownerProviderTestJWT(now().Add(600 * time.Second)), nil
 		},
-		func(context.Context) (time.Time, error) { return time.Now().Add(5 * time.Second), nil }, f.server.Client(), time.Now)
+		func(context.Context) (time.Time, error) { return now().Add(5 * time.Second), nil }, f.server.Client(), now)
 	if err != nil {
 		cancel()
 		t.Fatal(err)

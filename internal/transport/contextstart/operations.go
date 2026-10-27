@@ -325,6 +325,7 @@ type RegionalLocal struct {
 	Source fleetapp.ConnectorIdentitySourceReader
 	// Recordings answers collects of held recordings (ADR-248); optional.
 	Recordings RegionalRecordings
+	History    *HistoryLocal
 	Now        func() time.Time
 }
 
@@ -538,13 +539,17 @@ func ServeRegionalOperations(ctx context.Context, stream Stream, receiver fleet.
 	}
 	stage = streamRegionalWork
 	f, current, err := stream.AwaitWork(ctx)
-	if err != nil || f.Kind != contracts.APIContextWorkFrame {
+	if err != nil || f.Kind != contracts.APIContextWorkFrame && f.Kind != contracts.HistoryWorkFrame {
 		clear(f.Payload)
 		return contracts.ErrAPIContextProtocol
 	}
 	if current.Channel != receiver.Channel || !current.Valid(now()) {
 		clear(f.Payload)
 		return fleet.ErrDenied
+	}
+	if f.Kind == contracts.HistoryWorkFrame {
+		defer clear(f.Payload)
+		return serveRegionalHistory(ctx, stream, current, f.Payload, local.History, now)
 	}
 	stage = streamRegionalVerify
 	authenticated, err := verifier.VerifyAPIContextWork(ctx, f.Payload, current)

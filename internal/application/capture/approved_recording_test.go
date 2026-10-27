@@ -15,8 +15,11 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 )
 
-type availableRecording struct{}
+type availableRecording struct{ fixture *investigationFixture }
 
+func (a availableRecording) ResolvePacketRecorder(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
+	return a.fixture.svc.Targets.ResolvePod(ctx, r)
+}
 func (availableRecording) PacketRecorder(context.Context, targets.PodResolution) error { return nil }
 
 // SQL separately qualifies retained immutable reads and current-grant locking.
@@ -46,7 +49,7 @@ func TestApprovedRecordingStartsAfterPreviewExpiryWithOriginalPlan(t *testing.T)
 	f := &retainedRecording{investigationFixture: base}
 	base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
 	base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
-	base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableRecording{}
+	base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableRecording{base}
 	policy := identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}
 	base.svc.ReportPreviewFailure = func(stage string) { t.Log("stage", stage) }
 	base.svc.Approvals = fixedApprovalSettings{policy: policy}
@@ -103,3 +106,40 @@ func TestApprovedRecordingStartsAfterPreviewExpiryWithOriginalPlan(t *testing.T)
 
 var _ ContextPreviewStore = (*retainedRecording)(nil)
 var _ identities.CurrentIdentity = fixtureIdentityResolverHandle{}
+
+func TestApprovedHistoryRepeatCannotRenewItsSourceDeadline(t *testing.T) {
+	base := newInvestigationFixture()
+	f := &retainedRecording{investigationFixture: base}
+	base.target.NodeUID, base.target.NodeBootID, base.target.Pin.NodeName = "", "", ""
+	base.target.ExecutionClass, base.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+	base.svc.Previews, base.svc.Admission, base.svc.Recorders = f, f, availableRecording{base}
+	base.svc.Lifetime = 2 * time.Minute
+	policy := identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: true}
+	base.svc.Approvals = fixedApprovalSettings{policy: policy}
+	grants := &fakeGrants{}
+	base.svc.Grants = grants
+	intent := f.compositionIntent(networkComposition())
+	cutoff := f.now.Add(4 * time.Minute)
+	intent.RepeatedFrom = &value.HistoryLineage{CaptureID: fixtureID(41), ExpiresAt: cutoff}
+	p, err := base.svc.PreviewComposition(t.Context(), f.source(t, t.Context()), intent)
+	if err != nil || !p.Recordable {
+		t.Fatal("repeat preview", err)
+	}
+	if _, err = f.request(t, p.Preview, "history-review"); !errors.Is(err, authorization.ErrApprovalRequired) {
+		t.Fatal("independent repeat approval", err)
+	}
+	f.now = p.Preview.Deadline.Add(time.Minute)
+	policy.ObservedAt, policy.FreshUntil = f.now, f.now.Add(30*time.Second)
+	base.svc.Approvals = fixedApprovalSettings{policy: policy}
+	grants.covering = nil
+	grants.grant.ExpiresAt = cutoff.Add(time.Minute)
+	if _, err = f.request(t, p.Preview, "history-accept"); !errors.Is(err, reachedRecordingAdmission) || len(f.seen) != 1 || !f.seen[0].Plan.Input.Deadline.Equal(cutoff) || f.seen[0].RepeatedFrom == nil || !f.seen[0].RepeatedFrom.ExpiresAt.Equal(cutoff) {
+		t.Fatal("covering grant renewed or lost source cutoff", err, f.seen)
+	}
+	f.now = cutoff.Add(time.Second)
+	policy.ObservedAt, policy.FreshUntil = f.now, f.now.Add(30*time.Second)
+	base.svc.Approvals = fixedApprovalSettings{policy: policy}
+	if _, err = f.request(t, p.Preview, "expired-history"); !errors.Is(err, value.ErrPreviewExpired) || len(f.seen) != 1 {
+		t.Fatal("expired source reached admission", err)
+	}
+}

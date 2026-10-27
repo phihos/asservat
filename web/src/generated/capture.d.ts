@@ -506,7 +506,7 @@ export interface components {
             /** Format: date-time */
             notAfter: string;
         };
-        McpInput_preview_capture: {
+        McpInput_preview_capture: ({
             target_handle?: string;
             target_ref?: {
                 /** Format: uuid */
@@ -533,7 +533,12 @@ export interface components {
             result_access?: components["schemas"]["Contract_investigation_access_0d504ecd6bc8c0fd"];
             /** @description Requested evidence-access lifetime in seconds. Omission uses the administrator default; effective access and managed deletion remain bounded by current retention policy and its deletion budget. History restoration preserves its original request; use a normal edited preview to change it. */
             requested_retention_seconds?: number;
-        } & (((unknown | unknown) & (unknown | unknown | unknown)) | unknown);
+            /**
+             * @description Explicit manual selection when repeating a policy triggeringPod occurrence; the preview selects a current eligible Pod under the original workload identity.
+             * @enum {unknown}
+             */
+            history_selection?: "currentEligiblePod";
+        } & unknown) & (((unknown | unknown) & (unknown | unknown | unknown)) | unknown);
         Contract_capture_composition_fea23abd809a781c: {
             authored: components["schemas"]["Contract_capture_composition"];
             resolvedProfiles: components["schemas"]["Contract_capture_composition_d3d99d35a2742711"][];
@@ -641,7 +646,7 @@ export interface components {
         Contract_privacy_common_cf52919b29fc225a: "unknown" | "potentialPersonalData" | "personalData" | "specialCategoryPossible" | "verifiedNonPersonal";
         Contract_capture_assessment_9d972ed356c3acb3: {
             /**
-             * @description submissionPreparation measures from preparation of the first admitted submission: waiting counts and accepted retries retain the original registration. firstAcquisitionOrEarlierSource measures from acquisition or an earlier retained source.
+             * @description submissionPreparation measures every newly accepted manual capture from preparation of its first admitted submission: waiting counts and accepted retries retain the original registration. firstAcquisitionOrEarlierSource is reserved for typed existing-source snapshots and measures from the original source acquisition or an earlier retained source, never preview creation.
              * @enum {unknown}
              */
             anchorRule: "firstAcquisitionOrEarlierSource" | "submissionPreparation";
@@ -713,7 +718,9 @@ export interface components {
                 repeated_from_capture_id?: string;
                 profile_composition?: components["schemas"]["Contract_capture_composition_fea23abd809a781c"];
                 lifecycle_plan: components["schemas"]["Contract_action_lifecycle_35910c4fba296505"];
-                capture_assessment: components["schemas"]["Contract_capture_assessment_9c7f9709a5418f1b"];
+                capture_assessment: components["schemas"]["Contract_capture_assessment_9c7f9709a5418f1b"] & {
+                    actions?: unknown;
+                };
                 result_access?: components["schemas"]["Contract_investigation_access_03804ffde11279ad"];
                 preset_ref?: {
                     /** @enum {unknown} */
@@ -828,6 +835,8 @@ export interface components {
                 repeated_from_capture_id?: string;
                 /** @enum {unknown} */
                 operation?: "collect" | "recordingSave";
+                /** @enum {unknown} */
+                history_state?: "available" | "unavailable";
             };
         } | {
             /** @constant */
@@ -950,6 +959,8 @@ export interface components {
                     /** Format: uuid */
                     share_id?: string;
                 };
+                /** @enum {unknown} */
+                history_state?: "available" | "unavailable";
             };
         } | {
             /** @constant */
@@ -1021,6 +1032,13 @@ export interface components {
             navigation_uri: string;
             /** @enum {unknown} */
             operation?: "collect" | "recordingSave";
+            requester?: {
+                /** Format: uri */
+                issuer: string;
+                subject_id: string;
+                /** @enum {unknown} */
+                identity_type: "human" | "service" | "policy";
+            };
         } & (unknown & unknown);
         McpOutput_list_capture_history: components["schemas"]["Contract_mcp_result"] & ({
             /** @constant */
@@ -1028,6 +1046,532 @@ export interface components {
             data: components["schemas"]["Contract_capture_history_5bb857fd69a5246d"];
             /** @constant */
             data_class?: "metadata";
+        } | {
+            /** @constant */
+            status: "pending";
+            data: {
+                query_handle: string;
+                retry_after_seconds: number;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
+        McpInput_get_capture_settings: {
+            /** Format: uuid */
+            capture_id: string;
+        };
+        Contract_capture_history_6f7c512573a1694c: {
+            /** @constant */
+            kind: "captureSettings";
+            /** Format: uuid */
+            capture_id: string;
+            /** Format: uuid */
+            cluster_id: string;
+            namespace_uid: string;
+            /** Format: date-time */
+            accepted_at: string;
+            /** Format: date-time */
+            expires_at: string;
+            settings_digest: string;
+            original_execution_digest: string;
+            settings: components["schemas"]["Contract_capture_history_69de8902a1418e08"];
+            /** Format: uri */
+            navigation_uri: string;
+        };
+        Contract_capture_history_69de8902a1418e08: {
+            target: components["schemas"]["Contract_target"];
+            recipe_spec: components["schemas"]["Contract_recipe_ad816c81a7733f89"];
+            dependency_pins: components["schemas"]["Contract_collection_scope_d82f582d45541458"];
+            requested_retention?: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+            profile_composition?: components["schemas"]["Contract_capture_composition_fea23abd809a781c"];
+            original_effective_retention?: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+        };
+        Contract_recipe_ad816c81a7733f89: {
+            description: string;
+            actions: components["schemas"]["Contract_action"][];
+            maxTotalBytes: number;
+            maxDuration: string;
+            endpointBindings?: {
+                name: string;
+                templateRef: string;
+                /** @enum {string} */
+                addressMode: "targetLoopback" | "podIP";
+                portName: string;
+            }[];
+        };
+        /** Asservat action v1 */
+        Contract_action: {
+            $defs: {
+                processSelector: {
+                    match: {
+                        executablePath?: string;
+                        executableName?: string;
+                        /** @enum {unknown} */
+                        runtime?: "native" | "go" | "dotnet" | "python" | "node" | "jvm";
+                        buildIDs?: string[];
+                    };
+                    includeDescendants: boolean;
+                    maxDepth: number;
+                    /** @constant */
+                    resolve: "atDispatch";
+                };
+                batch: {
+                    maxProcesses: number;
+                    maxBytesPerProcess: number;
+                    maxStopPerProcess: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+                    maxTotalStop: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+                    /** @constant */
+                    consistency: "sequential";
+                };
+            };
+        } & ({
+            id: string;
+            /** @constant */
+            kind: "kubernetesSnapshot";
+            parameters: {
+                include: ("pod" | "workload" | "events" | "endpoints" | "rollout")[];
+            };
+            dependsOn?: string[];
+            required: boolean;
+            /** @enum {string} */
+            impact: "observe" | "sensitiveRead" | "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | {
+            id: string;
+            /** @constant */
+            kind: "logs";
+            parameters: {
+                before: string;
+                after: string;
+                /** @enum {string} */
+                stream: "stdout" | "stderr" | "both";
+            };
+            dependsOn?: string[];
+            required: boolean;
+            /** @enum {string} */
+            impact: "observe" | "sensitiveRead" | "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | {
+            id: string;
+            /** @constant */
+            kind: "processSnapshot";
+            parameters: {
+                include: ("status" | "limits" | "maps" | "smaps_rollup" | "threads" | "fdMetadata" | "cgroups" | "identity")[];
+            };
+            dependsOn?: string[];
+            required: boolean;
+            /** @enum {string} */
+            impact: "observe" | "sensitiveRead" | "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | {
+            id: string;
+            /** @constant */
+            kind: "fileRead";
+            parameters: {
+                /** @enum {string} */
+                namespace: "podRoots" | "targetProc" | "runtimeOutput";
+                path: string;
+                /** @enum {string} */
+                process: "podMainProcesses" | "allPodProcesses";
+            };
+            dependsOn?: string[];
+            required: boolean;
+            /** @enum {string} */
+            impact: "observe" | "sensitiveRead" | "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | ({
+            id: string;
+            /** @constant */
+            kind: "packetCapture";
+            parameters: components["schemas"]["Contract_packet_capture"];
+            dependsOn?: string[];
+            required: boolean;
+            /** @enum {string} */
+            impact: "observe" | "sensitiveRead" | "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default ongoing
+             * @enum {unknown}
+             */
+            executionMode: "onTrigger" | "ongoing";
+        } & (unknown & unknown)) | {
+            id: string;
+            /** @constant */
+            kind: "networkSnapshot";
+            parameters: {
+                include: ("addresses" | "routes" | "sockets" | "counters" | "socketOwners")[];
+            };
+            dependsOn?: string[];
+            required: boolean;
+            /** @enum {string} */
+            impact: "observe" | "sensitiveRead" | "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | {
+            id: string;
+            /** @constant */
+            kind: "runtimeDiagnostic";
+            parameters: {
+                /** @enum {string} */
+                runtime: "native" | "go" | "dotnet" | "python" | "node" | "jvm" | "cuda";
+                /** @enum {string} */
+                operation: "stacks" | "report" | "heap" | "counters" | "trace" | "gpuDump";
+                profileRef?: string;
+            };
+            dependsOn?: string[];
+            required: boolean;
+            /** @constant */
+            impact: "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | {
+            id: string;
+            /** @constant */
+            kind: "kernelCore";
+            parameters: {
+                profileRef: string;
+            };
+            dependsOn?: string[];
+            required: boolean;
+            /** @enum {string} */
+            impact: "observe" | "sensitiveRead" | "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | {
+            id: string;
+            /** @constant */
+            kind: "liveCore";
+            parameters: {
+                profileRef: string;
+                /** @enum {string} */
+                process: "podMainProcesses" | "selectedPID" | "matchedProcesses";
+                processIdentity?: {
+                    podUID: string;
+                    nodeBootID: components["schemas"]["Contract_common_2224a31324a0c811"];
+                    hostPID: number;
+                    startTimeTicks: number;
+                };
+                processSelector?: components["schemas"]["Contract_action_f252bcf961e0afcb"];
+                batch?: components["schemas"]["Contract_action_e8308e53a77c994b"];
+            } & (unknown & unknown);
+            dependsOn?: string[];
+            required: boolean;
+            /** @constant */
+            impact: "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | {
+            id: string;
+            /** @constant */
+            kind: "command";
+            parameters: {
+                argv: string[];
+                workingDirectory: string;
+                environmentNames?: string[];
+                /** @enum {string} */
+                adapter: "podsExec" | "qualifiedRuntime";
+            };
+            dependsOn?: string[];
+            required: boolean;
+            /** @constant */
+            impact: "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | {
+            id: string;
+            /** @constant */
+            kind: "httpDiagnostic";
+            parameters: {
+                endpointRef: string;
+                path: string;
+                /** @constant */
+                method: "GET";
+            };
+            dependsOn?: string[];
+            required: boolean;
+            /** @enum {string} */
+            impact: "observe" | "sensitiveRead" | "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | {
+            id: string;
+            /** @constant */
+            kind: "artifactCollect";
+            parameters: {
+                path: string;
+                /** @enum {string} */
+                format: "elf-core" | "dotnet-dump" | "hprof" | "node-report" | "cuda-core" | "text";
+                settleFor: string;
+            };
+            dependsOn?: string[];
+            required: boolean;
+            /** @enum {string} */
+            impact: "observe" | "sensitiveRead" | "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | {
+            id: string;
+            /** @constant */
+            kind: "profile";
+            parameters: {
+                /** @enum {unknown} */
+                runtime: "go" | "dotnet" | "jvm" | "node" | "python" | "native" | "any";
+                /** @enum {unknown} */
+                type: "cpu" | "heap" | "allocs" | "goroutine" | "block" | "mutex" | "threadcreate" | "offCpu" | "wall" | "lock" | "events" | "runtimeTrace";
+                source: {
+                    /** @enum {unknown} */
+                    kind: "httpEndpoint" | "runtimeSocket" | "runtimeFile" | "nativeAttach" | "gadget" | "ebpfSampler";
+                    profileRef?: string;
+                } & unknown;
+                duration?: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+                frequencyHz?: number;
+                forceGC: boolean;
+                /** @enum {unknown} */
+                mode: "snapshot" | "cumulative" | "delta" | "interval";
+            } & (unknown & unknown & unknown & unknown & unknown);
+            dependsOn?: string[];
+            required: boolean;
+            /** @constant */
+            impact: "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default onTrigger
+             * @constant
+             */
+            executionMode: "onTrigger";
+        } | ({
+            id: string;
+            /** @constant */
+            kind: "syscallTrace";
+            parameters: components["schemas"]["Contract_syscall_trace"];
+            dependsOn?: string[];
+            required: boolean;
+            /** @enum {string} */
+            impact: "observe" | "sensitiveRead" | "intrusive";
+            limits: components["schemas"]["Contract_common_118dfa56ea0142d0"];
+            /**
+             * @default ongoing
+             * @enum {unknown}
+             */
+            executionMode: "onTrigger" | "ongoing";
+        } & (unknown & unknown)));
+        Contract_common_118dfa56ea0142d0: {
+            maxBytes: number;
+            timeout: string;
+        };
+        /** Bounded packet action parameters */
+        Contract_packet_capture: {
+            profile: {
+                /** @constant */
+                kind: "networkHeaders";
+            } | {
+                /** @constant */
+                kind: "httpHeaders";
+                /** @constant */
+                protocol: "http1";
+                projectionRef: {
+                    name: string;
+                    version: string;
+                };
+                maxFlows: number;
+                maxHeaderBytes: number;
+                maxReassemblyBytesPerFlow: number;
+                maxReassemblyBytes: number;
+                idleTimeout: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+            } | {
+                /** @constant */
+                kind: "rawPackets";
+                snaplen: number;
+                protocolSnaplen?: {
+                    /** @enum {unknown} */
+                    protocol: "tcp" | "udp" | "icmp";
+                    bytes: number;
+                }[];
+            };
+            before: string;
+            after: string;
+            filter?: string;
+            ring: {
+                maxAge: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+                maxBytes: number;
+                segmentBytes: number;
+                maxSegments: number;
+                /** @enum {unknown} */
+                medium: "memory" | "encryptedDisk";
+                storageProfileRef?: string;
+            } & unknown;
+            peers: {
+                entries: ({
+                    cidrs: string[];
+                } | {
+                    podSelector: {
+                        namespace: string;
+                        matchLabels: {
+                            [key: string]: string;
+                        };
+                    };
+                } | {
+                    resourceRef: {
+                        /** @enum {unknown} */
+                        kind: "Pod" | "Deployment" | "StatefulSet" | "Service";
+                        namespace: string;
+                        name: string;
+                        /** @enum {unknown} */
+                        serviceMode?: "backends" | "virtualIP" | "both";
+                        readyOnly?: boolean;
+                    } & unknown;
+                })[];
+                /** @enum {unknown} */
+                protocol: "tcp" | "udp" | "icmp" | "any";
+                ports?: number[];
+                /** @enum {unknown} */
+                resolution: "frozen" | "follow";
+                maxEndpoints: number;
+                maxStaleness: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+            };
+            maxFrozenBytes: number;
+            maxConcurrentSnapshots: number;
+        };
+        /** Bounded pod-wide syscall acquisition parameters */
+        Contract_syscall_trace: {
+            /** @constant */
+            processes: "allPodProcesses";
+            /** @enum {unknown} */
+            mode: "metadata" | "arguments";
+            before: "0s" | components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+            after: "0s" | components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+            syscalls: {
+                /** @constant */
+                mode: "all";
+            } | {
+                /** @constant */
+                mode: "include";
+                names: string[];
+            };
+            /** @enum {unknown} */
+            result: "all" | "errors";
+            ring: components["schemas"]["Contract_packet_capture_8b1a78e06ce5adec"];
+            maxFrozenBytes: number;
+            maxConcurrentSnapshots: number;
+            maxEvents: number;
+            maxEventsPerSecond: number;
+            maxTrackedThreads: number;
+            arguments?: {
+                maxBytesPerEvent: number;
+                captureBuffers: boolean;
+            };
+        } & unknown;
+        Contract_collection_scope_d82f582d45541458: {
+            /** @enum {unknown} */
+            role: "recipe" | "collectionCeiling" | "retention" | "endpointTemplate" | "runtimePack" | "preset" | "projection" | "approvalPolicy" | "captureProfile" | "collector";
+            digest: string;
+            /** @description Source object of an organization or namespace captureProfile dependency. A release-embedded builtin profile (ADR-243) has none; its profileComposition provenance names the builtin catalog. */
+            source?: components["schemas"]["Contract_collection_scope_4ad7f6b328929f94"];
+        }[];
+        Contract_collection_scope_4ad7f6b328929f94: {
+            /** Format: uuid */
+            clusterID: string;
+            namespaceUID: string;
+            resourceUID: string;
+        };
+        Contract_recording_save_f55cbe756b7a0883: {
+            /** @constant */
+            kind: "recordingSaveSettings";
+            /** @constant */
+            operation: "recordingSave";
+            /** Format: uuid */
+            capture_id: string;
+            /** Format: uuid */
+            cluster_id: string;
+            namespace_uid: string;
+            /** Format: date-time */
+            accepted_at: string;
+            /** Format: date-time */
+            expires_at: string;
+            settings_digest: components["schemas"]["Contract_common_9cbf92fb972157c6"];
+            original_execution_digest: components["schemas"]["Contract_common_9cbf92fb972157c6"];
+            settings: {
+                target: components["schemas"]["Contract_target"];
+                policy: {
+                    /** Format: uuid */
+                    clusterID: string;
+                    namespaceUID: string;
+                    policyUID: string;
+                    executionDigest: components["schemas"]["Contract_common_9cbf92fb972157c6"];
+                };
+                action_windows: {
+                    actionID: string;
+                    before: components["schemas"]["Contract_common_76a8fd22c9ccd9dc"];
+                }[];
+            };
+            /** Format: uri */
+            navigation_uri: string;
+        };
+        McpOutput_get_capture_settings: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: components["schemas"]["Contract_capture_history_6f7c512573a1694c"] | components["schemas"]["Contract_recording_save_f55cbe756b7a0883"];
+            /** @constant */
+            data_class?: "extract";
         } | {
             /** @constant */
             status: "pending";

@@ -276,3 +276,23 @@ func TestDownloadEvidenceCredential(t *testing.T) {
 		t.Fatal("worker credential", string(store), err)
 	}
 }
+
+// The installation path must not silently drop the operator's existing
+// step-up or recording policy. Absent approval settings preserve old bytes.
+func TestInstallerIdentityApprovalSettings(t *testing.T) {
+	p := &contracts.InstallerPublicSettings{Issuer: "https://id.synthetic.invalid"}
+	before := installerIdentitySettings(p)
+	if before.Approvals != nil {
+		t.Fatal("absent approval policy changed")
+	}
+	policy := &contracts.IdentityApprovals{RequireRecordingApproval: true, StepUp: &contracts.IdentityStepUp{ACRValues: []string{"2"}, MaxAgeSeconds: 300}}
+	p.Approvals = policy
+	got := installerIdentitySettings(p)
+	if !reflect.DeepEqual(got.Approvals, policy) {
+		t.Fatal("installer lost explicit approval settings", got.Approvals)
+	}
+	p.Approvals = &contracts.IdentityApprovals{}
+	if got = installerIdentitySettings(p); got.Approvals == nil || got.Approvals.RequireRecordingApproval {
+		t.Fatal("explicit disabled policy changed")
+	}
+}

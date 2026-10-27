@@ -24,6 +24,10 @@ const InvestigationInputLimit = 32 << 10
 // bound leaves room for both copies inside the 64 KiB transport response limit.
 const InvestigationOutputLimit = 24 << 10
 
+// The sole browser settings budget; audit independently bounds its minimized
+// output byte count. Wire contracts do not import domain behavior.
+const InvestigationBrowserSettingsOutputLimit = 160 << 10
+
 type InvestigationTool struct {
 	Name         string          `json:"name"`
 	Description  string          `json:"description"`
@@ -124,6 +128,14 @@ func investigationJSON(b []byte, limit int) (any, error) {
 }
 
 func (v *InvestigationContracts) validate(name string, b []byte, output bool) error {
+	limit := InvestigationInputLimit
+	if output {
+		limit = InvestigationOutputLimit
+	}
+	return v.validateBound(name, b, output, limit)
+}
+
+func (v *InvestigationContracts) validateBound(name string, b []byte, output bool, limit int) error {
 	if v == nil {
 		return ErrInvestigationWire
 	}
@@ -131,9 +143,9 @@ func (v *InvestigationContracts) validate(name string, b []byte, output bool) er
 	if !ok {
 		return ErrInvestigationWire
 	}
-	limit, schema := InvestigationInputLimit, s.input
+	schema := s.input
 	if output {
-		limit, schema = InvestigationOutputLimit, s.output
+		schema = s.output
 	}
 	out, err := investigationJSON(b, limit)
 	if err != nil || schema.Validate(out) != nil {
@@ -144,6 +156,15 @@ func (v *InvestigationContracts) validate(name string, b []byte, output bool) er
 
 func (v *InvestigationContracts) ValidateInput(name string, b []byte) error {
 	return v.validate(name, b, false)
+}
+
+// ValidateBrowserOutput uses the identical canonical schema. Only this fixed
+// server-owned operation has a larger browser body; MCP uses ValidateOutput.
+func (v *InvestigationContracts) ValidateBrowserOutput(name string, b []byte) error {
+	if name == "get_capture_settings" {
+		return v.validateBound(name, b, true, InvestigationBrowserSettingsOutputLimit)
+	}
+	return v.ValidateOutput(name, b)
 }
 func (v *InvestigationContracts) ValidateOutput(name string, b []byte) error {
 	if err := v.validate(name, b, true); err != nil {

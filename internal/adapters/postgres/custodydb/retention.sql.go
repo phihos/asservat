@@ -163,7 +163,7 @@ func (q *Queries) ReadAttemptRetentionDecision(ctx context.Context, arg ReadAtte
 }
 
 const readRetainedContext = `-- name: ReadRetainedContext :one
-SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin FROM context_capture c WHERE c.root_id=$1 AND c.attempt_id=$2
+SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at FROM context_capture c WHERE c.root_id=$1 AND c.attempt_id=$2
 `
 
 type ReadRetainedContextParams struct {
@@ -208,6 +208,9 @@ func (q *Queries) ReadRetainedContext(ctx context.Context, arg ReadRetainedConte
 		&i.HistoryNamespaceUid,
 		&i.HistoryWorkloadUid,
 		&i.HistoryOrigin,
+		&i.HistoryParametersRequired,
+		&i.RepeatedFromCaptureID,
+		&i.RepeatedFromExpiresAt,
 	)
 	return i, err
 }

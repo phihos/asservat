@@ -2,6 +2,7 @@ package audit
 
 import (
 	"asservat.local/asservat/internal/domain/artifact"
+	auditvalue "asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
@@ -51,7 +52,18 @@ func (m *OperationMAC) AccountVersion() string {
 	return m.accountVersion
 }
 func (m *OperationMAC) Digest(domain string, b []byte) (artifact.Digest, error) {
-	if m == nil || len(b) > 64<<10 || (domain != "context-query-input/v1" && domain != "native-content-input/v1" && domain != "native-content-result/v1" && domain != "context-input/v1" && domain != "invalid-input/v1" && domain != "mcp-result/v1" && domain != "operation-error/v1" && domain != "principal/v1" && domain != "processing-input/v1" && domain != "processing-result/v1" && domain != "capture-intent/v2" && domain != "capture-intent-result/v1" && domain != "connector-retirement/v1" && domain != "connector-backing/v1" && domain != "connector-process/v1" && domain != "connector-credential/v1" && domain != "connector-result/v1") {
+	return m.digest(domain, b, 64<<10)
+}
+
+// BrowserSettingsResultDigest hashes only the already prepared canonical
+// response. It uses the existing result domain/key and stores no plaintext.
+// Callers still enforce the authenticated browser/name-specific response bound.
+func (m *OperationMAC) BrowserSettingsResultDigest(b []byte) (artifact.Digest, error) {
+	return m.digest("mcp-result/v1", b, auditvalue.OperationCaptureSettingsOutputLimit)
+}
+
+func (m *OperationMAC) digest(domain string, b []byte, limit int) (artifact.Digest, error) {
+	if m == nil || len(b) > limit || (domain != "context-query-input/v1" && domain != "native-content-input/v1" && domain != "native-content-result/v1" && domain != "context-input/v1" && domain != "invalid-input/v1" && domain != "mcp-result/v1" && domain != "operation-error/v1" && domain != "principal/v1" && domain != "processing-input/v1" && domain != "processing-result/v1" && domain != "capture-intent/v2" && domain != "capture-intent-result/v1" && domain != "connector-retirement/v1" && domain != "connector-backing/v1" && domain != "connector-process/v1" && domain != "connector-credential/v1" && domain != "connector-result/v1") {
 		return artifact.Digest{}, ErrUnavailable
 	}
 	m.mu.Lock()

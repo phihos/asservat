@@ -90,6 +90,16 @@
         "type": "string",
         "format": "uuid"
       },
+      "repeated_from_capture_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "history_selection": {
+        "enum": [
+          "currentEligiblePod"
+        ],
+        "description": "Explicit manual selection when repeating a policy triggeringPod occurrence; the preview selects a current eligible Pod under the original workload identity."
+      },
       "profile_composition": {
         "$ref": "#/$defs/d2"
       }
@@ -165,6 +175,29 @@
             {
               "required": [
                 "profile_composition"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "allOf": [
+      {
+        "if": {
+          "required": [
+            "history_selection"
+          ]
+        },
+        "then": {
+          "anyOf": [
+            {
+              "required": [
+                "history_capture_id"
+              ]
+            },
+            {
+              "required": [
+                "repeated_from_capture_id"
               ]
             }
           ]
@@ -942,7 +975,28 @@
                     "$ref": "#/$defs/d19"
                   },
                   "capture_assessment": {
-                    "$ref": "#/$defs/d20"
+                    "allOf": [
+                      {
+                        "$ref": "#/$defs/d20"
+                      },
+                      {
+                        "properties": {
+                          "actions": {
+                            "items": {
+                              "properties": {
+                                "retention": {
+                                  "properties": {
+                                    "anchorRule": {
+                                      "const": "submissionPreparation"
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
                   },
                   "preset_ref": {
                     "type": "object",
@@ -1184,11 +1238,6 @@
                         {
                           "required": [
                             "pod_selection"
-                          ]
-                        },
-                        {
-                          "required": [
-                            "repeated_from_capture_id"
                           ]
                         }
                       ]
@@ -2441,7 +2490,7 @@
               "firstAcquisitionOrEarlierSource",
               "submissionPreparation"
             ],
-            "description": "submissionPreparation measures from preparation of the first admitted submission: waiting counts and accepted retries retain the original registration. firstAcquisitionOrEarlierSource measures from acquisition or an earlier retained source."
+            "description": "submissionPreparation measures every newly accepted manual capture from preparation of its first admitted submission: waiting counts and accepted retries retain the original registration. firstAcquisitionOrEarlierSource is reserved for typed existing-source snapshots and measures from the original source acquisition or an earlier retained source, never preview creation."
           },
           "accessAgeSeconds": {
             "type": "integer",

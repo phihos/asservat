@@ -503,3 +503,20 @@ func TestPolicyGrantMetadataKeepsCurrentApproverAndLegacyAdHocPaths(t *testing.T
 		t.Fatal("legacy requester list changed", len(rows), err)
 	}
 }
+
+func TestPolicyGrantMetadataNeverOffersPersonalCaptureContinuation(t *testing.T) {
+	f, in := newPolicyGrantFixture(t)
+	g, _, err := f.svc.RequestPolicy(t.Context(), grantIdentity{f.requester, &f.now}, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g = f.approve(t, g)
+	for _, client := range []string{f.requester.Principal.ClientID, "another-human-client"} {
+		actor := f.requester
+		actor.Principal.ClientID = client
+		v, _, err := f.svc.Get(t.Context(), grantIdentity{actor, &f.now}, g.ID)
+		if err != nil || v.CanResume || v.CanResolve || v.ResumeRequiresOriginalClient {
+			t.Fatal("team grant became personal capture continuation", client, v.CanResume, v.CanResolve, v.ResumeRequiresOriginalClient, err)
+		}
+	}
+}

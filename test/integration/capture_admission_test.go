@@ -368,6 +368,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		return
 	}
 	create := func(t *testing.T, slots int64) scenario { return createForTarget(t, slots, nil, artifact.Digest{}) }
+	qualifyHistoryParameters(t, ctx, admin, poolFor, store, keys, create)
 	qualifyContextControlCapacity(t, ctx, admin, capturePool, controlPool, ledger, controlBacking, poolFor, createWithControl)
 	t.Run("recovery-blocks-new-context-admission", func(t *testing.T) {
 		s := create(t, 1)

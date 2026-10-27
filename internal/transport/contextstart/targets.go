@@ -16,7 +16,8 @@ import (
 
 // Targets is the hub's investigation target port over idle regional standbys
 // (ADR-179). The hub reads no workload cluster; each resolution is the
-// region's delegated proof, capped at its checked receiver validity.
+// region's original API observation. Source/peer proofs bound delivery, while
+// completed metadata retains its own first-read observation interval.
 type Targets struct {
 	Router *Router
 	Now    func() time.Time
@@ -45,14 +46,13 @@ func (t Targets) query(ctx context.Context, cluster, method string, in any, matc
 		return targets.PodResolution{}, err
 	}
 	regionalUntil := out.FreshUntil
-	out.FreshUntil = identity.Earlier(out.FreshUntil, until)
 	now := t.Now()
 	switch {
 	case out.ExecutionClass != artifact.ContextAPIExecution:
 		report("result/class")
 	case out.Request.ClusterID != cluster:
 		report("result/cluster")
-	case !out.Valid(now):
+	case !out.Valid(now) || !now.Before(until) || call.Err() != nil:
 		report(queryResultStep(call, regionalUntil, until, now))
 	case !matches(out):
 		report("result/request")
@@ -176,6 +176,39 @@ func (t Targets) PacketRecorder(ctx context.Context, p targets.PodResolution) er
 		return targets.ErrUnsupported
 	}
 	return nil
+}
+
+// ResolvePacketRecorder shares target and packet readiness under one original
+// receiver check. No second query or refreshed deadline is introduced.
+func (t Targets) ResolvePacketRecorder(ctx context.Context, r targets.Request) (targets.PodResolution, error) {
+	if !r.Valid() || t.Router == nil || t.Now == nil || ctx == nil || ctx.Err() != nil {
+		return targets.PodResolution{}, targets.ErrInvalid
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	call, diagnostics := NewStreamDiagnosticContext(call)
+	marks := &queryMarks{}
+	call = context.WithValue(call, queryMarksKey{}, marks)
+	start := fleetapp.RemainingBucket(call, time.Now())
+	report := func(step string) {
+		t.report("recorder-target/"+step, "start"+start+" end"+fleetapp.RemainingBucket(ctx, time.Now())+" ["+marks.String()+"]")
+	}
+	var out targets.RecorderResolution
+	until, err := t.Router.Query(call, r.ClusterID, queryResolvePacketRecorder, r, &out)
+	if err != nil {
+		report(queryStep(err, diagnostics))
+		return targets.PodResolution{}, err
+	}
+	now := t.Now()
+	if !out.Valid(now) || !now.Before(until) || call.Err() != nil || out.Target.Request != r {
+		report(queryResultStep(call, out.Target.FreshUntil, until, now))
+		return targets.PodResolution{}, targets.ErrUnavailable
+	}
+	if out.Recorder.Outcome != targets.RecorderAvailable {
+		return targets.PodResolution{}, targets.ErrUnsupported
+	}
+	report("ok")
+	return out.Target, nil
 }
 
 func (t Targets) report(step, timing string) {

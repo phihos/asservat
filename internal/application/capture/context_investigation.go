@@ -122,9 +122,11 @@ type ContextInvestigation struct {
 // ContextPreviewResult includes a transient assessment of the same reviewed
 // plan. Only Preview is persisted; assessment freshness never becomes authority.
 type ContextPreviewResult struct {
-	Preview    value.ContextPreview
-	Assessment planning.ContextAssessment
-	ValidUntil time.Time // Original metadata-delivery authority; never persisted.
+	CollectorImageDigest, ProjectionDigest artifact.Digest
+	Recorder                               *RecorderPreviewResult
+	Preview                                value.ContextPreview
+	Assessment                             planning.ContextAssessment
+	ValidUntil                             time.Time // Original metadata-delivery authority; never persisted.
 }
 
 type contextFacts struct {
@@ -243,8 +245,16 @@ func (s ContextInvestigation) factsWithStorageWait(ctx context.Context, source i
 		}
 		f.reasonUntil = r.ValidUntil
 	}
-	if !s.factsCurrent(f, s.Now()) || ctx.Err() != nil {
-		return f, previewFailure("facts/current", value.ErrChanged)
+	now := s.Now()
+	if !s.factsCurrent(f, now) || ctx.Err() != nil {
+		reason := s.nonStorageFactsFailure(f, now)
+		if reason == "" {
+			reason = "storage"
+			if s.storageCurrent(f.storage, f.target.Target(), now) {
+				reason = "context"
+			}
+		}
+		return f, previewFailure("facts/current/"+reason, value.ErrChanged)
 	}
 	return f, nil
 }
@@ -254,8 +264,35 @@ func (s ContextInvestigation) factsCurrent(f contextFacts, now time.Time) bool {
 }
 
 func (s ContextInvestigation) nonStorageFactsCurrent(f contextFacts, now time.Time) bool {
+	return s.nonStorageFactsFailure(f, now) == ""
+}
+
+// Closed private labels identify the existing first failed predicate without
+// copying provider/error text or changing any authority/deadline decision.
+func (s ContextInvestigation) nonStorageFactsFailure(f contextFacts, now time.Time) string {
 	t, p := f.target.Target(), f.retention.Proof
-	return f.target.Valid(now) && f.capability.Valid(now) && f.target.ExecutionClass == f.capability.ExecutionClass && f.capability.ProjectionDigest == compiler.ProjectionDigest() && p.Valid(now) && p.Matches(s.RootID, t.ClusterID, t.NamespaceUID, t.WorkloadUID, t.PodUID) && p.Policy == f.retention.PolicyRevision && !f.retention.ValidUntil.After(p.ValidUntil) && now.Before(f.retention.ValidUntil) && now.Before(f.eligibility.ValidUntil) && f.eligibility.VerifiedIdentity.Valid(now) && (f.reasonUntil.IsZero() || now.Before(f.reasonUntil))
+	for _, check := range []struct {
+		failed bool
+		name   string
+	}{
+		{!f.target.Valid(now), "target"},
+		{!f.capability.Valid(now), "capability"},
+		{f.target.ExecutionClass != f.capability.ExecutionClass, "capability-class"},
+		{f.capability.ProjectionDigest != compiler.ProjectionDigest(), "capability-projection"},
+		{!p.Valid(now), "retention-proof"},
+		{!p.Matches(s.RootID, t.ClusterID, t.NamespaceUID, t.WorkloadUID, t.PodUID), "retention-target"},
+		{p.Policy != f.retention.PolicyRevision, "retention-policy"},
+		{f.retention.ValidUntil.After(p.ValidUntil), "retention-bound"},
+		{!now.Before(f.retention.ValidUntil), "retention"},
+		{!now.Before(f.eligibility.ValidUntil), "eligibility"},
+		{!f.eligibility.VerifiedIdentity.Valid(now), "identity"},
+		{!f.reasonUntil.IsZero() && !now.Before(f.reasonUntil), "reason"},
+	} {
+		if check.failed {
+			return check.name
+		}
+	}
+	return ""
 }
 
 func (s ContextInvestigation) storageCurrent(v ContextStorageObservation, t authorization.Target, now time.Time) bool {
@@ -338,11 +375,14 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 	if err != nil {
 		return zero, previewFailure("facts", err)
 	}
-	if original != nil && (target.Request.ClusterID != original.ClusterID || target.Request.Namespace.UID != original.NamespaceUID || target.Request.Workload.UID != original.WorkloadUID) {
+	if original != nil && (target.Request.ClusterID != original.ClusterID || target.Request.Namespace.UID != original.NamespaceUID || target.Request.Workload.UID != original.WorkloadUID || (original.PodUID != "" && target.Request.PodUID != original.PodUID)) {
 		return zero, previewFailure("repeat/target", value.ErrTargetReplaced)
 	}
 	p := value.ContextPreview{ID: s.NewID(), RootID: s.RootID, InstallationID: s.InstallationID, IssuerEpoch: recovery.IssuerEpoch, CaptureID: s.NewID(), CaseID: s.NewID(), OccurrenceID: s.NewID(), ArtifactID: s.NewID(), AttemptID: s.NewID(), Actor: i.Principal, Intent: intent, Target: target.Request, Pin: target.Pin, Storage: f.storage.Selection, Retention: retentionReview(f.retention), Audience: slices.Clone(f.eligibility.DefaultAudience), CreatedAt: created, Deadline: created.Add(s.Lifetime)}
 	p.ExecutionClass = target.ExecutionClass
+	if intent.RepeatedFrom != nil {
+		p.Deadline = identity.Earlier(p.Deadline, intent.RepeatedFrom.ExpiresAt)
+	}
 	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.ContextAssessmentRulesDigestForClass(target.ExecutionClass)
 	if intent.Reason != nil {
 		p.Deadline = identity.Earlier(p.Deadline, intent.Reason.ExpiresAt)
@@ -396,7 +436,7 @@ func (s ContextInvestigation) preview(ctx context.Context, source identities.Cur
 	if !s.Now().Before(until) || ctx.Err() != nil {
 		return zero, previewFailure("response/current", value.ErrUnavailable)
 	}
-	return ContextPreviewResult{Preview: p.Clone(), Assessment: assessment, ValidUntil: until}, nil
+	return ContextPreviewResult{CollectorImageDigest: f.capability.CollectorImageDigest, ProjectionDigest: f.capability.ProjectionDigest, Preview: p.Clone(), Assessment: assessment, ValidUntil: until}, nil
 }
 
 func acceptedContext(a value.Accepted, digest artifact.Digest) bool {
@@ -473,8 +513,11 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 			}
 			p.CreatedAt = s.Now().UTC().Truncate(time.Microsecond)
 			p.Deadline = identity.Earlier(p.CreatedAt.Add(s.Lifetime), grant.ExpiresAt)
+			if p.Intent.RepeatedFrom != nil {
+				p.Deadline = identity.Earlier(p.Deadline, p.Intent.RepeatedFrom.ExpiresAt)
+			}
 		}
-		if p.Storage == (value.ContextStorageSelection{}) {
+		if p.Storage == (value.ContextStorageSelection{}) || !packetRecorderInput(p.Intent, p.ExecutionClass) {
 			return zero, value.ErrRecorderUnavailable
 		}
 	}
@@ -492,21 +535,39 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	// beside the target re-resolution instead of after it. It confers nothing:
 	// facts still read and check storage after both, and the wait is joined
 	// before the request returns.
-	storageWait := s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, identity.Earlier(p.Deadline, identity.Earlier(i.ValidUntil, recovery.FreshUntil)), p.Storage)
+	storageUntil, storageBound := p.Deadline, "preview"
+	for _, bound := range []struct {
+		at   time.Time
+		name string
+	}{{i.ValidUntil, "identity"}, {recovery.FreshUntil, "recovery"}} {
+		if bound.at.Before(storageUntil) {
+			storageUntil, storageBound = bound.at, bound.name
+		}
+	}
+	storageWait := s.beginStorageWait(ctx, targets.PodResolution{Request: p.Target}, storageUntil, p.Storage)
+	storageWait.bound = storageBound
 	defer storageWait.close()
 	resolveStarted := time.Now()
-	target, err := s.Targets.ResolvePod(ctx, p.Target)
+	var target targets.PodResolution
+	if recording && s.Recorders != nil {
+		target, err = s.Recorders.ResolvePacketRecorder(ctx, p.Target)
+	} else {
+		target, err = s.Targets.ResolvePod(ctx, p.Target)
+	}
 	auditapp.MarkStep(ctx, "q-resolve", resolveStarted)
 	if err != nil {
+		if recording && errors.Is(err, targets.ErrUnsupported) {
+			return zero, value.ErrRecorderUnavailable
+		}
 		// Reported with its closed class; the error still unwraps unchanged.
 		return zero, previewFailure("target/"+targetFailureClass(err), err)
 	}
 	if target.Request != p.Target || target.Pin != p.Pin || target.ExecutionClass != p.ExecutionClass {
 		return zero, s.requestChanged("target")
 	}
-	// The node must still offer the recorder; the connector checks it again
-	// before it queues the work.
-	if recording && !s.packetRecorderAvailable(ctx, p.Intent, target) {
+	// Recording resolution checks current availability in the same regional
+	// exchange. The connector still checks the node before queueing work.
+	if recording && s.Recorders == nil {
 		return zero, value.ErrRecorderUnavailable
 	}
 	s.reviewTarget(ctx, source, i.Principal, target)
@@ -596,7 +657,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 		}
 	}
 	admitStarted := time.Now()
-	a, err := s.Admission.AdmitReviewedContext(ctx, p.ID, value.Admission{Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})
+	a, err := s.Admission.AdmitReviewedContext(ctx, p.ID, value.Admission{RepeatedFrom: p.Intent.RepeatedFrom, Recovery: recovery, RootID: s.RootID, IdempotencyKey: key, SubmissionDigest: digest, Plan: plan, Eligibility: final, Storage: f.storage.Binding, Registration: r, CaseID: p.CaseID, OccurrenceID: p.OccurrenceID})
 	auditapp.MarkStep(ctx, "q-admit", admitStarted)
 	if err != nil {
 		return zero, err
@@ -611,6 +672,15 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	// next call recovers the original operation through the read-only lookup.
 	if _, err = s.currentIdentity(ctx, source, i.Principal, i.ValidUntil); err != nil || !recovery.Valid(s.Now()) || s.Now().Before(started) {
 		return zero, value.ErrDenied
+	}
+	if !a.Replay {
+		draft, e := HistoryDraftFromPreview(p, a)
+		if e == nil {
+			a.HistoryParameters = &draft
+			a.HistorySource = p.Intent.RepeatedFrom
+		} else {
+			a.HistoryUnavailable = true
+		}
 	}
 	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, identity.Earlier(i.ValidUntil, recovery.FreshUntil))
 	a.MetadataValidUntil = identity.Earlier(a.MetadataValidUntil, identity.Earlier(final.ValidUntil, final.VerifiedIdentity.ValidUntil))

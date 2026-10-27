@@ -31,6 +31,8 @@ const (
 // RestartPolicy is the compiled, accepted subset. It contains configuration
 // intent only; executor, delegation and limits come from protected acceptance.
 type RestartPolicy struct {
+	// Original accepted source context is private history input, excluded from policy intent equality.
+	HistoryAuthored                                  *HistoryAuthored `json:"-"`
 	ClusterID, Namespace, WorkloadKind, WorkloadName string
 	// Reasons is a sorted subset of OOMKilled, Error and CrashLoopBackOff.
 	Reasons []string

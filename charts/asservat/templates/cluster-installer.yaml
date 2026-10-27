@@ -180,7 +180,7 @@ spec:
         - name: installer
           image: {{ $c.image }}
           imagePullPolicy: IfNotPresent
-          command: [/asservat, installer-cluster, --in-cluster, --offer, /run/asservat/cluster/regional-offer.json, --bootstrap, /run/asservat/cluster/bootstrap.json, --namespace, {{ $c.namespace }}{{ if $executor }}, --evidence-credential, /run/asservat/cluster/evidence-storage.json{{ end }}{{ if $c.alertmanager }}, --alertmanager, {{ $c.alertmanager | quote }}{{ end }}{{ if $c.identityMappings }}, --identity-mappings, {{ $c.identityMappings | toJson | quote }}{{ end }}{{ if .Values.collector.enabled }}, --collector-namespace, {{ .Values.collector.namespace }}, --collector-name, {{ printf "%s-node" .Release.Name }}{{ end }}]
+          command: [/asservat, installer-cluster, --in-cluster, --offer, /run/asservat/cluster/regional-offer.json, --bootstrap, /run/asservat/cluster/bootstrap.json, --namespace, {{ $c.namespace }}{{ if $executor }}, --evidence-credential, /run/asservat/cluster/evidence-storage.json, --history-credential, /run/asservat/cluster/history-storage.json{{ end }}{{ if $c.alertmanager }}, --alertmanager, {{ $c.alertmanager | quote }}{{ end }}{{ if $c.identityMappings }}, --identity-mappings, {{ $c.identityMappings | toJson | quote }}{{ end }}{{ if .Values.collector.enabled }}, --collector-namespace, {{ .Values.collector.namespace }}, --collector-name, {{ printf "%s-node" .Release.Name }}{{ end }}]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -207,6 +207,6 @@ spec:
               {{- if $executor }}
               - secret:
                   name: {{ $c.evidenceSecret }}
-                  items: [{key: evidence-storage.json, path: evidence-storage.json}]
+                  items: [{key: evidence-storage.json, path: evidence-storage.json}, {key: history-storage.json, path: history-storage.json}]
               {{- end }}
 {{- end }}

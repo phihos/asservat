@@ -45,6 +45,7 @@ type regionalContext struct {
 	targets   *kube.PodTargets
 	collector *kube.ContextCollector
 	output    regionalArtifactOutput
+	history   objectstore.HistoryObjects
 	verifier  *jose.APIContextWorkSignatures
 	owners    *RegionalLifecycle
 	source    *kube.ConnectorIdentitySource
@@ -201,6 +202,14 @@ func newRegionalContext(ctx context.Context, c contracts.RegionalDeployment, in 
 	if err != nil {
 		return nil, closers, mounts.ErrUnavailable
 	}
+	// History is a separate purpose-limited capability in the same qualified
+	// backend/bucket. It never receives the raw evidence writer's credential.
+	metadata, err := objectstore.New(a.EvidenceStore.Endpoint, a.EvidenceStore.Region, a.EvidenceStore.Bucket, storageCredentials(in, contracts.RegionalHistoryCredentialFile), storage)
+	if err != nil {
+		return nil, closers, mounts.ErrUnavailable
+	}
+	closers = append(closers, metadata.Close)
+	out.history = objectstore.HistoryObjects{Store: metadata, StoreID: a.EvidenceStore.StoreID}
 	// ADR-176: keysets are wrapped by the local key service, per attempt, with
 	// this process's own connector client leaf.
 	keyRoots, _, err := mtls.OwnerTrustRoots(a.KeyService.Roots, time.Now())
@@ -253,6 +262,7 @@ func (r *regionalContext) run(ctx context.Context, credentials *mtls.ConnectorPr
 		return &fixedStepError{"start-client", err}
 	}
 	local := contextstart.RegionalLocal{Process: process, Targets: reportedTargets{r.targets, timedEventLog(os.Stderr, "regional target answer"), r.output.recordings}, Local: preparer, Starts: r.journal, Output: r.output, Collector: r.collector, Source: r.source, Now: time.Now}
+	local.History = &contextstart.HistoryLocal{Verifier: r.verifier, Effects: regionalHistoryObjects{objects: r.history, root: r.rootID, cluster: r.c.TrustSettings.ClusterID, epoch: process.ProcessEpoch(), now: time.Now}}
 	if r.output.recordings != nil {
 		local.Recordings = r.output.recordings
 	}
@@ -315,6 +325,27 @@ func (t reportedTargets) PacketRecorder(ctx context.Context, r targets.RecorderR
 		return targets.RecorderAnswer{Outcome: targets.RecorderUnavailable}, nil
 	}
 	return t.recordings.PacketRecorder(ctx, r)
+}
+
+// ResolvePacketRecorder observes the exact Pod and availability under one
+// original receiver proof, without a second query or namespace/Pod read.
+func (t reportedTargets) ResolvePacketRecorder(ctx context.Context, r targets.Request) (targets.RecorderResolution, error) {
+	p, node, err := t.PodTargets.ResolvePacketPod(ctx, r)
+	if err != nil {
+		return targets.RecorderResolution{}, err
+	}
+	return t.packetTargetAvailability(p, node), nil
+}
+func (t reportedTargets) packetTargetAvailability(p targets.PodResolution, node string) targets.RecorderResolution {
+	answer := targets.RecorderAnswer{Outcome: targets.RecorderUnavailable}
+	if node == "" {
+		answer.Outcome = targets.RecorderNoNode
+	} else if t.recordings != nil {
+		if v, ok := t.recordings.nodes.NodeByName(node); ok && v.PacketRecorderAvailable() {
+			return targets.RecorderResolution{Target: p, Recorder: targets.RecorderAnswer{Outcome: targets.RecorderAvailable}}
+		}
+	}
+	return targets.RecorderResolution{Target: p, Recorder: answer}
 }
 
 func (t reportedTargets) ReportAnswer(steps string) { t.report("answer", steps) }

@@ -8,6 +8,7 @@ Implementation and installed qualification remain in progress.
 sign-in path using current protected ACR settings and fresh authentication. The
 existing signed-claim check still decides assurance; real-provider LoA qualification
 remains pending. No migration or new credential.
+- **ADR-255 — Encrypted parameterized capture history:** [Bounded immutable settings and faithful repeat](255-encrypted-capture-history.md); implementation in progress, native qualification pending.
 
 [ADR-249 — Sensitive acquisition grants](249-sensitive-acquisition-grants.md) is S-04 increment
 12 (12a, individual approval): an adHocCapture AccessGrant per reviewed packet/syscall plan that
@@ -1022,3 +1023,7 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - **ADR-156 — Finite owner configuration audit epochs:** [Independent full-snapshot acceptance](156-finite-owner-audit-epochs.md), explicit automatic rollover overlap, finite charged capacity and distinct current/admitted dependency values. The [integrated foundation](../../test/results/owner-audit-epoch-integration.json) passes component qualification (144 top-level / 807 named race-test passes plus compilation, vet and canonical gates). The [separate codec](../../test/results/owner-epoch-codec-integration.json) passes 42 top-level / 99 named framed race tests and affected gates. Both remain unselected; current SQL29 v1 configuration receipts and runtime behavior are unchanged. SQL effects, reserve/checkpoint production, complete consumer composition, physical retirement and installed sustainability remain pending.
 
 - [252 — Approved capture acceptance](252-approved-capture-acceptance.md): retain bounded immutable review blueprints and fix a separately bounded capture deadline under the original current grant.
+
+- [ADR-257: preserve authored packet evidence funding](257-approved-recording-funding.md)
+
+- [ADR-260: API target observations after completed authenticated queries](260-api-target-observation-freshness.md)

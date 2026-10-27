@@ -216,3 +216,8 @@ gofmt-check:
 
 go-vet:
 	TMPDIR="$(ASSERVAT_BUILD_TMP)" go vet ./...
+
+# Metadata-only capability qualification; one owned pinned S3 fixture, no collector.
+.PHONY: history-storage-integration
+history-storage-integration:
+	$(PYTHON) scripts/test-history-storage.py $(or $(HISTORY_RESULT_NAME),history-storage-native-1)

@@ -65,8 +65,10 @@ func (c *PodTargets) ResolveWorkload(ctx context.Context, r value.WorkloadReques
 		return value.PodResolution{}, err
 	}
 	out.ObservedAt, out.FreshUntil = start, identity.Earlier(out.FreshUntil, start.Add(5*time.Second))
-	if deadline, ok := ctx.Deadline(); ok {
-		out.FreshUntil = identity.Earlier(out.FreshUntil, deadline)
+	if c.executionClass != artifact.ContextAPIExecution {
+		if deadline, ok := ctx.Deadline(); ok {
+			out.FreshUntil = identity.Earlier(out.FreshUntil, deadline)
+		}
 	}
 	if c.client.current(ctx, start, 5*time.Second) != nil || !out.Valid(c.client.now()) {
 		return value.PodResolution{}, value.ErrUnavailable

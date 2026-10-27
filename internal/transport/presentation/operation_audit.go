@@ -577,7 +577,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			body = []byte("invalid")
 		}
 	} else {
-		if len(reply.Body) > audit.OperationOutputLimit || len(reply.Body) == 0 {
+		if len(reply.Body) > reply.preparedOutputLimit(in.Name) || len(reply.Body) == 0 {
 			return out, auditapp.ErrUnavailable
 		}
 		if queryOperation(in.Name) && s.contracts.ValidateOutput(in.Name, reply.Body) != nil {
@@ -616,6 +616,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 				CaptureID  string             `json:"capture_id"`
 				ArtifactID string             `json:"artifact_id"`
 				Acceptance string             `json:"acceptance_id"`
+				GrantID    string             `json:"grant_id"`
 				DownloadID string             `json:"download_id"`
 				CaseID     string             `json:"case_id"`
 				State      string             `json:"state"`
@@ -639,6 +640,11 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 				out.ArtifactIDs = append(out.ArtifactIDs, refs.ArtifactID)
 			}
 			if (in.Name == "activate_policy" || in.Name == "deactivate_policy") && refs.Acceptance != "" {
+				out.Effect = "accepted"
+			}
+			if (in.Name == "decide_review" || in.Name == "revoke_grant") && refs.GrantID != "" {
+				// An acknowledged decision/revocation, including exact idempotent replay,
+				// is an accepted logical mutation. Service uncertainty remains unknown.
 				out.Effect = "accepted"
 			}
 			if in.Name == "prepare_artifact_download" && refs.DownloadID != "" {
@@ -667,7 +673,13 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			}
 		}
 	}
-	d, err := s.mac.Digest(domain, body)
+	var d artifact.Digest
+	var err error
+	if callErr == nil && in.Name == "get_capture_settings" && reply.browserSettings {
+		d, err = s.mac.BrowserSettingsResultDigest(body)
+	} else {
+		d, err = s.mac.Digest(domain, body)
+	}
 	out.OutputDigest = d
 	if err != nil || !out.Valid() {
 		return out, auditapp.ErrUnavailable

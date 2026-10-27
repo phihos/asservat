@@ -36,6 +36,7 @@ func (in *CompositionInput) composition() (*planning.ProfileComposition, error) 
 // plan is complete and reviewable; capture_enabled is true only for a manual
 // network-header plan whose node recorder is available (ADR-248).
 type RecorderPreviewData struct {
+	RepeatedFrom     string             `json:"repeated_from_capture_id,omitempty"`
 	PreviewID        string             `json:"preview_id"`
 	ExpiresAt        time.Time          `json:"expires_at"`
 	ExecutionDigest  string             `json:"execution_digest"`
@@ -116,7 +117,7 @@ func RecorderAssessment(a planning.RecorderAssessment) CaptureAssessment {
 		out.Actions = append(out.Actions, AssessmentAction{ActionID: x.ActionID, ExecutionMode: x.ExecutionMode,
 			Impact:     Impact{x.Impact.Level, x.Impact.HasUnknowns, slices.Clone(x.Impact.Effects), x.Impact.Explanation},
 			Data:       Exposure{x.Exposure.Classification, x.Exposure.Basis, slices.Clone(x.Exposure.RetainedPossible), slices.Clone(x.Exposure.TransientOnly), x.Exposure.UnknownContent},
-			Retention:  Retention{"firstAcquisitionOrEarlierSource", r.AccessAgeSeconds, r.DeleteAgeSeconds, r.MaximumAgeSeconds, r.DeletionBudgetSeconds, policies, true, true, "possible"},
+			Retention:  Retention{"submissionPreparation", r.AccessAgeSeconds, r.DeleteAgeSeconds, r.MaximumAgeSeconds, r.DeletionBudgetSeconds, policies, true, true, "possible"},
 			Quantities: quantities(x.Quantities)})
 	}
 	if a.Interaction != "" {
@@ -141,6 +142,9 @@ func (s *ContextOperations) recorderPreview(ctx context.Context, current identit
 	if err != nil {
 		return RecorderPreviewData{}, time.Time{}, err
 	}
+	return s.recorderPreviewResult(result, in.Target)
+}
+func (s *ContextOperations) recorderPreviewResult(result app.RecorderPreviewResult, target WorkloadReference) (RecorderPreviewData, time.Time, error) {
 	provenance, err := compiler.CompositionProvenance(result.Plan)
 	if err != nil {
 		return RecorderPreviewData{}, time.Time{}, value.ErrUnavailable
@@ -180,6 +184,6 @@ func (s *ContextOperations) recorderPreview(ctx context.Context, current identit
 		blockers = append(blockers, collectionBlockers(false)...)
 	}
 	return RecorderPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: limit, CaptureEnabled: len(blockers) == 0, ApprovalRequired: approval, Blockers: blockers,
-		Warnings: warnings, NavigationURI: s.config.PublicOrigin + "/captures/new", Composition: provenance, Lifecycle: lifecycle, Assessment: RecorderAssessment(result.Assessment), Target: in.Target,
+		Warnings: warnings, NavigationURI: s.config.PublicOrigin + "/captures/new", Composition: provenance, Lifecycle: lifecycle, Assessment: RecorderAssessment(result.Assessment), Target: target,
 		SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}}, result.ValidUntil, nil
 }

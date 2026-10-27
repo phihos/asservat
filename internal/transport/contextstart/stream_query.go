@@ -27,7 +27,8 @@ const (
 	queryReviewAccess = "review-access"
 	// ADR-248: whether the target Pod's node collector offers the packet
 	// recorder now.
-	queryPacketRecorder = "packet-recorder"
+	queryPacketRecorder        = "packet-recorder"
+	queryResolvePacketRecorder = "resolve-packet-recorder"
 )
 
 // RecorderTargets is the region's optional packet recorder availability
@@ -42,6 +43,12 @@ type RecorderTargets interface {
 // grants nothing.
 type ReviewTargets interface {
 	ReviewAccess(context.Context, targets.AccessReviewRequest) (targets.AccessReviewAnswer, error)
+}
+
+// PacketTargetResolver composes exact target and recorder readiness. A region
+// without this query capability returns a closed unsupported reply.
+type PacketTargetResolver interface {
+	ResolvePacketRecorder(context.Context, targets.Request) (targets.RecorderResolution, error)
 }
 
 // RestartTargets is the region's optional restart observation (ADR-228). A
@@ -109,9 +116,10 @@ func (s *frameStream) nextQuery() (int, error) {
 }
 
 // query is the hub's question to the region. It returns the region receiver's
-// validity, checked after a fresh source pull; the answer is delegated proof
-// the caller must not use beyond it. Any error other than errQueryAnswer
-// leaves the stream unusable.
+// validity, checked after a fresh source pull, bounding this exchange's I/O
+// and completion. Authority-bearing answers remain bounded by it. Completed
+// API target metadata keeps its own original observation interval (ADR-260).
+// Any error other than errQueryAnswer leaves the stream unusable.
 func (s *frameStream) query(ctx context.Context, method string, in, out any) (time.Time, error) {
 	if s == nil || ctx == nil || s.sources == nil {
 		return time.Time{}, fleet.ErrInvalid
@@ -312,6 +320,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		if reviewer, ok := s.targets.(ReviewTargets); ok {
 			out, e = reviewer.ReviewAccess(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryResolvePacketRecorder:
+		var r targets.Request
+		if decodeOperationBody(q.Body, &r) != nil || !r.Valid() {
+			return contracts.ErrAPIContextProtocol
+		}
+		if resolver, ok := s.targets.(PacketTargetResolver); ok {
+			out, e = resolver.ResolvePacketRecorder(bounded, r)
 		} else {
 			e = targets.ErrUnsupported
 		}

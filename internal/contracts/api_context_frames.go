@@ -38,6 +38,14 @@ const (
 	APIContextAnswerFrame
 )
 
+// History has a distinct range; retired/unknown common kinds remain rejected.
+const (
+	HistoryWorkFrame APIContextFrameKind = 32 + iota
+	HistoryRequestFrame
+	HistoryResponseFrame
+	HistoryReceiptFrame
+)
+
 // ADR-178 source frames per exchange: one after Hello, a request and reply at
 // attach and at work send, one immediately before the result, and a request
 // and reply before each ADR-179 query.
@@ -65,12 +73,14 @@ func apiContextFrameLimit(kind APIContextFrameKind) int {
 	switch kind {
 	case APIContextHelloFrame:
 		return APIContextWorkBytes
-	case APIContextWorkFrame:
+	case APIContextWorkFrame, HistoryWorkFrame:
 		return APIContextSignedWorkBytes
-	case APIContextResultFrame, APIContextReceiptFrame:
+	case APIContextResultFrame, APIContextReceiptFrame, HistoryReceiptFrame:
 		return 1024
 	case APIContextOperationRequestFrame, APIContextOperationResponseFrame, APIContextQueryFrame, APIContextAnswerFrame:
 		return APIContextOperationBytes
+	case HistoryRequestFrame, HistoryResponseFrame:
+		return HistoryCiphertextFrameBytes
 	case APIContextSourceRequestFrame:
 		return 1024
 	case APIContextSourceFrame:

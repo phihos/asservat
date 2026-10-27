@@ -1,6 +1,6 @@
 {
   "name": "resolve_capture_request",
-  "description": "Resolve an uncertain own pod-status request before editing. Returns the already accepted capture or durably closes the unaccepted reviewed request so it cannot later start. Never starts or cancels collection. Use the original preview_id and idempotency_key; retry any unknown reply with that same pair. Requires evidence:read and the same actor/client. Accepted capture metadata additionally requires current original-target read eligibility; closing an own unaccepted request does not disclose or require target metadata. Available while new collection is disabled. A closed result contains no target or effect metadata.",
+  "description": "Resolve an uncertain own reviewed capture request before editing. Returns the already accepted capture or durably closes the unaccepted reviewed request so it cannot later start. Never starts or cancels collection. Use the original preview_id and idempotency_key; retry any unknown reply with that same pair. Requires evidence:read and the same actor/client. Accepted capture metadata additionally requires current original-target read eligibility; closing an own unaccepted request does not disclose or require target metadata. Available while new collection is disabled. A closed result contains no target or effect metadata.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": true,

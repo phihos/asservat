@@ -14,8 +14,8 @@ import (
 // a configured limit, never a measured or estimated overhead. A change to an
 // effect, category or interpretation requires a new rule digest.
 const (
-	packetAssessmentRule  = `{"rule":"recorder-assessment/v1","mechanism":"packetCapture","profile":"networkHeaders","impact":"unknown","effects":["nodeCPU","collectorMemory","storageIO","uploadContention"],"retained":["networkAddresses","personalIdentifiers"],"transient":["userContent","credentials"],"anchor":"firstAcquisitionOrEarlierSource","metrics":"unavailable","quantities":["outputBytes:perIncident","ring:whileArmed|perIncident","frozen:perIncident"]}`
-	syscallAssessmentRule = `{"rule":"recorder-assessment/v1","mechanism":"syscallTrace","mode":"metadata","impact":"unknown","effects":["nodeCPU","applicationCPU","collectorMemory","storageIO","uploadContention"],"retained":["personalIdentifiers"],"transient":[],"anchor":"firstAcquisitionOrEarlierSource","metrics":"unavailable","quantities":["outputBytes:perIncident","ring:whileArmed|perIncident","frozen:perIncident"]}`
+	packetAssessmentRule  = `{"rule":"recorder-assessment/v2","mechanism":"packetCapture","profile":"networkHeaders","impact":"unknown","effects":["nodeCPU","collectorMemory","storageIO","uploadContention"],"retained":["networkAddresses","personalIdentifiers"],"transient":["userContent","credentials"],"anchor":"submissionPreparation","metrics":"unavailable","quantities":["outputBytes:perIncident","ring:whileArmed|perIncident","frozen:perIncident"]}`
+	syscallAssessmentRule = `{"rule":"recorder-assessment/v2","mechanism":"syscallTrace","mode":"metadata","impact":"unknown","effects":["nodeCPU","applicationCPU","collectorMemory","storageIO","uploadContention"],"retained":["personalIdentifiers"],"transient":[],"anchor":"submissionPreparation","metrics":"unavailable","quantities":["outputBytes:perIncident","ring:whileArmed|perIncident","frozen:perIncident"]}`
 	// No recorder capability exists in this release; the basis names that fact.
 	recorderCapabilityAbsent = "recorder-capability/v1:unavailable"
 )

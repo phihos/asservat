@@ -56,10 +56,13 @@ implementation. It independently rechecks the exact namespace, pod and owner
 chain. The node class also pins scheduled node UID and node boot ID; the API
 class carries no invented node/runtime provenance. Its result is the existing
 `PodResolution`, without workload labels, annotations, container names,
-configuration or other raw API content. The entire operation retains the
-original at-most-five-second observation interval and earlier caller deadline;
-the later `ResolvePod` call cannot renew the first namespace/workload reads.
-Cancellation, clock rollback and expiry fail after blocking work.
+configuration or other raw API content. The operation retains its original I/O
+deadline and cancellation checks. Under [ADR-260](../decisions/260-api-target-observation-freshness.md),
+a successfully completed API-class observation retains at most five seconds
+from its earliest target read, independently of the completed transport proof's
+expiry. The later `ResolvePod` call cannot renew the first namespace/workload
+reads. Cancellation, clock rollback and expiry fail after blocking work.
+NodeExecution retains its existing caller/observation cutoff behavior.
 
 The coordinator authenticates the current caller and checks current ordinary
 eligibility for the exact resolved target before disclosing preview metadata.
@@ -68,6 +71,26 @@ Request acceptance refreshes that exact request using `ResolvePod`, then
 compares the approved scope. A replaced pod/root/node or changed boot identity
 cannot become an implicit alternative or extend a prior approval. No value
 returned here is a permission or recovery proof.
+
+For an approved packet request, `resolve-packet-recorder` combines exact Pod
+resolution and point-in-time recorder availability under one regional query.
+It retains the same eight Namespace/Pod/ReplicaSet/Deployment GETs for a
+Deployment target and reuses the final Pod's scheduling/status fields locally,
+removing the separate availability exchange and its two Namespace/Pod GETs.
+Source/owner authentication and ordinary entitlement checks remain separate;
+these counts do not include those unchanged reads. The API execution pin still
+has no node name, UID or boot identity. Availability is a transient observation,
+not authority or an added NodeView lease. Recording start independently rereads
+the Pod's node and requires a current collector report before enqueueing.
+
+The combined result keeps its original target observation interval; its query
+I/O and completion keep the original receiver deadline. Unsupported peers
+refuse; there is no fallback query, target replacement or restarted interval.
+Preview retains its existing workload selection
+and availability query because it also produces plans for unavailable or
+unsupported recorders. The combined path applies only to an exact approved
+packet target. Local fake-API/transport tests establish the GET counts, final
+Pod reuse and refusals; installed latency qualification is recorded separately.
 
 ## Qualification and composition
 

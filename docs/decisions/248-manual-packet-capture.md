@@ -104,6 +104,16 @@ collector records nothing. No packet evidence can be captured, stored, published
    admits it with expectation native type `pcapng`, the generated action ID, native limit 8 MiB
    and the accepted recording (program, duration, cap); it refuses a request whose recording
    cannot finish 30 s before the write window ends.
+
+   The approved-request continuation now uses `resolve-packet-recorder` to
+   combine exact target resolution and availability in one exchange. Preview
+   retains `packet-recorder`. Both use current collector reports; the original
+   target interval and independent queue-time node check remain. ADR-260 keeps
+   receiver deadlines during I/O/completion and the API snapshot's own original
+   five-second interval afterward.
+   This is a read composition optimization, not another authority or freshness
+   mechanism; [target resolution](../architecture/workload-target-resolution.md)
+   records its scope and local verification.
 8. **Interim output cap (decision 3).** The recording keeps at most
    `min(limits.maxBytes, 8 MiB)`; the preview shows that output limit. An authored output edit
    above 8 MiB (`actionMaxBytes`) is refused with its field path; the builtin profile does not

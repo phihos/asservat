@@ -93,7 +93,11 @@ func (i *installedIdentity) consoleSession(t *testing.T, ctx context.Context, pu
 	if !strings.HasPrefix(action, i.Issuer+"/login-actions/") {
 		t.Fatal("browser journey login form escaped the issuer")
 	}
-	form, _ := http.NewRequestWithContext(ctx, http.MethodPost, action, strings.NewReader(url.Values{"username": {"developer"}, "password": {i.kc.UserPassword}}.Encode()))
+	username := i.kc.username
+	if username == "" {
+		username = "developer"
+	}
+	form, _ := http.NewRequestWithContext(ctx, http.MethodPost, action, strings.NewReader(url.Values{"username": {username}, "password": {i.kc.UserPassword}}.Encode()))
 	form.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	response, err := client.Do(form)
 	if err != nil {

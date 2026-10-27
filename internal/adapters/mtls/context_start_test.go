@@ -181,6 +181,11 @@ func (f *contextStartTLSFixture) open(t *testing.T) (*ContextStartExchange, cont
 }
 func (f *contextStartTLSFixture) work(t *testing.T, receiver value.APIContextReceiver, mutate ...func(*value.APIContextWork)) (value.APIContextWork, *jose.APIContextWorkSignatures, []byte, identity.Identity) {
 	t.Helper()
+	return f.workWithSigner(t, receiver, f.workSigner(t, receiver), mutate...)
+}
+
+func (f *contextStartTLSFixture) workWithSigner(t *testing.T, receiver value.APIContextReceiver, signer *jose.APIContextWorkSignatures, mutate ...func(*value.APIContextWork)) (value.APIContextWork, *jose.APIContextWorkSignatures, []byte, identity.Identity) {
+	t.Helper()
 	n := time.Now().UTC().Truncate(time.Microsecond)
 	until := n.Add(2 * time.Second)
 	if receiver.ValidUntil.Before(until) {
@@ -192,15 +197,6 @@ func (f *contextStartTLSFixture) work(t *testing.T, receiver value.APIContextRec
 	for _, m := range mutate {
 		m(&w)
 	}
-	pub, key, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	trust := value.APIContextWorkTrust{RootID: f.rootID, InstallationID: f.owner.InstallationID, ClusterID: receiver.Channel.Connector.Binding.ClusterID, IssuerEpoch: f.owner.IssuerEpoch, Trust: value.WorkTrust{Revision: rev, ObservedAt: n, FreshUntil: until, Keys: []value.WorkKey{{ID: "purpose-only-test-key", ClusterID: receiver.Channel.Connector.Binding.ClusterID, IssuerEpoch: f.owner.IssuerEpoch, PublicKey: pub, NotBefore: n.Add(-time.Minute), NotAfter: n.Add(time.Minute)}}}}
-	signer, err := jose.NewAPIContextWorkSignatures(contextStartTrust(func(context.Context) (value.APIContextWorkTrust, error) { return trust, nil }), "purpose-only-test-key", func(context.Context) crypto.Signer { return key }, time.Now)
-	if err != nil {
-		t.Fatal(err)
-	}
 	signed, err := signer.SignAPIContextWork(context.Background(), w)
 	if err != nil {
 		t.Fatal(err)
@@ -211,6 +207,28 @@ func (f *contextStartTLSFixture) work(t *testing.T, receiver value.APIContextRec
 // contextStartObservationRegistry binds the fixture registry to each
 // exchange's ADR-178 source feed: the feed must answer before registration.
 type contextStartObservationRegistry struct{ registry app.ConnectorLeafRegistry }
+
+// Synthetic trust is read independently for each operation, bounded by the
+// original receiver. It is not the lifetime of an as-yet-unissued work request.
+func (f *contextStartTLSFixture) workSigner(t *testing.T, receiver value.APIContextReceiver) *jose.APIContextWorkSignatures {
+	t.Helper()
+	pub, key, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created := time.Now().UTC().Truncate(time.Microsecond)
+	rev := identity.Revision{UID: ownerTestID, Generation: 1, Digest: artifact.Digest{1}}
+	reader := contextStartTrust(func(context.Context) (value.APIContextWorkTrust, error) {
+		now := time.Now().UTC().Truncate(time.Microsecond)
+		until := identity.Earlier(now.Add(5*time.Second), receiver.ValidUntil)
+		return value.APIContextWorkTrust{RootID: f.rootID, InstallationID: f.owner.InstallationID, ClusterID: receiver.Channel.Connector.Binding.ClusterID, IssuerEpoch: f.owner.IssuerEpoch, Trust: value.WorkTrust{Revision: rev, ObservedAt: now, FreshUntil: until, Keys: []value.WorkKey{{ID: "purpose-only-test-key", ClusterID: receiver.Channel.Connector.Binding.ClusterID, IssuerEpoch: f.owner.IssuerEpoch, PublicKey: pub, NotBefore: created.Add(-time.Minute), NotAfter: created.Add(time.Minute)}}}}, nil
+	})
+	signer, err := jose.NewAPIContextWorkSignatures(reader, "purpose-only-test-key", func(context.Context) crypto.Signer { return key }, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return signer
+}
 
 func (r contextStartObservationRegistry) ReadConnectorObservationRegistration(ctx context.Context, _ value.ConnectorCredentialProfile, source app.ConnectorIdentitySourceReader, leaf value.ConnectorCredentialCertificate) (app.ConnectorLeafRegistration, error) {
 	if _, e := source.ReadConnectorIdentitySource(ctx); e != nil {

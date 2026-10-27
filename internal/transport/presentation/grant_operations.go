@@ -219,35 +219,38 @@ type grantResultAccess struct {
 
 // grantData is get_grant's reply; list rows omit actions and result access.
 type grantData struct {
-	GrantID              string             `json:"grant_id"`
-	Phase                string             `json:"phase"`
-	Revision             int64              `json:"revision"`
-	Kind                 string             `json:"kind"`
-	CaptureID            string             `json:"capture_id"`
-	PreviewID            string             `json:"preview_id"`
-	ExecutionDigest      string             `json:"execution_digest"`
-	ReviewDigest         string             `json:"review_digest"`
-	Target               grantTarget        `json:"target"`
-	DataClass            string             `json:"data_class"`
-	Reasons              []grantReason      `json:"reasons"`
-	Actions              []grantAction      `json:"actions,omitempty"`
-	ObservationLimits    *grantLimits       `json:"observation_limits,omitempty"`
-	RequestedBy          *grantPrincipal    `json:"requested_by"`
-	RequestedAt          time.Time          `json:"requested_at"`
-	ReviewUntil          time.Time          `json:"review_until"`
-	PreviewDeadline      time.Time          `json:"preview_deadline"`
-	CaptureDeadlineRule  string             `json:"capture_deadline_rule"`
-	CaptureWindowSeconds int64              `json:"capture_window_seconds,omitempty"`
-	LifetimeSeconds      int64              `json:"lifetime_seconds"`
-	Decision             *grantDecision     `json:"decision,omitempty"`
-	NotAfter             *time.Time         `json:"not_after,omitempty"`
-	RevokedAt            *time.Time         `json:"revoked_at,omitempty"`
-	RevokedBy            *grantPrincipal    `json:"revoked_by,omitempty"`
-	ResultAccess         *grantResultAccess `json:"result_access,omitempty"`
-	RemainingBytes       *int64             `json:"remaining_bytes,omitempty"`
-	CanDecide            bool               `json:"can_decide"`
-	CanRevoke            bool               `json:"can_revoke"`
-	NavigationURI        string             `json:"approval_navigation_uri"`
+	GrantID                      string             `json:"grant_id"`
+	Phase                        string             `json:"phase"`
+	Revision                     int64              `json:"revision"`
+	Kind                         string             `json:"kind"`
+	CaptureID                    string             `json:"capture_id"`
+	PreviewID                    string             `json:"preview_id"`
+	ExecutionDigest              string             `json:"execution_digest"`
+	ReviewDigest                 string             `json:"review_digest"`
+	Target                       grantTarget        `json:"target"`
+	DataClass                    string             `json:"data_class"`
+	Reasons                      []grantReason      `json:"reasons"`
+	Actions                      []grantAction      `json:"actions,omitempty"`
+	ObservationLimits            *grantLimits       `json:"observation_limits,omitempty"`
+	RequestedBy                  *grantPrincipal    `json:"requested_by"`
+	RequestedAt                  time.Time          `json:"requested_at"`
+	ReviewUntil                  time.Time          `json:"review_until"`
+	PreviewDeadline              time.Time          `json:"preview_deadline"`
+	CaptureDeadlineRule          string             `json:"capture_deadline_rule"`
+	CaptureWindowSeconds         int64              `json:"capture_window_seconds,omitempty"`
+	LifetimeSeconds              int64              `json:"lifetime_seconds"`
+	Decision                     *grantDecision     `json:"decision,omitempty"`
+	NotAfter                     *time.Time         `json:"not_after,omitempty"`
+	RevokedAt                    *time.Time         `json:"revoked_at,omitempty"`
+	RevokedBy                    *grantPrincipal    `json:"revoked_by,omitempty"`
+	ResultAccess                 *grantResultAccess `json:"result_access,omitempty"`
+	RemainingBytes               *int64             `json:"remaining_bytes,omitempty"`
+	CanResume                    *bool              `json:"can_resume,omitempty"`
+	CanResolve                   *bool              `json:"can_resolve,omitempty"`
+	ResumeRequiresOriginalClient *bool              `json:"resume_requires_original_client,omitempty"`
+	CanDecide                    bool               `json:"can_decide"`
+	CanRevoke                    bool               `json:"can_revoke"`
+	NavigationURI                string             `json:"approval_navigation_uri"`
 }
 
 func digestText(d artifact.Digest) string { return hash(d) }
@@ -290,6 +293,7 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 	if !full {
 		return d
 	}
+	d.CanResume, d.CanResolve, d.ResumeRequiresOriginalClient = &v.CanResume, &v.CanResolve, &v.ResumeRequiresOriginalClient
 	for _, a := range r.Actions {
 		x := grantAction{ActionID: a.ActionID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, Before: a.Before, After: a.After, Filter: a.Filter, FilterInstructions: a.FilterInstructions, MaxBytes: a.MaxBytes, RingMaxBytes: a.RingMaxBytes, RingMaxAge: a.RingMaxAge, Sensitive: slices.Clone(a.Sensitive)}
 		if x.Sensitive == nil {
@@ -428,7 +432,12 @@ func (s *GrantOperations) CallWithContext(ctx context.Context, current identitie
 		clear(b)
 		return OperationReply{}, value.ErrUnavailable
 	}
-	return OperationReply{Body: b, ValidUntil: until, auditDecision: grantAuditDecision(operationErr)}, nil
+	// Self-approval cannot have an accepted prior attempt: the immutable
+	// requester is forbidden to decide through every client. This definite
+	// refusal differs from an unavailable/withdrawn-rights retry whose earlier
+	// logical mutation may already have committed.
+	noDispatch := name == "decide_review" && errors.Is(operationErr, authorization.ErrSelfApproval)
+	return OperationReply{Body: b, ValidUntil: until, auditDecision: grantAuditDecision(operationErr), auditNoDispatch: noDispatch}, nil
 }
 
 func grantAuditDecision(err error) operationAuditDecision {

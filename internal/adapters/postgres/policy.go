@@ -343,5 +343,5 @@ func acceptedPolicyIn(ctx context.Context, q *custodydb.Queries, root, installat
 	if now.Time.Before(started) || !source.Valid(now.Time) || !r.Authority.Valid(now.Time) || !now.Time.Before(until) {
 		return zero, value.PolicyAcceptance{}, value.ErrUnavailable
 	}
-	return authorization.AcceptedPolicySnapshot{Authority: r.Authority, ObservedAt: source.ObservedAt, FreshUntil: until, SourceUntil: identity.Earlier(source.FreshUntil, r.Authority.NotAfter)}, r, nil
+	return authorization.AcceptedPolicySnapshot{IntentVersion: r.IntentVersion, SourceRevision: r.Source.Revision, Authority: r.Authority, ObservedAt: source.ObservedAt, FreshUntil: until, SourceUntil: identity.Earlier(source.FreshUntil, r.Authority.NotAfter)}, r, nil
 }

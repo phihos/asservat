@@ -37,6 +37,7 @@ type fixture struct {
 	// journey: lossless restart, ADR-226).
 	PostgresContainer string
 	WorkerImage       string
+	CollectorImage    string
 	// UpgradeImage is the focused upgrade run's second release image, loaded
 	// into the hub cluster only (ADR-227).
 	UpgradeImage string

@@ -7,6 +7,24 @@ audit/copy spend. A-HWORK supervises the source, root and candidate loops under
 its existing protected scheduling Lease. See [ADR-141](../decisions/141-protected-capacity-production.md)
 and [REQ-CAP-004 through REQ-CAP-006](../../specs/capacity.md).
 
+## Packet evidence funding
+
+[ADR-257](../decisions/257-approved-recording-funding.md) corrects the physical
+projection of an authored packet reserve. Record count remains
+`min(context bytes / 1544192, context objects / 4, 512)`; evidence bytes become
+`min(context bytes, records * 9928704)` and objects remain `records * 4`.
+Metadata, audit, native transfer and key quantities do not change. This funds
+the existing 8 MiB packet output cap without discarding larger authored bytes
+when object slots determine the record count.
+
+Migration 00100 validates and exclusively locks the exact retained graph before
+adjusting only child byte ceilings and matching pool allocated totals. All IDs,
+revisions, original dates, object limits and used/uncertain charges remain fixed.
+Post-validation retains exact equality, rather than introducing a range or a
+legacy runtime mode. Down refuses atomically when charges exceed the old child
+ceiling. No runtime role gains DDL or a migration bypass. Exact pod-sized root inputs
+remain byte-identical, and workload readers consume the shared SQL arithmetic.
+
 ## Inputs and authority
 
 The local control reader loads complete pool/policy sets with typed canonical

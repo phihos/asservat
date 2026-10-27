@@ -186,7 +186,7 @@
             "firstAcquisitionOrEarlierSource",
             "submissionPreparation"
           ],
-          "description": "submissionPreparation measures from preparation of the first admitted submission: waiting counts and accepted retries retain the original registration. firstAcquisitionOrEarlierSource measures from acquisition or an earlier retained source."
+          "description": "submissionPreparation measures every newly accepted manual capture from preparation of its first admitted submission: waiting counts and accepted retries retain the original registration. firstAcquisitionOrEarlierSource is reserved for typed existing-source snapshots and measures from the original source acquisition or an earlier retained source, never preview creation."
         },
         "accessAgeSeconds": {
           "type": "integer",

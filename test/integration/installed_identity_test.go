@@ -34,9 +34,10 @@ const installedIdentityGroup = "synthetic-group"
 // group. All values are
 // synthetic; the realm exists only on the run's private network.
 type installedIdentity struct {
-	kc      *kcFixture
-	Issuer  string
-	RootPEM string
+	kc              *kcFixture
+	Issuer          string
+	RootPEM         string
+	ReviewerSubject string
 }
 
 func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string) *installedIdentity {
@@ -71,6 +72,9 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	}
 	// evidence:share is a default console scope so the browser can share (ADR-232 console).
 	scopes := []string{"basic", "evidence:read", "evidence:download", "evidence:capture", "evidence:share"}
+	if installedJourneyFocus() == "approved-recording" {
+		scopes = append(scopes, "acr")
+	}
 	kc.json("POST", prefix+"/clients", map[string]any{"clientId": "console", "protocol": "openid-connect", "publicClient": false, "secret": consoleSecret, "standardFlowEnabled": true, "directAccessGrantsEnabled": false, "implicitFlowEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false, "redirectUris": []string{strings.TrimSuffix(origin, "/") + "/auth/callback"}, "defaultClientScopes": scopes, "optionalClientScopes": []string{}, "attributes": map[string]string{"pkce.code.challenge.method": "S256"}, "protocolMappers": []any{audience("asservat-api"), groups}})
 	// Each MCP token names exactly one resource: the MCP endpoint, or the
 	// download content route (ADR-204 decision 10). The client requests one
@@ -93,13 +97,18 @@ func newInstalledIdentity(t *testing.T, f fixture, origin, consoleSecret string)
 	kc.json("PUT", prefix+"/groups/"+group, map[string]any{"name": "maintainers", "attributes": map[string]any{"asservat_group_id": []string{installedIdentityGroup}}})
 	user := created("/users", map[string]any{"username": "developer", "enabled": true, "email": "synthetic@example.invalid", "firstName": "Synthetic", "lastName": "Developer", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
 	kc.json("PUT", prefix+"/users/"+user+"/groups/"+group, nil)
+	var reviewer string
+	if installedJourneyFocus() == "approved-recording" {
+		reviewer = created("/users", map[string]any{"username": "reviewer", "enabled": true, "email": "reviewer@example.invalid", "firstName": "Synthetic", "lastName": "Reviewer", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
+		kc.json("PUT", prefix+"/users/"+reviewer+"/groups/"+group, nil)
+	}
 	// An organization member the installation accepts (eligible group) whom no
 	// AccessBinding names: the S-02 unrelated principal.
 	outsiders := created("/groups", map[string]any{"name": "outsiders"})
 	kc.json("PUT", prefix+"/groups/"+outsiders, map[string]any{"name": "outsiders", "attributes": map[string]any{"asservat_group_id": []string{installedUnrelatedGroup}}})
 	outsider := created("/users", map[string]any{"username": "outsider", "enabled": true, "email": "outsider@example.invalid", "firstName": "Synthetic", "lastName": "Outsider", "credentials": []any{map[string]any{"type": "password", "value": kc.UserPassword, "temporary": false}}})
 	kc.json("PUT", prefix+"/users/"+outsider+"/groups/"+outsiders, nil)
-	return &installedIdentity{kc: kc, Issuer: kc.Issuer, RootPEM: id.RootCA}
+	return &installedIdentity{kc: kc, Issuer: kc.Issuer, RootPEM: id.RootCA, ReviewerSubject: reviewer}
 }
 
 // installedUnrelatedGroup is eligible for sign-in but named by no AccessBinding.

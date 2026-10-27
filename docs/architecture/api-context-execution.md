@@ -16,6 +16,13 @@ retention, recovery and storage under its effect locks, and acquisition still
 checks the exact pinned Pod. No observation crosses a request or renews a deadline.
 Implementation and installed qualification are tracked in the progress record.
 
+Under [ADR-260](../decisions/260-api-target-observation-freshness.md), a completed
+API target read retains its own original five-second metadata interval rather
+than the completed exchange's authentication cutoff. This does not extend
+ADR-216's complete work-authority observation or the runner's original context.
+The target remains one input to the independent current checks above, not an
+execution permit.
+
 The first durable execution preparation follows
 [ADR-212](../decisions/212-api-preparation-remaining-interval.md): after current
 authority and storage locks, database time must leave at least one second

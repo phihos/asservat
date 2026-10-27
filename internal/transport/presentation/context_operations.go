@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"net/url"
@@ -41,6 +42,8 @@ type ContextProgressUseCase interface {
 // Bootstrap must leave it false until the full execution/publication workflow
 // is composed and qualified. A successful preview cannot set this switch.
 type ContextOperationsConfig struct {
+	HistoryRootID     string
+	HistoryCursorKeys app.HistoryKeys
 	PublicOrigin      string
 	CollectionEnabled bool
 	Now               func() time.Time
@@ -133,7 +136,9 @@ type ContextOperationInput struct {
 	// Sharing is the optional capture-time share of the result (ADR-235).
 	Sharing *ContextSharingInput `json:"sharing,omitempty"`
 	// ADR-236: the preview_capture history branch and list_capture_history.
-	HistoryCaptureID string `json:"history_capture_id,omitempty"`
+	HistoryCaptureID      string `json:"history_capture_id,omitempty"`
+	RepeatedFromCaptureID string `json:"repeated_from_capture_id,omitempty"`
+	HistorySelection      string `json:"history_selection,omitempty"`
 	// ADR-243: one builtin packet or syscall capture profile with typed edits.
 	Composition *CompositionInput `json:"profile_composition,omitempty"`
 	Origin      string            `json:"origin,omitempty"`
@@ -247,6 +252,8 @@ type ContextPreviewData struct {
 	RepeatedFrom     string             `json:"repeated_from_capture_id,omitempty"`
 }
 type ContextAcceptedData struct {
+	RepeatedFrom  string `json:"repeated_from_capture_id,omitempty"`
+	HistoryState  string `json:"history_state,omitempty"`
 	CaptureID     string `json:"capture_id"`
 	Phase         string `json:"phase"`
 	NavigationURI string `json:"navigation_uri"`
@@ -263,6 +270,8 @@ type ContextActionData struct {
 	ReasonCode string `json:"reason_code,omitempty"`
 }
 type ContextProgressData struct {
+	RepeatedFrom      string              `json:"repeated_from_capture_id,omitempty"`
+	HistoryState      string              `json:"history_state,omitempty"`
 	CaptureID         string              `json:"capture_id"`
 	Revision          int64               `json:"revision"`
 	Phase             string              `json:"phase"`
@@ -290,6 +299,14 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 		return OperationFailure{refusal.Code, boundedText(refusal.Path+": "+refusal.Reason, 1024), false}
 	}
 	switch {
+	case errors.Is(err, value.ErrHistorySelectionRequired):
+		return OperationFailure{"RequiresSelection", "This policy captured its triggering Pod. Choose a current eligible Pod for the new manual request.", false}
+	case errors.Is(err, value.ErrProfileChanged):
+		return OperationFailure{"ProfileChanged", "A saved dependency version is unavailable or changed. Review a new request with current versions explicitly.", false}
+	case errors.Is(err, value.ErrSettingsTooLarge):
+		return OperationFailure{"SettingsTooLarge", "Saved settings exceed the response limit. Open the capture in the browser or repeat by reference.", false}
+	case errors.Is(err, value.ErrSettingsUnavailable):
+		return OperationFailure{"ParametersUnavailable", "Saved settings are unavailable. Start a new preview with your current settings.", true}
 	case errors.Is(err, value.ErrRecorderUnavailable):
 		return OperationFailure{"RecorderUnavailable", "Packet and syscall recorders are not installed in this release. The reviewed plan cannot be submitted; no capture was started and nothing was reserved.", false}
 	case errors.Is(err, value.ErrSharingDenied):
@@ -362,6 +379,7 @@ type OperationReply struct {
 	auditNoDispatch bool
 	auditEffect     operationAuditEffect
 	owner           *operationReplyOwner
+	browserSettings bool
 }
 
 type operationAuditDecision uint8
@@ -431,7 +449,7 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 	case "preview_capture":
 		var result app.ContextPreviewResult
 		target, repeated := in.Target, ""
-		if in.Composition != nil {
+		if in.Composition != nil && in.RepeatedFromCaptureID == "" {
 			// ADR-243: a reviewed packet/syscall plan, blocked by RecorderUnavailable.
 			var data RecorderPreviewData
 			var previewUntil time.Time
@@ -442,18 +460,51 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 			}
 			break
 		}
-		if in.HistoryCaptureID != "" {
+		if in.HistoryCaptureID != "" || in.RepeatedFromCaptureID != "" {
 			// "Collect again" (ADR-236): the history entry supplies the target
 			// and requested retention; the preview runs every current check.
 			if s.history == nil {
 				return OperationReply{}, contracts.ErrInvestigationWire
 			}
 			var settings value.CaptureSettings
-			result, settings, operationErr = s.history.PreviewRepeat(ctx, current, in.HistoryCaptureID, in.Sharing.intent())
+			sourceID := in.HistoryCaptureID
+			if sourceID == "" {
+				sourceID = in.RepeatedFromCaptureID
+			}
+			edits := value.HistoryRepeatEdits{Selection: in.HistorySelection}
+			if in.RepeatedFromCaptureID != "" {
+				target := in.Target.target()
+				edits.Target = &target
+				edits.RequestedSeconds = in.RequestedSeconds
+				if in.Composition != nil {
+					edits.Composition, operationErr = in.Composition.composition()
+				}
+			}
+			if operationErr == nil {
+				if edited, ok := s.history.(interface {
+					PreviewEditedRepeat(context.Context, identities.CurrentIdentity, string, *value.ContextSharing, value.HistoryRepeatEdits) (app.ContextPreviewResult, value.CaptureSettings, error)
+				}); ok {
+					result, settings, operationErr = edited.PreviewEditedRepeat(ctx, current, sourceID, in.Sharing.intent(), edits)
+				} else if in.RepeatedFromCaptureID != "" || in.HistorySelection != "" {
+					operationErr = value.ErrInvalid
+				} else {
+					result, settings, operationErr = s.history.PreviewRepeat(ctx, current, sourceID, in.Sharing.intent())
+				}
+			}
 			target = WorkloadReference{ClusterID: settings.ClusterID, Namespace: settings.Namespace, Kind: settings.WorkloadKind, Name: settings.WorkloadName}
-			repeated = in.HistoryCaptureID
+			repeated = sourceID
 		} else {
 			result, operationErr = s.captures.Preview(ctx, current, value.ContextIntent{Target: in.Target.target(), Diagnostic: value.ContextDiagnosticName, RequestedSeconds: in.RequestedSeconds, Sharing: in.Sharing.intent()})
+		}
+		if operationErr == nil && result.Recorder != nil {
+			data, previewUntil, e := s.recorderPreviewResult(*result.Recorder, target)
+			operationErr = e
+			if e == nil {
+				data.RepeatedFrom = repeated
+				until = identity.Earlier(until, previewUntil)
+				out.Data, out.DataClass = data, "extract"
+			}
+			break
 		}
 		if operationErr == nil {
 			until = identity.Earlier(until, identity.Earlier(result.ValidUntil, result.Assessment.ValidUntil))
@@ -470,7 +521,7 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 		}
 		var historyUntil time.Time
 		var cursor *string
-		out.Data, cursor, historyUntil, operationErr = s.historyCall(ctx, current, name, in)
+		out.Data, cursor, historyUntil, operationErr = s.historyCall(ctx, current, i, name, in)
 		if operationErr == nil {
 			until = identity.Earlier(until, historyUntil)
 			out.NextCursor = cursor
@@ -504,7 +555,16 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 			}
 			if operationErr == nil {
 				until = identity.Earlier(until, accepted.MetadataValidUntil)
-				out.Data = ContextAcceptedData{CaptureID: accepted.CaptureID, Phase: "Accepted", NavigationURI: s.config.PublicOrigin + "/captures/" + accepted.CaptureID, Operation: "collect"}
+				data := ContextAcceptedData{CaptureID: accepted.CaptureID, Phase: "Accepted", NavigationURI: s.config.PublicOrigin + "/captures/" + accepted.CaptureID, Operation: "collect"}
+				if accepted.RepeatedFrom != nil && accepted.RepeatedFrom.Valid(s.config.Now()) {
+					data.RepeatedFrom = accepted.RepeatedFrom.CaptureID
+				}
+				if accepted.HistoryUnavailable {
+					data.HistoryState = "unavailable"
+				} else if accepted.HistoryRecorded {
+					data.HistoryState = "available"
+				}
+				out.Data = data
 			}
 		}
 	case "resolve_capture_request":
@@ -533,6 +593,10 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 		if operationErr == nil {
 			until = identity.Earlier(until, progress.ValidUntil)
 			data := ContextProgressData{CaptureID: progress.CaptureID, Revision: progress.Revision, Phase: progress.Phase, Actions: []ContextActionData{{ActionID: "pod-status", Phase: progress.ActionPhase, ReasonCode: progress.ReasonCode}}, CaseID: progress.CaseID, NavigationURI: s.config.PublicOrigin + "/captures/" + progress.CaptureID, RetryAfterSeconds: progress.RetryAfterSeconds, CanCancel: progress.CanCancel, Blockers: []OperationBlocker{}, Operation: "collect"}
+			data.HistoryState = progress.HistoryState
+			if progress.RepeatedFrom != nil && progress.RepeatedFrom.Valid(s.config.Now()) {
+				data.RepeatedFrom = progress.RepeatedFrom.CaptureID
+			}
 			if progress.Sharing != nil {
 				data.Sharing = &ContextSharingData{State: progress.Sharing.State, ShareID: progress.Sharing.ShareID}
 			}
@@ -543,6 +607,9 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 	}
 	if operationErr != nil {
 		out.Status, out.Data, out.NextCursor = "error", publicCaptureFailure(operationErr, name == "request_capture" || name == "resolve_capture_request"), nil
+		if name == "get_capture_settings" && errors.Is(operationErr, value.ErrSettingsTooLarge) {
+			out.Data = settingsSizeFailure(s.config.PublicOrigin, in.CaptureID)
+		}
 		if f, ok := approvalFailure(operationErr, s.config.PublicOrigin); ok && name == "request_capture" {
 			out.Data = f
 		}
@@ -556,12 +623,38 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 	}
 	until = identity.Earlier(until, finalIdentity.ValidUntil)
 	b, err := json.Marshal(out)
-	if err != nil || s.contracts.ValidateOutput(name, b) != nil {
+	browserSettings := browserSettingsView(ctx, name)
+	if err == nil && browserSettings {
+		canonical := jsontext.Value(b)
+		if canonical.Canonicalize() != nil {
+			return OperationReply{}, value.ErrUnavailable
+		}
+		b = canonical
+	}
+	// The response includes a bounded envelope as well as the settings view.
+	// A just-under-limit MCP view must still yield the canonical navigation
+	// error instead of failing the final contract with an unavailable reply.
+	if err == nil && name == "get_capture_settings" && !browserSettings && out.Status == "ok" && len(b) > contracts.InvestigationOutputLimit {
+		out.Status, out.DataClass, out.Data = "error", "metadata", settingsSizeFailure(s.config.PublicOrigin, in.CaptureID)
+		b, err = json.Marshal(out)
+	}
+	validate := s.contracts.ValidateOutput
+	if browserSettings {
+		validate = s.contracts.ValidateBrowserOutput
+	}
+	if err != nil || validate(name, b) != nil {
 		return OperationReply{}, value.ErrUnavailable
 	}
 	if !s.config.Now().Before(until) || ctx.Err() != nil {
 		clear(b)
 		return OperationReply{}, value.ErrUnavailable
 	}
-	return OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), auditNoDispatch: auditNoDispatch}, nil
+	return OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), auditNoDispatch: auditNoDispatch, browserSettings: browserSettings}, nil
+}
+
+func settingsSizeFailure(origin, captureID string) any {
+	return struct {
+		OperationFailure
+		NavigationURI string `json:"navigation_uri"`
+	}{publicCaptureFailure(value.ErrSettingsTooLarge, false), origin + "/captures/" + captureID}
 }
