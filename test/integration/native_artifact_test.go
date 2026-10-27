@@ -288,7 +288,7 @@ func qualifyNativeArtifacts(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	if err = ledger.ProvisionAllocation(ctx, capacity.StorageAllocation{ID: allocation, PoolID: root, ScopeID: custodyID(), ServiceClass: "evidence", PoolRevision: 1, Revision: 1, Bytes: bytesPer, Objects: objectsPer, ValidUntil: valid}); err != nil {
 		t.Fatal(err)
 	}
-	// Migration 00097: the 256 MiB attempt and its 34 temporary objects fit.
+	// Migration 00095: the 256 MiB attempt and its 34 temporary objects fit.
 	if _, err = ledger.RegisterStreaming(ctx, plan); err != nil {
 		t.Fatal("256 MiB streaming registration", err)
 	}

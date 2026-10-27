@@ -4,7 +4,7 @@
 increment 2: an artifact-type registry (pod status, PCAPNG, syscall JSON Lines, HTTP header JSON)
 with media type, format, safe filename and coverage; typed expectations with verified
 `actionLifecycle` provenance for ongoing saves; streaming native checks; a framed producer and
-full verifier; ADR-166 streaming custody raised to 256 MiB/33 parts (migration 00097); and a
+full verifier; ADR-166 streaming custody raised to 256 MiB/33 parts (migration 00095); and a
 multi-frame `NativeResponseSource` whose transfer renews the delivery lease before a chunk write
 with less than two seconds left. A 200 MiB synthetic PCAPNG is stored, verified and downloaded
 whole and resumed on real PostgreSQL/S3; the installed worker path stays pod-status-only until

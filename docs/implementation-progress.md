@@ -11,7 +11,7 @@ ongoing saves (source session, snapshot, t0, requested window, history/window co
 reasons, `sourceStoppedAt`, recording-save origin); streaming native checks (PCAPNG blocks, syscall
 events against the newly embedded `syscall-results` event schema, strict HTTP JSON);
 `objectstore.ArtifactProducer` (framed encoder into the ADR-166 multipart writer) and full
-recorder verification; ADR-166 raised to 256 MiB/33 parts by migration 00097 (checks widened
+recorder verification; ADR-166 raised to 256 MiB/33 parts by migration 00095 (checks widened
 only, floor 81); `objectstore.FramedNativeSource` for the ADR-113 windowed transfer; and a lease
 margin: a local source's chunk is written only under a lease with at least two seconds left,
 renewed with fresh current authority otherwise (four of the first five 200 MiB runs failed without

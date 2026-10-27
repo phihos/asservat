@@ -5,7 +5,7 @@ assessment); storage components implemented and real-service qualified. Requirem
 storage/download requirements, REQ-CAP fair storage; TASK-05 / TASK-07 / TASK-11.
 
 Amended by [ADR-244](244-native-artifact-types.md) (2026-10-27): the qualification bound is
-256 MiB with at most 33 parts (migration 00097), a framed encoder now feeds this writer together
+256 MiB with at most 33 parts (migration 00095), a framed encoder now feeds this writer together
 with small index/manifest/commit objects, and verification and native download of the stored
 artifact exist at component level. The 128 MiB/17-part figures below are historical.
 

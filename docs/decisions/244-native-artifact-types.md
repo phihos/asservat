@@ -5,7 +5,7 @@ Requirements: REQ-DLD-001/003 (SC-DLD-001/003), REQ-LIF-005/006, REQ-EVD-001–0
 REQ-SYS-001; TASK-05/07/11. Plan: [S-04 plan](../reviews/s04-plan-2026-10-27.md) §4 row 2, gate
 row P19 and open item 12. Amends [ADR-166](166-bounded-streaming-custody.md) (qualification bound
 128 MiB → 256 MiB) and refines [ADR-113](113-large-native-response-accounting.md) for local
-multi-frame sources. Migration **00097**.
+multi-frame sources. Migration **00095**.
 
 ## Problem
 
@@ -73,7 +73,7 @@ session expired` at about 179 MiB).
    recorder type rereads the whole artifact through the framed reader and the type check, with
    the original write cutoff and a bound of 30 s plus 1 s per 8 MiB frame (62 s at 256 MiB).
 6. **256 MiB streaming custody.** `StreamingNativeLimit` is 256 MiB and `StreamingMaxParts` 33
-   (256 MiB plus 32 frames of 64 KiB overhead in 8 MiB parts). Migration 00097 only widens the
+   (256 MiB plus 32 frames of 64 KiB overhead in 8 MiB parts). Migration 00095 only widens the
    attempt, temporary-byte and temporary-object checks; journal, claims, the deferred journal
    requirement and release rules are unchanged; the ADR-227 floor stays 81.
 7. **Native download of multi-frame artifacts.** `ContextVerifier.OpenNative` authenticates the
