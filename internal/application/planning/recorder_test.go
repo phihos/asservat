@@ -184,6 +184,14 @@ func TestFilterScreeningCorpus(t *testing.T) {
 	refusal(t, ScreenFilter("f", " \t "), value.CompositionFilterRejected, "f")
 	refusal(t, ScreenFilter("f", "host 10.0.0.1 or host münchen"), value.CompositionFilterRejected, "f")
 	refusal(t, ScreenFilter("f", "ether[0:4] = 0x47455420"), value.CompositionApproval, "f")
+	// libpcap lexes these hyphenated tokens as names (getaddrinfo); only a
+	// portrange operand is a range.
+	for _, expression := range []string{"host 1-2", "net 1-2", "src host 1-2", "port 1-2", "tcp and dst host 10-20"} {
+		refusal(t, ScreenFilter("f", expression), value.CompositionFilterRejected, "f")
+	}
+	if err := ScreenFilter("f", "tcp src portrange 1-2"); err != nil {
+		t.Fatal("portrange operand", err)
+	}
 	if NormalizeFilter("  tcp \t port\n80  ") != "tcp port 80" {
 		t.Fatal("normalization")
 	}
@@ -388,5 +396,15 @@ func TestRecorderAssessmentRules(t *testing.T) {
 	}
 	if _, err := AssessRecorder(plan, "not-a-uuid", now); err == nil {
 		t.Fatal("invalid assessment id accepted")
+	}
+}
+
+func TestEmptyTextEditGetsFieldRemedy(t *testing.T) {
+	path := "profile_composition.components[0].overrides[0]"
+	empty := value.ProfileEdit{ActionID: "sample", Field: "packetFilter", TextSet: true}
+	err := ValidateComposition(network(empty), &fakeCompiler{})
+	refusal(t, err, value.CompositionFilterRejected, path)
+	if !strings.Contains(err.Error(), "omit the edit") {
+		t.Fatal("empty filter lost its remedy", err)
 	}
 }

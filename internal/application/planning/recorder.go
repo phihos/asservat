@@ -299,6 +299,12 @@ func applyEdit(path string, e value.ProfileEdit, a *expandedAction) error {
 		return refuse(value.CompositionInvalid, path, reason)
 	}
 	text := func() (string, error) {
+		if e.Text == "" && e.TextSet && e.Field == "packetFilter" {
+			return "", ScreenFilter(path, "")
+		}
+		if e.Text == "" && e.TextSet {
+			return "", refuse(value.CompositionInvalid, path, e.Field+" is empty; omit the edit to keep the profile's value")
+		}
 		if e.Text == "" || e.Number != 0 || e.Ring != nil || e.Syscalls != nil {
 			return "", refuse(value.CompositionInvalid, path, e.Field+" takes a string value")
 		}

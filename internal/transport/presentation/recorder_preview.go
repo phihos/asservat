@@ -62,6 +62,7 @@ func (in *CompositionInput) composition() (*planning.ProfileComposition, error) 
 			switch o.Field {
 			case "packetFilter", "packetBefore", "packetAfter", "syscallMode", "syscallBefore", "syscallAfter", "actionTimeout", "actionExecutionMode", "filePath", "profileDuration":
 				err = json.Unmarshal(o.Value, &e.Text)
+				e.TextSet = err == nil && e.Text == "" // present but empty: the field validator gives the remedy
 			case "syscallMaxEvents", "syscallRate", "actionMaxBytes":
 				err = json.Unmarshal(o.Value, &e.Number)
 			case "packetRing", "syscallRing":

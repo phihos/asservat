@@ -46,7 +46,9 @@ type SyscallSelection struct {
 // member registered for its field carries the literal value; there is no
 // interpolation, patch or expression language. Unmodeled marks a registered
 // field whose value type this release does not accept, so the compiler can
-// refuse it with its field path instead of a generic wire error.
+// refuse it with its field path instead of a generic wire error. TextSet
+// marks a text field sent as the empty string, so the field's own validator
+// answers with its remedy instead of a generic malformed-composition error.
 type ProfileEdit struct {
 	ActionID, Field string
 	Text            string            `json:",omitempty"`
@@ -54,6 +56,7 @@ type ProfileEdit struct {
 	Ring            *RingSettings     `json:",omitempty"`
 	Syscalls        *SyscallSelection `json:",omitempty"`
 	Unmodeled       bool              `json:",omitempty"`
+	TextSet         bool              `json:",omitempty"`
 }
 
 // ProfileComponent selects one profile version and its edits.
@@ -96,7 +99,7 @@ func (e ProfileEdit) valid() bool {
 		return false
 	}
 	set := 0
-	for _, present := range []bool{e.Text != "", e.Number != 0, e.Ring != nil, e.Syscalls != nil, e.Unmodeled} {
+	for _, present := range []bool{e.Text != "" || e.TextSet, e.Number != 0, e.Ring != nil, e.Syscalls != nil, e.Unmodeled} {
 		if present {
 			set++
 		}

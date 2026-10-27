@@ -82,10 +82,22 @@ func ScreenFilter(path, expression string) error {
 			return filterRefusal(value.CompositionApproval, path, "raw byte comparisons such as tcp[13] or ip[0:1] can test payload bytes and need sensitive capture approval, which this release does not offer; use host, net, port, portrange and protocol primitives")
 		}
 	}
+	prev := ""
 	for _, t := range tokens {
 		if !filterWord(t[0]) {
+			prev = t
 			continue
 		}
+		// libpcap lexes a hyphenated token as a name everywhere except as a
+		// portrange operand, so `host 1-2` would reach getaddrinfo.
+		if strings.Contains(t, "-") && !strings.Contains(t, ":") {
+			if prev != "portrange" || !filterLiteral(t) {
+				return filterRefusal(value.CompositionFilterRejected, path, fmt.Sprintf("unsupported filter term %q: a hyphenated range is only valid after portrange; names are never resolved", t))
+			}
+			prev = t
+			continue
+		}
+		prev = t
 		if filterKeywords[t] || filterLiteral(t) {
 			continue
 		}
