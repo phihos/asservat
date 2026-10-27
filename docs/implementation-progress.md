@@ -239,6 +239,53 @@ The combined candidate still needs final gates, review and native qualification.
 
 ## Encrypted capture history (ADR-255, implementation checkpoint)
 
+Installed history run 40594022159 on `80386c5d` failed during initial schema
+setup, before any preview, approval, collector capture or React history path.
+Produce succeeded; schema returned the fixed saved-installation mismatch remedy
+(Go exit 1, 107.875s). All 3,249 hashes independently matched, sources were
+unchanged and cleanup was empty; environment report SHA-256
+`ac45448db577464cc363be78cd2636bdfda82c5d5b22c1c70705810dc8f234bc`.
+That broad remedy alone does not establish a changed UID or immutable input.
+
+Source analysis found a deterministic schema mismatch: migration 00101 creates
+`capture_history_parameter` and `capture_history_quota`, but the exact permanent
+installation inventory omitted both. `initialSchemaInventory` therefore rejects
+them as unknown during replay and at final equality; an ordinary Goose fixture
+does not exercise that installer boundary. The focused regression binds both
+names to the actual embedded migration and fails on unchanged production
+(exit 1, 0.009s). The correction adds only the two sorted names: 127 tables,
+within the unchanged 128-table catalog bound. Unknown schemas/relations, exact
+owner/shape, empty-table, original migration prefix, immutable root/bundle/UID,
+replay and database-incarnation checks remain binding.
+
+The shared exact inventory also feeds existing installation privileges and
+pristine checks. Preparation and activation each acquire their existing
+`SELECT`/`MAINTAIN` pair on these exact two new tables; the deduplicated setup
+manager union adds four corresponding grant-option tuples. No INSERT/UPDATE/
+DELETE, runtime role, object pattern or privilege bound is expanded. Once the
+tables exist, each relevant pristine inventory pass adds two existing-style
+`SELECT EXISTS` checks; role/history creation also includes those relations in
+its existing empty-database scan. There is no new service, credential, watch,
+configuration or background work. Excluding the tables or raising the bound
+would not satisfy this observed first-install defect.
+
+On frozen correction `1212b57b`, the existing real PostgreSQL schema test passes
+with actual exit 0: `TestInitialSchemaWithRealPostgres` 16.03s, Go 17.094s,
+runner phase 46.530s. It covers original-prefix resume and lost completion,
+exact manager grant union and extra-DELETE refusal, altered migration metadata,
+foreign/down/reordered history, changed database/process incarnation, original
+session-lock exclusion and completed read-only replay. Its existing 100-second
+context and fixture limits are unchanged. All 3,213 source hashes independently
+match; sources stayed unchanged, cleanup was empty, and the exact owned
+PostgreSQL/S3 containers were absent. Report SHA-256
+`700e8d36a1f13ec89c594110ddadc931ffc8fc32a3792223e8e81ab9d69cbc74`;
+archive `history-initial-schema-green-1-artifacts` in the local build cache.
+Full PostgreSQL adapter race checks pass (2.613s), as does canonical pre-push,
+including 227 console tests. SQL root facts are synthetic in this component
+fixture; it does not qualify native Kubernetes guards or the installed history
+workflow. Fresh installed qualification remains required. No collector or host
+Kubernetes fixture ran locally.
+
 The current history composition merges canonical main
 `eed8594020645fe6d10f8c6565e69a6235c7507d` into the isolated history branch
 (merge `e0e700d1`). PR100's exact reviewed candidate passed installed run
