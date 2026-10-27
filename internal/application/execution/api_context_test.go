@@ -52,6 +52,9 @@ func (f *apiRunnerFixture) Resolve(ctx context.Context, _ string) (identity.Iden
 	return i, nil
 }
 func (f *apiRunnerFixture) Permissions(ctx context.Context, t authorization.Target) (authorization.Projection, error) {
+	if f.mode == "eligibility-denied" {
+		return authorization.Projection{}, value.ErrDenied
+	}
 	return authorization.Projection{Target: t, Revision: identity.Revision{UID: "permissions", Generation: 1, Digest: [32]byte{1}}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), DeniesObservedAt: f.now, DeniesFreshUntil: f.now.Add(5 * time.Second), DeniesComplete: true, Allows: []authorization.CurrentAssignment{{Audience: f.work.Accepted.Expectation.Audience[0], ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}}}, nil
 }
 func (f *apiRunnerFixture) ReadAPIContextWork(context.Context, string, identity.Identity, artifact.RecoveryProof) (APIContextWork, error) {
@@ -61,16 +64,22 @@ func (f *apiRunnerFixture) ResolvePod(context.Context, targets.Request) (targets
 	if f.mode == "replacement-pod" && f.prepares.Load() > 0 {
 		return targets.PodResolution{}, targets.ErrChanged
 	}
-	if f.mode == "target-unavailable" {
+	switch f.mode {
+	case "target-unavailable":
 		return targets.PodResolution{}, targets.ErrUnavailable
+	case "target-denied":
+		return targets.PodResolution{}, targets.ErrDenied
+	case "target-changed":
+		return targets.PodResolution{}, targets.ErrChanged
 	}
 	return f.target, nil
 }
 
-// Only a refusal known to precede every start effect is reported as not
-// started; a lost preparation reply may have committed and stays uncertain.
+// Only a temporary unavailability known to precede every start effect is
+// reported as not started. A denial (target or eligibility), a changed target
+// and a lost preparation reply, which may have committed, keep their class.
 func TestAPIContextRunnerClassifiesOnlyPreEffectRefusalsAsNotStarted(t *testing.T) {
-	for mode, want := range map[string]bool{"target-unavailable": true, "lost-preparation-reply": false} {
+	for mode, want := range map[string]bool{"target-unavailable": true, "target-denied": false, "target-changed": false, "eligibility-denied": false, "lost-preparation-reply": false} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, current := apiRunner(t)
 			f.mode = mode

@@ -58,12 +58,11 @@ const standbyWork = 5 * time.Second
 
 // selectLocked returns the idle live standby of cluster with the latest
 // residency end still covering until plus standbyMargin, or nil. The newest
-// standby is preferred: the oldest is the one about to end.
+// standby is preferred: the oldest is the one about to end. It only reads.
 func (r *Router) selectLocked(cluster string, until time.Time, eligible func(*Standby) bool) *Standby {
 	var selected *Standby
 	var end time.Time
 	for _, s := range r.standby {
-		s.retireIdleLocked()
 		d, ok := s.ctx.Deadline()
 		if !ok || s.channel.Connector.Binding.ClusterID != cluster || s.attached || s.queryBusy || !eligible(s) || !s.liveLocked() || d.Before(until.Add(standbyMargin)) {
 			continue
@@ -73,6 +72,17 @@ func (r *Router) selectLocked(cluster string, until time.Time, eligible func(*St
 		}
 	}
 	return selected
+}
+
+// pruneLocked retires the idle standbys of cluster that can no longer cover
+// any work, so the region opens their replacements at once. Attach and Query
+// call it before selecting; each standby's own timer does the same.
+func (r *Router) pruneLocked(cluster string) {
+	for _, s := range r.standby {
+		if s.channel.Connector.Binding.ClusterID == cluster {
+			s.retireIdleLocked()
+		}
+	}
 }
 
 // ReceiverCheck rechecks the same actual TLS peer and accepted local process.
@@ -316,6 +326,7 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	var selected *Standby
 	for {
 		r.mu.Lock()
+		r.pruneLocked(cluster)
 		selected = r.selectLocked(cluster, deadline, func(s *Standby) bool { return s.queries < contracts.APIContextMaximumQueries })
 		if r.closed {
 			r.mu.Unlock()
@@ -382,6 +393,7 @@ func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachme
 	if r.closed || c == nil || len(r.captures) >= r.limits.Captures || c.captures >= c.limit.Captures || r.captures[capture] != nil {
 		return nil, fleet.ErrCapacity
 	}
+	r.pruneLocked(cluster)
 	selected := r.selectLocked(cluster, deadline, func(*Standby) bool { return true })
 	if selected == nil {
 		return nil, fleet.ErrUnavailable

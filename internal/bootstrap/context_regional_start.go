@@ -43,11 +43,12 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(id) || s.Runner.Read == nil || s.Runner.Capabilities == nil || s.Runner.Recovery == nil || s.Signer == nil || s.Router == nil || s.Now == nil {
 		return execution.ErrInvalid
 	}
-	// Every refusal before the run, and a failed run that never entered the
-	// one-use SQL preparation (or whose preparation rolled back before its
-	// insert, ADR-212), leaves the admitted capture unstarted: only reads
-	// happened, so an explicit continuation may start it (ADR-134). Any other
-	// run failure stays unavailable.
+	// A temporary unavailability before the run, or a run that failed as
+	// temporarily unavailable without entering the one-use SQL preparation
+	// (or whose preparation rolled back before its insert, ADR-212), leaves
+	// the admitted capture unstarted: only reads happened, so an explicit
+	// continuation may start it (ADR-134/250). A denial, expiry or any other
+	// run failure keeps its own class.
 	notStarted := errors.Join(execution.ErrUnavailable, capturevalue.ErrAcquisitionNotStarted)
 	// Dispatch can return early, without joining the run, when its exchange
 	// or attachment ends; the gate then refuses any later preparation.
@@ -139,7 +140,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	// Signing and every prior blocking read retain their original bounds. The
 	// same retained CurrentIdentity answers regional requests on this attachment.
 	if call.Err() != nil || !s.Now().Before(until) {
-		return notStarted
+		return execution.ErrUnavailable // the original interval ended: not retryable as not-started
 	}
 	mark = time.Now()
 	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
@@ -147,6 +148,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
 		r.Prepare = gatedPreparer{r.Prepare, gate}
 		result, err := r.ExecuteObserved(ctx, current, caller, accepted, capability, recovery)
+		gate.finish(err)
 		if err != nil && s.Report != nil {
 			step := "execute"
 			var fixed interface{ FixedStep() string }
@@ -164,12 +166,12 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		return "Unavailable", err
 	})
 	auditapp.MarkStep(ctx, "st-run", mark)
-	prepared := gate.close()
+	gate.close()
 	if e != nil && state == "" {
 		if s.Report != nil {
 			s.Report("dispatch (" + regionalOutcome(e) + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
 		}
-		if !prepared {
+		if gate.notStarted() {
 			return notStarted
 		}
 		return execution.ErrUnavailable
@@ -180,18 +182,34 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	case "PreparationUncertain":
 		return capturevalue.ErrPreparationUncertain
 	}
-	if !prepared {
+	if gate.notStarted() {
 		return notStarted
 	}
 	return execution.ErrUnavailable
 }
 
-// preparationGate records whether a run entered the one-use SQL preparation.
-// A preparation refused before its insert (ADR-212 headroom) does not count.
-// After close no preparation begins, so close's answer cannot change.
+// preparationGate records whether a run entered the one-use SQL preparation
+// and how the run ended. A preparation refused before its insert (ADR-212
+// headroom) does not count. After close no preparation begins.
 type preparationGate struct {
-	mu             sync.Mutex
-	closed, active bool
+	mu                       sync.Mutex
+	closed, active, finished bool
+	runErr                   error
+}
+
+func (g *preparationGate) finish(err error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.finished, g.runErr = true, err
+}
+
+// notStarted is true after close for a run that never entered preparation
+// and either failed as temporarily unavailable or was abandoned when its
+// exchange ended. A denied, expired or otherwise definite run never is.
+func (g *preparationGate) notStarted() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.closed && !g.active && (!g.finished || executionapp.TemporarilyUnavailable(g.runErr))
 }
 
 func (g *preparationGate) enter() bool {

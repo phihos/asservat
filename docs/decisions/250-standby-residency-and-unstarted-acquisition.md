@@ -38,18 +38,22 @@ capture was admitted and nothing had started; a plain same-key retry only replay
    work's or query's own deadline (at most 5 s). The margin covers the region's exchange starting,
    and so ending, its opening's setup before the hub registers it. No authority interval, socket
    lifetime or the 30-second residency changes.
-2. **Retire an idle standby that can no longer cover work.** At residency end minus 8 s, and when
-   a selection or a finished query finds one, the router ends an idle (not attached, not querying)
-   standby so the region opens its replacement at once (its ordinary one-second reopening). A
-   query still waits within its reserve for that registration; an Attach without a qualifying
+2. **Retire an idle standby that can no longer cover work.** At residency end minus 8 s, and in a
+   separate prune step that Attach and Query run before their read-only selection, and when a
+   finished query releases one, the router ends an idle (not attached, not querying) standby of
+   that cluster so the region opens its replacement at once (its ordinary one-second reopening).
+   A query still waits within its reserve for that registration; an Attach without a qualifying
    standby is refused before any effect.
-3. **Report an unstarted acquisition.** A start refused before any start effect — any refusal
-   before the regional run, a read-only check failure, the ADR-212 headroom rollback, or a run that
-   never entered the one-use SQL preparation (a gate refuses any preparation after the attachment
-   ended) — returns `ErrAcquisitionNotStarted`. `request_capture` projects it as the retryable
-   `AcquisitionNotStarted`, naming the explicit continuation (`continue_acquisition: true`) with
-   the same preview and key. Any refusal after the preparation was entered stays
-   `OutcomeUnknown`/`AcquisitionUncertain`.
+3. **Report an unstarted acquisition only for temporary unavailability.** A start refused before
+   any start effect as *temporarily unavailable* — an unavailable read before the regional run,
+   an unavailable read-only check, the ADR-212 headroom rollback, or a run abandoned when its
+   exchange ended before it entered the one-use SQL preparation (a gate refuses any preparation
+   after the attachment ended) — returns `ErrAcquisitionNotStarted`. `request_capture` projects it
+   as the retryable `AcquisitionNotStarted`, naming the explicit continuation
+   (`continue_acquisition: true`) with the same preview and key. A denial or revocation, expiry
+   (including the start's original interval or deadline), a changed target, a conflict or an
+   invalid request keeps its definite class even before any effect, and any refusal after the
+   preparation was entered stays `OutcomeUnknown`/`AcquisitionUncertain`.
 4. A refused preparation's diagnostic line names the earliest bound of its check interval
    (`PrepareAPIExecution[<bound>@<remaining>]`), for example `target@0` or `process@<1s`.
 

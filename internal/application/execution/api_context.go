@@ -233,8 +233,13 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	defer stop()
 	check, err := s.checkObserved(startCtx, current, w, original, capability, recovery)
 	if err != nil {
-		// The check only reads; nothing was prepared or started.
-		return zero, executeStep{"Check", errors.Join(err, value.ErrNotStarted)}
+		// The check only reads; nothing was prepared or started. Only a
+		// temporary unavailability may be continued; a denial or expiry
+		// keeps its definite class (ADR-250).
+		if TemporarilyUnavailable(err) {
+			err = errors.Join(err, value.ErrNotStarted)
+		}
+		return zero, executeStep{"Check", err}
 	}
 	r, mayCreate, err := s.Prepare.PrepareAPIExecution(startCtx, check)
 	if err != nil {
