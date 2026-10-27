@@ -6,7 +6,7 @@
   "data": {
     "preview_id": "00000000-0000-4000-8000-000000000080",
     "expires_at": "2026-10-09T12:05:00Z",
-    "execution_digest": "ba6268c735150eccd8a9a519d1c056cd8efb49b191d24a2007e5115c1b75d113",
+    "execution_digest": "aa80b097302f82697f33bbdb9f3a0a894bbfa775c1d1d4509d1c6fcba2309d97",
     "pod_count": 1,
     "max_bytes": 100663296,
     "max_process_starts": 0,
@@ -61,9 +61,6 @@
             "name": "http-headers",
             "version": "v1"
           },
-          "sourceUID": "fixture-http-headers-v1",
-          "sourceClusterID": "00000000-0000-4000-8000-000000000010",
-          "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
           "definitionDigest": "7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26"
         },
         {
@@ -73,9 +70,6 @@
             "name": "syscall-activity",
             "version": "v1"
           },
-          "sourceUID": "fixture-syscall-activity-v1",
-          "sourceClusterID": "00000000-0000-4000-8000-000000000010",
-          "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
           "definitionDigest": "d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180"
         },
         {
@@ -85,9 +79,6 @@
             "name": "process-context",
             "version": "v1"
           },
-          "sourceUID": "fixture-process-context-v1",
-          "sourceClusterID": "00000000-0000-4000-8000-000000000010",
-          "sourceNamespaceUID": "fixture-namespace-asservat-builtin-profiles",
           "definitionDigest": "a92029934333dcc497e760d5e38e6a369acc97d32b9a2dcf7098b03033228c9e"
         }
       ],
@@ -154,7 +145,7 @@
     "capture_assessment": {
       "schemaVersion": "capture-assessment/v1",
       "assessmentID": "00000000-0000-4000-8000-000000000161",
-      "planDigest": "ba6268c735150eccd8a9a519d1c056cd8efb49b191d24a2007e5115c1b75d113",
+      "planDigest": "aa80b097302f82697f33bbdb9f3a0a894bbfa775c1d1d4509d1c6fcba2309d97",
       "generatedAt": "2026-10-09T12:00:00Z",
       "validUntil": "2026-10-09T12:05:00Z",
       "basis": {

@@ -50,6 +50,49 @@ Verification (tracked test/results files restored after each run):
 - Not covered: stream filters and cgroup-only metrics (rejected capability gaps), lines of a
   restarted container instance, rotated log segments, metrics providers other than metrics-server.
 
+## S-04 increment 1: packet and syscall plans in preview (ADR-243, 2026-10-27)
+
+[ADR-243](decisions/243-packet-syscall-plans-in-preview.md): `preview_capture` gains
+`profile_composition` with one embedded builtin profile (`network-connections/v1` networkHeaders,
+`syscall-activity/v1` metadata; S6) and typed edits (filter, windows, ring, limits, timeout,
+mode). The compiler normalizes `executionMode` (default ongoing; onTrigger needs `before: 0s`),
+validates the whole plan, compiles a packet filter on the hub with static libpcap 1.11.0 (S2:
+4,096 bytes, 256 tokens, 256 instructions, `EN10MB`/65,535, names and escaped names refused,
+`proto[offset]` → `ApprovalRequired`) and produces the `recorder-preview/v1` plan whose digest is
+the execution digest, with lifecycle groups, provenance and the `recorder-assessment/v1`
+assessment. Every such preview has the `RecorderUnavailable` blocker, is persisted in the ADR-103
+blueprint table (no migration) and is refused by `request_capture` before any target, storage,
+admission or audit work; composed DebugPolicies are refused at compile time with their path.
+Builtin provenance carries no source object (schemas and composition fixtures updated); the
+network preset ring is 16 MiB/30 s. No recorder, node role, migration or SQL grant was added.
+
+Verification (no SQL schema, query or grant changed; tracked test/results files restored after
+each run):
+- Real PostgreSQL/S3 custody fixture (`scripts/test-custody.py --run
+  'TestContextAdmissionWithRealServices/(preview|composition|context-request)'`): the new
+  `composition-preview-persists-plan-only-blueprint` (created and read back byte-identically
+  without a storage selection; no capture or custody attempt) and the 9 existing preview,
+  replay, resolution and retention-preview subtests: PASS, no cleanup failures.
+- Unit: application/planning (normalization matrix of 34 refusals and 10 accepted plans, filter
+  screening corpus, compiler failures, lifecycle/filter binding, Go↔Python cross-language fixture
+  `examples/resolved-recorder-preview.json`, assessment rules, embedded definitions equal the
+  examples), application/capture (plan-only persisted preview, strict blueprint round trip,
+  `request_capture` refused without target reads or admission, refusals only after eligibility,
+  composed policy path), transport/presentation (wire reply validated by the runtime schema,
+  `extract`, blockers, refusal codes, schema-subset rejections, reply under 24 KiB),
+  transport/mcp (official SDK client through the composition branch), contracts (descriptor
+  31.1 KiB within the 32 KiB bound), adapters/pcap stub: PASS.
+- libpcap (`make pcap-check`, libpcap 1.11.0 static, user space only): feasibility corpus of 11
+  expressions gives the recorded verdicts in the x/net/bpf VM, the recorded IPv6 case compiles
+  through the planner, invalid syntax is rejected, 60 ports compile to more than 256 instructions
+  and are refused by the planner, the fixture program is pinned exactly, and the fully static
+  `-tags libpcap,netgo,osusergo` hub binary builds: PASS.
+- Gates: `make pre-push` (see the PR) and `make spec-check` with the new SC-NET-007 and
+  SC-CPR-006.
+
+Open: installed hub image still cgo-free (filters refused there until the recipe switches);
+syscall ABI names (increment 10); peers (increment 9); catalogs/composition (increment 11).
+
 ## S-06 increment 11: retention impact preview (ADR-240, 2026-10-27)
 
 

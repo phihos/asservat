@@ -1,6 +1,6 @@
 {
   "name": "preview_capture",
-  "description": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 is supported by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately. Collect again: pass history_capture_id from list_capture_history (optionally with sharing) to restore its target and requested retention into a fresh preview with every current check.",
+  "description": "Review a bounded whole-pod Kubernetes status snapshot, selected Pod, impact and data handling. No collection; only pod-status/v1 can be collected by this runtime. Optional sharing shares the published result with up to eight users or groups of your identity provider (needs evidence-owner and the evidence:share scope; default 24 hours, at most seven days); get_capture reports sharing separately. Collect again: pass history_capture_id from list_capture_history (optionally with sharing) to restore its target and requested retention into a fresh preview with every current check. Plan a recording: profile_composition with one builtin profile (network-connections/v1 packet headers, syscall-activity/v1 syscall metadata) and typed overrides (pcap packetFilter, windows, ring, timeout, mode; onTrigger needs before 0s) returns its lifecycle plan, compiled filter and assessment. Recorders are not installed yet: such a preview has the RecorderUnavailable blocker and request_capture refuses it.",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -89,6 +89,9 @@
       "history_capture_id": {
         "type": "string",
         "format": "uuid"
+      },
+      "profile_composition": {
+        "$ref": "#/$defs/d2"
       }
     },
     "required": [],
@@ -99,8 +102,42 @@
           "preset_ref"
         ],
         "not": {
-          "required": [
-            "history_capture_id"
+          "anyOf": [
+            {
+              "required": [
+                "history_capture_id"
+              ]
+            },
+            {
+              "required": [
+                "profile_composition"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "required": [
+          "target_ref",
+          "profile_composition"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "history_capture_id"
+              ]
+            },
+            {
+              "required": [
+                "preset_ref"
+              ]
+            },
+            {
+              "required": [
+                "sharing"
+              ]
+            }
           ]
         }
       },
@@ -123,6 +160,11 @@
             {
               "required": [
                 "requested_retention_seconds"
+              ]
+            },
+            {
+              "required": [
+                "profile_composition"
               ]
             }
           ]
@@ -160,6 +202,567 @@
       "d1": {
         "type": "string",
         "format": "date-time"
+      },
+      "d4": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "catalog": {
+            "enum": [
+              "builtin",
+              "organization",
+              "namespace"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^v[1-9][0-9]*$",
+            "maxLength": 32
+          }
+        },
+        "required": [
+          "catalog",
+          "name",
+          "version"
+        ]
+      },
+      "d6": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096,
+        "pattern": "\\S"
+      },
+      "d7": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+        "maxLength": 16
+      },
+      "d8": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+        "maxLength": 16
+      },
+      "d10": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+        "maxLength": 16
+      },
+      "d9": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxAge": {
+            "$ref": "#/$defs/d10"
+          },
+          "maxBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 268435456
+          },
+          "segmentBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 67108864
+          },
+          "maxSegments": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 64
+          },
+          "medium": {
+            "enum": [
+              "memory",
+              "encryptedDisk"
+            ]
+          },
+          "storageProfileRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          }
+        },
+        "required": [
+          "maxAge",
+          "maxBytes",
+          "segmentBytes",
+          "maxSegments",
+          "medium"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "medium": {
+                  "const": "encryptedDisk"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "storageProfileRef"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "storageProfileRef"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "d11": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "const": "all"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "const": "include"
+              },
+              "names": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_]{1,64}$"
+                },
+                "minItems": 1,
+                "maxItems": 128,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "mode",
+              "names"
+            ]
+          }
+        ]
+      },
+      "d12": {
+        "enum": [
+          "metadata",
+          "arguments"
+        ]
+      },
+      "d13": {
+        "anyOf": [
+          {
+            "const": "0s"
+          },
+          {
+            "$ref": "#/$defs/d10"
+          }
+        ]
+      },
+      "d14": {
+        "anyOf": [
+          {
+            "const": "0s"
+          },
+          {
+            "$ref": "#/$defs/d10"
+          }
+        ]
+      },
+      "d15": {
+        "$ref": "#/$defs/d9"
+      },
+      "d16": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000000
+      },
+      "d17": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100000
+      },
+      "d5": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "packetFilter"
+              },
+              "value": {
+                "$ref": "#/$defs/d6"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "packetBefore"
+              },
+              "value": {
+                "$ref": "#/$defs/d7"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "packetAfter"
+              },
+              "value": {
+                "$ref": "#/$defs/d8"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "packetRing"
+              },
+              "value": {
+                "$ref": "#/$defs/d9"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallFilter"
+              },
+              "value": {
+                "$ref": "#/$defs/d11"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallMode"
+              },
+              "value": {
+                "$ref": "#/$defs/d12"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallBefore"
+              },
+              "value": {
+                "$ref": "#/$defs/d13"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallAfter"
+              },
+              "value": {
+                "$ref": "#/$defs/d14"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallRing"
+              },
+              "value": {
+                "$ref": "#/$defs/d15"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallMaxEvents"
+              },
+              "value": {
+                "$ref": "#/$defs/d16"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallRate"
+              },
+              "value": {
+                "$ref": "#/$defs/d17"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "actionMaxBytes"
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1099511627776
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "actionTimeout"
+              },
+              "value": {
+                "$ref": "#/$defs/d10"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "actionExecutionMode"
+              },
+              "value": {
+                "enum": [
+                  "onTrigger",
+                  "ongoing"
+                ]
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          }
+        ]
+      },
+      "d3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,23}$"
+          },
+          "profileRef": {
+            "$ref": "#/$defs/d4"
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d5"
+            },
+            "minItems": 0,
+            "maxItems": 32
+          }
+        },
+        "required": [
+          "id",
+          "profileRef"
+        ]
+      },
+      "d2": {
+        "title": "Flat bounded capture profile composition",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d3"
+            },
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "maxTotalBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          },
+          "maxDuration": {
+            "$ref": "#/$defs/d10"
+          }
+        },
+        "required": [
+          "components",
+          "maxTotalBytes",
+          "maxDuration"
+        ]
       }
     }
   },
@@ -176,7 +779,10 @@
         "format": "uuid"
       },
       "data_class": {
-        "const": "metadata"
+        "enum": [
+          "metadata",
+          "extract"
+        ]
       },
       "status": {
         "type": "string",
@@ -329,11 +935,14 @@
                     "type": "string",
                     "format": "uuid"
                   },
-                  "lifecycle_plan": {
+                  "profile_composition": {
                     "$ref": "#/$defs/d0"
                   },
+                  "lifecycle_plan": {
+                    "$ref": "#/$defs/d19"
+                  },
                   "capture_assessment": {
-                    "$ref": "#/$defs/d1"
+                    "$ref": "#/$defs/d20"
                   },
                   "preset_ref": {
                     "type": "object",
@@ -472,10 +1081,8 @@
                   "navigation_uri",
                   "lifecycle_plan",
                   "capture_assessment",
-                  "preset_ref",
                   "target_ref",
-                  "selected_pods",
-                  "pod_selection"
+                  "selected_pods"
                 ],
                 "allOf": [
                   {
@@ -550,13 +1157,99 @@
                       }
                     }
                   }
+                ],
+                "oneOf": [
+                  {
+                    "required": [
+                      "preset_ref",
+                      "pod_selection"
+                    ],
+                    "not": {
+                      "required": [
+                        "profile_composition"
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "profile_composition"
+                    ],
+                    "not": {
+                      "anyOf": [
+                        {
+                          "required": [
+                            "preset_ref"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "pod_selection"
+                          ]
+                        },
+                        {
+                          "required": [
+                            "repeated_from_capture_id"
+                          ]
+                        }
+                      ]
+                    },
+                    "properties": {
+                      "capture_enabled": {
+                        "const": false
+                      },
+                      "approval_required": {
+                        "const": false
+                      },
+                      "pod_count": {
+                        "const": 1
+                      },
+                      "max_process_starts": {
+                        "const": 0
+                      },
+                      "blockers": {
+                        "contains": {
+                          "properties": {
+                            "code": {
+                              "const": "RecorderUnavailable"
+                            }
+                          },
+                          "required": [
+                            "code"
+                          ]
+                        }
+                      }
+                    }
+                  }
                 ]
               }
             },
             "required": [
               "status",
               "data"
-            ]
+            ],
+            "if": {
+              "properties": {
+                "data": {
+                  "required": [
+                    "profile_composition"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "data_class": {
+                  "const": "extract"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "data_class": {
+                  "const": "metadata"
+                }
+              }
+            }
           },
           {
             "type": "object",
@@ -605,6 +1298,9 @@
                   "message",
                   "retryable"
                 ]
+              },
+              "data_class": {
+                "const": "metadata"
               }
             },
             "required": [
@@ -616,7 +1312,708 @@
       }
     ],
     "$defs": {
+      "d3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "catalog": {
+            "enum": [
+              "builtin",
+              "organization",
+              "namespace"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          },
+          "version": {
+            "type": "string",
+            "pattern": "^v[1-9][0-9]*$",
+            "maxLength": 32
+          }
+        },
+        "required": [
+          "catalog",
+          "name",
+          "version"
+        ]
+      },
+      "d5": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096,
+        "pattern": "\\S"
+      },
+      "d6": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+        "maxLength": 16
+      },
+      "d7": {
+        "type": "string",
+        "pattern": "^(0s|[1-9][0-9]*(ms|s|m|h|d))$",
+        "maxLength": 16
+      },
+      "d9": {
+        "type": "string",
+        "pattern": "^[1-9][0-9]*(ms|s|m|h|d)$",
+        "maxLength": 16
+      },
+      "d8": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "maxAge": {
+            "$ref": "#/$defs/d9"
+          },
+          "maxBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 268435456
+          },
+          "segmentBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 67108864
+          },
+          "maxSegments": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 64
+          },
+          "medium": {
+            "enum": [
+              "memory",
+              "encryptedDisk"
+            ]
+          },
+          "storageProfileRef": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          }
+        },
+        "required": [
+          "maxAge",
+          "maxBytes",
+          "segmentBytes",
+          "maxSegments",
+          "medium"
+        ],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "medium": {
+                  "const": "encryptedDisk"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "storageProfileRef"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "storageProfileRef"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "d10": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "const": "all"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "mode": {
+                "const": "include"
+              },
+              "names": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_]{1,64}$"
+                },
+                "minItems": 1,
+                "maxItems": 128,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "mode",
+              "names"
+            ]
+          }
+        ]
+      },
+      "d11": {
+        "enum": [
+          "metadata",
+          "arguments"
+        ]
+      },
+      "d12": {
+        "anyOf": [
+          {
+            "const": "0s"
+          },
+          {
+            "$ref": "#/$defs/d9"
+          }
+        ]
+      },
+      "d13": {
+        "anyOf": [
+          {
+            "const": "0s"
+          },
+          {
+            "$ref": "#/$defs/d9"
+          }
+        ]
+      },
+      "d14": {
+        "$ref": "#/$defs/d8"
+      },
+      "d15": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1000000
+      },
+      "d16": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100000
+      },
+      "d4": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "packetFilter"
+              },
+              "value": {
+                "$ref": "#/$defs/d5"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "packetBefore"
+              },
+              "value": {
+                "$ref": "#/$defs/d6"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "packetAfter"
+              },
+              "value": {
+                "$ref": "#/$defs/d7"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "packetRing"
+              },
+              "value": {
+                "$ref": "#/$defs/d8"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallFilter"
+              },
+              "value": {
+                "$ref": "#/$defs/d10"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallMode"
+              },
+              "value": {
+                "$ref": "#/$defs/d11"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallBefore"
+              },
+              "value": {
+                "$ref": "#/$defs/d12"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallAfter"
+              },
+              "value": {
+                "$ref": "#/$defs/d13"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallRing"
+              },
+              "value": {
+                "$ref": "#/$defs/d14"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallMaxEvents"
+              },
+              "value": {
+                "$ref": "#/$defs/d15"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "syscallRate"
+              },
+              "value": {
+                "$ref": "#/$defs/d16"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "actionMaxBytes"
+              },
+              "value": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1099511627776
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "actionTimeout"
+              },
+              "value": {
+                "$ref": "#/$defs/d9"
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "field": {
+                "const": "actionExecutionMode"
+              },
+              "value": {
+                "enum": [
+                  "onTrigger",
+                  "ongoing"
+                ]
+              }
+            },
+            "required": [
+              "actionID",
+              "field",
+              "value"
+            ]
+          }
+        ]
+      },
+      "d2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,23}$"
+          },
+          "profileRef": {
+            "$ref": "#/$defs/d3"
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d4"
+            },
+            "minItems": 0,
+            "maxItems": 32
+          }
+        },
+        "required": [
+          "id",
+          "profileRef"
+        ]
+      },
+      "d1": {
+        "title": "Flat bounded capture profile composition",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d2"
+            },
+            "minItems": 1,
+            "maxItems": 1
+          },
+          "maxTotalBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1099511627776
+          },
+          "maxDuration": {
+            "$ref": "#/$defs/d9"
+          }
+        },
+        "required": [
+          "components",
+          "maxTotalBytes",
+          "maxDuration"
+        ]
+      },
+      "d17": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "componentID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          },
+          "profileRef": {
+            "$ref": "#/$defs/d3"
+          },
+          "sourceUID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "definitionDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "sourceClusterID": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceNamespaceUID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "componentID",
+          "profileRef",
+          "definitionDigest"
+        ],
+        "description": "Pinned resolved profile. A builtin definition is embedded in the release binary (ADR-243) and is identified by its definition digest alone; organization and namespace definitions name their source cluster, namespace and object.",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "profileRef": {
+                  "properties": {
+                    "catalog": {
+                      "const": "builtin"
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "sourceUID"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "sourceClusterID"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "sourceNamespaceUID"
+                    ]
+                  }
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "sourceUID",
+                "sourceClusterID",
+                "sourceNamespaceUID"
+              ]
+            }
+          }
+        ]
+      },
+      "d18": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "componentID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 24
+          },
+          "localActionID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "actionID": {
+            "type": "string",
+            "pattern": "^a[a-f0-9]{24}$"
+          },
+          "deduplicated": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "componentID",
+          "localActionID",
+          "actionID",
+          "deduplicated"
+        ]
+      },
       "d0": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "authored": {
+            "$ref": "#/$defs/d1"
+          },
+          "resolvedProfiles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d17"
+            },
+            "minItems": 1,
+            "maxItems": 8
+          },
+          "actionMap": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/d18"
+            },
+            "minItems": 1,
+            "maxItems": 128
+          }
+        },
+        "required": [
+          "authored",
+          "resolvedProfiles",
+          "actionMap"
+        ]
+      },
+      "d19": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -836,15 +2233,15 @@
           }
         ]
       },
-      "d2": {
+      "d21": {
         "type": "string",
         "format": "uuid"
       },
-      "d3": {
+      "d22": {
         "type": "string",
         "pattern": "^[a-f0-9]{64}$"
       },
-      "d4": {
+      "d23": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -910,7 +2307,7 @@
           }
         ]
       },
-      "d6": {
+      "d25": {
         "type": "string",
         "enum": [
           "unknown",
@@ -920,12 +2317,12 @@
           "verifiedNonPersonal"
         ]
       },
-      "d5": {
+      "d24": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "classification": {
-            "$ref": "#/$defs/d6"
+            "$ref": "#/$defs/d25"
           },
           "basis": {
             "enum": [
@@ -1028,7 +2425,7 @@
           }
         ]
       },
-      "d7": {
+      "d26": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1057,7 +2454,7 @@
           "policyDigests": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d3"
+              "$ref": "#/$defs/d22"
             },
             "minItems": 1,
             "maxItems": 64,
@@ -1094,7 +2491,7 @@
           "deleteAgeSeconds"
         ]
       },
-      "d8": {
+      "d27": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1151,7 +2548,7 @@
             "format": "date-time"
           },
           "environmentDigest": {
-            "$ref": "#/$defs/d3"
+            "$ref": "#/$defs/d22"
           },
           "coverage": {
             "type": "string",
@@ -1203,7 +2600,7 @@
           }
         ]
       },
-      "d1": {
+      "d20": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
@@ -1211,10 +2608,10 @@
             "const": "capture-assessment/v1"
           },
           "assessmentID": {
-            "$ref": "#/$defs/d2"
+            "$ref": "#/$defs/d21"
           },
           "planDigest": {
-            "$ref": "#/$defs/d3"
+            "$ref": "#/$defs/d22"
           },
           "generatedAt": {
             "type": "string",
@@ -1229,10 +2626,10 @@
             "additionalProperties": false,
             "properties": {
               "rulesDigest": {
-                "$ref": "#/$defs/d3"
+                "$ref": "#/$defs/d22"
               },
               "capabilityDigest": {
-                "$ref": "#/$defs/d3"
+                "$ref": "#/$defs/d22"
               },
               "metrics": {
                 "type": "object",
@@ -1305,7 +2702,7 @@
             ]
           },
           "combinedImpact": {
-            "$ref": "#/$defs/d4"
+            "$ref": "#/$defs/d23"
           },
           "actions": {
             "type": "array",
@@ -1325,18 +2722,18 @@
                   ]
                 },
                 "impact": {
-                  "$ref": "#/$defs/d4"
+                  "$ref": "#/$defs/d23"
                 },
                 "data": {
-                  "$ref": "#/$defs/d5"
+                  "$ref": "#/$defs/d24"
                 },
                 "retention": {
-                  "$ref": "#/$defs/d7"
+                  "$ref": "#/$defs/d26"
                 },
                 "quantities": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/$defs/d8"
+                    "$ref": "#/$defs/d27"
                   },
                   "minItems": 0,
                   "maxItems": 4
@@ -1357,7 +2754,7 @@
           "combinedQuantities": {
             "type": "array",
             "items": {
-              "$ref": "#/$defs/d8"
+              "$ref": "#/$defs/d27"
             },
             "minItems": 0,
             "maxItems": 16

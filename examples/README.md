@@ -75,7 +75,7 @@ The [history request](mcp-history-input.json) and [page](mcp-history-result.json
 | Example | Demonstrates |
 | --- | --- |
 | [Process context](capture-profile-process-context.yaml) | Shipped process/socket context with exposed output controls |
-| [Transport traffic](capture-profile-network-connections.yaml) | Both directions, sanitized network headers, editable peers/filter/ring |
+| [Transport traffic](capture-profile-network-connections.yaml) | Both directions, sanitized network headers, 16 MiB/30 s preset ring, editable peers/filter/ring; embedded in the release (ADR-243) |
 | [HTTP/1 headers](capture-profile-http-headers.yaml) | Shipped plain HTTP/1 header projection; sensitive observation |
 | [Go CPU](capture-profile-go-cpu.yaml) | Ten-second profile with named endpoint template and typed duration |
 | [Syscall activity](capture-profile-syscall-activity.yaml) | All current/new pod processes, finite metadata interval and event/ring limits |
@@ -86,6 +86,7 @@ The [history request](mcp-history-input.json) and [page](mcp-history-result.json
 | [MCP catalog](mcp-profiles-result.json) / [definition](mcp-profile-definition-result.json) | Bounded catalog summary versus protected definition projection |
 | [MCP composition request](mcp-composition-preview-input.json) / [preview](mcp-composition-preview-result.json) | Typed edits, pinned definitions and component/action provenance |
 | [Resolved composition scope](resolved-composition-scope.json) / [history settings](mcp-composed-settings-result.json) | Exact source identities, execution digest and repeatable version/override provenance |
+| [Reviewed recorder plan](resolved-recorder-preview.json) | ADR-243 plan-only packet preview: embedded builtin, hub-compiled libpcap program and digest, lifecycle, no acceptance |
 | [Syscall summary](mcp-syscall-summary-result.json) / [events](mcp-syscall-events-result.json) | No argument strings; explicit loss and paired durations |
 | [Raw syscall query](mcp-syscall-query-input.json) / [result](mcp-syscall-query-result.json) | Separate raw grant and bounded recorded argument projection |
 

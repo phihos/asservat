@@ -8,9 +8,15 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
 )
+
+// ErrRecorderUnavailable refuses submission of a reviewed packet or syscall
+// plan (ADR-243). No node recorder exists yet, so the preview shows the plan
+// and request_capture is refused before acceptance: nothing is reserved or charged.
+var ErrRecorderUnavailable = errors.New("packet and syscall recorders are not available")
 
 var (
 	ErrPreviewExpired        = errors.New("context preview expired; review a new preview")
@@ -38,9 +44,10 @@ func (r ProtectedReasonRef) Valid() bool {
 	return authorization.UUID(r.ID) && r.CiphertextDigest != (artifact.Digest{}) && previewTime(r.ExpiresAt)
 }
 
-// ContextIntent is private authored intent for the one implemented diagnostic.
-// A transport must resolve its diagnostic handle and protect any free-text reason
-// before constructing this value. It cannot substitute the broader incident-context preset.
+// ContextIntent is private authored intent for the one implemented diagnostic,
+// or (ADR-243) a reviewed capture profile composition. A transport must resolve
+// its diagnostic handle and protect any free-text reason before constructing
+// this value. It cannot substitute the broader incident-context preset.
 type ContextIntent struct {
 	Target           targets.WorkloadRequest
 	Diagnostic       string
@@ -48,10 +55,19 @@ type ContextIntent struct {
 	Reason           *ProtectedReasonRef
 	// Sharing (ADR-235) is an optional capture-time share of the result.
 	Sharing *ContextSharing `json:",omitempty"`
+	// Composition (ADR-243) replaces Diagnostic. Such a preview is a reviewed
+	// plan only: submission is refused with ErrRecorderUnavailable.
+	Composition *planning.ProfileComposition `json:",omitempty"`
 }
 
 func (i ContextIntent) Valid() bool {
-	return i.Target.Valid() && i.Diagnostic == ContextDiagnosticName && i.RequestedSeconds >= 0 && i.RequestedSeconds <= privacy.MaxAgeSeconds && (i.Reason == nil || i.Reason.Valid()) && (i.Sharing == nil || i.Sharing.Valid())
+	if !i.Target.Valid() || i.RequestedSeconds < 0 || i.RequestedSeconds > privacy.MaxAgeSeconds || (i.Reason != nil && !i.Reason.Valid()) || (i.Sharing != nil && !i.Sharing.Valid()) {
+		return false
+	}
+	if i.Composition != nil {
+		return i.Diagnostic == "" && i.Sharing == nil && i.Composition.Valid()
+	}
+	return i.Diagnostic == ContextDiagnosticName
 }
 
 // ContextStorageSelection records the reviewed placement without freshness or
@@ -115,7 +131,7 @@ func previewTime(t time.Time) bool {
 }
 
 func (p ContextPreview) Valid() bool {
-	if !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.IssuerEpoch) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.Storage.Valid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || p.Deadline.After(p.CreatedAt.Add(5*time.Minute)) || p.Intent.Reason != nil && p.Deadline.After(p.Intent.Reason.ExpiresAt) {
+	if !authorization.UUID(p.RootID) || !authorization.UUID(p.InstallationID) || !authorization.UUID(p.IssuerEpoch) || !p.Actor.Valid() || !p.Intent.Valid() || !p.Target.Valid() || !p.storageValid() || !p.Retention.Valid() || !previewTime(p.CreatedAt) || !previewTime(p.Deadline) || !p.Deadline.After(p.CreatedAt) || p.Deadline.After(p.CreatedAt.Add(5*time.Minute)) || p.Intent.Reason != nil && p.Deadline.After(p.Intent.Reason.ExpiresAt) {
 		return false
 	}
 	seen := map[string]bool{}
@@ -151,6 +167,14 @@ func (p ContextPreview) Valid() bool {
 	return true
 }
 
+// A composition preview (ADR-243) reserves no storage, so it carries none.
+func (p ContextPreview) storageValid() bool {
+	if p.Intent.Composition != nil {
+		return p.Storage == ContextStorageSelection{}
+	}
+	return p.Storage.Valid()
+}
+
 func (p ContextPreview) Current(now time.Time) bool {
 	return p.Valid() && !now.Before(p.CreatedAt) && now.Before(p.Deadline)
 }
@@ -164,6 +188,7 @@ func (p ContextPreview) Clone() ContextPreview {
 		p.Intent.Reason = &r
 	}
 	p.Intent.Sharing = p.Intent.Sharing.clone()
+	p.Intent.Composition = p.Intent.Composition.Clone()
 	return p
 }
 

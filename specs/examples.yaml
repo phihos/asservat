@@ -218,6 +218,8 @@ examples:
   input_tool: syscall_query
 - file: examples/resolved-composition-scope.json
   schema: https://asservat.io/spec/v1/collection-scope.schema.json
+- file: examples/resolved-recorder-preview.json
+  schema: https://asservat.io/spec/v1/recorder-preview.schema.json
 - file: examples/mcp-composed-settings-result.json
   schema: https://asservat.io/spec/v1/mcp-result.schema.json
   tool: get_capture_settings

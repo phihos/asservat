@@ -2,8 +2,11 @@ package integration
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"sync"
 	"testing"
@@ -17,6 +20,7 @@ import (
 	capture "asservat.local/asservat/internal/domain/capture"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
+	planDomain "asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -174,6 +178,44 @@ func qualifyContextPreviews(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			if err := admin.QueryRow(ctx, q, key).Scan(&count); err != nil || count != 0 {
 				t.Fatal("passive preview reserved collection", table, count, err)
 			}
+		}
+	})
+
+	// ADR-243: a plan-only packet/syscall preview persists in the same table
+	// without a storage selection and survives the strict decode/re-encode.
+	t.Run("composition-preview-persists-plan-only-blueprint", func(t *testing.T) {
+		s := create(t, 1)
+		store := newStore(t, s.a.RootID)
+		p := blueprint(t, s)
+		p.Intent.Diagnostic = ""
+		p.Intent.Composition = &planDomain.ProfileComposition{Components: []planDomain.ProfileComponent{{ID: "net", Profile: planDomain.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v1"}, Edits: []planDomain.ProfileEdit{{ActionID: "sample", Field: "packetFilter", Text: "tcp port 8080"}, {ActionID: "sample", Field: "packetRing", Ring: &planDomain.RingSettings{MaxAge: "40s", MaxBytes: 16 << 20, SegmentBytes: 4 << 20, MaxSegments: 4, Medium: "memory"}}}}}, MaxTotalBytes: 16 << 20, MaxDuration: "20s"}
+		p.Storage = capture.ContextStorageSelection{}
+		p.AssessmentRulesDigest = planning.RecorderAssessmentRulesDigest()
+		raw, err := os.ReadFile("../../examples/resolved-recorder-preview.json")
+		if err != nil {
+			t.Fatal(err)
+		}
+		scope := jsontext.Value(raw)
+		if err := scope.Canonicalize(); err != nil {
+			t.Fatal(err)
+		}
+		p.CanonicalScope, p.ScopeDigest = []byte(scope), artifact.Digest(sha256.Sum256(scope))
+		if !captureapp.ValidContextPreview(p) {
+			t.Fatal("invalid composition blueprint")
+		}
+		if err := store.CreateContextPreview(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+		got, err := store.ReadContextPreview(ctx, p.RootID, p.ID, p.Actor)
+		if err != nil || !reflect.DeepEqual(got, p) || got.Intent.Composition == nil || got.Intent.Composition.Components[0].Edits[1].Ring.MaxAge != "40s" {
+			t.Fatal("composition blueprint changed in SQL", err)
+		}
+		var captures, attempts int
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM context_capture WHERE root_id=$1", s.a.RootID).Scan(&captures); err != nil || captures != 0 {
+			t.Fatal("plan-only preview created a capture", captures, err)
+		}
+		if err := admin.QueryRow(ctx, "SELECT count(*) FROM custody_attempt WHERE allocation_id=$1", s.a.Registration.AllocationID).Scan(&attempts); err != nil || attempts != 0 {
+			t.Fatal("plan-only preview reserved custody", attempts, err)
 		}
 	})
 

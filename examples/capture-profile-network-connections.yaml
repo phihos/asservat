@@ -23,8 +23,8 @@ spec:
           after: 10s
           ring:
             maxAge: 30s
-            maxBytes: 4194304
-            segmentBytes: 1048576
+            maxBytes: 16777216
+            segmentBytes: 4194304
             maxSegments: 4
             medium: memory
           peers:
@@ -36,15 +36,15 @@ spec:
             resolution: frozen
             maxEndpoints: 1
             maxStaleness: 5s
-          maxFrozenBytes: 4194304
+          maxFrozenBytes: 16777216
           maxConcurrentSnapshots: 1
         required: true
         impact: observe
         limits:
-          maxBytes: 4194304
+          maxBytes: 16777216
           timeout: 15s
         executionMode: ongoing
-      maxTotalBytes: 4194304
+      maxTotalBytes: 16777216
       maxDuration: 20s
     editableFields:
     - actionID: sample

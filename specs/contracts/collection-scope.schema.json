@@ -264,28 +264,13 @@
             "pattern": "^[a-f0-9]{64}$"
           },
           "source": {
-            "$ref": "https://asservat.io/spec/v1/collection-scope.schema.json#/properties/source"
+            "$ref": "https://asservat.io/spec/v1/collection-scope.schema.json#/properties/source",
+            "description": "Source object of an organization or namespace captureProfile dependency. A release-embedded builtin profile (ADR-243) has none; its profileComposition provenance names the builtin catalog."
           }
         },
         "required": [
           "role",
           "digest"
-        ],
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "role": {
-                  "const": "captureProfile"
-                }
-              }
-            },
-            "then": {
-              "required": [
-                "source"
-              ]
-            }
-          }
         ]
       },
       "minItems": 1,

@@ -4,7 +4,7 @@ metadata:
   name: composed-ledger
   namespace: payments
 spec:
-  description: Expanded capture profile composition fixture.
+  description: Expanded capture profile composition.
   actions:
   - id: a005bdfce57635c5dabddbdd6
     kind: packetCapture

@@ -3,9 +3,12 @@
 Every capture/policy preview MUST help a maintainer judge the **combined effect on the workload**, the data that may be observed or retained, and how that data expires. The assessment is a deterministic, explainable projection of the effective plan and available authorized context. It uses the existing planner, admission and privacy services; it is not an embedded AI, a new permission system or a guarantee of harmless collection.
 
 The initial runtime [pod-status assessment](../docs/architecture/context-assessment.md)
-implements this contract for `builtin-pod-status-v1` only. Other mechanisms and
-public workflow composition remain pending; its configured output ceiling is not
-a measured overhead result.
+implements this contract for `builtin-pod-status-v1`. The `recorder-assessment/v1`
+rules ([ADR-243](../docs/decisions/243-packet-syscall-plans-in-preview.md)) cover
+network-header packet and metadata syscall plans: impact unknown, ring cost per
+observation pod while armed separate from frozen/output cost per incident, all
+quantities configured limits. Other mechanisms remain pending; configured
+ceilings are not measured overhead results.
 
 ## REQ-ASM-001 — Assess each mechanism using current evidence
 

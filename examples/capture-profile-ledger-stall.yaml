@@ -124,27 +124,18 @@ spec:
         catalog: builtin
         name: http-headers
         version: v1
-      sourceUID: fixture-http-headers-v1
-      sourceClusterID: 00000000-0000-4000-8000-000000000010
-      sourceNamespaceUID: fixture-namespace-asservat-builtin-profiles
       definitionDigest: 7a296e8c2a6acb8061a98db21e1f02c9d1aaac4bb31a352347fba1b7674d1d26
     - componentID: calls
       profileRef:
         catalog: builtin
         name: syscall-activity
         version: v1
-      sourceUID: fixture-syscall-activity-v1
-      sourceClusterID: 00000000-0000-4000-8000-000000000010
-      sourceNamespaceUID: fixture-namespace-asservat-builtin-profiles
       definitionDigest: d372b62bd29c56632939a153dd90da0cbd51bc759f43adea7bf123223d29e180
     - componentID: context
       profileRef:
         catalog: builtin
         name: process-context
         version: v1
-      sourceUID: fixture-process-context-v1
-      sourceClusterID: 00000000-0000-4000-8000-000000000010
-      sourceNamespaceUID: fixture-namespace-asservat-builtin-profiles
       definitionDigest: a92029934333dcc497e760d5e38e6a369acc97d32b9a2dcf7098b03033228c9e
   availability:
     enabled: true
