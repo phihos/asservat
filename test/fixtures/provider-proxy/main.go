@@ -21,6 +21,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -160,6 +161,7 @@ func signals() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	mux := http.NewServeMux()
+	mux.Handle("/traffic", trafficHandler())
 	mux.HandleFunc("/log", func(w http.ResponseWriter, r *http.Request) {
 		line := r.URL.Query().Get("line")
 		if line == "" || len(line) > 4096 {
@@ -185,4 +187,67 @@ func signals() error {
 		return err
 	}
 	return nil
+}
+
+const (
+	trafficMaxRecords  = 65536
+	trafficRecordBytes = 64
+	trafficMaxPayload  = trafficMaxRecords * trafficRecordBytes
+	trafficMaxDuration = 8 * time.Second
+)
+
+// Handler streams finite small flushed writes through the selected workload's
+// existing HTTP port. TCP segmentation/ACKs are measured by the real recorder,
+// not inferred from these application writes. Capture limits remain independent.
+func trafficHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query()
+		if r.Method != http.MethodGet || len(query) > 1 || len(query["records"]) > 1 {
+			http.Error(w, "traffic request", http.StatusBadRequest)
+			return
+		}
+		records := trafficMaxRecords
+		if len(query) == 1 {
+			n, err := strconv.Atoi(query.Get("records"))
+			if err != nil || n < 1 || n > trafficMaxRecords {
+				http.Error(w, "traffic records", http.StatusBadRequest)
+				return
+			}
+			records = n
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), trafficMaxDuration)
+		defer cancel()
+		until, _ := ctx.Deadline()
+		control := http.NewResponseController(w)
+		if ctx.Err() != nil || control.SetWriteDeadline(until) != nil {
+			http.Error(w, "traffic deadline unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("X-Fixture-Traffic-Max-Bytes", strconv.Itoa(records*trafficRecordBytes))
+		w.Header().Set("Trailer", "X-Fixture-Traffic-Writes, X-Fixture-Traffic-Bytes, X-Fixture-Traffic-Complete")
+		var written, bytes int
+		var complete bool
+		defer func() {
+			w.Header().Set("X-Fixture-Traffic-Writes", strconv.Itoa(written))
+			w.Header().Set("X-Fixture-Traffic-Bytes", strconv.Itoa(bytes))
+			w.Header().Set("X-Fixture-Traffic-Complete", strconv.FormatBool(complete))
+		}()
+		var record [trafficRecordBytes]byte
+		for i := range record {
+			record[i] = byte(i + 1)
+		}
+		for written < records && ctx.Err() == nil {
+			n, err := w.Write(record[:])
+			bytes += n
+			if err != nil || n != len(record) {
+				return
+			}
+			written++
+			if control.Flush() != nil {
+				return
+			}
+		}
+		complete = written == records && ctx.Err() == nil
+	})
 }
