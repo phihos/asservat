@@ -316,33 +316,12 @@ operations:
   effect: read
   role: signed-in
   contract: docs/interfaces/browser-openapi.yaml
-- operation: list_reviews
-  path: /api/v1/console/list_reviews
-  transport:
-  - browser
-  effect: read
-  role: requester-or-reviewer
-  contract: docs/interfaces/browser-openapi.yaml
 - operation: get_review
   path: /api/v1/console/get_review
   transport:
   - browser
   effect: read
   role: requester-or-reviewer
-  contract: docs/interfaces/browser-openapi.yaml
-- operation: decide_review
-  path: /api/v1/console/decide_review
-  transport:
-  - browser
-  effect: command
-  role: independent-reviewer
-  contract: docs/interfaces/browser-openapi.yaml
-- operation: revoke_grant
-  path: /api/v1/console/revoke_grant
-  transport:
-  - browser
-  effect: command
-  role: authorized-grant-revoker
   contract: docs/interfaces/browser-openapi.yaml
 - operation: apply_privacy_action
   path: /api/v1/console/apply_privacy_action
@@ -552,4 +531,25 @@ operations:
   - browser
   effect: read
   role: fleet-operator
+  contract: specs/contracts/mcp-tools.json
+- operation: list_reviews
+  path: /api/v1/operations/list_reviews
+  transport:
+  - browser
+  effect: read
+  role: requester-or-reviewer
+  contract: specs/contracts/mcp-tools.json
+- operation: decide_review
+  path: /api/v1/operations/decide_review
+  transport:
+  - browser
+  effect: command
+  role: independent-reviewer
+  contract: specs/contracts/mcp-tools.json
+- operation: revoke_grant
+  path: /api/v1/operations/revoke_grant
+  transport:
+  - browser
+  effect: command
+  role: authorized-grant-revoker
   contract: specs/contracts/mcp-tools.json

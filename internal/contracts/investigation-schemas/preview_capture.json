@@ -1197,9 +1197,6 @@
                       "capture_enabled": {
                         "const": false
                       },
-                      "approval_required": {
-                        "const": false
-                      },
                       "pod_count": {
                         "const": 1
                       },

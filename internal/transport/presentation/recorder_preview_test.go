@@ -11,6 +11,7 @@ import (
 	identities "asservat.local/asservat/internal/application/identity"
 	compiler "asservat.local/asservat/internal/application/planning"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
@@ -25,6 +26,7 @@ type recorderFixture struct {
 	*contextOperationFixture
 	composition *planning.ProfileComposition
 	compileErr  error
+	access      *authorization.ResultAccess
 }
 
 type oneInstruction struct{}
@@ -128,9 +130,19 @@ func TestCompositionPreviewWire(t *testing.T) {
 
 func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	s, f := recorderOperations(t, true)
+	// ADR-249: a raw byte predicate compiles into a reviewable plan that
+	// needs an individual approval before the recorder blocker.
 	raw := strings.Replace(wireComposition, `"tcp port 8080"`, `"tcp[13] & 2 != 0"`, 1)
 	reply, err := s.Call(t.Context(), f, "preview_capture", []byte(raw))
-	if err != nil || !strings.Contains(string(reply.Body), `"code":"ApprovalRequired"`) || !strings.Contains(string(reply.Body), "parameters.filter") || reply.auditDecision != operationAuditInvalid {
+	var approval struct {
+		Status string `json:"status"`
+		Data   struct {
+			ApprovalRequired bool               `json:"approval_required"`
+			Blockers         []OperationBlocker `json:"blockers"`
+			Warnings         []string           `json:"warnings"`
+		} `json:"data"`
+	}
+	if err != nil || json.Unmarshal(reply.Body, &approval) != nil || approval.Status != "ok" || !approval.Data.ApprovalRequired || len(approval.Data.Blockers) != 2 || approval.Data.Blockers[0].Code != "ApprovalRequired" || approval.Data.Blockers[0].ResponsibleRole != "approver" || approval.Data.Blockers[1].Code != "RecorderUnavailable" || !strings.Contains(strings.Join(approval.Data.Warnings, "\n"), "observation limits") {
 		t.Fatalf("raw byte predicate: %v %s", err, reply.Body)
 	}
 	unexposed := strings.Replace(wireComposition, `"field":"packetFilter","value":"tcp port 8080"`, `"field":"actionMaxBytes","value":1024`, 1)
@@ -155,4 +167,35 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 	if err != nil || !strings.Contains(string(reply.Body), `"code":"RecorderUnavailable"`) || !strings.Contains(string(reply.Body), "nothing was reserved") {
 		t.Fatalf("request refusal: %v %s", err, reply.Body)
 	}
+	// ADR-249: a pending review names its approval page and the approver role.
+	f.err = authorization.ApprovalPendingError{GrantID: "00000000-0000-4000-8000-0000000009a1"}
+	reply, err = s.Call(t.Context(), f, "request_capture", []byte(wireRequest))
+	if err != nil || !strings.Contains(string(reply.Body), `"code":"ApprovalRequired"`) || !strings.Contains(string(reply.Body), `"navigation_uri":"https://console.invalid/approvals/00000000-0000-4000-8000-0000000009a1"`) || !strings.Contains(string(reply.Body), `"responsible_role":"approver"`) {
+		t.Fatalf("pending approval: %v %s", err, reply.Body)
+	}
+	for code, final := range map[string]error{"ApprovalDenied": authorization.ErrGrantDenied, "ApprovalRevoked": authorization.ErrGrantRevoked, "ApprovalExpired": authorization.ErrGrantExpired} {
+		f.err = final
+		if reply, err = s.Call(t.Context(), f, "request_capture", []byte(wireRequest)); err != nil || !strings.Contains(string(reply.Body), `"code":"`+code+`"`) {
+			t.Fatalf("%s: %v %s", code, err, reply.Body)
+		}
+	}
+	// result_access travels only to the reviewed-plan request.
+	f.err = nil
+	withAccess := `{"preview_id":"00000000-0000-4000-8000-000000000020","idempotency_key":"same-key","result_access":{"actionIds":["a1"],"operations":["download_artifact"],"clientIDs":["console"],"maxArtifacts":1,"maxBytes":1024,"maxOperations":2,"notAfter":"2030-01-01T00:00:00Z"}}`
+	if _, err = s.Call(t.Context(), f, "request_capture", []byte(withAccess)); err != nil || f.access == nil || f.access.MaxBytes != 1024 || f.access.ClientIDs[0] != "console" {
+		t.Fatalf("result access not passed: %v %+v", err, f.access)
+	}
+	for name, bad := range map[string]string{
+		"read_memory":  strings.Replace(withAccess, `"download_artifact"`, `"read_memory"`, 1),
+		"five clients": strings.Replace(withAccess, `["console"]`, `["a","b","c","d","e"]`, 1),
+	} {
+		if _, err := s.Call(t.Context(), f, "request_capture", []byte(bad)); err == nil {
+			t.Fatalf("%s accepted by the runtime subset", name)
+		}
+	}
+}
+
+func (f *recorderFixture) RequestWithResultAccess(ctx context.Context, current identities.CurrentIdentity, preview, key string, access *authorization.ResultAccess) (value.Accepted, error) {
+	f.access = access
+	return f.Request(ctx, current, preview, key)
 }

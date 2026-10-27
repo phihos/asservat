@@ -42,6 +42,8 @@ var (
 	assetName         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*-[A-Za-z0-9_-]{8,64}\.(js|css|svg|png|jpg|jpeg|webp|ico|woff2)$`)
 	caseRoute         = regexp.MustCompile(`^/cases/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 	captureRoute      = regexp.MustCompile(`^/captures/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+	// ADR-249: one approval request page.
+	approvalRoute = regexp.MustCompile(`^/approvals/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 )
 
 type asset struct {
@@ -351,7 +353,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func consoleRoute(path string) bool {
-	return path == "/" || path == "/captures/new" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/retention-preview" || captureRoute.MatchString(path) || caseRoute.MatchString(path)
+	return path == "/" || path == "/captures/new" || path == "/policies" || path == "/shares" || path == "/access-preview" || path == "/retention-preview" || path == "/approvals" || captureRoute.MatchString(path) || caseRoute.MatchString(path) || approvalRoute.MatchString(path)
 }
 
 // ServeContent removes cache headers on conditional/range errors. Preserve the

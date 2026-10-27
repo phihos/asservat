@@ -4,7 +4,8 @@ package postgres
 // migration 00065's two regional capacity tables (ADR-197) and migration
 // 00066's refresh demands (ADR-200), 00067 deletion, 00068 queries and
 // 00082's four restart-trigger tables (ADR-228), 00086's evidence shares
-// (ADR-232) and 00096's three decision-time review tables (ADR-245).
+// (ADR-232), 00096's three decision-time review tables (ADR-245) and 00097's
+// three AccessGrant tables (ADR-249).
 // Missing or unknown relations reject first activation.
 // initialTransientTables exist only part way through migration replay: 00043
 // creates them and 00078 drops them (ADR-224). They never belong to a
@@ -12,6 +13,9 @@ package postgres
 var initialTransientTables = []string{"browser_refresh_consumer", "browser_refresh_owner"}
 
 var initialInstallationTables = []string{
+	"access_grant",
+	"access_grant_child",
+	"access_grant_use",
 	"artifact_download",
 	"authority_audit",
 	"browser_login",

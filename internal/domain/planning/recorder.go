@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/privacy"
 	"asservat.local/asservat/internal/domain/targets"
@@ -19,6 +20,32 @@ const (
 	CompositionApproval       = "ApprovalRequired"
 	CompositionNoCompiler     = "FilterCompilerUnavailable"
 )
+
+// Sensitive-acquisition reasons (ADR-249). Either makes the plan need an
+// individual approval before anything is armed.
+const (
+	// ReasonRawBytePredicate: a proto[offset] filter can test payload bytes.
+	ReasonRawBytePredicate = "rawBytePredicate"
+	// ReasonRecordingApproval: the installation requires approval for every
+	// packet/syscall recording (REQ-SYS-002 "unless an administrator requires more").
+	ReasonRecordingApproval = "recordingApprovalRequired"
+	// Fixed observation limits of a manual raw-byte predicate plan
+	// (REQ-AUT-006): cumulative bytes entering the predicate and its rate.
+	SensitiveMaxObservedBytes  = int64(1) << 30
+	SensitiveMaxBytesPerSecond = int64(16) << 20
+)
+
+// ObservationLimits are REQ-AUT-006 limits bound into the plan.
+type ObservationLimits struct {
+	MaxSessionSeconds, MaxObservedBytes, MaxBytesPerSecond, MaxConcurrentSessions int64
+}
+
+// RecorderApproval is a plan's requirement for an individual approval.
+type RecorderApproval struct {
+	DataClass         string
+	Reasons           []authorization.SensitiveReason
+	ObservationLimits *ObservationLimits
+}
 
 // CompositionError is a field-level refusal of an authored composition.
 type CompositionError struct {
@@ -67,6 +94,9 @@ type RecorderInput struct {
 	Composition ProfileComposition
 	Retention   privacy.Resolution
 	Deadline    time.Time
+	// RequireApproval is the protected installation setting that every
+	// recording needs approval (ADR-249); never a caller option.
+	RequireApproval bool
 }
 
 // RecorderAction is the normalized review summary of one expanded action.
@@ -83,6 +113,8 @@ type RecorderAction struct {
 	SyscallMode, SyscallSelection, Result            string
 	SyscallNames                                     int
 	MaxEvents, MaxEventsPerSecond, MaxTrackedThreads int64
+	// Sensitive lists the action's approval reason codes (ADR-249).
+	Sensitive []string
 }
 
 // ResolvedProfile pins one embedded builtin definition by digest (S6).
@@ -103,6 +135,8 @@ type RecorderPlan struct {
 	ScopeDigest    artifact.Digest
 	CompiledAt     time.Time
 	ValidUntil     time.Time
+	// Approval is non-nil when the plan needs an individual approval.
+	Approval *RecorderApproval
 }
 
 // AssessmentQuantity is a typed configured limit; never a measurement here.

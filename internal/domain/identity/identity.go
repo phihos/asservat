@@ -49,6 +49,37 @@ type Claims struct {
 	Issuer, Subject, ClientID     string
 	Scopes, Groups                []string
 	IssuedAt, ExpiresAt, KeyUntil time.Time
+	// ACR and AuthTime are the optional signed acr/auth_time claims (ADR-249).
+	// They are IdP assurance facts, never a client checkbox or a cookie.
+	ACR      string
+	AuthTime time.Time
+}
+
+// StepUpPolicy names the protected installation's accepted step-up assurance
+// (ADR-249, REQ-AUT-003): a signed acr value among ACRValues whose auth_time
+// is at most MaxAge old. The zero value configures no step-up, so no approval
+// can be decided.
+type StepUpPolicy struct {
+	ACRValues []string
+	MaxAge    time.Duration
+}
+
+// Configured reports whether an approval step-up is configured at all.
+func (s StepUpPolicy) Configured() bool { return len(s.ACRValues) > 0 }
+
+func (s StepUpPolicy) valid() bool {
+	if !s.Configured() {
+		return s.MaxAge == 0
+	}
+	return len(s.ACRValues) <= 8 && Strings(s.ACRValues, 8, 128) && s.MaxAge >= 30*time.Second && s.MaxAge <= time.Hour
+}
+
+// Assurance is the verified authentication context of one identity
+// observation. StepUpUntil is zero unless the signed acr matched the accepted
+// step-up policy; it never outlives the observation.
+type Assurance struct {
+	ACR                          string
+	AuthenticatedAt, StepUpUntil time.Time
 }
 
 // Client pins identity class only for a qualified issuer/client configuration
@@ -76,6 +107,12 @@ type Policy struct {
 	EligibleGroups         []string
 	GroupsAtIssueQualified bool
 	GroupMaxAge            time.Duration
+	// StepUp and RequireRecordingApproval are the protected installation
+	// approval settings (ADR-249). RequireRecordingApproval is the REQ-SYS-002
+	// "unless an administrator requires more" switch: metadata packet/syscall
+	// recordings then need the same individual approval as sensitive ones.
+	StepUp                   StepUpPolicy
+	RequireRecordingApproval bool
 }
 
 type Identity struct {
@@ -83,6 +120,12 @@ type Identity struct {
 	Scopes, Groups         []string
 	Policy                 Revision
 	VerifiedAt, ValidUntil time.Time
+	Assurance              Assurance
+}
+
+// SteppedUp reports a current IdP step-up of a human identity (ADR-249).
+func (i Identity) SteppedUp(now time.Time) bool {
+	return i.Principal.Kind == Human && !i.Assurance.StepUpUntil.IsZero() && now.Before(i.Assurance.StepUpUntil) && !i.Assurance.AuthenticatedAt.After(now)
 }
 
 func Text(s string, max int) bool {
@@ -122,7 +165,7 @@ func Earlier(a, b time.Time) time.Time {
 }
 
 func (p Policy) Validate(now time.Time) error {
-	if !p.Revision.Valid() || !Text(p.Issuer, 2048) || !Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) || len(p.Clients) < 1 || len(p.Clients) > 64 || len(p.EligibleSubjects) > 256 || len(p.EligibleGroups) > 256 || len(p.EligibleSubjects)+len(p.EligibleGroups) == 0 || !p.GroupsAtIssueQualified || p.GroupMaxAge <= 0 || p.GroupMaxAge > 5*time.Minute || !Strings(p.EligibleGroups, 256, 256) {
+	if !p.Revision.Valid() || !Text(p.Issuer, 2048) || !Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) || len(p.Clients) < 1 || len(p.Clients) > 64 || len(p.EligibleSubjects) > 256 || len(p.EligibleGroups) > 256 || len(p.EligibleSubjects)+len(p.EligibleGroups) == 0 || !p.GroupsAtIssueQualified || p.GroupMaxAge <= 0 || p.GroupMaxAge > 5*time.Minute || !Strings(p.EligibleGroups, 256, 256) || !p.StepUp.valid() {
 		return ErrUnavailable
 	}
 	clients := map[string]bool{}
@@ -169,7 +212,27 @@ func Admit(c Claims, p Policy, now time.Time) (Identity, error) {
 	if !eligible || !now.Before(until) {
 		return out, ErrDenied
 	}
-	return Identity{Principal{c.Issuer, c.Subject, c.ClientID, kind}, slices.Clone(c.Scopes), slices.Clone(c.Groups), p.Revision, now, until}, nil
+	return Identity{Principal{c.Issuer, c.Subject, c.ClientID, kind}, slices.Clone(c.Scopes), slices.Clone(c.Groups), p.Revision, now, until, assurance(c, p, kind, now, until)}, nil
+}
+
+// assurance derives step-up only from the signed acr/auth_time of a human
+// token and the protected policy; it ends at the earlier of auth_time+MaxAge
+// and the identity's own validity.
+func assurance(c Claims, p Policy, kind Kind, now, until time.Time) Assurance {
+	if c.ACR == "" || !Text(c.ACR, 128) {
+		return Assurance{}
+	}
+	a := Assurance{ACR: c.ACR}
+	if c.AuthTime.IsZero() || c.AuthTime.After(now) {
+		return a
+	}
+	a.AuthenticatedAt = c.AuthTime
+	if kind == Human && p.StepUp.Configured() && slices.Contains(p.StepUp.ACRValues, c.ACR) {
+		if end := Earlier(c.AuthTime.Add(p.StepUp.MaxAge), until); now.Before(end) {
+			a.StepUpUntil = end
+		}
+	}
+	return a
 }
 
 func (i Identity) Valid(now time.Time) bool {

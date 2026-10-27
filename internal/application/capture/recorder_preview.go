@@ -85,8 +85,12 @@ func (s ContextInvestigation) PreviewComposition(ctx context.Context, source ide
 	p.Intent.Composition = intent.Composition.Clone()
 	p.ExecutionClass = target.ExecutionClass
 	p.AssessmentID, p.AssessmentRulesDigest = s.NewID(), compiler.RecorderAssessmentRulesDigest()
+	required, err := s.requireRecordingApproval(ctx, i)
+	if err != nil {
+		return zero, previewFailure("approvals", err)
+	}
 	mark = time.Now()
-	plan, err := compiler.CompileRecorder(planning.RecorderInput{CaptureID: p.CaptureID, Executor: p.Actor, Target: target, Composition: *intent.Composition, Retention: r, Deadline: p.Deadline}, s.Filters, s.Now())
+	plan, err := compiler.CompileRecorder(planning.RecorderInput{CaptureID: p.CaptureID, Executor: p.Actor, Target: target, Composition: *intent.Composition, Retention: r, Deadline: p.Deadline, RequireApproval: required}, s.Filters, s.Now())
 	auditapp.MarkStep(ctx, "p-compile", mark)
 	if err != nil {
 		return zero, previewFailure("compile", err)

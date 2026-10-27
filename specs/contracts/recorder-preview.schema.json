@@ -182,6 +182,82 @@
     "deadline": {
       "type": "string",
       "format": "date-time"
+    },
+    "approval": {
+      "description": "ADR-249: present only when the plan needs an individual approval (adHocCapture AccessGrant) before any observation. Part of the execution digest.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dataClass": {
+          "enum": [
+            "metadata",
+            "extract",
+            "raw"
+          ]
+        },
+        "reasons": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "actionID": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "code": {
+                "enum": [
+                  "rawBytePredicate",
+                  "recordingApprovalRequired"
+                ]
+              }
+            },
+            "required": [
+              "actionID",
+              "code"
+            ]
+          }
+        },
+        "observationLimits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxSessionSeconds": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            },
+            "maxObservedBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1099511627776
+            },
+            "maxBytesPerSecond": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1073741824
+            },
+            "maxConcurrentSessions": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            }
+          },
+          "required": [
+            "maxSessionSeconds",
+            "maxObservedBytes",
+            "maxBytesPerSecond",
+            "maxConcurrentSessions"
+          ]
+        }
+      },
+      "required": [
+        "dataClass",
+        "reasons"
+      ]
     }
   },
   "required": [

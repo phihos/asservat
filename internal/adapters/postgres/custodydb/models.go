@@ -8,6 +8,80 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AccessGrant struct {
+	ID                 pgtype.UUID
+	RootID             pgtype.UUID
+	Kind               string
+	PreviewID          pgtype.UUID
+	CaptureID          pgtype.UUID
+	ClusterID          pgtype.UUID
+	NamespaceUid       string
+	WorkloadUid        string
+	PodUid             string
+	ExecutionDigest    []byte
+	ResultAccessDigest []byte
+	ReviewDigest       []byte
+	DataClass          string
+	Reasons            []byte
+	Review             []byte
+	Scope              []byte
+	RequesterIssuer    string
+	RequesterSubject   string
+	RequesterClient    string
+	LifetimeSeconds    int32
+	ResultAccess       []byte
+	NotAfter           pgtype.Timestamptz
+	MaxArtifacts       int32
+	MaxBytes           int64
+	MaxOperations      int64
+	ArtifactsSpent     int32
+	BytesSpent         int64
+	OperationsSpent    int64
+	IdempotencyKey     string
+	RequestDigest      []byte
+	RequestedAt        pgtype.Timestamptz
+	ReviewUntil        pgtype.Timestamptz
+	Decision           pgtype.Text
+	ApproverIssuer     pgtype.Text
+	ApproverSubject    pgtype.Text
+	ApproverClient     pgtype.Text
+	DecisionReason     pgtype.Text
+	DecisionAcr        pgtype.Text
+	DecisionAuthTime   pgtype.Timestamptz
+	DecidedAt          pgtype.Timestamptz
+	DecisionKey        pgtype.Text
+	ExpiresAt          pgtype.Timestamptz
+	RevokedAt          pgtype.Timestamptz
+	RevokerIssuer      pgtype.Text
+	RevokerSubject     pgtype.Text
+	RevokerClient      pgtype.Text
+	RevokeKey          pgtype.Text
+	Revision           int16
+}
+
+type AccessGrantChild struct {
+	ID             pgtype.UUID
+	RootID         pgtype.UUID
+	ParentID       pgtype.UUID
+	CaptureID      pgtype.UUID
+	ActionID       string
+	ArtifactID     pgtype.UUID
+	ArtifactDigest []byte
+	ClientID       string
+	CreatedAt      pgtype.Timestamptz
+}
+
+type AccessGrantUse struct {
+	ID         pgtype.UUID
+	RootID     pgtype.UUID
+	ParentID   pgtype.UUID
+	ChildID    pgtype.UUID
+	Operation  string
+	Bytes      int64
+	Operations int64
+	CreatedAt  pgtype.Timestamptz
+}
+
 type ArtifactDownload struct {
 	ID                    pgtype.UUID
 	RootID                pgtype.UUID

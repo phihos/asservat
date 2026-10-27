@@ -1,0 +1,138 @@
+package capture
+
+import (
+	"context"
+	"errors"
+	"time"
+
+	authapp "asservat.local/asservat/internal/application/authorization"
+	identities "asservat.local/asservat/internal/application/identity"
+	compiler "asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
+	value "asservat.local/asservat/internal/domain/capture"
+	"asservat.local/asservat/internal/domain/identity"
+)
+
+// RecorderGrants is the C-03 approval service (ADR-249) as the capture
+// request path uses it: open one review request for a current sensitive
+// plan, and check at every submission that an approved grant covers it.
+type RecorderGrants interface {
+	Request(context.Context, identities.CurrentIdentity, authapp.GrantRequestInput) (authorization.Grant, bool, error)
+	Covering(context.Context, identities.CurrentIdentity, string, artifact.Digest, authorization.Target) (authorization.Grant, time.Time, error)
+}
+
+// ApprovalSettings reads the protected installation approval settings.
+type ApprovalSettings interface {
+	IdentityPolicy(context.Context, string) (identity.Policy, error)
+}
+
+// requireRecordingApproval reads the installation's REQ-SYS-002 switch for
+// the caller's issuer. Without a configured reader the installation adds no
+// requirement; a failing reader refuses the preview.
+func (s ContextInvestigation) requireRecordingApproval(ctx context.Context, i identity.Identity) (bool, error) {
+	if s.Approvals == nil {
+		return false, nil
+	}
+	p, err := s.Approvals.IdentityPolicy(ctx, i.Principal.Issuer)
+	if err != nil || p.Validate(s.Now()) != nil {
+		return false, value.ErrUnavailable
+	}
+	return p.RequireRecordingApproval, nil
+}
+
+// RequestWithResultAccess submits a reviewed packet/syscall preview with an
+// optional same-human result-access instruction (REQ-INV-001). A pod-status
+// preview needs no review and refuses the instruction.
+func (s ContextInvestigation) RequestWithResultAccess(ctx context.Context, source identities.CurrentIdentity, previewID, key string, access *authorization.ResultAccess) (value.Accepted, error) {
+	var zero value.Accepted
+	if access == nil {
+		return s.Request(ctx, source, previewID, key)
+	}
+	if !s.configured() || ctx == nil || source == nil || ctx.Err() != nil {
+		return zero, value.ErrUnavailable
+	}
+	if !authorization.UUID(previewID) || !identity.Text(key, 128) {
+		return zero, value.ErrInvalid
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	i, err := source.ResolveIdentity(ctx)
+	if err != nil || !i.Valid(s.Now()) {
+		return zero, value.ErrDenied
+	}
+	p, err := s.Previews.ReadContextPreview(ctx, s.RootID, previewID, i.Principal)
+	if err != nil {
+		return zero, err
+	}
+	p = p.Clone()
+	if !ValidContextPreview(p) || p.ID != previewID || p.RootID != s.RootID || p.InstallationID != s.InstallationID || p.Actor != i.Principal {
+		return zero, value.ErrDenied
+	}
+	if p.Intent.Composition == nil {
+		return zero, value.ErrInvalid
+	}
+	return zero, s.recorderRequest(ctx, source, p, key, access)
+}
+
+// recorderRequest decides a reviewed packet/syscall submission (ADR-249).
+// A plan without an approval requirement is refused with RecorderUnavailable
+// (ADR-243). A plan that needs approval opens exactly one review request for
+// its capture identity while the preview is current, and is refused with
+// ApprovalRequired until an approved, current grant covers this exact plan
+// for the requesting human; only then does it reach RecorderUnavailable.
+// Nothing is armed, reserved or charged on any path.
+func (s ContextInvestigation) recorderRequest(ctx context.Context, source identities.CurrentIdentity, p value.ContextPreview, key string, access *authorization.ResultAccess) error {
+	actions, approval, err := compiler.RecorderScopeSummary(p.CanonicalScope)
+	if err != nil {
+		return value.ErrUnavailable
+	}
+	if approval == nil {
+		if access != nil {
+			return value.ErrInvalid
+		}
+		return value.ErrRecorderUnavailable
+	}
+	if s.Grants == nil {
+		return authorization.ErrApprovalRequired
+	}
+	t := authorization.Target{ClusterID: p.Target.ClusterID, NamespaceUID: p.Target.Namespace.UID, WorkloadUID: p.Target.Workload.UID, PodUID: p.Target.PodUID}
+	var wanted artifact.Digest
+	if access != nil {
+		wanted = authapp.ResultAccessDigest(p.CaptureID, p.ScopeDigest, authapp.NormalizeResultAccess(*access))
+	}
+	g, _, err := s.Grants.Covering(ctx, source, p.CaptureID, p.ScopeDigest, t)
+	switch {
+	case err == nil || errors.Is(err, authorization.ErrApprovalRequired) && g.ID != "":
+		// An existing request binds its result access; another instruction
+		// needs a fresh preview and review, never a silent replacement.
+		if access != nil && g.ResultAccessDigest != wanted {
+			return value.ErrConflict
+		}
+		if err != nil {
+			return authorization.ApprovalPendingError{GrantID: g.ID}
+		}
+		return value.ErrRecorderUnavailable
+	case errors.Is(err, authorization.ErrApprovalRequired):
+		// No request exists yet: only a current preview can open one.
+	default:
+		return err
+	}
+	if !p.Current(s.Now()) {
+		return value.ErrPreviewExpired
+	}
+	review := authapp.GrantReview{Namespace: p.Target.Namespace.Name, WorkloadKind: p.Target.Workload.Kind, WorkloadName: p.Target.Workload.Name, PodName: p.Target.PodName, Deadline: p.Deadline}
+	for _, a := range actions {
+		review.Actions = append(review.Actions, authapp.GrantReviewAction{ActionID: a.ID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, Before: a.Before, After: a.After, Filter: a.Filter, RingMaxAge: a.RingMaxAge,
+			FilterDigest: a.FilterDigest, FilterInstructions: a.FilterInstructions, MaxBytes: a.MaxBytes, RingMaxBytes: a.RingMaxBytes, Sensitive: a.Sensitive})
+	}
+	if l := approval.ObservationLimits; l != nil {
+		review.ObservationLimits = &authapp.GrantObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}
+	}
+	created, _, err := s.Grants.Request(ctx, source, authapp.GrantRequestInput{PreviewID: p.ID, CaptureID: p.CaptureID, Actor: p.Actor, Target: t, Scope: p.CanonicalScope, ExecutionDigest: p.ScopeDigest,
+		DataClass: approval.DataClass, Reasons: approval.Reasons, Review: review, Lifetime: authorization.GrantDefaultLifetime, ResultAccess: access, IdempotencyKey: key})
+	if err != nil {
+		return err
+	}
+	return authorization.ApprovalPendingError{GrantID: created.ID}
+}

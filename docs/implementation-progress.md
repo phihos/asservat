@@ -1,5 +1,85 @@
 # Sustained implementation progress
 
+## S-04 increment 12: sensitive acquisition grants (ADR-249, 2026-10-27)
+
+[ADR-249](decisions/249-sensitive-acquisition-grants.md) (12a, individual approval): an
+adHocCapture AccessGrant per reviewed packet/syscall plan that needs review. A raw-byte filter
+predicate (`proto[offset]`, `proto[offset:1|2|4]`) now compiles into a plan with reason
+`rawBytePredicate` and REQ-AUT-006 observation limits; `approvals.requireRecordingApproval` in the
+protected identity settings adds `recordingApprovalRequired` to every packet/syscall plan; both
+are part of the execution digest (metadata plans unchanged byte for byte). `request_capture`
+opens one review request per capture UID and is refused with `ApprovalRequired` (approval page,
+responsible role approver) until an approved, unrevoked, unexpired grant covers the exact plan for
+the requesting human with current collection eligibility; then `RecorderUnavailable`. Distinct
+`action-approver` (new evaluator operation `approveAction`), self-approval refused by issuer and
+subject across clients (service and SQL CHECK), approval needs an IdP step-up from the signed
+`acr`/`auth_time` (`approvals.stepUp`); denial and revocation need none. Result access on
+submission: one finite pool, exact children only for published artifacts of the approved capture,
+idempotent reservations never refunded. Migration 00097 (`access_grant`, `access_grant_child`,
+`access_grant_use`, four names on the normal audit lane), the `evidence-share` duty gains their
+grants. `get_grant` (browser and MCP) and browser-only `list_reviews`, `decide_review`,
+`revoke_grant`; console `/approvals` and `/approvals/<id>`.
+
+Verification (tracked test/results files restored after each fixture run):
+- Unit: domain/authorization `TestGrantEvaluatorMatrix` (self-approval through another client and
+  on deny, missing/stale approver role, no or expired step-up, deny without step-up, review window
+  over, revoked request, workload identity; coverage: pending, expired, revoked, denied, digest
+  mismatch, other capture, other client, other requester, invalid stored row) and
+  `TestGrantPoolAndChildRules` (NotAfter caps expiry, max artifacts, registered artifact for a
+  second client, unlisted client, broadened operation, other client of the same human, pool
+  arithmetic, expired parent); application/authorization `TestGrant*` through the service with an
+  in-memory ledger (decision/covering matrix incl. a deny on the requester and a tampered row;
+  revocation, denial, withdraw, inbox/requested visibility, one request per capture, review window;
+  result-access pool across two clients, idempotent children and uses, revocation stops children);
+  domain/identity `TestStepUpAssurance`; adapters/oidc `TestAccessTokenAssuranceClaims` (malformed
+  acr/auth_time is no assurance, never a rejected token); application/planning
+  `TestRecorderApprovalRequirement`; application/capture `TestSensitiveRecorderPlanNeedsApproval…`
+  (no admission on any path; expired preview opens no request) and
+  `TestRecorderApprovalSettingsAndResultAccess`; transport/presentation `TestGrantOperationsWire`
+  (canonical output validation, transports, identical reply for unknown and hidden grants) and the
+  updated composition wire tests; web `ApprovalsWorkspace.test.tsx` (4 tests). `go test -race` over
+  domain, application, oidc, postgres, presentation, mcp, browser, contracts, console: PASS. (A
+  pre-existing timing flake in `TestDownloadPolicyObservationNewRequestNearExpiry` was seen once
+  before #89 fixed it on main.)
+- Real PostgreSQL/S3 custody fixture, `scripts/test-custody.py --run
+  'TestContextAdmissionWithRealServices/access-grant'` (race-instrumented, compiled hub-runtime
+  grants, actual accepted projection with an added action-approver binding, an actually published
+  artifact): PASS in 5.1–5.6 s on the final source, also together with the policy-share,
+  verification-audit, download-worker native-content and request-owner subtests. It covers: request
+  and same-key replay, changed request under one key and a second key for one capture refused;
+  self-approval through another client refused by the service and by the SQL CHECK (23514); no
+  step-up and non-approver refused; four concurrent approvers record exactly one decision; in-place
+  edits refused by the trigger and DELETE by privilege (42501); an unpublished artifact never
+  becomes a child, duplicate delivery replays, a second client adds no artifact, an unlisted client
+  is refused; 14 concurrent 10-byte uses across both clients against a 100-byte pool spend exactly
+  100 bytes/10 operations (uses that waited past the 1 s lock timeout are unavailable, charge
+  nothing and are retried with the same use ID); spend survives a new store instance; continuous
+  uses during a revocation: none started after the revocation succeeds, pool never exceeded; a
+  2-second `notAfter` caps and expires the grant; the four names are on the normal audit lane.
+  Earlier runs found and fixed: jsonb normalizing the review bytes (review digest mismatch; column
+  is now bytea), a missing authentication context on a decision replay, and connection exhaustion
+  of later suites from the concurrent phases (the test now releases the shared permission pool).
+- Full custody suite (`scripts/test-custody.py`, about 800 s): 499 passing results; the
+  `download-worker-native-content*` and `download-worker-request-owners` subtests fail only in the
+  full run ("durable audit unavailable" while opening their audit journals) and pass in targeted
+  runs with the grant subtest. `origin/main` at 501b0836 in the same workstation also fails the full
+  suite (policy-share, download-worker-request-owners) and did not finish within the budget, so this
+  is recorded as pre-existing full-suite instability, not attributed to this change.
+- Keycloak (`scripts/test-identity.py`, owned TLS Keycloak): the real access token carries
+  `auth_time` with the `basic` scope but no `acr` until the client has the `acr` client scope; with
+  it, `acr "1"` and `auth_time` at issue time arrive and are parsed (`TestKeycloakProvider` PASS).
+  No LoA step-up flow was configured, so `acr` reflects ordinary login only.
+- `make pre-push` (spec, architecture, design, openapi, live, download, investigation checks,
+  schema bundles, helm-check, gate self-tests, sql-check, console-check, gofmt, vet): PASS on the
+  final source. No installed run: no recorder exists, so an installed run would only show the
+  same refusals, and step-up needs realm configuration the installed fixture lacks.
+
+
+Open: policy grants (12b); observation spend (needs recorders); a console step-up sign-in
+(`acr_values`/`max_age`) and Keycloak LoA step-up qualification; review requests open only while
+the preview is current, and starting an approved plan through acceptance is increment 13's;
+children have no production caller before increment 14.
+
 ## Guarded, group-ID, remote-cluster and workload permission sources (ADR-247, 2026-10-27)
 
 [ADR-247](decisions/247-guarded-and-workload-permission-sources.md) completes REQ-PER-003/005

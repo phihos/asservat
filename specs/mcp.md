@@ -36,7 +36,7 @@ The machine-readable catalog is [mcp-tools.json](contracts/mcp-tools.json). A UI
 | `get_file_excerpt` | Approved text/structured projection of a collected file | Extracts only by default; no live file reads |
 | `get_logs` | Redacted incident log extract with context bounds | No direct cluster log tailing through this tool |
 | `request_raw_access` | Request artifact-operation grant | Creates pending grant; does not collect or disclose evidence |
-| `get_grant` | Poll own grant state and remaining quota | Requester/approver/admin-specific views |
+| `get_grant` | Poll own grant state and remaining quota | Requester/approver-specific views; anyone else sees the same reply as for an unknown ID (ADR-249). The approval inbox `list_reviews`, `decide_review` and `revoke_grant` are browser-only console operations |
 | `read_memory` | Bounded core-memory view at an address | Raw scope + share/ACL + grant; max 16 KiB/call, cumulative quota |
 | `debugger_command` | Structured enum operation with typed arguments | Raw grant; no text command language, shell or code evaluation |
 | `pcap_query` | Bounded packet projection and typed display predicates | Raw grant if any raw artifact/fields; scan/packet/output caps |

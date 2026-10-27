@@ -81,6 +81,9 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		return nil, &fixedStepError{"audit-resolution", mounts.ErrUnavailable}
 	}
 
+	// ADR-249: the protected identity settings carry the approval settings
+	// (step-up and the installation's recording-approval switch).
+	pc.investigation.Approvals = id.mcp.Policies
 	operations, err := NewPublicContextOperations(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
 		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection})
 	if err != nil {
@@ -136,6 +139,14 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 		if operations, err = presentation.NewInvestigationRetentionPreviewOperations(operations, retentionPreview); err != nil {
 			return nil, &fixedStepError{"retention-preview", mounts.ErrUnavailable}
 		}
+	}
+	// ADR-249: get_grant and the approval inbox on the same audited routes.
+	grantOperations, err := presentation.NewGrantOperations(p.Origin, time.Now, ownerRandomID, pc.grants)
+	if err != nil {
+		return nil, &fixedStepError{"grants", mounts.ErrUnavailable}
+	}
+	if operations, err = presentation.NewInvestigationGrantOperations(operations, grantOperations); err != nil {
+		return nil, &fixedStepError{"grants", mounts.ErrUnavailable}
 	}
 	o := p.OperationAudit
 	services := PublicContextServices{Sessions: id.sessions, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
