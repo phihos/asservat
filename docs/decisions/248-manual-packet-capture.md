@@ -171,6 +171,14 @@ collector records nothing. No packet evidence can be captured, stored, published
   unavailable until their manifest is pinned.
 - **Signed work fields.** The API context work keeps its fixed `pod-status`/4096 format fields;
   the expectation digest binds the recording's action and limit.
+- **Approval (ADR-249).** A plan that needs approval is refused with `ApprovalRequired` until an
+  approved, current grant covers its exact digest; only then does the recorder check apply. The
+  installation's `requireRecordingApproval` switch is frozen into the accepted recording, so the
+  accepted plan reproduces the approved digest. A raw byte predicate (REQ-AUT-006 observation
+  limits) stays `RecorderUnavailable`: this recorder does not charge observation spend. Because a
+  review request can only be opened from a current preview, an approved plan whose preview has
+  expired still needs the ADR-249 increment-13 acceptance path. Result-access instructions are not
+  delivered by this recorder yet (`RecorderUnavailable`).
 
 ## Qualification
 
