@@ -115,9 +115,9 @@ Verification (tracked test/results files restored after each run):
   loaded workstation; PASS in 4.26 s).
 - Gates: `make pre-push` PASS; `make permission-schema-check`, `helm-check`, `spec-check`, `architecture-check` PASS. All fixture runs after the rebase onto main with the final sources (unchanged during each run, no cleanup failures). The timing test `TestDownloadPolicyObservationNewRequestNearExpiry` failed in two parallel whole-tree runs and passed alone (`-count=3`); it does not use the review port. The sharded `go-check` (race) was not run locally. No installed qualification.
 
-## Installed transient start failures: standby residency (ADR-245, 2026-10-27)
+## Installed transient start failures: standby residency (ADR-250, 2026-10-27)
 
-[ADR-245](decisions/245-standby-residency-and-unstarted-acquisition.md): intermittent installed
+[ADR-250](decisions/250-standby-residency-and-unstarted-acquisition.md): intermittent installed
 `OutcomeUnknown` from `request_capture` (runs 40446978365, 40450514312, 40410495985, 40406894497,
 40447076912) came from the hub router attaching regional work and target queries to the oldest
 standby exchange, whose 30-second residency cut the region's observations and stream mid-run.
@@ -125,7 +125,7 @@ Attach/Query now take the standby with the latest residency end covering the wor
 3 s and retire idle standbys that can no longer cover work; a start refused before any start
 effect reports the retryable `AcquisitionNotStarted`; the share and history focuses resolve,
 continue and re-review like the journey. A connector proof reuse floor was tried and reverted
-(it moved proof production into requests; ADR-245 records the evidence and the remaining
+(it moved proof production into requests; ADR-250 records the evidence and the remaining
 limitation).
 
 Verification: `make pre-push` passes. Native dispatches of the final commit 7d25c44f:

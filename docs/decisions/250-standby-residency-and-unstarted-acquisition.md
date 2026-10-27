@@ -1,4 +1,4 @@
-# ADR-245 — Standby residency for regional work and unstarted acquisition
+# ADR-250 — Standby residency for regional work and unstarted acquisition
 
 Date: 2026-10-27. Status: accepted; implemented; qualification below.
 Requirements: REQ-EXE-002, S-02. Refines [ADR-171](171-hub-run-context-execution.md) standby

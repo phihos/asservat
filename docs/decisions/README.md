@@ -18,7 +18,7 @@ review mints one persistent assignment per source and principal (the capturing p
 audience) and a per-Pod decision of at most `maxDecisionAgeSeconds`; a refusal or SAR outage ends it
 at once; explicit denies still win; reads repeat the recorded review. Migration 00096.
 
-[ADR-245 — Standby residency for regional work and unstarted acquisition](245-standby-residency-and-unstarted-acquisition.md)
+[ADR-250 — Standby residency for regional work and unstarted acquisition](250-standby-residency-and-unstarted-acquisition.md)
 fixes intermittent installed `OutcomeUnknown` starts: the hub router attached regional work to the
 oldest standby exchange, whose 30-second residency cut the region's observations and stream
 mid-run. Attach and target queries now take the standby with the latest residency end that
