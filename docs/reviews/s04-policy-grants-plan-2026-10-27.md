@@ -849,3 +849,37 @@ observation/session credit are still pending. Static call-site review confirms t
 new current-policy/grant gate runs on API work/start checks, never on stored
 completion or publication; no later-source control blocks already gathered
 artifact finalization through this gate.
+
+
+### Canonical approved-workflow composition
+
+The branch now composes canonical main `eed8594020645fe6d10f8c6565e69a6235c7507d`
+(the merged/qualified approved manual workflow), history 00101 and policy 00102.
+Resolve the squash-history conflicts by retaining canonical tri-state recorder
+availability, the actual-parent response reserve, fixed endpoint diagnostics and
+updated H2 metadata assertions, alongside history's pinned-repeat selection,
+encrypted settings/browser flow and policy workload metadata eligibility.
+Ad hoc original-client continuation hints remain intact; policy grants gain none.
+No grant, occurrence accounting, migration 00102 or SQL query implementation
+changed during this composition. Earlier real SQL reports remain bound to their
+recorded sources; they are reused, not relabeled as installed composition proof.
+
+Five critical diagnostic/wait files are byte-identical to canonical main:
+owner_endpoint.go, cluster_observation_operation_client.go,
+owner_endpoint_diagnostic.go, owner_route_diagnostic.go and
+context_storage_wait.go. History additions preserve the independent current
+request/authority cutoffs. Generated browser validators were regenerated from the
+merged contracts. Initial generation failed because this worktree lacked locked
+web dependencies; the existing console-install target installed the unchanged
+lockfile and generation passed. No package version or dependency changed.
+
+Actual composed gates: pre-push exit 0 (13,287 spec assertions, 62 sqlc files,
+67 Go packages/393 imports and 227 console unit tests); full affected race suites
+passed authorization 1.343s, capture 11.050s, PostgreSQL 2.557s, mTLS 36.860s,
+presentation 74.373s and MCP 50.996s. Console build/browser-check exit 0,
+Go 21.492s: actual built React/Go HTTPS with synthetic authority ran 23 browser
+journeys/20 accessibility scans and four native-restart boundaries/two scans.
+Those browser reports do not qualify real SQL/IdP/collectors or native transfer.
+Reports/screenshots are archived in the local build cache; generated test results
+were restored after archival. No extra SQL fixture, collector or hosted run was
+launched, and no push/publication is implied by these local gates.

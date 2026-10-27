@@ -308,7 +308,7 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 	case errors.Is(err, value.ErrSettingsUnavailable):
 		return OperationFailure{"ParametersUnavailable", "Saved settings are unavailable. Start a new preview with your current settings.", true}
 	case errors.Is(err, value.ErrRecorderUnavailable):
-		return OperationFailure{"RecorderUnavailable", "Packet and syscall recorders are not installed in this release. The reviewed plan cannot be submitted; no capture was started and nothing was reserved.", false}
+		return OperationFailure{"RecorderUnavailable", "No recorder is available for this reviewed plan. No capture was started and nothing was reserved.", false}
 	case errors.Is(err, value.ErrSharingDenied):
 		// Decided from the caller's own scope (preview) or after the
 		// caller's capture eligibility on the target (request): no oracle.

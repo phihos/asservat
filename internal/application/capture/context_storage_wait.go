@@ -9,6 +9,17 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 )
 
+// Reserve scheduling time for audit completion, final identity and response delivery.
+// This is not a new authority interval or a guarantee those operations finish.
+const storageResponseReserve = time.Second
+
+func storageReadinessUntil(ctx context.Context, until time.Time) time.Time {
+	if deadline, ok := ctx.Deadline(); ok && deadline.Add(-storageResponseReserve).Before(until) {
+		return deadline.Add(-storageResponseReserve)
+	}
+	return until
+}
+
 type contextStorageDemand uint8
 
 const (
@@ -30,10 +41,11 @@ type contextStorageWait struct {
 }
 
 func (s ContextInvestigation) beginStorageWait(ctx context.Context, target targets.PodResolution, until time.Time, selection value.ContextStorageSelection) *contextStorageWait {
-	call, cancel := context.WithDeadline(ctx, until)
+	waitUntil := storageReadinessUntil(ctx, until)
+	call, cancel := context.WithDeadline(ctx, waitUntil)
 	w := &contextStorageWait{done: make(chan struct{}), cancel: cancel, until: until, selection: selection, bound: "request"}
 	started := time.Now()
-	if s.Refresh == nil || s.Storage == nil {
+	if s.Refresh == nil || s.Storage == nil || !time.Now().Before(waitUntil) {
 		auditapp.MarkStep(ctx, "p-await-storage", started)
 		close(w.done)
 		return w
@@ -60,17 +72,42 @@ func (s ContextInvestigation) awaitStorage(ctx context.Context, target targets.P
 	if s.Refresh == nil || s.Storage == nil {
 		return storageDemandUnused
 	}
+	firstRead := true
 	ready := func() bool {
+		started := time.Now()
 		v, err := s.Storage.ContextStorage(ctx, target.Target())
-		return err == nil && !v.Binding.FreshUntil.Before(s.Now().Add(storageMargin))
+		fresh := err == nil && !v.Binding.FreshUntil.Before(s.Now().Add(storageMargin))
+		if firstRead {
+			step := "p-storage-hint-read-thin"
+			if err != nil {
+				step = "p-storage-hint-read-error"
+			} else if fresh {
+				step = "p-storage-hint-read-ready"
+			}
+			auditapp.MarkStep(ctx, step, started)
+			firstRead = false
+		}
+		return fresh
 	}
-	if ready() {
+	if ready() || ctx.Err() != nil {
 		return storageDemandUnused
 	}
-	if s.Refresh.DemandCapacityRefresh(ctx, target.Request) != nil {
+	if deadline, ok := ctx.Deadline(); ok && !time.Now().Before(deadline) {
+		return storageDemandUnused
+	}
+	started := time.Now()
+	err := s.Refresh.DemandCapacityRefresh(ctx, target.Request)
+	auditapp.MarkStep(ctx, "p-storage-demand", started)
+	if err != nil {
 		return storageDemandFailed
 	}
-	for !ready() {
+	for ctx.Err() == nil {
+		if deadline, ok := ctx.Deadline(); ok && !time.Now().Before(deadline) {
+			break
+		}
+		if ready() {
+			break
+		}
 		t := time.NewTimer(250 * time.Millisecond)
 		select {
 		case <-ctx.Done():
@@ -119,6 +156,13 @@ func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts
 	}
 	call, cancel := context.WithDeadline(ctx, until)
 	defer cancel()
+	waitUntil := storageReadinessUntil(ctx, until)
+	wait, stopWait := call, func() {}
+	if deadline, ok := call.Deadline(); !ok || waitUntil.Before(deadline) {
+		wait, stopWait = context.WithDeadline(call, waitUntil)
+	}
+	defer stopWait()
+	readinessCurrent := func() bool { return wait.Err() == nil && time.Now().Before(waitUntil) }
 	current := func() bool {
 		now := s.Now()
 		return storageCallCurrent(call, until, now) && s.nonStorageFactsCurrent(f, now)
@@ -176,7 +220,7 @@ func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts
 		// A valid but thin observation supplies no admission authority. Only
 		// another independent protected read may replace it. Other facts,
 		// selection and original deadlines cannot be replaced or extended.
-		if s.Refresh == nil || w.demand == storageDemandFailed {
+		if s.Refresh == nil || w.demand == storageDemandFailed || !readinessCurrent() {
 			return zero, previewFailure("facts/storage", contextStorageMarginRefusal{})
 		}
 		if w.demand == storageDemandUnused {
@@ -184,7 +228,10 @@ func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts
 				return zero, expired()
 			}
 			w.demand = storageDemandFailed
-			if err := s.Refresh.DemandCapacityRefresh(call, f.target.Request); err != nil {
+			started := time.Now()
+			err := s.Refresh.DemandCapacityRefresh(wait, f.target.Request)
+			auditapp.MarkStep(ctx, "p-storage-demand", started)
+			if err != nil {
 				return zero, previewFailure("facts/storage/refresh", err)
 			}
 			w.demand = storageDemandAcknowledged
@@ -197,6 +244,9 @@ func (s ContextInvestigation) consumeStorage(ctx context.Context, f contextFacts
 		case <-call.Done():
 			timer.Stop()
 			return zero, expired()
+		case <-wait.Done():
+			timer.Stop()
+			// One final authoritative read under the unchanged authority context.
 		case <-timer.C:
 		}
 	}

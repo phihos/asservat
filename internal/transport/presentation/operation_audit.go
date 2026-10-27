@@ -400,6 +400,12 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 			return OperationReply{}, stopped("audit-result", auditapp.ErrUnavailable)
 		}
 	}
+	// A failed service's existing bounded timings must be visible even while
+	// synchronous audit completion is still pending. The deferred final report
+	// retains its original event and includes the completion stages.
+	if s.Timing != nil && (ctx.Err() != nil || !timing.call.IsZero() && (callErr != nil || out.Status != "success")) {
+		timing.report(event+"/service-failed", steps, s.Timing)
+	}
 	// Once an outcome exists, completing its audit is allowed without reviving
 	// request authority. This bounded synchronous completion never redispatches.
 	auditCtx, finishCancel := context.WithDeadline(context.WithoutCancel(ctx), intent.WriteUntil)

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	compiler "asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/domain/artifact"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/planning"
 	"asservat.local/asservat/internal/domain/targets"
@@ -126,5 +127,46 @@ func TestComposedPolicyRefusedWithFieldPath(t *testing.T) {
 	s["profileComposition"] = map[string]any{"components": []any{map[string]any{"id": "ctx", "profileRef": map[string]any{"catalog": "builtin", "name": "process-context", "version": "v1"}}}, "maxTotalBytes": 1, "maxDuration": "1s"}
 	if _, err = compileSpec(t, s); !errors.As(err, &field) || field.Path != "spec.profileComposition" {
 		t.Fatal(err)
+	}
+}
+
+type refusedRecorderPreview struct {
+	availableRecording
+	err   error
+	calls int
+}
+
+func (r *refusedRecorderPreview) PacketRecorder(context.Context, targets.PodResolution) error {
+	r.calls++
+	return r.err
+}
+func TestRecorderPreviewOperationalFailureCannotStorePlanOnlyApproval(t *testing.T) {
+	for _, failure := range []error{targets.ErrUnavailable, targets.ErrChanged, context.Canceled, context.DeadlineExceeded, errors.New("private routing failure")} {
+		t.Run(failure.Error(), func(t *testing.T) {
+			f := newInvestigationFixture()
+			filters := &stubFilters{}
+			f.svc.Filters = filters
+			f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
+			f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+			recorder := &refusedRecorderPreview{availableRecording: availableRecording{f}, err: failure}
+			f.svc.Recorders = recorder
+			got, err := f.svc.PreviewComposition(t.Context(), f.source(t, t.Context()), f.compositionIntent(networkComposition(planning.ProfileEdit{ActionID: "sample", Field: "packetFilter", Text: "tcp port 8080"})))
+			if !errors.Is(err, failure) || got.Preview.ID != "" || len(f.previews) != 0 || filters.calls != 0 || f.admissions.Load() != 0 || recorder.calls != 1 {
+				t.Fatal("operational failure produced a frozen plan", err, len(f.previews), filters.calls, recorder.calls)
+			}
+		})
+	}
+}
+func TestRecorderPreviewExplicitUnsupportedRemainsPlanOnly(t *testing.T) {
+	f := newInvestigationFixture()
+	filters := &stubFilters{}
+	f.svc.Filters = filters
+	f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
+	f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+	recorder := &refusedRecorderPreview{availableRecording: availableRecording{f}, err: targets.ErrUnsupported}
+	f.svc.Recorders = recorder
+	got, err := f.svc.PreviewComposition(t.Context(), f.source(t, t.Context()), f.compositionIntent(networkComposition(planning.ProfileEdit{ActionID: "sample", Field: "packetFilter", Text: "tcp port 8080"})))
+	if err != nil || got.Recordable || got.Preview.ID == "" || len(f.previews) != 1 || filters.calls != 1 || got.Preview.Storage != (value.ContextStorageSelection{}) || f.admissions.Load() != 0 || recorder.calls != 1 {
+		t.Fatal("known unsupported capability lost plan-only preview", err, got.Recordable, len(f.previews))
 	}
 }

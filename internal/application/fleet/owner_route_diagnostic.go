@@ -17,6 +17,12 @@ func ownerRouteReadRefusal(ctx context.Context, stage string, err error) {
 	if !ok || report == nil {
 		return
 	}
+	// Only a concrete closed local diagnostic may add endpoint substeps.
+	var endpoint *ownerEndpointReadFailure
+	if stage == "route-read/endpoints/read" && errors.As(err, &endpoint) {
+		report(stage + "/" + endpoint.FixedStep() + RemainingBucket(ctx, time.Now()))
+		return
+	}
 	reason := "other"
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):

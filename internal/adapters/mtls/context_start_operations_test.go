@@ -368,7 +368,7 @@ func TestContextStartActualHTTP2TargetQueriesKeepTheStandby(t *testing.T) {
 	hub := contextstart.Targets{Router: f.router, Now: time.Now}
 	cluster := target.ClusterID
 	resolved, err := hub.ResolveWorkload(ctx, targets.WorkloadRequest{ClusterID: cluster, Namespace: "app", Kind: "Deployment", Name: "app"})
-	if err != nil || resolved.Request.PodName != "app-0" || resolved.Target() != target || resolved.FreshUntil.After(exchange.Receiver().ValidUntil.Add(time.Second)) {
+	if err != nil || resolved.Request.PodName != "app-0" || resolved.Target() != target || !resolved.Valid(time.Now()) || !resolved.FreshUntil.Equal(resolved.ObservedAt.Add(5*time.Second)) {
 		t.Fatal("workload query", err, resolved)
 	}
 	again, err := hub.ResolvePod(ctx, resolved.Request)
