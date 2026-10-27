@@ -602,7 +602,7 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		fence := cfg.PermissionFence{RootID: s.b.RootID, Epoch: s.b.Epoch, TrustDigest: s.b.TrustDigest}
 		commit := func() {
 			t.Helper()
-			batch, err := journal.Prepare(fence, custodyID(), time.Now().UTC())
+			batch, err := journal.Prepare(fence, custodyID(), time.Now().UTC(), configapp.Inheritance{})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -668,6 +668,152 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		flush(t, s.p)
 		if projection(t, s).Allows[0].Audience.AssignmentID == old.AssignmentID {
 			t.Fatal("namespace relist treated as continuous history")
+		}
+	})
+	// ADR-242: inherited assignments keep their identity only while the
+	// namespace version is unchanged or the watch was continuous; an
+	// unavailable source keeps them without granting; removal retires and a
+	// re-grant mints a new identity; an explicit deny still wins; the
+	// accepted namespace observation is recorded and previewed.
+	t.Run("inherited-assignments-continuity-unavailability-and-preview", func(t *testing.T) {
+		s := create(t)
+		accept(t, &s)
+		flush(t, s.p)
+		binding := s.b.Bases[0]
+		namespace := binding.Scope.Namespace
+		issuer := "https://id.example.test"
+		source := cfg.PermissionBasis{Resource: cfg.Resource{Kind: "PermissionSource", UID: custodyID(), Generation: 1, ResourceVersion: "source-1", SpecDigest: artifact.Digest{4}}, Scope: cfg.Scope{ClusterID: s.target.ClusterID, Namespace: namespace},
+			Effect: "Allow", Subjects: []cfg.Subject{{Kind: "Group", Issuer: issuer, ID: "team-s"}}, Roles: []string{"evidence-reader"}, ObservationVersion: "ns-1"}
+		source.ScopeDigest = configapp.PermissionScopeDigest(source)
+		observation := &cfg.NamespaceObservation{ClusterID: s.target.ClusterID, Keys: cfg.NamespaceKeys{Labels: []string{"managed"}, Annotations: []string{"owner"}},
+			Namespaces: []cfg.ObservedNamespace{{Name: namespace.Name, UID: namespace.UID, Labels: map[string]string{"managed": configapp.ValueDigest("true")}, Annotations: map[string]string{"owner": configapp.ValueDigest("payments")}}}}
+		step := func(t *testing.T, bases []cfg.PermissionBasis, unavailable []string, all bool) {
+			t.Helper()
+			s.b = fresh(s.b)
+			s.b.Bases, s.b.UnavailableSources, s.b.SourcesUnavailable, s.b.Namespaces = bases, unavailable, all, observation
+			s.b.InputDigest[1]++
+			accept(t, &s)
+			flush(t, s.p)
+		}
+		inherited := func(t *testing.T) string {
+			t.Helper()
+			for _, a := range projection(t, s).Allows {
+				if a.Audience.BasisKind == "PermissionSource" && a.Audience.SubjectID == "team-s" {
+					return a.Audience.AssignmentID
+				}
+			}
+			return ""
+		}
+		current := func(t *testing.T, id string) bool {
+			t.Helper()
+			var n int
+			if err := admin.QueryRow(ctx, "SELECT count(*) FROM permission_assignment WHERE id=$1 AND retired_at IS NULL", id).Scan(&n); err != nil {
+				t.Fatal(err)
+			}
+			return n == 1
+		}
+		step(t, []cfg.PermissionBasis{binding, source}, nil, false)
+		first := inherited(t)
+		if first == "" {
+			t.Fatal("inherited allow not granted")
+		}
+		var record []byte
+		if err := admin.QueryRow(ctx, "SELECT record FROM authority_audit WHERE id=$1", s.b.RequestID).Scan(&record); err != nil {
+			t.Fatal(err)
+		}
+		var event audit.AuthorityRecord
+		if json.Unmarshal(record, &event) != nil || event.Namespaces == nil || len(event.Namespaces.Namespaces) != 1 || bytes.Contains(record, []byte(`"payments"`)) {
+			t.Fatalf("namespace observation not recorded minimized: %s", record)
+		}
+		// A complete relist with unchanged versions, and a source write that
+		// only changes its resourceVersion, keep the identity.
+		step(t, []cfg.PermissionBasis{binding, source}, nil, false)
+		source.Resource.ResourceVersion = "source-2"
+		step(t, []cfg.PermissionBasis{binding, source}, nil, false)
+		if inherited(t) != first {
+			t.Fatal("unchanged inheritance re-minted its assignment")
+		}
+		// Unavailable: kept but never granted, alone or with every source.
+		step(t, []cfg.PermissionBasis{binding}, []string{source.Resource.UID}, false)
+		if inherited(t) != "" || !current(t, first) || len(projection(t, s).Allows) != 1 {
+			t.Fatal("unavailable source granted or lost its assignment")
+		}
+		step(t, []cfg.PermissionBasis{binding}, nil, true)
+		if inherited(t) != "" || !current(t, first) {
+			t.Fatal("unreadable source list granted or lost the assignment")
+		}
+		step(t, []cfg.PermissionBasis{binding, source}, nil, false)
+		if inherited(t) != first {
+			t.Fatal("unchanged namespace after an outage re-minted the assignment")
+		}
+		// A namespace version change without continuity retires; with a
+		// continuous watch it is kept.
+		source.ObservationVersion = "ns-2"
+		step(t, []cfg.PermissionBasis{binding, source}, nil, false)
+		second := inherited(t)
+		if second == "" || second == first || current(t, first) {
+			t.Fatal("relist after a gap claimed continuity")
+		}
+		source.ObservationVersion, source.Continuous = "ns-3", true
+		step(t, []cfg.PermissionBasis{binding, source}, nil, false)
+		if inherited(t) != second {
+			t.Fatal("continuous namespace watch re-minted the assignment")
+		}
+		// An explicit deny of the same group overrides the inherited allow.
+		deny := binding
+		deny.Resource.UID, deny.Effect = custodyID(), "Deny"
+		deny.Subjects = []cfg.Subject{{Kind: "Group", Issuer: issuer, ID: "team-s"}}
+		deny.Roles = []string{"evidence-reader"}
+		deny.ScopeDigest = configapp.PermissionScopeDigest(deny)
+		step(t, []cfg.PermissionBasis{binding, source, deny}, nil, false)
+		now := time.Now()
+		member := identity.Identity{Principal: identity.Principal{Issuer: issuer, Subject: "member", ClientID: "console", Kind: identity.Human}, Groups: []string{"team-s"}, Scopes: []string{"evidence:read"}, Policy: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
+		if r := authorization.ScopeEligibility(member, projection(t, s), authorization.ReadApproved, s.target, now); r.Eligible || r.Reason != "ExplicitDeny" {
+			t.Fatalf("inherited allow overrode an explicit deny: %+v", r)
+		}
+		step(t, []cfg.PermissionBasis{binding, source}, nil, false)
+		if r := authorization.ScopeEligibility(member, projection(t, s), authorization.ReadApproved, s.target, time.Now()); !r.Eligible {
+			t.Fatalf("inherited allow not effective: %+v", r)
+		}
+		// Removal retires; a re-grant mints a new identity.
+		step(t, []cfg.PermissionBasis{binding}, nil, false)
+		if inherited(t) != "" || current(t, second) {
+			t.Fatal("removed inheritance kept granting")
+		}
+		source.Continuous = false
+		step(t, []cfg.PermissionBasis{binding, source}, nil, false)
+		third := inherited(t)
+		if third == "" || third == second || third == first {
+			t.Fatal("re-grant restored a retired assignment")
+		}
+		// Two spec generations at once may hide A -> B -> A.
+		source.Resource.Generation += 2
+		step(t, []cfg.PermissionBasis{binding, source}, nil, false)
+		if id := inherited(t); id == "" || id == third {
+			t.Fatal("generation gap preserved the assignment")
+		}
+		// The preview evaluates a proposed source against this observation.
+		spec := cfg.Source{Resource: cfg.Resource{SpecDigest: artifact.Digest{6}}, Enabled: true, Type: "namespaceMetadata", ClusterID: s.target.ClusterID, Role: "evidence-reader", NamespaceSelector: map[string]string{"managed": "true"},
+			MaxDecisionAge: 30 * time.Second, MaxNamespaces: 10, Protection: cfg.Protection{Mode: "administratorManaged", ReviewRef: "review"},
+			Mapping: cfg.Mapping{Field: "annotation", Key: "owner", Mode: "valueMap", Issuer: issuer, Values: map[string][]string{"payments": {"team-p"}}}}
+		unobserved := spec
+		unobserved.Mapping.Key = "team"
+		changes, read, err := cfg.PreviewChanges([]cfg.AccessChange{{Action: "create", Kind: "PermissionSource", Source: spec}, {Action: "create", Kind: "PermissionSource", Source: unobserved}}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		snap, err := s.p.PreviewProjections(ctx, read)
+		if err != nil || len(snap.Sources) != 2 || len(snap.Sources[0].Grants) != 1 || snap.Sources[1].Unevaluated != cfg.MetadataNotObserved {
+			t.Fatalf("source preview read: %v %+v", err, snap.Sources)
+		}
+		got, err := cfg.PreviewAccess(changes, snap, []string{s.target.ClusterID}, nil, identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{1}}, time.Now())
+		if err != nil || got.Complete() || len(got.NotEvaluated) != 1 || got.DeltasTotal != 2 {
+			t.Fatalf("source preview: %v %+v", err, got)
+		}
+		for _, d := range got.Deltas {
+			if d.Subject.ID != "team-p" || d.Before != authorization.Deny || d.After != authorization.Allow || d.Target.NamespaceUID != namespace.UID || d.Target.WorkloadUID != cfg.OtherWorkloads {
+				t.Fatalf("source preview delta %+v", d)
+			}
 		}
 	})
 	t.Run("scope-change-and-delete-retire-without-audit", func(t *testing.T) {

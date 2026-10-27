@@ -203,7 +203,14 @@ func (d *InstalledHubWorkerDeployment) openPermission(ctx context.Context) (*per
 		}
 		w.browser = &identities.BrowserSettingsObserver{Source: source, Projection: projection, Now: time.Now}
 	}
-	w.reconciler = app.BindingReconciler{RootID: c.RootID, Reader: observer, Watcher: observer, Trust: guard, Store: store, Now: time.Now, NewID: uuid.NewString}
+	// ADR-242: namespace inheritance observes the hub cluster's namespaces
+	// with its own client, so a large namespace LIST never spends the
+	// binding reconciler's request budget.
+	namespaces, err := kube.NewPermissionClient(local.kubernetes("kube-observer.token"), c.Control.ClusterID, control, time.Now)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	w.reconciler = app.BindingReconciler{RootID: c.RootID, Reader: observer, Watcher: observer, Trust: guard, Store: store, Namespaces: namespaces, NamespaceClusterID: c.Control.ClusterID, Now: time.Now, NewID: uuid.NewString}
 	if r := c.Review; r != nil {
 		review, e := kube.NewBootstrapReviewClient(observer, r.Name, r.UID)
 		if e != nil {

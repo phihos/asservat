@@ -4,6 +4,7 @@ package audit
 import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"time"
 )
@@ -23,6 +24,10 @@ type AuthorityRecord struct {
 	Changes                 []AssignmentChange
 	Bootstrap               *PermissionBootstrap
 	Automation              []AutomationDelegation `json:",omitempty"`
+	// Namespaces is the minimized namespace observation that the accepted
+	// PermissionSource assignments were derived from (ADR-242): keys, names,
+	// UIDs and value digests only.
+	Namespaces *configuration.NamespaceObservation `json:",omitempty"`
 }
 
 // Complete minimized delegation snapshot for this accepted configuration. It
@@ -52,7 +57,7 @@ func (r AuthorityRecord) Valid() bool {
 	if r.Kind != "permission-reset" && r.Kind != "permission-change" && r.Kind != "permission-suspend" {
 		return false
 	}
-	if len(r.Automation) > 1024 || (len(r.Automation) > 0 && r.Kind != "permission-change") {
+	if len(r.Automation) > 1024 || (len(r.Automation) > 0 || r.Namespaces != nil) && r.Kind != "permission-change" || r.Namespaces != nil && !r.Namespaces.Valid() {
 		return false
 	}
 	delegations := map[string]bool{}

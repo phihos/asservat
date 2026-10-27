@@ -240,6 +240,7 @@ func (p *Permissions) SuspendPermissions(ctx context.Context, f cfg.PermissionFe
 func normalizedBatch(b cfg.PermissionBatch) cfg.PermissionBatch {
 	b.ObservedAt = b.ObservedAt.UTC()
 	b.FreshUntil = b.FreshUntil.UTC()
+	b.UnavailableSources = slices.Sorted(slices.Values(b.UnavailableSources))
 	b.Bases = slices.Clone(b.Bases)
 	for i := range b.Bases {
 		p := &b.Bases[i]
@@ -306,7 +307,13 @@ func validBatch(b cfg.PermissionBatch, now time.Time) error {
 	return nil
 }
 func equivalentBasis(old custodydb.PermissionBasis, next cfg.PermissionBasis) bool {
-	if old.ResourceVersion != next.Resource.ResourceVersion && !next.Continuous {
+	// A PermissionSource confers authority only through its spec, whose every
+	// transition advances metadata.generation; the generation checks below
+	// therefore prove its continuity, and a status or metadata write that
+	// changes only its resourceVersion keeps assignments (ADR-242). The
+	// namespace metadata it maps has no generation: its own resourceVersion
+	// must match exactly unless the namespace watch was continuous.
+	if next.Resource.Kind != "PermissionSource" && old.ResourceVersion != next.Resource.ResourceVersion && !next.Continuous {
 		return false
 	}
 	if !bytes.Equal(old.ScopeDigest, next.ScopeDigest[:]) || old.Effect != next.Effect || old.Kind != next.Resource.Kind {
@@ -403,6 +410,7 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 				record.Bootstrap.ExpiresAt = r.ExpiresAt
 			}
 		}
+		record.Namespaces = b.Namespaces
 		retained := map[memberKey]bool{}
 		retired := 0
 		for _, a := range rows {
@@ -410,6 +418,12 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 			old := bases[a.BasisKey]
 			if exists && wanted[member(a)] && equivalentBasis(old, basis) {
 				retained[member(a)] = true
+				continue
+			}
+			// An unavailable source keeps its accepted assignments without
+			// renewing them: their basis keeps its older seen_sequence, so no
+			// projection or capacity scope lets them grant (ADR-242).
+			if !exists && old.Kind == "PermissionSource" && (b.SourcesUnavailable || slices.Contains(b.UnavailableSources, old.Uid)) {
 				continue
 			}
 			if err = q.RetirePermissionAssignment(ctx, custodydb.RetirePermissionAssignmentParams{ID: a.ID, RetirementAuditID: id(record.ID)}); err != nil {
@@ -579,6 +593,12 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 	rootAudited := currentAuthorityAudit(reset, s.ID, s.Epoch) && currentAuthorityAudit(initial, s.ID, s.InitialAuditID)
 	for _, a := range rows {
 		if a.SeenSequence != s.Sequence {
+			// Only an unavailable source's kept allow may lag the stream
+			// (ADR-242); it grants nothing until accepted again. Any other
+			// stale row means the projection is inconsistent.
+			if a.SourceKind == "PermissionSource" && a.Effect == "Allow" {
+				continue
+			}
 			return authorization.Projection{}, cfg.ErrUnavailable
 		}
 		deadline := until

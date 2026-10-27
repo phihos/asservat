@@ -19,6 +19,16 @@ type PermissionBatch struct {
 	ObservedAt, FreshUntil   time.Time
 	Bases                    []PermissionBasis
 	Initial                  *PermissionInitialization
+	// UnavailableSources are PermissionSources whose current namespace
+	// observation is unknown (ADR-242). Their accepted assignments are kept,
+	// neither retired nor renewed, and grant nothing until a fresh
+	// observation is accepted. SourcesUnavailable applies this to every
+	// source because the source list itself could not be read.
+	UnavailableSources []string `json:",omitempty"`
+	SourcesUnavailable bool     `json:",omitempty"`
+	// Namespaces is the minimized namespace observation the source bases were
+	// derived from; nil while none is current.
+	Namespaces *NamespaceObservation `json:",omitempty"`
 }
 type PermissionBasis struct {
 	Resource Resource
@@ -60,9 +70,15 @@ func (b PermissionBatch) Validate(now time.Time) error {
 	if !authorization.UUID(b.RootID) || !authorization.UUID(b.Epoch) || !authorization.UUID(b.RequestID) || b.ExpectedSequence < 0 || b.TrustDigest == (artifact.Digest{}) || b.InputDigest == (artifact.Digest{}) || !identity.Fresh(b.ObservedAt, b.FreshUntil, now, 5*time.Second) || len(b.Bases) > 1024 {
 		return ErrInvalid
 	}
+	if b.Namespaces != nil && !b.Namespaces.Valid() || !identity.Strings(b.UnavailableSources, 1024, 64) || b.SourcesUnavailable && len(b.UnavailableSources) > 0 {
+		return ErrInvalid
+	}
 	seen := map[string]bool{}
 	rows := 0
 	for _, p := range b.Bases {
+		if p.Resource.Kind == "PermissionSource" && (b.SourcesUnavailable || slices.Contains(b.UnavailableSources, p.Resource.UID)) {
+			return ErrInvalid
+		}
 		r := p.Resource
 		if !identity.Text(r.UID, 64) || seen[p.Key()] || !identity.Text(r.ResourceVersion, 128) || r.Generation < 1 || r.Generation > 2147483647 || r.SpecDigest == (artifact.Digest{}) || p.ScopeDigest == (artifact.Digest{}) || !authorization.UUID(p.Scope.ClusterID) || !identity.Text(p.Scope.Namespace.UID, 64) || !identity.Text(p.Scope.Namespace.Name, 63) || (r.Kind != "AccessBinding" && r.Kind != "PermissionSource") || (p.Effect != "Allow" && p.Effect != "Deny") || len(p.Subjects) < 1 || len(p.Subjects) > 32 || !identity.Strings(p.Roles, 4, 32) || len(p.Roles) == 0 || len(p.Scope.Workloads) > 64 {
 			return ErrInvalid
@@ -74,7 +90,9 @@ func (b PermissionBatch) Validate(now time.Time) error {
 		if r.Kind == "PermissionSource" && p.Effect != "Allow" {
 			return ErrInvalid
 		}
-		if r.Kind == "PermissionSource" && !identity.Text(p.ObservationVersion, 128) {
+		// A namespaceMetadata source grants one role to groups over a whole
+		// namespace (REQ-PER-003); it names no workloads and never denies.
+		if r.Kind == "PermissionSource" && (!identity.Text(p.ObservationVersion, 128) || len(p.Scope.Workloads) != 0 || len(p.Roles) != 1 || slices.ContainsFunc(p.Subjects, func(s Subject) bool { return s.Kind != "Group" })) {
 			return ErrInvalid
 		}
 		if p.Automation != nil {

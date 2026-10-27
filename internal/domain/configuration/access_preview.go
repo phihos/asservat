@@ -26,27 +26,41 @@ const (
 	// ClusterUnavailable marks a cell outside the installation's enrolled
 	// clusters; such a cell is never evaluated.
 	ClusterUnavailable = "ClusterUnavailable"
-	// InheritanceNotAccepted marks a PermissionSource create/update: the
-	// installation accepts explicit bindings only (permission-acceptance.md),
-	// so a source changes no current assignment and its derived subjects are
-	// unknown. Its effect is Indeterminate, never Allow.
-	InheritanceNotAccepted = "InheritanceNotAccepted"
 )
 
 // AccessChange is one proposed configuration change. AccessBinding create and
 // update carry the decoded spec; update and delete name the existing object's
 // UID. A PermissionSource create/update carries its decoded spec and is
-// reported Indeterminate (InheritanceNotAccepted); its delete removes the
-// source's current assignments.
+// evaluated through the namespace grants that the accepted namespace
+// observation yields for it (ADR-242); its delete removes the source's
+// current assignments.
 type AccessChange struct {
 	Action  string // "create", "update" or "delete"
 	Kind    string // "AccessBinding" or "PermissionSource"
 	UID     string
 	Binding Binding
 	Source  Source
+	// Grants and Unevaluated are a source change's derivation from the
+	// snapshot. Unevaluated (MetadataUnavailable or MetadataNotObserved)
+	// makes the change Indeterminate: it is listed in NotEvaluated and an
+	// updated source's current assignments stay in the after state.
+	Grants      []NamespaceGrant
+	Unevaluated string
 }
 
 func (c AccessChange) sourceSpec() bool { return c.Kind == "PermissionSource" && c.Action != "delete" }
+
+// evaluated reports whether the change's effect is known: everything but a
+// source change whose namespace metadata is unknown.
+func (c AccessChange) evaluated() bool { return !c.sourceSpec() || c.Unevaluated == "" }
+
+// PreviewSourceGrants is what the accepted namespace observation yields for
+// one proposed source: its namespace grants, or Unevaluated when the
+// observation is unavailable or lacks the source's keys.
+type PreviewSourceGrants struct {
+	Grants      []NamespaceGrant
+	Unevaluated string
+}
 
 type PreviewBasis struct{ Kind, UID string }
 type PreviewNamespace struct{ ClusterID, NamespaceUID string }
@@ -58,6 +72,10 @@ type PreviewRead struct {
 	Namespaces []PreviewNamespace
 	Workloads  map[PreviewNamespace][]string
 	Bases      []PreviewBasis
+	// Sources are the proposed PermissionSource specs (creates and updates)
+	// in change order; the snapshot returns their grants from the accepted
+	// namespace observation and reads the cells of the namespaces granted.
+	Sources []Source
 	// Allowed, when set, restricts which namespaces may match an updated or
 	// deleted object: a delegated previewer's envelope namespaces. A match
 	// elsewhere is reported Unmatched, exactly like a nonexistent object.
@@ -84,6 +102,8 @@ type PreviewSnapshot struct {
 	Revision  identity.Revision
 	Cells     []PreviewCell
 	Unmatched []PreviewBasis
+	// Sources answers PreviewRead.Sources, in the same order.
+	Sources []PreviewSourceGrants
 }
 
 // PreviewAssignment is one assignment that decided a preview decision: a
@@ -192,8 +212,10 @@ func PreviewChanges(changes []AccessChange, envelopes []PreviewEnvelope) ([]Acce
 		switch {
 		case c.Action == "create" && c.UID == "" && (c.Kind == "AccessBinding" || c.Kind == "PermissionSource"):
 			c.Binding.Resource.UID = "proposed-" + strconv.Itoa(n+1)
+			c.Source.Resource.UID = c.Binding.Resource.UID
 		case c.Action == "update" && (c.Kind == "AccessBinding" || c.Kind == "PermissionSource") && identity.Text(c.UID, 64):
 			c.Binding.Resource.UID = c.UID
+			c.Source.Resource.UID = c.UID
 		case c.Action == "delete" && (c.Kind == "AccessBinding" || c.Kind == "PermissionSource") && identity.Text(c.UID, 64):
 		default:
 			return nil, PreviewRead{}, ErrInvalid
@@ -207,14 +229,15 @@ func PreviewChanges(changes []AccessChange, envelopes []PreviewEnvelope) ([]Acce
 				return nil, PreviewRead{}, ErrInvalid
 			}
 			seen[ref] = true
-			if !c.sourceSpec() {
-				read.Bases = append(read.Bases, ref)
-			}
+			read.Bases = append(read.Bases, ref)
 		}
 		if c.sourceSpec() {
 			if !authorization.UUID(c.Source.ClusterID) || c.Source.Resource.SpecDigest == (artifact.Digest{}) {
 				return nil, PreviewRead{}, ErrInvalid
 			}
+			c.Source.Resource.Kind = "PermissionSource"
+			c.Grants, c.Unevaluated = nil, ""
+			read.Sources = append(read.Sources, c.Source)
 			continue
 		}
 		if c.Action == "delete" {
@@ -273,10 +296,25 @@ func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []
 		return AccessPreview{}, ErrLimit
 	}
 	out := AccessPreview{Revision: snap.Revision}
-	for _, c := range changes {
-		if c.sourceSpec() {
-			out.NotEvaluated = append(out.NotEvaluated, c)
+	// Attach each proposed source's grants from the accepted namespace
+	// observation, in change order.
+	changes = slices.Clone(changes)
+	sources := 0
+	for n := range changes {
+		if !changes[n].sourceSpec() {
+			continue
 		}
+		if sources == len(snap.Sources) {
+			return AccessPreview{}, ErrInvalid
+		}
+		changes[n].Grants, changes[n].Unevaluated = snap.Sources[sources].Grants, snap.Sources[sources].Unevaluated
+		sources++
+		if !changes[n].evaluated() {
+			out.NotEvaluated = append(out.NotEvaluated, changes[n])
+		}
+	}
+	if sources != len(snap.Sources) {
+		return AccessPreview{}, ErrInvalid
 	}
 	unmatched, requested := slices.Clone(snap.Unmatched), changes
 	if envelopes != nil {
@@ -369,7 +407,7 @@ func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []
 
 func removedBy(changes []AccessChange, a artifact.AudienceAssignment) bool {
 	return slices.ContainsFunc(changes, func(c AccessChange) bool {
-		return c.UID != "" && !c.sourceSpec() && c.Kind == a.BasisKind && c.UID == a.BasisUID
+		return c.UID != "" && c.evaluated() && c.Kind == a.BasisKind && c.UID == a.BasisUID
 	})
 }
 
@@ -402,7 +440,24 @@ func applyChanges(cell PreviewCell, changes []AccessChange, now time.Time) (auth
 	after.Allows, after.Denies = keep(p.Allows), keep(p.Denies)
 	added := 0
 	for _, c := range changes {
-		if c.Action == "delete" || c.sourceSpec() {
+		if c.sourceSpec() {
+			// A namespace grant covers every workload of its namespace.
+			for _, g := range c.Grants {
+				if !c.evaluated() || c.Source.ClusterID != cell.Target.ClusterID || g.Namespace.UID != cell.Target.NamespaceUID {
+					continue
+				}
+				for _, subject := range g.Subjects {
+					added++
+					a := artifact.AudienceAssignment{Kind: subject.Kind, Issuer: subject.Issuer, SubjectID: subject.ID, Role: c.Source.Role,
+						BasisKind: "PermissionSource", BasisUID: c.Source.Resource.UID, AssignmentID: placeholderAssignment(added), BasisDigest: c.Source.Resource.SpecDigest}
+					proposed[a.AssignmentID] = true
+					after.Allows = append(after.Allows, authorization.CurrentAssignment{Audience: a, ObservedAt: p.ObservedAt, FreshUntil: p.FreshUntil})
+					touch(a)
+				}
+			}
+			continue
+		}
+		if c.Action == "delete" {
 			continue
 		}
 		b := c.Binding

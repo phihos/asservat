@@ -25,6 +25,8 @@ Each source retains cluster/control namespace/resource UID, name, opaque object 
 | Observation lifetime | Five seconds from before the first API read |
 | Namespace metadata query | At most 32 explicit keys; values at most 256 bytes |
 | Namespace metadata lifetime | 30 seconds from before the API read; source maximum may shorten it |
+| Namespace LIST (ADR-242) | 200 per page, 80 pages, 64 MiB; at most 4,096 namespaces carrying an observed key |
+| Namespace watch session | 2 seconds; a clean end renews observation freshness, bookmarks do not |
 
 These are fail-closed implementation limits, not a demonstrated deployment scale or measured overhead. There is no silent truncation. A future controller must coalesce reads and maintain bounded watched projections rather than issue a whole installation list for every developer request.
 
@@ -32,7 +34,7 @@ These are fail-closed implementation limits, not a demonstrated deployment scale
 
 Namespace reads pin namespace name/UID and cluster connection, retain resourceVersion and termination state, and return only explicitly selected label/annotation keys. They do not expose unrelated metadata. The adapter validates actual Kubernetes names/keys in addition to JSON Schema constraints. Subjects use bounded stable IDs and HTTPS issuer identifiers compatible with the initial identity adapter.
 
-Pure `ProposeBinding` and `ProposeNamespace` functions explain scope matches and produce finite **candidates without assignment IDs**. Explicit bindings match cluster, namespace name/UID and any configured workload kind/name/UID. Namespace mapping respects exact selector values, exclusions, termination, original freshness and the configured source maximum. Value maps preserve multiple owner teams and never parse comma-separated group IDs. A successful map still reports `RequiresProtectionQualification`. Direct `groupID` mapping reports `DirectoryValidationRequired`; exec/SAR and workload-metadata expansion remain unsupported here.
+Pure `ProposeBinding` explains binding scope matches and produces finite **candidates without assignment IDs**; C-01 `NamespaceGrants` evaluates a source against a minimized namespace observation (ADR-242). Explicit bindings match cluster, namespace name/UID and any configured workload kind/name/UID. Namespace mapping respects exact selector values, exclusions, termination, original freshness and the configured source maximum. Value maps preserve multiple owner teams and never parse comma-separated group IDs. Only `administratorManaged` value maps grant; `groupID` mapping, `admissionEnforced` protection, exec/SAR and workload-metadata sources report `SourceUnsupported` and grant nothing.
 
 The source declaration's `protection` block is not an admission or administrator attestation receipt. Source `maxNamespaces` is retained for the future accepted-source inventory and is not proven by a single namespace read. No namespace population limit, directory membership, writer trust, controller chain or whole-pod exec restriction is inferred by this component.
 

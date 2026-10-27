@@ -11806,7 +11806,7 @@
     },
     {
       "name": "preview_access_change",
-      "description": "Preview the effect of proposed AccessBinding and PermissionSource changes before applying them through Kubernetes (ADR-237). For each workload scope of the affected namespaces (at most 1,000) within your administration, reports which users, groups or workloads named by the added or removed assignments would change between Allow, Deny and Indeterminate for capture, read and download, with the assignment revisions that decide each side, evaluated by the same rules as the operations themselves over the current accepted permission data. Targets whose permission data is unavailable or outside the enrolled clusters, and PermissionSource creations or edits (inheritance is not yet accepted by this installation), are Indeterminate. The result is bounded to 256 KiB and delivered in pages: repeat the same request with next_cursor. Group members are never listed and no evidence is read. For fleet operators and configured delegation previewers; it changes nothing: apply the change with kubectl or GitOps.",
+      "description": "Preview the effect of proposed AccessBinding and PermissionSource changes before applying them through Kubernetes (ADR-237). For each workload scope of the affected namespaces (at most 1,000) within your administration, reports which users, groups or workloads named by the added or removed assignments would change between Allow, Deny and Indeterminate for capture, read and download, with the assignment revisions that decide each side, evaluated by the same rules as the operations themselves over the current accepted permission data. Targets whose permission data is unavailable or outside the enrolled clusters, and PermissionSource creations or edits whose namespace metadata the accepted observation lacks, are Indeterminate. Namespace-metadata sources are evaluated against the accepted namespace observation (ADR-242). The result is bounded to 256 KiB and delivered in pages: repeat the same request with next_cursor. Group members are never listed and no evidence is read. For fleet operators and configured delegation previewers; it changes nothing: apply the change with kubectl or GitOps.",
       "enabledByDefault": true,
       "transports": [
         "browser"
@@ -12267,7 +12267,10 @@
                               "const": "Indeterminate"
                             },
                             "reason": {
-                              "const": "InheritanceNotAccepted"
+                              "enum": [
+                                "MetadataUnavailable",
+                                "MetadataNotObserved"
+                              ]
                             }
                           },
                           "required": [

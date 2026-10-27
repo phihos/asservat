@@ -82,3 +82,8 @@ SELECT * FROM authority_audit WHERE id=$1 FOR UPDATE;
 
 -- name: AcknowledgeAuthorityAudit :execrows
 UPDATE authority_audit SET acknowledged_at=clock_timestamp(),object_key=$2,object_version=$3,object_etag=$4,object_bytes=$5,object_sha256=$6 WHERE id=$1 AND acknowledged_at IS NULL;
+
+-- name: ReadPermissionChangeRecord :one
+-- ADR-242: the authority event of the stream's current acceptance, which
+-- carries the accepted namespace observation.
+SELECT record FROM authority_audit WHERE stream_id=$1 AND epoch=$2 AND sequence=$3 AND event_kind='permission-change';

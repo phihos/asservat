@@ -159,6 +159,10 @@ func (c *PermissionClient) namespace(ctx context.Context, ref value.NamespaceRef
 type permissionListMetadata struct{ ResourceVersion, Continue string }
 
 func listEnvelope(b []byte, kind string) (permissionListMetadata, []json.RawMessage, error) {
+	return listEnvelopeOf(b, "asservat.io/v1alpha1", kind)
+}
+
+func listEnvelopeOf(b []byte, apiVersion, kind string) (permissionListMetadata, []json.RawMessage, error) {
 	var fields map[string]json.RawMessage
 	var out permissionListMetadata
 	var items []json.RawMessage
@@ -166,7 +170,7 @@ func listEnvelope(b []byte, kind string) (permissionListMetadata, []json.RawMess
 		return out, nil, value.ErrUnavailable
 	}
 	var version, k string
-	if json.Unmarshal(fields["apiVersion"], &version) != nil || version != "asservat.io/v1alpha1" || json.Unmarshal(fields["kind"], &k) != nil || k != kind+"List" {
+	if json.Unmarshal(fields["apiVersion"], &version) != nil || version != apiVersion || json.Unmarshal(fields["kind"], &k) != nil || k != kind+"List" {
 		return out, nil, value.ErrUnavailable
 	}
 	var metadata map[string]json.RawMessage

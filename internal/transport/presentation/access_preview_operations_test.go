@@ -34,8 +34,13 @@ func (f *previewOpsFixture) FleetAdministration(context.Context) (fleet.Administ
 	return fleet.Administration{InstallationID: previewInstallation, IssuerEpoch: previewInstallation, Issuer: "https://id.example.invalid", Revision: identity.Revision{UID: "fleet", Generation: 1, Digest: artifact.Digest{4}}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second),
 		Clients: []string{"console"}, Groups: []string{"platform-admins"}, DeliveryProfiles: []string{"kv"}, MaxActiveBootstraps: 1, MaxBootstrapHistory: 1, MaxClusters: 1}, nil
 }
-func (f *previewOpsFixture) PreviewProjections(context.Context, cfg.PreviewRead) (cfg.PreviewSnapshot, error) {
-	return cfg.PreviewSnapshot{Cells: f.cells, Unmatched: []cfg.PreviewBasis{{Kind: "AccessBinding", UID: "gone"}}}, nil
+func (f *previewOpsFixture) PreviewProjections(_ context.Context, r cfg.PreviewRead) (cfg.PreviewSnapshot, error) {
+	out := cfg.PreviewSnapshot{Cells: f.cells, Unmatched: []cfg.PreviewBasis{{Kind: "AccessBinding", UID: "gone"}}}
+	// The accepted namespace observation does not record proposed keys.
+	for range r.Sources {
+		out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Unevaluated: cfg.MetadataNotObserved})
+	}
+	return out, nil
 }
 func (f *previewOpsFixture) RecoveryState(context.Context) (artifact.RecoveryProof, error) {
 	return artifact.RecoveryProof{InstallationID: previewInstallation, IssuerEpoch: previewInstallation, Revision: identity.Revision{UID: "r", Generation: 1, Digest: artifact.Digest{3}}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}, nil
@@ -161,13 +166,14 @@ func TestPreviewAccessChangeReply(t *testing.T) {
 	}
 }
 
-// A PermissionSource creation is accepted, decoded and reported Indeterminate.
+// A PermissionSource edit whose keys the accepted namespace observation does
+// not record is decoded and reported Indeterminate (ADR-242).
 func TestPreviewAccessChangeSourceIndeterminate(t *testing.T) {
 	f, s := newPreviewOps(t)
 	source := `{"enabled":true,"clusterID":"` + accessCluster + `","type":"namespaceMetadata","namespaceSelector":{"matchLabels":{"team":"payments"}},"excludedNamespaces":["kube-system"],"role":"workload-maintainer","maxDecisionAgeSeconds":30,"maxNamespaces":10,` +
 		`"protection":{"mode":"administratorManaged","reviewRef":"review"},"metadataMapping":{"field":"annotation","key":"example.invalid/owner","mode":"groupID","issuer":"https://id.example.invalid"}}`
 	got, err := callPreview(t, f, s, `{"changes":[{"action":"update","kind":"PermissionSource","uid":"source-uid","spec":`+source+`}]}`)
-	if err != nil || got.Status != "ok" || got.Data.Complete || len(got.Data.NotEvaluated) != 1 || got.Data.NotEvaluated[0]["reason"] != "InheritanceNotAccepted" || got.Data.NotEvaluated[0]["decision"] != "Indeterminate" || got.Data.NotEvaluated[0]["uid"] != "source-uid" || !strings.Contains(got.Data.Message, "stay in effect in the after state") {
+	if err != nil || got.Status != "ok" || got.Data.Complete || len(got.Data.NotEvaluated) != 1 || got.Data.NotEvaluated[0]["reason"] != "MetadataNotObserved" || got.Data.NotEvaluated[0]["decision"] != "Indeterminate" || got.Data.NotEvaluated[0]["uid"] != "source-uid" || !strings.Contains(got.Data.Message, "stay in effect in the after state") {
 		t.Fatalf("%v %+v", err, got)
 	}
 }

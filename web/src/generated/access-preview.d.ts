@@ -229,8 +229,8 @@ export interface components {
                     uid?: string;
                     /** @constant */
                     decision: "Indeterminate";
-                    /** @constant */
-                    reason: "InheritanceNotAccepted";
+                    /** @enum {unknown} */
+                    reason: "MetadataUnavailable" | "MetadataNotObserved";
                 }[];
                 unmatched: {
                     /** @enum {unknown} */

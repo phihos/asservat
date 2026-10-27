@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	port "asservat.local/asservat/internal/application/configuration"
 	value "asservat.local/asservat/internal/domain/configuration"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/yaml"
@@ -108,11 +109,12 @@ func TestPermissionSnapshotAndMinimizedNamespace(t *testing.T) {
 		t.Fatal("unselected namespace content escaped")
 	}
 	target := value.Target{ClusterID: permissionCluster, Namespace: ns.Namespace, Workload: value.WorkloadRef{Kind: "Deployment", Name: "api", UID: "workload-uid"}}
-	p := value.ProposeNamespace(s.Sources[0], ns, target, s.ObservedAt)
-	if len(p.Candidates) != 2 || p.Reason != "RequiresProtectionQualification" {
-		t.Fatal("mapping did not preserve multiple teams and qualification")
+	observation := &value.NamespaceObservation{ClusterID: permissionCluster, Keys: value.NamespaceKeys{Labels: []string{"example.invalid/managed"}, Annotations: []string{"example.invalid/owner"}},
+		Namespaces: []value.ObservedNamespace{{Name: ns.Namespace.Name, UID: ns.Namespace.UID, Labels: map[string]string{"example.invalid/managed": port.ValueDigest(ns.Labels["example.invalid/managed"])}, Annotations: map[string]string{"example.invalid/owner": port.ValueDigest(ns.Annotations["example.invalid/owner"])}}}}
+	if grants, reason := port.NamespaceGrants(s.Sources[0], permissionCluster, observation); reason != "" || len(grants) != 1 || len(grants[0].Subjects) != 2 {
+		t.Fatal("mapping did not preserve multiple teams", reason)
 	}
-	if p = value.ProposeBinding(b, target, s.ObservedAt); len(p.Candidates) != 1 || p.Reason != "RequiresAcceptance" {
+	if p := value.ProposeBinding(b, target, s.ObservedAt); len(p.Candidates) != 1 || p.Reason != "RequiresAcceptance" {
 		t.Fatal("binding was not an unaccepted proposal")
 	}
 }
