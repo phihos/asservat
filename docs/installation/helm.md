@@ -277,6 +277,28 @@ without it, activation is refused with `DetectorUnavailable`. A connector
 installed by an earlier release lacks these permissions until it is installed
 again, and its log and resource polls stay Unknown.
 
+Exec and access-review inheritance ([ADR-245](../decisions/245-decision-time-permission-sources.md))
+needs an identity mapping record on the workload cluster, named by the
+PermissionSource's `identityMappingRef`:
+
+```yaml
+cluster:
+  identityMappings:
+    - name: company-oidc-to-cluster
+      issuer: https://identity.example.invalid/realms/company
+      usernamePrefix: "oidc:"   # the cluster's --oidc-username-prefix; the user is prefix + OIDC sub
+      groupsPrefix: "oidc:"     # omit to send no groups; groups are the stable group IDs
+```
+
+The record must match the cluster's own OIDC authenticator (username from the
+`sub` claim, groups from the stable group IDs Asservat receives). Display names
+and e-mail are never used. With records configured the connector account gets
+`create subjectaccessreviews`; it reviews only the authenticated user of a
+request for the exact Pod (or the configured workload/namespace check) and
+returns only the outcome. Like the Alertmanager address it is a fixed regional
+input (executor offer only). Without a matching record, decision-time sources
+of that cluster grant nothing.
+
 The regional cluster needs outbound HTTPS to the federation endpoint in the
 offer. The hub operator can pin the federation's node port with
 `federation.nodePort` so the endpoint is known before installation. If the

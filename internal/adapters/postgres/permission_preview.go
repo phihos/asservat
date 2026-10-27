@@ -70,6 +70,10 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 				return err
 			}
 			for _, src := range r.Sources {
+				if _, why := cfg.ReviewSourceFor(src); why == "" {
+					out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Unevaluated: cfg.DecisionTimeSource})
+					continue
+				}
 				grants, reason := configapp.NamespaceGrants(src, "", observation)
 				switch reason {
 				case cfg.MetadataUnavailable, cfg.MetadataNotObserved:

@@ -41,7 +41,8 @@ type AccessChange struct {
 	Binding Binding
 	Source  Source
 	// Grants and Unevaluated are a source change's derivation from the
-	// snapshot. Unevaluated (MetadataUnavailable or MetadataNotObserved)
+	// snapshot. Unevaluated (MetadataUnavailable, MetadataNotObserved or
+	// DecisionTimeSource)
 	// makes the change Indeterminate: it is listed in NotEvaluated and an
 	// updated source's current assignments stay in the after state.
 	Grants      []NamespaceGrant

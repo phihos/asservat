@@ -336,5 +336,23 @@ func (v *permissionValidator) source(object permissionObject, ref value.Resource
 		}
 		s.Mapping = value.Mapping{Field: m.Field, Key: m.Key, Mode: m.Mode, Issuer: m.Issuer, Values: m.Values}
 	}
+	if w := spec.WorkloadSelector; w != nil {
+		if !selectorValid(w.MatchLabels) {
+			return value.Source{}, value.ErrUnavailable
+		}
+		s.WorkloadSelector = w.MatchLabels
+	}
+	// ADR-245: the decision-time source fields; the reference names a local
+	// record of the target cluster's connector, never an address or plugin.
+	if spec.IdentityMappingRef != "" && len(validation.IsDNS1123Label(spec.IdentityMappingRef)) != 0 {
+		return value.Source{}, value.ErrUnavailable
+	}
+	s.IdentityMappingRef = spec.IdentityMappingRef
+	if p := spec.AdmissionParity; p != nil {
+		s.AdmissionParity = value.AdmissionParity{Mode: p.Mode, ReviewRef: p.ReviewRef, AdapterRef: p.AdapterRef}
+	}
+	if r := spec.AccessReview; r != nil {
+		s.AccessReviewCheck = r.Check
+	}
 	return s, nil
 }

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"asservat.local/asservat/internal/contracts"
+
 	port "asservat.local/asservat/internal/application/targets"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -23,6 +25,8 @@ type PodTargets struct {
 	executionClass artifact.ContextExecutionClass
 	// alerts is the cluster's configured Alertmanager (ADR-231), if any.
 	alerts *Alertmanager
+	// mappings are the cluster's identity mapping records (ADR-245).
+	mappings []contracts.RegionalIdentityMapping
 }
 
 var _ port.PodResolver = (*PodTargets)(nil)

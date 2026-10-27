@@ -22,7 +22,17 @@ const (
 	// ADR-228: one bounded Pod LIST of a named workload's restart counters,
 	// plus one Event LIST of its namespace for a probe detector (ADR-230).
 	queryObserveRestarts = "observe-workload-restarts"
+	// ADR-245: one decision-time SubjectAccessReview of one principal for one
+	// exact Pod by the target cluster's connector.
+	queryReviewAccess = "review-access"
 )
+
+// ReviewTargets is the region's optional decision-time access review
+// (ADR-245). A region without it answers the query as unsupported, which
+// grants nothing.
+type ReviewTargets interface {
+	ReviewAccess(context.Context, targets.AccessReviewRequest) (targets.AccessReviewAnswer, error)
+}
 
 // RestartTargets is the region's optional restart observation (ADR-228). A
 // region without it answers the query as unsupported.
@@ -282,6 +292,16 @@ func (s *frameStream) answerQuery(ctx context.Context, f contracts.APIContextFra
 		}
 		if observer, ok := s.targets.(RestartTargets); ok {
 			out, e = observer.ObserveWorkloadRestarts(bounded, r)
+		} else {
+			e = targets.ErrUnsupported
+		}
+	case queryReviewAccess:
+		var r targets.AccessReviewRequest
+		if decodeOperationBody(q.Body, &r) != nil {
+			return contracts.ErrAPIContextProtocol
+		}
+		if reviewer, ok := s.targets.(ReviewTargets); ok {
+			out, e = reviewer.ReviewAccess(bounded, r)
 		} else {
 			e = targets.ErrUnsupported
 		}

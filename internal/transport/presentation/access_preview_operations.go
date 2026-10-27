@@ -169,7 +169,7 @@ func previewBasis(rows []cfg.PreviewAssignment) []previewBasisData {
 func previewMessage(p cfg.AccessPreview, listed int) string {
 	switch {
 	case len(p.NotEvaluated) > 0:
-		return "Some PermissionSource creations or edits are Indeterminate: the accepted namespace observation is unavailable (MetadataUnavailable) or does not record the source's selector or mapping keys yet (MetadataNotObserved; apply the source with enabled: false first, then preview enabling it). An edited source's current assignments stay in effect in the after state of every listed decision. Nothing was changed: apply the reviewed objects with kubectl or GitOps."
+		return "Some PermissionSource creations or edits are Indeterminate: the accepted namespace observation is unavailable (MetadataUnavailable) or does not record the source's selector or mapping keys yet (MetadataNotObserved; apply the source with enabled: false first, then preview enabling it), or the source is a kubernetesExec/kubernetesAccessReview source that is reviewed per user and Pod at request time (DecisionTimeSource; use explain_access after applying it). An edited source's current assignments stay in effect in the after state of every listed decision. Nothing was changed: apply the reviewed objects with kubectl or GitOps."
 	case !p.Complete():
 		return "Some targets could not be evaluated and are listed as Indeterminate; their access after the change is unknown. Nothing was changed: apply the reviewed objects with kubectl or GitOps."
 	case p.DeltasTotal == 0:

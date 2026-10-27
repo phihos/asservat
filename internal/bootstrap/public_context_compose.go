@@ -105,6 +105,9 @@ type publicContext struct {
 	// retentionSources is the hub metadata reader of retention sources and
 	// the retained catalog (ADR-240 retention impact preview).
 	retentionSources *postgres.RetentionSources
+	// reviews are the ADR-245 decision-time reviews: the target cluster's
+	// connector reviews the request's principal before a permission read.
+	reviews authapp.AccessReviews
 }
 
 func decodeAuditPolicy(raw json.RawMessage, lane, root, installation string) (audit.OperationLifecyclePolicy, error) {
@@ -175,7 +178,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		}
 		return out, nil
 	}
-	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution", "policy-automation", "evidence-share")
+	sql, err := need("identity-read", "hub-metadata-read", "capture-preview", "capture-admit", "capture-resolution", "capture-intent-read", "capture-journal", "capture-ack", "api-execution", "policy-automation", "evidence-share", "access-review")
 	if err != nil {
 		return nil, err
 	}
@@ -334,9 +337,15 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	queries := contextstart.Targets{Router: router, Now: time.Now, Report: timedEventLog(os.Stderr, "context target query refused")}
+	reviewStore, err := postgres.NewAccessReviews(ctx, sql["access-review"], root)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.reviews = authapp.AccessReviews{Store: reviewStore, Reviewer: queries, Now: time.Now}
 	out.investigation = captureapp.ContextInvestigation{RootID: root, InstallationID: installation, Previews: previews, Replay: admissionsSQL, Admission: admissionsSQL, Resolution: resolution,
 		ReportPreviewFailure: eventLog(os.Stderr, "public preview refused"),
-		Targets:              contextstart.Targets{Router: router, Now: time.Now, Report: timedEventLog(os.Stderr, "context target query refused")}, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Recovery: out.recovery,
+		Targets:              queries, Eligibility: eligibility, Capabilities: capabilities, Retention: out.retention, Storage: storage, Refresh: refresh, Processing: processing, Recovery: out.recovery, Reviews: out.reviews,
 		// ADR-243: libpcap only in a hub build with the libpcap tag; otherwise a stub.
 		Filters:  pcap.NewCompiler(),
 		Lifetime: time.Duration(p.PreviewSeconds) * time.Second}
@@ -371,7 +380,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.progress = captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: progress}
+	out.progress = captureapp.ContextProgressService{RootID: root, InstallationID: installation, Reader: progress, Reviews: out.reviews}
 	routes, err := postgres.NewContextCaseReads(ctx, sql["hub-metadata-read"], root, recovery)
 	if err != nil {
 		return nil, mounts.ErrUnavailable
@@ -384,7 +393,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	}
 	out.progress.Shares = out.shares // ADR-235: get_capture's sharing status
 	out.caseRoutes = routes
-	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares}
+	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares, Reviews: out.reviews}
 	if out.fleet, err = newPublicFleet(ctx, c, providers, pools, observer, probe, a); err != nil {
 		return nil, err
 	}

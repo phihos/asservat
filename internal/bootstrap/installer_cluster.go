@@ -7,6 +7,7 @@ import (
 	"flag"
 	"io"
 	"os"
+	"strings"
 
 	"asservat.local/asservat/internal/adapters/kms"
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
@@ -33,6 +34,7 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 	inCluster := flags.Bool("in-cluster", false, "Helm hook only: use the Pod's installer account as the guards' administrator")
 	evidenceFile := flags.String("evidence-credential", "", "the operator's write-only regional evidence credential (required when the offer names the regional executor)")
 	alertmanager := flags.String("alertmanager", "", "optional in-cluster Alertmanager base URL for alert policies (ADR-231; regional executor only)")
+	mappingsJSON := flags.String("identity-mappings", "", "optional JSON array of identity mapping records for decision-time PermissionSources (ADR-245; regional executor only)")
 	if flags.Parse(args) != nil || flags.NArg() != 0 || *offerFile == "" || *bootstrapFile == "" {
 		return mounts.ErrUnavailable
 	}
@@ -67,6 +69,14 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 	} else if config, _, _, err = localKubernetes(*kubeconfig, *selected, ""); err != nil {
 		return err
 	}
+	var mappings []contracts.RegionalIdentityMapping
+	if *mappingsJSON != "" {
+		d := json.NewDecoder(strings.NewReader(*mappingsJSON))
+		d.DisallowUnknownFields()
+		if len(*mappingsJSON) > 32<<10 || d.Decode(&mappings) != nil || d.More() || !kube.IdentityMappingsValid(mappings) {
+			return mounts.ErrUnavailable
+		}
+	}
 	var evidence []byte
 	if *evidenceFile != "" {
 		if evidence, err = os.ReadFile(*evidenceFile); err != nil || len(evidence) > 32<<10 {
@@ -76,7 +86,7 @@ func RunInstallerCluster(ctx context.Context, args []string, out io.Writer) erro
 	}
 	// The output includes the public join record of an installed executor
 	// (ADR-196 decision 2); it holds no credential.
-	installed, err := kube.InstallRegionalConnector(ctx, config, kube.RegionalInstallPlan{Offer: offer, Bootstrap: envelope, Namespace: *namespace, AccountAdministrator: *inCluster, Evidence: evidence, Alertmanager: *alertmanager})
+	installed, err := kube.InstallRegionalConnector(ctx, config, kube.RegionalInstallPlan{Offer: offer, Bootstrap: envelope, Namespace: *namespace, AccountAdministrator: *inCluster, Evidence: evidence, Alertmanager: *alertmanager, IdentityMappings: mappings})
 	if err != nil {
 		return err
 	}

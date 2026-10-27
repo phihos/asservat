@@ -29,6 +29,11 @@ type PermissionBatch struct {
 	// Namespaces is the minimized namespace observation the source bases were
 	// derived from; nil while none is current.
 	Namespaces *NamespaceObservation `json:",omitempty"`
+	// ReviewSources are the accepted decision-time sources (ADR-245). They
+	// carry no subject; per-principal assignments are minted only by a
+	// recorded allowed review. A source missing from a batch retires its
+	// assignments unless SourcesUnavailable keeps them without renewal.
+	ReviewSources []ReviewSource `json:",omitempty"`
 }
 type PermissionBasis struct {
 	Resource Resource
@@ -72,6 +77,19 @@ func (b PermissionBatch) Validate(now time.Time) error {
 	}
 	if b.Namespaces != nil && !b.Namespaces.Valid() || !identity.Strings(b.UnavailableSources, 1024, 64) || b.SourcesUnavailable && len(b.UnavailableSources) > 0 {
 		return ErrInvalid
+	}
+	if len(b.ReviewSources) > 64 || b.SourcesUnavailable && len(b.ReviewSources) > 0 {
+		return ErrInvalid
+	}
+	reviews, perCluster := map[string]bool{}, map[string]int{}
+	for _, r := range b.ReviewSources {
+		if !r.Valid() || reviews[r.Resource.UID] || slices.Contains(b.UnavailableSources, r.Resource.UID) {
+			return ErrInvalid
+		}
+		reviews[r.Resource.UID] = true
+		if perCluster[r.ClusterID]++; perCluster[r.ClusterID] > MaxReviewSourcesPerCluster {
+			return ErrInvalid
+		}
 	}
 	seen := map[string]bool{}
 	rows := 0

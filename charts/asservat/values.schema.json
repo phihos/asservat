@@ -713,6 +713,44 @@
           "maxLength": 512,
           "pattern": "^$|^https?://[^/@?#\\s]+(/[^?#\\s]*)?$",
           "description": "ADR-231: optional in-cluster Alertmanager base URL that alert DebugPolicies on this cluster read (v2 API, no credentials). Regional executor only."
+        },
+        "identityMappings": {
+          "type": "array",
+          "maxItems": 16,
+          "description": "ADR-245: connector-local identity mapping records referenced by kubernetesExec/kubernetesAccessReview PermissionSources (identityMappingRef). Regional executor only.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "issuer",
+              "usernamePrefix"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$"
+              },
+              "issuer": {
+                "type": "string",
+                "maxLength": 2048,
+                "pattern": "^https://[^\\s]+$"
+              },
+              "usernamePrefix": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^[!-~]*$"
+              },
+              "groupsPrefix": {
+                "type": "string",
+                "maxLength": 256,
+                "pattern": "^[!-~]*$"
+              },
+              "uid": {
+                "type": "boolean"
+              }
+            }
+          }
         }
       }
     },

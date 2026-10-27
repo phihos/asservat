@@ -85,7 +85,23 @@ func publicRuntimeRoleGrants(purpose string) ([]publicRuntimeGrant, bool) {
 
 // Duties retain their exact compiled grants; only installed role plans may
 // render them into credentials. A retired duty is not an accepted role name.
+// ADR-245: every duty that reads permission assignments, and so may run the
+// permission projection, also reads the decision-time review tables that the
+// projection joins; none gains a write.
 func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
+	out, ok := publicRuntimeDutyBaseGrants(purpose)
+	if ok && slices.Contains(out, publicRuntimeGrant{"table", "permission_assignment", "", "SELECT"}) {
+		for _, table := range []string{"permission_review_source", "permission_review_assignment", "permission_review_decision"} {
+			if g := (publicRuntimeGrant{"table", table, "", "SELECT"}); !slices.Contains(out, g) {
+				out = append(out, g)
+			}
+		}
+		out = ownerIdentityGrantSet(out)
+	}
+	return out, ok
+}
+
+func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 	if out, ok := publicRuntimeCapacityGrants(purpose); ok {
 		return out, true
 	}
@@ -178,6 +194,18 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("policy_workload_window", "UPDATE", "tat")
 		add("policy_suppression", "INSERT")
 		add("policy_suppression", "UPDATE", "last_at", "count")
+	case "access-review":
+		// ADR-245: hub-api's request-time review records. It reads the stream
+		// and its accepted review sources under share locks, mints a
+		// principal's assignment once and records or ends a Pod decision; the
+		// capture table only names the Pod of one capture.
+		read("permission_stream", "authority_audit", "permission_review_source", "permission_review_assignment", "permission_review_decision", "context_capture")
+		add("permission_stream", "UPDATE", "id")
+		add("permission_review_source", "UPDATE", "uid")
+		add("permission_review_assignment", "INSERT")
+		add("permission_review_decision", "INSERT")
+		add("permission_review_decision", "UPDATE", "decided_at", "fresh_until")
+		add("permission_review_decision", "DELETE")
 	case "evidence-share":
 		// ADR-232: the share ledger. Shares bind to published case locators;
 		// only revocation and an ADR-238 management transfer may change a row
@@ -232,6 +260,12 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("permission_assignment", "INSERT")
 		add("permission_assignment", "UPDATE", "retired_at", "retirement_audit_id")
 		add("authority_audit", "INSERT")
+		// ADR-245: accepted decision-time sources; their per-principal
+		// assignments only retire here.
+		add("permission_review_source", "INSERT")
+		add("permission_review_source", "DELETE")
+		add("permission_review_source", "UPDATE", "epoch", "seen_sequence", "generation", "resource_version", "spec_digest", "authority_digest", "cluster_id", "role", "source_json", "accepted_audit_id")
+		add("permission_review_assignment", "UPDATE", "retired_at", "retirement_audit_id")
 	case "permission-audit":
 		// The publisher's pending read and acknowledgement only; the stream
 		// column grant permits its existing FOR UPDATE lock.

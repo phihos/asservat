@@ -230,7 +230,7 @@ export interface components {
                     /** @constant */
                     decision: "Indeterminate";
                     /** @enum {unknown} */
-                    reason: "MetadataUnavailable" | "MetadataNotObserved";
+                    reason: "MetadataUnavailable" | "MetadataNotObserved" | "DecisionTimeSource";
                 }[];
                 unmatched: {
                     /** @enum {unknown} */

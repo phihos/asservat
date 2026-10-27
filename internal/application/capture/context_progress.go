@@ -41,7 +41,16 @@ type ContextProgressService struct {
 	// Shares reads capture-time shares (ADR-235). Without it, a capture
 	// carrying a sharing instruction is reported unavailable.
 	Shares CaptureShareReader
-	Now    func() time.Time
+	// Reviews repeats the caller's recorded decision-time reviews of the
+	// capture's Pod before the status read (ADR-245); nil disables them.
+	Reviews ContextCaptureReviews
+	Now     func() time.Time
+}
+
+// ContextCaptureReviews repeats a principal's recorded decision-time reviews
+// of one capture's Pod (ADR-245). It returns nothing of the capture.
+type ContextCaptureReviews interface {
+	ReviewCapture(context.Context, identity.Identity, string) error
 }
 
 func (s ContextProgressService) Get(ctx context.Context, source identities.CurrentIdentity, captureID string) (value.ContextProgress, error) {
@@ -61,6 +70,9 @@ func (s ContextProgressService) Get(ctx context.Context, source identities.Curre
 	r, err := s.Recovery.RecoveryState(ctx)
 	if err != nil || r.InstallationID != s.InstallationID || !r.Valid(s.Now()) {
 		return zero, value.ErrUnavailable
+	}
+	if s.Reviews != nil {
+		_ = s.Reviews.ReviewCapture(ctx, i, captureID)
 	}
 	p, err := s.Reader.ReadContextProgress(ctx, value.ProgressQuery{RootID: s.RootID, CaptureID: captureID, Identity: i, Recovery: r})
 	if err != nil {

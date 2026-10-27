@@ -138,3 +138,16 @@ collector:
     frozenBytes: 268435456
     uploadBytesPerSecond: 33554432
     uploadBurstBytes: 67108864
+  # (kubernetesExec, kubernetesAccessReview) whose identityMappingRef names
+  # one. Each maps the hub's authenticated principal of `issuer` to this
+  # cluster's Kubernetes identity: user = usernamePrefix + the OIDC subject,
+  # groups = groupsPrefix + each current stable group ID (omit groupsPrefix to
+  # send no groups), uid = the subject when uid is true. Match the cluster's
+  # own OIDC authenticator; display names and e-mail are never used. With
+  # records the connector account gains SubjectAccessReview create.
+  # Regional executor only; changing them needs a connector reinstall.
+  identityMappings: []
+  # - name: company-oidc-to-cluster
+  #   issuer: https://identity.example.invalid/realms/company
+  #   usernamePrefix: "oidc:"
+  #   groupsPrefix: "oidc:"

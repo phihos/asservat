@@ -54,7 +54,10 @@ type ContextDownloadAuthority struct {
 	// target eligibility refuses, before the catalog read, and re-read at the
 	// final check and at every entitlement reconstruction. Nil disables it.
 	Shares ShareReader
-	Now    func() time.Time
+	// Reviews repeats the caller's recorded decision-time reviews before the
+	// permission read (ADR-245); nil disables them.
+	Reviews RecordedReviewRefresher
+	Now     func() time.Time
 }
 
 func (s ContextDownloadAuthority) CheckDownload(ctx context.Context, token string, scope artifact.DownloadScope) (artifact.DownloadAuthority, error) {
@@ -97,6 +100,9 @@ func (s ContextDownloadAuthority) checkDownloadCurrent(ctx context.Context, sour
 	var p value.Projection
 	var share *value.Share
 	if accepted == nil {
+		if s.Reviews != nil {
+			_ = s.Reviews.ReviewRecorded(ctx, i, target)
+		}
 		p, err = s.Permissions.Permissions(ctx, target)
 		if err != nil {
 			return out, downloadRefused("permission", err)

@@ -28,6 +28,19 @@ type AuthorityRecord struct {
 	// PermissionSource assignments were derived from (ADR-242): keys, names,
 	// UIDs and value digests only.
 	Namespaces *configuration.NamespaceObservation `json:",omitempty"`
+	// ReviewSources are the accepted decision-time sources of a
+	// permission-change (ADR-245); ReviewRetirements name the sources whose
+	// per-principal assignments this event retired, and how many.
+	ReviewSources     []configuration.ReviewSource `json:",omitempty"`
+	ReviewRetirements []ReviewRetirement           `json:",omitempty"`
+}
+
+// ReviewRetirement records that one event retired every current
+// per-principal assignment of one decision-time source. Principals are not
+// listed: they are the source's recorded audiences, not configuration.
+type ReviewRetirement struct {
+	SourceUID string
+	Retired   int64
 }
 
 // Complete minimized delegation snapshot for this accepted configuration. It
@@ -57,8 +70,21 @@ func (r AuthorityRecord) Valid() bool {
 	if r.Kind != "permission-reset" && r.Kind != "permission-change" && r.Kind != "permission-suspend" {
 		return false
 	}
-	if len(r.Automation) > 1024 || (len(r.Automation) > 0 || r.Namespaces != nil) && r.Kind != "permission-change" || r.Namespaces != nil && !r.Namespaces.Valid() {
+	if len(r.Automation) > 1024 || (len(r.Automation) > 0 || r.Namespaces != nil || len(r.ReviewSources) > 0) && r.Kind != "permission-change" || r.Namespaces != nil && !r.Namespaces.Valid() {
 		return false
+	}
+	if len(r.ReviewSources) > 64 || len(r.ReviewRetirements) > 128 {
+		return false
+	}
+	for _, s := range r.ReviewSources {
+		if !s.Valid() {
+			return false
+		}
+	}
+	for _, x := range r.ReviewRetirements {
+		if !identity.Text(x.SourceUID, 64) || x.Retired < 0 {
+			return false
+		}
 	}
 	delegations := map[string]bool{}
 	for _, a := range r.Automation {

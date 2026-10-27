@@ -26,6 +26,13 @@ type ContextTargets interface {
 	ResolvePod(context.Context, targets.Request) (targets.PodResolution, error)
 }
 
+// ContextAccessReviews reviews a resolved Pod for the caller's decision-time
+// PermissionSources before eligibility is read (REQ-PER-004, ADR-245). It
+// records allowed reviews only; it never grants by itself.
+type ContextAccessReviews interface {
+	ReviewResolved(context.Context, identity.Identity, targets.Request) error
+}
+
 type ContextEligibilityReader interface {
 	ContextEligibilityCurrent(context.Context, identities.CurrentIdentity, authorization.Target) authorization.CaptureEligibility
 }
@@ -84,6 +91,7 @@ type ContextInvestigation struct {
 	Retention              ContextRetentionResolver
 	Storage                ContextStorageReader
 	Refresh                ContextCapacityRefresh // optional (ADR-200)
+	Reviews                ContextAccessReviews   // optional (ADR-245)
 	Processing             ContextProcessingCoverageReader
 	Recovery               fleetapp.RecoveryReader
 	Reasons                ContextReasonReader
@@ -143,10 +151,28 @@ func (s ContextInvestigation) currentIdentity(ctx context.Context, source identi
 	return i, nil
 }
 
+// reviewTarget records the caller's decision-time reviews of target (ADR-245).
+// A failure only leaves no fresh decision, so the eligibility read that
+// follows decides without it.
+func (s ContextInvestigation) reviewTarget(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, target targets.PodResolution) {
+	if s.Reviews == nil {
+		return
+	}
+	mark := time.Now()
+	defer auditapp.MarkStep(ctx, "p-review", mark)
+	i, err := s.currentIdentity(ctx, source, actor, s.Now().Add(5*time.Second))
+	if err == nil {
+		_ = s.Reviews.ReviewResolved(ctx, i, target.Request)
+	}
+}
+
 func (s ContextInvestigation) facts(ctx context.Context, source identities.CurrentIdentity, actor identity.Principal, intent value.ContextIntent, target targets.PodResolution, anchor, originalUntil time.Time) (contextFacts, error) {
 	if !target.Valid(s.Now()) {
 		return contextFacts{target: target}, previewFailure("facts/target", value.ErrChanged)
 	}
+	// Before the storage wait: a first allowed review is also what lets the
+	// hub-worker enroll an otherwise unbound workload's capacity.
+	s.reviewTarget(ctx, source, actor, target)
 	wait := s.beginStorageWait(ctx, target, originalUntil, value.ContextStorageSelection{})
 	defer wait.close()
 	return s.factsWithStorageWait(ctx, source, actor, intent, target, anchor, wait)
@@ -434,6 +460,7 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	if target.Request != p.Target || target.Pin != p.Pin || target.ExecutionClass != p.ExecutionClass {
 		return zero, s.requestChanged("target")
 	}
+	s.reviewTarget(ctx, source, i.Principal, target)
 	anchor := s.Now().UTC().Truncate(time.Microsecond)
 	f, err := s.factsWithStorageWait(ctx, source, i.Principal, p.Intent, target, anchor, storageWait)
 	if err != nil {

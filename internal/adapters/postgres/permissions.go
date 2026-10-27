@@ -187,6 +187,9 @@ func (p *Permissions) BeginPermissions(ctx context.Context, root, epoch string, 
 			if _, err = q.RetirePermissionStream(ctx, custodydb.RetirePermissionStreamParams{StreamID: id(root), RetirementAuditID: id(epoch)}); err != nil {
 				return err
 			}
+			if err = retireReviewStream(ctx, q, root, &record); err != nil {
+				return err
+			}
 		}
 		if err = insertAuthority(ctx, q, record); err != nil {
 			return err
@@ -241,6 +244,8 @@ func normalizedBatch(b cfg.PermissionBatch) cfg.PermissionBatch {
 	b.ObservedAt = b.ObservedAt.UTC()
 	b.FreshUntil = b.FreshUntil.UTC()
 	b.UnavailableSources = slices.Sorted(slices.Values(b.UnavailableSources))
+	b.ReviewSources = slices.Clone(b.ReviewSources)
+	slices.SortFunc(b.ReviewSources, func(x, y cfg.ReviewSource) int { return cmp.Compare(x.Resource.UID, y.Resource.UID) })
 	b.Bases = slices.Clone(b.Bases)
 	for i := range b.Bases {
 		p := &b.Bases[i]
@@ -467,6 +472,9 @@ func (p *Permissions) AcceptPermissions(ctx context.Context, b cfg.PermissionBat
 				}
 			}
 		}
+		if err = acceptReviewSources(ctx, q, s, b, &record); err != nil {
+			return err
+		}
 		if err = insertAuthority(ctx, q, record); err != nil {
 			return err
 		}
@@ -617,6 +625,25 @@ func permissionProjection(ctx context.Context, q *custodydb.Queries, s custodydb
 			currentAuthorityAuditReceipt(uid(s.ID), uid(a.ActivationAuditID), a.AcknowledgedAt.Valid, a.ObjectKey, a.ObjectVersion, a.ObjectEtag, a.ObjectBytes, a.ObjectSha256) {
 			out.Allows = append(out.Allows, row)
 		}
+	}
+	// ADR-245: fresh decision-time allows of this exact Pod, each one
+	// principal's own recorded review by a current, acknowledged source. They
+	// are allow-only, so the row bound drops the oldest rather than failing.
+	reviews, err := q.SelectPermissionReviews(ctx, custodydb.SelectPermissionReviewsParams{StreamID: s.ID, Epoch: s.Epoch, SeenSequence: s.Sequence, ClusterID: id(target.ClusterID), NamespaceUid: target.NamespaceUID, WorkloadUid: target.WorkloadUID, PodUid: target.PodUID})
+	if err != nil {
+		return authorization.Projection{}, err
+	}
+	for _, r := range reviews {
+		if len(out.Allows)+len(out.Denies) >= 256 {
+			break
+		}
+		deadline := identity.Earlier(until, r.FreshUntil.Time)
+		if !rootAudited || !n.Time.Before(deadline) || !currentAuthorityAuditReceipt(uid(s.ID), uid(r.AcceptedAuditID), r.AcknowledgedAt.Valid, r.ObjectKey, r.ObjectVersion, r.ObjectEtag, r.ObjectBytes, r.ObjectSha256) {
+			continue
+		}
+		audience := artifact.AudienceAssignment{Kind: "User", Issuer: r.Issuer, SubjectID: r.SubjectID, Role: r.Role, BasisKind: "PermissionSource", BasisUID: r.SourceUid, AssignmentID: uid(r.ID)}
+		copy(audience.BasisDigest[:], r.BasisDigest)
+		out.Allows = append(out.Allows, authorization.CurrentAssignment{Audience: audience, ObservedAt: r.DecidedAt.Time, FreshUntil: deadline, Reviewed: true})
 	}
 	n, err = q.CurrentTime(ctx)
 	if err != nil {

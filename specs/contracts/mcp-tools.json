@@ -12269,7 +12269,8 @@
                             "reason": {
                               "enum": [
                                 "MetadataUnavailable",
-                                "MetadataNotObserved"
+                                "MetadataNotObserved",
+                                "DecisionTimeSource"
                               ]
                             }
                           },

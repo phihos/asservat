@@ -92,7 +92,7 @@ func newPublicProjection(ctx context.Context, d *OwnerDeployment, policy authapp
 	// Evidence reads observe recovery for up to the evidence-read window.
 	recovery := pc.recovery.ForEvidenceReads()
 	authority := authapp.ContextProjectionAuthority{RootID: root, Permissions: pc.permissions, Catalog: pc.catalog, Retention: pc.retention,
-		Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: recovery, Processing: processing, Now: time.Now}, Shares: pc.shares, Now: time.Now}
+		Environment: authapp.CurrentProjectionEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: recovery, Processing: processing, Now: time.Now}, Shares: pc.shares, Reviews: pc.reviews, Now: time.Now}
 	origins := d.shared.origins
 	origins.Projection = operations
 	client := d.shared.workers[ownerNativeAPIKey{profile.ClusterID, profile.NamespaceUID}]

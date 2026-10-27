@@ -95,7 +95,7 @@ func newPublicDownloads(ctx context.Context, d *OwnerDeployment, observer, probe
 		return nil, mounts.ErrUnavailable
 	}
 	gate := authapp.ContextDownloadAuthority{RootID: root, Identities: d.publicID.download, Permissions: pc.permissions, Catalog: pc.catalog, Retention: pc.retention,
-		Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: pc.recovery, Processing: processingReads, Now: time.Now}, Shares: pc.shares, Now: time.Now}
+		Environment: authapp.CurrentDownloadEnvironment{RootID: root, InstallationID: installation, Policies: policies, Recovery: pc.recovery, Processing: processingReads, Now: time.Now}, Shares: pc.shares, Reviews: pc.reviews, Now: time.Now}
 
 	makeDownloads := func(purpose string) (*postgres.Downloads, error) {
 		return postgres.NewDownloads(ctx, sql[purpose], root, g)

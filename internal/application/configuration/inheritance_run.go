@@ -20,6 +20,9 @@ type Inheritance struct {
 	UnavailableSources []string
 	SourcesUnavailable bool
 	Namespaces         *value.NamespaceObservation
+	// ReviewSources are the accepted decision-time sources (ADR-245), for
+	// every cluster: their reviews run in the target cluster's connector.
+	ReviewSources []value.ReviewSource `json:",omitempty"`
 }
 
 // namespaceItem is one ordered delivery of the namespace feed: a complete
@@ -209,6 +212,7 @@ func (s *bindingRun) inheritance(now time.Time) inheritanceState {
 		out.SourcesUnavailable = true
 		return out
 	}
+	out.ReviewSources = value.ReviewSources(s.sources)
 	var live *value.NamespaceObservation
 	if s.namespaces != nil {
 		live = s.namespaces.Observation(true)

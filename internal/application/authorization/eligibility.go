@@ -24,7 +24,10 @@ type Evaluator struct {
 	Identities  identities.Resolver
 	Permissions ProjectionReader
 	Evidence    AudienceReader
-	Now         func() time.Time
+	// Reviews repeats the caller's recorded decision-time reviews of the
+	// target before the permission read (ADR-245); nil disables them.
+	Reviews RecordedReviewRefresher
+	Now     func() time.Time
 }
 
 // credentialIdentity preserves existing private bearer callers. Browser and MCP
@@ -66,6 +69,10 @@ func (s Evaluator) EligibilityCurrent(ctx context.Context, current identities.Cu
 	i, err := current.ResolveIdentity(ctx)
 	if err != nil || !i.Valid(s.Now()) {
 		return deny("IdentityUnavailable")
+	}
+	if s.Reviews != nil {
+		// A failed review only leaves no fresh decision: it grants nothing.
+		_ = s.Reviews.ReviewRecorded(ctx, i, r.Target)
 	}
 	p, err := s.Permissions.Permissions(ctx, r.Target)
 	if err != nil {
