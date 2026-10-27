@@ -12340,6 +12340,405 @@
           }
         ]
       }
+    },
+    {
+      "name": "preview_retention_change",
+      "description": "Preview how proposed EvidenceRetentionPolicy changes would shorten the retention of evidence already stored, before applying them through Kubernetes (ADR-240). Applies the proposal to the latest accepted policies of the hub (no source_cluster_id) or of one cluster's local source exactly as reconciliation will after acceptance, over at most 10,000 retained artifacts whose deletion is not yet due: affected artifacts per cluster and class, how many would become unreadable or due for deletion at once, and the earliest new access end and deletion dates. A longer limit never moves an already bound date. Artifacts for which a newly selected label selector would need historical labels are Unknown, never assumed; clusters whose policy source is not current are listed as incomplete. For fleet operators; it changes nothing: apply the change with kubectl or GitOps.",
+      "enabledByDefault": true,
+      "transports": [
+        "browser"
+      ],
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "changes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "const": "create"
+                    },
+                    "source_cluster_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "spec": {
+                      "$ref": "https://asservat.io/spec/v1/retention-policy.schema.json#/properties/spec"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "spec"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "const": "update"
+                    },
+                    "source_cluster_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "uid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    },
+                    "spec": {
+                      "$ref": "https://asservat.io/spec/v1/retention-policy.schema.json#/properties/spec"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "uid",
+                    "spec"
+                  ]
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "action": {
+                      "const": "delete"
+                    },
+                    "source_cluster_id": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "uid": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "uid"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "changes"
+        ]
+      },
+      "outputSchema": {
+        "allOf": [
+          {
+            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
+          },
+          {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "ok"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "complete": {
+                        "type": "boolean"
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "observed_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "artifacts_scanned": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "scan_limited": {
+                        "type": "boolean"
+                      },
+                      "affected_total": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "read_closed_total": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "deletion_due_total": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "unknown_total": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      },
+                      "earliest_expires_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "earliest_delete_by": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "baseline_changed": {
+                        "type": "boolean"
+                      },
+                      "groups": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "cluster_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "privacy_class": {
+                              "enum": [
+                                "unknown",
+                                "potentialPersonalData",
+                                "personalData",
+                                "specialCategoryPossible",
+                                "verifiedNonPersonal"
+                              ]
+                            },
+                            "evidence_type": {
+                              "enum": [
+                                "coreDump",
+                                "heapDump",
+                                "packetCapture",
+                                "syscallTrace",
+                                "logs",
+                                "files",
+                                "profile",
+                                "commandOutput",
+                                "context",
+                                "other"
+                              ]
+                            },
+                            "scanned": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 10000
+                            },
+                            "affected": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 10000
+                            },
+                            "read_closed": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 10000
+                            },
+                            "deletion_due": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 10000
+                            },
+                            "unknown": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 10000
+                            },
+                            "earliest_expires_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "earliest_delete_by": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "cluster_id",
+                            "privacy_class",
+                            "evidence_type",
+                            "scanned",
+                            "affected",
+                            "read_closed",
+                            "deletion_due",
+                            "unknown"
+                          ]
+                        }
+                      },
+                      "groups_total": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 20000
+                      },
+                      "incomplete_clusters": {
+                        "type": "array",
+                        "maxItems": 32,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "cluster_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "reason": {
+                              "enum": [
+                                "SourceUnavailable"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "cluster_id",
+                            "reason"
+                          ]
+                        }
+                      },
+                      "incomplete_total": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 20000
+                      },
+                      "not_evaluated": {
+                        "type": "array",
+                        "maxItems": 16,
+                        "items": {
+                          "type": "object",
+                          "additionalProperties": false,
+                          "properties": {
+                            "action": {
+                              "enum": [
+                                "create",
+                                "update",
+                                "delete"
+                              ]
+                            },
+                            "source_cluster_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "uid": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 64
+                            },
+                            "reason": {
+                              "enum": [
+                                "UnknownObject",
+                                "SourceAmbiguous"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "action",
+                            "reason"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "complete",
+                      "message",
+                      "observed_at",
+                      "artifacts_scanned",
+                      "scan_limited",
+                      "affected_total",
+                      "read_closed_total",
+                      "deletion_due_total",
+                      "unknown_total",
+                      "baseline_changed",
+                      "groups",
+                      "groups_total",
+                      "incomplete_clusters",
+                      "incomplete_total",
+                      "not_evaluated"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "error"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      },
+                      "navigation_uri": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 2048
+                      },
+                      "responsible_role": {
+                        "enum": [
+                          "maintainer",
+                          "approver",
+                          "administrator",
+                          "none"
+                        ]
+                      },
+                      "retry_after_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "message",
+                      "retryable"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

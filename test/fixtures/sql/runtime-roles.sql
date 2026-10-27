@@ -606,3 +606,11 @@ GRANT CONNECT ON DATABASE custody_test TO context_query_key_fixture;
 GRANT USAGE ON SCHEMA public TO context_query_key_fixture;
 GRANT SELECT ON context_query_key_binding TO context_query_key_fixture;
 GRANT UPDATE(used_roles) ON context_query_key_binding TO context_query_key_fixture;
+
+-- ADR-240: the retention impact preview reads only tables the production
+-- hub-metadata-read union already selects (plus its existing share-lock
+-- columns); it holds no effect, audit or catch-up privilege.
+CREATE ROLE retention_preview_read_runtime LOGIN PASSWORD 'synthetic-retention-preview-read'; GRANT CONNECT ON DATABASE custody_test TO retention_preview_read_runtime; GRANT USAGE ON SCHEMA public TO retention_preview_read_runtime;
+GRANT SELECT ON goose_db_version,permission_stream,retention_source,retention_checkpoint,retention_catchup,retention_catchup_effect,retention_decision,context_capture,custody_attempt TO retention_preview_read_runtime;
+GRANT UPDATE(id) ON permission_stream TO retention_preview_read_runtime;
+GRANT UPDATE(root_id) ON retention_source TO retention_preview_read_runtime;

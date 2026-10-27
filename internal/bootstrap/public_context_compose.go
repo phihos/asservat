@@ -101,6 +101,9 @@ type publicContext struct {
 	// ADR-232 concrete evidence shares and the case routes they bind to.
 	shares     *postgres.EvidenceShares
 	caseRoutes *postgres.ContextCaseReads
+	// retentionSources is the hub metadata reader of retention sources and
+	// the retained catalog (ADR-240 retention impact preview).
+	retentionSources *postgres.RetentionSources
 }
 
 func decodeAuditPolicy(raw json.RawMessage, lane, root, installation string) (audit.OperationLifecyclePolicy, error) {
@@ -284,6 +287,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
+	out.retentionSources = sources
 	// ADR-179: no selector reader; selector policies refuse new collection.
 	accepted := privacyapp.AcceptedRetentionReader{Topology: shared.topologies, Sources: sources, Now: time.Now}
 	out.retention = privacyapp.RetentionResolver{Policies: accepted, RetainedPolicies: accepted, Now: time.Now}

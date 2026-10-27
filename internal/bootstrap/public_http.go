@@ -126,6 +126,17 @@ func newPublicHandler(ctx context.Context, d *OwnerDeployment, a publicAuditStor
 			return nil, &fixedStepError{"access-preview", mounts.ErrUnavailable}
 		}
 	}
+	// ADR-240: the fleet operators' browser-only preview_retention_change.
+	retentionPreview, err := composePublicRetentionPreview(PublicContextOperationsConfig{RootID: root, InstallationID: installation, PublicOrigin: p.Origin, CollectionEnabled: true, Now: time.Now, NewID: ownerRandomID},
+		PublicContextOperationServices{Investigation: pc.investigation, Intents: pc.intents, Regional: pc.regional, Progress: pc.progress, Cases: pc.cases, Downloads: dl.coordinator, Native: dl.native, Projection: dl.projection}, pc)
+	if err != nil {
+		return nil, &fixedStepError{"retention-preview", mounts.ErrUnavailable}
+	}
+	if retentionPreview != nil {
+		if operations, err = presentation.NewInvestigationRetentionPreviewOperations(operations, retentionPreview); err != nil {
+			return nil, &fixedStepError{"retention-preview", mounts.ErrUnavailable}
+		}
+	}
 	o := p.OperationAudit
 	services := PublicContextServices{Sessions: id.sessions, MCPIdentity: id.mcp, DownloadIdentity: id.download, Operations: operations, NormalAudit: normal, ResolutionAudit: resolution, AuditMAC: pc.mac, Native: dl.native.Runtime, Transfer: dl.native.Transfer}
 	if pc.fleet != nil {

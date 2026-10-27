@@ -1,5 +1,14 @@
 # Decision records
 
+[ADR-240 — Retention impact preview](240-retention-impact-preview.md) is S-06 increment 11: the
+browser-only `preview_retention_change` lets a current fleet operator submit proposed
+EvidenceRetentionPolicy changes and see how many retained artifacts would be shortened per cluster
+and class, how many would become unreadable or due for deletion at once, and the earliest new
+access end and deletion dates, computed by the catch-up's own retained-obligation functions over
+the current effective deadlines (at most 10,000 artifacts). Lengthening never moves a bound date;
+artifacts needing unrecorded label history are Unknown; clusters whose source is not ready are
+incomplete. Console `/retention-preview`. Migration 00093 adds the audit operation name.
+
 [ADR-239 — Bounded recurring-policy sharing](239-recurring-policy-sharing.md) is S-06 increment 8:
 a DebugPolicy's `spec.sharing` (≤ 8 recipients, `maxCaptures` 1–100, absolute `notAfter` ≤ 7 days)
 is accepted by `activate_policy` only with `evidence:share` and an evidence-owner group of the

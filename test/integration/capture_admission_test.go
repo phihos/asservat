@@ -391,6 +391,7 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	qualifyAPIExecutionTransactions(t, ctx, admin, poolFor, store, keys, create)
 	qualifyContextPublications(t, ctx, admin, poolFor, store, keys, create, authorityPool.Reset)
 	qualifyRetentionCatchup(t, ctx, admin, poolFor, store, keys, create)
+	qualifyRetentionPreview(t, ctx, admin, poolFor, store, keys, create)
 	charges := func(t *testing.T, s scenario, want int64) {
 		t.Helper()
 		var count, bytes int64
