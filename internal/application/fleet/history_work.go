@@ -64,3 +64,16 @@ type HistorySession interface {
 type HistoryDispatcher interface {
 	PrepareHistory(context.Context, string, string) (HistorySession, error)
 }
+
+// HistoryCopiesMatch accepts no receipts only for independently authorized
+// inventory cleanup after the original writer interval. The SQL producer must
+// separately prove that no write claim was issued; timing alone is no permit.
+func HistoryCopiesMatch(a capture.HistoryOperationAuthority, c artifact.Copies) bool {
+	if capture.HistoryCopiesDigest(c) != a.CopiesDigest {
+		return false
+	}
+	if c == (artifact.Copies{}) {
+		return a.Operation == "purge" && !a.StartedAt.Before(a.Expectation.Registration.WriteUntil)
+	}
+	return c.Validate(a.Expectation.Registration) == nil
+}

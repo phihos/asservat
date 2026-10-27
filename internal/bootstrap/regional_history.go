@@ -60,7 +60,7 @@ func (r regionalHistoryObjects) ExecuteHistory(ctx context.Context, a capture.Hi
 		}
 		out.Bundle, out.Copies = bundle, c
 	case "purge":
-		if c.Validate(e.Registration) != nil || capture.HistoryCopiesDigest(c) != a.CopiesDigest {
+		if !fleetapp.HistoryCopiesMatch(a, c) {
 			return out, artifact.ErrIntegrity
 		}
 		if err := r.objects.Purge(call, e); err != nil {

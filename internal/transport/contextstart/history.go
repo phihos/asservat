@@ -47,7 +47,7 @@ func historyRequest(a capture.HistoryOperationAuthority, b capture.HistoryCipher
 		}
 		m.Bundle = encoded
 	case "read", "purge":
-		if c.Validate(a.Expectation.Registration) != nil || capture.HistoryCopiesDigest(c) != a.CopiesDigest {
+		if !fleetapp.HistoryCopiesMatch(a, c) {
 			return m, artifact.ErrIntegrity
 		}
 		m.Copies = historyJSON(c)
@@ -220,7 +220,7 @@ func serveRegionalHistory(ctx context.Context, s Stream, r fleet.APIContextRecei
 		}
 		defer b.Clear()
 	} else {
-		if len(m.Bundle) != 0 || historyDecode(m.Copies, &copies) != nil || copies.Validate(a.Expectation.Registration) != nil || capture.HistoryCopiesDigest(copies) != a.CopiesDigest {
+		if len(m.Bundle) != 0 || historyDecode(m.Copies, &copies) != nil || !fleetapp.HistoryCopiesMatch(a, copies) {
 			return fleet.ErrDenied
 		}
 	}

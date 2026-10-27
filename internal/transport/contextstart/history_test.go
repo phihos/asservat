@@ -195,3 +195,38 @@ func TestHistoryPeerDisconnectCancelsAndJoinsRegionalEffect(t *testing.T) {
 		t.Fatal("disconnected operation returned success")
 	}
 }
+
+func TestHistoryEmptyReceiptsRequireExpiredUnclaimedPurge(t *testing.T) {
+	w, _, b, copies := historyFixture()
+	a := w.Authority
+	a.Operation = "purge"
+	a.BundleDigest = artifact.Digest{}
+	a.CopiesDigest = capture.HistoryCopiesDigest(artifact.Copies{})
+	a.DeletionFence = 1
+	a.Expectation.Registration.WriteUntil = a.StartedAt
+	if _, err := historyRequest(a, b, artifact.Copies{}); err != nil {
+		t.Fatal(err)
+	}
+	for _, op := range []string{"read", "write"} {
+		other := a
+		other.Operation = op
+		if fleetapp.HistoryCopiesMatch(other, artifact.Copies{}) {
+			t.Fatal("empty receipts admitted for", op)
+		}
+	}
+	early := a
+	early.StartedAt = a.StartedAt.Add(-time.Microsecond)
+	if _, err := historyRequest(early, b, artifact.Copies{}); err == nil {
+		t.Fatal("cleanup before original writer bound")
+	}
+	partial := artifact.Copies{}
+	partial[0] = copies[0]
+	a.CopiesDigest = capture.HistoryCopiesDigest(partial)
+	if _, err := historyRequest(a, b, partial); err == nil {
+		t.Fatal("partial receipts accepted")
+	}
+	a.CopiesDigest = artifact.Digest{99}
+	if _, err := historyRequest(a, b, artifact.Copies{}); err == nil {
+		t.Fatal("different cleanup digest accepted")
+	}
+}
