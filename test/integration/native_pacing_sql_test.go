@@ -238,7 +238,7 @@ func TestNativePacingSQLWithRealPostgres(t *testing.T) {
 	// changing statistics capacity. This is a deliberate qualification fault,
 	// not proof of which condition ended an earlier installed run.
 	var maximum int
-	if err := admin.QueryRow(ctx, `SHOW pg_stat_statements.max`).Scan(&maximum); err != nil || maximum != 5000 {
+	if err := admin.QueryRow(ctx, `SELECT current_setting('pg_stat_statements.max')::integer`).Scan(&maximum); err != nil || maximum != 5000 {
 		t.Fatal("statistics capacity differs from the pinned default", maximum, err)
 	}
 	flood := func(ordinal int) {
