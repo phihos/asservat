@@ -44,6 +44,21 @@ work), their deadlines and joined cleanup remain unchanged. The complete mTLS
 package passes with race detection (exit 0, 36.692s). This changes tests only;
 it does not qualify an installed capture or change production timing.
 
+Installed run 40571692960 on 21806d0d failed earlier, during the initial
+`preview_capture` MCP call: HTTP/2 `INTERNAL_ERROR`, with the private
+`facts/current/operation` refusal (Go 476.985s; approved subtest 6.13s).
+Independent approval, the real preview-expiry wait and submission were never
+reached. The target query completed in 390ms; the enclosing public operation
+expired during storage consumption. The capacity worker separately reported
+three guarded-read failures at owner lookup, before claim. Its `read left 0s`
+is the error-path placeholder, not a measured remaining authority interval.
+The exact lookup substep and which enclosing timer fired first remain unknown.
+All 3,194 source hashes independently matched, source stayed unchanged and
+cleanup reported no failures; report SHA-256
+`6ba8ce88bba2dd19735a4f84d5e33c01bcd83b67ffa925888bbd5c4863121d5d`.
+This is neither an installed ADR-260 pass nor evidence for extending capacity
+proofs, retrying effects or reviving the rejected proof-refresh branch.
+
 ## Approved packet request: local target composition correction (2026-10-27)
 
 Native run 40557482326 on 23bf0042 failed before admission with
