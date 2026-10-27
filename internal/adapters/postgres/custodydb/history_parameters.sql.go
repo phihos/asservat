@@ -346,8 +346,28 @@ func (q *Queries) ListHistoryEvictionCandidates(ctx context.Context, arg ListHis
 }
 
 const listHistoryRetirementCandidates = `-- name: ListHistoryRetirementCandidates :many
-SELECT h.capture_id,a.cluster_id,h.state FROM capture_history_parameter h JOIN custody_attempt a ON a.id=h.attempt_id
-WHERE h.root_id=$1 AND ($2::uuid IS NULL OR h.capture_id>$2::uuid) AND (((h.visible OR h.state='deleted') AND h.summary_expires_at<=$3::timestamptz) OR (h.state IN('reserved','available','deleting') AND (a.effective_expires_at<=$3::timestamptz OR NOT h.visible OR (h.state='reserved' AND a.write_until<=$3::timestamptz))))
+WITH candidates AS (
+ (SELECT h.capture_id FROM capture_history_parameter h
+  WHERE h.root_id=$1::uuid AND ($2::uuid IS NULL OR h.capture_id>$2::uuid)
+   AND (h.visible OR h.state='deleted') AND h.summary_expires_at<=$3::timestamptz
+  ORDER BY h.capture_id LIMIT 16)
+ UNION
+ (SELECT h.capture_id FROM capture_history_parameter h
+  WHERE h.root_id=$1::uuid AND ($2::uuid IS NULL OR h.capture_id>$2::uuid)
+   AND NOT h.visible AND h.state IN('reserved','available','deleting')
+  ORDER BY h.capture_id LIMIT 16)
+ UNION
+ (SELECT h.capture_id FROM custody_attempt a JOIN capture_history_parameter h ON h.attempt_id=a.id
+  WHERE h.root_id=$1::uuid AND ($2::uuid IS NULL OR h.capture_id>$2::uuid)
+   AND a.state<>'deleted' AND a.effective_expires_at<=$3::timestamptz AND h.state IN('reserved','available','deleting')
+  ORDER BY h.capture_id LIMIT 16)
+ UNION
+ (SELECT h.capture_id FROM capture_history_parameter h JOIN custody_attempt a ON a.id=h.attempt_id
+  WHERE h.root_id=$1::uuid AND ($2::uuid IS NULL OR h.capture_id>$2::uuid)
+   AND h.state='reserved' AND a.write_until<=$3::timestamptz
+  ORDER BY h.capture_id LIMIT 16)
+)
+SELECT h.capture_id,a.cluster_id,h.state FROM candidates c JOIN capture_history_parameter h ON h.capture_id=c.capture_id JOIN custody_attempt a ON a.id=h.attempt_id
 ORDER BY h.capture_id LIMIT 16
 `
 
@@ -363,6 +383,9 @@ type ListHistoryRetirementCandidatesRow struct {
 	State     string
 }
 
+// Each purpose-specific due index supplies at most 16 IDs before deduplication.
+// The effective-custody branch uses its existing nondeleted partial index:
+// typed settlement changes both history and custody to deleted in one transaction.
 func (q *Queries) ListHistoryRetirementCandidates(ctx context.Context, arg ListHistoryRetirementCandidatesParams) ([]ListHistoryRetirementCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, listHistoryRetirementCandidates, arg.RootID, arg.AfterID, arg.Through)
 	if err != nil {

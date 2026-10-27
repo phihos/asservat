@@ -3,6 +3,25 @@ import { Investigation } from './investigation';
 import { SyntheticOperations, session, target, id, previewResult, acceptedResult, progressResult, catalogResult, resolvedAcceptedResult, resolvedClosedResult, recordingPreviewResult, approvalPendingResult, settingsResult, historyResult } from './test-fixtures';
 
 const controllers: Investigation[] = [];
+it('opens settings from a direct capture URL and repeats only after an explicit review with a fresh target', async () => {
+  const client = new SyntheticOperations(); const controller = new Investigation(client); controllers.push(controller);
+  client.responder = name => name === 'get_capture' ? progressResult('Succeeded') : name === 'get_capture_settings' ? settingsResult(id(8)) : previewResult();
+  controller.attach(session, new AbortController().signal, id(8));
+  await vi.waitFor(() => expect(controller.snapshot().busy).toBe(false));
+  await controller.repeat(id(8));
+  expect(client.calls.some(c => c.name === 'preview_capture')).toBe(false);
+  await controller.showSettings(id(8));
+  expect(controller.snapshot()).toMatchObject({ stage: 'progress', captureID: id(8), settings: { capture_id: id(8) } });
+  const recording = recordingPreviewResult(); if (recording.status !== 'ok') throw new Error();
+  await controller.previewComposition(recording.data.profile_composition!.authored, id(8), undefined, '0');
+  expect(controller.snapshot()).toMatchObject({ stage: 'progress', captureID: id(8), settings: { capture_id: id(8) } });
+  expect(client.calls.some(c => c.name === 'preview_capture')).toBe(false);
+  client.responder = () => { const p = previewResult(); if (p.status !== 'ok') throw new Error(); p.data.repeated_from_capture_id = id(8); p.data.selected_pods![0].name = 'api-new'; p.data.selected_pods![0].uid = 'fresh-pod-uid'; return p; };
+  await controller.repeat(id(8));
+  expect(client.calls.at(-1)!.input).toEqual({ history_capture_id: id(8) });
+  expect(controller.snapshot()).toMatchObject({ stage: 'review', captureID: undefined, repeatedFrom: id(8), draft: { target }, preview: { selected_pods: [{ name: 'api-new', uid: 'fresh-pod-uid' }] } });
+  expect(client.calls.some(c => c.name === 'request_capture')).toBe(false);
+});
 it('reviews edited recorder parameters under the same source and version pins without restoring old authority', async () => {
   const { controller, client } = await ready('3600');
   client.responder = name => name === 'get_capture_settings' ? settingsResult() : recordingPreviewResult(id(41));

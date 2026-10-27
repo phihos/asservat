@@ -11,6 +11,17 @@ import (
 const OperationCipherLimit = 64 << 10
 const OperationOutputLimit = 24 << 10
 
+// Only the authenticated browser settings view has this larger prepared-byte
+// maximum. Audit stores the HMAC/count/refs, never the parameter response body.
+const OperationCaptureSettingsOutputLimit = 160 << 10
+
+func operationOutputLimit(name string) int64 {
+	if name == "get_capture_settings" {
+		return OperationCaptureSettingsOutputLimit
+	}
+	return OperationOutputLimit
+}
+
 // Lane is server-selected from the fixed operation, never supplied by a caller.
 func OperationLane(name string) string {
 	switch name {
@@ -85,7 +96,7 @@ type OperationOutcome struct {
 func (r OperationOutcome) Valid() bool {
 	if !r.Intent.Valid() || !slices.Contains([]string{"success", "denied", "invalid", "unavailable", "interrupted"}, r.Status) ||
 		!slices.Contains([]string{"prepared", "not_available", "invalid_input", "authority_unavailable", "interrupted"}, r.Reason) ||
-		!slices.Contains([]string{"none", "accepted", "unknown"}, r.Effect) || r.ClientReceipt != "unknown" || r.OutputBytes < 0 || r.OutputBytes > OperationOutputLimit ||
+		!slices.Contains([]string{"none", "accepted", "unknown"}, r.Effect) || r.ClientReceipt != "unknown" || r.OutputBytes < 0 || r.OutputBytes > operationOutputLimit(r.Intent.Name) ||
 		r.OutputDigest == (artifact.Digest{}) || r.RecordedAt.Before(r.Intent.CreatedAt) || !r.RecordedAt.Before(r.Intent.WriteUntil) ||
 		r.MetadataUntil.Before(r.Intent.CreatedAt) || r.MetadataUntil.After(r.Intent.RequestUntil) {
 		return false

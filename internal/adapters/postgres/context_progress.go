@@ -242,7 +242,7 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 		}
 		if c.HistoryParametersRequired {
 			out.HistoryState = "unavailable"
-			if f.HistoryParametersState.String == "available" && f.HistoryVisible.Bool && n.Time.Before(f.HistorySummaryExpires.Time) && n.Time.Before(f.HistorySettingsExpires.Time) {
+			if f.HistoryParametersState.String == "available" && f.HistoryCustodyState.String == artifact.StoredUnpublished && f.HistoryVisible.Bool && n.Time.Before(f.HistorySummaryExpires.Time) && n.Time.Before(f.HistorySettingsExpires.Time) {
 				out.HistoryState = "available"
 			}
 		}

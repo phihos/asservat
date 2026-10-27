@@ -3,6 +3,7 @@ package presentation
 import (
 	"context"
 	"encoding/json"
+	"encoding/json/jsontext"
 	"errors"
 	"fmt"
 	"net/url"
@@ -378,6 +379,7 @@ type OperationReply struct {
 	auditNoDispatch bool
 	auditEffect     operationAuditEffect
 	owner           *operationReplyOwner
+	browserSettings bool
 }
 
 type operationAuditDecision uint8
@@ -605,6 +607,9 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 	}
 	if operationErr != nil {
 		out.Status, out.Data, out.NextCursor = "error", publicCaptureFailure(operationErr, name == "request_capture" || name == "resolve_capture_request"), nil
+		if name == "get_capture_settings" && errors.Is(operationErr, value.ErrSettingsTooLarge) {
+			out.Data = settingsSizeFailure(s.config.PublicOrigin, in.CaptureID)
+		}
 		if f, ok := approvalFailure(operationErr, s.config.PublicOrigin); ok && name == "request_capture" {
 			out.Data = f
 		}
@@ -618,12 +623,38 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 	}
 	until = identity.Earlier(until, finalIdentity.ValidUntil)
 	b, err := json.Marshal(out)
-	if err != nil || s.contracts.ValidateOutput(name, b) != nil {
+	browserSettings := browserSettingsView(ctx, name)
+	if err == nil && browserSettings {
+		canonical := jsontext.Value(b)
+		if canonical.Canonicalize() != nil {
+			return OperationReply{}, value.ErrUnavailable
+		}
+		b = canonical
+	}
+	// The response includes a bounded envelope as well as the settings view.
+	// A just-under-limit MCP view must still yield the canonical navigation
+	// error instead of failing the final contract with an unavailable reply.
+	if err == nil && name == "get_capture_settings" && !browserSettings && out.Status == "ok" && len(b) > contracts.InvestigationOutputLimit {
+		out.Status, out.DataClass, out.Data = "error", "metadata", settingsSizeFailure(s.config.PublicOrigin, in.CaptureID)
+		b, err = json.Marshal(out)
+	}
+	validate := s.contracts.ValidateOutput
+	if browserSettings {
+		validate = s.contracts.ValidateBrowserOutput
+	}
+	if err != nil || validate(name, b) != nil {
 		return OperationReply{}, value.ErrUnavailable
 	}
 	if !s.config.Now().Before(until) || ctx.Err() != nil {
 		clear(b)
 		return OperationReply{}, value.ErrUnavailable
 	}
-	return OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), auditNoDispatch: auditNoDispatch}, nil
+	return OperationReply{Body: b, ValidUntil: until, auditDecision: captureAuditDecision(operationErr), auditNoDispatch: auditNoDispatch, browserSettings: browserSettings}, nil
+}
+
+func settingsSizeFailure(origin, captureID string) any {
+	return struct {
+		OperationFailure
+		NavigationURI string `json:"navigation_uri"`
+	}{publicCaptureFailure(value.ErrSettingsTooLarge, false), origin + "/captures/" + captureID}
 }

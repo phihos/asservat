@@ -18,8 +18,8 @@ export interface Operations {
   call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>>;
 }
 
-// All five routes are fixed, local and session authenticated. Native evidence
-// transfers have a different transport; this client only accepts metadata.
+// Routes are fixed, local and session authenticated. Settings and recording
+// previews use the canonical extract class; native transfers remain separate.
 export const operations: Operations = {
   call<N extends Operation>(name: N, input: Input<N>, csrf: string, signal: AbortSignal): Promise<Output<N>> {
     const key = name === 'request_capture' || name === 'resolve_capture_request' ? (input as Input<'request_capture'>).idempotency_key : undefined;
@@ -29,10 +29,11 @@ export const operations: Operations = {
 
 // postOperation is the one session-authenticated metadata operation request:
 // generated input/output validation, CSRF, an optional identical
-// Idempotency-Key header, 10 s and 32 KiB bounds, and no automatic replay.
+// Idempotency-Key header, 10 s and fixed response bounds, and no automatic replay.
 // Only a paged list (allowCursor) may return a next_cursor.
 export async function postOperation(name: string, input: unknown, csrf: string, signal: AbortSignal, validInput: (value: unknown) => boolean, validOutput: (value: unknown) => boolean, idempotencyKey?: string, allowCursor = false): Promise<unknown> {
   if (!validInput(input)) throw new OperationFailure(400);
+  const responseLimit = name === 'get_capture_settings' ? 160 * 1024 : 32_768;
   const request = new AbortController();
   const abort = () => request.abort();
   signal.addEventListener('abort', abort, { once: true });
@@ -56,7 +57,7 @@ export async function postOperation(name: string, input: unknown, csrf: string, 
         const { value, done } = await reader.read();
         if (done) break;
         size += value.length;
-        if (size > 32_768 || request.signal.aborted) throw new OperationFailure(502);
+        if (size > responseLimit || request.signal.aborted) throw new OperationFailure(502);
         chunks.push(value);
       }
     } finally { await reader.cancel(); reader.releaseLock(); }
@@ -67,7 +68,8 @@ export async function postOperation(name: string, input: unknown, csrf: string, 
     const value: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
     if (!validOutput(value)) throw new OperationFailure(502);
     const result = value as { data_class?: string; truncated?: boolean; next_cursor?: unknown };
-    if (result.data_class !== 'metadata' || result.truncated || (result.next_cursor !== null && !allowCursor)) throw new OperationFailure(502);
+    const permittedClass = result.data_class === 'metadata' || (result.data_class === 'extract' && (name === 'preview_capture' || name === 'get_capture_settings'));
+    if (!permittedClass || result.truncated || (result.next_cursor !== null && !allowCursor)) throw new OperationFailure(502);
     return value;
   } finally { clearTimeout(timer); signal.removeEventListener('abort', abort); }
 }

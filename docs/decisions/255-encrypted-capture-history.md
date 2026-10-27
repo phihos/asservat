@@ -96,14 +96,14 @@ including exact four-object cardinality. The existing common 32 KiB frames are
 unchanged. Only signed history operations use the separately derived finite
 authority, bundle and escaped receipt envelope bounds.
 
-The focused real PostgreSQL/S3 run `history-parameters-native-9` passed encrypted
+The focused real PostgreSQL/S3 run `history-parameters-native-10` passed encrypted
 write/read, own-selector eviction without premature refund, ordinary evidence
 deletion-path refusal and actual history-prefix inventory before charge release.
-It measured **4,216 physical ciphertext bytes** against **1,671,168 reserved
-bytes** for its synthetic parameter record. The selected subtest took 7.16 s;
-the Go fixture took 8.61 s, with unchanged relevant sources and no
+It measured **4,214 physical ciphertext bytes** against **1,671,168 reserved
+bytes** for its synthetic parameter record. The selected subtest took 7.67 s;
+the Go fixture took 9.142 s, with unchanged relevant sources and no
 cleanup failures. This is component evidence, not installed recorder performance.
-Run 9 additionally covers positive persisted lineage, source-expiry extension
+Runs 9–10 additionally cover positive persisted lineage, source-expiry extension
 and unknown-source refusal, nanosecond request-deadline normalization, required
 encrypted snapshots with no scope fallback, and settled projection/counter
 pruning. Runs 1–5 exposed fixture role/eligibility/time issues and a production
@@ -112,7 +112,7 @@ Run 7 found a source-read fixture permission omission. Run 8 reproduced a real
 ordering bug: per-selector eviction hid the chosen source before the new
 snapshot's source check. Source authority now precedes eviction in the same
 locked transaction, and its original expiry bounds the final check. All earlier
-actual failure reports remain retained alongside run 9.
+actual failure reports remain retained alongside runs 9–10.
 
 ## Composition and independent lifetimes
 
@@ -145,6 +145,71 @@ reset at the end. The hint grants no authority; every candidate still needs its
 own current SQL authority and exact completion. No retry map, durable phase,
 extra request, configuration or overlapping pass is added. Deterministic
 two-region and partial-pass regressions verify both progress and retained spend.
+
+The first 100,000-row real-SQL probe found two complete scans behind the bounded
+16-row output: 64.47 ms for an idle hint and 62.82 ms with one due row. These are
+synthetic minimal TEMP columns and warm local storage, not production CPU or row
+width measurements. An indexed UNION of four separately bounded 16-ID branches
+selects at most 64 IDs before deduplication and the unchanged 16-row keyset/order.
+The fourth probe passed old/new equivalence for 81 IDs across six pages. Its
+original predicate took 67.54 ms, the UNION without active indexes 10.65 ms, and
+the custom plan with two partial active-state indexes 0.049 ms. The third probe
+also exposed a real cached generic-plan regression: about 0.54 s after the fifth
+execution despite a fast custom EXPLAIN. Only this read-only hint now uses pgx
+CacheDescribe through a scoped DBTX wrapper around the generated query; pool
+policy and all effect transactions remain unchanged. Ten repeated actual adapter
+calls past that transition took 0.605–0.958 ms; EXPLAIN was 0.033 ms and the named
+generic-plan counter did not advance. This sends about 3 KiB query text per
+three-second idle request instead of retaining the demonstrated half-second scan.
+
+Each new partial index occupied 90,112 bytes after 1,000-row churn; the existing
+summary index occupied 6,144,000 bytes. For 1,000 minimal TEMP rows, history insert
+time changed from 9.17 to 10.81 ms, available transitions from 10.90 to 11.86 ms,
+and hiding from 9.20 to 11.04 ms. The unrelated custody insert measurement varied
+from 4.57 to 108.29 ms; it is retained, not attributed to history indexes.
+These local warm TEMP/no-WAL probes are neither production latency nor installed
+aggregate cost. All four reports, including failures, are retained; run 4 had
+actual exit 0, identical source hashes and no cleanup failures. No cadence,
+authority check, durable state, privilege or configuration changes for this fix.
+
+## Large browser settings
+
+The shared MCP result contract remains 24 KiB (and the MCP socket writer 64 KiB).
+Only authenticated browser `get_capture_settings` receives a private server-owned
+160 KiB prepared-response budget and fixed client read cap. It uses the same
+current authorization, existing public audit lane and original source deadlines.
+Canonical JSON is written directly, so HTML-sensitive/multibyte strings cannot
+grow through a second HTML-escaping serialization. Snapshot admission already
+bounds the initial escaped JSON to 128 KiB before canonicalizing it. The audit
+contains only existing HMAC/count/references; its encrypted record cap stays
+64 KiB, and general digest/output limits remain unchanged.
+
+One settings invocation performs four history GETs/three unwraps, plus its
+existing two public audit records (two PUTs, two exact GETs, two wraps and two
+unwraps): **2 PUTs, 6 GETs, 2 wraps, 5 unwraps**, excluding current authority SQL/API
+work and later audit retirement. Each later audit deletion certificate adds one
+PUT/GET/wrap/unwrap. A proposed 17-call fragment protocol would instead require
+34 audit PUTs, 102 total GETs, 34 wraps, 85 unwraps and 17 sets of current checks,
+plus 17 later certificates. The fixed browser budget avoids that protocol,
+additional reads and failure states without persistent plaintext or a new lane.
+
+## Restore boundary
+
+The existing recovery reader/transaction guard fences a restored database
+incarnation; it does not inventory an entire object store. History reads require
+both the typed available header and generic `stored_unpublished` custody state,
+four current receipts, original dates and current recovery/permission/retention.
+Missing, pruned or expired headers cannot authorize a read/repeat or a scope-JSON
+fallback. Generic deleted attempts keep their independent no-second-refund
+tombstones. A restored old header still references its original attempt/dates;
+an orphan object's fixed `history/v1/` key identifies its storage purpose.
+
+Implemented inventories cover per-attempt object/version/upload cleanup and
+separate purpose-specific audit diagnostics. Global reconciliation of every
+recognized prefix after backup/restore remains an existing platform gap; this
+change does not claim to supply it or complete backup-horizon qualification.
+No extra permanent purpose/mapping field or personal routing marker is retained
+solely for a hypothetical future inventory mechanism.
 
 Current unit/race regressions cover fresh workload Pod selection, exact explicit
 Pod refusal, original filter/window/composition restoration, edited retention,

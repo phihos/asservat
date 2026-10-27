@@ -34,11 +34,11 @@ def history_subset(name, tool):
     if name == "list_capture_history":
         for key in ("target_handle", "cluster_id", "target"):
             props.pop(key)
-        props["origin"] = {"enum": ["manual", "policy", "all"]}
+        props["origin"] = {"enum": ["manual", "policy", "discovery", "all"]}
         schema.pop("oneOf")
         schema["required"] = ["target_ref"]
         description["description"] = ("List recent accepted pod-status captures of a currently authorized named workload, newest first, for seven days after acceptance: "
-                                      "your own requests and those whose retained audience you currently belong to. Origin manual (default), policy or all; "
+                                      "your own requests and those whose retained audience you currently belong to. Origin manual (default), policy, discovery or all; "
                                       "at most limit entries (default 20, maximum 100) and next_cursor for more. A recreated workload starts a new history. "
                                       "Repeat one with preview_capture history_capture_id. No evidence or settings are read.")
     else:

@@ -169,17 +169,32 @@ export class Investigation {
     this.publish({ history, historyMessage, historyCursor });
   }
   showSettings = async (captureID: string) => {
-    if (this.receipt || this.state.busy) return;
+    if (this.state.busy || (this.receipt && this.receipt.captureID !== captureID)) return;
     this.publish({ settings: undefined });
     const data = await this.run('get_capture_settings', { capture_id: captureID });
     if (!data) return;
-    if (data.capture_id !== captureID || data.cluster_id !== this.state.draft.target.cluster_id || Date.parse(data.expires_at) <= Date.now()) {
+    if (data.capture_id !== captureID || (!this.receipt && data.cluster_id !== this.state.draft.target.cluster_id) || Date.parse(data.expires_at) <= Date.now()) {
       this.publish({ error: 'The saved settings could not be verified. Refresh the history before continuing.' }); return;
     }
     this.publish({ settings: data });
     this.settingsExpiry = setTimeout(() => this.publish({ settings: undefined }), Math.min(2_147_483_647, Date.parse(data.expires_at) - Date.now()));
   };
   closeSettings = () => { clearTimeout(this.settingsExpiry); this.publish({ settings: undefined }); };
+  private prepareHistoryRepeat(captureID: string) {
+    if (!this.receipt) return true;
+    const saved = this.state.settings;
+    const workload = saved?.settings.target.workloadRef;
+    if (this.receipt.captureID !== captureID || saved?.capture_id !== captureID || !workload || Date.parse(saved.expires_at) <= Date.now()) {
+      this.publish({ error: 'View the available saved settings before preparing a new request.' }); return false;
+    }
+    // Only this explicit review action leaves the original progress view.
+    // Current selection/approval happen on the server; the old request continues
+    // independently and its retry receipt/grant/sharing is never reused.
+    const target: Target = { cluster_id: saved.cluster_id, namespace: saved.settings.target.namespace, kind: workload.kind, name: workload.name };
+    this.invalidate(); this.receipt = undefined;
+    this.publish({ draft: { target, retention: '' }, captureID: undefined, progress: undefined, approvalURI: undefined, history: undefined, stage: 'diagnostics' });
+    return true;
+  }
   historyOrigin = async (origin: 'manual' | 'policy' | 'discovery' | 'all') => {
     if (this.receipt || this.state.busy) return;
     this.publish({ historyOrigin: origin, history: undefined, historyMessage: undefined });
@@ -197,7 +212,7 @@ export class Investigation {
   // "Collect again": the server restores the capture's target and requested
   // retention into a fresh preview and runs every current check.
   repeat = async (captureID: string, selection?: 'currentEligiblePod') => {
-    if (this.receipt || this.state.busy) return;
+    if (this.state.busy || !this.prepareHistoryRepeat(captureID)) return;
     this.selected = undefined; this.selectedComposition = undefined; this.repeatOf = captureID; this.reviewed = undefined;
     this.repeatSelection = selection;
     this.repeatRetention = undefined;
@@ -253,21 +268,26 @@ export class Investigation {
   // An already-authored/restored typed composition, not a profile editor or
   // a catalog entry invented by the browser. The server resolves every pin.
   previewComposition = async (composition: NonNullable<Input<'preview_capture'>['profile_composition']>, repeatedFrom?: string, selection?: 'currentEligiblePod', requestedRetention?: string) => {
-    if (this.receipt || this.state.busy) return;
-    if (this.state.draft.sharing?.length) {
+    if (this.state.busy || (this.receipt && !repeatedFrom)) return;
+    if (!this.receipt && this.state.draft.sharing?.length) {
       this.publish({ error: 'Capture-time sharing is not available for this recording review. Remove that instruction before preparing it.' }); return;
     }
-    const input: Input<'preview_capture'> = { target_ref: structuredClone(this.state.draft.target), profile_composition: structuredClone(composition) };
-    if (repeatedFrom) input.repeated_from_capture_id = repeatedFrom;
-    if (selection) input.history_selection = selection;
     const retention = repeatedFrom ? requestedRetention ?? '' : this.state.draft.retention;
+    let requestedSeconds: number | undefined;
     if (retention !== '') {
       const seconds = Number(retention);
       if (!/^[1-9][0-9]*$/.test(retention) || !Number.isSafeInteger(seconds) || seconds > 315360000) {
         this.publish({ error: 'Retention must be a whole number of seconds between 1 and 315360000.' }); return;
       }
-      input.requested_retention_seconds = seconds;
+      requestedSeconds = seconds;
     }
+    // Validate edits before leaving the original progress/settings view, so a
+    // typo can be corrected without losing the snapshot or retry handle.
+    if (this.receipt && !this.prepareHistoryRepeat(repeatedFrom!)) return;
+    const input: Input<'preview_capture'> = { target_ref: structuredClone(this.state.draft.target), profile_composition: structuredClone(composition) };
+    if (repeatedFrom) input.repeated_from_capture_id = repeatedFrom;
+    if (selection) input.history_selection = selection;
+    if (requestedSeconds !== undefined) input.requested_retention_seconds = requestedSeconds;
     this.selected = undefined; this.repeatOf = repeatedFrom; this.reviewed = undefined;
     this.repeatSelection = selection;
     this.repeatRetention = requestedRetention;

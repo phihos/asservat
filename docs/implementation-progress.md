@@ -13,27 +13,43 @@ acceptance; a later grant cannot renew it. History failure leaves an independent
 accepted incident and its start intact. Browser settings/pagination are bounded
 in memory and clear at their original deadlines and session/scope changes.
 
-Focused real SQL/S3 `history-parameters-native-9` passed: actual exit 0, unchanged
-source hashes, empty cleanup failures; selected subtest 7.16 s. It covers
+Focused real SQL/S3 `history-parameters-native-10` passed: actual exit 0, unchanged
+source hashes (including 4,311 captured repository files), empty cleanup failures
+and independently absent owned containers; selected subtest 7.67 s / Go 9.142 s. It covers
 encrypted roundtrip, persisted lineage and source-cutoff/unknown-source refusal,
 own-selector eviction, no plaintext fallback, nanosecond deadline normalization,
 ordinary evidence-prefix deletion refusal, actual matching-prefix inventory before
 refund, and settled projection/counter pruning. Its synthetic snapshot used
-4,216 physical ciphertext bytes against 1,671,168 reserved bytes. Reports/logs
-for all runs 1–9 remain in the local qualification cache. Earlier failures are
+4,214 physical ciphertext bytes against 1,671,168 reserved bytes. Reports/logs
+for all runs 1–10 remain in the local qualification cache. Earlier failures are
 retained: role/identity/time fixture corrections, UTC registration normalization,
 and source authority checked too late after self-eviction. This is component
 evidence, with explicit synthetic authority/process inputs.
 
 Affected package race tests, console checks, specification/architecture/design,
 SQL generation and Helm render/schema gates pass at the recorded checkpoints.
-The browser/restart gate passed 20 synthetic journeys / 17 accessibility scans
-and four restart boundaries / two scans before the final pagination additions;
-final frozen checks remain required. The actual installed recorder → protected
+The authenticated browser alone has a fixed 160 KiB settings response budget,
+under the existing authorization/audit path, covering the 128 KiB snapshot and
+envelope. MCP keeps its standard limit and receives browser navigation when too
+large. Canonical output preserves HTML/multibyte strings without escaping growth;
+only minimized HMAC/count/reference facts enter audit. Direct capture pages now
+open settings and explicitly prepare fresh repeats without inheriting the old
+receipt/grant/sharing. Wrapped, keyboard-scrollable JSON sections keep large
+values within desktop/mobile layouts. The final frozen built-browser gate passed 23
+synthetic journeys / 20 accessibility scans and four restart boundaries / two
+scans, with 4,311 unchanged source hashes and a 22.616 s Go fixture. The 224-test
+console gate, full affected race suites and final pre-push pass. The Discovery
+origin filter is recognized without inventing a discovery capture producer.
+The actual installed recorder → protected
 settings → edited React repeat → new independent grant → native result journey
 is being composed using the existing installed OIDC/recorder fixture. Neither
-API parity nor synthetic UI tests qualify that full workflow. Max-scale cleanup
-query cost and final installed qualification remain pending; REQ-HIS-001–004 and
+API parity nor synthetic UI tests qualify that full workflow. The 100,000-row
+minimal TEMP-table comparison passes old/new 81-ID/fair keyset equivalence:
+the actual indexed retirement adapter took 0.605–0.958 ms over ten executions,
+avoiding a demonstrated cached generic-plan regression near 0.54 s. Two partial
+indexes occupied 90,112 bytes each after churn; detailed transition costs and
+all failed probes remain in ADR-255. These are local synthetic SQL measurements,
+not installed aggregate latency. Final installed qualification remains pending; REQ-HIS-001–004 and
 the full increment are not marked complete by this checkpoint.
 
 ## Approved capture acceptance (ADR-252, 2026-10-27)

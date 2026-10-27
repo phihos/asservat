@@ -35,7 +35,10 @@ CREATE TABLE capture_history_parameter (
  CHECK(state NOT IN('deleting','deleted') OR (write_id IS NULL OR writer_completion_json IS NOT NULL))
 );
 CREATE INDEX capture_history_parameter_selector ON capture_history_parameter(root_id,selector_key,created_at DESC,capture_id DESC) WHERE visible;
-CREATE INDEX capture_history_parameter_retirement ON capture_history_parameter(root_id,summary_expires_at,capture_id) WHERE state<>'deleted';
+CREATE INDEX capture_history_parameter_retirement ON capture_history_parameter(root_id,summary_expires_at,capture_id);
+-- Active-only indexes avoid scanning every retained available snapshot at idle.
+CREATE INDEX capture_history_parameter_hidden ON capture_history_parameter(root_id,capture_id) WHERE NOT visible AND state IN('reserved','available','deleting');
+CREATE INDEX capture_history_parameter_reserved ON capture_history_parameter(root_id,capture_id) INCLUDE(attempt_id) WHERE state='reserved';
 
 -- Independently expiring lineage is not a foreign key or an access grant.
 ALTER TABLE context_capture ADD COLUMN history_parameters_required boolean NOT NULL DEFAULT false;

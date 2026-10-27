@@ -28,12 +28,14 @@ const (
 // is eligible to collect from the current workload.
 var ErrTargetReplaced = errors.New("the repeated workload was recreated")
 
-// HistoryOrigin is manual (a human request) or policy (a policy occurrence).
+// HistoryOrigin also recognizes the discovery read filter. Recognizing that
+// filter does not implement or authorize a discovery capture producer.
 type HistoryOrigin string
 
 const (
-	HistoryManual HistoryOrigin = "manual"
-	HistoryPolicy HistoryOrigin = "policy"
+	HistoryManual    HistoryOrigin = "manual"
+	HistoryPolicy    HistoryOrigin = "policy"
+	HistoryDiscovery HistoryOrigin = "discovery"
 )
 
 // HistoryCursor is the keyset position after the last examined row. It only
@@ -61,11 +63,11 @@ type HistoryQuery struct {
 }
 
 func (q HistoryQuery) Valid(now time.Time) bool {
-	if !authorization.UUID(q.RootID) || !q.Target.Valid() || len(q.Origins) < 1 || len(q.Origins) > 2 || q.Limit < 1 || q.Limit > MaxHistoryPage || !q.Identity.Valid(now) || !q.Recovery.Valid(now) {
+	if !authorization.UUID(q.RootID) || !q.Target.Valid() || len(q.Origins) < 1 || len(q.Origins) > 3 || q.Limit < 1 || q.Limit > MaxHistoryPage || !q.Identity.Valid(now) || !q.Recovery.Valid(now) {
 		return false
 	}
 	for _, o := range q.Origins {
-		if o != HistoryManual && o != HistoryPolicy {
+		if o != HistoryManual && o != HistoryPolicy && o != HistoryDiscovery {
 			return false
 		}
 	}

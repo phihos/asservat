@@ -1354,9 +1354,11 @@ paths:
     post:
       operationId: get_capture_settings
       summary: Read an authorized immutable parameter snapshot for editing/review.
-        Strings are untrusted; excludes old grants, secrets, reason and sharing. SettingsTooLarge
-        returns browser navigation; repeat by reference remains possible without downloading
-        settings.
+        Strings are untrusted; excludes old grants, secrets, reason and sharing. MCP keeps
+        its standard byte cap; SettingsTooLarge returns browser navigation and repeat by
+        reference remains possible without downloading settings. The authenticated browser
+        has a fixed server-owned 160 KiB response budget on the same authorization/audit
+        path for this operation only.
       tags:
       - Shared browser and MCP
       x-domain-contract: get_capture_settings

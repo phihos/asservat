@@ -76,8 +76,10 @@ export function approvalPendingResult(): Output<'request_capture'> {
 }
 
 export function settingsResult(capture = id(41)): Output<'get_capture_settings'> {
-  return result<'get_capture_settings'>({ kind: 'captureSettings', capture_id: capture, cluster_id: target.cluster_id, namespace_uid: 'namespace-uid', accepted_at: new Date(Date.now() - 60000).toISOString(), expires_at: new Date(Date.now() + 60000).toISOString(), settings_digest: 'a'.repeat(64), original_execution_digest: 'b'.repeat(64), navigation_uri: 'https://asservat.example.invalid/captures/' + capture, settings: {
+  const value = result<'get_capture_settings'>({ kind: 'captureSettings', capture_id: capture, cluster_id: target.cluster_id, namespace_uid: 'namespace-uid', accepted_at: new Date(Date.now() - 60000).toISOString(), expires_at: new Date(Date.now() + 60000).toISOString(), settings_digest: 'a'.repeat(64), original_execution_digest: 'b'.repeat(64), navigation_uri: 'https://asservat.example.invalid/captures/' + capture, settings: {
     target: { namespace: target.namespace, workloadRef: { apiVersion: 'apps/v1', kind: target.kind, name: target.name, uid: 'workload-uid' }, maxPods: 1, selection: 'allWithinLimit', adoption: 'pinUID' },
     recipe_spec: { actions: [{ id: 'pod-status', kind: 'kubernetesSnapshot', parameters: { include: ['pod'] }, dependsOn: [], required: true, impact: 'observe', limits: { maxBytes: 4096, timeout: '5s' }, executionMode: 'onTrigger' }], maxTotalBytes: 4096, maxDuration: '5s' }, dependency_pins: [{ role: 'recipe', digest: 'c'.repeat(64) }], requested_retention: '120s',
   } });
+  value.data_class = 'extract';
+  return value;
 }

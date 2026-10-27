@@ -11,6 +11,7 @@ import (
 
 	identities "asservat.local/asservat/internal/application/identity"
 	planning "asservat.local/asservat/internal/application/planning"
+	"asservat.local/asservat/internal/contracts"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 )
@@ -86,10 +87,17 @@ func (s *ContextOperations) historyCall(ctx context.Context, current identities.
 			return nil, nil, time.Time{}, value.ErrUnavailable
 		}
 		canonical := jsontext.Value(b)
-		if canonical.Canonicalize() != nil || json.Unmarshal(canonical, &view) != nil {
+		// Unmarshal into a fresh projection: RawMessage.UnmarshalJSON can reuse
+		// capacity, so filling view again would mutate the caller's snapshot.
+		var canonicalView CaptureSettingsView
+		if canonical.Canonicalize() != nil || json.Unmarshal(canonical, &canonicalView) != nil {
 			return nil, nil, time.Time{}, value.ErrUnavailable
 		}
-		if len(b) > 24<<10 || len(canonical) > 24<<10 {
+		limit := contracts.InvestigationOutputLimit
+		if browserSettingsView(ctx, name) {
+			limit = value.MaxHistoryParameters
+		}
+		if (!browserSettingsView(ctx, name) && len(b) > limit) || len(canonical) > limit {
 			return nil, nil, time.Time{}, value.ErrSettingsTooLarge
 		}
 		d := sha256.Sum256(canonical)
@@ -97,15 +105,17 @@ func (s *ContextOperations) historyCall(ctx context.Context, current identities.
 			d = settings.SettingsKey
 		}
 		return CaptureSettingsRecord{Kind: "captureSettings", CaptureID: settings.CaptureID, ClusterID: settings.ClusterID, NamespaceUID: settings.NamespaceUID, AcceptedAt: settings.AcceptedAt, ExpiresAt: settings.ExpiresAt,
-			SettingsDigest: hex.EncodeToString(d[:]), ExecutionDigest: hash(settings.ExecutionDigest), Settings: view, NavigationURI: s.config.PublicOrigin + "/captures/" + settings.CaptureID}, nil, settings.ValidUntil, nil
+			SettingsDigest: hex.EncodeToString(d[:]), ExecutionDigest: hash(settings.ExecutionDigest), Settings: canonicalView, NavigationURI: s.config.PublicOrigin + "/captures/" + settings.CaptureID}, nil, settings.ValidUntil, nil
 	}
 	origins := []value.HistoryOrigin{value.HistoryManual}
 	switch in.Origin {
 	case "", "manual":
 	case "policy":
 		origins = []value.HistoryOrigin{value.HistoryPolicy}
+	case "discovery":
+		origins = []value.HistoryOrigin{value.HistoryDiscovery}
 	case "all":
-		origins = []value.HistoryOrigin{value.HistoryManual, value.HistoryPolicy}
+		origins = []value.HistoryOrigin{value.HistoryManual, value.HistoryPolicy, value.HistoryDiscovery}
 	default:
 		return nil, nil, time.Time{}, value.ErrInvalid
 	}

@@ -34,8 +34,31 @@ UPDATE capture_history_parameter SET state='deleting',delete_id=$3,delete_execut
 SELECT * FROM capture_history_parameter WHERE root_id=$1 AND visible AND summary_expires_at<=sqlc.arg(through)::timestamptz ORDER BY summary_expires_at,capture_id LIMIT 16 FOR UPDATE;
 
 -- name: ListHistoryRetirementCandidates :many
-SELECT h.capture_id,a.cluster_id,h.state FROM capture_history_parameter h JOIN custody_attempt a ON a.id=h.attempt_id
-WHERE h.root_id=$1 AND (sqlc.narg(after_id)::uuid IS NULL OR h.capture_id>sqlc.narg(after_id)::uuid) AND (((h.visible OR h.state='deleted') AND h.summary_expires_at<=sqlc.arg(through)::timestamptz) OR (h.state IN('reserved','available','deleting') AND (a.effective_expires_at<=sqlc.arg(through)::timestamptz OR NOT h.visible OR (h.state='reserved' AND a.write_until<=sqlc.arg(through)::timestamptz))))
+-- Each purpose-specific due index supplies at most 16 IDs before deduplication.
+-- The effective-custody branch uses its existing nondeleted partial index:
+-- typed settlement changes both history and custody to deleted in one transaction.
+WITH candidates AS (
+ (SELECT h.capture_id FROM capture_history_parameter h
+  WHERE h.root_id=sqlc.arg(root_id)::uuid AND (sqlc.narg(after_id)::uuid IS NULL OR h.capture_id>sqlc.narg(after_id)::uuid)
+   AND (h.visible OR h.state='deleted') AND h.summary_expires_at<=sqlc.arg(through)::timestamptz
+  ORDER BY h.capture_id LIMIT 16)
+ UNION
+ (SELECT h.capture_id FROM capture_history_parameter h
+  WHERE h.root_id=sqlc.arg(root_id)::uuid AND (sqlc.narg(after_id)::uuid IS NULL OR h.capture_id>sqlc.narg(after_id)::uuid)
+   AND NOT h.visible AND h.state IN('reserved','available','deleting')
+  ORDER BY h.capture_id LIMIT 16)
+ UNION
+ (SELECT h.capture_id FROM custody_attempt a JOIN capture_history_parameter h ON h.attempt_id=a.id
+  WHERE h.root_id=sqlc.arg(root_id)::uuid AND (sqlc.narg(after_id)::uuid IS NULL OR h.capture_id>sqlc.narg(after_id)::uuid)
+   AND a.state<>'deleted' AND a.effective_expires_at<=sqlc.arg(through)::timestamptz AND h.state IN('reserved','available','deleting')
+  ORDER BY h.capture_id LIMIT 16)
+ UNION
+ (SELECT h.capture_id FROM capture_history_parameter h JOIN custody_attempt a ON a.id=h.attempt_id
+  WHERE h.root_id=sqlc.arg(root_id)::uuid AND (sqlc.narg(after_id)::uuid IS NULL OR h.capture_id>sqlc.narg(after_id)::uuid)
+   AND h.state='reserved' AND a.write_until<=sqlc.arg(through)::timestamptz
+  ORDER BY h.capture_id LIMIT 16)
+)
+SELECT h.capture_id,a.cluster_id,h.state FROM candidates c JOIN capture_history_parameter h ON h.capture_id=c.capture_id JOIN custody_attempt a ON a.id=h.attempt_id
 ORDER BY h.capture_id LIMIT 16;
 
 -- name: DeleteSettledHistoryParameters :execrows

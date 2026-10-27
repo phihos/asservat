@@ -225,7 +225,7 @@ func historyEntries(ctx context.Context, tx *custodydb.Queries, root string, vis
 			entry.SettingsExpiresAt = identity.Earlier(entry.ExpiresAt, f.HistorySettingsExpires.Time)
 			if !now.Before(entry.SettingsExpiresAt) {
 				entry.RepeatState = "parametersExpired"
-			} else if f.HistoryParametersState.String != "available" {
+			} else if f.HistoryParametersState.String != "available" || f.HistoryCustodyState.String != artifact.StoredUnpublished {
 				entry.RepeatState = "parametersUnavailable"
 			} else if entry.Origin == value.HistoryPolicy {
 				entry.RepeatState = "requiresSelection"

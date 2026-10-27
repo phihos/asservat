@@ -101,6 +101,11 @@ func historyStorage(ctx context.Context, q *custodydb.Queries, h custodydb.Captu
 	if err != nil || !r.Registration.Equal(e.Registration) {
 		return out, value.ErrUnavailable
 	}
+	// An old restored header cannot override the generic deletion tombstone
+	// or an incomplete writer. Both persisted records must agree on storage.
+	if h.State == "available" && r.State != artifact.StoredUnpublished {
+		return out, value.ErrSettingsUnavailable
+	}
 	var retention value.HistoryRetention
 	if json.Unmarshal(h.RetentionJson, &retention) != nil || !retention.Valid() {
 		return out, value.ErrUnavailable
@@ -648,6 +653,22 @@ func (s *HistoryParametersLedger) ReadHistoryStorage(ctx context.Context, in val
 	return out, required, nil
 }
 
+type historyRetirementHintDB struct{ custodydb.DBTX }
+
+func (db historyRetirementHintDB) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	// Cache only parameter/result descriptions for this date-sensitive hint.
+	// A named generic plan reproduced 100k idle probes after five executions.
+	// CacheDescribe keeps one steady round trip and plans the original bounds.
+	return db.DBTX.Query(ctx, sql, append([]any{pgx.QueryExecModeCacheDescribe}, args...)...)
+}
+
+// ReadHistoryRetirementHints exposes only the generated routing query so the
+// real-SQL cost regression exercises the production execution mode as well as
+// its SQL. Returned IDs never grant read, write or deletion authority.
+func ReadHistoryRetirementHints(ctx context.Context, db custodydb.DBTX, args custodydb.ListHistoryRetirementCandidatesParams) ([]custodydb.ListHistoryRetirementCandidatesRow, error) {
+	return custodydb.New(historyRetirementHintDB{db}).ListHistoryRetirementCandidates(ctx, args)
+}
+
 // HistoryRetirementCandidates is a minimized bounded maintenance hint. It
 // grants no deletion authority and includes no payload, key or object locator.
 func (s *HistoryParametersLedger) HistoryRetirementCandidates(ctx context.Context, through time.Time, after string) ([]value.HistoryRetirementCandidate, error) {
@@ -656,7 +677,7 @@ func (s *HistoryParametersLedger) HistoryRetirementCandidates(ctx context.Contex
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	rows, err := custodydb.New(s.ledger.pool).ListHistoryRetirementCandidates(call, custodydb.ListHistoryRetirementCandidatesParams{RootID: id(s.root), Through: ts(through), AfterID: id(after)})
+	rows, err := ReadHistoryRetirementHints(call, s.ledger.pool, custodydb.ListHistoryRetirementCandidatesParams{RootID: id(s.root), Through: ts(through), AfterID: id(after)})
 	if err != nil {
 		return nil, value.ErrUnavailable
 	}

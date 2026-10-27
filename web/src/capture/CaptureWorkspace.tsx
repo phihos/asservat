@@ -113,12 +113,12 @@ function SavedSettings({ settings, busy, controller }: { settings: Data<'get_cap
     if (typeof field.value === typeof value) field.value = value as typeof field.value;
     setComposition(changed);
   };
-  return <section className="review-section" aria-label="Saved capture settings">
+  return <section className="review-section saved-settings" aria-label="Saved capture settings">
     <h3>Saved settings</h3>
     <p>Requested retention: {'requested_retention' in settings.settings ? settings.settings.requested_retention : 'Installation default'}. Available until {new Date(settings.expires_at).toLocaleString()}.</p>
     {selection && <p>The original policy selected a triggering Pod. This review selects a current eligible Pod of the same workload.</p>}
-    {provenance && <><h4>Authored profiles and version pins</h4><pre>{JSON.stringify(provenance, null, 2)}</pre></>}
-    <h4>Accepted settings</h4><pre>{JSON.stringify(settings.settings, null, 2)}</pre>
+    {provenance && <><h4>Authored profiles and version pins</h4><pre tabIndex={0} role="region" aria-label="Authored profiles JSON">{JSON.stringify(provenance, null, 2)}</pre></>}
+    <h4>Accepted settings</h4><pre tabIndex={0} role="region" aria-label="Accepted settings JSON">{JSON.stringify(settings.settings, null, 2)}</pre>
     {composition && <fieldset disabled={busy}><legend>Adjust saved recording settings</legend>
       <label>New requested retention in seconds (optional)<input type="number" min="1" step="1" value={retention} onChange={event => setRetention(event.currentTarget.value)} /></label>
       <label>Maximum duration <input value={composition.maxDuration} onChange={event => setComposition({ ...composition, maxDuration: event.currentTarget.value })} /></label>
@@ -225,6 +225,9 @@ export function CaptureWorkspace({ session, scope, controller }: { session: Sess
         {state.progress.blockers.map((blocker, index) => <p className="notice" key={index}>{blocker.message}</p>)}
         {state.progress.sharing && <p role="status">{sharingLabels[state.progress.sharing.state]}</p>}
         {state.progress.case_id && <p><a className="button" href={"/cases/" + state.progress.case_id}>View evidence</a></p>}
+        {state.progress.history_state === 'available' && <Button className="button secondary" isDisabled={state.busy} onPress={() => void controller.showSettings(state.progress!.capture_id)}>View settings</Button>}
+        {state.progress.history_state === 'unavailable' && <p>Saved settings are unavailable. Start a new investigation to prepare a request with your current settings.</p>}
+        {state.settings && <><p>Reviewing these settings prepares a new request. The original capture is not cancelled.</p><SavedSettings key={state.settings.settings_digest} settings={state.settings} busy={state.busy} controller={controller} /></>}
       </> : !state.error && <p role="status">Checking collection status…</p>}
       {state.canContinue && <div className="actions"><Button className="button" isDisabled={state.busy} onPress={() => void controller.continueAcquisition()}>{state.continuing ? 'Continuing collection…' : 'Continue collection'}</Button><p>Continues the original capture and checks your current access.</p></div>}
       {state.captureID && <p><a href="/captures/new">Start a new investigation</a>. This does not cancel the original collection.</p>}
