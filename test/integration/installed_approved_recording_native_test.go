@@ -190,7 +190,7 @@ func (b *installedBrowser) approvedRecordingStepUp(t *testing.T, ctx context.Con
 	b.csrf = view.CSRF
 }
 
-func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func()) {
+func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), historyPhase func(string)) {
 	t.Helper()
 	if _, err := os.Stat("/etc/asservat-disposable-host"); err != nil {
 		t.Fatal("approved recording requires disposable runner", err)
@@ -535,7 +535,8 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	// The original requester browser creates a new
 	// repeat; the separate reviewer only authenticates and decides its new grant.
 	if installedJourneyFocus() == "approved-recording" {
-		qualifyInstalledRecorderHistory(t, ctx, self, address, arguments["target_ref"].(map[string]string), receipt.CaptureID, grantID, invoke, func(approvalCtx context.Context, repeatGrant string) {
+		historyPhase(receipt.CaptureID)
+		qualifyInstalledRecorderHistory(t, ctx, self, address, arguments["target_ref"].(map[string]string), receipt.CaptureID, grantID, invoke, func(captureID string) { historyPhase(captureID); diagnose() }, func(approvalCtx context.Context, repeatGrant string) {
 			browser.approvedRecordingStepUp(t, approvalCtx, reviewer, repeatGrant)
 			if code := browserCallCurrent(approvalCtx, browser, "decide_review", map[string]any{"grant_id": repeatGrant, "decision": "approve", "reason": "independent installed edited history repeat", "idempotency_key": "installed-history-approval-" + repeatGrant}, nil); code != "" {
 				t.Fatal("signed independent history decision", code)

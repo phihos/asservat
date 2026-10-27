@@ -316,7 +316,7 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 	if err != nil {
 		return nil, mounts.ErrUnavailable
 	}
-	out.history = &captureapp.HistoryParameterService{RootID: root, InstallationID: installation, Ledger: historySQL, Regional: RegionalHistoryDispatch{Router: router, Signer: signers, Now: time.Now}, Codec: objectstore.HistoryCodec{Sealer: a.seal, Opener: a.open, Keys: out.mac}, Keys: out.mac, Recovery: out.recovery, Retention: out.retention, Limits: historyBounds}
+	out.history = &captureapp.HistoryParameterService{RootID: root, InstallationID: installation, Ledger: historySQL, Regional: RegionalHistoryDispatch{Router: router, Signer: signers, Now: time.Now}, Codec: objectstore.HistoryCodec{Sealer: a.seal, Opener: a.open, Keys: out.mac}, Keys: out.mac, Recovery: out.recovery, Retention: out.retention, Limits: historyBounds, ReportFailure: eventLog(os.Stderr, "history unavailable")}
 
 	// ADR-228: policy captures share the investigation; the eligibility port
 	// evaluates a policy executor through its acceptance and team delegation.

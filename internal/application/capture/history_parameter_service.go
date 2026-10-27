@@ -41,13 +41,17 @@ type HistoryParameterService struct {
 	Limits                 value.HistoryLimits
 	NewID                  func() string
 	Now                    func() time.Time
+	// ReportFailure receives only closed operation/stage/context-state words.
+	ReportFailure func(string)
 }
 
 func (s HistoryParameterService) configured() bool {
 	return authorization.UUID(s.RootID) && authorization.UUID(s.InstallationID) && s.Ledger != nil && s.Regional != nil && s.Codec != nil && s.Keys != nil && s.Recovery != nil && s.Retention != nil && s.Limits.Valid() && s.NewID != nil && s.Now != nil
 }
 
-func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Accepted, i identity.Identity, p value.HistoryParameters, source *value.HistoryLineage) error {
+func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Accepted, i identity.Identity, p value.HistoryParameters, source *value.HistoryLineage) (failure error) {
+	stage := "input"
+	defer func() { s.reportFailure(ctx, "write", stage, failure) }()
 	if !s.configured() || ctx == nil || !p.Valid() || accepted.Expectation.Validate() != nil || accepted.CaptureID != accepted.Expectation.CaptureUID || p.OriginalExecutionDigest != accepted.ScopeDigest || accepted.Replay {
 		return value.ErrHistoryUnavailable
 	}
@@ -57,25 +61,30 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	}
 	// Validate and bound the immutable plaintext before reserving storage or
 	// invoking any KMS/backend operation.
+	stage = "parameters"
 	plain, err := value.CanonicalHistoryParameters(p)
 	if err != nil {
 		return err
 	}
 	clear(plain)
+	stage = "keys"
 	selector, settings, err := HistoryParameterKeys(s.Keys, s.RootID, p)
 	if err != nil {
 		return err
 	}
+	stage = "recovery"
 	recovery, err := s.Recovery.RecoveryState(ctx)
 	if err != nil || recovery.InstallationID != s.InstallationID || !recovery.Valid(s.Now()) {
 		return value.ErrHistoryUnavailable
 	}
 	target := authorization.Target{ClusterID: p.Target.ClusterID, NamespaceUID: p.NamespaceUID, WorkloadUID: p.WorkloadUID, PodUID: original.PodUID}
+	stage = "retention"
 	retention, err := s.Retention.ResolveCaseMetadata(ctx, privacy.Input{ControlKind: "case-metadata", Target: target, PrivacyClass: "potentialPersonalData", EvidenceType: "other", AnchorAt: accepted.CreatedAt})
 	if err != nil {
 		return err
 	}
 	expiry, deleteBy := retention.ExpiresAt, retention.DeleteBy
+	stage = "source"
 	if source != nil {
 		if !source.Valid(s.Now()) {
 			return value.ErrSettingsUnavailable
@@ -92,18 +101,22 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	r.ExpiresAt = expiry
 	r.DeleteBy = deleteBy
 	e := value.HistoryExpectation{RootID: s.RootID, CaptureID: accepted.CaptureID, Registration: r, SelectorKey: selector, SettingsKey: settings, MACVersion: s.Keys.AccountVersion(), OriginalExecutionDigest: accepted.ScopeDigest}
+	stage = "expectation"
 	if !e.Valid() {
 		return value.ErrSettingsUnavailable
 	}
+	stage = "reserve"
 	storage, err := s.Ledger.ReserveHistoryParameters(ctx, value.HistoryReservation{Expectation: e, Identity: i, Recovery: recovery, Limits: s.Limits, SummaryExpiresAt: retention.ExpiresAt, Retention: retention, Source: source})
 	if err != nil {
 		return err
 	}
+	stage = "seal"
 	bundle, err := s.Codec.SealHistory(ctx, e, p)
 	if err != nil {
 		return err
 	}
 	defer bundle.Clear()
+	stage = "prepare"
 	session, err := s.Regional.PrepareHistory(ctx, p.Target.ClusterID, accepted.CaptureID)
 	if err != nil {
 		return err
@@ -111,18 +124,22 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 	defer session.Close()
 	operation, cancel := context.WithDeadline(ctx, session.NotAfter())
 	defer cancel()
+	stage = "bundle"
 	bundleDigest, err := value.HistoryCiphertextsDigest(bundle)
 	if err != nil {
 		return err
 	}
+	stage = "claim"
 	authority, err := s.Ledger.ClaimHistoryWrite(operation, value.HistoryWriteRequest{Storage: storage, Identity: i, Recovery: recovery, RequestID: s.NewID(), ExecutorEpoch: session.ExecutorEpoch(), BundleDigest: bundleDigest})
 	if err != nil {
 		return err
 	}
+	stage = "execute"
 	reply, err := session.ExecuteHistory(operation, authority, bundle, artifact.Copies{})
 	if err != nil {
 		return err
 	}
+	stage = "completion"
 	if reply.WriterCompletion == nil || !reply.WriterCompletion.Valid(e) || reply.WriterCompletion.OperationID != authority.RequestID || reply.WriterCompletion.ProcessEpoch != authority.ExecutorEpoch || reply.Copies.Validate(r) != nil || reply.WriterCompletion.CopiesDigest != value.HistoryCopiesDigest(reply.Copies) {
 		return artifact.ErrIntegrity
 	}
@@ -131,6 +148,7 @@ func (s HistoryParameterService) Persist(ctx context.Context, accepted value.Acc
 			return artifact.ErrIntegrity
 		}
 	}
+	stage = "settle"
 	return s.Ledger.CompleteHistoryWrite(ctx, value.HistoryWriteResult{Authority: authority, Copies: reply.Copies, Completion: *reply.WriterCompletion, Recovery: recovery})
 }
 
@@ -140,25 +158,31 @@ func (s HistoryParameterService) ListCaptureHistory(ctx context.Context, q value
 	}
 	return s.Legacy.ListCaptureHistory(ctx, q)
 }
-func (s HistoryParameterService) ReadCaptureSettings(ctx context.Context, q value.SettingsQuery) (value.CaptureSettings, error) {
+func (s HistoryParameterService) ReadCaptureSettings(ctx context.Context, q value.SettingsQuery) (result value.CaptureSettings, failure error) {
+	stage := "input"
+	defer func() { s.reportFailure(ctx, "read", stage, failure) }()
 	var zero value.CaptureSettings
 	if !s.configured() || !q.Valid(s.Now()) || q.RootID != s.RootID {
 		return zero, value.ErrDenied
 	}
+	stage = "storage"
 	storage, required, err := s.Ledger.ReadHistoryStorage(ctx, q)
 	if err != nil {
 		return zero, err
 	}
+	stage = "legacy"
 	if !required {
 		if s.Legacy == nil {
 			return zero, value.ErrSettingsUnavailable
 		}
 		return s.Legacy.ReadCaptureSettings(ctx, q)
 	}
+	stage = "retention"
 	retained, err := s.Retention.ResolveRetainedCaseMetadata(ctx, storage.Retention.Input, storage.Effective, storage.Retention.Origins)
 	if err != nil || !s.Now().Before(retained.ExpiresAt) {
 		return zero, value.ErrSettingsUnavailable
 	}
+	stage = "prepare"
 	session, err := s.Regional.PrepareHistory(ctx, storage.Expectation.Registration.Location.ClusterID, q.CaptureID)
 	if err != nil {
 		return zero, value.ErrSettingsUnavailable
@@ -167,21 +191,25 @@ func (s HistoryParameterService) ReadCaptureSettings(ctx context.Context, q valu
 	operation, cancel := context.WithDeadline(ctx, session.NotAfter())
 	defer cancel()
 	in := value.HistoryReadRequest{Retention: retained, Query: q, RequestID: s.NewID(), ExecutorEpoch: session.ExecutorEpoch()}
+	stage = "authorize"
 	permission, err := s.Ledger.AuthorizeHistoryRead(operation, in)
 	if err != nil {
 		return zero, err
 	}
+	stage = "execute"
 	reply, err := session.ExecuteHistory(operation, permission.Authority, value.HistoryCiphertexts{}, permission.Storage.Copies)
 	if err != nil {
 		return zero, value.ErrSettingsUnavailable
 	}
 	defer reply.Bundle.Clear()
+	stage = "open"
 	p, err := s.Codec.OpenHistory(operation, permission.Storage.Expectation, permission.Storage.Copies, reply.Bundle)
 	if err != nil {
 		return zero, value.ErrSettingsUnavailable
 	}
 	// The original operation stays finite across provider/object I/O. A second
 	// current SQL check grants no extra lifetime and prevents stale disclosure.
+	stage = "final"
 	final, err := s.Ledger.AuthorizeHistoryRead(operation, in)
 	if err != nil || !s.Now().Before(permission.Authority.NotAfter) || value.HistoryExpectationDigest(final.Storage.Expectation) != value.HistoryExpectationDigest(permission.Storage.Expectation) {
 		return zero, value.ErrSettingsUnavailable

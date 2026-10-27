@@ -526,7 +526,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 		}
 		if installedJourneyFocus() == "approved-recording" {
 			t.Run("approved-recording", func(t *testing.T) {
-				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose)
+				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, func(captureID string) { installedHistoryStorageDiagnostics(t, ctx, admin, p.RootID, captureID) })
 			})
 			return
 		}

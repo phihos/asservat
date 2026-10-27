@@ -236,3 +236,57 @@ installed console/history remains unqualified. The later PR100 target
 composition and executable browser fixture wiring are recorded separately in
 the progress record; prior native results above retain their original source
 provenance.
+
+## Original submission budget and installed read failure
+
+Installed run 40596917652 on `3673c264` reached one accepted approved capture
+and its authenticated native PCAPNG download, then failed at the first
+`get_capture_settings` with `ParametersUnavailable`, before React editing or a
+repeat. Go took 625.780s and the approved subtest 152.28s. All 3,249 source hashes
+matched, source stayed unchanged and cleanup was empty; environment report
+SHA-256 `7c1509ce004a716d6dfe3b85d52a9da111af9d76213d5ff57bc943812bd2d1f9`.
+The first 2,660-byte PCAPNG has SHA-256
+`8734a0032c1bbc89118a851703f86111a3e5cc70a6a7f27185df49ab30341b2d`.
+The whole approved/history case failed; no final approved-recording report was
+written. That failure alone does not distinguish an absent/incomplete snapshot
+from a retained read, relay or codec failure.
+
+A deterministic application regression reproduces a concrete ordering defect:
+admission and acknowledged intent succeed, then Start consumes the original
+five-second invocation and returns an uncertain deadline error. Deferred history
+runs afterward with zero budget, records nothing and cannot be retried by passive
+replay. The local RED preserves the accepted capture and one start; it is not
+proof that this was the hosted failure's precise phase.
+
+The same synchronous advisory history attempt now runs after acknowledged intent
+and current identity, before blocking Start. An early failure retains the one
+existing best-effort attempt; replay remains passive. All work retains the
+original invocation, identity, source and accepted deadlines. Provider counts
+remain three wraps/four PUTs per successful snapshot, with zero eager GETs; this
+moves their latency earlier on the dispatch critical path. A current identity
+check follows that blocking work before Start (one additional existing-port
+recheck per dispatch attempt reaching this boundary, including explicit
+continuation). No timer, background task, retry, durable phase,
+credential or storage path is added. A quick history error still permits Start
+when time remains. Slow history can consume the original budget and prevent
+Start; admission remains accepted, and no deadline is extended. Installed timing
+must establish the combined cost before this workflow is qualified.
+
+Closed write/read stage and original-invocation context-state words use one
+private constructor callback through the existing bounded event logger. They
+never include provider errors, identities, parameters, credentials or object/key
+locators; the public ParametersUnavailable response is unchanged. The fixture
+also logs one exact capture's closed header/custody states and numeric receipt
+count before history and on failure, using its existing administrator connection.
+This is diagnostic fixture authority only. Subsequent failure invokes existing
+process diagnostics so a write outage and read/relay/codec failure are separable.
+No settings operation grants evidence read, download or cleanup authority, and
+no hub connection to regional S3 is introduced. Fresh installed qualification
+remains required.
+
+Local focused sequencing/diagnostic tests pass (0.019s); full capture/bootstrap/
+presentation race suites pass in 11.019s / 52.790s / 74.493s, and the local browser
+proxy helper race passes in 1.072s. Canonical pre-push passes with the existing
+spec virtualenv and pinned sqlc, including 227 console tests. The initial
+sequencing RED and a subsequent diagnostic-test duplicate-field compile failure
+are retained separately. No external fixture or collector ran for this fix.
