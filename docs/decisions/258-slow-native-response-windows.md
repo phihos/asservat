@@ -114,6 +114,40 @@ unchanged short key-binding proof dates, missing-producer refusal, actual expiry
 cancellation and inability to serialize the private admission. These are unit
 boundaries, not real Kubernetes TokenReview qualification.
 
+Prior real Kubernetes producer qualification passed with a fixed fixture proof factory:
+`TestDownloadWorkerProofWithRealKubernetesTLS`, 6.92 s selected test / 7.988 s Go
+package, exit 0. The dedicated-audience bound token's `TokenNotAfter` equals the
+actual TokenRequest `status.expirationTimestamp`. One initial proof used two
+TokenReviews and eight live-object GETs. After the original five-second proof
+expired at wall time, twelve response checks performed twelve explicitly
+synthetic SQL observations and zero Kubernetes requests. Missing tokens and
+missing purpose-specific expiry producers deny; wrong audience/binding, changed
+spec and deleting objects retain their real-API negatives.
+
+A separate trusted-clock check advances the attester to the actual returned
+token expiry: wall-time TokenReview still authenticates, then the existing
+reviewed-expiry parser refuses after one TokenReview and before any object GET.
+This does not claim a wall-clock-expired TokenReview result or wait ten minutes.
+Dispatch pins, certificate issuance and operation/SQL authority remain fixture
+inputs. All 3,180 source hashes matched and cleanup failures were empty; no owned
+Docker or Kind resources remained. Archived report
+`~/.cache/asservat-build/codex-bf86-resume/native-response-qualification/native-response-proof-kube-1-environment.json`,
+SHA256 `d2e556ea1f39db5aaa98828903c9e7e7f1b1f297eee8b9d4f638da5659d345ea`.
+A corrected factory run additionally feeds the actual supplied token through
+`NativeOrigins` into the attester; an invalid supplied token is denied by one
+real TokenReview before any GET. The positive and repeated-check counts remain
+two TokenReviews/eight GETs initially and zero Kubernetes calls for twelve later
+checks. The selected test passed in 7.44 s / Go package 8.559 s, exit 0; phase
+including compile was approximately 44.0 s. All 3,180 source hashes matched,
+cleanup failures were empty and the owned resources were gone. An unrelated
+HAPTIC cluster was left untouched. Archived final report
+`~/.cache/asservat-build/codex-bf86-resume/native-response-qualification/native-response-proof-kube-2-environment.json`,
+SHA256 `b7d5db04b506d0dc5b51a68a38231daa4e8cfabf220339c61ee718a97984ab7b`.
+The prior report qualifies its producer source, not this corrected token handoff.
+
+The [remaining installed qualification plan](../research/native-response-qualification.md)
+keeps this producer result distinct from a paced installed transfer.
+
 Selected real SQL qualification passed on 2026-10-27:
 `TestContextAdmissionWithRealServices/download-worker-native-owner-renewal`:
 subtest 10.75 s, top-level 11.23 s, Go exit 0, harness phase including compile

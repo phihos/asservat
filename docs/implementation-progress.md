@@ -67,8 +67,26 @@ The final objectstore/evidence/native race suites passed
 retains the same actual 4 KiB SQL/S3/TLS/key-slot scope and synthetic authority
 boundaries; the earlier native7 report remains labeled as the prior candidate.
 
-Pod-proof/bootstrap/human inputs remain synthetic. Actual Kubernetes attestation,
-paced composed 8 MiB transfer and aggregate installed SQL/S3/KMS/API cost,
+The response-proof producer now also passes the existing owned Kubernetes/TLS
+fixture: selected test 7.44 s, Go package 8.559 s, exit 0. Its reviewed expiry
+matches the actual TokenRequest expiration. The proof factory consumes the
+actual token supplied to NativeOrigins; an invalid supplied token is refused by
+one TokenReview before any GET. Initial attestation made two
+TokenReviews and eight GETs; twelve response checks after the original proof's
+actual five-second expiry made zero Kubernetes requests and twelve synthetic SQL
+observations. Missing token/expiry producer, wrong audience/binding, changed spec
+and deleting-object negatives pass. Advancing only the trusted attester clock to
+the actual returned expiration refuses after one real wall-time TokenReview and
+zero GETs; this does not claim real-time token expiration. All 3,180 recorded
+hashes match, cleanup is empty and no owned Docker/Kind resources remain.
+Archived report
+`~/.cache/asservat-build/codex-bf86-resume/native-response-qualification/native-response-proof-kube-2-environment.json`
+has SHA256 `b7d5db04b506d0dc5b51a68a38231daa4e8cfabf220339c61ee718a97984ab7b`.
+
+The SQL transfer's Pod-proof/bootstrap/human inputs and the Kubernetes producer
+fixture's SQL/dispatch/certificate-issuance inputs remain synthetic. Installed
+composition of both, paced composed 8 MiB transfer and aggregate installed
+SQL/S3/KMS/API cost,
 installed transfer and practical slower-link qualification remain pending. The
 candidate ceiling implies roughly 0.4 MiB/s
 for a full 8 MiB window before control overhead. This does not complete S-02 or
