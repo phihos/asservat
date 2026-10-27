@@ -282,6 +282,10 @@ func TestNodeCollectorWithRealKubernetes(t *testing.T) {
 		t.Fatalf("status interval %v", interval)
 	}
 
+	if b, err := k.CoreV1().Pods(f.CollectorNamespace).GetLogs(first.Name, &core.PodLogOptions{LimitBytes: ptr.To[int64](8 << 10)}).DoRaw(ctx); err == nil {
+		results["collectorLog"] = strings.Split(strings.TrimSpace(string(b)), "\n")
+	}
+
 	// 4. A restart is a new collector generation: new Pod, new epoch; the old
 	// process's certificate stops authenticating.
 	if err := k.CoreV1().Pods(f.CollectorNamespace).Delete(ctx, first.Name, meta.DeleteOptions{}); err != nil {

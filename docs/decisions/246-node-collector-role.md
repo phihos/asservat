@@ -127,6 +127,15 @@ proceed.
 - **Budget policy node limits** are accepted and intersectable but not yet read at admission
   (increment 6 reserves rings).
 - **Engine**: only the local runtime's host initialization is exercised; no gadget runs.
+- **S-03 node-local readers (backlog, not implemented).** ADR-241 refused the resource options
+  that need node-local cgroup files (CPU throttling, memory growth rate, PSI) and stdout/stderr
+  stream filters for log triggers, pending a node-local reader. This role is the intended host
+  for both: it already runs once per node in the host PID namespace with an attested identity and
+  a status/work channel to the connector, so detector readings would travel as typed work and
+  receipts on this channel instead of a second node agent. Each needs its own read-only host
+  mount (the host cgroup v2 hierarchy for cgroup files, `/var/log/pods` for container log
+  streams), which this increment does not add, and its own gate answers (exposure of other
+  tenants' cgroup and log files on the node, read cost per tracked Pod per poll).
 - **Probe once per process**: kernel facts do not change without a reboot (which is a new
   process); the engine and BPF facts are not re-probed.
 
