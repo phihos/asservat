@@ -29,7 +29,7 @@ const (
 	MaxHistoryManifestCiphertext = MaxHistoryManifest + artifact.CipherOverhead
 	MaxHistoryCommitCiphertext   = 32 << 10
 	// Array brackets, three commas and eight quotes, then exact base64 sizes.
-	HistoryBundleMaxBytes = 13 + 4*((MaxHistoryDataCiphertext+2)/3+(MaxHistoryIndexCiphertext+2)/3+(MaxHistoryManifestCiphertext+2)/3+(MaxHistoryCommitCiphertext+2)/3)
+	HistoryBundleMaxBytes = int(13 + 4*((MaxHistoryDataCiphertext+2)/3+(MaxHistoryIndexCiphertext+2)/3+(MaxHistoryManifestCiphertext+2)/3+(MaxHistoryCommitCiphertext+2)/3))
 )
 
 // HistoryCiphertextLimits derive the finite transport bound without reducing
