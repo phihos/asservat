@@ -82,6 +82,15 @@ func CompileContextProtocolBacking(contextSlice BudgetAmount, h ContextBackingHi
 	if out.Evidence, e = amount(unit, 4); e != nil {
 		return zero, e
 	}
+	// Record, object and protocol work remain bounded by the small-context
+	// profile. Preserve authored evidence funding for the supported packet
+	// output cap instead of discarding it when objects bind the record count.
+	recordingUnit := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
+	recordingBytes, ok := capacityProduct(n, recordingUnit)
+	if !ok {
+		return zero, ErrBudgetInvalid
+	}
+	out.Evidence.Bytes = min(contextSlice.Bytes, recordingBytes)
 	// Two maximum originals coexist. The deletion certificate can be written
 	// only after original absence; it does not add a third simultaneous object.
 	if out.CaptureObjects, e = amount(2*audit.OperationCipherLimit, 2); e != nil {

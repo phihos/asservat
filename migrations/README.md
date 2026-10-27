@@ -60,3 +60,9 @@ read shared lifecycle/history rows as the migration owner. Runtime capture
 cleanup roles retain only their private filtered views and fixed effects; they
 receive no shared-table or direct-validator execution grant. The fixed search
 path and qualified relation names are retained. See [capture-intent lifecycle](../docs/architecture/capture-intent-lifecycle.md).
+
+`00100_packet_evidence_backing.sql` corrects the authored context-byte projection
+for supported packet recordings. It atomically validates and adjusts retained
+physical child ceilings and pool totals without changing identities, object
+limits, charges or deadlines. Down refuses when retained charges cannot fit the
+historical ceiling. See [ADR-257](../docs/decisions/257-approved-recording-funding.md).

@@ -1,6 +1,32 @@
 # Sustained implementation progress
 
 
+## Authored packet custody funding correction (2026-10-27)
+
+Installed run 40538171521 on c5db1e11 passed self-approval refusal, independent
+fresh approval and the real preview-expiry wait, then returned CapacityUnavailable
+on submission. The actual authored 39,714,816-byte/16-object context reserve was
+projected as a 6,176,768-byte custody child; one packet reservation needs 9,928,704
+bytes. [ADR-257](decisions/257-approved-recording-funding.md) and migration 00100
+correct the projection and upgrade existing already-backed children, retaining
+record/object/protocol limits, identities, all charges and original deadlines.
+
+The failing pure arithmetic regression is now green. Targeted real PostgreSQL/
+S3/OpenBao fixture `TestPacketEvidenceBackingMigrationWithRealPostgres` passes
+(Go 5.531 seconds; runner/test exit 0). It creates actual purpose-separated legacy
+SQL enrollments under two upfront authored policies, preserves a small child and
+its uncertain reservation, grows a packet-funded child, refuses a malformed
+predecessor without partial changes, proves an unspent Down/Up roundtrip, then
+accepts an actual packet custody reservation and refuses Down while retaining
+that charge. Source/administrator/history inputs remain synthetic; no collector
+or evidence output runs in this fixture. Tested sources stayed unchanged and
+cleanup is empty; report SHA-256
+`0e92b011f9f8bbff8bedfa1c09621569039719c512e0ad92cb97d8880ab223ab`.
+Two earlier local fixture attempts failed (ambiguous migration SQL alias, then
+an invalid test setup changing an enrolled policy) and were cleaned before this
+corrected run. No complete installed approved packet publication/download has
+passed yet; the corrected candidate still needs guarded remote qualification.
+
 ## Approved recording request and continuation (2026-10-27)
 
 The browser can request independent approval for an already-reviewed recorder
