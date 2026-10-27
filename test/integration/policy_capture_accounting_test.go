@@ -21,7 +21,7 @@ import (
 // representation are synthetic. It does not supply public review authority.
 func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, scope []byte, key string) string {
 	t.Helper()
-	role := narrowRole(t, ctx, admin, "policy_accounting_grant_", "synthetic-accounting", func(role string) []string {
+	role := narrowRole(t, ctx, admin, "policy_accounting_grant_"+key+"_", "synthetic-accounting", func(role string) []string {
 		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
 		if !ok {
 			t.Fatal("missing hub duty")

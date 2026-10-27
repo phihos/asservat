@@ -1087,3 +1087,19 @@ was aligned and regeneration/final pre-push exit 0 passes all 230 console unit
 tests plus full schema/SQL/specification/architecture/vet checks. Earlier failure
 logs remain archived. The corrected original-grant SQL case and actual SQL
 accepted-pool status assertion still require the next coordinated focused run.
+
+
+Focused status/acquisition smoke1 on 87e3f492: runner/Go exit 1, child 5.86s,
+Go 6.317s, phase 9.176s; all 3,260 source hashes match, unchanged, cleanup empty,
+exact owned ihvcclkp PostgreSQL/S3 absent. Absolute archive:
+/home/phil/.cache/asservat-build/approved-workflow/policy102-status-acquisition-smoke-1-artifacts;
+report SHA-256 7c401adc163c12eae357e6137966e09a91215aa506d675e4afc1fa3e7c79abce.
+The real shared-status assertion and original prepaid API acquisition read pass
+before the replacement callback, where the fixture attempts an existing role.
+The shared narrowRole helper takes the first 12 UUID characters, constant for
+custodyID's monotonic test IDs; invoking the grant helper twice with its same
+prefix collided. Scope the helper's two fixture login prefixes by their already
+distinct fixed original/replacement request keys. No global helper, production
+role or privilege change, and no replacement/revocation success claimed. This
+failure is retained; the host slot was released to storage qualification and no
+automatic repeat is authorized.
