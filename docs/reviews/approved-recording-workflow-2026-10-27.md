@@ -218,3 +218,58 @@ both versions are recorded. capinfos is supplied by tshark's existing required
 wireshark-common dependency. No package cache, extra image, test retry, product
 deadline change or longer job is introduced. A setup failure cannot start the
 native suite. The diagnostic capture result remains pending.
+
+Run 40557482326 on 23bf0042 completed with failure: Go 563.658s, approved
+recording subtest 129.46s. Tooling setup took 14s. The exact refusal is now
+`request/facts/current/target`, before admission. The initial request was
+OutcomeUnknown and explicit resolution acknowledged closed; neither is a
+capture pass. The same copied target passed Valid at facts entry and its static
+fields do not change, isolating the later refusal to its original freshness
+predicate. Report SHA-256
+`8a64b558a81cd2c3fda3be8a7d1ebbae73e4fea9af4632281ceba70dbca1afb3`;
+test/go exits 1, unchanged sources, empty cleanup failures. All 3,188 reported
+hashes independently match the local exact head.
+
+The installed preview timings show target resolution below 500ms, a separate
+recorder query below 2s, and storage waits below 2–3s. These intervals accumulate
+against the earlier target bound; they are not independent five-second budgets.
+The scoped correction under investigation combines the regional packet-target
+read and availability query, reusing the already-read exact Pod while retaining
+API execution's empty Pin.NodeName, a distinct transient availability fact and
+the queue-time node check. No result from that correction is qualified yet.
+
+Required CI on the same head separately found an original-request cancellation
+ordering race in admitted enrollment. A deterministic delayed-propagation
+regression reproduced later effects after the original owner was cancelled.
+The isolated candidate retains and checks that owner at existing proof/effect
+gates; deadlines/interfaces remain unchanged and it adds no API calls, timers,
+goroutines or durable state. Full evidence race tests and 100 cancellation
+repetitions pass locally. It is composed locally as f3a1fb60; the combined
+candidate has not yet been pushed or qualified natively.
+
+For a Deployment, the target correction removes one of two Router queries and
+two of ten exact target/availability GETs (eight remain: two each for Namespace, Pod, ReplicaSet
+and Deployment). It adds zero credentials, permissions, watches, timers,
+background tasks, configuration switches or fallback states. Source/owner
+authentication reads are unchanged and excluded from those GET counts. An
+unsupported peer refuses rather than falling back to duplicate work. Preview
+still needs its existing workload-selection/plan-only path, so its availability
+query remains in use. The same final Pod read supplies readiness locally; the
+API pin stays node-free and no NodeView expiry lease is introduced.
+
+A deterministic model of the measured serial phases (400ms target, 1.4s second
+query, 1.8s storage, original receiver bound 3s) reproduces the target refusal
+before the fix and reaches synthetic admission after removing duplicate work.
+These values model the installed timing buckets; they are not new precise
+runtime measurements. Fake-API and transport tests cover exact eight-GET
+resolution, final Pod resource-version/node reuse, replacement/deletion/expiry,
+host-network/nonrunning/unscheduled refusal, unchanged original deadlines and
+unsupported peer/protocol behavior. Installed performance remains pending.
+
+Final local combined-candidate checks returned zero: `make pre-push` (including
+218 console tests, SQL generation, specification/design/architecture gates and
+vet), affected target/capture/transport/bootstrap race tests, selected Kubernetes
+target races, the cancellation races above, and `make pcap-check` (real libpcap
+compiler tests plus the static production-command build; no capture/BPF load).
+A separate read-only source review found no blocking regression. Required hosted
+CI and a fresh installed approved-recording run remain mandatory before merge.
