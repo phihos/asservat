@@ -61,7 +61,25 @@ func (f *apiRunnerFixture) ResolvePod(context.Context, targets.Request) (targets
 	if f.mode == "replacement-pod" && f.prepares.Load() > 0 {
 		return targets.PodResolution{}, targets.ErrChanged
 	}
+	if f.mode == "target-unavailable" {
+		return targets.PodResolution{}, targets.ErrUnavailable
+	}
 	return f.target, nil
+}
+
+// Only a refusal known to precede every start effect is reported as not
+// started; a lost preparation reply may have committed and stays uncertain.
+func TestAPIContextRunnerClassifiesOnlyPreEffectRefusalsAsNotStarted(t *testing.T) {
+	for mode, want := range map[string]bool{"target-unavailable": true, "lost-preparation-reply": false} {
+		t.Run(mode, func(t *testing.T) {
+			f, s, current := apiRunner(t)
+			f.mode = mode
+			_, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
+			if err == nil || errors.Is(err, value.ErrNotStarted) != want || f.captures.Load() != 0 {
+				t.Fatal("pre-effect classification", err, want)
+			}
+		})
+	}
 }
 func (f *apiRunnerFixture) ContextCapability(context.Context, authorization.Target) (planning.ContextCapability, error) {
 	return f.cap, nil

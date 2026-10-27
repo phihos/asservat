@@ -47,12 +47,13 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 	developer := connect("installed-share-owner", owner.shareTokenSource(origin).Token)
 	defer developer.Close()
 	// call returns the validated envelope's status, error code and data.
-	call := func(session *sdk.ClientSession, name string, arguments any, data any) (string, string) {
+	// try reports a transport error; call fails the test on it.
+	try := func(session *sdk.ClientSession, name string, arguments any, data any) (string, string, error) {
 		t.Helper()
 		result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: name, Arguments: arguments})
 		if err != nil {
-			diagnose()
-			t.Fatal("installed share call", name, err)
+			t.Logf("installed share: %s -> transport %v", name, err)
+			return "", "", err
 		}
 		reply, code, err := installedJourneyReplyCode(wire, name, result)
 		if err != nil {
@@ -65,7 +66,16 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 			}
 		}
 		t.Logf("installed share: %s -> %s %s request %s", name, reply.Status, code, reply.RequestID)
-		return reply.Status, code
+		return reply.Status, code, nil
+	}
+	call := func(session *sdk.ClientSession, name string, arguments any, data any) (string, string) {
+		t.Helper()
+		status, code, err := try(session, name, arguments, data)
+		if err != nil {
+			diagnose()
+			t.Fatal("installed share call", name, err)
+		}
+		return status, code
 	}
 	type caseView struct {
 		Case struct {
@@ -210,16 +220,19 @@ func installedJourneyShare(t *testing.T, ctx context.Context, wire *contracts.In
 		PreviewID string   `json:"preview_id"`
 		Warnings  []string `json:"warnings"`
 	}
-	if status, code := call(developer, "preview_capture", arguments, &previewed); status != "ok" || previewed.PreviewID == "" || len(previewed.Warnings) != 1 {
+	if status, code, err := installedJourneyPreview(ctx, func() (string, string, error) { return try(developer, "preview_capture", arguments, &previewed) }); err != nil || status != "ok" || previewed.PreviewID == "" || len(previewed.Warnings) != 1 {
 		diagnose()
-		t.Fatal("installed sharing preview", status, code, previewed)
+		t.Fatal("installed sharing preview", status, code, err, previewed)
 	}
 	var accepted struct {
 		CaptureID string `json:"capture_id"`
 	}
-	if status, code := call(developer, "request_capture", map[string]string{"preview_id": previewed.PreviewID, "idempotency_key": "installed-capture-share-1"}, &accepted); status != "ok" || accepted.CaptureID == "" {
+	accepted.CaptureID, err = installedJourneySubmit(ctx, func(name string, arguments any, data any) (string, string) {
+		return call(developer, name, arguments, data)
+	}, map[string]any{"preview_id": previewed.PreviewID, "idempotency_key": "installed-capture-share-1"})
+	if err != nil {
 		diagnose()
-		t.Fatal("installed sharing request_capture", status, code)
+		t.Fatal("installed sharing request_capture", err)
 	}
 	var progress struct {
 		Phase   string `json:"phase"`

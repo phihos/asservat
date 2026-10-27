@@ -29,6 +29,20 @@ func TestContextProcessingCoverageFailurePreservesUnknownEarlierRequest(t *testi
 	}
 }
 
+func TestAcceptedStartRefusedBeforeEffectNamesContinuation(t *testing.T) {
+	err := errors.Join(errors.New("local start state unavailable"), value.ErrAcquisitionNotStarted)
+	f := publicCaptureFailure(err, true)
+	if f.Code != "AcquisitionNotStarted" || !f.Retryable || !strings.Contains(f.Message, "continue_acquisition: true") || !strings.Contains(f.Message, "accepted") {
+		t.Fatalf("request: %+v", f)
+	}
+	if f := publicCaptureFailure(err, false); f.Code != "NotAvailable" {
+		t.Fatalf("preview: %+v", f)
+	}
+	if f := publicCaptureFailure(errors.Join(value.ErrPreparationUncertain, value.ErrAcquisitionNotStarted), true); f.Code != "AcquisitionUncertain" {
+		t.Fatalf("uncertain preparation outranks: %+v", f)
+	}
+}
+
 func TestPreviewChangeIsRetryableButRequestChangeIsReviewChanged(t *testing.T) {
 	if f := publicCaptureFailure(value.ErrChanged, false); f.Code != "NotAvailable" || !f.Retryable {
 		t.Fatalf("preview: %+v", f)

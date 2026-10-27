@@ -4,6 +4,7 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"context"
 	"errors"
+	"sync/atomic"
 
 	"time"
 
@@ -42,6 +43,12 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(id) || s.Runner.Read == nil || s.Runner.Capabilities == nil || s.Runner.Recovery == nil || s.Signer == nil || s.Router == nil || s.Now == nil {
 		return execution.ErrInvalid
 	}
+	// Every refusal before the run, and a run refused before any start
+	// effect, leaves the admitted capture unstarted: an explicit continuation
+	// may start it (ADR-134/212). Any other run failure stays unavailable.
+	notStarted := errors.Join(execution.ErrUnavailable, capturevalue.ErrAcquisitionNotStarted)
+	// Atomic: dispatch may return before an abandoned run finishes.
+	var refusedBefore atomic.Bool
 	started := s.Now().UTC().Truncate(time.Microsecond)
 	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer cancel()
@@ -73,7 +80,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	narrow("identity", caller.ValidUntil)
 	recovery, e := s.Runner.Recovery.RecoveryState(call)
 	if e != nil || !recovery.Valid(s.Now()) {
-		return execution.ErrUnavailable
+		return notStarted
 	}
 	narrow("recovery", recovery.FreshUntil)
 	mark = time.Now()
@@ -93,7 +100,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	capability, e := s.Runner.Capabilities.ContextCapability(call, target)
 	auditapp.MarkStep(ctx, "st-capability", mark)
 	if e != nil || !capability.Valid(s.Now()) {
-		return execution.ErrUnavailable
+		return notStarted
 	}
 	narrow("capability", capability.FreshUntil)
 	// Reservation happens before signing/attachment. A closing old exchange stays
@@ -102,14 +109,14 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	attachment, e := s.Router.Attach(call, target.ClusterID, id)
 	auditapp.MarkStep(ctx, "st-attach", mark)
 	if e != nil {
-		return execution.ErrUnavailable
+		return notStarted
 	}
 	defer attachment.Close()
 	mark = time.Now()
 	receiver, e := attachment.Receiver(call)
 	auditapp.MarkStep(ctx, "st-receiver", mark)
 	if e != nil {
-		return execution.ErrUnavailable
+		return notStarted
 	}
 	narrow("receiver", receiver.ValidUntil)
 	if receiver.Channel.Connector.Binding.InstallationID != recovery.InstallationID || receiver.Channel.Connector.Binding.IssuerEpoch != recovery.IssuerEpoch {
@@ -129,13 +136,14 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	// Signing and every prior blocking read retain their original bounds. The
 	// same retained CurrentIdentity answers regional requests on this attachment.
 	if call.Err() != nil || !s.Now().Before(until) {
-		return execution.ErrUnavailable
+		return notStarted
 	}
 	mark = time.Now()
 	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
 		r := s.Runner
 		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
 		result, err := r.ExecuteObserved(ctx, current, caller, accepted, capability, recovery)
+		refusedBefore.Store(err != nil && errors.Is(err, execution.ErrNotStarted))
 		if err != nil && s.Report != nil {
 			step := "execute"
 			var fixed interface{ FixedStep() string }
@@ -157,6 +165,9 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		if s.Report != nil {
 			s.Report("dispatch (" + regionalOutcome(e) + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
 		}
+		if refusedBefore.Load() {
+			return notStarted
+		}
 		return execution.ErrUnavailable
 	}
 	switch state {
@@ -164,9 +175,11 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		return nil
 	case "PreparationUncertain":
 		return capturevalue.ErrPreparationUncertain
-	default:
-		return execution.ErrUnavailable
 	}
+	if refusedBefore.Load() {
+		return notStarted
+	}
+	return execution.ErrUnavailable
 }
 
 // Diagnostic only: a retained caller deadline is not a fresh start interval.

@@ -23,6 +23,9 @@ func (s APIContextStart) StartContext(ctx context.Context, current identities.Cu
 	if errors.Is(err, value.ErrPreparationUncertain) {
 		return capturevalue.ErrPreparationUncertain
 	}
+	if errors.Is(err, value.ErrNotStarted) {
+		return errors.Join(err, capturevalue.ErrAcquisitionNotStarted)
+	}
 	if err != nil {
 		return err
 	}

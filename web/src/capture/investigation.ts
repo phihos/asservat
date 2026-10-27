@@ -102,7 +102,9 @@ export class Investigation {
       if (generation === this.generation && !scope.aborted) {
         if (this.state.continuing && this.receipt && error instanceof OperationFailure && ['AcquisitionClosed', 'AcquisitionUncertain'].includes(error.code)) this.receipt.continuationBlocked = true;
         const message = operationMessage(error);
-        this.publish({ error: this.state.continuing && !this.receipt?.continuationBlocked ? message + " Collection may already have started. Check its status before retrying this same request." : message });
+        // AcquisitionNotStarted is known to precede every start effect.
+        const notStarted = error instanceof OperationFailure && error.code === 'AcquisitionNotStarted';
+        this.publish({ error: this.state.continuing && !this.receipt?.continuationBlocked && !notStarted ? message + " Collection may already have started. Check its status before retrying this same request." : message });
       }
       return;
     } finally {

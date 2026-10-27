@@ -233,7 +233,8 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	defer stop()
 	check, err := s.checkObserved(startCtx, current, w, original, capability, recovery)
 	if err != nil {
-		return zero, executeStep{"Check", err}
+		// The check only reads; nothing was prepared or started.
+		return zero, executeStep{"Check", errors.Join(err, value.ErrNotStarted)}
 	}
 	r, mayCreate, err := s.Prepare.PrepareAPIExecution(startCtx, check)
 	if err != nil {
