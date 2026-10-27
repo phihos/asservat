@@ -150,6 +150,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// provenance. Root/qualification arguments are not a role boundary.
 		out = append(out, publicRuntimeGrant{"function", "read_capacity_audit_profiles(uuid,uuid,uuid,bytea,text,timestamptz,timestamptz)", "", "EXECUTE"})
 	case "capture-admit":
+		out = append(out, publicRuntimeGrant{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"})
 		// Original publication coverage only; no processing initialization,
 		// restriction, lineage or counter mutation is delegated to admission.
 		read("processing_root", "processing_rule")
@@ -239,6 +240,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})
 		}
 	case "capture-preview":
+		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
 		// Passive private blueprints only. SQL33/36 prohibit live deletion,
 		// content rewrites and restoring a closed preview. No capture admission.
 		read("permission_stream", "context_preview", "context_preview_fence")
@@ -249,6 +251,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// ADR-200: a refresh demand for an enrolled workload; no authority.
 		out = append(out, publicRuntimeGrant{"function", "demand_capacity_refresh(uuid,uuid,text,text,text,text,text)", "", "EXECUTE"})
 	case "capture-resolution":
+		out = append(out, publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"})
 		// Current same-actor request resolution may only close a passive draft
 		// or fence its absent original ID. It cannot admit/cancel accepted work.
 		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_capture", "context_preview", "context_preview_fence")

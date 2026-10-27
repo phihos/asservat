@@ -13,6 +13,7 @@ package postgres
 var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 	// ADR-217: exact union of the former read, prepare and record credentials.
 	"api-execution": {
+		{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"},
 		{"schema", "public", "", "USAGE"},
 		{"table", "authority_audit", "", "SELECT"},
 		{"table", "context_capture", "", "SELECT"},

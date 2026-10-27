@@ -225,7 +225,7 @@ func (s *ContextAdmissions) AdmitReviewedContext(ctx context.Context, previewID 
 
 func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, a value.Admission) (value.Accepted, error) {
 	var out value.Accepted
-	if s == nil || s.ledger == nil || a.RootID != s.root || !validAdmission(a) {
+	if s == nil || s.ledger == nil || a.RootID != s.root || !validAdmission(a) || approvedContextPlan(a) && previewID == "" {
 		return out, value.ErrInvalid
 	}
 	topology, err := s.retention.observe(ctx, a.Plan.Input.Target.Target().ClusterID)
@@ -404,8 +404,10 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 			if !slices.Equal(fresh.DefaultAudience, a.Eligibility.DefaultAudience) || !slices.Equal(fresh.ContributingAssignments, a.Eligibility.ContributingAssignments) {
 				return value.ErrChanged
 			}
-			if previewID != "" && !reviewed.Current(n.Time) {
-				return value.ErrChanged
+			if previewID != "" {
+				if err := currentReviewedContext(ctx, q, reviewed, a); err != nil {
+					return err
+				}
 			}
 			if !planning.VerifyContextPlan(a.Plan, n.Time) || a.Plan.CompiledAt.After(n.Time) || !a.Storage.Valid(n.Time) || !identity.Fresh(binding.ObservedAt.Time, binding.FreshUntil.Time, n.Time, 30*time.Second) {
 				return value.ErrChanged
@@ -429,8 +431,10 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 				return value.ErrUnavailable
 			}
 
-			if previewID != "" && !reviewed.Current(n.Time) {
-				return value.ErrChanged
+			if previewID != "" {
+				if err := currentReviewedContext(ctx, q, reviewed, a); err != nil {
+					return err
+				}
 			}
 			if s.auditMAC != nil && !n.Time.Before(auditUntil) {
 				return value.ErrChanged

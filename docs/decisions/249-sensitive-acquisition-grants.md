@@ -125,11 +125,12 @@ Benefit established, cost small: proceed.
 - **Browser step-up login:** [ADR-253](253-approval-stepup-login.md) adds the console
   sign-in link and current-policy `acr_values`/`max_age=0` redirect. Real Keycloak
   LoA step-up qualification (plan open item 10) remains pending.
-- **Preview lifetime:** a review request can only be opened while its preview is current (≤ 5
-  minutes); approval may come later, but the plan's own deadline is the preview's. Increment 13
-  must start an approved plan through acceptance with its own capture deadline (or extend the
-  pending-review model); until then every approved plan is still refused with
-  `RecorderUnavailable`.
+- **Preview lifetime:** resolved by [ADR-252](252-approved-capture-acceptance.md):
+  explicitly marked approved plans keep their exact immutable review scope and
+  receive a separate bounded execution deadline at acceptance under the original
+  grant. New review requests still require a current preview. Actual qualification
+  is recorded separately in implementation progress.
+
 - **Children** have no production caller until the first raw output (increment 14); requester
   eligibility at materialization is not re-evaluated (the requester is not present), only at every
   use.

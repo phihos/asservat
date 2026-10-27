@@ -616,3 +616,7 @@ CREATE ROLE retention_preview_read_runtime LOGIN PASSWORD 'synthetic-retention-p
 GRANT SELECT ON goose_db_version,permission_stream,retention_source,retention_checkpoint,retention_catchup,retention_catchup_effect,retention_decision,context_capture,custody_attempt TO retention_preview_read_runtime;
 GRANT UPDATE(id) ON permission_stream TO retention_preview_read_runtime;
 GRANT UPDATE(root_id) ON retention_source TO retention_preview_read_runtime;
+
+-- ADR-252: fixed read retention and exact current approval; no grant table access.
+GRANT EXECUTE ON FUNCTION context_preview_read_until(uuid,uuid) TO context_preview_runtime,context_preview_cleanup_runtime,context_request_resolution_runtime;
+GRANT EXECUTE ON FUNCTION lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea) TO capture_runtime,api_execution_read_runtime,api_execution_prepare_runtime,api_execution_runtime;

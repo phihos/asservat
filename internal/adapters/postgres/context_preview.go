@@ -164,7 +164,18 @@ func (s *ContextPreviews) ReadContextPreview(ctx context.Context, root, preview 
 		if err != nil {
 			return err
 		}
-		return currentPreview(ctx, q, out)
+		now, e := q.CurrentTime(ctx)
+		if e != nil {
+			return e
+		}
+		until, e := q.ContextPreviewReadUntil(ctx, custodydb.ContextPreviewReadUntilParams{RootID: id(root), PreviewID: id(preview)})
+		if e != nil {
+			return e
+		}
+		if !until.Valid || !now.Time.Before(until.Time) || now.Time.Before(out.CreatedAt) {
+			return value.ErrPreviewExpired
+		}
+		return ctx.Err()
 	})
 	if err != nil {
 		return value.ContextPreview{}, captureError(err)

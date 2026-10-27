@@ -75,6 +75,7 @@ func TestPublicDownloadSourceRoleReadsReceiptsWithoutEffectPrivileges(t *testing
 func TestPublicContextDraftRolesHaveExactPurposeGrants(t *testing.T) {
 	common := []publicRuntimeGrant{{"schema", "public", "", "USAGE"}, {"table", "goose_db_version", "", "SELECT"}}
 	previews := append(slices.Clone(common),
+		publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"},
 		publicRuntimeGrant{"table", "permission_stream", "", "SELECT"},
 		publicRuntimeGrant{"table", "context_preview", "", "SELECT"},
 		publicRuntimeGrant{"table", "context_preview_fence", "", "SELECT"},
@@ -85,6 +86,7 @@ func TestPublicContextDraftRolesHaveExactPurposeGrants(t *testing.T) {
 		// ADR-200: a refresh demand, no table grant.
 		publicRuntimeGrant{"function", "demand_capacity_refresh(uuid,uuid,text,text,text,text,text)", "", "EXECUTE"})
 	resolution := append(slices.Clone(common),
+		publicRuntimeGrant{"function", "context_preview_read_until(uuid,uuid)", "", "EXECUTE"},
 		publicRuntimeGrant{"table", "fleet_current_trust", "", "SELECT"},
 		publicRuntimeGrant{"table", "permission_stream", "", "SELECT"},
 		publicRuntimeGrant{"table", "permission_basis", "", "SELECT"},

@@ -460,8 +460,19 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	// status.
 	recording := p.Intent.Composition != nil
 	if recording {
-		if err := s.recorderRequest(ctx, source, p, key, nil); err != nil {
+		grant, err := s.recorderRequest(ctx, source, p, key, nil)
+		if err != nil {
 			return zero, err
+		}
+		if grant.ID != "" {
+			// ADR-252: the immutable approved scope binds duration and the
+			// exact original Pod. Only this marked plan may get a capture
+			// deadline at acceptance, never beyond the original grant.
+			if !compiler.RecorderApprovedAcceptance(p.CanonicalScope) {
+				return zero, s.requestChanged("approval/timing")
+			}
+			p.CreatedAt = s.Now().UTC().Truncate(time.Microsecond)
+			p.Deadline = identity.Earlier(p.CreatedAt.Add(s.Lifetime), grant.ExpiresAt)
 		}
 		if p.Storage == (value.ContextStorageSelection{}) {
 			return zero, value.ErrRecorderUnavailable

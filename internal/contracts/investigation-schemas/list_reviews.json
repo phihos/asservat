@@ -288,10 +288,6 @@
                           "type": "string",
                           "format": "date-time"
                         },
-                        "plan_deadline": {
-                          "type": "string",
-                          "format": "date-time"
-                        },
                         "lifetime_seconds": {
                           "type": "integer",
                           "minimum": 60,
@@ -413,6 +409,23 @@
                           "type": "string",
                           "format": "uri",
                           "maxLength": 2048
+                        },
+                        "preview_deadline": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans."
+                        },
+                        "capture_deadline_rule": {
+                          "enum": [
+                            "previewDeadline",
+                            "acceptanceWithinGrant"
+                          ],
+                          "description": "Whether the frozen plan uses its preview deadline, or fixes one capture window at acceptance under the original approval expiry."
+                        },
+                        "capture_window_seconds": {
+                          "type": "integer",
+                          "const": 300,
+                          "description": "Maximum window fixed once at acceptance, never beyond original approval expiry."
                         }
                       },
                       "required": [
@@ -430,11 +443,35 @@
                         "requested_by",
                         "requested_at",
                         "review_until",
-                        "plan_deadline",
+                        "preview_deadline",
                         "lifetime_seconds",
                         "can_decide",
                         "can_revoke",
-                        "approval_navigation_uri"
+                        "approval_navigation_uri",
+                        "capture_deadline_rule"
+                      ],
+                      "allOf": [
+                        {
+                          "if": {
+                            "properties": {
+                              "capture_deadline_rule": {
+                                "const": "acceptanceWithinGrant"
+                              }
+                            }
+                          },
+                          "then": {
+                            "required": [
+                              "capture_window_seconds"
+                            ]
+                          },
+                          "else": {
+                            "not": {
+                              "required": [
+                                "capture_window_seconds"
+                              ]
+                            }
+                          }
+                        }
                       ]
                     }
                   }

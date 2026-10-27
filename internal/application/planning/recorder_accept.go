@@ -216,3 +216,10 @@ func RecorderFiltersOf(plan value.RecorderPlan) ([]value.CompiledExpression, err
 	}
 	return out, nil
 }
+
+// RecorderApprovedAcceptance identifies the explicit ADR-252 timing contract.
+// Legacy approved scopes keep their original deadline and cannot be renewed.
+func RecorderApprovedAcceptance(scope []byte) bool {
+	var s recorderScope
+	return strict(scope, &s) == nil && s.Version == value.RecorderPlanVersion && s.Timing == "approvedAcceptance/v1" && s.Deadline == "" && s.Approval != nil
+}

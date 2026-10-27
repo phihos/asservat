@@ -219,33 +219,35 @@ type grantResultAccess struct {
 
 // grantData is get_grant's reply; list rows omit actions and result access.
 type grantData struct {
-	GrantID           string             `json:"grant_id"`
-	Phase             string             `json:"phase"`
-	Revision          int64              `json:"revision"`
-	Kind              string             `json:"kind"`
-	CaptureID         string             `json:"capture_id"`
-	PreviewID         string             `json:"preview_id"`
-	ExecutionDigest   string             `json:"execution_digest"`
-	ReviewDigest      string             `json:"review_digest"`
-	Target            grantTarget        `json:"target"`
-	DataClass         string             `json:"data_class"`
-	Reasons           []grantReason      `json:"reasons"`
-	Actions           []grantAction      `json:"actions,omitempty"`
-	ObservationLimits *grantLimits       `json:"observation_limits,omitempty"`
-	RequestedBy       *grantPrincipal    `json:"requested_by"`
-	RequestedAt       time.Time          `json:"requested_at"`
-	ReviewUntil       time.Time          `json:"review_until"`
-	PlanDeadline      time.Time          `json:"plan_deadline"`
-	LifetimeSeconds   int64              `json:"lifetime_seconds"`
-	Decision          *grantDecision     `json:"decision,omitempty"`
-	NotAfter          *time.Time         `json:"not_after,omitempty"`
-	RevokedAt         *time.Time         `json:"revoked_at,omitempty"`
-	RevokedBy         *grantPrincipal    `json:"revoked_by,omitempty"`
-	ResultAccess      *grantResultAccess `json:"result_access,omitempty"`
-	RemainingBytes    *int64             `json:"remaining_bytes,omitempty"`
-	CanDecide         bool               `json:"can_decide"`
-	CanRevoke         bool               `json:"can_revoke"`
-	NavigationURI     string             `json:"approval_navigation_uri"`
+	GrantID              string             `json:"grant_id"`
+	Phase                string             `json:"phase"`
+	Revision             int64              `json:"revision"`
+	Kind                 string             `json:"kind"`
+	CaptureID            string             `json:"capture_id"`
+	PreviewID            string             `json:"preview_id"`
+	ExecutionDigest      string             `json:"execution_digest"`
+	ReviewDigest         string             `json:"review_digest"`
+	Target               grantTarget        `json:"target"`
+	DataClass            string             `json:"data_class"`
+	Reasons              []grantReason      `json:"reasons"`
+	Actions              []grantAction      `json:"actions,omitempty"`
+	ObservationLimits    *grantLimits       `json:"observation_limits,omitempty"`
+	RequestedBy          *grantPrincipal    `json:"requested_by"`
+	RequestedAt          time.Time          `json:"requested_at"`
+	ReviewUntil          time.Time          `json:"review_until"`
+	PreviewDeadline      time.Time          `json:"preview_deadline"`
+	CaptureDeadlineRule  string             `json:"capture_deadline_rule"`
+	CaptureWindowSeconds int64              `json:"capture_window_seconds,omitempty"`
+	LifetimeSeconds      int64              `json:"lifetime_seconds"`
+	Decision             *grantDecision     `json:"decision,omitempty"`
+	NotAfter             *time.Time         `json:"not_after,omitempty"`
+	RevokedAt            *time.Time         `json:"revoked_at,omitempty"`
+	RevokedBy            *grantPrincipal    `json:"revoked_by,omitempty"`
+	ResultAccess         *grantResultAccess `json:"result_access,omitempty"`
+	RemainingBytes       *int64             `json:"remaining_bytes,omitempty"`
+	CanDecide            bool               `json:"can_decide"`
+	CanRevoke            bool               `json:"can_revoke"`
+	NavigationURI        string             `json:"approval_navigation_uri"`
 }
 
 func digestText(d artifact.Digest) string { return hash(d) }
@@ -255,8 +257,14 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 	requester := g.Requester.Issuer == caller.Issuer && g.Requester.Subject == caller.Subject
 	d := grantData{GrantID: g.ID, Phase: string(v.Phase), Revision: g.Revision, Kind: g.Kind, CaptureID: g.CaptureID, PreviewID: g.PreviewID, ExecutionDigest: digestText(g.ExecutionDigest), ReviewDigest: digestText(g.ReviewDigest),
 		Target: grantTarget{g.Target.ClusterID, r.Namespace, r.WorkloadKind, r.WorkloadName, r.PodName}, DataClass: g.DataClass, Reasons: []grantReason{}, RequestedBy: principalView(g.Requester),
-		RequestedAt: g.RequestedAt.UTC(), ReviewUntil: g.ReviewUntil.UTC(), PlanDeadline: r.Deadline.UTC(), LifetimeSeconds: int64(g.Lifetime / time.Second),
+		RequestedAt: g.RequestedAt.UTC(), ReviewUntil: g.ReviewUntil.UTC(), PreviewDeadline: r.Deadline.UTC(), CaptureDeadlineRule: "previewDeadline", LifetimeSeconds: int64(g.Lifetime / time.Second),
 		CanDecide: v.Approver && v.Phase == authorization.GrantPending, CanRevoke: g.RevokedAt.IsZero() && (requester || v.Approver), NavigationURI: s.origin + "/approvals/" + g.ID}
+	var timing struct {
+		Timing string `json:"timing"`
+	}
+	if json.Unmarshal(g.Scope, &timing) == nil && timing.Timing == "approvedAcceptance/v1" {
+		d.CaptureDeadlineRule, d.CaptureWindowSeconds = "acceptanceWithinGrant", 300
+	}
 	for _, x := range g.Reasons {
 		d.Reasons = append(d.Reasons, grantReason{x.ActionID, x.Code})
 	}

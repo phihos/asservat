@@ -39,3 +39,29 @@ The reviewer sees collection and follow-up access together and performs one auth
 ### SC-INV-003
 
 Given an approved combined request submitted through the console, when the capture completes and the developer opens the download or a selected agent queries it, then the same review is resolved automatically into exact current artifact rights. Refresh/retry requires no duplicate form and never recollects evidence. An unlisted agent gets an actionable missing-client review rather than token copying or an unexplained denial. The UI shows both capture readiness and evidence access; automated fixtures do not establish real usability.
+
+### Approved-plan acceptance timing (ADR-252)
+
+The passive preview's expiry bounds opening a new review; it does not consume an
+approved capture's execution window. For explicitly versioned
+`approvedAcceptance/v1` recorder plans, retain the exact original blueprint under
+the existing quotas through the original grant review/expiry bounds. Approval
+never renews those bounds. Same-human/client acceptance fixes one finite capture
+deadline (at most five minutes and never beyond the original grant expiry) while
+preserving original IDs, exact Pod, frozen composition/filter, audience, storage,
+relative retention and approved digest. Recheck current ordinary entitlement,
+recovery, retention and current approved/unrevoked grant at admission and new
+execution effects; serialize grant use with revocation. An accepted retry returns
+the original deadline and never recollects. Legacy plans with an absolute preview
+deadline require a new review; they cannot silently gain the new timing contract.
+
+SC-INV-001 includes approval after preview expiry, exact original-target submission,
+revocation racing admission, and replay without renewed timing. Missing/replaced
+Pods and material scope changes require new selection and review.
+
+The approval view reports passive `preview_deadline`, `capture_deadline_rule`
+and the marked plan's `capture_window_seconds` separately; it must not label an
+expired preview as the new capture's start deadline. A change to the protected
+recording-approval requirement in either direction requires a new preview/review
+at submission, preserving exact reviewed scope rather than silently weakening
+or strengthening it.

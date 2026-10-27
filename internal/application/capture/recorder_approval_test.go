@@ -144,3 +144,23 @@ func TestRecorderApprovalSettingsAndResultAccess(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRecordingApprovalSettingsChangeRequiresFreshReview(t *testing.T) {
+	for _, original := range []bool{false, true} {
+		t.Run(map[bool]string{false: "approval-now-required", true: "approval-no-longer-required"}[original], func(t *testing.T) {
+			f := newInvestigationFixture()
+			ctx := context.Background()
+			policy := identity.Policy{Revision: identity.Revision{UID: "identity", Generation: 1, Digest: [32]byte{1}}, Issuer: f.actor.Issuer, ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute, RequireRecordingApproval: original}
+			f.svc.Approvals = fixedApprovalSettings{policy: policy}
+			preview, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition()))
+			if err != nil {
+				t.Fatal(err)
+			}
+			policy.RequireRecordingApproval = !original
+			f.svc.Approvals = fixedApprovalSettings{policy: policy}
+			if _, err = f.request(t, preview.Preview, "changed-settings"); !errors.Is(err, value.ErrChanged) || f.admissions.Load() != 0 {
+				t.Fatal("changed administrator requirement did not require new review", err)
+			}
+		})
+	}
+}
