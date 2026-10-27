@@ -1,9 +1,9 @@
 # Native response version boundary qualification
 
 Date: 2026-10-27. Requirements: REQ-DLD-002/003/004.
-Status: actual worker subprocess/transport checks pass; the first shared SQL
-pair attempt failed before claim. Its fixture TLS correction and operational
-rollout remain unqualified. This is test-only qualification work.
+Status: actual worker subprocess/transport and scoped shared SQL owner pair
+checks pass. Operational rollout and the remaining transport matrix are pending.
+This is test-only qualification work.
 
 The old production tree is canonical PR100 main
 `eed8594020645fe6d10f8c6565e69a6235c7507d`; the new tree is PR101
@@ -63,7 +63,7 @@ logs are in `~/.cache/asservat-build/native-mixed-version-build-1/manifest.json`
 and `~/.cache/asservat-build/codex-bf86-resume/native-mixed-*.log`. Both binaries
 compile schema 100; a common schema floor does not prove native semantic support.
 
-## Shared SQL owner pair remains unqualified
+## Shared SQL owner pair and retained initial failure
 
 The additional `download-worker-native-owner-mixed` case reuses the existing
 native exchange's real PostgreSQL, encrypted S3 audit, enrollment/certificate,
@@ -127,10 +127,59 @@ and the new immutable build2 manifest. Build1 remains unchanged.
 The corrected build2 worker/boundary parent race suite exits 0 in 4.504s, and
 full canonical pre-push plus explicit-file helper vet exit 0. These checks do
 not qualify a mixed SQL claim or the actual PostgreSQL authentication path.
-The next owned PG/S3 run requires root coordination and fresh source freezing;
-no retry has run. Initial accounting counters and their snapshot hash are now
-logged without identities or payloads, alongside operation hashes/sequences and
-actual old cleanup results.
+After root review and slot coordination, the next single owned PG/S3 run used
+fresh frozen source as recorded below. Initial accounting counters and their
+snapshot hash are logged without identities or payloads, alongside operation
+hashes/sequences and actual old cleanup results.
+
+### Scoped real SQL result after the TLS correction
+
+`native-owner-mixed-2` passes exact source
+`0b0c1d2a7faab6b335a8a34761be080f9483a282`: selected subtest 14.33s, parent 14.71s,
+Go 15.772s, runner phase 18.596s and terminal exit 0. It executes the actual old/new
+binaries from immutable build2 against the same existing-role PostgreSQL/S3
+fixture. All 3,191 frozen repository source hashes matched; helper/manifest hashes
+were unchanged; cleanup failures were empty. The exact owned PostgreSQL/S3
+containers and their network were independently confirmed absent afterward.
+
+The actual old ClaimNativeOperation creates the short row and the new adapter
+observes the exact returned operation hash. After its original end, new observe
+and renewal deny. The new twenty-second owner is immediately unavailable to old
+observe, while new observe succeeds. Fresh independent delivery authority then
+advances sequence 3→4 on the identical original operation hash; an expired short
+observation is never reused. The old adapter's exact historical Close returns
+success and persists closure for both short and new long rows. New-side teardown
+was not needed in this run. Closed renewal remains refused.
+
+The initial accounting snapshot and every comparison remain unchanged:
+
+| Counter | Observed retained value |
+| --- | --- |
+| Charged output/read | 351 B / 8,388,608 B |
+| Requests | 1 |
+| Reserved responses/windows | 1 / 1 |
+| Charged native backing rows/keys | 1 / 0 |
+| Preparation used-role mask | 7 |
+| Native key rows/used-role mask | 0 / 0 |
+
+The snapshot SHA-256 is
+`ba0d992f21207bbea0e1709dc46f9e37f6da90d4a7a39908c51b853c4f4de70c`.
+It includes original session/source-window identities and deadlines, generations,
+reserved audit bytes, window ordinal/outcome and key accounting. Their equality
+is checked after each accepted or refused version operation; no limit, charge,
+key slot, source or deadline is reset to make the sequence pass. No response
+payload is delivered by this SQL-only sequence, and no native response key is
+opened. Initial metadata preparation has its existing three spent roles.
+
+The environment report SHA-256 is
+`1f465f6ddf695c3124d04282114a3525283c771b64a5422f4aba79c529fb04a6`.
+Its exact passed name is
+`TestContextAdmissionWithRealServices/download-worker-native-owner-mixed`.
+The report, Go log, runner log and original build2 manifest are archived under
+`~/.cache/asservat-build/codex-bf86-resume/native-owner-mixed-2-artifacts`.
+This qualifies this owner-adapter boundary with the fixture's explicitly
+synthetic initial authority/bootstrap/Pod inputs; it does not qualify a deployed
+mixed serving peer/connector or operational rollout.
 
 Canonical `make pre-push` exits 0 with the existing spec virtualenv and pinned
 sqlc, including 218 console checks; explicit-file helper vet and Python syntax
@@ -150,8 +199,9 @@ The first implementation is about 1,000 test/script lines, including bounded
 protocol DTOs, build/provenance checks and actual transport fixtures. It reuses
 existing installation/bootstrap, guard and role setup instead of duplicating it.
 The observed benefit is direct old-worker refusal evidence that same-version
-tests could not supply; the shared SQL and operational-version risks are still
-unqualified. There is no per-deployment runtime cost and no compatibility
+tests could not supply, plus the scoped real SQL owner result above. Remaining
+serving-hop and operational-version behavior is unqualified. There is no
+per-deployment runtime cost and no compatibility
 mechanism to configure, upgrade or roll back.
 
 Actual old serving-hub and old connector transport boundaries remain outside
