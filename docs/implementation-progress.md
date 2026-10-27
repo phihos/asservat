@@ -23,7 +23,20 @@ current decision, `Indeterminate`/`DecisionTimeSource` before otherwise). `resol
 repeats the caller's recorded review of its preview's Pod first. REQ-PER-006: each decision change
 of a (source, principal, Pod) — first allow, revocation with its closed reason, restoration — is one
 `permission-review` event in the authority audit outbox (published and acknowledged by the existing
-publisher); confirming reviews only update the SQL row. Migration 00096 follows S-04 increment 2's 00095.
+publisher); confirming reviews only update the SQL row. hub-api appends these events only through
+the SECURITY DEFINER function `record_permission_review_audit` (current stream epoch/sequence,
+current review assignment of that stream, kind `permission-review`) and holds no INSERT on
+`authority_audit`; an allow whose decision row is not written (decided before the current
+refusal) records no event. Migration 00096 follows S-04 increment 2's 00095.
+
+PR #88 follow-up verification (2026-10-27): `make initial-installation-integration` PASS (136.6 s)
+incl. `public-runtime-roles-matrix` and `public-runtime-roles-lost-completion/hub-runtime-generated-role-effects`
+(hub runtime role again denied `INSERT INTO authority_audit`); custody
+`TestPermissionAuthorityWithRealServices` PASS incl. the new stale-allow case in
+`decision-time-reviews-mint-expire-deny-and-retire` (0.44 s: refusal, allow decided 2 s earlier
+writes no row and no event, current allow restores; events exactly granted/granted/revoked/
+restored/revoked/restored); `make permission-integration` exit 0 (decision-time subtest 4.28 s);
+`make pre-push` exit 0.
 
 Verification (tracked test/results files restored after each run):
 - Unit: domain/configuration (`ReviewSourceFor`, equivalence, per-cluster bound, batch

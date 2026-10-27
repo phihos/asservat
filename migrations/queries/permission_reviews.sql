@@ -40,7 +40,8 @@ SELECT * FROM permission_review_assignment WHERE stream_id=$1 AND source_uid=$2 
 -- name: CountPermissionReviewAssignments :one
 SELECT count(*) FROM permission_review_assignment WHERE stream_id=$1 AND source_uid=$2 AND retired_at IS NULL;
 
--- name: UpsertPermissionReviewDecision :exec
+-- name: UpsertPermissionReviewDecision :execrows
+-- Affects no row for an older decision or another target of the same Pod UID.
 INSERT INTO permission_review_decision(assignment_id,pod_uid,cluster_id,namespace_name,namespace_uid,workload_kind,workload_name,workload_uid,pod_name,decided_at,fresh_until)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 ON CONFLICT(assignment_id,pod_uid) DO UPDATE SET decided_at=EXCLUDED.decided_at,fresh_until=EXCLUDED.fresh_until
@@ -103,3 +104,6 @@ JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream
 WHERE a.stream_id=$1 AND a.source_uid=$2 AND a.retired_at IS NULL AND rs.epoch=$3 AND rs.seen_sequence=$4 AND au.acknowledged_at IS NOT NULL
 GROUP BY a.id,a.issuer,a.subject_id,a.role,a.basis_digest,d.cluster_id,d.namespace_uid,d.workload_uid
 ORDER BY d.cluster_id,d.namespace_uid,d.workload_uid,a.id LIMIT 1001;
+
+-- name: RecordPermissionReviewAudit :exec
+SELECT record_permission_review_audit($1,$2,$3,$4);

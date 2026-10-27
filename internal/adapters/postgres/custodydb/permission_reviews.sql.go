@@ -314,6 +314,27 @@ func (q *Queries) PrunePermissionReviewDecisions(ctx context.Context, assignment
 	return err
 }
 
+const recordPermissionReviewAudit = `-- name: RecordPermissionReviewAudit :exec
+SELECT record_permission_review_audit($1,$2,$3,$4)
+`
+
+type RecordPermissionReviewAuditParams struct {
+	AuditID     pgtype.UUID
+	Stream      pgtype.UUID
+	EventDigest []byte
+	Record      []byte
+}
+
+func (q *Queries) RecordPermissionReviewAudit(ctx context.Context, arg RecordPermissionReviewAuditParams) error {
+	_, err := q.db.Exec(ctx, recordPermissionReviewAudit,
+		arg.AuditID,
+		arg.Stream,
+		arg.EventDigest,
+		arg.Record,
+	)
+	return err
+}
+
 const retirePermissionReviewSource = `-- name: RetirePermissionReviewSource :execrows
 UPDATE permission_review_assignment SET retired_at=clock_timestamp(),retirement_audit_id=$3 WHERE stream_id=$1 AND source_uid=$2 AND retired_at IS NULL
 `
@@ -715,7 +736,7 @@ func (q *Queries) SelectRecordedReviews(ctx context.Context, arg SelectRecordedR
 	return items, nil
 }
 
-const upsertPermissionReviewDecision = `-- name: UpsertPermissionReviewDecision :exec
+const upsertPermissionReviewDecision = `-- name: UpsertPermissionReviewDecision :execrows
 INSERT INTO permission_review_decision(assignment_id,pod_uid,cluster_id,namespace_name,namespace_uid,workload_kind,workload_name,workload_uid,pod_name,decided_at,fresh_until)
 VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 ON CONFLICT(assignment_id,pod_uid) DO UPDATE SET decided_at=EXCLUDED.decided_at,fresh_until=EXCLUDED.fresh_until
@@ -736,8 +757,9 @@ type UpsertPermissionReviewDecisionParams struct {
 	FreshUntil    pgtype.Timestamptz
 }
 
-func (q *Queries) UpsertPermissionReviewDecision(ctx context.Context, arg UpsertPermissionReviewDecisionParams) error {
-	_, err := q.db.Exec(ctx, upsertPermissionReviewDecision,
+// Affects no row for an older decision or another target of the same Pod UID.
+func (q *Queries) UpsertPermissionReviewDecision(ctx context.Context, arg UpsertPermissionReviewDecisionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertPermissionReviewDecision,
 		arg.AssignmentID,
 		arg.PodUid,
 		arg.ClusterID,
@@ -750,7 +772,10 @@ func (q *Queries) UpsertPermissionReviewDecision(ctx context.Context, arg Upsert
 		arg.DecidedAt,
 		arg.FreshUntil,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const upsertPermissionReviewSource = `-- name: UpsertPermissionReviewSource :exec

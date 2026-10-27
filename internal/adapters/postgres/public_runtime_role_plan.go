@@ -206,8 +206,9 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("permission_review_decision", "INSERT")
 		add("permission_review_decision", "UPDATE", "decided_at", "fresh_until")
 		add("permission_review_decision", "DELETE")
-		// REQ-PER-006: decision-change events into the authority outbox.
-		add("authority_audit", "INSERT")
+		// REQ-PER-006: decision-change events into the authority outbox,
+		// only through the narrow review-event function (no table INSERT).
+		out = append(out, publicRuntimeGrant{"function", "record_permission_review_audit(uuid,uuid,bytea,jsonb)", "", "EXECUTE"})
 	case "evidence-share":
 		// ADR-232: the share ledger. Shares bind to published case locators;
 		// only revocation and an ADR-238 management transfer may change a row

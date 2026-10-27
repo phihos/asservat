@@ -939,6 +939,20 @@ func TestPermissionAuthorityWithRealServices(t *testing.T) {
 		if got := changes(t); !slices.Equal(got, []string{"alice:granted:Allowed", "bob:granted:Allowed", "alice:revoked:Denied", "alice:restored:Allowed"}) {
 			t.Fatalf("decision changes %v", got)
 		}
+		// An allow decided before the current refusal does not overwrite it:
+		// no row changes, so no restored event (Gitar finding on PR #88).
+		if err = record(t, alice, source, false); err != nil {
+			t.Fatal(err)
+		}
+		if err = store.RecordReview(ctx, authapp.ReviewDecision{Source: source, Principal: alice.Principal, Target: request, Allowed: true, Outcome: "Allowed", DecidedAt: time.Now().Add(-2 * time.Second)}); err != nil || reviewed(t, alice) != "" {
+			t.Fatal("stale allow overwrote the refusal", err)
+		}
+		if err = record(t, alice, source, true); err != nil || reviewed(t, alice) != first {
+			t.Fatal("current allow did not restore", err)
+		}
+		if got := changes(t); !slices.Equal(got, []string{"alice:granted:Allowed", "bob:granted:Allowed", "alice:revoked:Denied", "alice:restored:Allowed", "alice:revoked:Denied", "alice:restored:Allowed"}) {
+			t.Fatalf("stale allow wrote a decision event: %v", got)
+		}
 		flush(t, s.p)
 		var pending int
 		if admin.QueryRow(ctx, "SELECT count(*) FROM authority_audit WHERE stream_id=$1 AND event_kind='permission-review' AND acknowledged_at IS NULL", s.b.RootID).Scan(&pending) != nil || pending != 0 {

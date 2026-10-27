@@ -343,8 +343,14 @@ func (r *AccessReviews) RecordReview(ctx context.Context, d authapp.ReviewDecisi
 		default:
 			change = audit.ReviewRestored
 		}
-		if err = q.UpsertPermissionReviewDecision(ctx, custodydb.UpsertPermissionReviewDecisionParams{AssignmentID: a.ID, PodUid: t.PodUID, ClusterID: id(t.ClusterID), NamespaceName: t.Namespace.Name, NamespaceUid: t.Namespace.UID, WorkloadKind: t.Workload.Kind, WorkloadName: t.Workload.Name, WorkloadUid: t.Workload.UID, PodName: t.PodName, DecidedAt: ts(decided), FreshUntil: ts(until)}); err != nil {
+		changed, err := q.UpsertPermissionReviewDecision(ctx, custodydb.UpsertPermissionReviewDecisionParams{AssignmentID: a.ID, PodUid: t.PodUID, ClusterID: id(t.ClusterID), NamespaceName: t.Namespace.Name, NamespaceUid: t.Namespace.UID, WorkloadKind: t.Workload.Kind, WorkloadName: t.Workload.Name, WorkloadUid: t.Workload.UID, PodName: t.PodName, DecidedAt: ts(decided), FreshUntil: ts(until)})
+		if err != nil {
 			return err
+		}
+		if changed == 0 {
+			// An older decision or another target of the Pod UID: the row
+			// was not written, so nothing changed and no event is due.
+			return nil
 		}
 		if err = q.PrunePermissionReviewDecisions(ctx, a.ID); err != nil {
 			return err
@@ -375,5 +381,14 @@ func recordReviewChange(ctx context.Context, q *custodydb.Queries, s custodydb.P
 		Issuer: p.Issuer, Subject: p.Subject, AssignmentID: assignment, ClusterID: t.ClusterID, NamespaceUID: t.Namespace.UID, WorkloadUID: t.Workload.UID, PodUID: t.PodUID, DecidedAt: decided.UTC(), FreshUntil: until.UTC()}
 	var input artifact.Digest
 	copy(input[:], digest(c))
-	return insertAuthority(ctx, q, audit.AuthorityRecord{ID: uuid.NewString(), RootID: uid(s.ID), Epoch: uid(s.Epoch), Sequence: s.Sequence, Kind: "permission-review", InputDigest: input, CreatedAt: now.UTC(), Review: &c})
+	r := audit.AuthorityRecord{ID: uuid.NewString(), RootID: uid(s.ID), Epoch: uid(s.Epoch), Sequence: s.Sequence, Kind: "permission-review", InputDigest: input, CreatedAt: now.UTC(), Review: &c}
+	if !r.Valid() {
+		return cfg.ErrInvalid
+	}
+	data, err := json.Marshal(r)
+	if err != nil || len(data) > 8<<20 {
+		return cfg.ErrLimit
+	}
+	// hub-api appends through the narrow review-event function only.
+	return q.RecordPermissionReviewAudit(ctx, custodydb.RecordPermissionReviewAuditParams{AuditID: id(r.ID), Stream: id(r.RootID), EventDigest: digest(r), Record: data})
 }

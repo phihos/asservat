@@ -112,5 +112,23 @@ END $$;
 -- hub-worker's authority publisher. A confirming review writes no event.
 ALTER TABLE authority_audit DROP CONSTRAINT authority_audit_event_kind_check,
  ADD CONSTRAINT authority_audit_event_kind_check CHECK (event_kind IN ('permission-reset','permission-change','permission-suspend','permission-review'));
+-- hub-api holds no INSERT on authority_audit: this function appends only a
+-- 'permission-review' event of the current stream epoch and sequence for a
+-- current review assignment of that stream.
+-- +goose StatementBegin
+CREATE FUNCTION record_permission_review_audit(audit_id uuid,stream uuid,event_digest bytea,record jsonb) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+DECLARE s public.permission_stream;
+BEGIN
+ SELECT * INTO s FROM public.permission_stream WHERE id=stream FOR SHARE;
+ IF NOT FOUND OR octet_length(event_digest)<>32 OR jsonb_typeof(record)<>'object' OR record->>'Kind'<>'permission-review' OR record->>'ID'<>audit_id::text OR
+  record->>'RootID'<>stream::text OR record->>'Epoch'<>s.epoch::text OR (record->>'Sequence')::bigint<>s.sequence OR jsonb_typeof(record->'Review')<>'object' OR
+  NOT EXISTS (SELECT 1 FROM public.permission_review_assignment a WHERE a.stream_id=stream AND a.id::text=record->'Review'->>'AssignmentID' AND a.retired_at IS NULL) THEN
+  RAISE EXCEPTION 'permission review audit refused' USING ERRCODE='23514';
+ END IF;
+ INSERT INTO public.authority_audit(id,stream_id,epoch,sequence,event_kind,event_digest,record) VALUES(audit_id,stream,s.epoch,s.sequence,'permission-review',event_digest,record);
+END $$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION record_permission_review_audit(uuid,uuid,bytea,jsonb) FROM PUBLIC;
 -- No destructive Down: retired assignment IDs and recorded review targets keep
 -- historical audiences from being resurrected after a rollback.

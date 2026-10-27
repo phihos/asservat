@@ -105,7 +105,11 @@ SelfSubjectRulesReview (REQ-PER-004).
    `MappingUnsupported`, `Unavailable` — as reason) and an allow after a refusal (`restored`). Each
    change is one immutable `permission-review` event in the existing authority audit outbox, inside
    the review's own SQL transaction, published, encrypted and acknowledged in batches by the
-   hub-worker's authority publisher like every other authority event. The record holds source UID,
+   hub-worker's authority publisher like every other authority event. hub-api holds no INSERT on
+   `authority_audit`: it appends through the SECURITY DEFINER function
+   `record_permission_review_audit`, which writes only a `permission-review` event at the
+   stream's current epoch and sequence for a current review assignment of that stream. An allow
+   whose decision row is not written (decided before the current refusal) records no event. The record holds source UID,
    generation and spec digest, the identity mapping reference, issuer and subject, assignment ID,
    cluster/namespace/workload/Pod UIDs, decision time and lifetime, and the outcome; never a token,
    Kubernetes user name, group, or namespace/Pod name. A review that confirms the current state
@@ -129,7 +133,7 @@ SelfSubjectRulesReview (REQ-PER-004).
 | 2 | Risk accepted | Yes: "configurable inheritance including pod exec rights" is an accepted maintainer requirement; first-release scope by the 2026-10-26 decision. |
 | 3 | Typical deployments | Yes where teams get `kubectl exec` through OIDC groups (the common RBAC onboarding); off by default (no source, no mapping). |
 | 4 | Precedent | Request-time SubjectAccessReview with short caches is the standard Kubernetes delegation pattern: `k8s.io/apiserver` delegated authorization (aggregated API servers, 10 s allow/deny cache by default), kube-rbac-proxy (SAR per request), Kubernetes Dashboard/Headlamp ("can I" reviews). |
-| 5 | Privileges added | Connector: `create subjectaccessreviews` (cluster-scoped, only when identity mappings are configured; reveals authorizer decisions, changes nothing). Hub: SQL duty `access-review` (insert assignments/decisions, update/delete decisions, insert decision-change events into the authority outbox); hub-worker `permission-accept` gains review-source writes and assignment retirement; every duty that reads assignments gains SELECT on the 3 tables. No credential, secret, collector or worker change; no new network path (existing hub→region query channel). |
+| 5 | Privileges added | Connector: `create subjectaccessreviews` (cluster-scoped, only when identity mappings are configured; reveals authorizer decisions, changes nothing). Hub: SQL duty `access-review` (insert assignments/decisions, update/delete decisions, append decision-change events through the narrow `record_permission_review_audit` function, no table INSERT on the authority outbox); hub-worker `permission-accept` gains review-source writes and assignment retirement; every duty that reads assignments gains SELECT on the 3 tables. No credential, secret, collector or worker change; no new network path (existing hub→region query channel). |
 | 6 | Failure/degraded states | 1 new (decision events are an outbox, not a state): a review that cannot be answered (SAR forbidden/unavailable, connector unreachable, oversized frame) is recorded as a refusal and grants nothing — the same state as "denied". |
 | 7 | Self-configuration | None: existing source fields; bounds are constants. Identity mappings are semantic (must match the cluster's authenticator), not tuning. |
 | 8 | External dependencies | Kubernetes SAR API (`authorization.k8s.io/v1`, GA), the cluster's authorizer chain and its OIDC authenticator configuration (the operator attests both via `admissionParity.reviewRef` and the mapping). |
