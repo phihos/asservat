@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"testing"
@@ -127,6 +128,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	// the activation does after its checks, and acknowledges its audit.
 	var active string
 	var authority authorization.AcceptedPolicyAuthority
+	var authorityScope []byte
 	accept := func(scope byte, maxCaptures int, notAfter time.Time) string {
 		t.Helper()
 		refresh()
@@ -136,7 +138,16 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		if err != nil {
 			t.Fatal(err)
 		}
-		authority = authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policyUID, Creator: creator, Executor: authorization.PolicyPrincipal(installation, policyUID), ScopeDigest: artifact.Digest{scope}, ClusterID: pod.ClusterID, NamespaceUID: pod.NamespaceUID, WorkloadUID: pod.WorkloadUID,
+		authorityScope, err = json.Marshal(struct {
+			Format   string
+			Version  byte
+			Workload authorization.WorkloadTarget
+			Recipe   artifact.Digest
+		}{"synthetic-policy-scope/v1", scope, authorization.WorkloadTarget{ClusterID: pod.ClusterID, NamespaceUID: pod.NamespaceUID, WorkloadUID: pod.WorkloadUID}, planning.RecipeDigest()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		authority = authorization.AcceptedPolicyAuthority{InstallationID: installation, PolicyUID: policyUID, Creator: creator, Executor: authorization.PolicyPrincipal(installation, policyUID), ScopeDigest: sha256.Sum256(authorityScope), ClusterID: pod.ClusterID, NamespaceUID: pod.NamespaceUID, WorkloadUID: pod.WorkloadUID,
 			Delegation: identity.Revision{UID: b.Resource.UID, Generation: b.Resource.Generation, Digest: b.Resource.SpecDigest}, Owners: []artifact.AudienceAssignment{sponsor}, Actions: []string{authorization.PolicyContextAction}, Limits: authorization.AutomationLimits{MaxExecutions: 50, MaxBytes: 1 << 20}, IssuedAt: now, NotAfter: now.Add(time.Hour)}
 		author := identity.Identity{Principal: creator, Scopes: []string{"evidence:read", "evidence:capture", authorization.ShareScope}, Groups: []string{"maintainers"}, Policy: s.a.Eligibility.VerifiedIdentity.Policy, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}
 		in := capture.PolicyAdmission{RootID: root, Recovery: recovery, Target: workload, Authority: authority, Author: author,
@@ -315,7 +326,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 
 	// Acceptance A of generation 1 shares at most three captures.
 	first := accept(61, 3, time.Now().Add(time.Hour))
-	firstGrant := attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority)
+	firstGrant := attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope)
 	hub := captureAdmissions("policy_share_admit_a_")
 	c1, c2 := admit(hub), admit(hub)
 	// A restarted hub (a new admission adapter) continues the stored counter.
@@ -361,6 +372,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	// Editing the DebugPolicy (generation 2) stops sharing: acceptance B of the
 	// new revision starts its own counter, and nothing earlier is backfilled.
 	source.Revision.Generation, source.Revision.Digest = 2, artifact.Digest{54}
+	source.CollectionDigest[0]++ // an explicitly changed collection scope, not sharing-only reauthorization
 	observe()
 	second := accept(62, 3, time.Now().Add(25*time.Second))
 	c5, c6 := admit(hub), admit(hub)

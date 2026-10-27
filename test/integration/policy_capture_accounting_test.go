@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"crypto/sha256"
 	"testing"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 
 // SQL-only review/attachment fixture: current identity and immutable review
 // representation are synthetic. It does not supply public review authority.
-func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority) string {
+func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, scope []byte) string {
 	t.Helper()
 	role := narrowRole(t, ctx, admin, "policy_accounting_grant_", "synthetic-accounting", func(role string) []string {
 		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
@@ -60,13 +61,20 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 		t.Fatal("protected settings acceptance", err)
 	}
 	limits := authorization.AutomationLimits{MaxExecutions: 4, MaxBytes: 4 * artifact.MaxContextBytes}
-	g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantPolicy, Requester: a.Creator, ExecutionDigest: a.ScopeDigest, DataClass: "extract", Reasons: []authorization.SensitiveReason{{ActionID: "pod-status", Code: "synthetic-component-review"}}, Scope: []byte(`{"fixture":"accepted-context-policy"}`), Review: []byte(`{}`), Lifetime: time.Hour, Revision: 1, Policy: &authorization.PolicyGrantScope{Authority: a, RecipeDigest: planning.RecipeDigest(), Limits: limits, ApprovalPolicyRef: settings.Revision, ApprovalMaxAge: time.Hour}}
+	g := authorization.Grant{ID: custodyID(), RootID: s.a.RootID, Kind: authorization.GrantPolicy, Requester: a.Creator, ExecutionDigest: a.ScopeDigest, DataClass: "extract", Reasons: []authorization.SensitiveReason{{ActionID: "pod-status", Code: "synthetic-component-review"}}, Scope: scope, Review: []byte(`{}`), Lifetime: time.Hour, Revision: 1, Policy: &authorization.PolicyGrantScope{Authority: a, RecipeDigest: planning.RecipeDigest(), Limits: limits, ApprovalPolicyRef: settings.Revision, ApprovalMaxAge: time.Hour}}
 	g.ReviewDigest = app.ReviewDigest(g, g.Review)
+	blueprint := g
+	blueprint.RequestedAt = now
+	blueprint.ReviewUntil = now.Add(authorization.GrantReviewWindow)
+	blueprint.PolicyNotAfter = identity.Earlier(now.Add(g.Lifetime), a.NotAfter)
+	if !blueprint.Valid() || sha256.Sum256(scope) != g.ExecutionDigest || app.ReviewDigest(g, g.Review) != g.ReviewDigest {
+		t.Fatal("synthetic grant blueprint violates immutable domain/scope/review bindings")
+	}
 	recovery, err := s.recovery.reader.RecoveryState(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	g, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: g, IdempotencyKey: "accounting-review", RequestDigest: artifact.Digest{78}}, recovery)
+	g, _, err = store.RequestGrant(ctx, app.StoredGrantRequest{Grant: g, IdempotencyKey: "accounting-review", RequestDigest: app.PolicyGrantRequestDigest(a.Creator, app.PolicyGrantRequestInput{PolicyUID: a.PolicyUID, IdempotencyKey: "accounting-review", Lifetime: g.Lifetime, Limits: limits})}, recovery)
 	if err != nil {
 		t.Fatal("policy grant request", err)
 	}

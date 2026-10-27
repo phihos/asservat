@@ -782,3 +782,20 @@ archived with actual Go/provider logs under
 `approved-workflow/policy102-accounting-smoke-1-artifacts/` in the local build
 cache. Preserve the passing unchanged migration/attachment evidence; retry only
 the concrete failed policy-share component after fixture correction and gates.
+
+
+Accounting smoke 2 (`ef5a211d`) failed overall before capture admission:
+settings acceptance passed under its separate duty, then the new fixture's grant
+scope bytes did not hash to its synthetic accepted authority digest. PostgreSQL
+correctly refused access_grant_check; the digest CHECK is unchanged. Go 2.805s,
+selected child 2.35s, runner phase 22.048s, exit 1; unchanged 3,249 source hashes,
+cleanup empty and both exact owned containers absent. Report SHA-256
+`b51ca1afff2ab5018143b0e3866870fbc34d319bef250df8bb404fc34d5267f6`,
+archived under `approved-workflow/policy102-accounting-smoke-2-artifacts/`.
+The fixture correction builds one synthetic collection-scope document before
+acceptance, hashes those exact bytes into authority and passes those same bytes
+to the grant. It checks the domain blueprint and review hash before SQL and uses
+the real typed caller-input digest. The second accepted fixture version explicitly
+changes source collection intent; a sharing-only edit never reauthorizes or resets
+collection budgets. These remain synthetic authority inputs to real SQL, not
+production compiler/identity qualification. No product check or privilege changes.
