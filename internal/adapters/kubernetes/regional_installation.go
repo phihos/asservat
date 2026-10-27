@@ -213,6 +213,9 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 	clusterRole, role := regionalRBAC(p.Namespace)
 	if p.Collector != nil {
 		clusterRole.Rules = append(clusterRole.Rules, regionalNodeReadRule())
+		if executor {
+			role.Rules = append(role.Rules, regionalNodeInputReadRule())
+		}
 	}
 	if executor {
 		cluster, connector, capacityRole := regionalExecutorRBAC(p.Namespace)

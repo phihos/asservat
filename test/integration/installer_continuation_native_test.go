@@ -107,6 +107,12 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 		issuer, providerRoots = identity.Issuer, identity.RootPEM
 		clients = append(clients, contracts.IdentityClient{ID: "mcp", Kind: "human", ClassQualified: true})
 	}
+	var approvals *contracts.IdentityApprovals
+	if installedJourneyFocus() == "approved-recording" {
+		// Real fresh password authentication at the reference provider's LoA1;
+		// this fixture does not configure or claim MFA/LoA2.
+		approvals = &contracts.IdentityApprovals{RequireRecordingApproval: true, StepUp: &contracts.IdentityStepUp{ACRValues: []string{"1"}, MaxAgeSeconds: 300}}
+	}
 	document, _ := json.Marshal(contracts.InstallerContinuation{Format: contracts.InstallerContinuationFormat, Namespace: namespace,
 		WorkerProvider:      contracts.InstallerProviderSelection{AuthMount: providers.worker.AuthMount, AuthMountAccessor: providers.worker.AuthMountAccessor},
 		OwnerProvider:       contracts.InstallerProviderSelection{AuthMount: providers.owner.AuthMount, AuthMountAccessor: providers.owner.AuthMountAccessor},
@@ -114,7 +120,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 		// ADR-185: synthetic browser identity settings exercise the public sources step.
 		Public: &contracts.InstallerPublicSettings{Origin: origin, Issuer: issuer, ClientID: "console",
 			MaxLifetimeSeconds: 3600, MaxLogins: 8, MaxSessions: 8, MaxLogoutEvents: 8, Clients: clients,
-			EligibleGroups: []string{"synthetic-group", installedUnrelatedGroup}, GroupMaxAgeSeconds: 300,
+			EligibleGroups: []string{"synthetic-group", installedUnrelatedGroup}, GroupMaxAgeSeconds: 300, Approvals: approvals,
 			// ADR-190: the operator's synthetic capacity profile and release operator.
 			Capacity: nativeCapacityProfile(),
 			// ADR-210: the synthetic group's console users are the processing
@@ -518,6 +524,12 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
+		if installedJourneyFocus() == "approved-recording" {
+			t.Run("approved-recording", func(t *testing.T) {
+				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose)
+			})
+			return
+		}
 		if focus := installedJourneyFocus(); focus == "policy" || focus == "alert" || focus == "logresource" {
 			// ADR-228: the restart-trigger policy journey (ADR-231: its alert
 			// phase in the alert focus, ADR-241: its log and resource phases in
@@ -567,7 +579,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "approved-recording" {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}

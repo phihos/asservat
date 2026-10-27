@@ -64,7 +64,7 @@ func (s *AdmittedWorkerEnrollment) BeginAcquisitionEnrollment(ctx context.Contex
 		}
 		service := s.Download
 		service.Proofs = targetWorkerProof{reader: proof, target: original.Worker.CredentialTarget()}
-		certificate, e = service.EnrollAdmitted(limited, parent.ID, worker, csr)
+		certificate, e = service.enrollAdmitted(limited, ctx, parent.ID, worker, csr)
 	case value.AcquisitionProjection:
 		if s.ProjectionProofs == nil {
 			return nil, stepped("attester", artifact.ErrDownloadUnavailable)
@@ -75,7 +75,7 @@ func (s *AdmittedWorkerEnrollment) BeginAcquisitionEnrollment(ctx context.Contex
 		}
 		service := s.Projection
 		service.Proofs = targetAcquisitionProof{reader: proof, worker: original.Worker}
-		certificate, e = service.EnrollProjection(limited, parent, worker, csr)
+		certificate, e = service.enrollProjection(limited, ctx, parent, worker, csr)
 	default:
 		return nil, stepped("request", artifact.ErrDownloadUnavailable)
 	}
@@ -85,7 +85,7 @@ func (s *AdmittedWorkerEnrollment) BeginAcquisitionEnrollment(ctx context.Contex
 	// Final identity validation consumes a new current read; it never recreates
 	// the admitted lifetime. Hold that read's original bound through socket write.
 	final, e := s.Bindings.ReadAcquisitionEnrollment(limited, parent, worker)
-	if e != nil || !final.Valid(s.Now()) || final.Worker != original.Worker || limited.Err() != nil || !certificate.Peer.Valid(s.Now()) || certificate.Peer.InstallationID != installation || certificate.Peer.PeerID != original.Worker.Binding.PodUID || certificate.Peer.Role != "acquisition" || certificate.Peer.NotAfter.After(original.Worker.Intent.RunUntil) {
+	if e != nil || !final.Valid(s.Now()) || final.Worker != original.Worker || limited.Err() != nil || ctx.Err() != nil || !certificate.Peer.Valid(s.Now()) || certificate.Peer.InstallationID != installation || certificate.Peer.PeerID != original.Worker.Binding.PodUID || certificate.Peer.Role != "acquisition" || certificate.Peer.NotAfter.After(original.Worker.Intent.RunUntil) {
 		return nil, collapsed("final", artifact.ErrDownloadUnavailable, e)
 	}
 	response, end := context.WithDeadline(limited, identity.Earlier(final.FreshUntil, certificate.Peer.NotAfter))

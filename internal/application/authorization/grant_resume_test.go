@@ -34,15 +34,15 @@ func TestGrantResumeHintNeedsOriginalClientAndCurrentCollectionRights(t *testing
 	}
 	otherClient := f.requester
 	otherClient.Principal.ClientID = "agent"
-	if v := get(otherClient); v.CanResume || v.CanResolve {
+	if v := get(otherClient); v.CanResume || v.CanResolve || !v.ResumeRequiresOriginalClient {
 		t.Fatal("another original-human client inherited a grant")
 	}
-	if get(f.approver).CanResume {
+	if v := get(f.approver); v.CanResume || v.ResumeRequiresOriginalClient {
 		t.Fatal("reviewer inherited requester capture")
 	}
 	noCaptureScope := f.requester
 	noCaptureScope.Scopes = []string{"evidence:read"}
-	if v := get(noCaptureScope); v.CanResume || v.CanResolve {
+	if v := get(noCaptureScope); v.CanResume || !v.CanResolve || v.ResumeRequiresOriginalClient {
 		t.Fatal("missing capture scope can resume")
 	}
 	previous := f.projection
@@ -92,4 +92,35 @@ func TestMarkedGrantResumeHintExpiresAtOriginalDeadline(t *testing.T) {
 	if err != nil || v.CanResume || !v.CanResolve {
 		t.Fatal("original expiry must remove start hint but retain recovery", err)
 	}
+}
+
+func TestGrantPendingAndDeniedNeverOfferResolutionOrClientGuidance(t *testing.T) {
+	f := newGrantFixture(t)
+	in := f.input(84, nil)
+	in.Scope = []byte(`{"timing":"approvedAcceptance/v1"}`)
+	in.ExecutionDigest = sha256.Sum256(in.Scope)
+	g, _, err := f.svc.Request(context.Background(), grantIdentity{f.requester, &f.now}, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := func() {
+		t.Helper()
+		for _, actor := range []identity.Identity{f.requester, f.approver} {
+			v, _, err := f.svc.Get(context.Background(), grantIdentity{actor, &f.now}, g.ID)
+			if err != nil || v.CanResolve || v.CanResume || v.ResumeRequiresOriginalClient {
+				t.Fatal("unapproved review offered a start/closure/client instruction", err)
+			}
+		}
+		other := f.requester
+		other.Principal.ClientID = "agent"
+		v, _, err := f.svc.Get(context.Background(), grantIdentity{other, &f.now}, g.ID)
+		if err != nil || v.ResumeRequiresOriginalClient || v.CanResolve {
+			t.Fatal("unapproved review instructed another client", err)
+		}
+	}
+	check()
+	if _, _, err = f.svc.Decide(context.Background(), grantIdentity{f.approver, &f.now}, g.ID, false, "declined", "denied"); err != nil {
+		t.Fatal(err)
+	}
+	check()
 }

@@ -28,6 +28,7 @@ type ownerProviderControlFixture struct {
 	server                                   *httptest.Server
 	issued, expires                          time.Time
 	shift                                    time.Duration
+	clock                                    func() time.Time
 	loginCalls, renewCalls, lookups, revokes int
 	mode                                     string
 	authChange                               func(*ownerProviderAuthReply)
@@ -74,7 +75,11 @@ func ownerProviderTestJWT(end time.Time) []byte {
 func (f *ownerProviderControlFixture) serve(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	now := time.Now().Add(f.shift)
+	now := time.Now()
+	if f.clock != nil {
+		now = f.clock()
+	}
+	now = now.Add(f.shift)
 	meta := map[string]string{"role": f.control.role, "service_account_name": f.control.account, "service_account_uid": f.control.accountUID, "service_account_namespace": f.control.namespace, "service_account_secret_name": ""}
 	writeAuth := func() {
 		a := ownerProviderAuthReply{ClientToken: "exact-service-token", Accessor: "exact-accessor", Policies: []string{f.control.role}, TokenPolicies: []string{f.control.role}, Metadata: meta, Orphan: true, EntityID: "10000000-0000-4000-8000-000000000009", LeaseDuration: 300, Renewable: true, Type: "service"}

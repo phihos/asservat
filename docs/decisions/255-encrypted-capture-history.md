@@ -96,7 +96,8 @@ including exact four-object cardinality. The existing common 32 KiB frames are
 unchanged. Only signed history operations use the separately derived finite
 authority, bundle and escaped receipt envelope bounds.
 
-The focused real PostgreSQL/S3 run `history-parameters-native-10` passed encrypted
+The prior schema-100 history checkpoint’s focused real PostgreSQL/S3 run
+`history-parameters-native-10` passed encrypted
 write/read, own-selector eviction without premature refund, ordinary evidence
 deletion-path refusal and actual history-prefix inventory before charge release.
 It measured **4,214 physical ciphertext bytes** against **1,671,168 reserved

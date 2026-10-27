@@ -157,8 +157,10 @@ export interface components {
                 capture_window_seconds?: 300;
                 /** @description Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority. */
                 can_resume: boolean;
-                /** @description Advisory original requester/client may attempt passive original-request lookup/closure. It never authorizes a new start. */
+                /** @description Advisory original requester/client may recover a possibly accepted request after an approved decision. Never offered for pending or denied review; a missing acceptance closes the original intent. */
                 can_resolve: boolean;
+                /** @description Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer. */
+                resume_requires_original_client: boolean;
             } & unknown;
         } | {
             /** @constant */

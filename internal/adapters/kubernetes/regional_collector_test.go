@@ -29,6 +29,7 @@ func TestRegionalCollectorProvisioning(t *testing.T) {
 	api.PrependReactor("create", "*", func(a k8stesting.Action) (bool, runtime.Object, error) {
 		o := a.(k8stesting.CreateAction).GetObject().(meta.Object)
 		o.SetUID(types.UID(ownerID(int(100 + uid.Add(1)))))
+		o.SetResourceVersion("created-version")
 		return false, nil, nil
 	})
 	p := RegionalInstallPlan{Namespace: "asservat-connector", Collector: &RegionalCollectorPlan{Namespace: "asservat-collector", Name: "asservat-node"}}
@@ -48,6 +49,9 @@ func TestRegionalCollectorProvisioning(t *testing.T) {
 	secret, err := api.CoreV1().Secrets("asservat-connector").Get(ctx, RegionalNodes, meta.GetOptions{})
 	if err != nil || !*secret.Immutable {
 		t.Fatal("server Secret", err)
+	}
+	if nodes.serverInput != (contracts.ConnectorAPIInput{Kind: "Secret", Name: RegionalNodes, UID: string(secret.UID), ResourceVersion: secret.ResourceVersion, DedicatedToAPI: true}) {
+		t.Fatal("listener input pin did not come from acknowledged Secret", nodes.serverInput)
 	}
 	pair, err := tls.X509KeyPair(secret.Data[contracts.RegionalNodeServerFile], secret.Data[contracts.RegionalNodeServerKeyFile])
 	if err != nil {

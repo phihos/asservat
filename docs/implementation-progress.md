@@ -13,7 +13,9 @@ acceptance; a later grant cannot renew it. History failure leaves an independent
 accepted incident and its start intact. Browser settings/pagination are bounded
 in memory and clear at their original deadlines and session/scope changes.
 
-Focused real SQL/S3 `history-parameters-native-10` passed: actual exit 0, unchanged
+The following component evidence predates schema-101 renumbering and composition
+with the approved-recording funding/cancellation candidate; it does not qualify
+the newly composed source. Focused real SQL/S3 `history-parameters-native-10` passed: actual exit 0, unchanged
 source hashes (including 4,311 captured repository files), empty cleanup failures
 and independently absent owned containers; selected subtest 7.67 s / Go 9.142 s. It covers
 encrypted roundtrip, persisted lineage and source-cutoff/unknown-source refusal,
@@ -51,6 +53,109 @@ indexes occupied 90,112 bytes each after churn; detailed transition costs and
 all failed probes remain in ADR-255. These are local synthetic SQL measurements,
 not installed aggregate latency. Final installed qualification remains pending; REQ-HIS-001–004 and
 the full increment are not marked complete by this checkpoint.
+
+
+## Authored packet custody funding correction (2026-10-27)
+
+Installed run 40538171521 on c5db1e11 passed self-approval refusal, independent
+fresh approval and the real preview-expiry wait, then returned CapacityUnavailable
+on submission. The actual authored 39,714,816-byte/16-object context reserve was
+projected as a 6,176,768-byte custody child; one packet reservation needs 9,928,704
+bytes. [ADR-257](decisions/257-approved-recording-funding.md) and migration 00100
+correct the projection and upgrade existing already-backed children, retaining
+record/object/protocol limits, identities, all charges and original deadlines.
+
+The failing pure arithmetic regression is now green. Targeted real PostgreSQL/
+S3/OpenBao fixture `TestPacketEvidenceBackingMigrationWithRealPostgres` passes
+(Go 5.531 seconds; runner/test exit 0). It creates actual purpose-separated legacy
+SQL enrollments under two upfront authored policies, preserves a small child and
+its uncertain reservation, grows a packet-funded child, refuses a malformed
+predecessor without partial changes, proves an unspent Down/Up roundtrip, then
+accepts an actual packet custody reservation and refuses Down while retaining
+that charge. Source/administrator/history inputs remain synthetic; no collector
+or evidence output runs in this fixture. Tested sources stayed unchanged and
+cleanup is empty; report SHA-256
+`0e92b011f9f8bbff8bedfa1c09621569039719c512e0ad92cb97d8880ab223ab`.
+Two earlier local fixture attempts failed (ambiguous migration SQL alias, then
+an invalid test setup changing an enrolled policy) and were cleaned before this
+corrected run. No complete installed approved packet publication/download has
+passed yet; the corrected candidate still needs guarded remote qualification.
+
+The subsequent installed run 40546623947 on 79694a43 failed before admission
+with the private facts/current refusal. Explicit resolution safely closed the
+unstarted request, so the helper returned closed=true; it did not accept or run
+a capture. That run neither proves nor disproves the corrected physical charge.
+The fixture now retains its initial public code and resolver state without
+identifiers, and closed private bound labels distinguish the existing fact,
+storage and whole-operation checks. Pure retained-recorder tests reproduce
+refusal followed by explicit closure for identity, recovery, target, capability
+and retention expiry, with zero admissions and the original blueprint unchanged.
+No current deadline, authority check or retry policy changes. The installed
+expired bound and any justified dependency-path correction remain pending.
+
+## Approved recording request and continuation (2026-10-27)
+
+The browser can request independent approval for an already-reviewed recorder
+composition, retain its original submission through pending review and resume it
+from the approval detail. The server computes advisory resume/resolve hints for
+the full original requester/client; resolution is offered only after an approved
+decision and names its close-if-unstarted effect. Original-client guidance is
+restricted to that same requesting human on another client while the plan is
+Approved. Current admission remains authoritative.
+One preview-bound intent key survives retries and page remounts. A grant made by
+another OAuth client is accompanied by original-client guidance, without transfer.
+This supplies continuation of existing reviews; a new packet profile editor is
+not implemented by this change.
+
+The installer and Helm input preserve the existing optional protected approval
+settings, including step-up and `requireRecordingApproval`. Absent settings keep
+old input bytes. Recorder assessment rules v2 and the manual preview contract now
+state retention from submission preparation, with old unsubmitted rule digests
+requiring fresh review. The page renders the supplied recorder assessment and
+output limit instead of pod-status-specific text; overhead remains unmeasured.
+
+Local console check passes 218 tests. The built browser checks pass 20 journeys,
+17 accessibility scans and the native restart checks. Affected capture,
+authorization, planning, presentation, installer and contract unit packages pass;
+the original-recorder-anchor regression and canonical manual-anchor validators
+pass. Helm, specification, architecture and gate self-tests pass. A broad local
+`go-check` was stopped after 12.5 minutes (exit 143): its ordinary race packages
+and first five Kubernetes groups passed, but the whole gate is incomplete and
+must not be described as passed. Established CI shards cover the full gate.
+
+The new guarded `continuation-approved-recording` focus is implemented for
+actual MCP request → independent signed browser step-up approval → real preview
+expiry → original-client submit → node Gadget recording → encrypted publication
+and authenticated native PCAPNG download opened by tshark. It retains the
+production preview lifetime and existing installer/authority guards, uses the
+published pinned Gadget, and adds no fixture grant rows. The reference provider
+uses actual fresh password LoA1, not MFA. The operator's existing reserve is sized
+for packet ciphertext while retaining four records/16 objects. Offline harness
+checks and integration compilation pass; this installed flow and its runtime
+remain **unqualified until the full flow passes on a disposable runner**.
+Run 40507673537 was cancelled during setup (84 seconds) for fixture review;
+no qualification test ran in that attempt. The next frozen run,
+40511222353, failed before installation in the bootstrap fixture's topology
+assertion: the harness supplied the intended two clusters but the Go focus
+selector still expected three. Sources were unchanged, cleanup was complete and
+build scratch was removed; the 9.9-second collector build verified its pinned
+blobs but supplied no runtime qualification. A privilege-free regression
+reproduces that exact count mismatch, and the consumer now selects two for the
+new focus. Existing topology/fast-fixture cases and the strict service assertion
+are retained.
+Run 40513823733 then reached the actual guarded installer but failed the
+collector apply after 426.139 seconds of Go execution (job 12m22s): the whole
+chart also rendered an unrelated installation-intent ConfigMap into a nonexistent
+release namespace. The collector stage now renders only the official collector
+template and pins its render context to the actual installed connector namespace;
+it creates no regional namespace or extra RBAC outside installer staging. A pure
+command-stage regression fails before the fix, and the Helm render gate verifies
+that the exact original four collector resources remain unchanged. The failed
+run retained unchanged source hashes and complete cleanup; it is not an approved
+recording qualification.
+
+See [the scoped plan and complexity gate](reviews/approved-recording-workflow-2026-10-27.md).
+
 
 ## Approved capture acceptance (ADR-252, 2026-10-27)
 
