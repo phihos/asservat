@@ -26,6 +26,18 @@ type nativeSQLSnapshot struct {
 	Roles                          map[uint32]nativeSQLCounters
 }
 
+// Install only after the real initial schema/role workflow has finished. An
+// extension before bootstrap would violate its pristine-schema requirement.
+// This owned fixture schema is inaccessible to all product roles; the existing
+// fixture administrator alone reads numeric aggregates.
+const nativePacingStatisticsSetup = `BEGIN;
+CREATE SCHEMA fixture_native_statistics;
+CREATE EXTENSION pg_stat_statements WITH SCHEMA fixture_native_statistics;
+REVOKE ALL ON SCHEMA fixture_native_statistics FROM PUBLIC;
+REVOKE ALL ON ALL TABLES IN SCHEMA fixture_native_statistics FROM PUBLIC;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA fixture_native_statistics FROM PUBLIC;
+COMMIT;`
+
 func nativePacingSQLSnapshot(ctx context.Context, admin *pgxpool.Pool) (nativeSQLSnapshot, error) {
 	s := nativeSQLSnapshot{StartedAt: time.Now().UTC(), Roles: make(map[uint32]nativeSQLCounters)}
 	if ctx == nil || ctx.Err() != nil || admin == nil {
@@ -33,7 +45,7 @@ func nativePacingSQLSnapshot(ctx context.Context, admin *pgxpool.Pool) (nativeSQ
 	}
 	call, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
-	const info = `SELECT stats_reset,dealloc FROM pg_stat_statements_info`
+	const info = `SELECT stats_reset,dealloc FROM fixture_native_statistics.pg_stat_statements_info`
 	if err := admin.QueryRow(call, info).Scan(&s.ResetAt, &s.Deallocations); err != nil {
 		return s, errors.New("SQL measurement extension unavailable")
 	}
@@ -42,7 +54,7 @@ func nativePacingSQLSnapshot(ctx context.Context, admin *pgxpool.Pool) (nativeSQ
 	// from query text. Numeric deltas and an idle baseline remain separate.
 	rows, err := admin.Query(call, `SELECT userid,sum(calls)::bigint,sum(rows)::bigint,
  sum(total_exec_time)::double precision,count(*)::bigint
- FROM pg_stat_statements WHERE userid<>(current_user::regrole)::oid
+ FROM fixture_native_statistics.pg_stat_statements WHERE userid<>(current_user::regrole)::oid
  AND dbid=(SELECT oid FROM pg_database WHERE datname=current_database())
  GROUP BY userid ORDER BY userid LIMIT 513`)
 	if err != nil {
@@ -162,6 +174,12 @@ func TestNativePacingSQLWithRealPostgres(t *testing.T) {
 	if err != nil {
 		t.Fatal("SQL measurement administrator unavailable")
 	}
+	// The standalone test owns a fresh measurement fixture. The installed
+	// journey invokes the same setup only after completing actual bootstrap.
+	if _, err := admin.Exec(ctx, nativePacingStatisticsSetup); err != nil {
+		admin.Close()
+		t.Fatal("private SQL statistics setup failed", err)
+	}
 	var reader, otherDatabase *pgxpool.Pool
 	created := false
 	defer func() {
@@ -184,6 +202,12 @@ func TestNativePacingSQLWithRealPostgres(t *testing.T) {
 		t.Fatal("owned measurement role creation failed")
 	}
 	created = true
+	var exposed bool
+	if err := admin.QueryRow(ctx, `SELECT has_schema_privilege('fixture_native_pacing_statistics','fixture_native_statistics','USAGE')
+ OR EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='fixture_native_statistics' AND has_table_privilege('fixture_native_pacing_statistics',c.oid,'SELECT'))
+ OR EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='fixture_native_statistics' AND has_function_privilege('fixture_native_pacing_statistics',p.oid,'EXECUTE'))`).Scan(&exposed); err != nil || exposed {
+		t.Fatal("fixture statistics exposed to an ordinary runtime login", err)
+	}
 	var role uint32
 	if err := admin.QueryRow(ctx, `SELECT oid FROM pg_roles WHERE rolname='fixture_native_pacing_statistics'`).Scan(&role); err != nil {
 		t.Fatal("measurement role identity unavailable")

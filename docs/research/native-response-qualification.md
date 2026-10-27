@@ -61,17 +61,15 @@ remain its original qualification. For this separate near-full experiment,
 review `actionMaxBytes=8 MiB`, `packetAfter=10s`, `actionTimeout=20s` and finite
 composition limits before approval. No duration changes after acceptance are
 allowed. Keep the product's current 8 MiB native cap.
-After the exact accepted source reports Running, run sixteen batches of 4,096 flushed 64-byte writes
+After the exact accepted capture reports Running, run sixteen batches of 4,096 flushed 64-byte writes
 at 500 ms start intervals. Maximum application payload is 4 MiB; traffic phase
 ends after 8.5 s or the earlier original context, with no retry. Record real
-capture/traffic timestamp overlap. TCP segmentation, ACKs and PCAPNG overhead are
+capture/traffic timestamp overlap. Public Running records execution start before gadget attachment; it is not an attach-ready signal. Record the execution observation and traffic interval, then verify actual retained packets and timestamps. An undersized result fails without retry. TCP segmentation, ACKs and PCAPNG overhead are
 not predictable from application writes; measure them.
 
 The caller must invoke `nativePacingRequireNearFullRecording`: only measured
 native sizes 8,323,072..8,388,608 bytes qualify. A tiny artifact or a byte above the
-current cap fails. Record the existing collector's OutputFull/loss counters and
-standard PCAPNG interface/drop statistics (using existing verification/tshark,
-not a hand-written packet parser). Cap saturation or dropped packets must be
+current cap fails. Record standard PCAPNG interface/drop statistics through the existing native tools (`capinfos -M -I` and tshark), not a hand-written packet parser. The current format combines all filtered/unsupported/output-full/lost drops in its ISB; it does not expose a separate OutputFull/LostSamples breakdown to this fixture. Report that measurement gap explicitly rather than inventing per-cause counts. Cap saturation or dropped packets must be
 explicit; reaching the size does not mean all generated traffic was retained.
 No hidden capture retry, larger native limit or replacement workload is allowed.
 If this bounded source does not fill the window, keep the failed measurement and
@@ -90,9 +88,7 @@ require the same cursor/window to cross the first five-second observation.
 
 Require exact SHA-256, authenticated metadata, native filename and successful
 PCAPNG parsing. Reuse the same prepared artifact for an unpaced control, a paced
-whole transfer, a valid range/resume and stale If-Range behavior. Add bounded
-revocation and original-request cancellation cases, retaining original deadlines
-and conservative spend; require no successful post-cutoff write/ACK. Never
+whole transfer, a valid range/resume and stale If-Range behavior. These four sessions exhaust the existing cumulative session reservation. Revocation, cancellation and concurrency remain separate qualification gaps; do not raise or refund the budget for them. Permission-change timing follows the accepted bounded recheck contract, so this experiment adds no immediate-revocation guarantee. Never
 renew a closed identity batch or add per-piece key opening. Preparation and
 each response window retain their separate three one-use unwrap slots.
 
@@ -102,7 +98,7 @@ Once the current installation/approval/history setup qualifies, reuse it rather
 than installing another graph. Reserve twenty seconds for one additional capture:
 its reviewed window is ten seconds, action timeout twenty seconds, and bounded
 traffic phase 8.5 seconds. Preparation keeps its existing fixed deadlines, with a fixture wait
-budget of 60 seconds for its acknowledged continuation; no uncertain POST replay.
+a 60-second polling cutoff for its acknowledged continuation; an already-started call retains its original 45-second call bound and the whole test retains its 18-minute bound. This is not a hard 60-second effect deadline; no uncertain POST replay.
 Allow 60 seconds total for an unpaced control, paced whole, two resume ranges and
 stale If-Range, each under its original request/session/operation bounds. The
 expected near-full paced body is about 6.4 seconds at 1.25 MiB/s, not a new
@@ -199,3 +195,72 @@ admitted windows, not chunks, workload replicas or idle viewers. If measured
 costs or the approximately 0.4 MiB/s ceiling floor are impractical, reassess the
 whole design before proposing a different finite bound. A successful 1.25 MiB/s
 case does not promise arbitrary slow-client support or complete S-02.
+
+
+## Local composed fixture wiring checkpoint (2026-10-27)
+
+The unpublished `continuation-native-paced` focus now wires the existing real
+installation, independent fresh-form approval and real preview-expiry flow into
+one reviewed finite 10s recording, exact-target bounded traffic and four cumulative
+download sessions. The original approved-recording request stays 2s. Replay and
+other-client checks in the paced focus run after publication so they cannot
+consume the finite traffic opportunity. Running is execution observation only;
+absence of observed running, undersized output or missing real packet overlap
+fails without a capture retry or replacement.
+
+The four sessions are unpaced whole, paced whole, two disjoint ranges in one
+session (joined full hash), and stale If-Range falling back to a whole response.
+The range session charges 4MiB preparation plus two fixed 8.375MiB framed-read
+bounds: 20.75MiB within the existing 24MiB read budget; output totals one native
+file within 16MiB. No ignored cipher/index overhead or limit increase is used.
+The recording phase remains open through actual publication and case lookup; first-to-last snapshot deltas also include gaps between phases. Public completed state plus one pinned SQL read must positively confirm the
+paced response's final acknowledgement and closed owner/window; byte EOF alone
+cannot pass. The 64KiB HTTP/2 receive windows / 32KiB client reads at 25ms preserve
+backpressure. One initial and one after-five-seconds SQL sample require a newer
+lease sequence on the same operation/window/deadline and exactly three consumed
+local-key authorization slots. Preparation has its separate three slots.
+
+The setup phase starts before public processing/login/preview/review and ends at the first observed execution start. Installation/bootstrap work precedes this phase and is not attributed to the investigation. Later phase snapshots include generated-role statement counts/time/rows, fixed
+provider request/status/header-time counters and an idle interval matched to the full paced phase (HTTP setup, body and completion checks), with exact measured edges rather than subtracting assumed equal totals.
+The fixture-only API-server audit logs RequestReceived Metadata for ServiceAccount
+GET and TokenReview CREATE under blocking-strict writes. Four existing-admin
+readyz markers establish bounded retained coverage and are excluded from counts.
+Logs are bounded to four 32MiB files per cluster; raw exports stay in the private
+fixture directory and are deleted after numeric aggregation. Missing coverage,
+truncation, duplicate audit IDs, phase overlap or statistics reset fails the
+measurement. No runtime permission, credential, watch or product audit path was
+added. All deltas include background services and separate snapshot edge times;
+they are not an atomic causal trace or CPU cost.
+
+The existing collector-native tooling setup has a three-minute step bound, one
+170s apt operation plus 5s termination grace, no acquisition retries, bounded
+network/lock waits and visible failures; no native test starts after setup
+failure. Working preinstalled tools skip apt. The 20-minute job and 18-minute Go
+limits remain. No hosted paced run, near-full collected result, installed owner
+renewal, aggregate cost or mixed-version qualification has passed yet.
+
+
+The statistics library is preloaded at fixture startup, but its SQL extension is
+created only after the actual initial installation/schema/role workflow finishes.
+Creating it earlier would violate the pristine-schema contract. The extension
+lives in `fixture_native_statistics`, with all schema/table/function PUBLIC
+privileges revoked in one transaction, and only the fixture administrator reads
+its qualified views. No product guard is changed. The revised explicit-file
+real PostgreSQL helper passed in an owned network-none, read-only PG18 container:
+test exit0, source unchanged, ordinary-login schema/table/function access denied,
+correct two target-database statements with administrator/other-database work
+excluded, cleanup exit0 and container confirmed absent. Runner elapsed1.614s;
+report SHA-256 `d5c09d7acb27efaa07df785c12657ffffb8d091d5c8a4e4ee242d27d821b2451`.
+The first harness attempt failed before executing the test because Docker cp
+refused a read-only container root; that failed report is retained. The passing
+attempt used a private read-only bind of the test binary and synthetic fixture.
+Neither result qualifies installed bootstrap, aggregate runtime cost or capture.
+
+Final local checkpoint checks passed: targeted integration helper race tests
+(22.656s; external fixture tests skipped there and qualified separately above),
+14 Python topology/configuration/privacy/coverage tests, workflow YAML and Bash
+syntax, spec-check, architecture-check, Go architecture and diff checks. A
+separate read-only review confirmed that this focused installed path does not
+rerun initial schema inventory after adding the private fixture schema. A future
+initial-schema replay would reject it; this experiment does not qualify that
+combination. The branch remains unpublished and has not run a collector locally.

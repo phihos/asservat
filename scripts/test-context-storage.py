@@ -23,6 +23,7 @@ import urllib.error
 import urllib.request
 
 from helm_registry import HelmRegistry, REGISTRY, verify_registry_cleanup
+import native_kube_audit
 
 ROOT = Path(__file__).resolve().parents[1]
 SEAWEED = "chrislusf/seaweedfs@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d"
@@ -94,7 +95,7 @@ def postgres_fixture_options(regional_context_start=None, lock_waits=False, inst
 def source_hashes():
     files = [ROOT/"go.mod", ROOT/"go.sum", Path(__file__), ROOT/"scripts/fetch-gadget.sh", ROOT/"scripts/ci-native.sh", ROOT/".github/workflows/native.yml"]
     files += list((ROOT/"cmd").rglob("*.go")) + list((ROOT/"internal").rglob("*.go")) + list((ROOT/"test/integration").rglob("*.go"))
-    files += [ROOT/"scripts/helm_registry.py"] + list((ROOT/"charts/asservat").rglob("*"))
+    files += [ROOT/"scripts/helm_registry.py", ROOT/"scripts/native_kube_audit.py"] + list((ROOT/"charts/asservat").rglob("*"))
     files = [p for p in files if p.is_file()]
     files += list((ROOT/"internal").rglob("*.json")) + list((ROOT/"migrations").rglob("*.sql")) + list((ROOT/"migrations").rglob("*.go")) + list((ROOT/"test/fixtures").rglob("*.sql")) + list((ROOT/"test/fixtures").rglob("*.go"))
     return {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}
@@ -323,13 +324,13 @@ def qualify_direct_helper_issuer(env, report):
 
 def qualification_cluster_count(default_count, installer_continuation=False):
     """Owned topology: one hub plus one workload cluster for these focuses."""
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share", "approved-recording", "native-paced"):
         return 2
     return default_count
 
 
 def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False, installer_continuation=False):
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "approved-recording":
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("approved-recording", "native-paced"):
         return "18m"
     if installer_continuation:
         # The installed journey waits for its capture's ten-minute expiry; the
@@ -341,16 +342,21 @@ def qualification_go_timeout(helm_bootstrap=False, runtime_provider_owner=False,
 
 
 def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=False, initial_bootstrap_chain=False, helm_bootstrap=False, regional_context_start=None, runtime_object_roundtrip=False, owner_provider_auth=False, runtime_provider_pair=False, runtime_provider_worker=False, runtime_provider_owner=False, installer_continuation=False, helm_cluster=False, keep_on_failure=False):
-    approved_recording = installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "approved-recording"
+    focus = os.environ.get("ASSERVAT_JOURNEY_FOCUS")
+    collector_qualification = installer_continuation and focus in ("approved-recording", "native-paced")
+    native_paced = installer_continuation and focus == "native-paced"
     guard = Path("/etc/asservat-disposable-host")
-    if approved_recording and not guard.is_file():
-        raise RuntimeError("approved-recording refused: disposable-host guard is absent; never run a collector on a workstation")
+    if collector_qualification and not guard.is_file():
+        raise RuntimeError(f"{focus} refused: disposable-host guard is absent; never run a collector on a workstation")
     if helm_cluster and (helm_bootstrap or test_pattern is not None):
         raise ValueError("--helm-cluster owns its registry/chart infrastructure and exact test selection")
     # ADR-193 step 6: the Helm registry/chart infrastructure, another test.
     helm_bootstrap = helm_bootstrap or helm_cluster
     test_pattern, cluster_count = qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation)
     cluster_count = qualification_cluster_count(cluster_count, installer_continuation)
+    if native_paced:
+        for filename in ("native-paced-report.json", "native-paced-kubernetes-audit.json"):
+            (ROOT/"test/results"/filename).unlink(missing_ok=True)
     helm_test = "TestHelmClusterInstallWithRealServices" if helm_cluster else "TestHelmBootstrapWithRealServices"
     if helm_cluster:
         test_pattern = "^" + helm_test + "$"
@@ -380,6 +386,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         registry = None
         registry_nodes = []
         build_scratch = None
+        audit_started = False
+        audit_nodes = []
         report = {"scope": "component integration, not S-02 release acceptance", "runtimeProviderPairQualification": runtime_provider_pair, "runtimeProviderWorkerQualification": runtime_provider_worker, "runtimeProviderOwnerQualification": runtime_provider_owner, "installerContinuationQualification": installer_continuation, "aggregateGoTimeout": qualification_go_timeout(helm_bootstrap, runtime_provider_owner, installer_continuation), "bootstrapFixtureSeconds": (2700 if installer_continuation else 720 if runtime_provider_owner else 480) if initial_bootstrap_chain else None, "images": {"s3": SEAWEED, "kms": BAO, "kubernetes": NODE, "postgres": POSTGRES}, "clusters": [], "testPattern": test_pattern, "testPackage": test_package, "runtimeObjectRoundTripQualification": runtime_object_roundtrip, "ownerProviderAuthenticationQualification": owner_provider_auth, "initialHandoverQualification": initial_handover, "initialSchemaHandoverQualification": initial_schema_handover, "initialBootstrapChainQualification": initial_bootstrap_chain, "helmBootstrapQualification": helm_bootstrap and not helm_cluster, "helmClusterQualification": helm_cluster, "regionalContextStartQualification": regional_context_start, "fixtureMigratesDatabase": not (initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)}
         exit_code = 1
         try:
@@ -430,7 +438,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             run(["docker", "build", "--network=none", "--label", "asservat.test="+run_id, "-t", worker_tag, str(image_dir)])
             worker_info = json.loads(run(["docker", "image", "inspect", worker_tag]))[0]
             report["workerBuild"] = {"binarySHA256": hashlib.sha256((image_dir/"asservat").read_bytes()).hexdigest(), "tags": "libpcap,netgo,osusergo (static)", "dockerImageID": worker_info["Id"], "tag": worker_tag}
-            if approved_recording:
+            if collector_qualification:
                 collector_dir = work / "collector-image"
                 collector_dir.mkdir()
                 started = time.monotonic()
@@ -473,7 +481,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 return info["NetworkSettings"]["Networks"][network]["IPAddress"]
             s3ip = service("s3", SEAWEED, ["mini", "-dir=/data", "-ip.bind=0.0.0.0", "-admin.ui=false", "-s3.port=8333"], ["--user", "1000:1000", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-v", "/data", "-e", "AWS_ACCESS_KEY_ID=synthetic-only", "-e", "AWS_SECRET_ACCESS_KEY=synthetic-only-secret", "--entrypoint", "/usr/bin/weed"])
             baoip = service("kms", BAO, ["server", "-dev", "-dev-no-store-token", "-dev-root-token-id=synthetic-root", "-dev-listen-address=0.0.0.0:8200"], ["--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=64m", "-e", "SKIP_SETCAP=true", "-e", "BAO_DISABLE_MLOCK=true", "--entrypoint", "/usr/bin/bao"])
-            pgip = service("postgres", POSTGRES, postgres_fixture_options(regional_context_start, lock_waits=installer_continuation, installed_budget=installed_budget), ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"])
+            pgip = service("postgres", POSTGRES, postgres_fixture_options(regional_context_start, lock_waits=installer_continuation, installed_budget=installed_budget, native_statistics=native_paced), ["--user", "postgres", "--read-only", "--tmpfs", "/tmp:rw,nosuid,nodev,size=32m", "--tmpfs", "/var/run/postgresql:rw,nosuid,nodev,size=16m,mode=1777", "-v", "/var/lib/postgresql", "-e", "POSTGRES_PASSWORD=synthetic-only", "-e", "POSTGRES_DB=custody_test"])
             proxy_ip = service("tls", worker_tag, ["http://"+s3ip+":8333", "http://"+baoip+":8200", pgip+":5432"], ["--user", "65532:65532", "--read-only", "--entrypoint", "/provider-proxy"])
             for _ in range(50):
                 try:
@@ -510,6 +518,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     time.sleep(.1)
                 else: raise RuntimeError("PostgreSQL fixture not ready")
             dsn="postgres://postgres:synthetic-only@"+pgip+":5432/custody_test?sslmode=disable"
+            if native_paced:
+                report["nativeSQLStatistics"] = True
             prepare_fixture_database(cache, work, dsn, pgname, initial_schema_handover or initial_bootstrap_chain or helm_bootstrap)
             for url in ["http://"+s3ip+":8333", "http://"+baoip+":8200/v1/sys/health"]:
                 for attempt in range(40):
@@ -522,6 +532,8 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     time.sleep(.25)
                 else: raise RuntimeError("fixture did not become ready")
             fixture = {"s3": "http://"+s3ip+":8333", "kms": "http://"+baoip+":8200", "postgres":dsn, "postgresContainer": pgname, "nativeProviders":native_providers, "clusters": []}
+            if native_paced:
+                fixture["nativeSQLStatistics"] = True
             if installer_continuation:
                 fixture["identity"] = start_keycloak(work, network, run_id, containers, report)
             if alert:
@@ -561,10 +573,18 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                     kind_config.write_text(json.dumps({"kind":"Cluster", "apiVersion":"kind.x-k8s.io/v1alpha4", "nodes":[{"role":"control-plane", "extraMounts":[mount]}]}))
                     create += ["--config", str(kind_config)]
                     report["ephemeralNodeState"] = {"volume":ephemeral_volumes[-1], "maxBytes":3*1024**3, "storage":"tmpfs", "scope":"Synthetic API node only; original startup/product deadlines, no persistence qualification"}
-                if approved_recording and index == 1:
+                if collector_qualification and index == 1:
                     kind_config = work / "kind-approved-collector.json"
                     kind_config.write_text(json.dumps({"kind": "Cluster", "apiVersion": "kind.x-k8s.io/v1alpha4", "nodes": [{"role": "control-plane", "extraMounts": [{"hostPath": str(guard), "containerPath": str(guard), "readOnly": True}]}]}))
                     create += ["--config", str(kind_config)]
+                if native_paced:
+                    # Extend the provider-pair/collector configuration; never
+                    # replace its tmpfs or disposable-host guard mounts.
+                    audit_config = json.loads(kind_config.read_text())
+                    native_kube_audit.configure(audit_config, work, index)
+                    kind_config = work / ("kind-native-paced-" + str(index) + ".json")
+                    kind_config.write_text(json.dumps(audit_config))
+                    create = create[:create.index("--config")] + ["--config", str(kind_config)]
                 creates.append(create)
             # The first create alone sets up Kind's shared Docker network; the
             # rest run concurrently.
@@ -704,6 +724,12 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
                 command += ["-timeout", aggregate_timeout]
             command += [test_package]
             report["journeyFocus"] = os.environ.get("ASSERVAT_JOURNEY_FOCUS", "")
+            if native_paced:
+                for index, cluster in enumerate(fixture["clusters"]):
+                    owned = native_kube_audit.owned_node(network+"-"+str(index))
+                    audit_nodes.append((owned, cluster["config"]))
+                    run(["kubectl", "--kubeconfig", cluster["config"], "--request-timeout=5s", "get", "--raw", "/readyz"])
+                audit_started = True
             # Each output line also goes, with its elapsed seconds, to a timing
             # log, so slow phases are measured rather than guessed.
             began = time.monotonic()
@@ -785,6 +811,23 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         finally:
             report["testExit"] = exit_code
             failures = []
+            if native_paced:
+                try:
+                    if not audit_started or len(audit_nodes) != 2:
+                        raise ValueError("native audit setup incomplete")
+                    for _, config in audit_nodes:
+                        run(["kubectl", "--kubeconfig", config, "--request-timeout=5s", "get", "--raw", "/readyz"])
+                    audit = native_kube_audit.collect(ROOT/"test/results/native-paced-report.json", audit_nodes, work)
+                    report["nativeKubernetesAudit"] = audit
+                except (OSError, ValueError, KeyError, TypeError, IndexError, subprocess.SubprocessError):
+                    report["nativeKubernetesAudit"] = {"complete": False, "reason": "bounded owned audit coverage unavailable"}
+                    exit_code = 1
+                try:
+                    (ROOT/"test/results/native-paced-kubernetes-audit.json").write_text(json.dumps(report["nativeKubernetesAudit"], indent=2)+"\n")
+                except OSError:
+                    report["nativeKubernetesAudit"] = {"complete": False, "reason": "aggregate artifact unavailable"}
+                    exit_code = 1
+                report["testExit"] = exit_code
             # Preserve diagnostics from this owned database before removing it.
             # Without them, role/query failures collapse to the public unavailable
             # error and the original SQL cause disappears with fixture cleanup.

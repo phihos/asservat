@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"html"
 	"io"
 	"mime"
@@ -19,6 +20,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -29,6 +31,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -164,10 +167,23 @@ func (b *installedBrowser) approvedRecordingStepUp(t *testing.T, ctx context.Con
 	b.csrf = view.CSRF
 }
 
-func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func()) {
+func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identity *installedIdentity, publicRoot []byte, address, origin, cluster, namespace, workload, regionalConfig string, diagnose func(), measurement *nativePacingMeasurement) {
 	t.Helper()
 	if _, err := os.Stat("/etc/asservat-disposable-host"); err != nil {
 		t.Fatal("approved recording requires disposable runner", err)
+	}
+	var finishSetup func() error
+	if measurement != nil {
+		var err error
+		finishSetup, err = measurement.begin(ctx, "setup")
+		if err != nil {
+			t.Fatal("native workflow initial snapshot", err)
+		}
+		defer func() {
+			if err := measurement.writeReport(); err != nil {
+				t.Error("write native measurement report", err)
+			}
+		}()
 	}
 	cert, err := x509.ParseCertificate(publicRoot)
 	if err != nil {
@@ -235,6 +251,9 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		Pods     []struct{ UID, Name string } `json:"selected_pods"`
 	}
 	arguments := approvedRecordingArguments(cluster, namespace, workload)
+	if measurement != nil {
+		arguments = nativePacingArguments(cluster, namespace, workload)
+	}
 	read("preview_capture", arguments, &preview)
 	if preview.ID == "" || !preview.Approval || preview.Enabled || len(preview.Pods) != 1 || preview.Pods[0].UID == "" || !time.Now().Before(preview.Expires) {
 		t.Fatal("approved recording preview lacks original production review window", preview)
@@ -343,10 +362,19 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if err != nil {
 		t.Fatal(err)
 	}
+	trafficTransport, err := rest.TransportFor(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	trafficClient := &http.Client{Transport: trafficTransport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	defer trafficClient.CloseIdleConnections()
 	traffic, endTraffic := context.WithCancel(ctx)
 	joined := make(chan struct{})
 	go func() {
 		defer close(joined)
+		if measurement != nil {
+			return
+		}
 		for traffic.Err() == nil {
 			call, end := context.WithTimeout(traffic, 2*time.Second)
 			_, _ = region.CoreV1().RESTClient().Get().Namespace(namespace).Resource("pods").Name(preview.Pods[0].Name+":8080").SubResource("proxy").Suffix("log").Param("line", "synthetic-approved-recording").DoRaw(call)
@@ -378,6 +406,33 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		}
 		return code
 	}
+	trafficDone := measurement == nil
+	var finishRecording func() error
+	observeTraffic := func(current installedJourneyCaptureProgress, expectedID string) {
+		if !trafficDone && current.CaptureID == expectedID && current.Phase == "Running" {
+			measurement.ExecutionObservedAt = time.Now().UTC()
+			if err := finishSetup(); err != nil {
+				t.Fatal("native workflow setup snapshot", err)
+			}
+			finishRecording, err = measurement.begin(ctx, "recording")
+			if err != nil {
+				t.Fatal(err)
+			}
+			measurement.TrafficStartedAt = time.Now().UTC()
+			measurement.Traffic, err = nativePacingTraffic(ctx, func(c context.Context, records int) (*http.Response, error) {
+				request, err := http.NewRequestWithContext(c, http.MethodGet, strings.TrimSuffix(cfg.Host, "/")+"/api/v1/namespaces/"+url.PathEscape(namespace)+"/pods/"+url.PathEscape(preview.Pods[0].Name+":8080")+"/proxy/traffic?records="+fmt.Sprint(records), nil)
+				if err != nil {
+					return nil, err
+				}
+				return trafficClient.Do(request)
+			})
+			measurement.TrafficFinishedAt = time.Now().UTC()
+			if err != nil {
+				t.Fatal("bounded exact-target traffic", err)
+			}
+			trafficDone = true
+		}
+	}
 	continuation := map[string]any{"preview_id": preview.ID, "idempotency_key": original["idempotency_key"], "continue_acquisition": true}
 	closed, err := installedJourneyRecoverCapture(ctx, requestCapture(original), func() (installedJourneyDisposition, error) {
 		var disposition installedJourneyDisposition
@@ -396,6 +451,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}, installedJourneyPause, func(id string) (installedJourneyCaptureProgress, error) {
 		var current installedJourneyCaptureProgress
 		read("get_capture", map[string]string{"capture_id": id}, &current)
+		observeTraffic(current, id)
 		return current, nil
 	})
 	if err != nil || closed || receipt.CaptureID == "" {
@@ -403,18 +459,24 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Fatal("approved expired-preview submission", closed, err)
 	}
 	originalID := receipt.CaptureID
-	if code := requestCapture(original); code != "" || receipt.CaptureID != originalID {
-		t.Fatal("approved replay changed original capture", code)
-	}
-	for _, otherClient := range []*installedBrowser{self, browser} {
-		if code := browserCall(otherClient, "request_capture", original, nil); code != "NotAvailable" && code != "ReviewChanged" {
-			t.Fatal("known key leaked another actor/client accepted replay", code)
+	confirmReplay := func() {
+		if code := requestCapture(original); code != "" || receipt.CaptureID != originalID {
+			t.Fatal("approved replay changed original capture", code)
 		}
+		for _, otherClient := range []*installedBrowser{self, browser} {
+			if code := browserCall(otherClient, "request_capture", original, nil); code != "NotAvailable" && code != "ReviewChanged" {
+				t.Fatal("known key leaked another actor/client accepted replay", code)
+			}
+		}
+	}
+	if measurement == nil {
+		confirmReplay()
 	}
 	until := time.Now().Add(3 * time.Minute)
 	var progress installedJourneyCaptureProgress
 	for time.Now().Before(until) {
 		read("get_capture", map[string]string{"capture_id": receipt.CaptureID}, &progress)
+		observeTraffic(progress, originalID)
 		ready, err := installedJourneyCaptureCaseReady(ctx, receipt.CaptureID, progress)
 		if err != nil {
 			diagnose()
@@ -427,9 +489,12 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatal(err)
 		}
 	}
-	if progress.Phase != "Succeeded" || progress.CaseID == "" {
+	if !trafficDone || progress.Phase != "Succeeded" || progress.CaseID == "" {
 		diagnose()
 		t.Fatal("real recording did not publish", progress)
+	}
+	if measurement != nil {
+		confirmReplay()
 	}
 	var evidence struct {
 		Artifacts []struct {
@@ -440,6 +505,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	read("get_case", map[string]string{"case_id": progress.CaseID}, &evidence)
 	if len(evidence.Artifacts) != 1 || evidence.Artifacts[0].Expires.Before(submitted.Add(590*time.Second)) || evidence.Artifacts[0].Expires.After(time.Now().Add(600*time.Second)) {
 		t.Fatal("manual recording retention did not start at submission", evidence)
+	}
+	if measurement != nil {
+		if err := finishRecording(); err != nil {
+			t.Fatal(err)
+		}
 	}
 	var download installedJourneyDownload
 	prepare := map[string]string{"artifact_id": evidence.Artifacts[0].ID, "idempotency_key": "installed-approved-download"}
@@ -452,6 +522,13 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		if code != "" || reply.Status != "ok" || json.Unmarshal(reply.Data, &download) != nil {
 			diagnose()
 			t.Fatal("initial or acknowledged download preparation failed", code)
+		}
+	}
+	var finishPrepare func() error
+	if measurement != nil {
+		finishPrepare, err = measurement.begin(ctx, "prepare-unpaced")
+		if err != nil {
+			t.Fatal(err)
 		}
 	}
 	prepareDownload()
@@ -476,6 +553,21 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		diagnose()
 		t.Fatal("approved recording native download not ready", download.State)
 	}
+	var finishUnpaced func() error
+	if measurement != nil {
+		if err := nativePacingRequireNearFullRecording(*download.SizeBytes); err != nil {
+			t.Fatal(err)
+		}
+		measurement.NearFullBytes = *download.SizeBytes
+		if err := finishPrepare(); err != nil {
+			t.Fatal(err)
+		}
+		finishUnpaced, err = measurement.begin(ctx, "unpaced")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	unpacedStarted := time.Now()
 	response := installedJourneyContent(t, ctx, &http.Client{Transport: transport, Timeout: time.Minute}, strings.TrimSuffix(origin, "/")+download.ContentPath, identity.downloadToken(), nil)
 	_, disposition, dispositionErr := mime.ParseMediaType(response.Header.Get("Content-Disposition"))
 	if dispositionErr != nil || disposition["filename"] != "artifact-"+evidence.Artifacts[0].ID+".pcapng" {
@@ -487,6 +579,23 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	digest := sha256.Sum256(native)
 	if err != nil || response.StatusCode != http.StatusOK || int64(len(native)) != *download.SizeBytes || hex.EncodeToString(digest[:]) != download.SHA256 {
 		t.Fatal("native PCAPNG does not match authenticated metadata", err)
+	}
+	if measurement != nil {
+		if response.ProtoMajor != 2 || response.ContentLength != int64(len(native)) || response.Header.Get("ETag") != download.ETag {
+			t.Fatal("unpaced HTTP/2 control metadata mismatch")
+		}
+		measurement.Bodies = map[string]nativePacingResult{"unpaced": {Bytes: int64(len(native)), SHA256: digest, Elapsed: time.Since(unpacedStarted)}}
+		if err := finishUnpaced(); err != nil {
+			t.Fatal(err)
+		}
+		qualifyInstalledNativePacing(t, ctx, measurement, transport, identity, origin, evidence.Artifacts[0].ID, download, native, invoke, read, diagnose)
+	}
+	var finishChecks func() error
+	if measurement != nil {
+		finishChecks, err = measurement.begin(ctx, "joined-cleanup")
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	path := "../results/approved-recording.pcapng"
 	if err := os.WriteFile(path, native, 0600); err != nil {
@@ -505,6 +614,36 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			t.Fatalf("native packet outside reviewed port: %q", line)
 		}
 	}
+	if measurement != nil {
+		stats, err := exec.CommandContext(ctx, "capinfos", "-M", "-I", path).Output()
+		if err != nil || len(stats) == 0 || len(stats) > 65536 {
+			t.Fatal("native PCAPNG interface statistics unavailable", err)
+		}
+		measurement.PCAPInterfaceStatistics = string(stats)
+		timestamps, err := exec.CommandContext(ctx, "tshark", "-r", path, "-T", "fields", "-e", "frame.time_epoch").Output()
+		if err != nil || len(timestamps) > 16<<20 {
+			t.Fatal("native packet timestamps unavailable", err)
+		}
+		for _, value := range strings.Fields(string(timestamps)) {
+			seconds, err := strconv.ParseFloat(value, 64)
+			if err != nil || seconds <= 0 {
+				t.Fatal("native packet timestamp invalid")
+			}
+			at := time.Unix(0, int64(seconds*1e9)).UTC()
+			if measurement.FirstPacketAt.IsZero() || at.Before(measurement.FirstPacketAt) {
+				measurement.FirstPacketAt = at
+			}
+			if at.After(measurement.LastPacketAt) {
+				measurement.LastPacketAt = at
+			}
+			if !at.Before(measurement.TrafficStartedAt) && !at.After(measurement.TrafficFinishedAt) {
+				measurement.PacketsDuringTraffic++
+			}
+		}
+		if measurement.PacketsDuringTraffic == 0 {
+			t.Fatal("native PCAPNG has no measured traffic overlap")
+		}
+	}
 	// A closed preview is one finished intent even when its key is public.
 	// A different key cannot reopen it or cause another approval/capture.
 	var closedPreview struct {
@@ -519,6 +658,12 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	}
 	if _, code := invoke("request_capture", map[string]string{"preview_id": closedPreview.ID, "idempotency_key": "another-key-cannot-revive-closed-preview"}); code != "ReviewChanged" && code != "NotAvailable" {
 		t.Fatal("closed public intent became a fresh start", code)
+	}
+	if measurement != nil {
+		if err := finishChecks(); err != nil {
+			t.Fatal(err)
+		}
+		measurement.Complete = true
 	}
 	report := map[string]any{"captureID": receipt.CaptureID, "grantID": grantID, "previewID": preview.ID, "executionDigest": preview.Digest, "independentReviewerSubject": reviewer.ReviewerSubject, "previewExpiresAt": preview.Expires, "submittedAt": submitted, "remainingRealWaitSeconds": realWait.Seconds(), "nativeSHA256": hex.EncodeToString(digest[:]), "nativeBytes": len(native), "tsharkPackets": len(lines), "assurance": "real signed Keycloak fresh password LoA1, not MFA", "authorization": "public product request/decision/admission; no fixture grant rows"}
 	raw, _ := json.MarshalIndent(report, "", "  ")

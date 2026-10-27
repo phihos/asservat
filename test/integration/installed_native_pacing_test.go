@@ -4,9 +4,14 @@ import (
 	"encoding/json"
 	"testing"
 
+	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/contracts"
 	"asservat.local/asservat/internal/domain/artifact"
 )
+
+func installedRecordingFocus() bool {
+	return installedJourneyFocus() == "approved-recording" || installedJourneyFocus() == "native-paced"
+}
 
 // This is a separate reviewed public capture request, before independent
 // approval. It does not lengthen the accepted PR-100 recording or its deadlines.
@@ -49,5 +54,18 @@ func TestNativePacingReviewedCaptureInput(t *testing.T) {
 	after, _ := json.Marshal(approvedRecordingArguments(cluster, "payments", "api"))
 	if string(after) != string(ordinary) {
 		t.Fatal("pacing request changed the original approved-recording fixture")
+	}
+}
+
+func TestNativePacingRangesFitExistingSessionBudget(t *testing.T) {
+	typeInfo, ok := artifact.LookupNativeType(artifact.PCAPNGArtifact)
+	if !ok {
+		t.Fatal("PCAPNG native type missing")
+	}
+	// The fixed source bounds include frame/index cipher overhead even for a
+	// half-file range. Preparation charges four MiB; each response 8.375MiB.
+	read := evidence.ContextDownloadReadWork + 2*evidence.NativeWindowReadWork(typeInfo)
+	if read != 21757952 || read > 24<<20 {
+		t.Fatal("two ranges exceed the unchanged 24MiB session", read)
 	}
 }

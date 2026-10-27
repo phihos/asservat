@@ -108,7 +108,7 @@ func prepareInstallerContinuationNative(t *testing.T, ctx context.Context, api k
 		clients = append(clients, contracts.IdentityClient{ID: "mcp", Kind: "human", ClassQualified: true})
 	}
 	var approvals *contracts.IdentityApprovals
-	if installedJourneyFocus() == "approved-recording" {
+	if installedRecordingFocus() {
 		// Real fresh password authentication at the reference provider's LoA1;
 		// this fixture does not configure or claim MFA/LoA2.
 		approvals = &contracts.IdentityApprovals{RequireRecordingApproval: true, StepUp: &contracts.IdentityStepUp{ACRValues: []string{"1"}, MaxAgeSeconds: 300}}
@@ -524,9 +524,19 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
-		if installedJourneyFocus() == "approved-recording" {
+		if installedRecordingFocus() {
 			t.Run("approved-recording", func(t *testing.T) {
-				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose)
+				var measurement *nativePacingMeasurement
+				if installedJourneyFocus() == "native-paced" {
+					if !f.NativeSQLStatistics {
+						t.Fatal("native pacing SQL statistics not configured")
+					}
+					if _, err := admin.Exec(ctx, nativePacingStatisticsSetup); err != nil {
+						t.Fatal("post-bootstrap private SQL statistics setup", err)
+					}
+					measurement = &nativePacingMeasurement{admin: admin, root: p.RootID, providers: providers}
+				}
+				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement)
 			})
 			return
 		}
@@ -579,7 +589,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "approved-recording" {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" || focus == "approved-recording" || focus == "native-paced" {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}
