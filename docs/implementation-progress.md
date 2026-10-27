@@ -1,8 +1,20 @@
 # Sustained implementation progress
 
+## Installed pacing request correction (2026-10-27)
+
+The first pacing run 40591118979 failed on `fa69b019` before approval or traffic:
+its fixture requested a non-editable `actionMaxBytes` field. Actual Go exited 1
+in 480.868s; all 3,223 source hashes matched, sources stayed unchanged and cleanup
+completed. The incomplete report has no capture/download/renewal or aggregate
+cost result. The fixture now relies on the builtin's existing 8 MiB recorder cap
+and has an actual-planner RED/GREEN preflight; production validation, profiles,
+quotas and original authority are unchanged. See the
+[qualification record](research/native-response-qualification.md#first-installed-pacing-attempt-and-request-preflight-2026-10-27).
+Fresh installed pacing qualification remains pending.
+
 ## Paced native continuation composed with qualified PR100 (2026-10-27)
 
-The local unpublished paced candidate now includes canonical main
+At the local composition checkpoint before publication, the paced candidate includes canonical main
 `eed8594020645fe6d10f8c6565e69a6235c7507d`, preserving final PR100 storage response
 scheduling, operational-recorder refusal, closed diagnostics and API metadata
 freshness. A content comparison against the prior 21806d0d API checkpoint found

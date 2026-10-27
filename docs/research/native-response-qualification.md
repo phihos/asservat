@@ -1,6 +1,35 @@
 # Remaining native response qualification
 
-Date: 2026-10-27. Status: tested qualification helpers; installed paced transfer and combined costs unrun.
+Date: 2026-10-27. Status: first installed attempt failed before traffic; corrected request preflight passed. Installed paced transfer and combined costs remain pending.
+
+## First installed pacing attempt and request preflight (2026-10-27)
+
+Run 40591118979 on `fa69b019` failed before approval or traffic generation:
+`preview_capture` returned `InvalidComposition`. Actual Go exited 1 in
+480.868s; the approved-recording subtest took 9.84s. The first transient storage
+refusal delivered its typed response with Finish below 100ms; the later refusal
+was a deterministic request error. All 3,223 source hashes independently match,
+sources stayed unchanged and cleanup reported no failures. Environment report
+SHA-256: `2ee0c3233a477878e0087496c9378905a3465e30583631906ef461db187ff5ca`.
+The pacing report is incomplete, with no traffic, capture, native body or owner
+renewal. It qualifies none of those paths or their aggregate costs.
+
+The fixture requested `actionMaxBytes`, a general schema field that immutable
+`builtin/network-connections/v1` does not expose. Its authored output ceiling
+already exceeds the recorder's existing 8 MiB native cap. Removing that
+unsupported override preserves the same effective cap, aggregate 16 MiB bound,
+ten-second recording, twenty-second action deadline and independent approval.
+No profile, compiler validation, quota, production code or authority changes.
+
+The preflight now runs the actual builtin planner and derives its accepted
+recording, rather than checking only input-schema validity. Target/retention
+facts and the existing recorded filter compiler are synthetic; actual libpcap
+filter behavior and installed collection remain separately qualified. Before
+the fixture correction the new test exited 1 in 0.060s with the exact unexposed
+field path. Afterward the focused race checks exit 0 in 1.334s and require the
+10,000ms recording, 8 MiB native cap and approval. Original approved-recording
+arguments remain unchanged. Canonical pre-push and focused race checks passed; independent source review found no concrete blocker. A fresh installed pacing result is still required.
+
 
 ADR-258 separately qualifies paced 8,126,572-byte synthetic transport, actual
 4 KiB SQL/S3/TLS/key-slot delivery, and the actual Kubernetes response-proof
