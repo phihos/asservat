@@ -56,13 +56,16 @@ func workloadClient(t *testing.T, clock *atomic.Int64, serve func(http.ResponseW
 }
 
 func TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner(t *testing.T) {
-	modes := []string{"deployment", "statefulset", "expressions", "frozen-request", "pod-deployment", "pod-statefulset", "pod-unowned", "pod-job", "pod-unscheduled", "foreign-only", "empty", "namespace-replaced", "workload-replaced", "pod-replaced", "node-rebooted", "list-denied", "list-incomplete", "list-remaining", "list-oversized", "list-wrong-label", "list-duplicate-name", "list-duplicate-uid", "list-missing-rv", "selector-empty", "selector-invalid", "selector-case-alias", "late-original", "clock-rollback"}
+	modes := []string{"short-parent", "deployment", "statefulset", "expressions", "frozen-request", "pod-deployment", "pod-statefulset", "pod-unowned", "pod-job", "pod-unscheduled", "foreign-only", "empty", "namespace-replaced", "workload-replaced", "pod-replaced", "node-rebooted", "list-denied", "list-incomplete", "list-remaining", "list-oversized", "list-wrong-label", "list-duplicate-name", "list-duplicate-uid", "list-missing-rv", "selector-empty", "selector-invalid", "selector-case-alias", "late-original", "clock-rollback"}
 	for _, mode := range modes {
 		t.Run(mode, func(t *testing.T) {
 			var nsReads, rootReads, podReads, nodeReads, lists atomic.Int64
 			var replace atomic.Bool
 			clock := &atomic.Int64{}
 			start := time.Date(2026, 10, 11, 12, 0, 0, 0, time.UTC)
+			if mode == "short-parent" {
+				start = time.Now().UTC()
+			}
 			clock.Store(start.UnixNano())
 			kind := "Deployment"
 			if mode == "statefulset" || mode == "pod-statefulset" {
@@ -203,10 +206,18 @@ func TestNamedWorkloadResolutionPinsSelectedPodAndRealOwner(t *testing.T) {
 			if strings.HasPrefix(mode, "pod-") && mode != "pod-replaced" {
 				r.Kind, r.Name = "Pod", "b-app"
 			}
-			out, err := resolver.ResolveWorkload(context.Background(), r)
-			success := mode == "deployment" || mode == "statefulset" || mode == "expressions" || mode == "frozen-request" || mode == "pod-deployment" || mode == "pod-statefulset" || mode == "pod-unowned"
+			ctx := context.Background()
+			wantUntil := start.Add(5 * time.Second)
+			if mode == "short-parent" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 500*time.Millisecond)
+				defer cancel()
+				wantUntil, _ = ctx.Deadline()
+			}
+			out, err := resolver.ResolveWorkload(ctx, r)
+			success := mode == "short-parent" || mode == "deployment" || mode == "statefulset" || mode == "expressions" || mode == "frozen-request" || mode == "pod-deployment" || mode == "pod-statefulset" || mode == "pod-unowned"
 			if success {
-				if err != nil || !out.Valid(time.Unix(0, clock.Load())) || out.Request.PodName != "b-app" || out.Request.PodUID != "pod-b-app" || out.Request.Namespace.UID != "payments-uid" || out.NodeUID != "node-uid" || !out.ObservedAt.Equal(start) || !out.FreshUntil.Equal(start.Add(5*time.Second)) {
+				if err != nil || !out.Valid(time.Unix(0, clock.Load())) || out.Request.PodName != "b-app" || out.Request.PodUID != "pod-b-app" || out.Request.Namespace.UID != "payments-uid" || out.NodeUID != "node-uid" || !out.ObservedAt.Equal(start) || !out.FreshUntil.Equal(wantUntil) {
 					t.Fatalf("selection failed or pins changed: %+v, %v", out, err)
 				}
 				if mode == "pod-unowned" {
