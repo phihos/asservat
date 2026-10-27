@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -123,10 +124,19 @@ func (a *pcapngArtifact) Close() {}
 // final-sink acknowledgement per chunk. Whole-file and If-Range resumed
 // downloads return the stored bytes and headers of the pcapng type.
 func TestNativeTwoHopPCAPNGWindowChunksAndResume(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	nativePCAPNGWindowChunksAndResume(t, false)
+}
+func TestNativeTwoHopSlowPCAPNGWindowChunksAndResume(t *testing.T) {
+	nativePCAPNGWindowChunksAndResume(t, true)
+}
+func nativePCAPNGWindowChunksAndResume(t *testing.T, slow bool) {
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
 	source := pcapngSourceValue(t)
 	body := syntheticPCAPNG(t, 2*int(artifact.DeliveryBytes)+300_000) // three chunks
+	if slow {
+		body = syntheticPCAPNG(t, int(artifact.RemoteNativeLimit)-(256<<10))
+	}
 	sum := sha256.Sum256(body)
 	now := time.Now()
 	target := value.WorkerCredentialTarget{InstallationID: nativeID, SessionID: nativeID, WorkerID: nativeID, PodUID: nativeID, CreatedAt: now, RunUntil: now.Add(time.Minute)}
@@ -168,18 +178,35 @@ func TestNativeTwoHopPCAPNGWindowChunksAndResume(t *testing.T) {
 		a := artifact.DownloadAuthority{Scope: artifact.DownloadScope{RootID: nativeID, ArtifactID: nativeID, CaptureID: nativeID, ClusterID: nativeID, NamespaceUID: nativeID, WorkloadUID: nativeID, PodUID: nativeID, Version: evidence.ContextCopiesDigest(source.Copies), Principal: identity.Principal{Issuer: "https://id.invalid", Subject: "dev", ClientID: "browser", Kind: identity.Human}}, PermissionEpoch: nativeID, PermissionSequence: 1, ProjectionDigest: artifact.Digest{1}, DecisionDigest: artifact.Digest{2}, IdentityRevision: identity.Revision{UID: "policy", Generation: 1, Digest: [32]byte{3}}, CheckedAt: now, ValidUntil: now.Add(4 * time.Second), AccessUntil: source.Expectation.Registration.ExpiresAt, DeleteBy: source.Expectation.Registration.DeleteBy}
 		lease := artifact.DownloadDeliveryLease{ResponseID: nativeID, WindowID: nativeID, OwnerID: nativeID, Generation: 1, Sequence: 1, Offset: selection.Offset, Length: selection.Length, StartedAt: now, Until: a.ValidUntil, Authority: a}
 		fence++
-		response, client, _ := flowOperation(t, ctx, source, value.NativeResponse, fence, lease)
+		var sequence atomic.Int64
+		sequence.Store(1)
+		var checks atomic.Int32
+		var observe []func(value.NativeLease) value.NativeLease
+		if slow {
+			observe = append(observe, func(l value.NativeLease) value.NativeLease {
+				checks.Add(1)
+				l.Sequence = sequence.Load()
+				l.ObservedAt = time.Now()
+				l.Until = identity.Earlier(l.ObservedAt.Add(4*time.Second), l.Operation.Until)
+				return l
+			})
+		}
+		response, client, _ := flowOperationWithConnector(t, ctx, source, value.NativeResponse, fence, lease, nil, observe...)
 		defer response.Close()
 		worker := flowRunWorker(t, ctx, client, target, result)
 		readWork := evidence.NativeWindowReadWork(source.Expectation.Type())
 		outcome := make(chan error, 1)
 		server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			outcome <- func() error {
-				factory := browser.HTTPDownloadResponseFactory{Writer: w, Request: r}
+				var writer http.ResponseWriter = w
+				if slow {
+					writer = &pacedNativeSink{ResponseWriter: w, ctx: r.Context(), delay: 750 * time.Millisecond}
+				}
+				factory := browser.HTTPDownloadResponseFactory{Writer: writer, Request: r}
 				if got, e := factory.SelectDownloadResponse(m); e != nil || got != selection {
 					return artifact.ErrIntegrity
 				}
-				work, stop := context.WithDeadline(r.Context(), lease.Until)
+				work, stop := context.WithDeadline(r.Context(), now.Add(identity.EvidenceReadRequestWindow))
 				defer stop()
 				plan := artifact.DownloadResponse{ID: nativeID, SessionID: nativeID, OwnerID: nativeID, Generation: 1, Plan: artifact.DownloadResponsePlan{Version: 1, Selection: selection, WholeFile: selection.Offset == 0 && selection.Length == m.Size, WindowReadLimit: readWork}, StartedAt: now, Until: target.RunUntil}
 				sink, e := factory.OpenDownloadResponse(work, m, plan)
@@ -193,9 +220,20 @@ func TestNativeTwoHopPCAPNGWindowChunksAndResume(t *testing.T) {
 				}
 				for offset, end := lease.Offset, lease.Offset+lease.Length; offset < end; {
 					n := min(artifact.DeliveryBytes, end-offset)
-					chunk, e := response.ReadChunk(work, lease, offset, n)
+					if slow && time.Now().Add(2*time.Second).After(lease.Until) {
+						observed := time.Now()
+						a.CheckedAt = observed
+						a.ValidUntil = observed.Add(4 * time.Second)
+						lease.StartedAt = observed
+						lease.Until = a.ValidUntil
+						lease.Authority = a
+						lease.Sequence = sequence.Add(1)
+					}
+					piece, stopPiece := context.WithDeadline(work, lease.Until)
+					defer stopPiece()
+					chunk, e := response.ReadChunk(piece, lease, offset, n)
 					if e != nil {
-						return e
+						return fmt.Errorf("read at%d sequence%d: %w", offset, lease.Sequence, e)
 					}
 					// The window's read work is reported once, with its first chunk.
 					want := int64(0)
@@ -206,16 +244,18 @@ func TestNativeTwoHopPCAPNGWindowChunksAndResume(t *testing.T) {
 						clear(chunk.Bytes)
 						return artifact.ErrIntegrity
 					}
-					written, e := sink.WriteChunk(work, lease, offset, chunk.Bytes)
+					bounded, stopBound := context.WithDeadline(piece, chunk.NativeUntil)
+					defer stopBound()
+					written, e := sink.WriteChunk(bounded, lease, offset, chunk.Bytes)
 					clear(chunk.Bytes)
 					if e != nil {
-						return e
+						return fmt.Errorf("sink at%d sequence%d until%s: %w", offset, lease.Sequence, time.Until(lease.Until), e)
 					}
 					if written != n {
 						return artifact.ErrIntegrity
 					}
-					if e = response.AcknowledgeNativeChunk(work, lease, offset, n); e != nil {
-						return e
+					if e = response.AcknowledgeNativeChunk(bounded, lease, offset, n); e != nil {
+						return fmt.Errorf("ack at%d sequence%d: %w", offset, lease.Sequence, e)
 					}
 					offset += n
 				}
@@ -242,10 +282,20 @@ func TestNativeTwoHopPCAPNGWindowChunksAndResume(t *testing.T) {
 		if outcomeErr != nil || workerErr != nil {
 			t.Fatal("remote window", outcomeErr, "worker", workerErr)
 		}
+		if slow {
+			t.Logf("window observer checks=%d, lease renewals=%d, bytes=%d", checks.Load(), sequence.Load()-1, len(got))
+		}
 		return reply, got
 	}
 
+	started := time.Now()
 	whole, got := download(t, nil)
+	if slow && time.Since(started) <= 5*time.Second {
+		t.Fatal("paced final sink did not exceed first observation")
+	}
+	if slow {
+		t.Logf("paced two-hop window: %d bytes, %.3fs, %.3f MiB/s; same cursor per window", len(got), time.Since(started).Seconds(), float64(len(got))/(1<<20)/time.Since(started).Seconds())
+	}
 	if whole.StatusCode != http.StatusOK || !bytes.Equal(got, body) || sha256.Sum256(got) != sum {
 		t.Fatal("whole-file pcapng download differs", whole.StatusCode, len(got), len(body))
 	}
@@ -273,4 +323,29 @@ func TestNativeTwoHopPCAPNGWindowChunksAndResume(t *testing.T) {
 	if reader.opens.Load() != 4 {
 		t.Fatal("framed source openings", reader.opens.Load())
 	}
+}
+
+// The final production HTTPS sink sees real blocking writes and retains its
+// write deadline/controller; only deterministic peer backpressure is injected.
+type pacedNativeSink struct {
+	http.ResponseWriter
+	ctx        context.Context
+	delay      time.Duration
+	afterWrite func()
+}
+
+func (w *pacedNativeSink) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+func (w *pacedNativeSink) Write(p []byte) (int, error) {
+	timer := time.NewTimer(w.delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+	case <-w.ctx.Done():
+		return 0, w.ctx.Err()
+	}
+	n, err := w.ResponseWriter.Write(p)
+	if err == nil && w.afterWrite != nil {
+		w.afterWrite()
+	}
+	return n, err
 }

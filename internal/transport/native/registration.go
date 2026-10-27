@@ -75,6 +75,7 @@ func (r *HubRouter) RegisterNativeExchange(ctx context.Context, input evidence.N
 		}
 		command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: nativeReference(operation), Kind: string(operation.Kind), Projection: projection, Source: payload, Operation: wire, ParentID: operation.ParentID, Generation: operation.Generation, LeaseSequence: lease.Sequence, Until: lease.Until.UTC().Format(time.RFC3339Nano)}
 		if operation.Kind == value.NativeResponse {
+			command.Until = operation.Until.UTC().Format(time.RFC3339Nano)
 			command.WindowID = delivery.WindowID
 			command.Offset = delivery.Offset
 			command.Length = delivery.Length

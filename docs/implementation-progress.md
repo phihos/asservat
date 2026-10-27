@@ -1,5 +1,80 @@
 # Sustained implementation progress
 
+## Slow regional native response renewal (ADR-258, 2026-10-27)
+
+The same prepaid regional window can now retain its source cursor and key
+opening across independently current delivery leases. SQL advances the existing
+native owner sequence; original response/source/window/owner/generation,
+processing identity and fixed operation deadline remain unchanged. Responses
+use a candidate 20-second conversation ceiling; actual disclosure observations
+remain at most five seconds. Initial full attestation also supplies its reviewed actual token expiry as a
+private immutable admission bound. No raw token or recurring Kubernetes proof
+read is retained; SQL checks continue and actual expiry caps final write/ACK.
+Kubernetes-only identity changes are independently observed by the next window,
+within the original twenty-second ceiling.
+
+Four complete affected race packages passed (authorization 1.645 s,
+evidence 4.895 s, native transport 97.335 s, mTLS 34.884 s). The paced real two-hop
+TLS/production HTTPS-sink regression delivered 8,126,572 exact bytes in 6.313 s
+(1.228 MiB/s), with 70 current-check callbacks and 2 lease renewals, one cursor
+per window, exact resume and stale-If-Range fallback. Paced revocation and the
+original caller deadline stopped partial transfers. Source/SQL/identity inputs
+in that transport test remain synthetic.
+
+Selected actual PostgreSQL/S3 native-owner renewal passed with one immutable
+20-second operation crossing its old five-second observation: fresh independent
+authority advances the existing owner; expired, same-sequence, wrong-caller,
+worker, changed-processing and closed-owner cases deny. Subtest 10.75 s;
+Go exit 0; source hashes unchanged; cleanup failures empty and owned Docker
+resources gone. Local archived report
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-owner-renewal-1-environment.json`
+has SHA256 `0b8e675ae6c23b111738a3e480e1561520cdd76a5cae70334267e600e717e5c3`.
+The pre-cancellation-guard combined native run also passed both selected cases:
+`download-worker-native-exchange` 9.60 s and
+`download-worker-native-owner-renewal` 10.64 s; top-level 20.63 s, Go exit 0,
+harness phase including compile 46.783 s. Source hashes were unchanged and
+cleanup failures were empty. The existing 4 KiB response traverses the production
+attachment/reader path with actual TLS, PostgreSQL/S3 audit and three one-use key
+slots. Archived report
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-exchange-7-environment.json`
+has SHA256 `b6124d1124b6e25ece89edbad571f299005c88382b0ebfbdc18a71230028dff8`.
+
+Earlier composed failures exposed post-clamp timestamp precision mismatch and
+the reader's shared initial-opening/cursor deadline. Both have failing-before,
+passing-after regressions: normalize operation ends after all clamps, and keep
+initial metadata/three unwraps within five seconds while the cursor retains its
+original response owner. Encrypted-object tests confirm no reopening after the
+short context is canceled and no reads after owner cancellation. After the reader correction,
+objectstore/evidence race suites passed (4.767 s/4.852 s), and integration
+compilation passed. No runtime assertion was weakened.
+
+Strengthening the owner-cancellation check
+then reproduced a separate buffered-read defect: a valid contiguous range could
+return after cancellation without another cursor read. Caller/owner cancellation now
+closes the source and clears plaintext before buffered return and after blocking
+reads. Expiry of a short piece observation during an owned frame load preserves
+the cursor; fresh disclosure authority remains mandatory before delivery. The
+blocked-object regression distinguishes that expiry from explicit cancellation.
+
+Final post-guard qualification passed with these cancellation and short-piece
+contracts present: native exchange 9.36 s, owner renewal 10.21 s, top-level
+19.96 s, Go exit 0, harness phase including compile 43.429 s. Source hashes were
+unchanged and cleanup failures were empty. Archived report
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-exchange-8-environment.json`
+has SHA256 `e4ff44c6e6945dccd6f970cf06d023e581b7fdd4f1a0ff892eddcf767a553a7a`.
+The final objectstore/evidence/native race suites passed
+(5.081 s/4.847 s/98.921 s), as did the full pre-push gate. The native report
+retains the same actual 4 KiB SQL/S3/TLS/key-slot scope and synthetic authority
+boundaries; the earlier native7 report remains labeled as the prior candidate.
+
+Pod-proof/bootstrap/human inputs remain synthetic. Actual Kubernetes attestation,
+paced composed 8 MiB transfer and aggregate installed SQL/S3/KMS/API cost,
+installed transfer and practical slower-link qualification remain pending. The
+candidate ceiling implies roughly 0.4 MiB/s
+for a full 8 MiB window before control overhead. This does not complete S-02 or
+claim arbitrary slow-client support; ADR-258 records the proof/API cost floor.
+
+
 ## Approved capture acceptance (ADR-252, 2026-10-27)
 
 Approval-required recordings now retain their exact passive review blueprint

@@ -1,82 +1,182 @@
 # ADR-258 — Native response windows under slow delivery
 
-Date: 2026-10-27. Status: draft; gate regression qualified, composed implementation pending.
+Date: 2026-10-27. Status: implemented candidate; selected qualification passed,
+installed aggregate-cost qualification pending.
 Requirements: REQ-DLD-002/003/004. Maintainer clarification: AGENTS.md, 2026-10-20.
 
-## Observed problem
+## Problem and decision
 
 ADR-220 already reconstructs ordinary download entitlement every 30 seconds.
-Changing that constant does not remove the current transfer limit. ADR-248's
-remote source opens one conversation for an entire prepaid 8 MiB window and
-requires its original delivery lease for every chunk and acknowledgement.
-The native operation, original peer proof, SQL owner, frame gate and HTTP
-conversation also end at the first short observation. A fresh observation
-cannot keep that window open after five seconds. The resulting 1.6 MiB/s
-floor is arithmetic from the window and deadline, not measured throughput.
-
-The regression `TestNativeResponseGateRechecksBeyondInitialObservation`
-reproduced an immediate refusal after twelve simulated seconds, before a
-second current check was called. The operation itself and its processing
-proof were still within their original bounds. This is a component result,
-not a slow-client or installed transfer measurement.
-
-## Proposed implementation and qualification
+Changing that constant does not remove the transfer limit: ADR-248 opens one
+remote conversation for an entire prepaid 8 MiB window but pins that conversation
+to its first five-second disclosure observation. The resulting 1.6 MiB/s floor
+is arithmetic, not measured throughput. The gate regression reproduced refusal
+after twelve simulated seconds before invoking its fresh callback.
 
 Separate finite conversation ownership from each short disclosure observation.
-The response gate prototype uses the existing twenty-second evidence-read
-window as a fixed conversation ceiling and returns each new observation with
-its own five-second cutoff. Revocation still closes it, and no observation
-renews the original operation deadline. Preparation and observation operations
-keep their existing behavior.
+A response operation has one fixed candidate twenty-second ceiling, intersected
+with original caller, worker and access deadlines. Each native/delivery lease
+still lasts at most five seconds. Inbound waits may use the fixed ceiling;
+outbound frames and the final sink require current short authority. Nothing
+rolls the original operation forward. Preparation, observation and approved
+projection operations retain their existing purpose-specific bounds.
 
-That gate change alone does **not** fix downloads. Before this decision can be
-implemented or qualified:
+Reuse the existing RenewNativeOwner SQL transition. Between acknowledged chunks,
+a fresh independent caller observation may advance the same response/window,
+owner, generation, source/version, range, certificate and native operation.
+Only a strictly newer delivery sequence renews its native owner. The acknowledged
+sequence replaces its process observation cache; subsequent actual downgrade
+closes the gate. Independently current observations of the same operation may
+have bounded cache lag: composition retains the newer known sequence with the
+earlier cutoff. Unknown renewal stops the conversation and retains spend.
 
-- Compose renewed delivery leases within the same exact prepaid window and
-  source cursor, preserving source/version, range, owner, generation, original
-  operation and final-sink acknowledgement. An expired value cannot become
-  current merely by rewriting a timestamp.
-- Reuse the existing `RenewNativeOwner` SQL transition and its monotonic
-  sequence constraints rather than adding another owner journal. The current
-  adapter does not expose that transition. Fresh authority and peer checks
-  must still guard renewal, with no replay of uncertain effects.
-- Carry fresh caller observations between completed chunks without reviving
-  a closed identity batch. Refresh an expired peer observation for the exact
-  original worker when required; no replacement Pod, certificate or process.
-  Preserve caller cancellation and actual token/certificate/worker/access
-  cutoffs. Receiving bytes is separate from permission to disclose them.
-- Keep keys/cursor open once per prepaid window; no per-chunk KMS calls,
-  artificial smaller accounting windows, whole-file buffering or new retry.
-- Measure real two-hop mTLS and final HTTPS delivery with slow final writes,
-  exact bytes/resume, current-check counts and original-deadline/revocation
-  negatives. Measure the composed SQL/S3/KMS path before claiming the selected
-  interval is practical. A synthetic clock alone cannot establish throughput.
+The initial processing proof establishes immutable operation identity while
+valid at StartedAt. Its dates are never rewritten or treated as fresh later.
+SQL claim, observe, renewal and completion independently check current
+processing/recovery/parent/worker/certificate facts and the same state identity.
+This avoids widening generic catalog or recovery observation contracts.
 
-The final interval and protocol changes remain subject to those measurements.
-The twenty-second prototype is an engineering candidate using an existing
-bounded request interval, not a maintainer-selected number.
+Regional readers also separate initial opening from cursor ownership. Metadata
+reads and the three key unwraps remain under an initial five-second context;
+framed reads retain the original response context and use fresh per-piece checks.
+Canceling the joined opening context cannot cancel the retained cursor. Pod-status
+reads still finish entirely within the short initial context. No key is reopened
+between chunks.
 
-## Complexity gate for the proposed reuse
+## Finite original Pod identity
 
-| Item | Answer |
+ADR-068's full initial TokenReview and live namespace/account/Job/Pod proof
+remain required. A purpose-specific local attester output also returns the
+actual token expiry already read after successful TokenReview. NativeOrigin
+retains that reviewed bound privately; neither wire fields nor deserializing an
+origin can manufacture it. A missing producer fails closed for responses.
+The original proof retains its short dates for key binding, which still requires
+fresh proof. Each receiving hop performs its own initial attestation.
+
+Within the fixed response, exact original Pod identity is an admission fact;
+current SQL worker/certificate/processing/permission checks continue. Actual
+token and certificate expiry, worker/access cutoffs, original deadline and
+cancellation still stop disclosure. The exact checked remote chunk carries its
+native cutoff through the final HTTP write and ACK, intersected with the human
+lease without replacing it. A missing remote cutoff denies delivery. A blocked
+or failed write cannot be revived under another lease.
+
+The accepted tradeoff is up to twenty seconds before a Kubernetes-only
+Pod/Job/account deletion or spec change is independently re-observed. The next
+window performs full fresh attestation. We retain no raw token, refresh timer,
+periodic Kubernetes check or replacement identity. Repeating the full attester
+inside a window would add at least two TokenReviews plus eight object GETs per
+proof refresh, plus profile/source checks; three two-hop refresh cycles would
+add at least twelve TokenReviews and forty-eight GETs. That cost has no sufficient
+benefit over this bounded admission plus current SQL checks.
+
+[S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html)
+and [CloudFront](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-signed-urls.html)
+check URL expiry when admitting a request and allow an existing transfer to
+continue, while a reconnect needs valid authorization. This supports finite
+admission as a familiar design analogy; Asservat still enforces actual token
+expiry and independent current disclosure checks. Kubernetes documents token
+revocation sixty seconds beyond a Pod's deletionTimestamp, rather than universal
+instantaneous deletion revocation ([documentation](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/)).
+
+## Complexity gate
+
+| Item | Benefit / cost |
 |---|---|
-| 1 | Source proves a whole 8 MiB window is confined to one five-second lease; component regression reproduces refusal despite a fresh callback. Installed slow-client rates remain unmeasured. |
-| 2 | Yes: relaxed bounded download rechecks are explicitly authorized. The original five-second whole-window restriction is an agent choice. |
-| 3 | Larger native files over slower links; the 4 KiB pod-status path rarely reaches this limit. |
-| 4 | Reuse the local framed source's existing renewal and the native SQL owner's already-defined renewal transition; no external-project claim. |
-| 5 | Target: zero new roles, credentials, endpoints or root keys. Any retained proof reader/token lifetime must be explicitly bounded and reviewed; it cannot gain another scope. |
-| 6 | Target: zero new durable phases; the existing response/window/owner sequences account for renewal. More transient ownership states require reassessment. |
-| 7 | Zero new configuration knobs; choose a documented finite bound from measurements. |
-| 8 | Existing TLS, SQL, object-store and key adapters only. |
-| 9 | One existing owner-row update per renewed lease; exact frequency and combined authorization/API cost must be measured. Keep one key opening and the existing read charge per 8 MiB window, not per delivery chunk. No added watcher or background poll. |
-| 10 | No new schema anticipated: the SQL renewal query/guard already exist. Confirm rolling behavior before changing wire interpretation. Older/current sources still use their short bounds until composed. |
-| 11 | Raising only the permission cache does not address the refusal. Smaller accounting windows would multiply audit/key/control cost; buffering would move the bottleneck and add memory. Reuse existing renewal before adding either mechanism. |
+| 1 | Whole-window refusal is reproduced; ordinary slow-link demand below the final candidate floor is not yet qualified. |
+| 2 | Relaxed bounded rechecks are maintainer-authorized; the former whole-window five-second restriction was an agent choice. |
+| 3 | Applies to larger native files on slower links; 4 KiB pod status rarely encounters the limit. |
+| 4 | Reuse existing owner renewal and cursor; finite-admission precedents above are analogies, not imported authority semantics. |
+| 5 | Zero new roles, credentials, listeners, network paths, token retention or key openings. Initial attestation and its permissions are unchanged. |
+| 6 | Zero new durable phases/fallbacks. Missing local expiry/cutoff or unknown renewal uses existing unavailable/stop behavior. |
+| 7 | Zero configuration knobs. The candidate finite bound is explicitly measured and limited below. |
+| 8 | Existing SQL, TLS, S3, KMS and Kubernetes attesters only; no new provider behavior is assumed. |
+| 9 | O(active responses) small identity/cutoff values; zero additional Kubernetes calls within a window. One existing owner update per newer lease; existing one-second SQL observation memo, one cursor/key opening per window, unchanged native buffering. |
+| 10 | No schema or wire-field migration. Mixed old/new peers can reject the longer command and fail closed; drain/roll matched components. No installed rolling-upgrade qualification is claimed. |
+| 11 | Changing permission-cache timing alone leaves the defect. Smaller windows multiply audit/key work; whole-file buffering adds memory. Existing renewal is the smaller integrated change. |
 
-## Evidence so far
+## Qualification and limits
 
-The gate regression failed with actual exit 1. After separating its conversation
-ceiling from short observations it passes, including current revocation and
-original-operation expiry. Complete authorization-domain, evidence and native
-transport race packages pass. Logs are retained under the local recovery cache.
-No installed or end-to-end slow-transfer success is claimed, and this work does
-not complete the download requirement or change unrelated authority deadlines.
+Real two-hop mTLS plus production HTTPS sink, synthetic source/SQL/identity:
+8,126,572 exact bytes took 6.313 s at 1.228 MiB/s with 750 ms blocking final writes
+per chunk, seventy current-check callbacks and two lease renewals. Resume
+returned 7,073,675 exact bytes with sixty-two callbacks and two renewals;
+stale If-Range returned the full body. Each window opened one cursor.
+Paced revocation stopped after 7,340,032 bytes; original-request expiry stopped
+after 4,194,304 bytes. A blocked HTTPS write under an earlier native token cutoff
+returned zero bytes and performed no successful write. The actual coordinator
+also stops a blocked sink at the native cutoff with no ACK or refund.
+
+Attester HTTP/API unit regressions return the exact reviewed token expiry,
+including short-token, malformed, revoked and replaced-object cases, while
+retaining exactly two initial TokenReviews. Origin tests prove no reattestation,
+unchanged short key-binding proof dates, missing-producer refusal, actual expiry,
+cancellation and inability to serialize the private admission. These are unit
+boundaries, not real Kubernetes TokenReview qualification.
+
+Selected real SQL qualification passed on 2026-10-27:
+`TestContextAdmissionWithRealServices/download-worker-native-owner-renewal`:
+subtest 10.75 s, top-level 11.23 s, Go exit 0, harness phase including compile
+53.264 s. Actual PostgreSQL, S3 encrypted audit and registered certificate retain
+one original twenty-second operation past its old five-second SQL observation.
+Expired observation refuses; independent fresh authority advances the existing
+owner. Wrong caller, worker, processing state, same-sequence replay and closed
+owner deny. The report has unchanged before/after hashes and empty cleanup
+failures; owned Docker resources were gone. Human/bootstrap/Pod proof is
+synthetic; this is not a paced combined SQL/S3/KMS payload measurement.
+
+Archived report:
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-owner-renewal-1-environment.json`,
+SHA256 `0b8e675ae6c23b111738a3e480e1561520cdd76a5cae70334267e600e717e5c3`.
+The pre-cancellation-guard candidate qualification selected both
+`download-worker-native-exchange` and `download-worker-native-owner-renewal`:
+9.60 s and 10.64 s respectively, top-level 20.63 s, Go exit 0, harness phase
+including compile 46.783 s. Source hashes were unchanged and cleanup failures
+were empty. The native exchange delivers the exact existing 4 KiB response over
+actual TLS with actual PostgreSQL/S3 audit and three one-use key slots. Its
+Pod-proof/bootstrap/human inputs remain synthetic; this is neither actual
+TokenReview qualification nor a paced composed 8 MiB payload measurement.
+
+Archived prior report:
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-exchange-7-environment.json`,
+SHA256 `b6124d1124b6e25ece89edbad571f299005c88382b0ebfbdc18a71230028dff8`.
+
+Earlier composed runs exposed two deadline defects rather than qualifying this candidate.
+Clamping an already-normalized operation end to a nanosecond context deadline
+caused equality failure after SQL normalized its result to microseconds. The
+regression now normalizes after every clamp, only shortening the deadline.
+After that fix, the regional reader still rejected the longer response context
+before reading: its initial five-second key/opening phase and retained cursor
+shared one deadline. A failing actual-adapter regression led to the separated
+contexts above. Encrypted-object tests prove three key opens once, exact reads
+after opening cancellation, and refusal after owner cancellation. That native
+run verifies the composed path after both deadline corrections.
+
+Strengthening the cancellation regression then exposed buffered plaintext being
+returned after owner cancellation without another cursor read. The corrected
+reader refuses already-expired calls, checks explicit caller cancellation and
+original owner expiry after blocking reads, and clears buffered plaintext when
+closing. A piece observation expiring during an owned frame load does not cancel
+the cursor; independently fresh disclosure authority is required before delivery.
+An actual blocked-object regression returns the verified frame after its short
+piece observation expires, then succeeds on a fresh contiguous read. Explicit
+caller or original owner cancellation refuses the next otherwise-valid range and
+clears the buffer. The earlier native report is not evidence for that later change.
+
+Final post-guard qualification selected both native cases with all deadline,
+reader, cancellation and short-piece-expiry corrections present: native exchange
+9.36 s, owner renewal 10.21 s, top-level 19.96 s, Go exit 0, harness phase
+including compile 43.429 s. Before/after source hashes were unchanged and cleanup
+failures were empty. The actual 4 KiB SQL/S3/TLS/key-slot scope and synthetic
+Pod-proof/bootstrap/human boundaries above remain unchanged. The affected
+objectstore/evidence/native race suites also passed (5.081 s/4.847 s/98.921 s),
+including the blocked-object observation-expiry and explicit-cancellation cases.
+
+Archived final report:
+`~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-exchange-8-environment.json`,
+SHA256 `e4ff44c6e6945dccd6f970cf06d023e581b7fdd4f1a0ff892eddcf767a553a7a`.
+
+The candidate twenty-second ceiling still implies about 0.4 MiB/s for a full
+8 MiB window before control overhead. Aggregate installed SQL/S3/KMS/API cost
+and practical slower-link qualification remain pending. No arbitrary slow-client
+support or full installed download completion is claimed.

@@ -100,24 +100,23 @@ func (s *RemoteContextSource) DescribeCurrent(ctx context.Context, current ident
 }
 
 // ReadChunkCurrent returns the next chunk of the lease's window. The first
-// chunk (at the window offset) opens one private conversation for the whole
-// window under the current identity and the lease's own deadline; every later
-// chunk must follow the previous one's final-sink acknowledgement in the same
-// window and lease. A failed chunk ends the conversation; the window is not
+// chunk opens one fixed bounded private conversation for the whole window.
+// Later chunks follow the previous final-sink acknowledgement and may bring a
+// newer independently authorized lease for the same exact prepaid window. A failed chunk ends the conversation; the window is not
 // retried here.
 func (s *RemoteContextSource) ReadChunkCurrent(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease, offset, length int64) (NativeResponseChunk, error) {
 	if s == nil || ctx == nil || !lease.Valid(s.attachment.config.Now()) || lease.Authority.Scope != s.request.Scope || length < 1 || length > artifact.DeliveryBytes || !lease.Allows(offset, length, s.attachment.config.Now()) {
-		return NativeResponseChunk{}, artifact.ErrDownloadUnavailable
+		return NativeResponseChunk{}, stepped("native-delivery-lease", artifact.ErrDownloadUnavailable)
 	}
 	s.mu.Lock()
-	ok := !s.closed && s.owner.Err() == nil && !s.busy && (s.active == nil && offset == lease.Offset || s.active != nil && !s.pending && lease == s.lease && offset == s.next)
+	ok := !s.closed && s.owner.Err() == nil && !s.busy && (s.active == nil && offset == lease.Offset || s.active != nil && !s.pending && SameNativeWindow(lease, s.lease) && lease.Sequence >= s.lease.Sequence && offset == s.next)
 	if ok {
 		ok = s.enterLocked()
 	}
 	exchange := s.active
 	s.mu.Unlock()
 	if !ok {
-		return NativeResponseChunk{}, artifact.ErrDownloadUnavailable
+		return NativeResponseChunk{}, stepped("native-window-order", artifact.ErrDownloadUnavailable)
 	}
 	defer s.leave()
 	if exchange == nil {
@@ -126,13 +125,36 @@ func (s *RemoteContextSource) ReadChunkCurrent(ctx context.Context, current iden
 			return NativeResponseChunk{}, e
 		}
 	}
+	if lease != s.lease {
+		check, err := s.attachment.current(s.owner, current, s.request)
+		if err == nil && exchange.renew != nil {
+			err = exchange.renew(ctx, check, lease)
+		} else if err == nil {
+			err = artifact.ErrDownloadUnavailable
+		}
+		if err != nil {
+			s.cancel()
+			exchange.Close()
+			return NativeResponseChunk{}, err
+		}
+		s.mu.Lock()
+		s.lease = lease
+		s.mu.Unlock()
+	}
 	call, cancel := context.WithCancel(ctx)
 	stop := context.AfterFunc(s.owner, cancel)
 	defer func() { stop(); cancel() }()
 	chunk, e := exchange.ReadChunk(call, lease, offset, length)
 	s.mu.Lock()
-	if e == nil && s.closed {
-		e = artifact.ErrDownloadUnavailable
+	if e == nil {
+		switch {
+		case s.closed:
+			e = stepped("native-source-closed", artifact.ErrDownloadUnavailable)
+		case chunk.NativeUntil.IsZero():
+			e = stepped("native-chunk-cutoff-missing", artifact.ErrDownloadUnavailable)
+		case !s.attachment.config.Now().Before(chunk.NativeUntil):
+			e = stepped("native-chunk-cutoff-expired", artifact.ErrDownloadUnavailable)
+		}
 	}
 	if e != nil {
 		finish := s.activeStop
@@ -151,20 +173,27 @@ func (s *RemoteContextSource) ReadChunkCurrent(ctx context.Context, current iden
 }
 
 // openWindow opens the window's conversation. It belongs to this source and
-// the lease (cancelled by Close and ending at the lease deadline), not to the
+// fixed operation (cancelled by Close and ending at its original deadline), not to the
 // first chunk's call, whose cancellation still stops the opening itself.
 func (s *RemoteContextSource) openWindow(ctx context.Context, current identities.CurrentIdentity, lease artifact.DownloadDeliveryLease) (*attachedExchange, error) {
-	window, cancel := context.WithDeadline(context.WithoutCancel(ctx), lease.Until)
+	until := s.attachment.config.Now().Add(value.NativeConversationWindow(value.NativeResponse))
+	if bound, ok := s.owner.Deadline(); ok && bound.Before(until) {
+		until = bound
+	}
+	window, cancel := context.WithDeadline(context.WithoutCancel(ctx), until)
 	stopOwner := context.AfterFunc(s.owner, cancel)
 	finish := func() { stopOwner(); cancel() }
 	stopCall := context.AfterFunc(ctx, cancel)
 	check, e := s.attachment.current(window, current, s.request)
+	if e != nil {
+		e = stepped("native-window-current", e)
+	}
 	var exchange *attachedExchange
 	if e == nil {
 		exchange, e = s.attachment.open(window, s.request, value.NativeResponse, lease.ResponseID, lease.Generation, lease, check)
 	}
 	if !stopCall() && e == nil {
-		e = artifact.ErrDownloadUnavailable // the first chunk's call ended while opening
+		e = stepped("native-window-opening-canceled", artifact.ErrDownloadUnavailable) // the first chunk's call ended while opening
 	}
 	if e != nil {
 		if exchange != nil {
@@ -249,4 +278,10 @@ func (s *RemoteContextSource) Close() {
 	if finish != nil {
 		finish()
 	}
+}
+
+// SameNativeWindow compares immutable prepaid response ownership, not the
+// short independently refreshed current-authority observation.
+func SameNativeWindow(a, b artifact.DownloadDeliveryLease) bool {
+	return a.ResponseID == b.ResponseID && a.WindowID == b.WindowID && a.OwnerID == b.OwnerID && a.Generation == b.Generation && a.Offset == b.Offset && a.Length == b.Length && a.Authority.Scope == b.Authority.Scope
 }

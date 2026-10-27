@@ -90,8 +90,9 @@ func (a *HubWorkerAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 		if e != nil {
 			return value.NativeLease{}, step("operation", e)
 		}
-		if !local.Operation.Equal(peer.Operation) || local.Certificate != peer.Certificate || local.Sequence != peer.Sequence {
-			return value.NativeLease{}, step("match", artifact.ErrDownloadUnavailable)
+		local, e = evidence.JoinNativeObservations(local, peer, a.now())
+		if e != nil {
+			return value.NativeLease{}, step("match", e)
 		}
 		local.Until = identity.Earlier(local.Until, identity.Earlier(admissionServing(local, serving), identity.Earlier(until, peer.Until)))
 		return local, nil
@@ -100,7 +101,7 @@ func (a *HubWorkerAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 		inner.Close()
 		return nil, step("gate", e)
 	}
-	return &peerConversation{inner, gate}, nil
+	return &peerConversation{inner: inner, gate: gate}, nil
 }
 
 // nativeParkReserve is the part of the worker's single request budget kept for

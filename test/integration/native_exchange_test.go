@@ -40,6 +40,7 @@ import (
 )
 
 type nativeExchangeFixture struct {
+	renewOnly              bool
 	content                *nativeContextFixture
 	worker                 value.DownloadWorker
 	enrollment             workerEnrollmentFixture
@@ -70,6 +71,13 @@ func (p nativeSQLProof) ReadDownloadPeerProof(ctx context.Context, session strin
 	}
 	now := time.Now().UTC()
 	return value.KeyWorkerProof{Binding: p.worker.Binding, Peer: peer, TokenDigest: sha256.Sum256(raw), ObservedAt: now, FreshUntil: minPublicationTime(now.Add(5*time.Second), p.worker.Intent.RunUntil)}, nil
+}
+
+// Explicit synthetic Pod/token attestation boundary of this fixture. Production
+// obtains this expiry only from the Kubernetes TokenReview-backed attester.
+func (p nativeSQLProof) ReadNativeResponsePeerProof(ctx context.Context, session string, peer value.KeyPeer) (evidence.NativeResponsePeerProof, error) {
+	proof, err := p.ReadDownloadPeerProof(ctx, session, peer)
+	return evidence.NativeResponsePeerProof{Proof: proof, TokenNotAfter: p.worker.Intent.RunUntil}, err
 }
 
 // This native lab composes actual SQL45/42, encrypted S3, three-slot remote A-KEY,
@@ -324,6 +332,16 @@ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExcha
 	if e != nil {
 		t.Fatal(e)
 	}
+	if f.renewOnly {
+		stopWorker()
+		leaf, err := x509.ParseCertificate(clientCertificate.Certificate[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		peer := value.KeyPeer{InstallationID: target.InstallationID, PeerID: target.PodUID, Role: "acquisition", Certificate: sha256.Sum256(leaf.Raw), NotBefore: leaf.NotBefore, NotAfter: leaf.NotAfter}
+		qualifyNativeOwnerRenewal(t, ctx, f, owners, enrollment, peer, session, metadata, objects)
+		return
+	}
 	transfer := evidence.DownloadResponseTransfer{Sessions: f.runtime, Responses: f.runtime, Authority: f.gate, Objects: objects, Audit: f.audit, Now: time.Now, NewID: custodyID}
 	outcomes := make(chan error, 1)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -358,6 +376,20 @@ func qualifyNativeExchangePhase(t *testing.T, ctx context.Context, f nativeExcha
 	response.Body.Close()
 	defer clear(body)
 	transferErr := <-outcomes
+	if transferErr != nil {
+		var stage interface{ FixedStep() string }
+		if errors.As(transferErr, &stage) {
+			t.Log("native transfer refused stage", stage.FixedStep())
+		}
+		var responses, windows int
+		if err := f.admin.QueryRow(ctx, "SELECT count(*) FROM download_response WHERE session_id=$1", session.ID).Scan(&responses); err == nil {
+			t.Log("native response admissions", responses)
+		}
+		if err := f.admin.QueryRow(ctx, "SELECT count(*) FROM download_window WHERE session_id=$1", session.ID).Scan(&windows); err == nil {
+			t.Log("native window admissions", windows)
+		}
+	}
+
 	if e != nil || int64(len(body)) != metadata.Size || artifact.Digest(sha256.Sum256(body)) != metadata.SHA256 {
 		t.Fatal("exact native bytes", len(body), e, "transfer", transferErr)
 	}
@@ -501,7 +533,7 @@ func (a *nativeSQLAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 		if e != nil {
 			return nil, e
 		}
-		a.test.Log("native diagnostic", a.side, "origin accepted", time.Until(origin.Lease.Until))
+		a.test.Log("native diagnostic", a.side, "origin accepted", origin.Lease.Operation.Kind, "sequence", origin.Lease.Sequence, time.Until(origin.Lease.Until))
 		return a.router.Attach(ctx, origin, h)
 	}
 	peer, e := a.verifier.Verify(state)
@@ -512,7 +544,7 @@ func (a *nativeSQLAdmission) OpenNative(ctx context.Context, state *tls.Connecti
 	if e != nil {
 		return nil, e
 	}
-	a.test.Log("native diagnostic", a.side, "origin accepted", time.Until(origin.Lease.Until))
+	a.test.Log("native diagnostic", a.side, "origin accepted", origin.Lease.Operation.Kind, "sequence", origin.Lease.Sequence, time.Until(origin.Lease.Until))
 	ref := origin.Lease.Operation.Reference
 	h.Reference = contracts.NativeReference{InstallationID: ref.InstallationID, SessionID: ref.SessionID, WorkerID: ref.WorkerID, OperationID: ref.OperationID, Fence: ref.Fence}
 	h.WorkerLeaf = append([]byte(nil), state.PeerCertificates[0].Raw...)
@@ -590,6 +622,13 @@ func nativeSQLWorkerLoop(t *testing.T, ctx context.Context, client *mtls.NativeC
 		if e == nil {
 			disposition, e := native.RunWorkerConversation(ctx, stream, hello, target, key, result)
 			t.Log("native diagnostic worker conversation terminal", attempt, disposition.State, e)
+			if e != nil {
+				var stage interface{ FixedStep() string }
+				if errors.As(e, &stage) {
+					t.Log("native worker refused stage", stage.FixedStep())
+				}
+			}
+
 			joined <- nativeSQLWorkerOutcome{disposition, e}
 			if e != nil || disposition.State != contracts.NativeJoined {
 				return fmt.Errorf("uncertain original native conversation: %w", e)

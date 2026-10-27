@@ -17,6 +17,13 @@ import (
 type NativeOperationReader interface {
 	ObserveNativeOperation(context.Context, value.NativeReference, value.KeyPeer) (value.NativeLease, error)
 }
+
+// NativeOperationRenewer advances only an already admitted response owner
+// after the response has obtained a newer current delivery lease.
+type NativeOperationRenewer interface {
+	RenewNativeOperation(context.Context, value.NativeReference, artifact.DownloadAuthority, value.KeyPeer) (value.NativeLease, error)
+}
+
 type NativeOperations interface {
 	NativeOperationReader
 	ClaimNativeOperation(context.Context, value.WorkerEnrollment, artifact.DownloadAuthority, value.NativeOperation) (value.NativeOperation, error)
@@ -177,7 +184,7 @@ func (g *NativeFrameGate) Check(ctx context.Context) (value.NativeLease, error) 
 	join()
 	stop()
 	g.mu.Lock()
-	valid := err == nil && callErr == nil && !g.closed && g.ctx.Err() == nil && l.Valid(g.now()) && l.Operation.CurrentValid(g.now()) && sameNativeOperation(l.Operation, g.lease.Operation) && l.Certificate == g.lease.Certificate && l.Sequence == g.lease.Sequence
+	valid := err == nil && callErr == nil && !g.closed && g.ctx.Err() == nil && l.Valid(g.now()) && l.Operation.CurrentValid(g.now()) && sameNativeOperation(l.Operation, g.lease.Operation) && l.Certificate == g.lease.Certificate && (l.Sequence == g.lease.Sequence || l.Operation.Kind == value.NativeResponse && l.Sequence > g.lease.Sequence)
 	if valid {
 		end := identity.Earlier(g.until, gateCeiling(l))
 		if end.Before(g.until) {

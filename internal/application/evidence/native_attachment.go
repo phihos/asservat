@@ -80,6 +80,7 @@ type attachedExchange struct {
 	release  *nativeOperationRelease
 	once     sync.Once
 	closeErr error
+	renew    func(context.Context, NativePreparationCheck, artifact.DownloadDeliveryLease) error
 }
 
 // A positive completion and cancellation cleanup share one original close
@@ -130,29 +131,38 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 	}
 	initial, e := check(ctx)
 	if e != nil || !initial.Valid(c.Now()) || !initial.Environment.CurrentValid(c.Now()) || initial.Environment.Path.AcquisitionClusterID != c.Enrollment.Worker.Intent.Profile.ClusterID || initial.Environment.Path.WorkerConfiguration != c.Enrollment.Worker.Intent.Profile.Configuration || initial.Scope != r.Scope {
-		return nil, artifact.ErrDownloadUnavailable
+		return nil, collapsed("attachment-initial", artifact.ErrDownloadUnavailable, e)
 	}
 	end := identity.Earlier(initial.ValidUntil, c.Enrollment.Worker.Intent.RunUntil).UTC().Truncate(time.Microsecond)
+	if kind == value.NativeResponse {
+		end = identity.Earlier(c.Now().Add(value.NativeConversationWindow(kind)), identity.Earlier(initial.AccessUntil, c.Enrollment.Worker.Intent.RunUntil)).UTC().Truncate(time.Microsecond)
+	}
 	if d, ok := ctx.Deadline(); ok {
 		end = identity.Earlier(end, d)
 	}
+	// SQL normalizes operation times to microseconds. Clamp every original
+	// bound first, then normalize by shortening so the exact returned identity
+	// survives a nanosecond-precision caller/window deadline.
+	end = end.UTC().Truncate(time.Microsecond)
 	call, stop := context.WithDeadline(ctx, end)
 	defer stop()
 	fence, e := c.Fences.NextNativeFence(call, c.Enrollment.Worker.Intent.ID)
 	if e != nil {
-		return nil, e
+		return nil, stepped("attachment-fence", e)
 	}
 	operation := value.NativeOperation{Path: initial.Environment.Path, Processing: initial.Environment.Processing, Reference: value.NativeReference{InstallationID: c.Enrollment.Worker.Binding.InstallationID, SessionID: r.SessionID, WorkerID: c.Enrollment.Worker.Intent.ID, OperationID: c.NewID(), Fence: fence}, Kind: kind, HubPodUID: c.HubPodUID, HubProcessEpoch: c.HubProcessEpoch, WorkerPodUID: c.Enrollment.Worker.Binding.PodUID, WorkerPublicKey: c.Enrollment.PublicKeyDigest, SourceVersion: r.Scope.Version, ParentID: parent, Generation: generation, StartedAt: c.Now().UTC().Truncate(time.Microsecond), Until: end}
-	if !operation.Valid() {
-		return nil, artifact.ErrDownloadExpired
+	if !operation.CurrentValid(c.Now()) {
+		return nil, stepped("attachment-operation", artifact.ErrDownloadExpired)
 	}
 	var currentMu sync.Mutex
+	var currentOrigin NativeOrigin
 	current := func(bound context.Context, origin NativeOrigin) (value.NativeLease, error) {
 		currentMu.Lock()
 		defer currentMu.Unlock()
 		if bound.Err() != nil || ctx.Err() != nil {
 			return value.NativeLease{}, artifact.ErrDownloadExpired
 		}
+		currentOrigin = origin
 		a, e := check(bound)
 		if e != nil || !a.Valid(c.Now()) || !a.Environment.CurrentValid(c.Now()) || a.Environment.Path != operation.Path || a.Environment.Processing.Epoch != operation.Processing.Epoch || a.Environment.Processing.Sequence != operation.Processing.Sequence || a.Environment.Processing.StateDigest != operation.Processing.StateDigest || a.Scope != r.Scope {
 			return value.NativeLease{}, artifact.ErrDownloadUnavailable
@@ -202,7 +212,7 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 	release := &nativeOperationRelease{owners: c.Owners, operation: operation}
 	pending, e := c.Registrar.RegisterNativeExchange(ctx, NativeExchangeRegistration{Operation: operation, Source: cloneNativeSource(source), Delivery: delivery, Complete: release.complete}, before, current)
 	if e != nil {
-		return nil, e
+		return nil, stepped("attachment-register", e)
 	}
 	claimed, e := c.Owners.ClaimNativeOperation(call, c.Enrollment, initial, operation)
 	if e != nil || !claimed.Equal(operation) || call.Err() != nil {
@@ -210,7 +220,7 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 		if e == nil {
 			e = artifact.ErrDownloadUnavailable
 		}
-		return nil, e
+		return nil, stepped("attachment-claim", e)
 	}
 	exchange, e := pending.Wait(call)
 	if e != nil {
@@ -218,9 +228,38 @@ func (s *NativeAttachment) open(ctx context.Context, r ContextDownloadRequest, k
 		cleanup, done := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		_ = release.cleanup(cleanup)
 		done()
-		return nil, e
+		return nil, stepped("attachment-wait", e)
 	}
-	return &attachedExchange{NativeExchange: exchange, pending: pending, release: release}, nil
+	attached := &attachedExchange{NativeExchange: exchange, pending: pending, release: release}
+	if kind == value.NativeResponse {
+		attached.renew = func(bound context.Context, next NativePreparationCheck, l artifact.DownloadDeliveryLease) error {
+			currentMu.Lock()
+			defer currentMu.Unlock()
+			if next == nil || !SameNativeWindow(delivery, l) || l.Sequence <= delivery.Sequence || !l.Valid(c.Now()) || !c.Now().Before(end) || ctx.Err() != nil {
+				return artifact.ErrDownloadUnavailable
+			}
+			a, err := next(bound)
+			if err != nil {
+				return err
+			}
+			_, err = c.Origins.proofBound(bound, currentOrigin)
+			if err != nil {
+				return err
+			}
+			renewer, ok := c.Owners.(NativeOperationRenewer)
+			if !ok {
+				return artifact.ErrDownloadUnavailable
+			}
+			renewed, err := renewer.RenewNativeOperation(bound, operation.Reference, a, currentOrigin.Proof.Peer)
+			if err != nil || !renewed.Operation.Equal(operation) || renewed.Sequence != l.Sequence || renewed.Certificate != currentOrigin.Lease.Certificate || !renewed.Valid(c.Now()) || bound.Err() != nil {
+				return artifact.ErrDownloadUnavailable
+			}
+			c.Origins.Recent.put(nativeObservationKey{operation.Reference, currentOrigin.Proof.Peer}, renewed, c.Now())
+			check, delivery = next, l
+			return nil
+		}
+	}
+	return attached, nil
 }
 func (s *NativeAttachment) PrepareNativeMetadata(ctx context.Context, r ContextDownloadRequest, i audit.DownloadIntent, a artifact.DownloadAuthority, check NativePreparationCheck) (artifact.NativeDownloadMetadata, NativePreparationCommit, error) {
 	if !i.Valid() || i.SessionID != r.SessionID || i.Batch.Purpose != artifact.DownloadMetadata || i.Batch.Authority.Scope != r.Scope || a.Scope != r.Scope {

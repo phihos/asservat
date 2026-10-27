@@ -179,7 +179,7 @@ func (r *RegionalContextResult) enter(ctx context.Context, o value.NativeOperati
 		return nil, nil, artifact.ErrDownloadUnavailable
 	}
 	deadline, ok := ctx.Deadline()
-	if !ok || deadline.After(r.now().Add(value.NativeLeaseWindow(o.Kind))) {
+	if !ok || deadline.After(r.now().Add(value.NativeConversationWindow(o.Kind))) {
 		return nil, nil, artifact.ErrDownloadUnavailable
 	}
 	r.mu.Lock()
@@ -342,7 +342,7 @@ func (r *RegionalContextResult) ReadWindow(ctx context.Context, o value.NativeOp
 		body, e := reader.ReadNativeContext(call, source, o, window, o.Until)
 		defer clear(body)
 		if e != nil || call.Err() != nil || !r.now().Before(o.Until) || int64(len(body)) != metadata.Size || sha256.Sum256(body) != metadata.SHA256 {
-			return artifact.ErrDownloadUnavailable
+			return collapsed("regional-pod-status-read", artifact.ErrDownloadUnavailable, e)
 		}
 		for at := offset; at < offset+length; {
 			n := min(artifact.DeliveryBytes, offset+length-at)
@@ -362,7 +362,7 @@ func (r *RegionalContextResult) ReadWindow(ctx context.Context, o value.NativeOp
 	}
 	a, e := open.OpenNativeArtifact(call, source, o, window, o.Until)
 	if e != nil {
-		return artifact.ErrDownloadUnavailable
+		return collapsed("regional-artifact-open", artifact.ErrDownloadUnavailable, e)
 	}
 	defer a.Close()
 	if !sameNativeMetadata(a.Metadata(), metadata) {

@@ -53,7 +53,7 @@ func (o NativeOperation) Valid() bool {
 	case NativePrepare, NativeObserve:
 		return o.Reference.Parent().Purpose == AcquisitionDownload && !o.Until.After(o.StartedAt.Add(5*time.Second))
 	case NativeResponse:
-		return o.Reference.Parent().Purpose == AcquisitionDownload && !o.Until.After(o.StartedAt.Add(8*time.Hour))
+		return o.Reference.Parent().Purpose == AcquisitionDownload && !o.Until.After(o.StartedAt.Add(NativeConversationWindow(NativeResponse)))
 	case NativeProjection:
 		return o.Reference.Parent().Purpose == AcquisitionProjection && !o.Until.After(o.StartedAt.Add(identity.EvidenceReadRequestWindow))
 	default:
@@ -152,5 +152,14 @@ func (o NativeOperation) Equal(other NativeOperation) bool {
 // CurrentValid is required by live native admission. Historical absence remains
 // decodable for audit and zero-byte terminal closure, never data or key I/O.
 func (o NativeOperation) CurrentValid(now time.Time) bool {
-	return o.Valid() && o.Path.Valid() && o.Processing.Valid(now) && o.Path.TargetClusterID == o.Processing.Location.ClusterID && !o.Until.After(o.Processing.ValidUntil)
+	if !o.Valid() || !o.Path.Valid() || o.Path.TargetClusterID != o.Processing.Location.ClusterID {
+		return false
+	}
+	if o.Kind == NativeResponse {
+		// This immutable operation identity is not a disclosure observation. Every
+		// live consumer also requires a current short NativeLease and its complete
+		// callback. SQL rechecks the same processing state on claim/observe/renew.
+		return o.Processing.Valid(o.StartedAt) && !now.Before(o.StartedAt) && now.Before(o.Until)
+	}
+	return o.Processing.Valid(now) && !o.Until.After(o.Processing.ValidUntil)
 }

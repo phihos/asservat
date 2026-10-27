@@ -17,6 +17,23 @@ type DownloadPeerToken interface {
 type DownloadPeerProofReader interface {
 	ReadDownloadPeerProof(context.Context, string, authorization.KeyPeer) (authorization.KeyWorkerProof, error)
 }
+
+// NativeResponsePeerProof is trusted local attester output, never wire input.
+// TokenNotAfter is the actual expiry read only after successful TokenReview;
+// Proof keeps its original short dates and remains required for key binding.
+type NativeResponsePeerProof struct {
+	Proof         authorization.KeyWorkerProof
+	TokenNotAfter time.Time
+}
+
+func (p NativeResponsePeerProof) Valid(now time.Time) bool {
+	return p.Proof.Valid(now) && !p.TokenNotAfter.Before(p.Proof.FreshUntil) && now.Before(p.TokenNotAfter)
+}
+
+type NativeResponseProofReader interface {
+	ReadNativeResponsePeerProof(context.Context, string, authorization.KeyPeer) (NativeResponsePeerProof, error)
+}
+
 type DownloadKeyBindingLedger interface {
 	BindAttestedDownloadKeys(context.Context, string, artifact.DownloadAuthority, string, int64, authorization.KeyScope, authorization.KeyPeer, authorization.KeyWorkerProof) error
 }
