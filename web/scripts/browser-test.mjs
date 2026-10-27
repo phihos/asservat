@@ -252,6 +252,19 @@ try {
   assert.deepEqual(managerStats, { revocations: 1, executions_used: 4, collected_bytes_used: 32 << 20 });
   checks.push('current team manager views original policy/workload/expiry/reservations through real C03 and built React; revokes once without review, personal capture or budget reset');
 
+  await page.goto(origin + '/policies');
+  await page.getByLabel('Policy name').fill('team-policy');
+  await page.getByRole('button', { name: 'Show policy' }).click();
+  await page.getByText('5 of 100 used', { exact: true }).waitFor();
+  await page.getByText(/16[,. ]?384 of 1[,. ]?073[,. ]?741[,. ]?824 bytes reserved/).waitFor();
+  await page.getByText('0 of 0 bytes charged before filtering', { exact: true }).waitFor();
+  await page.getByText(/budgets are shared across captures and grants/).waitFor();
+  await page.getByRole('button', { name: 'Check status' }).click();
+  await page.getByText('5 of 100 used', { exact: true }).waitFor();
+  await scan('shared-policy-budgets');
+  checks.push('shared policy budgets through current status service and explicit refresh');
+  await page.screenshot({ path: output + '/policy-budgets.png', fullPage: true });
+
   await page.goto(origin + '/');
 
   await control('unavailable');

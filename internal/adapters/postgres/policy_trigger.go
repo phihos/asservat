@@ -347,6 +347,8 @@ func (s *PolicyTriggers) Status(ctx context.Context, policy string) (value.Polic
 			out.ActiveID = record.ID
 		}
 		out.Authority, out.ExecutionsSpent, out.MaxExecutions, out.NotAfter, out.AcceptedIntentVersion, out.AcceptedGeneration = a, accepted.ExecutionsSpent, a.Limits.MaxExecutions, a.NotAfter.UTC(), record.IntentVersion, record.Source.Revision.Generation
+		out.CollectedBytesSpent, out.MaxCollectedBytes = accepted.CollectedBytesSpent, a.Limits.MaxBytes
+		out.ObservedBytesSpent, out.MaxObservedBytes = accepted.ObservedBytesSpent, a.Limits.MaxObservedBytes
 		out.ClusterID, out.NamespaceUID, out.WorkloadUID = a.ClusterID, a.NamespaceUID, a.WorkloadUID
 		if record.Sharing != nil {
 			out.Sharing = &value.PolicySharingStatus{Instruction: *record.Sharing, Spent: int64(accepted.SharesSpent)}

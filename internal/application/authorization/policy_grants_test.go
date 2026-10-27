@@ -614,3 +614,74 @@ func TestPolicyGrantRequesterWithoutPinnedManagementGetsNoRevocationHint(t *test
 		t.Fatal("requested list offered unavailable revocation", len(rows), reads, err)
 	}
 }
+
+// A replay can block on the SQL row lock just like a fresh revocation. Its
+// historical success must not return protected grant metadata to a stale caller.
+type blockedPolicyRevokeStore struct {
+	GrantStore
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (s blockedPolicyRevokeStore) RevokeGrant(ctx context.Context, in GrantRevocationInput, r artifact.RecoveryProof) (value.Grant, bool, error) {
+	close(s.entered)
+	select {
+	case <-s.release:
+	case <-ctx.Done():
+		return value.Grant{}, false, ctx.Err()
+	}
+	return s.GrantStore.RevokeGrant(ctx, in, r)
+}
+
+type policyReplayIdentity struct{ i identity.Identity }
+
+func (s *policyReplayIdentity) ResolveIdentity(context.Context) (identity.Identity, error) {
+	return s.i, nil
+}
+func TestPolicyGrantRevokeReplayRechecksCurrentIdentityAndOriginalDeadline(t *testing.T) {
+	for _, change := range []string{"groups", "identity-expiry", "eligibility-expiry"} {
+		t.Run(change, func(t *testing.T) {
+			f, in := newPolicyGrantFixture(t)
+			current := &policyReplayIdentity{i: f.requester}
+			g, _, err := f.svc.RequestPolicy(context.Background(), current, in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			g, _, err = f.svc.Revoke(context.Background(), current, g.ID, g.Revision, "withdraw-policy")
+			if err != nil {
+				t.Fatal(err)
+			}
+			entered, release := make(chan struct{}), make(chan struct{})
+			f.svc.Store = blockedPolicyRevokeStore{GrantStore: f.store, entered: entered, release: release}
+			type result struct {
+				g   value.Grant
+				err error
+			}
+			done := make(chan result, 1)
+			go func() {
+				out, _, err := f.svc.Revoke(context.Background(), current, g.ID, g.Revision-1, "withdraw-policy")
+				done <- result{out, err}
+			}()
+			<-entered
+			switch change {
+			case "groups":
+				current.i.Groups = []string{"unrelated"}
+			case "identity-expiry":
+				current.i.ValidUntil = f.now
+			case "eligibility-expiry":
+				f.now = f.now.Add(31 * time.Second)
+				current.i.VerifiedAt = f.now
+				current.i.ValidUntil = f.now.Add(30 * time.Second)
+			}
+			close(release)
+			got := <-done
+			if got.err == nil || got.g.ID != "" {
+				t.Fatal("blocked replay disclosed historical grant metadata", got.err, got.g.ID)
+			}
+			after, _ := f.store.Grant(context.Background(), g.ID)
+			if after.Revision != g.Revision || after.PolicySpend != g.PolicySpend || after.RevokedAt != g.RevokedAt {
+				t.Fatal("refused replay mutated immutable outcome/spend")
+			}
+		})
+	}
+}

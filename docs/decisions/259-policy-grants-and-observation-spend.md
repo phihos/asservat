@@ -161,3 +161,21 @@ there is no extra provider/SQL read, broader list visibility or evidence access.
 Shared accepted-policy pools remain independently binding and must be visible in
 the existing policy-status workflow; grant counters alone are not available
 collection capacity.
+
+
+The existing `get_policy_status` browser/MCP response now includes four required
+shared accepted-pool fields: `collected_bytes_spent`, `max_collected_bytes`,
+`observed_bytes_spent`, `max_observed_bytes`. They reuse the existing accepted
+row and original authority, add no read or privilege, and retain current viewer
+metadata authorization. Native-output reservations and pre-filter observation
+charges stay separate from each grant's counters and measured gathered user data.
+The console uses explicit status refresh with no new polling or acquisition.
+
+A revocation replay returns protected grant metadata. Fresh and replay results
+therefore share the existing final identity check; policy results also preserve
+current group/policy identity and the original management eligibility deadline
+after blocking storage. There is one final identity resolution, no second
+workload projection. Lost final authority hides the result and refunds no spend
+or completed revocation. The former direct replay return reproduced disclosures
+under blocked-store group loss and identity/eligibility expiry; those regressions
+remain required.

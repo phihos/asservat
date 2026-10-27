@@ -477,19 +477,20 @@ func (s GrantService) Revoke(ctx context.Context, current identities.CurrentIden
 	if (g.Kind == value.GrantPolicy || !sameHuman(g.Requester, i.Principal)) && !currentApprover {
 		return zero, false, value.ErrNotApprover
 	}
-	if !g.RevokedAt.IsZero() {
-		// Only the same revoker's retry with the same key is a replay.
-		return s.Store.RevokeGrant(ctx, GrantRevocationInput{GrantID: grantID, Revoker: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}, recovery)
-	}
-	if !value.CanRevoke(g, i, approver, s.Now()) {
+	// The store resolves the same revoker/key replay. Both fresh and replay
+	// results retain the final caller check after a potentially blocking lock.
+	if g.RevokedAt.IsZero() && !value.CanRevoke(g, i, approver, s.Now()) {
 		return zero, false, value.ErrNotApprover
 	}
 	out, replay, err := s.Store.RevokeGrant(ctx, GrantRevocationInput{GrantID: grantID, Revoker: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}, recovery)
 	if err != nil {
 		return zero, false, err
 	}
-	if err = s.final(ctx, current, i); err != nil {
+	if err = s.finalGrantMetadata(ctx, current, i, g.Kind == value.GrantPolicy); err != nil {
 		return zero, false, err
+	}
+	if g.Kind == value.GrantPolicy && !s.Now().Before(approver.ValidUntil) {
+		return zero, false, ErrGrantUnavailable
 	}
 	return out, replay, nil
 }

@@ -117,6 +117,14 @@ export interface components {
                     kind: "policy";
                     policy_uid: string;
                 };
+                /** @description Conservative native-output reservations shared by this acceptance; uncertain spend remains charged. Not measured bytes. */
+                collected_bytes_spent: number;
+                /** @description Original accepted cumulative native-output ceiling, shared across grant replacements and controls. */
+                max_collected_bytes: number;
+                /** @description Conservative pre-filter observation charges shared by this acceptance, including uncertain legacy spend. Not collected output. */
+                observed_bytes_spent: number;
+                /** @description Original accepted cumulative pre-filter observation ceiling; zero permits no continuing acquisition. */
+                max_observed_bytes: number;
                 executions_spent: number;
                 max_executions: number;
                 watched_pods: number;

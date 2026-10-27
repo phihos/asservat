@@ -7,9 +7,13 @@ History correction 3673c264 is retained, including its eviction mutation-count
 fence and installation inventory fix. The composed schema-102 inventory is 130
 permanent tables; catalog bounds now derive from those exact names plus one
 unknown-detection row, with only the two existing replay-transient exceptions.
-The old 128-table guard reproduced a local failure. Complete schema-102 real
-installation and original-grant replacement/revocation tests still await the
-coordinated SQL fixture; history's schema-101 pass is separate evidence.
+The old 128-table guard reproduced a local failure. The composed schema-102
+real installation test now passes 16.96s on a3f9c8da, including all 13 direct
+children and both activation-incarnation nested cases, with 3,258 unchanged
+hashes and empty cleanup. Its combined run exits 1 in the new acquisition
+fixture's invalid installed role name before adapter construction; original-grant
+replacement/revocation remains unqualified. History's schema-101 pass is separate
+evidence.
 
 The isolated policy-grants branch composes canonical main `eed85940`, history
 101 and schema 102 request/settings,
@@ -30,6 +34,18 @@ spend and intentionally stops further collection under previously spent legacy
 scopes; same-intent renewal remains a separate unfinished lifecycle. Down refuses
 preserved spend. See the [decision](decisions/259-policy-grants-and-observation-spend.md)
 and [source-bound plan/results](reviews/s04-policy-grants-plan-2026-10-27.md).
+
+The existing get_policy_status now exposes original shared accepted execution,
+output-reservation and observation-charge budgets through browser/MCP and React,
+using the already-read acceptance/authority with no added SQL queries or polling.
+Current viewer eligibility and final identity checks remain; the status confers
+no execution/evidence rights. Real built-console checks pass 25 journeys/22
+accessibility scans (Go 22.598s) with synthetic ledger/source/projection facts.
+The adjacent revoked-grant replay now applies the same final current policy
+identity and original manager deadline after blocking storage; three reproduced
+blocked-replay regressions pass, without a second workload read. Full affected
+races and final pre-push pass. Actual SQL status mapping and original-grant
+acquisition replacement/revocation remain pending the corrected-role fixture.
 
 Actual owned PostgreSQL/S3 evidence is component scoped. The revised legacy
 migration and request/settings/attachment cases passed on `da522a48` (2.93s and

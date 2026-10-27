@@ -67,13 +67,16 @@ function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies
       <p role="status">{states[s.state] ?? s.state}</p>
       <dl className="facts">
         {s.detector && <><dt>Trigger</dt><dd>{detector(s.detector)}</dd></>}
-        <dt>Executions</dt><dd>{s.executions_spent} of {s.max_executions} used</dd>
+        <dt>Shared policy executions</dt><dd>{s.executions_spent} of {s.max_executions} used</dd>
+        <dt>Shared output reservations</dt><dd>{s.collected_bytes_spent.toLocaleString()} of {s.max_collected_bytes.toLocaleString()} bytes reserved</dd>
+        <dt>Shared observation charges</dt><dd>{s.observed_bytes_spent.toLocaleString()} of {s.max_observed_bytes.toLocaleString()} bytes charged before filtering</dd>
         <dt>Expires</dt><dd>{new Date(s.expires_at).toLocaleString()}</dd>
         <dt>Watched pods</dt><dd>{s.watched_pods}</dd>
         <dt>Occurrences</dt><dd>{s.occurrences}, {s.captured} captured</dd>
         {s.sharing && <><dt>Sharing</dt><dd>{sharing(s.sharing)}</dd></>}
         {s.suppressions.length > 0 && <><dt>Suppressed</dt><dd>{s.suppressions.map(x => `${x.count} × ${reasons[x.reason] ?? x.reason}`).join('; ')}</dd></>}
       </dl>
+      <p>These policy budgets are shared across captures and grants. Reservations and uncertain spend stay charged; they are not measurements of gathered user data. Grant and workload limits may further restrict collection.</p>
       {s.recent.length > 0 && <ul className="progress-actions" aria-label="Recent occurrences">{s.recent.map(o => <li key={o.occurrence_id}>
         <span>{new Date(o.created_at).toLocaleString()} ({occurrence(o)})</span>
         <span>{o.capture_id ? <a href={'/captures/' + o.capture_id}>View capture</a> : o.outcome}</span>

@@ -88,3 +88,13 @@ SC-PER-007 and SC-EXE-001 now include: creator leaves but team policy remains el
 Personal offline-user execution and SCIM/CAEP integrations remain optional future modes. Normal browser session refresh is required for ergonomic human access; it is not a personal credential retained indefinitely for recurring jobs.
 
 REQ-AUT-001 browser configuration follows [ADR-061](../docs/decisions/061-current-browser-configuration.md). Administrators manage the [closed session settings](contracts/browser-settings.schema.json) through a pinned protected ConfigMap, separately from issuer/group eligibility and credentials. Current source observations expire within five seconds; login, identity and refresh fail closed on suspension or stale configuration. Lower lifetime limits shorten existing sessions irreversibly; raising a maximum never renews them. Source replacement/rollback and reused epochs are rejected. Issuer, client or browser-origin changes invalidate prior sessions through a new epoch. A settings outage must still permit authenticated local sign-out and verified provider revocation without granting identity or evidence access. Bootstrap protection and post-restore epoch qualification remain separate prerequisites.
+
+
+The existing get_policy_status browser/MCP workflow reports the current accepted
+policy's shared execution, native-output reservation and pre-filter observation
+charge counters with their original accepted ceilings and expiry. These pools
+are distinct from each grant's reservations and remain shared after attachment
+replacement, pause/resume and sharing controls. Conservative legacy/uncertain
+charges are never described as measured gathered user data. The existing current
+viewer/workload metadata authorization and final freshness checks remain required;
+status confers no acquisition, evidence/history or personal continuation rights.

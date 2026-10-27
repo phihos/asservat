@@ -94,14 +94,24 @@ func attachPolicyAccountingGrant(t *testing.T, ctx context.Context, admin *pgxpo
 func qualifyOriginalPolicyGrantAcquisition(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, s captureAdmissionScenario, a authorization.AcceptedPolicyAuthority, c capture.Accepted, oldGrant string, replace func() string, refresh func()) {
 	t.Helper()
 	role := narrowRole(t, ctx, admin, "policy_accounting_api_", "synthetic-accounting-api", func(role string) []string {
-		grants, ok := postgres.PublicRuntimeRoleGrantSQL("api-execution", role)
+		// API execution is a shared hub duty, not a separately installed role.
+		// Exercise its production adapter with the actual compiled hub union.
+		grants, ok := postgres.PublicRuntimeRoleGrantSQL("hub-runtime", role)
 		if !ok {
-			t.Fatal("missing execution duty")
+			t.Fatal("missing installed hub role")
 		}
 		return grants
 	})
 	pool := poolFor(role, "synthetic-accounting-api")
 	defer pool.Close()
+	statuses, err := postgres.NewPolicyTriggers(ctx, pool, s.a.RootID, a.InstallationID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	status, err := statuses.Status(ctx, a.PolicyUID)
+	if err != nil || status.ActiveID == "" || status.ExecutionsSpent != 5 || status.CollectedBytesSpent != 4*artifact.MaxContextBytes || status.MaxCollectedBytes != a.Limits.MaxBytes || status.ObservedBytesSpent != 0 || status.MaxObservedBytes != a.Limits.MaxObservedBytes {
+		t.Fatal("shared accepted budget status differs from actual charged pool", status, err)
+	}
 	reader, err := postgres.NewAPIContextExecutions(ctx, pool, s.a.RootID, postgres.EffectTransactionGuards{Recovery: s.recovery.guard, Retention: s.retention.guard})
 	if err != nil {
 		t.Fatal(err)

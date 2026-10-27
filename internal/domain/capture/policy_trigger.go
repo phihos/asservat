@@ -307,17 +307,20 @@ type PolicyStatus struct {
 	Generation, IntentVersion          int64
 	AcceptedIntentVersion              int64
 	// AcceptedGeneration is the DebugPolicy generation the acceptance named.
-	AcceptedGeneration                   int64
-	Suspended, Deleted                   bool
-	Creator                              *identity.Principal
-	ExecutionsSpent, MaxExecutions       int64
-	NotAfter                             time.Time
-	WatchedPods, Occurrences, Captured   int64
-	Recent                               []PolicyOccurrenceStatus
-	Suppressions                         []PolicySuppression
-	ClusterID, NamespaceUID, WorkloadUID string
-	Authority                            authorization.AcceptedPolicyAuthority
-	SourceObservedAt, SourceFreshUntil   time.Time
+	AcceptedGeneration             int64
+	Suspended, Deleted             bool
+	Creator                        *identity.Principal
+	ExecutionsSpent, MaxExecutions int64
+	// Shared accepted pools: conservative charges/reservations, not measured output.
+	CollectedBytesSpent, MaxCollectedBytes int64
+	ObservedBytesSpent, MaxObservedBytes   int64
+	NotAfter                               time.Time
+	WatchedPods, Occurrences, Captured     int64
+	Recent                                 []PolicyOccurrenceStatus
+	Suppressions                           []PolicySuppression
+	ClusterID, NamespaceUID, WorkloadUID   string
+	Authority                              authorization.AcceptedPolicyAuthority
+	SourceObservedAt, SourceFreshUntil     time.Time
 	// Detector describes the current DebugPolicy's detector, if it compiles.
 	Detector *PolicyDetector
 	// Sharing is the acceptance's recurring sharing (ADR-239), if any.

@@ -1009,3 +1009,81 @@ schema/SQL generation, specification, architecture and vet gates. Logs are
 archived as policy102-history-composed-{prepush,postgres-race}.log under the
 existing approved-workflow cache. No external service qualification ran during
 this composition; both new real-SQL scenarios remain pending.
+
+
+Composed smoke1 on frozen a3f9c8da: overall runner/Go exit 1 (Go 21.712s,
+phase 52.037s); initial-schema parent passes 16.96s. All 13 direct schema
+children pass, including unknown-first/last catalog overflow and both nested
+activation changed-database/changed-postmaster cases. This is genuine schema-102
+first-install/role/prefix/incarnation qualification with synthetic protected root,
+not a deployed installer proof. All 3,258 source hashes match, source unchanged,
+cleanup empty and exact owned n4fzsg3r PostgreSQL/S3 containers absent. Report
+SHA-256 78ee813a274f6fdaeb90e0837733069278423dd509643de129e30019e189a9a7;
+report/log/provider evidence archived before removing untracked result copies.
+
+Policy-share reaches the expected 4/16,384 grant and 5/16,384 accepted accounting
+checkpoint, then its new acquisition fixture fails before adapter construction:
+it incorrectly requests retired installed-purpose api-execution from the public
+role renderer. That name remains a shared hub duty; the renderer correctly
+refuses it. Correct the fixture to existing compiled hub-runtime union, as other
+policy fixtures already do. No production privilege, constraint or role-purpose
+change; standalone-duty exact grant tests remain separate source checks. No
+acquisition success is claimed and no automatic rerun is authorized.
+
+
+### Shared accepted-policy budget status composition
+
+Observed gap: get_grant correctly shows only its own reservations, while the
+existing get_policy_status exposes accepted executions but omits the shared
+accepted native-output/observation pools. Add four required typed fields to the
+same browser/MCP status data: collected_bytes_spent, max_collected_bytes,
+observed_bytes_spent, max_observed_bytes. The existing SQL acceptance row already
+contains both counters, and decodePolicy already provides original authored
+ceilings; use these exact values, including conservative legacy saturation.
+No subtraction from grants or inferred measured bytes. Preserve the existing
+current viewer identity/whole-workload metadata checks, recovery/source state,
+original expiry and final freshness; status grants no collection or evidence
+access. Browser labels native output as reserved and observation as charged,
+explains shared policy scope, and retains the existing explicit Refresh action.
+
+Complexity/cost: zero new SQL queries/round trips, API calls/connections, roles,
+privileges, background tasks, timers, watches, dependencies or configuration.
+Four bounded integers add under 160 JSON bytes per existing status response.
+Existing projection/audit and privacy contracts remain, no new failure state or
+public endpoint. A per-grant substitute would hide the actual shared ceiling;
+a separate budget service would add cost without improving this workflow.
+
+
+Review found one adjacent protected-result gap: GrantService.Revoke returned an
+already-revoked replay directly before final identity validation. A blocked-store
+regression reproduces metadata disclosure after same-principal group loss,
+identity expiry and original manager-eligibility expiry (all three RED, exit 1,
+0.008s). Fresh/replay now converge on existing finalGrantMetadata and preserve
+the original policy management deadline. Fresh retains one final identity read;
+replay acquires its missing final identity check. No second workload or grant
+read, new freshness interval or mechanism; refused replies do not undo/refund a
+previously committed revocation or its counters. Ad hoc uses its existing final
+check. Current manager/get and manual regressions remain binding.
+
+
+Shared status/replay verification: full race suites pass capture 11.116s,
+authorization 1.355s, presentation 80.516s and PostgreSQL 2.573s. Tests include
+current team-maintainer status after creator departure, refused lost membership
+and final identity expiry, canonical distinct accepted counters/ceilings even
+after expiry, and all three blocked-replay regressions. Existing canonical status
+fixtures with finite zero output/observation budgets validate unchanged.
+
+Actual console-browser check passes (Go 22.598s): 25 journeys/22 accessibility
+scans plus four restart boundaries/two scans. The new journey uses built React
+through HTTPS/cookie/CSRF/canonical operations into the real policy-status service
+with synthetic accepted ledger/source/projection/recovery. It shows accepted
+5/100 executions, 16,384/1 GiB native-output reservations and 0/0 pre-filter
+observation charges, with explicit refresh; no new polling, external requests,
+CSP or runtime errors. Archive:
+/home/phil/.cache/asservat-build/approved-workflow/policy102-status-browser-artifacts.
+This is not SQL, IdP, audit, collector or installed qualification. First pre-push
+caught required-field array ordering drift between browser/MCP; canonical order
+was aligned and regeneration/final pre-push exit 0 passes all 230 console unit
+tests plus full schema/SQL/specification/architecture/vet checks. Earlier failure
+logs remain archived. The corrected original-grant SQL case and actual SQL
+accepted-pool status assertion still require the next coordinated focused run.

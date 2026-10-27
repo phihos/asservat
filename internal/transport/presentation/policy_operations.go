@@ -181,21 +181,25 @@ type policySuppressionData struct {
 	LastAt  time.Time `json:"last_at"`
 }
 type policyStatusData struct {
-	PolicyUID       string                  `json:"policy_uid"`
-	AcceptanceID    string                  `json:"acceptance_id"`
-	State           string                  `json:"state"`
-	Generation      int64                   `json:"generation"`
-	ExpiresAt       time.Time               `json:"expires_at"`
-	Executor        policyExecutor          `json:"executor"`
-	ExecutionsSpent int64                   `json:"executions_spent"`
-	MaxExecutions   int64                   `json:"max_executions"`
-	WatchedPods     int64                   `json:"watched_pods"`
-	Occurrences     int64                   `json:"occurrences"`
-	Captured        int64                   `json:"captured"`
-	Recent          []policyOccurrenceData  `json:"recent"`
-	Suppressions    []policySuppressionData `json:"suppressions"`
-	Detector        *policyDetectorData     `json:"detector,omitempty"`
-	Sharing         *policyStatusSharing    `json:"sharing,omitempty"`
+	CollectedBytesSpent int64                   `json:"collected_bytes_spent"`
+	MaxCollectedBytes   int64                   `json:"max_collected_bytes"`
+	ObservedBytesSpent  int64                   `json:"observed_bytes_spent"`
+	MaxObservedBytes    int64                   `json:"max_observed_bytes"`
+	PolicyUID           string                  `json:"policy_uid"`
+	AcceptanceID        string                  `json:"acceptance_id"`
+	State               string                  `json:"state"`
+	Generation          int64                   `json:"generation"`
+	ExpiresAt           time.Time               `json:"expires_at"`
+	Executor            policyExecutor          `json:"executor"`
+	ExecutionsSpent     int64                   `json:"executions_spent"`
+	MaxExecutions       int64                   `json:"max_executions"`
+	WatchedPods         int64                   `json:"watched_pods"`
+	Occurrences         int64                   `json:"occurrences"`
+	Captured            int64                   `json:"captured"`
+	Recent              []policyOccurrenceData  `json:"recent"`
+	Suppressions        []policySuppressionData `json:"suppressions"`
+	Detector            *policyDetectorData     `json:"detector,omitempty"`
+	Sharing             *policyStatusSharing    `json:"sharing,omitempty"`
 }
 
 func publicPolicyFailure(err error) OperationFailure {
@@ -298,7 +302,7 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 			if acceptance == "" {
 				acceptance = st.DeactivatedID
 			}
-			data := policyStatusData{PolicyUID: st.PolicyUID, AcceptanceID: acceptance, State: policyState(st, s.now()), Generation: st.Generation, ExpiresAt: st.NotAfter.UTC(), Executor: policyExecutor{"policy", st.PolicyUID}, ExecutionsSpent: st.ExecutionsSpent, MaxExecutions: st.MaxExecutions, WatchedPods: st.WatchedPods, Occurrences: st.Occurrences, Captured: st.Captured, Recent: []policyOccurrenceData{}, Suppressions: []policySuppressionData{}}
+			data := policyStatusData{CollectedBytesSpent: st.CollectedBytesSpent, MaxCollectedBytes: st.MaxCollectedBytes, ObservedBytesSpent: st.ObservedBytesSpent, MaxObservedBytes: st.MaxObservedBytes, PolicyUID: st.PolicyUID, AcceptanceID: acceptance, State: policyState(st, s.now()), Generation: st.Generation, ExpiresAt: st.NotAfter.UTC(), Executor: policyExecutor{"policy", st.PolicyUID}, ExecutionsSpent: st.ExecutionsSpent, MaxExecutions: st.MaxExecutions, WatchedPods: st.WatchedPods, Occurrences: st.Occurrences, Captured: st.Captured, Recent: []policyOccurrenceData{}, Suppressions: []policySuppressionData{}}
 			for _, o := range st.Recent {
 				outcome := o.Outcome
 				if outcome == "" {

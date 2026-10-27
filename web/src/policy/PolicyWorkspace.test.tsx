@@ -19,7 +19,7 @@ const detectors: Record<Kind, unknown> = {
 };
 const status = (state: string, kind: Kind = 'exit') => result<'get_capture'>({
   policy_uid: 'policy-uid', acceptance_id: id(9), state, generation: 1, expires_at: new Date(Date.now() + 3_600_000).toISOString(),
-  executor: { kind: 'policy', policy_uid: 'policy-uid' }, executions_spent: 2, max_executions: 10, watched_pods: 3, occurrences: 2, captured: 1,
+  executor: { kind: 'policy', policy_uid: 'policy-uid' }, executions_spent: 2, max_executions: 10, collected_bytes_spent: 8192, max_collected_bytes: 65536, observed_bytes_spent: 0, max_observed_bytes: 0, watched_pods: 3, occurrences: 2, captured: 1,
   recent: [kind !== 'exit'
     ? { occurrence_id: id(10), capture_id: id(8), outcome: 'captured', detector: kind, failed_at: '2026-10-26T12:00:00Z', created_at: new Date().toISOString() }
     : { occurrence_id: id(10), capture_id: id(8), outcome: 'captured', detector: 'exit', restarts: 1, created_at: new Date().toISOString() }],
@@ -66,6 +66,9 @@ it('shows content-free status and deactivates with CSRF and one idempotency key'
   fireEvent.click(screen.getByRole('button', { name: 'Show policy' }));
   expect(await screen.findByText('Active')).toBeTruthy();
   expect(screen.getByText('2 of 10 used')).toBeTruthy();
+  expect(screen.getByText(`${(8192).toLocaleString()} of ${(65536).toLocaleString()} bytes reserved`)).toBeTruthy();
+  expect(screen.getByText('0 of 0 bytes charged before filtering')).toBeTruthy();
+  expect(screen.getByText(/budgets are shared across captures and grants/)).toBeTruthy();
   expect(screen.getByText('10 × cooldown or workload budget')).toBeTruthy();
   expect(screen.getByRole('link', { name: 'View capture' }).getAttribute('href')).toBe('/captures/' + id(8));
   expect(screen.queryByRole('button', { name: 'Activate' })).toBeNull();
@@ -204,4 +207,14 @@ it('sends the identical idempotency header for policy commands', async () => {
   await operations.call('deactivate_policy', { policy_name: 'p', idempotency_key: id(3) }, 'C'.repeat(43), new AbortController().signal);
   expect(fetcher.mock.calls[0][0]).toBe('/api/v1/operations/deactivate_policy');
   expect(fetcher.mock.calls[0][1]).toMatchObject({ method: 'POST', credentials: 'same-origin', headers: { 'X-CSRF-Token': 'C'.repeat(43), 'Idempotency-Key': id(3) } });
+});
+
+it('rejects missing shared pools and does not present charges as gathered output', () => {
+ const reply = structuredClone(status('active'));
+ if (reply.status !== 'ok') throw new Error('fixture');
+ const missing = structuredClone(reply) as unknown as { data: Record<string, unknown> };
+ delete missing.data.observed_bytes_spent;
+ expect(validOutput_get_policy_status(missing)).toBe(false);
+ reply.data.observed_bytes_spent = 8192; reply.data.max_observed_bytes = 8192;
+ expect(validOutput_get_policy_status(reply)).toBe(true);
 });
