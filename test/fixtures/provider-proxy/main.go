@@ -22,6 +22,8 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -77,6 +79,7 @@ func serve() error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 	failures := make(chan error, 3)
+	counters := &providerCounters{}
 	for i, port := range []string{"8443", "8444"} {
 		upstream, e := url.Parse(os.Args[i+1])
 		if e != nil || upstream.Scheme != "http" || upstream.Host == "" {
@@ -85,7 +88,7 @@ func serve() error {
 		proxy := httputil.NewSingleHostReverseProxy(upstream)
 		transport := &http.Transport{Proxy: nil, ResponseHeaderTimeout: 5 * time.Second}
 		defer transport.CloseIdleConnections()
-		proxy.Transport = transport
+		proxy.Transport = providerCounterTransport{next: transport, counters: counters, provider: i}
 		proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, e error) {
 			http.Error(w, "fixture backend unavailable", http.StatusBadGateway)
 		}
@@ -93,7 +96,7 @@ func serve() error {
 		if e != nil {
 			return e
 		}
-		server := &http.Server{Handler: proxy, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 10 * time.Second, MaxHeaderBytes: 32768}
+		server := &http.Server{Handler: counters.handler(proxy), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 10 * time.Second, MaxHeaderBytes: 32768}
 		defer server.Close()
 		go func() { failures <- server.Serve(ln) }()
 	}
@@ -249,5 +252,156 @@ func trafficHandler() http.Handler {
 			}
 		}
 		complete = written == records && ctx.Err() == nil
+	})
+}
+
+// Provider measurement is fixture-only. It records fixed numeric categories,
+// never request identifiers or values. The underlying objects are not wrapped:
+// request/response bodies and their streaming/upgrade interfaces stay intact.
+const providerCounterPath = "/__asservat_fixture/counters"
+
+var providerCounterNames = [...]string{
+	"s3_get", "s3_head", "s3_put", "s3_post", "s3_delete", "s3_other",
+	"kms_encrypt", "kms_decrypt", "kms_sign", "kms_verify", "kms_login",
+	"kms_lookup", "kms_renew", "kms_revoke", "kms_other",
+}
+
+type providerCounterValues struct {
+	Dispatches        int64 `json:"dispatches"`
+	Active            int64 `json:"active_roundtrips"`
+	TransportErrors   int64 `json:"transport_errors"`
+	Status2xx         int64 `json:"status_2xx"`
+	Status3xx         int64 `json:"status_3xx"`
+	Status4xx         int64 `json:"status_4xx"`
+	Status5xx         int64 `json:"status_5xx"`
+	StatusOther       int64 `json:"status_other"`
+	HeaderNanoseconds int64 `json:"roundtrip_to_headers_nanoseconds"`
+}
+
+type providerCounters struct {
+	mu     sync.Mutex
+	values [len(providerCounterNames)]providerCounterValues
+}
+
+type providerCounterTransport struct {
+	next     http.RoundTripper
+	counters *providerCounters
+	provider int // existing serve loop: 0=S3, 1=KMS; SQL is unchanged
+}
+
+func providerCounterCategory(provider int, request *http.Request) int {
+	if provider == 0 {
+		switch request.Method {
+		case http.MethodGet:
+			return 0
+		case http.MethodHead:
+			return 1
+		case http.MethodPut:
+			return 2
+		case http.MethodPost:
+			return 3
+		case http.MethodDelete:
+			return 4
+		default:
+			return 5
+		}
+	}
+	if request.URL == nil {
+		return 14
+	}
+	// Inspect only operation positions. No path or query value is retained.
+	parts := strings.Split(strings.Trim(request.URL.Path, "/"), "/")
+	last := parts[len(parts)-1]
+	auth := len(parts) >= 4 && parts[0] == "v1" && parts[1] == "auth"
+	if auth && parts[2] == "token" && request.Method == http.MethodGet && last == "lookup-self" {
+		return 11
+	}
+	if request.Method != http.MethodPost {
+		return 14
+	}
+	if auth {
+		if last == "login" {
+			return 10
+		}
+		if parts[2] == "token" {
+			switch last {
+			case "renew-self":
+				return 12
+			case "revoke-self":
+				return 13
+			}
+		}
+	}
+	if len(parts) >= 4 && parts[0] == "v1" {
+		switch parts[len(parts)-2] {
+		case "encrypt":
+			return 6
+		case "decrypt":
+			return 7
+		case "sign":
+			return 8
+		case "verify":
+			return 9
+		}
+	}
+	return 14
+}
+
+func (t providerCounterTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	index := providerCounterCategory(t.provider, request)
+	t.counters.mu.Lock()
+	t.counters.values[index].Dispatches++
+	t.counters.values[index].Active++
+	t.counters.mu.Unlock()
+	started := time.Now()
+	response, err := t.next.RoundTrip(request)
+	elapsed := time.Since(started).Nanoseconds()
+	t.counters.mu.Lock()
+	defer t.counters.mu.Unlock()
+	v := &t.counters.values[index]
+	v.Active--
+	v.HeaderNanoseconds += elapsed
+	if err != nil || response == nil {
+		v.TransportErrors++
+	} else {
+		switch response.StatusCode / 100 {
+		case 2:
+			v.Status2xx++
+		case 3:
+			v.Status3xx++
+		case 4:
+			v.Status4xx++
+		case 5:
+			v.Status5xx++
+		default:
+			v.StatusOther++
+		}
+	}
+	return response, err
+}
+
+func (c *providerCounters) snapshot() map[string]providerCounterValues {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	result := make(map[string]providerCounterValues, len(providerCounterNames))
+	for i, name := range providerCounterNames {
+		result[name] = c.values[i]
+	}
+	return result
+}
+
+func (c *providerCounters) handler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != providerCounterPath {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if r.Method != http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(c.snapshot())
 	})
 }

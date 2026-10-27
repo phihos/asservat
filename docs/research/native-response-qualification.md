@@ -37,7 +37,7 @@ Run the helpers with:
 
 ```sh
 go test -race -count=1 ./test/integration -run '^TestNativePacing'
-go test -race -count=1 test/fixtures/provider-proxy/main.go test/fixtures/provider-proxy/traffic_test.go
+go test -race -count=1 test/fixtures/provider-proxy/main.go test/fixtures/provider-proxy/traffic_test.go test/fixtures/provider-proxy/counters_test.go
 ```
 
 The standalone fixture command is intentional: provider bridge code retains its
@@ -125,10 +125,11 @@ request counts rather than subtracting them and calling the result exact.
   response rechecks within the original operation must add zero proof API calls.
   Protected dispatch/profile reads remain a separate measured category.
 - S3 and provider KMS: extend the existing fixture-only provider TLS proxy with
-  bounded method/operation counters, snapshots and latency totals. Count no
-  object names, query values, bodies, wrapped keys or credentials. Keep its
-  current endpoints and forwarding behavior. Distinguish audit writes, artifact
-  metadata/range GETs and key operations; prove no per-piece unwraps.
+  bounded method/operation counters and response-header latency snapshots, as
+  defined below. Count no object names, query values, bodies, wrapped keys or
+  credentials. Keep its current forwarding behavior. S3 audit/artifact effects
+  remain ambiguous within a method category; report that limitation. Key
+  operation totals can check the absence of per-piece provider unwraps.
 - SQL: use the owned PostgreSQL server's standard `pg_stat_statements` extension
   in fixture configuration only, if available in the pinned image. Read numeric
   call/time/row counters by the generated installation roles, without query text
@@ -144,6 +145,39 @@ request counts rather than subtracting them and calling the result exact.
   bytes, SQL calls/time, peak fixture/container memory and CPU. Counters add no
   production API, credentials, background service or runtime permission. Measure
   their fixture overhead with the unpaced control.
+
+## Provider snapshot interface
+
+The existing provider bridge serves `GET /__asservat_fixture/counters` on either
+its S3 TLS origin (8443) or KMS TLS origin (8444). Both listeners expose the same
+process counters. Reuse the fixture's existing pinned TLS roots/client; no token
+is needed for these numeric fixture snapshots. SQL port 8445 is unchanged. This
+is an owned test-fixture route, never a product endpoint. Reads are `no-store`,
+do not forward to a provider and do not count themselves. Other methods return
+405. There is no reset or label input.
+
+The JSON object always has fifteen fixed keys:
+`s3_get`, `s3_head`, `s3_put`, `s3_post`, `s3_delete`, `s3_other`, `kms_encrypt`,
+`kms_decrypt`, `kms_sign`, `kms_verify`, `kms_login`, `kms_lookup`, `kms_renew`,
+`kms_revoke`, `kms_other`. Each value contains only integer totals:
+`dispatches`, `active_roundtrips`, `transport_errors`, `status_2xx`, `status_3xx`,
+`status_4xx`, `status_5xx`, `status_other`, `roundtrip_to_headers_nanoseconds`.
+Unknown methods/operations use the fixed `other` category. Paths, object names,
+query/header values, bodies and credentials never enter the counter state or
+snapshot. Requests and responses, including the exact body objects and their
+streaming/upgrade interfaces, pass through unchanged. Counter code does not
+retry, buffer, read or close bodies.
+
+Dispatches count calls into the backend HTTP RoundTripper, not wire attempts;
+internal transport retries are not individually visible. Concurrent durations
+overlap, so their sum is not end-to-end wall time or CPU time. Time ends at response
+headers or transport error, excluding body lifetime/bytes and final downstream
+flush. `active_roundtrips=0` therefore does not prove body/worker quiescence.
+Use the journey's actual joined lifecycle and phase/idle snapshots. Deltas are
+background-inclusive; S3 methods cannot distinguish audit from artifact effects.
+Label that ambiguity rather than adding path or payload tracing. Measurement
+cost is two short mutex updates per dispatch and a fixed fifteen-entry snapshot;
+there is no additional backend request, goroutine or production dependency.
 
 ## Decision gate
 
