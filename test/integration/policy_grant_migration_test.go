@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	"asservat.local/asservat/migrations"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -178,9 +180,13 @@ func TestCustodyPolicyGrantMigrationWithRealPostgres(t *testing.T) {
 			t.Fatal("upgrade replenished unknown historical pools or fenced pristine scope", i, collected, observed)
 		}
 		if i < 2 {
-			result, err := scratch.Exec(ctx, `UPDATE policy_acceptance SET collected_bytes_spent=collected_bytes_spent+1 WHERE id=$1 AND collected_bytes_spent<4096`, id)
-			if err != nil || result.RowsAffected() != 0 {
-				t.Fatal("historical scope gained additional output after upgrade", i, err)
+			var rootID, acceptanceID pgtype.UUID
+			if rootID.Scan(legacyRoot) != nil || acceptanceID.Scan(id) != nil {
+				t.Fatal("fixture identity")
+			}
+			count, err := custodydb.New(scratch).SpendPolicyCollectedBytes(ctx, custodydb.SpendPolicyCollectedBytesParams{RootID: rootID, ID: acceptanceID, Bytes: 1})
+			if err != nil || count != 0 {
+				t.Fatal("production reservation replenished historical output after upgrade", i, err)
 			}
 		}
 	}
