@@ -815,3 +815,11 @@ unchanged 3,249 hashes, no cleanup failures and both exact owned containers abse
 Report SHA-256
 `31af1fc2ed21e989bfac3eba92bff03eb99b89d12861a07e88db33bacfdcf556`,
 archived under `approved-workflow/policy102-accounting-smoke-3-artifacts/`.
+
+
+Review of the complete sharing scenario also makes acceptance C an explicit
+fourth source generation with changed collection intent. Generation 3 stays an
+unaccepted control-only edit that stops sharing without changing collection
+acceptance B. Both new collection acceptances now have distinct source intent;
+stop/revoke/replay control transitions retain the same accepted counter pools.
+These fixture corrections add no product behavior or relaxed constraints.

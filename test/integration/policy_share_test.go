@@ -472,10 +472,14 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if !got["capture:"+c1.CaptureID].Revoked || !got["capture:"+c2.CaptureID].Revoked || got["capture:"+c5.CaptureID].Revoked {
 		t.Fatal("revoke-all did not revoke exactly its acceptance's shares", got)
 	}
-	// Stop future sharing (REQ-SHR-007) of acceptance C (generation 3): a
+	// Stop future sharing (REQ-SHR-007) of acceptance C (generation 4): a
 	// current team member stops it; the capture that claimed its slot before
 	// the Stop still publishes its share, the next capture claims none, and
 	// revoke-all at revision 2 then revokes that share.
+	// This separate accepted collection scope is not a sharing-only reset.
+	source.Revision.Generation, source.Revision.Digest = 4, artifact.Digest{56}
+	source.CollectionDigest[0]++
+	observe()
 	third := accept(63, 3, time.Now().Add(time.Hour))
 	c8 := admit(hub)
 	if w := stored(c8); w == nil || w.Acceptance != third {
