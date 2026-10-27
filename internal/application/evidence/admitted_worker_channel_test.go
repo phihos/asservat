@@ -3,10 +3,13 @@ package evidence
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
+	auditapp "asservat.local/asservat/internal/application/audit"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/audit"
 	value "asservat.local/asservat/internal/domain/authorization"
 )
 
@@ -165,5 +168,121 @@ func TestAdmittedEnrollmentNamesRefusingStage(t *testing.T) {
 	var cause interface{ StepCause() error }
 	if !errors.Is(err, artifact.ErrDownloadUnavailable) || !errors.As(err, &fixed) || fixed.FixedStep() != "identity" || !errors.As(err, &cause) || !errors.Is(cause.StepCause(), ErrDownloadMetadataUnavailable) {
 		t.Fatal("identity refusal lost its stage or cause", err)
+	}
+}
+
+// context cancellation closes the owner's Done before all derived children
+// necessarily observe it. Hold that propagation to exercise the boundary
+// deterministically rather than depending on the scheduler during cancel().
+type heldEnrollmentCancellation struct {
+	context.Context
+	mu       sync.Mutex
+	callback func()
+}
+
+func (c *heldEnrollmentCancellation) Value(any) any { return nil }
+func (c *heldEnrollmentCancellation) AfterFunc(f func()) func() bool {
+	c.mu.Lock()
+	c.callback = f
+	c.mu.Unlock()
+	return func() bool {
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		pending := c.callback != nil
+		c.callback = nil
+		return pending
+	}
+}
+func (c *heldEnrollmentCancellation) propagate() {
+	c.mu.Lock()
+	f := c.callback
+	c.callback = nil
+	c.mu.Unlock()
+	if f != nil {
+		f()
+	}
+}
+func TestAdmittedEnrollmentChecksOriginalOwnerBeforeNextEffect(t *testing.T) {
+	for _, phase := range []string{"proof", "claim-enrollment", "sign", "activate"} {
+		t.Run(phase, func(t *testing.T) {
+			f, s := admittedChannelFixture(t)
+			original, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			owner := &heldEnrollmentCancellation{Context: original}
+			defer owner.propagate()
+			f.hooks[phase] = cancel
+			d, err := s.BeginAcquisitionEnrollment(owner, s.InstallationID, f.w.Intent.Acquisition().Parent, f.w.Intent.ID, []byte("pod-token"), []byte("same-process-csr"))
+			if d != nil {
+				d.Close()
+			}
+			if owner.Err() == nil {
+				t.Fatal("original cancellation not exercised")
+			}
+			if err == nil || d != nil || f.calls[len(f.calls)-1] != phase {
+				t.Fatal("effect crossed original owner cancellation", err, f.calls)
+			}
+		})
+	}
+}
+
+// The projection parent uses the same HTTP ownership boundary without borrowing
+// any download authority. Unused embedded ports panic if another effect starts.
+type cancellationProjectionPorts struct {
+	ProjectionEnrollmentEffects
+	AcquisitionCertificateIssuer
+	auditapp.AcquisitionEnrollmentWriter
+	f *workerLifecycleFixture
+}
+
+func (p cancellationProjectionPorts) ClaimAcquisitionEnrollment(ctx context.Context, proof value.AcquisitionWorkerProof) (value.AcquisitionEnrollment, audit.Receipt, bool, error) {
+	err := p.f.step(ctx, "claim-enrollment")
+	return value.AcquisitionEnrollment{Worker: proof.Worker, PublicKeyDigest: proof.PublicKeyDigest, ClaimedAt: p.f.Now()}, audit.Receipt{}, false, err
+}
+
+func (p cancellationProjectionPorts) WriteAcquisitionEnrollment(ctx context.Context, _ value.AcquisitionEnrollment) (audit.Receipt, error) {
+	_ = p.f.step(ctx, "write-enrollment-audit")
+	return audit.Receipt{}, errors.New("unexpected projection audit after original cancellation")
+}
+
+type cancellationProjectionProof func(context.Context, value.AcquisitionParent, string, artifact.Digest) (value.AcquisitionWorkerProof, error)
+
+func (f cancellationProjectionProof) ReadAcquisitionEnrollmentProof(ctx context.Context, parent value.AcquisitionParent, worker string, key artifact.Digest) (value.AcquisitionWorkerProof, error) {
+	return f(ctx, parent, worker, key)
+}
+func TestAdmittedProjectionChecksOriginalOwnerBeforeNextEffect(t *testing.T) {
+	for _, phase := range []string{"proof", "claim-enrollment"} {
+		t.Run(phase, func(t *testing.T) {
+			f, s := admittedChannelFixture(t)
+			w := f.w.Acquisition()
+			w.Intent.Parent.Purpose = value.AcquisitionProjection
+			w.Binding.Parent = w.Intent.Parent
+			w.Binding.Job = w.Intent.JobName()
+			if !w.Valid() {
+				t.Fatal("invalid projection identity fixture")
+			}
+			s.Bindings = admittedBindingsFunc(func(context.Context, value.AcquisitionParent, string) (value.AcquisitionWorkerIdentity, error) {
+				return value.AcquisitionWorkerIdentity{Worker: w, ObservedAt: f.Now(), FreshUntil: f.Now().Add(5 * time.Second)}, nil
+			})
+			ports := cancellationProjectionPorts{f: f}
+			s.Projection = ProjectionEnrollmentCoordinator{CSR: f, Ledger: ports, Audit: ports, Issuer: ports, Now: f.Now}
+			s.ProjectionProofs = func(DownloadPeerToken) (AcquisitionEnrollmentProofReader, error) {
+				return cancellationProjectionProof(func(ctx context.Context, _ value.AcquisitionParent, _ string, key artifact.Digest) (value.AcquisitionWorkerProof, error) {
+					err := f.step(ctx, "proof")
+					return value.AcquisitionWorkerProof{Worker: w, PublicKeyDigest: key, TokenDigest: artifact.Digest{1}, ObservedAt: f.Now(), FreshUntil: f.Now().Add(5 * time.Second)}, err
+				}), nil
+			}
+			original, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			owner := &heldEnrollmentCancellation{Context: original}
+			defer owner.propagate()
+			f.hooks[phase] = cancel
+			d, err := s.BeginAcquisitionEnrollment(owner, s.InstallationID, w.Intent.Parent, w.Intent.ID, []byte("pod-token"), []byte("same-process-csr"))
+			if d != nil {
+				d.Close()
+			}
+			if owner.Err() == nil || err == nil || d != nil || f.calls[len(f.calls)-1] != phase {
+				t.Fatal("projection effect crossed original owner cancellation", err, f.calls)
+			}
+		})
 	}
 }

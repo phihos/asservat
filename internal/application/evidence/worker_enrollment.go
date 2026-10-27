@@ -113,24 +113,30 @@ func (s *WorkerEnrollmentCoordinator) enrollChecked(ctx context.Context, session
 // the worker's own finite HTTP request; SQL effects independently check current
 // parent/configuration/recovery. The certificate confers no evidence rights.
 func (s *WorkerEnrollmentCoordinator) EnrollAdmitted(ctx context.Context, session, worker string, csr []byte) (value.WorkerCertificate, error) {
+	return s.enrollAdmitted(ctx, ctx, session, worker, csr)
+}
+
+// Keep the actual HTTP owner independently visible while cancellation propagates
+// through the narrower operation and proof contexts.
+func (s *WorkerEnrollmentCoordinator) enrollAdmitted(ctx, owner context.Context, session, worker string, csr []byte) (value.WorkerCertificate, error) {
 	var zero value.WorkerCertificate
-	if s == nil || ctx == nil || ctx.Err() != nil || s.CSR == nil || s.Proofs == nil || s.Ledger == nil || s.Activation == nil || s.Audit == nil || s.Acknowledgements == nil || s.Issuer == nil || s.Now == nil || !value.UUID(session) || !value.UUID(worker) || len(csr) < 1 || len(csr) > 8192 {
+	if s == nil || ctx == nil || owner == nil || owner.Err() != nil || ctx.Err() != nil || s.CSR == nil || s.Proofs == nil || s.Ledger == nil || s.Activation == nil || s.Audit == nil || s.Acknowledgements == nil || s.Issuer == nil || s.Now == nil || !value.UUID(session) || !value.UUID(worker) || len(csr) < 1 || len(csr) > 8192 {
 		return zero, artifact.ErrInvalid
 	}
 	call, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	key, err := s.CSR.EnrollmentKey(csr)
-	if err != nil || key == (artifact.Digest{}) {
+	if err != nil || key == (artifact.Digest{}) || owner.Err() != nil {
 		return zero, collapsed("csr", artifact.ErrInvalid, err)
 	}
 	p, err := s.Proofs.ReadWorkerEnrollmentProof(call, session, worker, key)
-	if err != nil || !p.Valid(s.Now()) || p.Worker.Intent.SessionID != session || p.Worker.Intent.ID != worker || p.PublicKeyDigest != key || call.Err() != nil {
+	if err != nil || !p.Valid(s.Now()) || p.Worker.Intent.SessionID != session || p.Worker.Intent.ID != worker || p.PublicKeyDigest != key || call.Err() != nil || owner.Err() != nil {
 		return zero, collapsed("proof", artifact.ErrDownloadUnavailable, err)
 	}
 	proofCall, stop := context.WithDeadline(call, p.FreshUntil)
 	defer stop()
 	flow := &downloadEnrollmentFlow{service: s, check: func() (value.WorkerEnrollmentProof, error) {
-		if proofCall.Err() != nil || !p.Valid(s.Now()) {
+		if owner.Err() != nil || ctx.Err() != nil || call.Err() != nil || proofCall.Err() != nil || !p.Valid(s.Now()) {
 			return value.WorkerEnrollmentProof{}, artifact.ErrDownloadExpired
 		}
 		return p, nil

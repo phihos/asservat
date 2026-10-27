@@ -36,23 +36,29 @@ type ProjectionEnrollmentCoordinator struct {
 }
 
 func (s *ProjectionEnrollmentCoordinator) EnrollProjection(ctx context.Context, parent value.AcquisitionParent, worker string, csr []byte) (value.WorkerCertificate, error) {
+	return s.enrollProjection(ctx, ctx, parent, worker, csr)
+}
+
+func (s *ProjectionEnrollmentCoordinator) enrollProjection(ctx, owner context.Context, parent value.AcquisitionParent, worker string, csr []byte) (value.WorkerCertificate, error) {
 	var zero value.WorkerCertificate
-	if s == nil || ctx == nil || ctx.Err() != nil || s.CSR == nil || s.Proofs == nil || s.Ledger == nil || s.Audit == nil || s.Issuer == nil || s.Now == nil || !parent.Valid() || parent.Purpose != value.AcquisitionProjection || !value.UUID(worker) || len(csr) < 1 || len(csr) > 8192 {
+	if s == nil || ctx == nil || owner == nil || owner.Err() != nil || ctx.Err() != nil || s.CSR == nil || s.Proofs == nil || s.Ledger == nil || s.Audit == nil || s.Issuer == nil || s.Now == nil || !parent.Valid() || parent.Purpose != value.AcquisitionProjection || !value.UUID(worker) || len(csr) < 1 || len(csr) > 8192 {
 		return zero, query.ErrUnavailable
 	}
 	call, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	key, e := s.CSR.EnrollmentKey(csr)
-	if e != nil || key == (artifact.Digest{}) {
+	if e != nil || key == (artifact.Digest{}) || owner.Err() != nil {
 		return zero, collapsed("csr", query.ErrUnavailable, e)
 	}
 	p, e := s.Proofs.ReadAcquisitionEnrollmentProof(call, parent, worker, key)
-	if e != nil || !p.Valid(s.Now()) || p.Worker.Intent.Parent != parent || p.Worker.Intent.ID != worker || p.PublicKeyDigest != key || call.Err() != nil {
+	if e != nil || !p.Valid(s.Now()) || p.Worker.Intent.Parent != parent || p.Worker.Intent.ID != worker || p.PublicKeyDigest != key || call.Err() != nil || owner.Err() != nil {
 		return zero, collapsed("proof", query.ErrUnavailable, e)
 	}
 	proofCall, stop := context.WithDeadline(call, p.FreshUntil)
 	defer stop()
-	f := &projectionEnrollmentFlow{service: s, proof: p, check: func() bool { return proofCall.Err() == nil && p.Valid(s.Now()) }}
+	f := &projectionEnrollmentFlow{service: s, proof: p, check: func() bool {
+		return owner.Err() == nil && ctx.Err() == nil && call.Err() == nil && proofCall.Err() == nil && p.Valid(s.Now())
+	}}
 	return enrollAcquisition(proofCall, f, csr, key, s.Now)
 }
 
