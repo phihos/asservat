@@ -186,7 +186,10 @@ func (c *DirectHolderObservationClient) ObserveCluster(ctx context.Context, requ
 		if err == errHolderNoStandby {
 			return zero, &fixedStepError{"locate", errHolderNoStandby}
 		}
-		return zero, &fixedStepError{"locate", value.ErrUnavailable}
+		if err == nil {
+			err = value.ErrUnavailable
+		}
+		return zero, &fixedStepError{"locate", err}
 	}
 	defer selected.Close()
 	if bounded.Err() != nil || !routes.Groups.Valid(c.now()) || !selected.locator.Matches(request.LocatorQuery(), selected.leaf.Binding, c.now()) {
@@ -283,6 +286,13 @@ func (c *DirectHolderObservationClient) locate(ctx context.Context, q value.Clus
 		if v.selected != nil {
 			v.selected.Close()
 		}
+		// Lookup emits only fixed local labels. Pick the lexical minimum so
+		// concurrent failure ordering cannot change the diagnostic. This does
+		// not select another candidate or interrupt a pending positive.
+		var step, previous *fixedStepError
+		if errors.As(v.err, &step) && (!errors.As(result.err, &previous) || step.step < previous.step) {
+			result.err = step
+		}
 		return false
 	}
 searching:
@@ -304,7 +314,9 @@ searching:
 				default:
 					// Every worker ran out of candidates and only an
 					// authenticated absence lets a worker advance.
-					result.err = value.ErrUnavailable
+					if result.err == nil {
+						result.err = value.ErrUnavailable
+					}
 					if !received && ctx.Err() == nil {
 						result.err = errHolderNoStandby
 					}
@@ -331,6 +343,9 @@ searching:
 				}
 				if result.err == errHolderNoStandby && ctx.Err() == nil {
 					return nil, errHolderNoStandby
+				}
+				if ctx.Err() == nil && result.err != nil {
+					return nil, result.err
 				}
 				return nil, value.ErrUnavailable
 			}
@@ -377,7 +392,16 @@ func (c *DirectHolderObservationClient) current(ctx context.Context, connection 
 	r.Configuration.Configuration = r.Configuration.Configuration.Clone()
 	return r, nil
 }
-func (c *DirectHolderObservationClient) lookup(root, search context.Context, q value.ClusterObservationLocatorQuery, candidates value.APIContextOwnerCandidates, g value.OwnerObservationCandidateGroup, address string) (*ownerLocalLocated, bool, error) {
+func (c *DirectHolderObservationClient) lookup(root, search context.Context, q value.ClusterObservationLocatorQuery, candidates value.APIContextOwnerCandidates, g value.OwnerObservationCandidateGroup, address string) (located *ownerLocalLocated, absent bool, failure error) {
+	// Never retain provider text, tokens, object identities or nested remote
+	// errors. Only this local stage reaches the existing capacity diagnostic;
+	// the public error class remains unavailable.
+	stage := "open"
+	defer func() {
+		if failure != nil {
+			failure = &fixedStepError{stage, value.ErrUnavailable}
+		}
+	}()
 	name, err := mtls.OwnerBootstrapServerName(c.pin.Pool)
 	if err != nil {
 		return nil, false, err
@@ -387,6 +411,7 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 		return nil, false, err
 	}
 	defer socket.Close()
+	stage = "peer"
 	state := socket.socket.ConnectionState()
 	connection, err := mtls.NewOwnerBootstrapConnection(c.verifier, &state, candidates)
 	if err != nil {
@@ -396,6 +421,7 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 	if err != nil || leaf.Binding.PodUID != g.PodUID || !slices.Contains(g.Owners, leaf.Binding) {
 		return nil, false, value.ErrDenied
 	}
+	stage = "registration-first"
 	first, err := c.current(search, connection, nil)
 	if err != nil {
 		return nil, false, err
@@ -419,10 +445,12 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 		}
 	}()
 	request := value.OwnerObservationRequest{RootID: q.RootID, ID: q.RequestID, Challenge: q.Challenge, RequestedAt: q.RequestedAt, NotAfter: q.NotAfter}
+	stage = "native-begin"
 	selected.native, err = c.native.OpenOwnerObservationOperation(nativeRoot, request, []value.OwnerBinding{leaf.Binding})
 	if err != nil || selected.native == nil {
 		return nil, false, value.ErrUnavailable
 	}
+	stage = "native-original"
 	facts, err := selected.native.Original(nativeRoot)
 	if err != nil || !facts.Valid(c.now()) || facts.Final || facts.Pin != c.pin || !value.SameOwnerObservationRequest(facts.Request, request) || !ownerLocalNativePeer(facts, first, address) {
 		return nil, false, value.ErrUnavailable
@@ -431,6 +459,7 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 	end = identity.Earlier(end, facts.FreshUntil)
 	currentCall, stopCurrent := context.WithDeadline(search, end)
 	defer stopCurrent()
+	stage = "registration-before-get"
 	current, err := c.current(currentCall, connection, &first)
 	if err != nil {
 		return nil, false, err
@@ -438,6 +467,7 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 	end = identity.Earlier(end, current.FreshUntil)
 	tokenCall, stopToken := context.WithDeadline(currentCall, end)
 	defer stopToken()
+	stage = "token"
 	token, err := c.tokens.ReadClusterObservationToken(tokenCall)
 	if err != nil || len(token) == 0 || len(token) > 16<<10 || bytes.ContainsAny(token, " \t\r\n") || tokenCall.Err() != nil {
 		clear(token)
@@ -445,20 +475,24 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 	}
 	selected.token = bytes.Clone(token)
 	clear(token)
+	stage = "locator-target"
 	target, err := contracts.EncodeClusterObservationLocalLocatorTarget(contracts.ClusterObservationLocalLocatorQuery{PodUID: c.podUID, Query: ownerLocalQueryWire(q)})
 	if err != nil {
 		return nil, false, err
 	}
+	stage = "locator-get"
 	data, err := socket.request(tokenCall, http.MethodGet, target, contracts.ClusterObservationLocalLocatorMedia, nil, selected.token)
 	if err != nil {
 		return nil, false, err
 	}
 	defer clear(data)
+	stage = "registration-after-get"
 	last, err := c.current(tokenCall, connection, &first)
 	if err != nil {
 		return nil, false, err
 	}
 	end = identity.Earlier(end, last.FreshUntil)
+	stage = "locator-reply"
 	reply, err := contracts.DecodeClusterObservationLocalLocator(data)
 	if err != nil || reply.PodUID != c.podUID || reply.Query != ownerLocalQueryWire(q) || tokenCall.Err() != nil || !c.now().Before(end) {
 		return nil, false, value.ErrUnavailable
@@ -466,6 +500,7 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 	if reply.Locator == nil {
 		return nil, true, nil
 	}
+	stage = "locator-match"
 	locator := ownerOperationLocator(*reply.Locator)
 	if !locator.Matches(q, leaf.Binding, c.now()) {
 		return nil, false, value.ErrUnavailable
@@ -475,6 +510,7 @@ func (c *DirectHolderObservationClient) lookup(root, search context.Context, q v
 	// The original operation context survives joined locator transport cleanup.
 	// Losing search cancellation is detached only for a complete positive reply.
 	detach()
+	stage = "completion"
 	if search.Err() != nil || nativeRoot.Err() != nil || !c.now().Before(selected.until) {
 		return nil, false, value.ErrUnavailable
 	}
