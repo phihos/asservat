@@ -50,9 +50,10 @@ func NewAPIContextTargets(client *PermissionClient) (*PodTargets, error) {
 }
 
 type targetObject struct {
-	ref          cfg.Resource
-	owner        *meta.OwnerReference
-	node, bootID string
+	ref            cfg.Resource
+	owner          *meta.OwnerReference
+	node, bootID   string
+	packetEligible bool
 }
 
 func (c *PodTargets) object(ctx context.Context, path, kind, namespace, name, uid string) (targetObject, error) {
@@ -132,6 +133,17 @@ func (c *PodTargets) object(ctx context.Context, path, kind, namespace, name, ui
 		if node := spec["nodeName"]; node != nil && json.Unmarshal(node, &out.node) != nil {
 			return out, value.ErrUnavailable
 		}
+		// This optional readiness projection never makes API diagnosis depend
+		// on scheduling/status. Invalid/missing fields simply offer no recorder.
+		var host bool
+		hostOK := true
+		if v := spec["hostNetwork"]; v != nil {
+			hostOK = string(v) != "null" && json.Unmarshal(v, &host) == nil
+		}
+		var status struct {
+			Phase string `json:"phase"`
+		}
+		out.packetEligible = hostOK && !host && json.Unmarshal(fields["status"], &status) == nil && status.Phase == "Running" && len(validation.IsDNS1123Subdomain(out.node)) == 0
 	}
 	if kind == "Node" {
 		var status, info map[string]json.RawMessage
