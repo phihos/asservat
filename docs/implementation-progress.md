@@ -15,7 +15,7 @@ the requesting human with current collection eligibility; then `RecorderUnavaila
 subject across clients (service and SQL CHECK), approval needs an IdP step-up from the signed
 `acr`/`auth_time` (`approvals.stepUp`); denial and revocation need none. Result access on
 submission: one finite pool, exact children only for published artifacts of the approved capture,
-idempotent reservations never refunded. Migration 00098 (`access_grant`, `access_grant_child`,
+idempotent reservations never refunded. Migration 00097 (`access_grant`, `access_grant_child`,
 `access_grant_use`, four names on the normal audit lane), the `evidence-share` duty gains their
 grants. `get_grant` (browser and MCP) and browser-only `list_reviews`, `decide_review`,
 `revoke_grant`; console `/approvals` and `/approvals/<id>`.
@@ -73,9 +73,7 @@ Verification (tracked test/results files restored after each fixture run):
   schema bundles, helm-check, gate self-tests, sql-check, console-check, gofmt, vet): PASS on the
   final source. No installed run: no recorder exists, so an installed run would only show the
   same refusals, and step-up needs realm configuration the installed fixture lacks.
-- Migration bundle: this branch carries 00098 without 00097 (S-04 increment 4); local runs used an
-  uncommitted placeholder 00097, and `TestInitialSchemaEmbeddedBundle…`/the upgrade-schema test
-  need 00097 merged first.
+
 
 Open: policy grants (12b); observation spend (needs recorders); a console step-up sign-in
 (`acr_values`/`max_age`) and Keycloak LoA step-up qualification; review requests open only while

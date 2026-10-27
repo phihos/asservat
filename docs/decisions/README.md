@@ -8,7 +8,7 @@ every recording when the protected identity settings set `approvals.requireRecor
 approved, current grant covers the exact plan (capture UID, execution digest, data class, reasons,
 requester); a distinct human with a current `action-approver` assignment decides it, and approval
 needs an IdP step-up verified from the signed `acr`/`auth_time`. One finite result-access pool with
-exact children for published artifacts of the approved capture; migration 00098; `get_grant` and
+exact children for published artifacts of the approved capture; Migration 00097; `get_grant` and
 the browser-only `list_reviews`, `decide_review`, `revoke_grant` with a console inbox. Policy
 grants (12b) and observation spend remain open.
 

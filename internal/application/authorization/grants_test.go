@@ -15,7 +15,7 @@ import (
 	"asservat.local/asservat/internal/domain/identity"
 )
 
-// memoryGrants mirrors the SQL ledger's rules (migration 00098) closely
+// memoryGrants mirrors the SQL ledger's rules (migration 00097) closely
 // enough to exercise the service: one request per capture, one decision by a
 // distinct human, one revocation, monotonic pool spend and idempotent keys.
 type memoryGrants struct {

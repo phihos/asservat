@@ -107,7 +107,7 @@ type GrantUseRequest struct {
 	Use                      value.GrantUse
 }
 
-// GrantStore is the SQL grant ledger (migration 00098). Mutations run under
+// GrantStore is the SQL grant ledger (Migration 00097). Mutations run under
 // the current recovery fence; a replayed key returns the stored row and
 // replay=true. The store re-checks decision, revocation, expiry, pool and
 // self-approval in SQL; the service's checks come first.

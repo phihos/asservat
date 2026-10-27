@@ -17,7 +17,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// AccessGrants is the ADR-249 grant ledger (migration 00098). It stores
+// AccessGrants is the ADR-249 grant ledger (Migration 00097). It stores
 // requests, one decision, one revocation, exact children and monotonic pool
 // spend; it never decides who may approve. SQL re-checks self-approval,
 // review window, decision, revocation, expiry and pool bounds.

@@ -4,7 +4,7 @@ Date: 2026-10-27. Status: accepted; implemented; qualification below.
 Requirements: REQ-AUT-003 (SC-AUT-003), REQ-AUT-004, REQ-AUT-005, REQ-AUT-006 (limits bound, spend
 pending), REQ-INV-001–003, REQ-SYS-002 ("unless an administrator requires more"). Plan:
 [S-04 plan](../reviews/s04-plan-2026-10-27.md) §2 P14, §4 row 12 (split: this is 12a, individual
-approval; 12b, policy grants, is open) and §4.1. Migration 00098.
+approval; 12b, policy grants, is open) and §4.1. Migration 00097.
 
 ## Problem
 
@@ -83,7 +83,7 @@ build it first.
    Revocation, denial or expiry of the parent stops new children and every child use. No production
    caller exists yet: the first raw output (increment 14) wires `Materialize` at publication and
    `Use` into download authorization.
-7. **Audit and storage.** Migration 00098 adds `access_grant` (one row per plan; immutable apart
+7. **Audit and storage.** Migration 00097 adds `access_grant` (one row per plan; immutable apart
    from one decision, one revocation and monotonic pool counters, enforced by a trigger),
    `access_grant_child` and `access_grant_use` (append-only), and the four operation names on the
    normal audit lane (`operation_audit_lane`, `operation_audit_human_input_valid`, copied from
@@ -135,9 +135,7 @@ Benefit established, cost small: proceed.
 - **Children** have no production caller until the first raw output (increment 14); requester
   eligibility at materialization is not re-evaluated (the requester is not present), only at every
   use.
-- The migration number 00098 requires 00097 (S-04 increment 4) to merge first (00096 has
-  merged and does not redefine the audit-lane functions); if 00097 adds operation names, the two
-  functions in 00098 must include them.
+
 - **Keycloak:** a realm client needs the `acr` client scope for the claim to appear in access
   tokens (measured below); `auth_time` comes with the `basic` scope.
 
