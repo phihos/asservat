@@ -89,7 +89,8 @@ session expired` at about 179 MiB).
    next frame discloses nothing, so a local source loads it under the response, not the lease
    deadline (cancellation still stops it). Before writing a chunk, the transfer renews the lease,
    with a fresh current-authority observation, whenever less than two seconds remain; a chunk is
-   written only under such a lease or cleared. Remote sources are unchanged because their chunk
+   written only under such a lease or cleared: if even the renewed lease has less than two seconds
+   left (an identity about to expire), nothing more is written and the client resumes. Remote sources are unchanged because their chunk
    acknowledgement is bound to the original lease. The five-second lease, one-MiB chunks and
    64 MiB windows are unchanged.
 

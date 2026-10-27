@@ -29,6 +29,8 @@ type responseTransferFixture struct {
 	advanceBetweenWindows                                      bool
 	slowRead                                                   int // chunk ordinal whose read outlasts its lease
 	denyAfterSlow                                              bool
+	batchLife                                                  time.Duration // identity observation length after the slow read; 5 s when zero
+	minWriteLease                                              time.Duration // least lease time left at any chunk write
 	backing                                                    []byte
 	windowWrite                                                time.Time
 }
@@ -59,7 +61,11 @@ func (f *responseTransferFixture) BeginBatch(context.Context) (identities.Identi
 	}
 	f.active = true
 	f.batches++
-	return &responseTestBatch{f: f, until: f.now.Add(5 * time.Second)}, nil
+	life := 5 * time.Second
+	if f.batchLife > 0 && f.slowRead < 0 {
+		life = f.batchLife
+	}
+	return &responseTestBatch{f: f, until: f.now.Add(life)}, nil
 }
 func (f *responseTransferFixture) Close() { f.closed++ }
 func (f *responseTransferFixture) CheckDownloadCurrent(ctx context.Context, b identities.CurrentIdentity, s artifact.DownloadScope) (artifact.DownloadAuthority, error) {
@@ -196,6 +202,9 @@ func (f *responseTransferFixture) WriteChunk(_ context.Context, l artifact.Downl
 		return 0, artifact.ErrDownloadExpired
 	}
 	f.chunks++
+	if left := l.Until.Sub(f.now); f.minWriteLease == 0 || left < f.minWriteLease {
+		f.minWriteLease = left
+	}
 	if f.fail == "write" {
 		f.emitted++
 		return 1, artifact.ErrDownloadUnavailable
@@ -245,8 +254,18 @@ func TestResponseTransferRenewsLeaseAfterSlowLocalRead(t *testing.T) {
 	if e := service.Transfer(context.Background(), f, req, f, f); e != nil {
 		t.Fatal(e)
 	}
-	if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.leases != 2 || f.batches < 2 {
-		t.Fatal("slow read not delivered under a fresh lease", f.s.State, f.emitted, f.leases, f.batches)
+	if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.leases != 2 || f.batches < 2 || f.minWriteLease < localWriteMargin {
+		t.Fatal("slow read not delivered under a fresh lease", f.s.State, f.emitted, f.leases, f.batches, f.minWriteLease)
+	}
+	// A renewal that cannot give the margin (identity about to expire) writes
+	// nothing; every earlier write started with at least the margin.
+	f, service, req = newResponseTransferFixture(t, 3*artifact.DeliveryBytes)
+	f.slowRead, f.batchLife = 2, time.Second
+	if e := service.Transfer(context.Background(), f, req, f, f); !errors.Is(e, artifact.ErrDownloadExpired) {
+		t.Fatal("short renewal accepted", e)
+	}
+	if f.emitted != artifact.DeliveryBytes || f.minWriteLease < localWriteMargin {
+		t.Fatal("chunk written with less than the margin", f.emitted, f.minWriteLease)
 	}
 	f, service, req = newResponseTransferFixture(t, 3*artifact.DeliveryBytes)
 	f.slowRead, f.denyAfterSlow = 2, true

@@ -452,6 +452,11 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 					if e == nil && (!lease.Valid(t.Now()) || lease.ResponseID != r.ID || lease.WindowID != windowID || lease.OwnerID != r.OwnerID || lease.Generation != r.Generation || lease.Authority.Scope != session.Scope || lease.Until.After(a.ValidUntil)) {
 						e = artifact.ErrIntegrity
 					}
+					// A renewal that still cannot give the margin (for example an
+					// identity about to expire) writes nothing: the client resumes.
+					if e == nil && t.Now().Add(localWriteMargin).After(lease.Until) {
+						e = artifact.ErrDownloadExpired
+					}
 					if e != nil {
 						clear(chunk.Bytes)
 						return e
