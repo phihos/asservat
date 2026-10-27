@@ -82,6 +82,11 @@ func (n *nodePackets) start(ctx context.Context, epoch string, w collector.Work)
 	return r
 }
 
+// packetDeliveryGrace bounds the delivery of a finished capture after the
+// node stops: the result still reaches the connector (or the attempt ends)
+// within this time; the connector accepts it until startBy + duration + 30 s.
+const packetDeliveryGrace = 10 * time.Second
+
 func (n *nodePackets) run(ctx context.Context, epoch, workID string, p collector.PacketCapture, rec *packets.Recorder, started time.Time) {
 	var mu sync.Mutex
 	capture, cancel := context.WithTimeout(ctx, p.Duration)
@@ -90,11 +95,12 @@ func (n *nodePackets) run(ctx context.Context, epoch, workID string, p collector
 		rec.Add(f.Data, f.Wire, f.At)
 		mu.Unlock()
 	})
+	// The capture completed when its own deadline ended it; a later node
+	// stop does not discard that result. A capture the node stopped early is
+	// reported as failed, never as a shorter recording.
+	completed := errors.Is(capture.Err(), context.DeadlineExceeded)
 	cancel()
 	ended := n.now().UTC()
-	if ctx.Err() != nil {
-		return
-	}
 	mu.Lock()
 	out, counters, closeErr := rec.Close(ended, stats.LostSamples)
 	mu.Unlock()
@@ -107,39 +113,70 @@ func (n *nodePackets) run(ctx context.Context, epoch, workID string, p collector
 		result.Failure = collector.ReasonTargetNotFound
 	case errors.Is(err, gadget.ErrTargetHostNetwork):
 		result.Failure = collector.ReasonTargetHostNet
-	case err != nil || closeErr != nil:
+	case err != nil || closeErr != nil || !completed:
 		result.Failure = collector.ReasonCaptureFailed
 	}
 	if err != nil {
 		n.log(fmt.Sprintf("node collector: capture %s stopped: %v", p.CaptureID, err))
 	}
-	if closeErr != nil || !result.Valid() {
-		n.log("node collector: capture " + p.CaptureID + " produced no valid result")
-		return
-	}
-	// The upload token bucket never consumes on a wait: wait, then take.
-	for {
-		n.budgetMu.Lock()
-		wait, err := n.budget().TakeUpload(n.now(), result.CapturedBytes)
-		n.budgetMu.Unlock()
-		if err != nil {
-			n.log("node collector: capture " + p.CaptureID + " exceeds the node upload burst")
+	// Delivery has its own bounded context, so a node stop cannot silently
+	// drop a finished capture or its failure.
+	deliver, stop := context.WithTimeout(context.WithoutCancel(ctx), packetDeliveryGrace)
+	defer stop()
+	if result.Failure != "" || !result.Valid() || !n.takeUpload(deliver, result.CapturedBytes) {
+		// A failed, invalid or oversized result is reported as a failure with
+		// an empty PCAPNG, so the connector records a terminal state.
+		if result.Failure == "" {
+			n.log("node collector: capture " + p.CaptureID + " produced no deliverable result")
+			result.Failure = collector.ReasonCaptureFailed
+		}
+		out = emptyCapture(started, ended)
+		result.CapturedBytes = int64(len(out))
+		if out == nil || !result.Valid() || !n.takeUpload(deliver, result.CapturedBytes) {
+			n.log("node collector: capture " + p.CaptureID + " failure could not be reported")
 			return
 		}
+	}
+	if err := n.upload(deliver, epoch, result, out); err != nil {
+		n.log(fmt.Sprintf("node collector: capture %s upload failed: %v", p.CaptureID, err))
+		return
+	}
+	n.log(fmt.Sprintf("node collector: capture %s uploaded: %d of %d frames retained, %d bytes, %d lost samples, failure %q", p.CaptureID, result.Retained, result.Seen, result.CapturedBytes, result.LostSamples, result.Failure))
+}
+
+// takeUpload waits for the node's upload token bucket (it never consumes on
+// a wait) within ctx; false when the bytes exceed the burst or ctx ends.
+func (n *nodePackets) takeUpload(ctx context.Context, bytes int64) bool {
+	for {
+		n.budgetMu.Lock()
+		wait, err := n.budget().TakeUpload(n.now(), bytes)
+		n.budgetMu.Unlock()
+		if err != nil {
+			return false
+		}
 		if wait == 0 {
-			break
+			return true
 		}
 		t := time.NewTimer(wait)
 		select {
 		case <-ctx.Done():
 			t.Stop()
-			return
+			return false
 		case <-t.C:
 		}
 	}
-	if err := n.upload(ctx, epoch, result, out); err != nil {
-		n.log(fmt.Sprintf("node collector: capture %s upload failed: %v", p.CaptureID, err))
-		return
+}
+
+// emptyCapture is the PCAPNG of a failure report: section and interface
+// headers only.
+func emptyCapture(started, ended time.Time) []byte {
+	r, err := packets.NewRecorder(nil, 64<<10, started, "")
+	if err != nil {
+		return nil
 	}
-	n.log(fmt.Sprintf("node collector: capture %s uploaded: %d of %d frames retained, %d bytes, %d lost samples, failure %q", p.CaptureID, result.Retained, result.Seen, result.CapturedBytes, result.LostSamples, result.Failure))
+	out, _, err := r.Close(ended, 0)
+	if err != nil {
+		return nil
+	}
+	return out
 }

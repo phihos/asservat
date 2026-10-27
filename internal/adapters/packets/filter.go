@@ -2,6 +2,7 @@ package packets
 
 import (
 	"errors"
+	"sync"
 
 	value "asservat.local/asservat/internal/domain/planning"
 	"golang.org/x/net/bpf"
@@ -26,7 +27,17 @@ type Filter struct {
 	program []bpf.Instruction
 	lengths []int // indexes of ld len
 	vm      *bpf.VM
+
+	// A program with ld len is specialized once per distinct wire length
+	// and reused (bpf.VM.Run keeps no state, so a VM is safe to share).
+	mu     sync.Mutex
+	byWire map[uint32]*bpf.VM
 }
+
+// maxWireVMs bounds the per-wire-length cache. Pod traffic has at most a
+// few thousand distinct lengths (≤ MTU); a length beyond the bound is
+// specialized for that frame only.
+const maxWireVMs = 4096
 
 // CheckProgram reports whether the evaluator runs program exactly: every
 // instruction decodes, no ancillary data load other than the packet length,
@@ -77,15 +88,39 @@ func (f *Filter) Match(frame []byte, wire int) bool {
 	}
 	vm := f.vm
 	if len(f.lengths) > 0 {
-		program := append([]bpf.Instruction(nil), f.program...)
-		for _, i := range f.lengths {
-			program[i] = bpf.LoadConstant{Dst: bpf.RegA, Val: uint32(wire)}
-		}
 		var err error
-		if vm, err = bpf.NewVM(program); err != nil {
+		if vm, err = f.vmFor(uint32(wire)); err != nil {
 			return false
 		}
 	}
 	n, err := vm.Run(frame)
 	return err == nil && n > 0
+}
+
+// vmFor returns the program specialized for wire, building it at most once
+// per distinct length while the cache has room.
+func (f *Filter) vmFor(wire uint32) (*bpf.VM, error) {
+	f.mu.Lock()
+	vm, ok := f.byWire[wire]
+	f.mu.Unlock()
+	if ok {
+		return vm, nil
+	}
+	program := append([]bpf.Instruction(nil), f.program...)
+	for _, i := range f.lengths {
+		program[i] = bpf.LoadConstant{Dst: bpf.RegA, Val: wire}
+	}
+	vm, err := bpf.NewVM(program)
+	if err != nil {
+		return nil, err
+	}
+	f.mu.Lock()
+	if f.byWire == nil {
+		f.byWire = map[uint32]*bpf.VM{}
+	}
+	if len(f.byWire) < maxWireVMs {
+		f.byWire[wire] = vm
+	}
+	f.mu.Unlock()
+	return vm, nil
 }
