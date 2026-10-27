@@ -13,9 +13,13 @@ Full application-identity, OIDC and browser transport packages pass with
 `go test -race -count=1` (1.028 s, 3.163 s and 16.365 s). Console check
 (19 files/209 tests), build, built-browser checks (20 journeys/17 accessibility
 scans plus four native-download boundaries/two scans) and `make pre-push` pass.
-The provider fixture now contains a fresh-login form/callback assertion using
-Keycloak baseline ACR 1; its run remains pending. Real higher-LoA/MFA step-up
-qualification also remains pending; component tests do not establish it.
+[Identity run 40494657078](https://github.com/phihos/asservat/actions/runs/40494657078)
+passed the real Keycloak fresh-login form/callback assertion with baseline ACR 1,
+then failed the existing concurrent-refresh test. The fixture selected one
+session's ciphertext by root alone and copied it into both login rows, violating
+their row-bound encryption. Those reads/mutations now select the actual session
+ID; its full rerun remains pending. Failed run: exit 1, unchanged sources, empty
+cleanup failures. Real higher-LoA/MFA qualification remains pending.
 
 
 ## S-04 increment 12: sensitive acquisition grants (ADR-249, 2026-10-27)
