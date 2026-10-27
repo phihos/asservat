@@ -164,3 +164,22 @@ func TestRecordingApprovalSettingsChangeRequiresFreshReview(t *testing.T) {
 		})
 	}
 }
+
+func TestRecorderSubmissionRejectsAnotherIssuersApprovalSettings(t *testing.T) {
+	f := newInvestigationFixture()
+	ctx := context.Background()
+	p, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A complete, fresh policy for another issuer cannot supply this issuer's
+	// administrator settings, even if its switch agrees with the frozen plan.
+	policy := identity.Policy{Revision: identity.Revision{UID: "other-policy", Generation: 1, Digest: [32]byte{1}}, Issuer: "https://other.example.invalid", ObservedAt: f.now, FreshUntil: f.now.Add(30 * time.Second), Clients: []identity.Client{{ID: "console", Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{"dev-team"}, GroupsAtIssueQualified: true, GroupMaxAge: time.Minute}
+	if policy.Validate(f.now) != nil {
+		t.Fatal("fixture policy is invalid")
+	}
+	f.svc.Approvals = fixedApprovalSettings{policy: policy}
+	if _, err = f.request(t, p.Preview, "other-issuer"); !errors.Is(err, value.ErrUnavailable) || f.admissions.Load() != 0 {
+		t.Fatal("foreign settings supplied approval authority", err)
+	}
+}

@@ -1,5 +1,47 @@
 # Sustained implementation progress
 
+## Approved capture acceptance (ADR-252, 2026-10-27)
+
+Approval-required recordings now retain their exact passive review blueprint
+through the original grant's finite review/expiry bounds, under the existing
+preview quotas. The explicitly marked approved scope binds finite action
+durations; submission fixes one capture deadline within five minutes and the
+original grant expiry. SQL admission and execution check the exact current grant
+under a shared row lock; revocation is serialized. The original Pod, IDs, frozen
+filters, audience, storage, relative retention and approval digest are preserved.
+Old absolute-deadline scopes need fresh review. Submission checks the existing
+cached administrator approval setting once, with an exact issuer match; toggling
+the requirement in either direction requires a new preview. Approval presentation
+now separates preview expiry from the acceptance window.
+
+The compiler timing regression fails with the original absolute-deadline code;
+both administrator-toggle regressions also fail before the cached setting check.
+Fixed affected Go package tests and the five affected package race suites pass
+(capture, planning, presentation, PostgreSQL and planning domain).
+`make pre-push` passes, including the final exact-issuer refinement. `console-check`
+passes 19 test files / 209 tests; `console-browser-check` (including build) passes
+20 journeys / 17 accessibility scans and the native-restart suite's four
+boundaries / two scans. These use synthetic application data.
+
+Targeted actual PostgreSQL qualification is
+`test/results/approved-recording-sql-4-environment.json`: exit 0, exactly
+`TestContextAdmissionWithRealServices/recording-approved-plan-after-preview-expiry`,
+unchanged source hashes and empty cleanup failures. It covers retained pending
+review, cleanup after actual preview expiry, reviewed admission with the original
+approved digest, grant-lock/revocation ordering and original-operation replay.
+The grant decision/bootstrap is explicitly synthetic; this is SQL/component
+qualification, not an installed independent-review journey. Runs 1–2 failed on a
+new fixture's timestamp ordering (the first attempted edit matched no bytes);
+run 3 correctly rejected a migration/admin pool supplied to a runtime adapter.
+Run 4 uses the compiled product hub-runtime grants. SQL facets are unchanged by
+the subsequent cached-settings and timing-presentation refinements.
+
+Final candidate custody shards, initial-installation role qualification and the
+installed continuation journey are pending. Policy grants, observation spend,
+result-access child composition and installed approval usability remain separate
+work. No broader S-04 completion is claimed.
+
+
 ## Approval step-up sign-in (ADR-253, 2026-10-27)
 
 The approval detail now links to `/auth/step-up` and returns to that exact plan.

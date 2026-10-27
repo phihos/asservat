@@ -36,7 +36,7 @@ func (s ContextInvestigation) requireRecordingApproval(ctx context.Context, issu
 		return false, nil
 	}
 	p, err := s.Approvals.IdentityPolicy(ctx, issuer)
-	if err != nil || p.Validate(s.Now()) != nil {
+	if err != nil || p.Issuer != issuer || p.Validate(s.Now()) != nil {
 		return false, value.ErrUnavailable
 	}
 	return p.RequireRecordingApproval, nil
