@@ -223,6 +223,17 @@ failed before the corrections. The complete affected race packages pass:
 evidence 4.883 s, native transport 101.577 s and mTLS 41.284 s. The archived
 SQL/S3 and Kubernetes reports above predate these review corrections.
 
+A further review reproduced storing the caller's delivery lease before the
+post-body gate confirmed its sequence, and accepting an unconfirmed future
+sequence for ACK. Delivery state now advances only after successful matching
+gate confirmation. A failed confirmation clears plaintext and cancels the
+existing operation without changing its accepted lease or releasing pending
+accounting. ACK requires a live operation/caller and the exact accepted sequence
+before consuming pending bytes. RED/GREEN tests cover each mutation boundary and
+successful advancement. Full affected races pass: native 98.944 s, evidence
+4.854 s and mTLS 34.752 s. Earlier external qualifications retain their original
+source scope; they do not qualify this later correction.
+
 The candidate twenty-second ceiling still implies about 0.4 MiB/s for a full
 8 MiB window before control overhead. Aggregate installed SQL/S3/KMS/API cost
 and practical slower-link qualification remain pending. No arbitrary slow-client

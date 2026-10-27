@@ -262,19 +262,26 @@ func (o *HubOperation) ReadChunk(ctx context.Context, l artifact.DownloadDeliver
 	if o == nil || ctx == nil || !o.matchChunk(l, offset, length) || !o.claimChunk(offset, length) {
 		return evidence.NativeResponseChunk{}, artifact.ErrDownloadUnavailable
 	}
-	o.mu.Lock()
-	o.delivery = l
-	o.mu.Unlock()
 	select {
 	case b := <-o.body:
 		native, e := o.gate.Check(ctx)
 		if e != nil || native.Sequence != l.Sequence {
 			clear(b)
+			o.cancel()
 			if e != nil {
 				return evidence.NativeResponseChunk{}, e
 			}
 			return evidence.NativeResponseChunk{}, step("chunk-sequence", artifact.ErrDownloadUnavailable)
 		}
+		o.mu.Lock()
+		if o.closed || o.ctx.Err() != nil || ctx.Err() != nil {
+			o.mu.Unlock()
+			clear(b)
+			o.cancel()
+			return evidence.NativeResponseChunk{}, artifact.ErrDownloadUnavailable
+		}
+		o.delivery = l
+		o.mu.Unlock()
 		// The window's read work is reported once, with its first chunk.
 		var work int64
 		if offset == o.command.Offset {
@@ -301,11 +308,11 @@ func (o *HubOperation) expectedVersion() artifact.Digest {
 	return evidence.ContextCopiesDigest(o.expected.Copies)
 }
 func (o *HubOperation) AcknowledgeNativeChunk(ctx context.Context, l artifact.DownloadDeliveryLease, offset, length int64) error {
-	if o == nil || !o.matchChunk(l, offset, length) {
+	if o == nil || ctx == nil || ctx.Err() != nil || !o.matchChunk(l, offset, length) {
 		return artifact.ErrDownloadUnavailable
 	}
 	o.mu.Lock()
-	ok := o.pending == length && offset == o.next
+	ok := !o.closed && o.ctx.Err() == nil && ctx.Err() == nil && l.Sequence == o.delivery.Sequence && o.pending == length && offset == o.next
 	if ok {
 		o.pending = 0
 		o.next += length

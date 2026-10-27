@@ -92,6 +92,15 @@ changed scope, lower sequence and expired ACK still deny. Full affected race
 packages pass (evidence 4.883 s, native 101.577 s, mTLS 41.284 s). The external
 reports above qualify their recorded sources and predate these review corrections.
 
+The next review also reproduced prematurely retaining an unconfirmed caller
+lease and consuming pending bytes with a future ACK sequence. The operation now
+retains only gate-confirmed delivery, clears plaintext/cancels on confirmation
+failure, and checks live ownership plus exact accepted sequence before ACK state
+changes. No retry, refund or new state is added. Mutation-boundary RED/GREEN
+regressions and complete native/evidence/mTLS races pass
+(98.944 s/4.854 s/34.752 s). Existing external custody/SQL/Kubernetes results
+remain evidence for their recorded source versions, before this later fix.
+
 The SQL transfer's Pod-proof/bootstrap/human inputs and the Kubernetes producer
 fixture's SQL/dispatch/certificate-issuance inputs remain synthetic. Installed
 composition of both, paced composed 8 MiB transfer and aggregate installed
