@@ -314,6 +314,16 @@
                         "minimum": 1,
                         "maximum": 1125899906842624
                       },
+                      "maxRingBytes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 4294967296
+                      },
+                      "maxFrozenBytes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 4294967296
+                      },
                       "impactProfileRef": {
                         "type": "string",
                         "minLength": 1,

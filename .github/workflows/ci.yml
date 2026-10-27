@@ -115,6 +115,8 @@ jobs:
       - if: steps.libpcap.outputs.cache-hit != 'true'
         run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends flex bison
       - run: make pcap-check
+      # ADR-246: the collector build links the pinned Inspektor Gadget runtime.
+      - run: make gadget-check
       - if: github.ref == 'refs/heads/main'
         run: find ~/.cache/go-build -type f -mmin +90 -delete
       - if: github.ref == 'refs/heads/main'

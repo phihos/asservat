@@ -88,6 +88,15 @@ pcap-check: libpcap
 	file "$(ASSERVAT_BUILD_TMP)/asservat-hub" | grep -q 'statically linked'
 	rm -f "$(ASSERVAT_BUILD_TMP)/asservat-hub"
 
+# ADR-246 (S1): only the collector image links Inspektor Gadget (build tag
+# gadget); every other build carries a stub. Vet and build the static
+# collector binary. Compilation only: nothing is loaded into the kernel.
+.PHONY: gadget-check
+gadget-check:
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" go vet -tags gadget ./internal/adapters/gadget/ ./internal/bootstrap/
+	TMPDIR="$(ASSERVAT_BUILD_TMP)" CGO_ENABLED=0 go build -tags gadget,netgo,osusergo -trimpath -buildvcs=false -o "$(ASSERVAT_BUILD_TMP)/asservat-collector" ./cmd/asservat
+	rm -f "$(ASSERVAT_BUILD_TMP)/asservat-collector"
+
 .PHONY: sql-tools sql-check custody-integration
 sql-tools:
 	mkdir -p "$(ASSERVAT_TOOL_BIN)" "$(ASSERVAT_BUILD_TMP)"

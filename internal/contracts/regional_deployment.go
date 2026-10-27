@@ -36,7 +36,27 @@ type RegionalDeployment struct {
 	// Capacity enables the ADR-197 v2 capacity observation standby. It
 	// requires APIContext, whose settings pin this Deployment's template.
 	Capacity *RegionalCapacity `json:"capacity,omitempty"`
+	// Collector enables the ADR-246 node work channel listener for the
+	// cluster's `asservat node` DaemonSet.
+	Collector *RegionalCollector `json:"collector,omitempty"`
 }
+
+// RegionalCollector names the collector namespace, DaemonSet and service
+// account whose Pod-bound tokens the connector attests. The listener's
+// server certificate and key are the fixed files RegionalNodeServerFile and
+// RegionalNodeServerKeyFile in the deployment root; node client
+// certificates come from an in-memory issuer of the connector process.
+type RegionalCollector struct {
+	Namespace      WorkerObjectReference `json:"namespace"`
+	DaemonSet      string                `json:"daemonSet"`
+	ServiceAccount string                `json:"serviceAccount"`
+}
+
+const (
+	RegionalNodeListenAddress = ":8444"
+	RegionalNodeServerFile    = "node-server.pem"
+	RegionalNodeServerKeyFile = "node-server-key.pem"
+)
 
 // RegionalCapacity pins the region's capacity selector guard, its probe
 // namespace and account (whose tokens this Pod's account mints in memory),

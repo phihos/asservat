@@ -13,8 +13,8 @@ import (
 
 func main() { os.Exit(run()) }
 func run() int {
-	if len(os.Args) < 2 || (os.Args[1] != "configuration-role-install" && os.Args[1] != "installer-provider-recipe" && os.Args[1] != "installer-resume" && os.Args[1] != "installer-provider-apply" && os.Args[1] != "installer-cluster" && os.Args[1] != "installer-cluster-join" && os.Args[1] != "installer-upgrade" && os.Args[1] != "installer-continue" && os.Args[1] != "download-worker" && os.Args[1] != "hub-api" && os.Args[1] != "hub-worker" && os.Args[1] != "hub-federation" && os.Args[1] != "connector" && os.Args[1] != "key-service" && os.Args[1] != "publisher" && os.Args[1] != "initial-install" && os.Args[1] != "initial-prepare" && os.Args[1] != "initial-schema" && os.Args[1] != "initial-bootstrap" && os.Args[1] != "initial-bootstrap-schema" && os.Args[1] != "initial-bootstrap-retire" && os.Args[1] != "initial-bootstrap-prepare") || (os.Args[1] == "configuration-role-install" || os.Args[1] == "installer-continue" || os.Args[1] == "hub-api" || os.Args[1] == "hub-worker" || os.Args[1] == "hub-federation" || os.Args[1] == "connector" || os.Args[1] == "key-service" || os.Args[1] == "publisher" || os.Args[1] == "initial-install" || os.Args[1] == "initial-prepare" || os.Args[1] == "initial-schema" || os.Args[1] == "initial-bootstrap" || os.Args[1] == "initial-bootstrap-schema" || os.Args[1] == "initial-bootstrap-retire" || os.Args[1] == "initial-bootstrap-prepare") && len(os.Args) != 2 {
-		fmt.Fprintln(os.Stderr, "usage: asservat installer-provider-recipe [public provider name flags] | installer-resume [--kubeconfig file] [--context name] [--namespace name] [--name install] | installer-provider-apply --installation id --audit-credential file [--federation-audit-credential file] [--oidc-client-secret file --public-tls-certificate file --public-tls-key file] [--kubeconfig file] [--context name] [--namespace name] | installer-cluster --offer file --bootstrap file [--evidence-credential file] [--kubeconfig file] [--context name] [--namespace name] [--in-cluster] | installer-cluster-join --namespace name --join file [--standby n] [--captures n] [--kubeconfig file] [--context name] | installer-upgrade --inputs dir [--image repo@sha256:digest --namespace hub --installation id] | installer-continue | download-worker [protected startup arguments] | configuration-role-install | hub-api | hub-worker | hub-federation | connector | key-service | publisher | initial-install | initial-prepare | initial-schema | initial-bootstrap | initial-bootstrap-schema | initial-bootstrap-retire | initial-bootstrap-prepare")
+	if len(os.Args) < 2 || (os.Args[1] != "configuration-role-install" && os.Args[1] != "installer-provider-recipe" && os.Args[1] != "installer-resume" && os.Args[1] != "installer-provider-apply" && os.Args[1] != "installer-cluster" && os.Args[1] != "installer-cluster-join" && os.Args[1] != "installer-upgrade" && os.Args[1] != "installer-continue" && os.Args[1] != "download-worker" && os.Args[1] != "hub-api" && os.Args[1] != "hub-worker" && os.Args[1] != "hub-federation" && os.Args[1] != "connector" && os.Args[1] != "key-service" && os.Args[1] != "publisher" && os.Args[1] != "initial-install" && os.Args[1] != "initial-prepare" && os.Args[1] != "initial-schema" && os.Args[1] != "initial-bootstrap" && os.Args[1] != "initial-bootstrap-schema" && os.Args[1] != "initial-bootstrap-retire" && os.Args[1] != "initial-bootstrap-prepare" && os.Args[1] != "node") || (os.Args[1] == "configuration-role-install" || os.Args[1] == "node" || os.Args[1] == "installer-continue" || os.Args[1] == "hub-api" || os.Args[1] == "hub-worker" || os.Args[1] == "hub-federation" || os.Args[1] == "connector" || os.Args[1] == "key-service" || os.Args[1] == "publisher" || os.Args[1] == "initial-install" || os.Args[1] == "initial-prepare" || os.Args[1] == "initial-schema" || os.Args[1] == "initial-bootstrap" || os.Args[1] == "initial-bootstrap-schema" || os.Args[1] == "initial-bootstrap-retire" || os.Args[1] == "initial-bootstrap-prepare") && len(os.Args) != 2 {
+		fmt.Fprintln(os.Stderr, "usage: asservat installer-provider-recipe [public provider name flags] | installer-resume [--kubeconfig file] [--context name] [--namespace name] [--name install] | installer-provider-apply --installation id --audit-credential file [--federation-audit-credential file] [--oidc-client-secret file --public-tls-certificate file --public-tls-key file] [--kubeconfig file] [--context name] [--namespace name] | installer-cluster --offer file --bootstrap file [--evidence-credential file] [--kubeconfig file] [--context name] [--namespace name] [--in-cluster] | installer-cluster-join --namespace name --join file [--standby n] [--captures n] [--kubeconfig file] [--context name] | installer-upgrade --inputs dir [--image repo@sha256:digest --namespace hub --installation id] | installer-continue | download-worker [protected startup arguments] | configuration-role-install | hub-api | hub-worker | hub-federation | connector | key-service | publisher | initial-install | initial-prepare | initial-schema | initial-bootstrap | initial-bootstrap-schema | initial-bootstrap-retire | initial-bootstrap-prepare | node")
 		return 2
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
@@ -60,6 +60,8 @@ func run() int {
 		err = bootstrap.RunKeyService(ctx)
 	} else if os.Args[1] == "publisher" {
 		err = bootstrap.RunPublisher(ctx)
+	} else if os.Args[1] == "node" {
+		err = bootstrap.RunNode(ctx, os.Getenv(contracts.NodePodUIDEnvironment))
 	} else if os.Args[1] == "hub-worker" {
 		err = bootstrap.RunHubWorker(ctx, os.Getenv(contracts.OwnerPodUIDEnvironment))
 	} else {
@@ -75,6 +77,10 @@ func run() int {
 		}
 		if os.Args[1] == "download-worker" {
 			fmt.Fprintln(os.Stderr, bootstrap.DownloadWorkerDiagnostic(err))
+			return 1
+		}
+		if os.Args[1] == "node" {
+			fmt.Fprintln(os.Stderr, bootstrap.NodeDiagnostic(err))
 			return 1
 		}
 		if os.Args[1] == "hub-worker" || os.Args[1] == "publisher" {
