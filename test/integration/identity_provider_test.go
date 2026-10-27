@@ -213,7 +213,9 @@ func TestKeycloakProvider(t *testing.T) {
 		map[string]any{"name": "stable-groups", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "config": map[string]string{"user.attribute": "asservat_group_id", "claim.name": "asservat_groups", "jsonType.label": "String", "multivalued": "true", "aggregate.attrs": "true", "access.token.claim": "true", "id.token.claim": "false", "userinfo.token.claim": "false"}},
 	}
 	for _, client := range []string{"console", "account-test"} {
-		scopes := []string{"basic", "evidence:read", "evidence:download", "evidence:capture"}
+		// ADR-249: the "acr" client scope puts the signed acr claim into access
+		// tokens (approval step-up); "basic" already carries auth_time.
+		scopes := []string{"basic", "acr", "evidence:read", "evidence:download", "evidence:capture"}
 		mappers := common
 		if client == "account-test" {
 			scopes = append(scopes, "roles", "profile")
@@ -286,6 +288,24 @@ func TestKeycloakProvider(t *testing.T) {
 	if claims.Subject != userID || claims.ClientID != "console" || tokens.ID == "" || tokens.Refresh == "" {
 		t.Fatal("human access token binding")
 	}
+	// ADR-249: the actual provider's access token carries the signed acr
+	// and auth_time that approval step-up is decided from (values only,
+	// no LoA step-up flow is configured in this realm).
+	if claims.ACR == "" || claims.AuthTime.IsZero() || time.Since(claims.AuthTime) > 2*time.Minute || claims.AuthTime.After(claims.IssuedAt) {
+		var names []string
+		if parts := strings.Split(tokens.Access, "."); len(parts) == 3 {
+			decoded, _ := base64.RawURLEncoding.DecodeString(parts[1])
+			var fields map[string]json.RawMessage
+			_ = json.Unmarshal(decoded, &fields)
+			for name := range fields {
+				names = append(names, name)
+			}
+			slices.Sort(names)
+			t.Logf("acr field %s, auth_time field %s", fields["acr"], fields["auth_time"])
+		}
+		t.Fatalf("provider assurance claims: acr %q auth_time %v; access token fields %v", claims.ACR, claims.AuthTime, names)
+	}
+	t.Logf("provider assurance claims: acr %q, auth_time %s before issue", claims.ACR, claims.IssuedAt.Sub(claims.AuthTime))
 	for _, token := range []string{tokens.ID, tokens.Refresh} {
 		if _, err := v.Verify(context.Background(), token); err == nil {
 			t.Fatal("non-access credential accepted")

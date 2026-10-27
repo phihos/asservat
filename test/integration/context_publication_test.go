@@ -299,6 +299,17 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		qualifyEvidenceShare(t, ctx, admin, poolFor, f.scenario, f.e, f.reader, publishAuthority)
 	})
 
+	t.Run("access-grant-approval-children-pool-revocation-and-expiry", func(t *testing.T) {
+		f := setup(t)
+		if _, err := f.publisher.Publish(ctx, f.e.CaptureUID, f.copies); err != nil {
+			t.Fatal(err)
+		}
+		publishAuthority := func() error {
+			return (auditapp.AuthorityPublisher{Ledger: f.scenario.p, Objects: &objectstore.AuthorityObjects{Store: store, Seal: keys, Open: keys}}).PublishAuthority(ctx)
+		}
+		qualifyAccessGrants(t, ctx, admin, poolFor, f.scenario, f.e, publishAuthority, releasePermissionBurst)
+	})
+
 	t.Run("capture-time-share-once-at-publication-and-owner-checked-at-admission", func(t *testing.T) {
 		qualifyCaptureShare(t, ctx, admin, poolFor, create, func(t *testing.T, admit func(*testing.T, *captureAdmissionScenario) capture.Accepted) captureShareFixture {
 			f := setupAdmitted(t, nil, nil, admit)

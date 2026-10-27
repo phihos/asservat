@@ -139,6 +139,8 @@ type ContextOperationInput struct {
 	Origin      string            `json:"origin,omitempty"`
 	Cursor      string            `json:"cursor,omitempty"`
 	Limit       int               `json:"limit,omitempty"`
+	// ADR-249: the same-human result access of a reviewed recorder plan.
+	ResultAccess *ResultAccessInput `json:"result_access,omitempty"`
 }
 
 // ContextSharingInput is the implemented subset of the canonical capture
@@ -489,6 +491,14 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 					auditNoDispatch = true
 					operationErr = value.ErrUnavailable
 				}
+			} else if in.ResultAccess != nil {
+				// ADR-249: only a reviewed recorder plan takes result access.
+				if reviewed, ok := s.captures.(ContextResultAccessRequest); ok {
+					accepted, operationErr = reviewed.RequestWithResultAccess(ctx, current, in.PreviewID, in.IdempotencyKey, in.ResultAccess.access())
+				} else {
+					auditNoDispatch = true
+					operationErr = value.ErrInvalid
+				}
 			} else {
 				accepted, operationErr = s.captures.Request(ctx, current, in.PreviewID, in.IdempotencyKey)
 			}
@@ -533,6 +543,9 @@ func (s *ContextOperations) CallWithContext(ctx context.Context, current identit
 	}
 	if operationErr != nil {
 		out.Status, out.Data, out.NextCursor = "error", publicCaptureFailure(operationErr, name == "request_capture" || name == "resolve_capture_request"), nil
+		if f, ok := approvalFailure(operationErr, s.config.PublicOrigin); ok && name == "request_capture" {
+			out.Data = f
+		}
 	}
 	if name == "get_capture_settings" && out.Status == "ok" {
 		out.DataClass = "extract" // canonical class of a settings projection

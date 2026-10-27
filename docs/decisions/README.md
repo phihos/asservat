@@ -1,5 +1,17 @@
 # Decision records
 
+[ADR-249 — Sensitive acquisition grants](249-sensitive-acquisition-grants.md) is S-04 increment
+12 (12a, individual approval): an adHocCapture AccessGrant per reviewed packet/syscall plan that
+needs review (a raw-byte filter predicate, now compiled with REQ-AUT-006 observation limits, or
+every recording when the protected identity settings set `approvals.requireRecordingApproval`).
+`request_capture` opens one review request and is refused with `ApprovalRequired` until an
+approved, current grant covers the exact plan (capture UID, execution digest, data class, reasons,
+requester); a distinct human with a current `action-approver` assignment decides it, and approval
+needs an IdP step-up verified from the signed `acr`/`auth_time`. One finite result-access pool with
+exact children for published artifacts of the approved capture; migration 00098; `get_grant` and
+the browser-only `list_reviews`, `decide_review`, `revoke_grant` with a console inbox. Policy
+grants (12b) and observation spend remain open.
+
 [ADR-247 — Guarded, group-ID, remote-cluster and workload permission sources](247-guarded-and-workload-permission-sources.md)
 completes REQ-PER-003/005: `admissionEnforced` namespace sources need a live proof of the capacity
 namespace label guard covering their keys; `groupID` values are validated against the identity

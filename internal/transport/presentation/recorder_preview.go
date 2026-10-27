@@ -212,10 +212,23 @@ func (s *ContextOperations) recorderPreview(ctx context.Context, current identit
 		limit += a.MaxBytes
 	}
 	blockers := []OperationBlocker{RecorderUnavailableBlocker}
+	warnings := recorderWarnings(result.Plan)
+	approval := result.Plan.Approval != nil
+	if approval {
+		// ADR-249: an individual approval precedes any observation.
+		view := &recorderApprovalView{}
+		for _, r := range result.Plan.Approval.Reasons {
+			view.reasons = append(view.reasons, r.Code+" ("+r.ActionID+")")
+		}
+		blockers = append([]OperationBlocker{approvalRequiredBlocker(view)}, blockers...)
+		if l := result.Plan.Approval.ObservationLimits; l != nil {
+			warnings = append(warnings, fmt.Sprintf("A raw byte comparison may test payload bytes: the approval binds observation limits of %d s per session, %d bytes in total, %d bytes per second and %d concurrent session.", l.MaxSessionSeconds, l.MaxObservedBytes, l.MaxBytesPerSecond, l.MaxConcurrentSessions))
+		}
+	}
 	if !s.config.CollectionEnabled {
 		blockers = append(blockers, collectionBlockers(false)...)
 	}
-	return RecorderPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: limit, CaptureEnabled: false, Blockers: blockers,
-		Warnings: recorderWarnings(result.Plan), NavigationURI: s.config.PublicOrigin + "/captures/new", Composition: provenance, Lifecycle: lifecycle, Assessment: RecorderAssessment(result.Assessment), Target: in.Target,
+	return RecorderPreviewData{PreviewID: p.ID, ExpiresAt: p.Deadline, ExecutionDigest: hash(p.ScopeDigest), PodCount: 1, MaxBytes: limit, CaptureEnabled: false, ApprovalRequired: approval, Blockers: blockers,
+		Warnings: warnings, NavigationURI: s.config.PublicOrigin + "/captures/new", Composition: provenance, Lifecycle: lifecycle, Assessment: RecorderAssessment(result.Assessment), Target: in.Target,
 		SelectedPods: []SelectedPod{{ClusterID: p.Target.ClusterID, Namespace: p.Target.Namespace.Name, Name: p.Target.PodName, UID: p.Target.PodUID, Workload: SelectedWorkload{Kind: p.Target.Workload.Kind, Name: p.Target.Workload.Name, UID: p.Target.Workload.UID}}}}, result.ValidUntil, nil
 }

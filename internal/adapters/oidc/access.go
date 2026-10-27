@@ -136,6 +136,12 @@ type claimsDTO struct {
 	Groups          []string        `json:"groups"`
 	Type            string          `json:"typ"`
 	StableGroups    []string        `json:"asservat_groups"`
+	// ADR-249: optional IdP assurance; approval step-up is decided from
+	// these signed claims and the protected policy only.
+	// A malformed value is treated as absent (no assurance), never as a
+	// reason to reject an otherwise valid access token.
+	ACR      json.RawMessage `json:"acr"`
+	AuthTime json.RawMessage `json:"auth_time"`
 }
 
 func parse(raw string) (header, claimsDTO, error) {
@@ -176,7 +182,7 @@ func parseProfile(raw string, profile TokenProfile) (header, claimsDTO, error) {
 	// encoding/json struct matching is case-insensitive; JWT claim names are
 	// not. Reject aliases rather than permitting two interpretations.
 	for name := range fields {
-		for _, known := range []string{"iss", "sub", "client_id", "azp", "aud", "iat", "exp", "nbf", "jti", "scope", "groups", "act", "may_act", "cnf", "nonce", "typ", "asservat_groups"} {
+		for _, known := range []string{"iss", "sub", "client_id", "azp", "aud", "iat", "exp", "nbf", "jti", "scope", "groups", "act", "may_act", "cnf", "nonce", "typ", "asservat_groups", "acr", "auth_time"} {
 			if name != known && strings.EqualFold(name, known) {
 				return h, c, identity.ErrInvalid
 			}
@@ -256,6 +262,7 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (identity.Claims, err
 	if len(audiences) != 1 || audiences[0] != v.trust.Audience {
 		return out, identity.ErrDenied
 	}
+	acr, authTime := assuranceClaims(c, now)
 	var scopes []string
 	if c.Scope != "" {
 		scopes = strings.Split(c.Scope, " ")
@@ -285,7 +292,22 @@ func (v *Verifier) Verify(ctx context.Context, raw string) (identity.Claims, err
 	if now.Before(checkedAt) || !now.Before(until) || now.Unix() >= *c.Expires || *c.Issued > now.Unix() || c.NotBefore != nil && *c.NotBefore > now.Unix() {
 		return out, identity.ErrDenied
 	}
-	return identity.Claims{Issuer: c.Issuer, Subject: c.Subject, ClientID: c.Client, Scopes: scopes, Groups: c.Groups, IssuedAt: time.Unix(*c.Issued, 0).UTC(), ExpiresAt: time.Unix(*c.Expires, 0).UTC(), KeyUntil: until}, nil
+	return identity.Claims{Issuer: c.Issuer, Subject: c.Subject, ClientID: c.Client, Scopes: scopes, Groups: c.Groups, IssuedAt: time.Unix(*c.Issued, 0).UTC(), ExpiresAt: time.Unix(*c.Expires, 0).UTC(), KeyUntil: until, ACR: acr, AuthTime: authTime}, nil
+}
+
+// assuranceClaims returns the signed acr and auth_time (ADR-249) when both
+// are well formed: acr a short string, auth_time a positive integer not after
+// iat or now. Anything else yields no assurance; it is not a token error.
+func assuranceClaims(c claimsDTO, now time.Time) (string, time.Time) {
+	var acr string
+	var authTime int64
+	if len(c.ACR) == 0 || json.Unmarshal(c.ACR, &acr) != nil || !identity.Text(acr, 128) {
+		return "", time.Time{}
+	}
+	if len(c.AuthTime) == 0 || json.Unmarshal(c.AuthTime, &authTime) != nil || authTime <= 0 || authTime > *c.Issued || authTime > now.Unix() {
+		return acr, time.Time{}
+	}
+	return acr, time.Unix(authTime, 0).UTC()
 }
 
 func (v *Verifier) key(ctx context.Context, kid string) (crypto.PublicKey, time.Time, error) {

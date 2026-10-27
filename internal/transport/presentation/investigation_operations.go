@@ -94,6 +94,14 @@ func NewInvestigationRetentionPreviewOperations(base *InvestigationOperations, p
 	return withOperations(base, preview)
 }
 
+// NewInvestigationGrantOperations adds the ADR-249 grant operations the same way.
+func NewInvestigationGrantOperations(base *InvestigationOperations, grants *GrantOperations) (*InvestigationOperations, error) {
+	if grants == nil {
+		return nil, ErrOperationsConfiguration
+	}
+	return withOperations(base, grants)
+}
+
 func withOperations(base *InvestigationOperations, policies Operations) (*InvestigationOperations, error) {
 	if base == nil || policies.PublicOrigin() != base.origin {
 		return nil, ErrOperationsConfiguration
@@ -225,6 +233,8 @@ func (s *InvestigationOperations) CallWithContext(ctx context.Context, current i
 	case *AccessPreviewOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	case *RetentionPreviewOperations:
+		return p.CallWithContext(ctx, current, call, name, raw)
+	case *GrantOperations:
 		return p.CallWithContext(ctx, current, call, name, raw)
 	default:
 		return OperationReply{}, contracts.ErrInvestigationWire

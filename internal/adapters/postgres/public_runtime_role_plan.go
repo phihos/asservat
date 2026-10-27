@@ -221,6 +221,15 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// its instruction and marks it stopped or revoked once (a trigger keeps it so).
 		read("policy_acceptance")
 		add("policy_acceptance", "UPDATE", "sharing_revoked_at", "sharing_revoke_key", "sharing_stopped_at", "sharing_stop_key")
+		// ADR-249: the AccessGrant ledger shares this authorization duty. One
+		// decision, one revocation and monotonic pool spend may change a row
+		// (its trigger enforces it); children and uses are append-only.
+		read("access_grant", "access_grant_child", "access_grant_use")
+		add("access_grant", "INSERT")
+		add("access_grant", "UPDATE", "decision", "approver_issuer", "approver_subject", "approver_client", "decision_reason", "decision_acr", "decision_auth_time", "decided_at", "decision_key", "expires_at",
+			"revoked_at", "revoker_issuer", "revoker_subject", "revoker_client", "revoke_key", "revision", "artifacts_spent", "bytes_spent", "operations_spent")
+		add("access_grant_child", "INSERT")
+		add("access_grant_use", "INSERT")
 	case "capture-journal":
 		for _, signature := range []string{"read_capture_operation(uuid,uuid)", "capture_audit_journal(uuid,jsonb,text,jsonb)", "claim_capture_reconciliation(uuid,jsonb,text)"} {
 			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})

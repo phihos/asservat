@@ -569,7 +569,7 @@ paths:
   /api/v1/operations/get_grant:
     post:
       operationId: get_grant
-      summary: Poll an authorized grant view.
+      summary: "Read one approval request or grant for its requester or a current approver: phase, exact reviewed plan, decision with authentication context, expiry, revocation and remaining result-access pool (ADR-249)."
       tags:
       - Shared browser and MCP
       x-domain-contract: get_grant
@@ -1727,41 +1727,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AccessExplainInput'
-  /api/v1/console/list_reviews:
-    post:
-      operationId: list_reviews
-      summary: List reviews
-      tags:
-      - Human console
-      x-required-role: requester-or-reviewer
-      x-effect: read
-      parameters:
-      - name: X-CSRF-Token
-        in: header
-        required: true
-        description: Required on session-authenticated POST; validate origin and session-bound
-          token.
-        schema: *id001
-      responses:
-        '200':
-          description: Authorized bounded projection or operation receipt.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReviewPage'
-        default:
-          description: Transport or application failure, nondisclosing before access
-            is established.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/PageInput'
   /api/v1/console/get_review:
     post:
       operationId: get_review
@@ -1797,88 +1762,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/DetailInput'
-  /api/v1/console/decide_review:
-    post:
-      operationId: decide_review
-      summary: Decide review
-      tags:
-      - Human console
-      x-required-role: independent-reviewer
-      x-effect: command
-      parameters:
-      - name: X-CSRF-Token
-        in: header
-        required: true
-        description: Required on session-authenticated POST; validate origin and session-bound
-          token.
-        schema: *id001
-      - name: Idempotency-Key
-        in: header
-        required: true
-        description: Required for commands. Principal/client/operation-bound; same
-          body retries the original operation.
-        schema: *id002
-      responses:
-        '200':
-          description: Authorized bounded projection or operation receipt.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandReceipt'
-        default:
-          description: Transport or application failure, nondisclosing before access
-            is established.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ReviewDecisionInput'
-  /api/v1/console/revoke_grant:
-    post:
-      operationId: revoke_grant
-      summary: Revoke grant
-      tags:
-      - Human console
-      x-required-role: authorized-grant-revoker
-      x-effect: command
-      parameters:
-      - name: X-CSRF-Token
-        in: header
-        required: true
-        description: Required on session-authenticated POST; validate origin and session-bound
-          token.
-        schema: *id001
-      - name: Idempotency-Key
-        in: header
-        required: true
-        description: Required for commands. Principal/client/operation-bound; same
-          body retries the original operation.
-        schema: *id002
-      responses:
-        '200':
-          description: Authorized bounded projection or operation receipt.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/CommandReceipt'
-        default:
-          description: Transport or application failure, nondisclosing before access
-            is established.
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/Problem'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RevisionCommand'
   /api/v1/console/apply_privacy_action:
     post:
       operationId: apply_privacy_action
@@ -3203,6 +3086,127 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
+  /api/v1/operations/list_reviews:
+    post:
+      operationId: list_reviews
+      summary: The approver inbox (pending requests of other people where the caller is a current action-approver) or the caller's own requests (browser only, ADR-249).
+      tags:
+      - Human console
+      x-domain-contract: list_reviews
+      x-effect: read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpInput_list_reviews'
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: Required on session-authenticated POST; validate origin and session-bound token.
+        schema:
+          type: string
+          maxLength: 256
+      responses:
+        '200':
+          description: Existing bounded MCP domain-result envelope; domain errors remain status=error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpOutput_list_reviews'
+        default:
+          description: Transport/session/validation failure; no evidence in error details.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/operations/decide_review:
+    post:
+      operationId: decide_review
+      summary: Approve (current IdP step-up required) or deny one pending approval request of another person; self-approval is refused from any client (browser only, ADR-249).
+      tags:
+      - Human console
+      x-domain-contract: decide_review
+      x-effect: command
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpInput_decide_review'
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: Required on session-authenticated POST; validate origin and session-bound token.
+        schema:
+          type: string
+          maxLength: 256
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: Must equal the body idempotency_key.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      responses:
+        '200':
+          description: Existing bounded MCP domain-result envelope; domain errors remain status=error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpOutput_decide_review'
+        default:
+          description: Transport/session/validation failure; no evidence in error details.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /api/v1/operations/revoke_grant:
+    post:
+      operationId: revoke_grant
+      summary: Revoke one approval request or grant as its requester or a current approver; no step-up, it only restricts (browser only, ADR-249).
+      tags:
+      - Human console
+      x-domain-contract: revoke_grant
+      x-effect: command
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/McpInput_revoke_grant'
+      parameters:
+      - name: X-CSRF-Token
+        in: header
+        required: true
+        description: Required on session-authenticated POST; validate origin and session-bound token.
+        schema:
+          type: string
+          maxLength: 256
+      - name: Idempotency-Key
+        in: header
+        required: true
+        description: Must equal the body idempotency_key.
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 128
+      responses:
+        '200':
+          description: Existing bounded MCP domain-result envelope; domain errors remain status=error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/McpOutput_revoke_grant'
+        default:
+          description: Transport/session/validation failure; no evidence in error details.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
 components:
   securitySchemes:
     BrowserSession:
@@ -4223,6 +4227,581 @@ components:
               - incomplete_clusters
               - incomplete_total
               - not_evaluated
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: error
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                retryable:
+                  type: boolean
+                navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                responsible_role:
+                  enum:
+                  - maintainer
+                  - approver
+                  - administrator
+                  - none
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - code
+              - message
+              - retryable
+          required:
+          - status
+          - data
+    McpInput_list_reviews:
+      type: object
+      additionalProperties: false
+      properties:
+        view:
+          enum:
+          - pending
+          - requested
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+      required:
+      - view
+    McpOutput_list_reviews:
+      allOf:
+      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
+      - oneOf:
+        - type: object
+          properties:
+            status:
+              const: ok
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                approvals:
+                  type: array
+                  maxItems: 100
+                  items:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      grant_id:
+                        type: string
+                        format: uuid
+                      phase:
+                        enum:
+                        - Pending
+                        - Approved
+                        - Denied
+                        - Revoked
+                        - Expired
+                        - Exhausted
+                      revision:
+                        type: integer
+                        minimum: 1
+                        maximum: 3
+                      kind:
+                        const: adHocCapture
+                      capture_id:
+                        type: string
+                        format: uuid
+                      preview_id:
+                        type: string
+                        format: uuid
+                      execution_digest:
+                        type: string
+                        pattern: ^[a-f0-9]{64}$
+                      review_digest:
+                        type: string
+                        pattern: ^[a-f0-9]{64}$
+                      target:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          cluster_id:
+                            type: string
+                            format: uuid
+                          namespace:
+                            type: string
+                            minLength: 1
+                            maxLength: 63
+                          workload_kind:
+                            enum:
+                            - Deployment
+                            - StatefulSet
+                            - Pod
+                          workload_name:
+                            type: string
+                            minLength: 1
+                            maxLength: 253
+                          pod_name:
+                            type: string
+                            minLength: 1
+                            maxLength: 253
+                        required:
+                        - cluster_id
+                        - namespace
+                        - workload_kind
+                        - workload_name
+                        - pod_name
+                      data_class:
+                        enum:
+                        - metadata
+                        - extract
+                        - raw
+                      reasons:
+                        type: array
+                        minItems: 1
+                        maxItems: 16
+                        items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            action_id:
+                              type: string
+                              minLength: 1
+                              maxLength: 64
+                            code:
+                              enum:
+                              - rawBytePredicate
+                              - recordingApprovalRequired
+                          required:
+                          - action_id
+                          - code
+                      observation_limits:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          max_session_seconds:
+                            type: integer
+                            minimum: 1
+                            maximum: 3600
+                          max_observed_bytes:
+                            type: integer
+                            minimum: 1
+                            maximum: 1099511627776
+                          max_bytes_per_second:
+                            type: integer
+                            minimum: 1
+                            maximum: 1073741824
+                          max_concurrent_sessions:
+                            type: integer
+                            minimum: 1
+                            maximum: 1000
+                        required:
+                        - max_session_seconds
+                        - max_observed_bytes
+                        - max_bytes_per_second
+                        - max_concurrent_sessions
+                      requested_by:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          issuer:
+                            type: string
+                            minLength: 1
+                            maxLength: 2048
+                          subject:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                          client_id:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                        required:
+                        - issuer
+                        - subject
+                        - client_id
+                      requested_at:
+                        type: string
+                        format: date-time
+                      review_until:
+                        type: string
+                        format: date-time
+                      plan_deadline:
+                        type: string
+                        format: date-time
+                      lifetime_seconds:
+                        type: integer
+                        minimum: 60
+                        maximum: 28800
+                      decision:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          decision:
+                            enum:
+                            - approved
+                            - denied
+                          decided_by:
+                            type: object
+                            additionalProperties: false
+                            properties:
+                              issuer:
+                                type: string
+                                minLength: 1
+                                maxLength: 2048
+                              subject:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                              client_id:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                            required:
+                            - issuer
+                            - subject
+                            - client_id
+                          decided_at:
+                            type: string
+                            format: date-time
+                          reason:
+                            type: string
+                            minLength: 1
+                            maxLength: 512
+                          authentication_context:
+                            type: object
+                            additionalProperties: false
+                            properties:
+                              acr:
+                                type: string
+                                minLength: 1
+                                maxLength: 128
+                              authenticated_at:
+                                type: string
+                                format: date-time
+                            required:
+                            - acr
+                            - authenticated_at
+                        required:
+                        - decision
+                        - decided_by
+                        - decided_at
+                        - reason
+                      not_after:
+                        type: string
+                        format: date-time
+                      revoked_at:
+                        type: string
+                        format: date-time
+                      revoked_by:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          issuer:
+                            type: string
+                            minLength: 1
+                            maxLength: 2048
+                          subject:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                          client_id:
+                            type: string
+                            minLength: 1
+                            maxLength: 256
+                        required:
+                        - issuer
+                        - subject
+                        - client_id
+                      can_decide:
+                        type: boolean
+                      can_revoke:
+                        type: boolean
+                      approval_navigation_uri:
+                        type: string
+                        format: uri
+                        maxLength: 2048
+                    required:
+                    - grant_id
+                    - phase
+                    - revision
+                    - kind
+                    - capture_id
+                    - preview_id
+                    - execution_digest
+                    - review_digest
+                    - target
+                    - data_class
+                    - reasons
+                    - requested_by
+                    - requested_at
+                    - review_until
+                    - plan_deadline
+                    - lifetime_seconds
+                    - can_decide
+                    - can_revoke
+                    - approval_navigation_uri
+              required:
+              - approvals
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: pending
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                query_handle:
+                  type: string
+                  minLength: 1
+                  maxLength: 4096
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - query_handle
+              - retry_after_seconds
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: error
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                retryable:
+                  type: boolean
+                navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                responsible_role:
+                  enum:
+                  - maintainer
+                  - approver
+                  - administrator
+                  - none
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - code
+              - message
+              - retryable
+          required:
+          - status
+          - data
+    McpInput_decide_review:
+      type: object
+      additionalProperties: false
+      properties:
+        grant_id:
+          type: string
+          format: uuid
+        decision:
+          enum:
+          - approve
+          - deny
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 512
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 128
+      required:
+      - grant_id
+      - decision
+      - reason
+      - idempotency_key
+    McpOutput_decide_review:
+      allOf:
+      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
+      - oneOf:
+        - type: object
+          properties:
+            status:
+              const: ok
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                grant_id:
+                  type: string
+                  format: uuid
+                phase:
+                  enum:
+                  - Approved
+                  - Denied
+                  - Expired
+                revision:
+                  type: integer
+                  minimum: 2
+                  maximum: 3
+                not_after:
+                  type: string
+                  format: date-time
+              required:
+              - grant_id
+              - phase
+              - revision
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: pending
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                query_handle:
+                  type: string
+                  minLength: 1
+                  maxLength: 4096
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - query_handle
+              - retry_after_seconds
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: error
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+                message:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                retryable:
+                  type: boolean
+                navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                responsible_role:
+                  enum:
+                  - maintainer
+                  - approver
+                  - administrator
+                  - none
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - code
+              - message
+              - retryable
+          required:
+          - status
+          - data
+    McpInput_revoke_grant:
+      type: object
+      additionalProperties: false
+      properties:
+        grant_id:
+          type: string
+          format: uuid
+        expected_revision:
+          type: integer
+          minimum: 1
+          maximum: 3
+        idempotency_key:
+          type: string
+          minLength: 1
+          maxLength: 128
+      required:
+      - grant_id
+      - expected_revision
+      - idempotency_key
+    McpOutput_revoke_grant:
+      allOf:
+      - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
+      - oneOf:
+        - type: object
+          properties:
+            status:
+              const: ok
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                grant_id:
+                  type: string
+                  format: uuid
+                phase:
+                  const: Revoked
+                revision:
+                  type: integer
+                  minimum: 2
+                  maximum: 3
+              required:
+              - grant_id
+              - phase
+              - revision
+          required:
+          - status
+          - data
+        - type: object
+          properties:
+            status:
+              const: pending
+            data:
+              type: object
+              additionalProperties: false
+              properties:
+                query_handle:
+                  type: string
+                  minLength: 1
+                  maxLength: 4096
+                retry_after_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 60
+              required:
+              - query_handle
+              - retry_after_seconds
           required:
           - status
           - data
@@ -7747,7 +8326,6 @@ components:
                   type: string
                   format: uuid
                 phase:
-                  type: string
                   enum:
                   - Pending
                   - Approved
@@ -7755,13 +8333,360 @@ components:
                   - Revoked
                   - Expired
                   - Exhausted
+                revision:
+                  type: integer
+                  minimum: 1
+                  maximum: 3
+                kind:
+                  const: adHocCapture
+                capture_id:
+                  type: string
+                  format: uuid
+                preview_id:
+                  type: string
+                  format: uuid
+                execution_digest:
+                  type: string
+                  pattern: ^[a-f0-9]{64}$
+                review_digest:
+                  type: string
+                  pattern: ^[a-f0-9]{64}$
+                target:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    cluster_id:
+                      type: string
+                      format: uuid
+                    namespace:
+                      type: string
+                      minLength: 1
+                      maxLength: 63
+                    workload_kind:
+                      enum:
+                      - Deployment
+                      - StatefulSet
+                      - Pod
+                    workload_name:
+                      type: string
+                      minLength: 1
+                      maxLength: 253
+                    pod_name:
+                      type: string
+                      minLength: 1
+                      maxLength: 253
+                  required:
+                  - cluster_id
+                  - namespace
+                  - workload_kind
+                  - workload_name
+                  - pod_name
+                data_class:
+                  enum:
+                  - metadata
+                  - extract
+                  - raw
+                reasons:
+                  type: array
+                  minItems: 1
+                  maxItems: 16
+                  items:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      action_id:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                      code:
+                        enum:
+                        - rawBytePredicate
+                        - recordingApprovalRequired
+                    required:
+                    - action_id
+                    - code
+                observation_limits:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    max_session_seconds:
+                      type: integer
+                      minimum: 1
+                      maximum: 3600
+                    max_observed_bytes:
+                      type: integer
+                      minimum: 1
+                      maximum: 1099511627776
+                    max_bytes_per_second:
+                      type: integer
+                      minimum: 1
+                      maximum: 1073741824
+                    max_concurrent_sessions:
+                      type: integer
+                      minimum: 1
+                      maximum: 1000
+                  required:
+                  - max_session_seconds
+                  - max_observed_bytes
+                  - max_bytes_per_second
+                  - max_concurrent_sessions
+                requested_by:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    issuer:
+                      type: string
+                      minLength: 1
+                      maxLength: 2048
+                    subject:
+                      type: string
+                      minLength: 1
+                      maxLength: 256
+                    client_id:
+                      type: string
+                      minLength: 1
+                      maxLength: 256
+                  required:
+                  - issuer
+                  - subject
+                  - client_id
+                requested_at:
+                  type: string
+                  format: date-time
+                review_until:
+                  type: string
+                  format: date-time
+                plan_deadline:
+                  type: string
+                  format: date-time
+                lifetime_seconds:
+                  type: integer
+                  minimum: 60
+                  maximum: 28800
+                decision:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    decision:
+                      enum:
+                      - approved
+                      - denied
+                    decided_by:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        issuer:
+                          type: string
+                          minLength: 1
+                          maxLength: 2048
+                        subject:
+                          type: string
+                          minLength: 1
+                          maxLength: 256
+                        client_id:
+                          type: string
+                          minLength: 1
+                          maxLength: 256
+                      required:
+                      - issuer
+                      - subject
+                      - client_id
+                    decided_at:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                      minLength: 1
+                      maxLength: 512
+                    authentication_context:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        acr:
+                          type: string
+                          minLength: 1
+                          maxLength: 128
+                        authenticated_at:
+                          type: string
+                          format: date-time
+                      required:
+                      - acr
+                      - authenticated_at
+                  required:
+                  - decision
+                  - decided_by
+                  - decided_at
+                  - reason
+                not_after:
+                  type: string
+                  format: date-time
+                revoked_at:
+                  type: string
+                  format: date-time
+                revoked_by:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    issuer:
+                      type: string
+                      minLength: 1
+                      maxLength: 2048
+                    subject:
+                      type: string
+                      minLength: 1
+                      maxLength: 256
+                    client_id:
+                      type: string
+                      minLength: 1
+                      maxLength: 256
+                  required:
+                  - issuer
+                  - subject
+                  - client_id
+                can_decide:
+                  type: boolean
+                can_revoke:
+                  type: boolean
+                approval_navigation_uri:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                actions:
+                  type: array
+                  minItems: 1
+                  maxItems: 16
+                  items:
+                    type: object
+                    additionalProperties: false
+                    properties:
+                      action_id:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                      kind:
+                        enum:
+                        - packetCapture
+                        - syscallTrace
+                      execution_mode:
+                        enum:
+                        - ongoing
+                        - onTrigger
+                      before:
+                        type: string
+                        minLength: 1
+                        maxLength: 16
+                      after:
+                        type: string
+                        minLength: 1
+                        maxLength: 16
+                      filter:
+                        type: string
+                        minLength: 1
+                        maxLength: 4096
+                      filter_digest:
+                        type: string
+                        pattern: ^[a-f0-9]{64}$
+                      filter_instructions:
+                        type: integer
+                        minimum: 1
+                        maximum: 256
+                      max_bytes:
+                        type: integer
+                        minimum: 1
+                        maximum: 1099511627776
+                      ring_max_bytes:
+                        type: integer
+                        minimum: 1
+                        maximum: 268435456
+                      ring_max_age:
+                        type: string
+                        minLength: 1
+                        maxLength: 16
+                      sensitive:
+                        type: array
+                        maxItems: 4
+                        items:
+                          enum:
+                          - rawBytePredicate
+                          - recordingApprovalRequired
+                    required:
+                    - action_id
+                    - kind
+                    - execution_mode
+                    - before
+                    - after
+                    - max_bytes
+                    - ring_max_bytes
+                    - ring_max_age
+                    - sensitive
+                result_access:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    action_ids:
+                      type: array
+                      minItems: 1
+                      maxItems: 16
+                      items:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                    operations:
+                      type: array
+                      minItems: 1
+                      maxItems: 1
+                      items:
+                        const: download_artifact
+                    client_ids:
+                      type: array
+                      minItems: 1
+                      maxItems: 4
+                      items:
+                        type: string
+                        minLength: 1
+                        maxLength: 256
+                    max_artifacts:
+                      type: integer
+                      minimum: 1
+                      maximum: 64
+                    max_bytes:
+                      type: integer
+                      minimum: 1
+                      maximum: 274877906944
+                    max_operations:
+                      type: integer
+                      minimum: 1
+                      maximum: 10000
+                    not_after:
+                      type: string
+                      format: date-time
+                    artifacts_used:
+                      type: integer
+                      minimum: 0
+                      maximum: 64
+                    bytes_used:
+                      type: integer
+                      minimum: 0
+                      maximum: 274877906944
+                    operations_used:
+                      type: integer
+                      minimum: 0
+                      maximum: 10000
+                  required:
+                  - action_ids
+                  - operations
+                  - client_ids
+                  - max_artifacts
+                  - max_bytes
+                  - max_operations
+                  - not_after
+                  - artifacts_used
+                  - bytes_used
+                  - operations_used
                 remaining_bytes:
                   type: integer
                   minimum: 0
                   maximum: 1000000000000
-                not_after:
-                  type: string
-                  format: date-time
                 remaining_executions:
                   type: integer
                   minimum: 0
@@ -7770,13 +8695,27 @@ components:
                   type: integer
                   minimum: 0
                   maximum: 1099511627776
-                approval_navigation_uri:
-                  type: string
-                  format: uri
-                  maxLength: 2048
               required:
               - grant_id
               - phase
+              - revision
+              - kind
+              - capture_id
+              - preview_id
+              - execution_digest
+              - review_digest
+              - target
+              - data_class
+              - reasons
+              - requested_by
+              - requested_at
+              - review_until
+              - plan_deadline
+              - lifetime_seconds
+              - can_decide
+              - can_revoke
+              - approval_navigation_uri
+              - actions
           required:
           - status
           - data
@@ -9258,8 +10197,6 @@ components:
             - reason
           - required:
             - sharing
-          - required:
-            - result_access
     McpOutput_request_capture:
       allOf:
       - $ref: https://asservat.io/spec/v1/mcp-result.schema.json

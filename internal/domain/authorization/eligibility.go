@@ -16,6 +16,10 @@ const (
 	CollectContext   Operation = "collectContext"
 	ReadApproved     Operation = "readApproved"
 	DownloadApproved Operation = "downloadApproved"
+	// ApproveAction is reviewing another person's sensitive acquisition
+	// request (ADR-249): the action-approver role in scope. It is never an
+	// evidence read and never collection.
+	ApproveAction Operation = "approveAction"
 )
 
 type Target struct{ ClusterID, NamespaceUID, WorkloadUID, PodUID string }
@@ -87,7 +91,7 @@ func (t Target) Valid() bool {
 	return UUID(t.ClusterID) && identity.Text(t.NamespaceUID, 64) && identity.Text(t.WorkloadUID, 64) && identity.Text(t.PodUID, 64)
 }
 func (op Operation) Valid() bool {
-	return op == CollectContext || op == ReadApproved || op == DownloadApproved
+	return op == CollectContext || op == ReadApproved || op == DownloadApproved || op == ApproveAction
 }
 func validAudience(a artifact.AudienceAssignment) bool {
 	return (a.Kind == "User" || a.Kind == "Group" || a.Kind == "Workload") && identity.Text(a.Issuer, 2048) && identity.Text(a.SubjectID, 256) && validRole(a.Role) && (a.BasisKind == "AccessBinding" || a.BasisKind == "PermissionSource") && identity.Text(a.BasisUID, 64) && UUID(a.AssignmentID) && a.BasisDigest != (artifact.Digest{})
@@ -101,6 +105,8 @@ func permits(role string, op Operation) bool {
 		return role == "workload-maintainer"
 	case ReadApproved, DownloadApproved:
 		return role == "evidence-reader" || role == "workload-maintainer" || role == "evidence-owner"
+	case ApproveAction:
+		return role == "action-approver"
 	}
 	return false
 }
@@ -185,10 +191,10 @@ func evaluateDetail(i identity.Identity, p Projection, op Operation, t Target, e
 	if !projectionCurrent(p, t, now) {
 		return deny("PermissionUnavailable")
 	}
-	if op == CollectContext && e != nil {
+	if (op == CollectContext || op == ApproveAction) && e != nil {
 		return deny("InvalidRequest")
 	}
-	if requireRetained && op != CollectContext && (e == nil || !e.valid() || e.Target != t || !now.Before(e.ExpiresAt)) {
+	if requireRetained && op != CollectContext && op != ApproveAction && (e == nil || !e.valid() || e.Target != t || !now.Before(e.ExpiresAt)) {
 		return deny("EvidenceUnavailable")
 	}
 	if e != nil && e.DataClass != "metadata" && e.DataClass != "extract" {

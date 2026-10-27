@@ -100,7 +100,9 @@ type publicContext struct {
 	hubPolicies    *kube.HubPolicySources
 	policyAudit    auditapp.PolicyAcceptancePublisher
 	// ADR-232 concrete evidence shares and the case routes they bind to.
-	shares     *postgres.EvidenceShares
+	shares *postgres.EvidenceShares
+	// ADR-249 individual approvals (the AccessGrant ledger and its service).
+	grants     authapp.GrantService
 	caseRoutes *postgres.ContextCaseReads
 	// retentionSources is the hub metadata reader of retention sources and
 	// the retained catalog (ADR-240 retention impact preview).
@@ -392,6 +394,13 @@ func newPublicContext(ctx context.Context, in *ownerInputs, files *providerInput
 		return nil, mounts.ErrUnavailable
 	}
 	out.progress.Shares = out.shares // ADR-235: get_capture's sharing status
+	// ADR-249: the grant ledger shares the authorization duty's credential.
+	grantStore, err := postgres.NewAccessGrants(ctx, sql["evidence-share"], root, recovery)
+	if err != nil {
+		return nil, mounts.ErrUnavailable
+	}
+	out.grants = authapp.GrantService{RootID: root, InstallationID: installation, Permissions: out.permissions, Store: grantStore, Recovery: out.recovery, NewID: ownerRandomID, Now: time.Now}
+	out.investigation.Grants = out.grants
 	out.caseRoutes = routes
 	out.cases = catalogapp.ContextCaseService{RootID: root, InstallationID: installation, Routes: routes, Permissions: out.permissions, Catalog: out.catalog, Retention: out.retention, Processing: processing, Shares: out.shares, Reviews: out.reviews}
 	if out.fleet, err = newPublicFleet(ctx, c, providers, pools, observer, probe, a); err != nil {

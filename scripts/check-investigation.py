@@ -56,7 +56,11 @@ for key, value in [('digest', 'a'*64), ('approver', parent['spec']['approver']),
     bad = copy.deepcopy(request)
     bad['result_access'][key] = value
     invalid(validator(tools['preview_capture']['inputSchema']), bad)
-bad = {'preview_id': '00000000-0000-4000-8000-000000000001', 'idempotency_key': 'submit', 'result_access': request['result_access']}
+# ADR-249: submit-by-preview may carry the result access of a reviewed plan
+# (bound by its own digest); authored authority fields stay invalid there too.
+submit = {'preview_id': '00000000-0000-4000-8000-000000000001', 'idempotency_key': 'submit', 'result_access': request['result_access']}
+valid(validator(tools['request_capture']['inputSchema']), submit)
+bad = copy.deepcopy(submit); bad['result_access']['approver'] = parent['spec']['approver']
 invalid(validator(tools['request_capture']['inputSchema']), bad)
 for value, prop, replacement in [(parent, 'grantType', 'policy'), (child, 'grantType', 'adHocCapture')]:
     bad = copy.deepcopy(value); bad['spec'][prop] = replacement; invalid(grantv, bad)

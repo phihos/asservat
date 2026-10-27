@@ -15,8 +15,10 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/application/privacy"
 	"asservat.local/asservat/internal/domain/artifact"
+	authvalue "asservat.local/asservat/internal/domain/authorization"
 	capturevalue "asservat.local/asservat/internal/domain/capture"
 	configuration "asservat.local/asservat/internal/domain/configuration"
 	fleetvalue "asservat.local/asservat/internal/domain/fleet"
@@ -28,7 +30,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const currentSchemaVersion = 96
+const currentSchemaVersion = 98
 
 // schemaFloorComment prefixes the version table's comment that records the
 // oldest binary schema the database still serves (ADR-227). Only the schema
@@ -154,7 +156,10 @@ func (l *Ledger) transaction(ctx context.Context, f func(*custodydb.Queries) err
 		if err == nil {
 			return nil
 		}
-		for _, sentinel := range []error{identityvalue.ErrDenied, identityvalue.ErrInvalid, identityvalue.ErrSessionBusy, identityvalue.ErrSessionCapacity} {
+		for _, sentinel := range []error{identityvalue.ErrDenied, identityvalue.ErrInvalid, identityvalue.ErrSessionBusy, identityvalue.ErrSessionCapacity,
+			// ADR-249 grant ledger outcomes.
+			authapp.ErrGrantConflict, authapp.ErrGrantNotFound, authvalue.ErrGrantInvalid, authvalue.ErrGrantNotPending, authvalue.ErrSelfApproval,
+			authvalue.ErrGrantPoolExhausted, authvalue.ErrGrantScope, authvalue.ErrGrantRevoked, authvalue.ErrGrantExpired, authvalue.ErrGrantDenied, authvalue.ErrStepUpRequired} {
 			if errors.Is(err, sentinel) {
 				return sentinel
 			}

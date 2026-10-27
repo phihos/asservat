@@ -74,11 +74,11 @@ func TestCompositionPreviewIsPlanOnlyAndRequestRefused(t *testing.T) {
 func TestCompositionErrorsFollowEligibility(t *testing.T) {
 	f := newInvestigationFixture()
 	ctx := context.Background()
-	bad := networkComposition(planning.ProfileEdit{ActionID: "sample", Field: "packetFilter", Text: "tcp[13] & 2 != 0"})
+	bad := networkComposition(planning.ProfileEdit{ActionID: "sample", Field: "packetFilter", Text: "host db.payments.svc"})
 	_, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(bad))
 	var refusal planning.CompositionError
-	if !errors.As(err, &refusal) || refusal.Code != planning.CompositionApproval {
-		t.Fatal("raw byte predicate not refused as approval-required", err)
+	if !errors.As(err, &refusal) || refusal.Code != planning.CompositionFilterRejected {
+		t.Fatal("name lookup not refused", err)
 	}
 	// An authenticated but ineligible caller (no evidence:capture scope)
 	// learns nothing about its composition or the target.

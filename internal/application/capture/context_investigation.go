@@ -101,10 +101,16 @@ type ContextInvestigation struct {
 	// Filters is the hub's libpcap compiler for composition previews (ADR-243).
 	// It is optional: without it a packet filter edit is refused with
 	// FilterCompilerUnavailable; it never affects pod-status previews.
-	Filters  compiler.FilterCompiler
-	Lifetime time.Duration
-	Now      func() time.Time
-	NewID    func() string
+	Filters compiler.FilterCompiler
+	// Grants is the ADR-249 approval service. Without it a packet/syscall
+	// plan that needs approval is refused with ApprovalRequired, never armed.
+	Grants RecorderGrants
+	// Approvals reads the protected installation approval settings
+	// (ADR-249); nil adds no installation requirement.
+	Approvals ApprovalSettings
+	Lifetime  time.Duration
+	Now       func() time.Time
+	NewID     func() string
 	// ReportPreviewFailure receives only fixed private stage labels. It is
 	// diagnostic, synchronous and must not perform blocking work or grant authority.
 	ReportPreviewFailure func(string)
@@ -438,8 +444,10 @@ func (s ContextInvestigation) Request(ctx context.Context, source identities.Cur
 	}
 	// ADR-243: a reviewed packet/syscall plan has no recorder to run it. It is
 	// refused before any target, storage or admission work; nothing is charged.
+	// ADR-249: a plan that needs approval is first refused with
+	// ApprovalRequired until an approved grant covers it.
 	if p.Intent.Composition != nil {
-		return zero, value.ErrRecorderUnavailable
+		return zero, s.recorderRequest(ctx, source, p, key, nil)
 	}
 	if !p.Current(s.Now()) {
 		return zero, value.ErrPreviewExpired

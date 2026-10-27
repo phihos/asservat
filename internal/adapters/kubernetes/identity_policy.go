@@ -155,6 +155,7 @@ func cloneIdentityPolicy(p value.Policy) value.Policy {
 	p.Clients = slices.Clone(p.Clients)
 	p.EligibleSubjects = slices.Clone(p.EligibleSubjects)
 	p.EligibleGroups = slices.Clone(p.EligibleGroups)
+	p.StepUp.ACRValues = slices.Clone(p.StepUp.ACRValues)
 	return p
 }
 
@@ -171,6 +172,12 @@ func (c *IdentityPolicyClient) readPolicy(ctx context.Context, issuer string) (v
 		return out, value.ErrUnavailable
 	}
 	out = value.Policy{Revision: value.Revision{UID: ref.UID, Generation: wire.Revision, Digest: digest}, Issuer: wire.Issuer, ObservedAt: start, FreshUntil: start.Add(30 * time.Second), EligibleGroups: wire.EligibleGroups, GroupsAtIssueQualified: wire.GroupsAtIssueQualified, GroupMaxAge: time.Duration(wire.GroupMaxAgeSeconds) * time.Second}
+	if a := wire.Approvals; a != nil {
+		out.RequireRecordingApproval = a.RequireRecordingApproval
+		if a.StepUp != nil {
+			out.StepUp = value.StepUpPolicy{ACRValues: slices.Clone(a.StepUp.ACRValues), MaxAge: time.Duration(a.StepUp.MaxAgeSeconds) * time.Second}
+		}
+	}
 	for _, v := range wire.Clients {
 		out.Clients = append(out.Clients, value.Client{ID: v.ID, Kind: value.Kind(v.Kind), ClassQualified: v.ClassQualified})
 	}

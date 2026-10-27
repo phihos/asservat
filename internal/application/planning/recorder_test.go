@@ -132,7 +132,6 @@ func TestCompositionNormalizationMatrix(t *testing.T) {
 		"unknown version":                {value.ProfileComposition{Components: []value.ProfileComponent{{ID: "net", Profile: value.ProfileRef{Catalog: "builtin", Name: "network-connections", Version: "v2"}}}, MaxTotalBytes: 1, MaxDuration: "1s"}, value.CompositionProfileMissing, "profile_composition.components[0].profileRef"},
 		"aggregate output never raised":  {func() value.ProfileComposition { x := network(); x.MaxTotalBytes = 1 << 20; return x }(), value.CompositionInvalid, "profile_composition.maxTotalBytes"},
 		"two components":                 {value.ProfileComposition{Components: append(network().Components, syscalls().Components...), MaxTotalBytes: 32 << 20, MaxDuration: "30s"}, value.CompositionInvalid, "profile_composition.components"},
-		"raw byte predicate":             {network(text("sample", "packetFilter", "tcp[13] & 2 != 0")), value.CompositionApproval, "profile_composition.components[0] action sample.parameters.filter"},
 		"unresolved host name":           {network(text("sample", "packetFilter", "host db.payments.svc")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
 		"service name port":              {network(text("sample", "packetFilter", "tcp port https")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
 		"gateway resolves names":         {network(text("sample", "packetFilter", "gateway 10.0.0.1")), value.CompositionFilterRejected, "profile_composition.components[0] action sample.parameters.filter"},
@@ -153,16 +152,17 @@ func TestCompositionNormalizationMatrix(t *testing.T) {
 		})
 	}
 	for name, composition := range map[string]value.ProfileComposition{
-		"defaults":                 network(),
-		"onTrigger next interval":  network(text("sample", "actionExecutionMode", "onTrigger"), text("sample", "packetBefore", "0s")),
-		"ongoing retrospective":    network(text("sample", "packetAfter", "0s")),
-		"ongoing after only":       network(text("sample", "packetBefore", "0s")),
-		"filter and longer window": network(text("sample", "packetFilter", "  tcp port 8080\n and host 10.0.0.12 "), text("sample", "packetAfter", "15s"), text("sample", "actionTimeout", "20s")),
-		"recorded ipv6 case":       network(text("sample", "packetFilter", "ip6 and dst host 2001:db8::2")),
-		"cidr and portrange":       network(text("sample", "packetFilter", "net 10.0.0.0/8 and udp dst portrange 50-60")),
-		"protocol number":          network(text("sample", "packetFilter", "ip proto 6")),
-		"syscall defaults":         syscalls(),
-		"syscall include errors":   syscalls(value.ProfileEdit{ActionID: "syscalls", Field: "syscallFilter", Syscalls: &value.SyscallSelection{Mode: "include", Names: []string{"openat", "connect"}}}, text("syscalls", "actionExecutionMode", "onTrigger"), text("syscalls", "syscallBefore", "0s")),
+		"defaults":                                     network(),
+		"onTrigger next interval":                      network(text("sample", "actionExecutionMode", "onTrigger"), text("sample", "packetBefore", "0s")),
+		"ongoing retrospective":                        network(text("sample", "packetAfter", "0s")),
+		"ongoing after only":                           network(text("sample", "packetBefore", "0s")),
+		"filter and longer window":                     network(text("sample", "packetFilter", "  tcp port 8080\n and host 10.0.0.12 "), text("sample", "packetAfter", "15s"), text("sample", "actionTimeout", "20s")),
+		"recorded ipv6 case":                           network(text("sample", "packetFilter", "ip6 and dst host 2001:db8::2")),
+		"cidr and portrange":                           network(text("sample", "packetFilter", "net 10.0.0.0/8 and udp dst portrange 50-60")),
+		"protocol number":                              network(text("sample", "packetFilter", "ip proto 6")),
+		"raw byte predicate (needs approval, ADR-249)": network(text("sample", "packetFilter", "tcp[13] & 2 != 0")),
+		"syscall defaults":                             syscalls(),
+		"syscall include errors":                       syscalls(value.ProfileEdit{ActionID: "syscalls", Field: "syscallFilter", Syscalls: &value.SyscallSelection{Mode: "include", Names: []string{"openat", "connect"}}}, text("syscalls", "actionExecutionMode", "onTrigger"), text("syscalls", "syscallBefore", "0s")),
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := ValidateComposition(composition, c); err != nil {
@@ -179,11 +179,18 @@ func TestFilterScreeningCorpus(t *testing.T) {
 			t.Fatalf("%q: %v", expression, err)
 		}
 	}
-	refusal(t, ScreenFilter("f", "tcp[tcpflags] & tcp-syn != 0"), value.CompositionApproval, "f")
+	// ADR-249: a raw byte comparison passes screening and marks the plan as
+	// needing approval; symbolic names inside it are still never resolved.
+	refusal(t, ScreenFilter("f", "tcp[tcpflags] & tcp-syn != 0"), value.CompositionFilterRejected, "f")
+	if err := ScreenFilter("f", "tcp[13] & 2 != 0"); err != nil || !RawBytePredicate("tcp[13] & 2 != 0") || RawBytePredicate("tcp port 80") {
+		t.Fatal("raw byte predicate screening", err)
+	}
 	refusal(t, ScreenFilter("f", strings.Repeat("tcp or ", 600)+"tcp"), value.CompositionFilterRejected, "f")
 	refusal(t, ScreenFilter("f", " \t "), value.CompositionFilterRejected, "f")
 	refusal(t, ScreenFilter("f", "host 10.0.0.1 or host münchen"), value.CompositionFilterRejected, "f")
-	refusal(t, ScreenFilter("f", "ether[0:4] = 0x47455420"), value.CompositionApproval, "f")
+	if err := ScreenFilter("f", "ether[0:4] = 0x47455420"); err != nil {
+		t.Fatal("raw byte comparison screening", err)
+	}
 	// libpcap lexes these hyphenated tokens as names (getaddrinfo); only a
 	// portrange operand is a range.
 	for _, expression := range []string{"host 1-2", "net 1-2", "src host 1-2", "port 1-2", "tcp and dst host 10-20"} {

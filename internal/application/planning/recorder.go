@@ -275,6 +275,8 @@ type expandedAction struct {
 	syscall *syscallParameters
 	filter  *value.CompiledFilter
 	localID string
+	// sensitive names why this action needs individual approval (ADR-249).
+	sensitive []string
 }
 
 func editRing(r *value.RingSettings) ring {
@@ -407,13 +409,13 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 			Kind string `json:"kind"`
 		}
 		if json.Unmarshal(a.packet.Profile, &kind) != nil || kind.Kind != "networkHeaders" {
-			return refuse(value.CompositionApproval, path+".parameters.profile.kind", "HTTP headers and raw packets need sensitive capture approval, which this release does not offer; use networkHeaders")
+			return refuse(value.CompositionApproval, path+".parameters.profile.kind", "HTTP headers and raw packets need sensitive capture approval and a recorder that this release does not have; use networkHeaders")
 		}
 		beforeText, afterText, r, frozen, snapshots = a.packet.Before, a.packet.After, a.packet.Ring, a.packet.MaxFrozenBytes, a.packet.MaxConcurrentSnapshots
 	} else {
 		s := a.syscall
 		if s.Mode != "metadata" || len(s.Arguments) != 0 {
-			return refuse(value.CompositionApproval, path+".parameters.mode", "syscall argument tracing needs sensitive observation approval, which this release does not offer; use metadata")
+			return refuse(value.CompositionApproval, path+".parameters.mode", "syscall argument tracing needs sensitive observation approval and a recorder that this release does not have; use metadata")
 		}
 		if s.Processes != "allPodProcesses" {
 			return refuse(value.CompositionInvalid, path+".parameters.processes", "syscall tracing covers all pod processes")
@@ -497,6 +499,9 @@ func normalize(path string, a *expandedAction, compiler FilterCompiler) error {
 		}
 		a.packet.Filter = NormalizeFilter(a.packet.Filter)
 		a.filter = &f
+		if RawBytePredicate(a.packet.Filter) {
+			a.sensitive = append(a.sensitive, value.ReasonRawBytePredicate)
+		}
 	}
 	return nil
 }
@@ -724,6 +729,26 @@ type recorderTarget struct {
 	PodUID    string   `json:"podUID"`
 }
 
+// approvalRecord is the plan's sensitive-acquisition requirement (ADR-249).
+// It is part of the execution digest, so the approved grant binds it.
+type approvalRecord struct {
+	DataClass         string                   `json:"dataClass"`
+	Reasons           []reasonRecord           `json:"reasons"`
+	ObservationLimits *observationLimitsRecord `json:"observationLimits,omitempty"`
+}
+
+type reasonRecord struct {
+	ActionID string `json:"actionID"`
+	Code     string `json:"code"`
+}
+
+type observationLimitsRecord struct {
+	MaxSessionSeconds     int64 `json:"maxSessionSeconds"`
+	MaxObservedBytes      int64 `json:"maxObservedBytes"`
+	MaxBytesPerSecond     int64 `json:"maxBytesPerSecond"`
+	MaxConcurrentSessions int64 `json:"maxConcurrentSessions"`
+}
+
 type recorderScope struct {
 	Version    string                 `json:"schemaVersion"`
 	Source     source                 `json:"source"`
@@ -737,6 +762,7 @@ type recorderScope struct {
 	Retention  []effectiveRetention   `json:"effectiveRetention"`
 	Deadline   string                 `json:"deadline"`
 	Interim    string                 `json:"acceptance"`
+	Approval   *approvalRecord        `json:"approval,omitempty"`
 }
 
 // CompileRecorder compiles a one-component packet or syscall composition into
@@ -763,6 +789,7 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 	if !r.ExpiresAt.Equal(expected) || !r.DeleteBy.Equal(expected.Add(time.Duration(r.DeletionBudgetSeconds)*time.Second)) {
 		return bad()
 	}
+	approval := &approvalRecord{DataClass: "extract"}
 	refs := make([]policyRef, 0, len(r.Policies))
 	seen := map[string]bool{}
 	for _, p := range r.Policies {
@@ -826,10 +853,39 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 			scope.Lifecycle.OngoingPodScope = "acceptedCapturePods"
 		}
 		scope.Lifecycle.Actions = append(scope.Lifecycle.Actions, record)
+		codes := slices.Clone(x.sensitive)
+		if in.RequireApproval {
+			codes = append(codes, value.ReasonRecordingApproval)
+		}
+		for _, code := range codes {
+			approval.Reasons = append(approval.Reasons, reasonRecord{id, code})
+			summary.Sensitive = append(summary.Sensitive, code)
+		}
+		if slices.Contains(x.sensitive, value.ReasonRawBytePredicate) {
+			// REQ-AUT-006: a payload-sensitive predicate needs finite
+			// observation limits before any byte reaches it.
+			t, _ := durationValue(a.Limits.Timeout, false)
+			limits := observationLimitsRecord{MaxSessionSeconds: int64(min(t, time.Hour) / time.Second), MaxObservedBytes: value.SensitiveMaxObservedBytes, MaxBytesPerSecond: value.SensitiveMaxBytesPerSecond, MaxConcurrentSessions: 1}
+			if approval.ObservationLimits == nil {
+				approval.ObservationLimits = &limits
+			} else {
+				approval.ObservationLimits.MaxSessionSeconds = max(approval.ObservationLimits.MaxSessionSeconds, limits.MaxSessionSeconds)
+			}
+		}
 		scope.Provenance.ActionMap = append(scope.Provenance.ActionMap, wireAlias{component.ID, x.localID, id, false})
 		scope.Retention = append(scope.Retention, effectiveRetention{id, r.PurposeRef, r.PrivacyClass, r.EvidenceType, r.RequestedSeconds, r.MaximumSeconds, r.DeletionBudgetSeconds, refs})
 		expanded.Actions = append(expanded.Actions, a)
 		out.Actions = append(out.Actions, summary)
+	}
+	if len(approval.Reasons) > 0 {
+		scope.Approval = approval
+		out.Approval = &value.RecorderApproval{DataClass: approval.DataClass}
+		for _, r := range approval.Reasons {
+			out.Approval.Reasons = append(out.Approval.Reasons, authorization.SensitiveReason{ActionID: r.ActionID, Code: r.Code})
+		}
+		if l := approval.ObservationLimits; l != nil {
+			out.Approval.ObservationLimits = &value.ObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}
+		}
 	}
 	recipeBytes, err := json.Marshal(expanded)
 	if err != nil {
@@ -868,4 +924,73 @@ func CompileRecorder(in value.RecorderInput, filters FilterCompiler, now time.Ti
 func VerifyRecorderPlan(plan value.RecorderPlan, filters FilterCompiler, now time.Time) bool {
 	fresh, err := CompileRecorder(plan.Input, filters, now)
 	return err == nil && fresh.ScopeDigest == plan.ScopeDigest && bytes.Equal(fresh.CanonicalScope, plan.CanonicalScope)
+}
+
+// RecorderScopeSummary reads the reviewable action summary and the approval
+// requirement back from a persisted canonical recorder-preview/v1 scope
+// (ADR-249). It presents the frozen plan; it never recompiles it, and the
+// scope digest stays the authority.
+func RecorderScopeSummary(scope []byte) ([]value.RecorderAction, *value.RecorderApproval, error) {
+	var doc recorderScope
+	if strict(scope, &doc) != nil || doc.Version != value.RecorderPlanVersion {
+		return nil, nil, value.ErrInvalid
+	}
+	var recipe recipeSpec
+	if strict(doc.Recipe, &recipe) != nil || len(recipe.Actions) < 1 || len(recipe.Actions) > 16 {
+		return nil, nil, value.ErrInvalid
+	}
+	filters := map[string]compiledFilterRecord{}
+	for _, f := range doc.Filters {
+		filters[f.ActionID] = f
+	}
+	out := make([]value.RecorderAction, 0, len(recipe.Actions))
+	for _, a := range recipe.Actions {
+		s := value.RecorderAction{ID: a.ID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, Timeout: a.Limits.Timeout, MaxBytes: a.Limits.MaxBytes, EvidenceType: evidenceType(a.Kind)}
+		var r ring
+		switch a.Kind {
+		case "packetCapture":
+			var p packetParameters
+			if strict(a.Parameters, &p) != nil {
+				return nil, nil, value.ErrInvalid
+			}
+			s.Before, s.After, s.Filter, r = p.Before, p.After, p.Filter, p.Ring
+		case "syscallTrace":
+			var p syscallParameters
+			if strict(a.Parameters, &p) != nil {
+				return nil, nil, value.ErrInvalid
+			}
+			s.Before, s.After, s.SyscallMode, r = p.Before, p.After, p.Mode, p.Ring
+		default:
+			return nil, nil, value.ErrInvalid
+		}
+		s.RingMaxAge, s.RingMaxBytes = r.MaxAge, r.MaxBytes
+		if f, ok := filters[a.ID]; ok {
+			b, err := hex.DecodeString(f.ProgramDigest)
+			if err != nil || len(b) != len(s.FilterDigest) {
+				return nil, nil, value.ErrInvalid
+			}
+			copy(s.FilterDigest[:], b)
+			s.FilterInstructions = len(f.Program)
+		}
+		out = append(out, s)
+	}
+	if doc.Approval == nil {
+		return out, nil, nil
+	}
+	approval := &value.RecorderApproval{DataClass: doc.Approval.DataClass}
+	for _, r := range doc.Approval.Reasons {
+		approval.Reasons = append(approval.Reasons, authorization.SensitiveReason{ActionID: r.ActionID, Code: r.Code})
+		for i := range out {
+			if out[i].ID == r.ActionID {
+				out[i].Sensitive = append(out[i].Sensitive, r.Code)
+			}
+		}
+	}
+	if l := doc.Approval.ObservationLimits; l != nil {
+		approval.ObservationLimits = &value.ObservationLimits{MaxSessionSeconds: l.MaxSessionSeconds, MaxObservedBytes: l.MaxObservedBytes, MaxBytesPerSecond: l.MaxBytesPerSecond, MaxConcurrentSessions: l.MaxConcurrentSessions}
+	}
+	if len(approval.Reasons) == 0 {
+		return nil, nil, value.ErrInvalid
+	}
+	return out, approval, nil
 }

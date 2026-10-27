@@ -44,11 +44,17 @@ func NormalizeFilter(expression string) string {
 	return strings.Join(strings.Fields(expression), " ")
 }
 
+// RawBytePredicate reports a raw byte comparison (proto[offset]). It can test
+// payload bytes even when only headers are retained, so the plan needs an
+// individual sensitive-acquisition approval (ADR-249, REQ-AUT-006).
+func RawBytePredicate(expression string) bool {
+	return strings.ContainsAny(expression, "[]")
+}
+
 // ScreenFilter enforces the REQ-NET-001 bounds before compilation: at most
-// 4,096 bytes and 256 syntax tokens of printable ASCII, no name that libpcap
-// would resolve, and no raw byte comparison. proto[offset] can test payload
-// bytes even when only headers are retained, so it needs sensitive capture
-// approval (ApprovalRequired), which this release cannot grant.
+// 4,096 bytes and 256 syntax tokens of printable ASCII and no name that
+// libpcap would resolve. A raw byte comparison passes screening; the
+// compiler marks its plan as needing approval (RawBytePredicate).
 func ScreenFilter(path, expression string) error {
 	if len(expression) > value.MaxFilterBytes {
 		return filterRefusal(value.CompositionFilterRejected, path, fmt.Sprintf("the filter has %d bytes; at most %d are allowed", len(expression), value.MaxFilterBytes))
@@ -77,16 +83,24 @@ func ScreenFilter(path, expression string) error {
 			return filterRefusal(value.CompositionFilterRejected, path, "escaped names such as \\tcp are looked up by name; use the protocol number, for example ip proto 6")
 		}
 	}
+	prev, depth := "", 0
 	for _, t := range tokens {
-		if t == "[" || t == "]" {
-			return filterRefusal(value.CompositionApproval, path, "raw byte comparisons such as tcp[13] or ip[0:1] can test payload bytes and need sensitive capture approval, which this release does not offer; use host, net, port, portrange and protocol primitives")
+		switch t {
+		case "[":
+			depth++
+		case "]":
+			depth--
 		}
-	}
-	prev := ""
-	for _, t := range tokens {
 		if !filterWord(t[0]) {
 			prev = t
 			continue
+		}
+		// Inside proto[offset:size] the size suffix is 1, 2 or 4 (ADR-249).
+		if offset, size, ok := strings.Cut(t, ":"); ok && depth > 0 && (size == "1" || size == "2" || size == "4") {
+			if _, err := strconv.ParseUint(offset, 0, 16); err == nil {
+				prev = t
+				continue
+			}
 		}
 		// libpcap lexes a hyphenated token as a name everywhere except as a
 		// portrange operand, so `host 1-2` would reach getaddrinfo.
