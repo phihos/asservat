@@ -53,7 +53,9 @@ capture was admitted and nothing had started; a plain same-key retry only replay
    (`continue_acquisition: true`) with the same preview and key. A denial or revocation, expiry
    (including the start's original interval or deadline), a changed target, a conflict or an
    invalid request keeps its definite class even before any effect, and any refusal after the
-   preparation was entered stays `OutcomeUnknown`/`AcquisitionUncertain`.
+   preparation was entered stays `OutcomeUnknown`/`AcquisitionUncertain`. The runner never
+   inspects a dependency's error (diagnostics contract): it returns a check failure under its
+   fixed `Check` step, and the composing start classifies it.
 4. A refused preparation's diagnostic line names the earliest bound of its check interval
    (`PrepareAPIExecution[<bound>@<remaining>]`), for example `target@0` or `process@<1s`.
 

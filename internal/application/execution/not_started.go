@@ -10,7 +10,8 @@ import (
 	"asservat.local/asservat/internal/domain/targets"
 )
 
-// TemporarilyUnavailable reports whether a refusal before any start effect
+// TemporarilyUnavailable is for composing callers that may inspect errors; the
+// runner itself never inspects a dependency error. It reports whether a refusal before any start effect
 // is a temporary unavailability that an explicit continuation may retry
 // (ADR-250). A definite refusal keeps its own class: denial or revocation,
 // expiry (including the original deadline), a changed or replaced target, a

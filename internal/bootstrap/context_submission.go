@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"errors"
+	"strings"
 
 	captureapp "asservat.local/asservat/internal/application/capture"
 	executionapp "asservat.local/asservat/internal/application/execution"
@@ -23,7 +24,11 @@ func (s APIContextStart) StartContext(ctx context.Context, current identities.Cu
 	if errors.Is(err, value.ErrPreparationUncertain) {
 		return capturevalue.ErrPreparationUncertain
 	}
-	if errors.Is(err, value.ErrNotStarted) {
+	// Not started: the ADR-212 headroom rollback, or a read-only check that
+	// failed as temporarily unavailable (ADR-250). The runner itself never
+	// inspects dependency errors; this composition classifies them.
+	var fixed interface{ FixedStep() string }
+	if errors.Is(err, value.ErrNotStarted) || errors.As(err, &fixed) && strings.HasPrefix(fixed.FixedStep(), "Check") && executionapp.TemporarilyUnavailable(err) {
 		return errors.Join(err, capturevalue.ErrAcquisitionNotStarted)
 	}
 	if err != nil {

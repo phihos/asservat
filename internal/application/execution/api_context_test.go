@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -71,23 +72,52 @@ func (f *apiRunnerFixture) ResolvePod(context.Context, targets.Request) (targets
 		return targets.PodResolution{}, targets.ErrDenied
 	case "target-changed":
 		return targets.PodResolution{}, targets.ErrChanged
+	case "target-private":
+		return targets.PodResolution{}, uninspectableError{}
 	}
 	return f.target, nil
 }
 
-// Only a temporary unavailability known to precede every start effect is
-// reported as not started. A denial (target or eligibility), a changed target
-// and a lost preparation reply, which may have committed, keep their class.
-func TestAPIContextRunnerClassifiesOnlyPreEffectRefusalsAsNotStarted(t *testing.T) {
-	for mode, want := range map[string]bool{"target-unavailable": true, "target-denied": false, "target-changed": false, "eligibility-denied": false, "lost-preparation-reply": false} {
+// The runner never marks a check failure itself: it keeps the dependency's
+// error under the fixed Check step. A composer classifies it, so only a
+// temporary unavailability counts as not started; a denial (target or
+// eligibility) or a changed target keeps its class. A lost preparation reply
+// is never marked not started.
+func TestAPIContextRunnerLeavesCheckClassificationToTheComposer(t *testing.T) {
+	for mode, want := range map[string]bool{"target-unavailable": true, "target-denied": false, "target-changed": false, "eligibility-denied": false} {
 		t.Run(mode, func(t *testing.T) {
 			f, s, current := apiRunner(t)
 			f.mode = mode
 			_, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
-			if err == nil || errors.Is(err, value.ErrNotStarted) != want || f.captures.Load() != 0 {
-				t.Fatal("pre-effect classification", err, want)
+			var fixed interface{ FixedStep() string }
+			if err == nil || errors.Is(err, value.ErrNotStarted) || !errors.As(err, &fixed) || !strings.HasPrefix(fixed.FixedStep(), "Check") || TemporarilyUnavailable(err) != want || f.captures.Load() != 0 {
+				t.Fatal("check classification", err, want)
 			}
 		})
+	}
+	f, s, current := apiRunner(t)
+	f.mode = "lost-preparation-reply"
+	_, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
+	if err == nil || errors.Is(err, value.ErrNotStarted) {
+		t.Fatal("a possibly committed preparation was marked not started", err)
+	}
+}
+
+// The runner must not inspect a dependency's private error (diagnostics
+// contract); a check failure passes it through unexamined.
+type uninspectableError struct{}
+
+func (uninspectableError) Error() string { panic("rendered") }
+func (uninspectableError) Unwrap() error { panic("unwrapped") }
+func (uninspectableError) Is(error) bool { panic("inspected") }
+
+func TestAPIContextRunnerDoesNotInspectCheckErrors(t *testing.T) {
+	f, s, current := apiRunner(t)
+	f.mode = "target-private"
+	_, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
+	var step executeStep
+	if !errors.As(err, &step) || step.step != "Check" {
+		t.Fatal("private check failure lost its fixed step")
 	}
 }
 func (f *apiRunnerFixture) ContextCapability(context.Context, authorization.Target) (planning.ContextCapability, error) {
