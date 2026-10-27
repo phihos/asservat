@@ -534,6 +534,11 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 					if _, err := admin.Exec(ctx, nativePacingStatisticsSetup); err != nil {
 						t.Fatal("post-bootstrap private SQL statistics setup", err)
 					}
+					// Bootstrap DDL is outside this measurement. Reset the owned
+					// fixture library once before the first baseline, never midphase.
+					if _, err := admin.Exec(ctx, nativePacingStatisticsReset); err != nil {
+						t.Fatal("pre-baseline private SQL statistics reset", err)
+					}
 					measurement = &nativePacingMeasurement{admin: admin, root: p.RootID, providers: providers}
 				}
 				qualifyInstalledApprovedRecording(t, ctx, identity, publicRoot, publicAddress, origin, cluster, namespace, workload, f.Clusters[1].Config, diagnose, measurement)
