@@ -74,6 +74,17 @@ func (p browserFixturePolicy) IdentityPolicy(_ context.Context, issuer string) (
 	return identity.Policy{Revision: identity.Revision{UID: "synthetic-browser-policy", Generation: 1, Digest: [32]byte{1}}, Issuer: issuer, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Clients: []identity.Client{{ID: p.client, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{p.group}, GroupsAtIssueQualified: true, GroupMaxAge: 5 * time.Minute}, nil
 }
 
+// The browser fixture requests the provider's baseline ACR solely to qualify
+// the fresh-authentication redirect/form/callback path. This is not a higher-LoA
+// or MFA realm qualification; a redirect is never evidence of assurance.
+type browserStepUpFixturePolicy struct{ browserFixturePolicy }
+
+func (p browserStepUpFixturePolicy) IdentityPolicy(ctx context.Context, issuer string) (identity.Policy, error) {
+	policy, err := p.browserFixturePolicy.IdentityPolicy(ctx, issuer)
+	policy.StepUp = identity.StepUpPolicy{ACRValues: []string{"1"}, MaxAge: 5 * time.Minute}
+	return policy, err
+}
+
 // Real HTTPS browser/OIDC, PostgreSQL, and OpenBao. Protected root and identity
 // configuration are synthetic acceptance inputs, not production bootstrap.
 func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user, group string) {
@@ -230,7 +241,8 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		t.Fatal(err)
 	}
 	defer verifier.Close()
-	sessions := app.BrowserSessions{Store: store, Cipher: cipher, Provider: provider, Identities: app.Service{Tokens: verifier, Policies: browserFixturePolicy{f.Issuer, clientID, group}, Now: time.Now}, Logout: provider, Issuer: f.Issuer, ClientID: clientID, Epoch: epoch, Lifetime: 8 * time.Hour, Now: time.Now}
+	policy := browserStepUpFixturePolicy{browserFixturePolicy{f.Issuer, clientID, group}}
+	sessions := app.BrowserSessions{Store: store, Cipher: cipher, Provider: provider, Policies: policy, Identities: app.Service{Tokens: verifier, Policies: policy, Now: time.Now}, Logout: provider, Issuer: f.Issuer, ClientID: clientID, Epoch: epoch, Lifetime: 8 * time.Hour, Now: time.Now}
 	handler = browser.SessionHandler{Origin: server.URL, Issuer: f.Issuer, Sessions: sessions}
 	roots := x509.NewCertPool()
 	roots.AppendCertsFromPEM(ca)
@@ -259,9 +271,13 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		}
 		return resp.StatusCode, b, resp.Header
 	}
-	login := func() (string, string) {
+	loginWithMode := func(stepUp bool) (string, string) {
 		t.Helper()
-		status, _, headers := request("GET", server.URL+"/auth/login?return_to=%2Finvestigations", "", "")
+		route, returnTo := "/auth/login", "/investigations"
+		if stepUp {
+			route, returnTo = "/auth/step-up", "/approvals/00000000-0000-4000-8000-000000000001"
+		}
+		status, _, headers := request("GET", server.URL+route+"?return_to="+url.QueryEscape(returnTo), "", "")
 		if status != 303 {
 			t.Fatalf("login start %d", status)
 		}
@@ -270,7 +286,13 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		if query.Query().Get("code_challenge_method") != "S256" || query.Query().Get("nonce") == "" || strings.Contains(authURL, "offline_access") {
 			t.Fatal("login protocol bounds")
 		}
+		if stepUp && (query.Query().Get("max_age") != "0" || query.Query().Get("acr_values") != "1") {
+			t.Fatal("step-up did not request fresh configured assurance")
+		}
 		status, page, headers := request("GET", authURL, "", "")
+		if stepUp && status != 200 {
+			t.Fatalf("max_age=0 did not require active sign-in despite existing provider session: %d", status)
+		}
 		if status == 200 {
 			match := regexp.MustCompile(`<form[^>]*id="kc-form-login"[^>]*action="([^"]+)"`).FindSubmatch(page)
 			if len(match) != 2 {
@@ -290,7 +312,7 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		if status != 303 {
 			t.Fatalf("product callback %d: %s", status, b)
 		}
-		if headers.Get("Location") != "/investigations" {
+		if headers.Get("Location") != returnTo {
 			t.Fatal("return path changed")
 		}
 		for _, c := range headers.Values("Set-Cookie") {
@@ -315,7 +337,12 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		}
 		return view.CSRF, callback
 	}
+	login := func() (string, string) { return loginWithMode(false) }
 	csrf, callback := login()
+	// Keep this sequence in the parent: login/request helpers report failures
+	// through its testing.T, and must never call parent Fatal from a child.
+	csrf, _ = loginWithMode(true)
+	t.Log("actual Keycloak fresh-authentication form, PKCE callback and exact approval return passed; higher LoA/MFA not configured")
 	currentOrigin, _ := url.Parse(server.URL)
 	var submissionCookie string
 	for _, c := range jar.Cookies(currentOrigin) {
@@ -323,6 +350,7 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 			submissionCookie = c.Value
 		}
 	}
+	submissionSessionID := sha256.Sum256([]byte(submissionCookie))
 	verifiedHuman, err := sessions.Resolve(ctx, submissionCookie, false)
 	if err != nil {
 		t.Fatal(err)
@@ -344,7 +372,7 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 	}
 	var encrypted []byte
 	var version int64
-	if err = admin.QueryRow(ctx, "SELECT ciphertext,version FROM browser_session WHERE root_id=$1", root).Scan(&encrypted, &version); err != nil || version != 1 || bytes.Contains(encrypted, []byte("access_token")) || bytes.Contains(encrypted, []byte(csrf)) {
+	if err = admin.QueryRow(ctx, "SELECT ciphertext,version FROM browser_session WHERE root_id=$1 AND id=$2", root, submissionSessionID[:]).Scan(&encrypted, &version); err != nil || version != 1 || bytes.Contains(encrypted, []byte("access_token")) || bytes.Contains(encrypted, []byte(csrf)) {
 		t.Fatal("plaintext session state or GET mutation")
 	}
 	if _, err = pool.Exec(ctx, "UPDATE browser_session_root SET enabled=false WHERE id=$1", root); err == nil {
@@ -354,13 +382,13 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		t.Fatal("browser has evidence credentials")
 	}
 	// Corruption cannot produce an identity; restore only through fixture admin.
-	if _, err = admin.Exec(ctx, "UPDATE browser_session SET ciphertext=$2 WHERE root_id=$1", root, []byte("corrupt")); err != nil {
+	if _, err = admin.Exec(ctx, "UPDATE browser_session SET ciphertext=$2 WHERE root_id=$1 AND id=$3", root, []byte("corrupt"), submissionSessionID[:]); err != nil {
 		t.Fatal(err)
 	}
 	if status, _, _ := request("GET", server.URL+"/api/v1/session", "", ""); status != 503 {
 		t.Fatalf("corrupt encrypted session %d", status)
 	}
-	if _, err = admin.Exec(ctx, "UPDATE browser_session SET ciphertext=$2,refresh_at=created_at+interval '1 microsecond' WHERE root_id=$1", root, encrypted); err != nil {
+	if _, err = admin.Exec(ctx, "UPDATE browser_session SET ciphertext=$2,refresh_at=created_at+interval '1 microsecond' WHERE root_id=$1 AND id=$3", root, encrypted, submissionSessionID[:]); err != nil {
 		t.Fatal(err)
 	}
 	var wg sync.WaitGroup
@@ -386,12 +414,12 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 	if !ok {
 		t.Fatal("no concurrent refresh completed")
 	}
-	if err = admin.QueryRow(ctx, "SELECT version FROM browser_session WHERE root_id=$1", root).Scan(&version); err != nil || version != 2 {
+	if err = admin.QueryRow(ctx, "SELECT version FROM browser_session WHERE root_id=$1 AND id=$2", root, submissionSessionID[:]).Scan(&version); err != nil || version != 2 {
 		t.Fatalf("refresh did not rotate exactly once: %d %v", version, err)
 	}
 	t.Log("actual confidential OIDC/S256/nonce, opaque cookies, encrypted SQL credentials, current identity and single refresh across eight callers passed")
 	if !t.Run("CSRF-read-overlapping-committed-provider-refresh", func(t *testing.T) {
-		if _, e := admin.Exec(ctx, "UPDATE browser_session SET refresh_at=created_at+interval '1 microsecond' WHERE root_id=$1", root); e != nil {
+		if _, e := admin.Exec(ctx, "UPDATE browser_session SET refresh_at=created_at+interval '1 microsecond' WHERE root_id=$1 AND id=$2", root, submissionSessionID[:]); e != nil {
 			t.Fatal(e)
 		}
 		paused := sessions
@@ -429,7 +457,7 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		if fresh, e := sessions.CSRF(ctx, submissionCookie); e != nil || fresh != csrf {
 			t.Fatal("fresh CSRF lookup did not recover without another rotation", e)
 		}
-		if e := admin.QueryRow(ctx, "SELECT version FROM browser_session WHERE root_id=$1", root).Scan(&version); e != nil || version != 3 {
+		if e := admin.QueryRow(ctx, "SELECT version FROM browser_session WHERE root_id=$1 AND id=$2", root, submissionSessionID[:]).Scan(&version); e != nil || version != 3 {
 			t.Fatalf("CSRF lookup rotated or lost provider result: version=%d err=%v", version, e)
 		}
 	}) {
@@ -437,14 +465,14 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 	}
 	// Complete replacement of membership, including removal, at refresh.
 	f.json("DELETE", "/admin/realms/asservat-test/users/"+user+"/groups/"+group, nil)
-	if _, err = admin.Exec(ctx, "UPDATE browser_session SET refresh_at=created_at+interval '1 microsecond' WHERE root_id=$1", root); err != nil {
+	if _, err = admin.Exec(ctx, "UPDATE browser_session SET refresh_at=created_at+interval '1 microsecond' WHERE root_id=$1 AND id=$2", root, submissionSessionID[:]); err != nil {
 		t.Fatal(err)
 	}
 	if status, _, _ := request("POST", server.URL+"/auth/refresh", "", csrf); status != 401 {
 		t.Fatalf("removed membership refresh %d", status)
 	}
 	f.json("PUT", "/admin/realms/asservat-test/users/"+user+"/groups/"+group, nil)
-	if _, err = admin.Exec(ctx, "DELETE FROM browser_session WHERE root_id=$1", root); err != nil {
+	if _, err = admin.Exec(ctx, "DELETE FROM browser_session WHERE root_id=$1 AND id=$2", root, submissionSessionID[:]); err != nil {
 		t.Fatal(err)
 	}
 	csrf, _ = login()
@@ -759,7 +787,7 @@ func browserSQLFences(t *testing.T, admin *pgxpool.Pool, store *postgres.Browser
 	if e := store.ClaimRefresh(ctx, r.ID, 1, [32]byte{8}); !errors.Is(e, identity.ErrSessionBusy) {
 		t.Fatalf("second refresh %v", e)
 	}
-	if _, e := admin.Exec(ctx, "UPDATE browser_session SET claim_until=clock_timestamp()-interval '1 second' WHERE root_id=$1", root); e != nil {
+	if _, e := admin.Exec(ctx, "UPDATE browser_session SET claim_until=clock_timestamp()-interval '1 second' WHERE root_id=$1 AND id=$2", root, r.ID[:]); e != nil {
 		t.Fatal(e)
 	}
 	if e := store.FinishRefresh(ctx, r.ID, 1, claim, []byte("replacement"), now.Add(time.Minute)); !errors.Is(e, identity.ErrDenied) {

@@ -17,6 +17,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/step-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sign in again with the configured approval assurance
+         * @description Uses current protected identity settings for acr_values and requests max_age=0. Reuses the normal bounded state, nonce, PKCE and browser-binding challenge. Does not decide a review or confer assurance; approval still requires current signed acr/auth_time and target permissions. Unavailable settings return an administrator-directed sanitized problem.
+         */
+        get: operations["begin_browser_step_up"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/callback": {
         parameters: {
             query?: never;
@@ -195,6 +215,28 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description Pinned provider redirect and Secure HttpOnly SameSite=Lax browser-binding cookie. */
+            303: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    begin_browser_step_up: {
+        parameters: {
+            query?: {
+                return_to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pinned provider redirect and Secure HttpOnly SameSite=Lax browser-binding cookie. Provider parameters cannot be selected by the caller. */
             303: {
                 headers: {
                     Location?: string;

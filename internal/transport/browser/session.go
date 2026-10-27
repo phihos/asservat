@@ -82,12 +82,15 @@ func clearSessionCookie(w http.ResponseWriter, name string) {
 	http.SetCookie(w, &http.Cookie{Name: name, Path: "/", MaxAge: -1, Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode})
 }
 func sessionProblem(w http.ResponseWriter, status int) {
+	sessionProblemTitle(w, status, http.StatusText(status))
+}
+func sessionProblemTitle(w http.ResponseWriter, status int, title string) {
 	w.Header().Set("Content-Type", "application/problem+json")
 	if status == 503 || status == http.StatusConflict {
 		w.Header().Set("Retry-After", "1")
 	}
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]any{"type": "about:blank", "title": http.StatusText(status), "status": status})
+	_ = json.NewEncoder(w).Encode(map[string]any{"type": "about:blank", "title": title, "status": status})
 }
 func sessionFailure(w http.ResponseWriter, err error) {
 	status := 503
@@ -111,7 +114,7 @@ func (h SessionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch r.URL.Path {
-	case "/auth/login":
+	case "/auth/login", "/auth/step-up":
 		if r.Method != "GET" {
 			sessionProblem(w, 405)
 			return
@@ -131,9 +134,25 @@ func (h SessionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if path == "" {
 			path = "/"
 		}
-		v, e := h.Sessions.Begin(r.Context(), path)
+		var v app.LoginRedirect
+		if r.URL.Path == "/auth/step-up" {
+			service, ok := h.Sessions.(interface {
+				BeginStepUp(context.Context, string) (app.LoginRedirect, error)
+			})
+			if !ok {
+				sessionProblemTitle(w, 503, "Step-up unavailable; ask your administrator to check identity settings.")
+				return
+			}
+			v, e = service.BeginStepUp(r.Context(), path)
+		} else {
+			v, e = h.Sessions.Begin(r.Context(), path)
+		}
 		if e != nil {
-			sessionFailure(w, e)
+			if r.URL.Path == "/auth/step-up" && errors.Is(e, identity.ErrUnavailable) {
+				sessionProblemTitle(w, 503, "Step-up unavailable; ask your administrator to check identity settings.")
+			} else {
+				sessionFailure(w, e)
+			}
 			return
 		}
 		setSessionCookie(w, loginCookie, v.Browser, v.ExpiresAt)

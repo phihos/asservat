@@ -5,6 +5,15 @@ Scope: C-02 owns session coordination, C-20 the HTTP ingress, C-21 the OIDC/SQL/
 ## Login and use
 
 1. GET `/auth/login?return_to=/investigations` validates a local return path, writes a five-minute encrypted challenge and redirects to the pinned authorization endpoint. The challenge binds independently random state, nonce, verifier and browser cookie. SQL stores hashes of the external state/cookie. PKCE uses S256.
+GET `/auth/step-up?return_to=/approvals/<id>` starts the same bounded login with
+`acr_values` from the current protected identity policy and `max_age=0`, requesting
+fresh provider authentication. It accepts only the local return path. A redirect
+or a successful login does not establish approval assurance: each approval still
+checks the returned signed `acr`/`auth_time`, current policy and current exact
+target permissions. The console returns to the reviewed plan for an explicit
+decision. Unconfigured or unavailable step-up settings yield a sanitized failure
+directing the user to their administrator. See [ADR-253](../decisions/253-approval-stepup-login.md).
+
 2. The GET callback requires the selected issuer, exact state and browser cookie. It atomically consumes the challenge before exchange, verifies ID/access token purpose and binding, and resolves the human through current protected organization policy. Concurrent or repeated callbacks cannot exchange again. A wrong browser cannot consume the legitimate challenge.
 3. A fresh random session cookie identifies an encrypted credential record. The envelope binds installation epoch, issuer, client, row, purpose and version; swapping rows/versions cannot authenticate the credential. SQL retains only minimal identity/session metadata outside that envelope. The finite lifetime is the shorter of the private composition limit and current administrator maximum, bounded to one minute–24 hours. SQL returns the effective expiry for the callback cookie; there is no sliding renewal.
 4. GET `/api/v1/session` returns the existing documented subject, empty installation-wide roles, CSRF token, fixed expiry and `step_up: unavailable`. Roles remain target-specific. It verifies the existing access token and reads current identity policy without rotating tokens.

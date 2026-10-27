@@ -20,6 +20,21 @@ paths:
           headers:
             Location: {schema: {type: string, format: uri}}
         default: {$ref: '#/components/responses/Problem'}
+  /auth/step-up:
+    get:
+      operationId: begin_browser_step_up
+      summary: Sign in again with the configured approval assurance
+      description: Uses current protected identity settings for acr_values and requests max_age=0. Reuses the normal bounded state, nonce, PKCE and browser-binding challenge. Does not decide a review or confer assurance; approval still requires current signed acr/auth_time and target permissions. Unavailable settings return an administrator-directed sanitized problem.
+      parameters:
+      - in: query
+        name: return_to
+        schema: {type: string, maxLength: 2048, default: /}
+      responses:
+        '303':
+          description: Pinned provider redirect and Secure HttpOnly SameSite=Lax browser-binding cookie. Provider parameters cannot be selected by the caller.
+          headers:
+            Location: {schema: {type: string, format: uri}}
+        default: {$ref: '#/components/responses/Problem'}
   /auth/callback:
     get:
       operationId: complete_browser_login
