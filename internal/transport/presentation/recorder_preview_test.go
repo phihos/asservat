@@ -111,7 +111,7 @@ func TestCompositionPreviewWire(t *testing.T) {
 	if len(d.Lifecycle.Actions) != 1 || d.Lifecycle.Actions[0]["activation"] != "manualSession" || d.Lifecycle.Actions[0]["requestedBefore"] != "30s" || len(d.Composition.ActionMap) != 1 || len(d.Composition.Authored.Components[0].Overrides) != 3 {
 		t.Fatalf("lifecycle/provenance: %s", reply.Body)
 	}
-	if d.Assessment.Actions[0].Retention.AnchorRule != "firstAcquisitionOrEarlierSource" || d.Assessment.Scope.ObservationPods != 1 || !strings.Contains(strings.Join(d.Warnings, "\n"), "no history before the request") {
+	if d.Assessment.Actions[0].Retention.AnchorRule != "submissionPreparation" || d.Assessment.Scope.ObservationPods != 1 || !strings.Contains(strings.Join(d.Warnings, "\n"), "no history before the request") {
 		t.Fatalf("assessment/warnings: %s", reply.Body)
 	}
 	if len(reply.Body) > 24<<10 {

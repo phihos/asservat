@@ -155,6 +155,10 @@ export interface components {
                  * @constant
                  */
                 capture_window_seconds?: 300;
+                /** @description Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority. */
+                can_resume: boolean;
+                /** @description Advisory original requester/client may attempt passive original-request lookup/closure. It never authorizes a new start. */
+                can_resolve: boolean;
             } & unknown;
         } | {
             /** @constant */

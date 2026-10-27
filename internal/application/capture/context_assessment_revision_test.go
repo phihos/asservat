@@ -1,6 +1,7 @@
 package capture
 
 import (
+	"context"
 	"encoding/hex"
 	"errors"
 	"reflect"
@@ -58,5 +59,33 @@ func TestContextOldAnchorReviewNeedsRefreshButAcceptedRequestRemainsRecoverable(
 				t.Fatal("accepted replay changed original retention or operation dates")
 			}
 		})
+	}
+}
+
+// Persisted v1 recorder rules described a different retention anchor. A new
+// interpretation must require another review before any grant or admission.
+func TestRecorderOldRetentionAnchorReviewNeedsRefresh(t *testing.T) {
+	f := newInvestigationFixture()
+	f.target.NodeUID, f.target.NodeBootID, f.target.Pin.NodeName = "", "", ""
+	f.target.ExecutionClass, f.cap.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+	f.svc.Recorders = availableRecording{}
+	f.svc.Filters = &stubFilters{}
+	ctx := context.Background()
+	r, err := f.svc.PreviewComposition(ctx, f.source(t, ctx), f.compositionIntent(networkComposition()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	old, err := hex.DecodeString("20e562ac0561ec3e07ebc73fbbbed44fdc099ce805e9b44ff8aa37f2f4c16d4e")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := r.Preview
+	if string(p.AssessmentRulesDigest[:]) == string(old) {
+		t.Fatal("manual retention interpretation kept v1 digest")
+	}
+	copy(p.AssessmentRulesDigest[:], old)
+	f.previews[p.ID] = p
+	if _, err := f.request(t, p, "unsubmitted-recorder-v1"); !errors.Is(err, value.ErrChanged) || f.admissions.Load() != 0 {
+		t.Fatalf("old recorder timing reached admission: %v", err)
 	}
 }

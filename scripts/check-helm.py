@@ -188,6 +188,14 @@ def check_bootstrap(directory):
     assert settings["clients"] == [{"id": "console", "kind": "human", "classQualified": True}] and settings["eligibleGroups"] == ["stable-group-id"]
     assert settings["origin"] == "https://asservat.example" and settings["groupMaxAgeSeconds"] == 300
     assert "permissionDelegations" not in settings, "empty delegations changed existing installer identities"
+    assert "approvals" not in settings, "absent approval settings changed existing installer identities"
+    approved = copy.deepcopy(public)
+    approvals = {"requireRecordingApproval": True, "stepUp": {"acrValues": ["2"], "maxAgeSeconds": 300}}
+    approved["bootstrap"]["continuation"]["public"]["approvals"] = approvals
+    adocs = render(approved)
+    ainput, = [r for r in adocs if "continuation.json" in r.get("data", {})]
+    assert json.loads(ainput["data"]["continuation.json"])["public"]["approvals"] == approvals
+    assert ainput["data"]["continuation.json"] != pinput["data"]["continuation.json"], "approval policy is not bound to installer input"
     delegated = copy.deepcopy(public)
     envelope = {"writers": [{"kind": "Group", "name": "payments-admins"}],
                 "clusterID": "10000000-0000-4000-8000-000000000001",

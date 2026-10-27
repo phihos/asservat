@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from 'react-aria-components';
 import type { Session } from '../auth/session';
+import { operations as captureOperations, type Operations as CaptureOperations } from '../capture/http';
+import { approvalSubmissionKey } from '../capture/approval-intent';
 import { operationMessage } from '../capture/http';
 import { operations as defaultOperations, type Grant, type Operations, type ReviewRow } from './http';
 
@@ -23,7 +25,7 @@ function Rows({ rows, empty, label }: { rows?: ReviewRow[]; empty: string; label
   </li>)}</ul>;
 }
 
-function Detail({ grant, busy, onDecide, onRevoke }: { grant: Grant; busy: boolean; onDecide: (approve: boolean, reason: string) => void; onRevoke: () => void }) {
+function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { grant: Grant; busy: boolean; onDecide: (approve: boolean, reason: string) => void; onRevoke: () => void; onResume: () => void; onResolve: () => void }) {
   const [reason, setReason] = useState('');
   return <>
     <section className="review-section" aria-labelledby="approval-plan">
@@ -59,6 +61,9 @@ function Detail({ grant, busy, onDecide, onRevoke }: { grant: Grant; busy: boole
         <Button className="button" isDisabled={busy || reason.trim() === ''} onPress={() => onDecide(true, reason.trim())}>Approve</Button>
         <Button className="button secondary" isDisabled={busy || reason.trim() === ''} onPress={() => onDecide(false, reason.trim())}>Deny</Button>
       </>}
+      {grant.can_resume && <div className="actions"><Button className="button" isDisabled={busy} onPress={onResume}>Continue approved capture</Button><p>Uses the exact reviewed preview and original requester client. It can continue the original accepted acquisition; it cannot create another capture.</p></div>}
+      {grant.can_resolve && <div className="actions"><Button className="button secondary" isDisabled={busy} onPress={onResolve}>Resolve original request</Button><p>Opens the original capture if it was accepted. Otherwise it closes this reviewed request so it cannot start a capture.</p></div>}
+      {!grant.can_resolve && <p>Collection must continue through the original requesting client ({grant.requested_by.client_id}) with its current permissions. This page does not transfer its approval to another client.</p>}
       {grant.can_revoke && <Button className="button secondary" isDisabled={busy} onPress={onRevoke}>{grant.phase === 'Pending' ? 'Withdraw request' : 'Revoke approval'}</Button>}
     </section>
   </>;
@@ -67,8 +72,10 @@ function Detail({ grant, busy, onDecide, onRevoke }: { grant: Grant; busy: boole
 // ADR-249: the approval inbox. Approvers see the pending requests of other
 // people for workloads where they hold action-approver now; everyone sees
 // their own requests. The detail page shows the exact reviewed plan.
-export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOperations, newID = () => crypto.randomUUID() }: { session: Session; scope: AbortSignal; grantID?: string; client?: Operations; newID?: () => string }) {
+export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOperations, captureClient = captureOperations, newID = () => crypto.randomUUID(), onAccepted = captureID => window.location.assign('/captures/' + captureID) }: { session: Session; scope: AbortSignal; grantID?: string; client?: Operations; captureClient?: CaptureOperations; newID?: () => string; onAccepted?: (captureID: string) => void }) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const command = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => command.current?.abort(), [scope]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string>();
   const [pending, setPending] = useState<ReviewRow[]>();
@@ -107,6 +114,38 @@ export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOp
       if (!scope.aborted) setMessage(operationMessage(error) + ' Retrying repeats the same decision.');
     } finally { if (!scope.aborted) setBusy(false); }
   };
+  const continueRequest = async (resolve: boolean) => {
+    const original = grant;
+    if (!original || busy || scope.aborted || (resolve ? !original.can_resolve : !original.can_resume)) return;
+    command.current?.abort();
+    const request = new AbortController(); command.current = request;
+    const abort = () => request.abort(); scope.addEventListener('abort', abort, { once: true });
+    const input = { preview_id: original.preview_id, idempotency_key: approvalSubmissionKey(original.preview_id) };
+    setBusy(true); setMessage(undefined);
+    try {
+      if (resolve) {
+        const result = await captureClient.call('resolve_capture_request', input, session.csrf_token, request.signal);
+        if (request.signal.aborted || scope.aborted || command.current !== request) return;
+        if (result.status === 'ok') {
+          if (result.data.state === 'accepted') onAccepted(result.data.capture_id);
+          else {
+            setGrant({ ...original, can_resume: false, can_resolve: false });
+            setMessage('The original request is closed. Prepare a new review before collecting.');
+          }
+        } else setMessage(result.status === 'error' ? result.data.message : 'The original result is not confirmed. Resolve this same request again.');
+      } else {
+        const result = await captureClient.call('request_capture', { ...input, continue_acquisition: true }, session.csrf_token, request.signal);
+        if (request.signal.aborted || scope.aborted || command.current !== request) return;
+        if (result.status === 'ok') onAccepted(result.data.capture_id);
+        else setMessage(result.status === 'error' ? result.data.message : 'The original result is not confirmed. Retry this same approved request.');
+      }
+    } catch (error) {
+      if (!request.signal.aborted && !scope.aborted) setMessage(operationMessage(error) + ' Retrying uses this same reviewed request. You can resolve its original outcome before making another request.');
+    } finally {
+      scope.removeEventListener('abort', abort);
+      if (!request.signal.aborted && !scope.aborted && command.current === request) setBusy(false);
+    }
+  };
   const decide = (approve: boolean, reason: string) => grant && void act(() => client.call('decide_review', { grant_id: grant.grant_id, decision: approve ? 'approve' : 'deny', reason, idempotency_key: key((approve ? 'approve:' : 'deny:') + reason) }, session.csrf_token, scope));
   const revoke = () => grant && void act(() => client.call('revoke_grant', { grant_id: grant.grant_id, expected_revision: grant.revision, idempotency_key: key('revoke:' + grant.revision) }, session.csrf_token, scope));
   return <div className="capture-workspace">
@@ -114,7 +153,7 @@ export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOp
       <p>Sensitive recordings, such as a packet filter that tests payload bytes, need an independent approver before anything is recorded. {grantID ? <a href="/approvals">All approvals</a> : <a href="/captures/new">Collect evidence</a>}</p>
     </div>
     {message && <p role="alert" className="notice">{message}</p>}
-    {grantID ? grant && <Detail grant={grant} busy={busy} onDecide={decide} onRevoke={revoke}/> : <>
+    {grantID ? grant && <Detail grant={grant} busy={busy} onDecide={decide} onRevoke={revoke} onResume={() => void continueRequest(false)} onResolve={() => void continueRequest(true)}/> : <>
       <section className="review-section" aria-labelledby="to-review" aria-busy={busy}>
         <h2 id="to-review">Waiting for your review</h2>
         <Rows rows={pending} empty="No requests are waiting for you." label="Requests to review"/>

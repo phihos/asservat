@@ -81,12 +81,16 @@ func TestGrantOperationsWire(t *testing.T) {
 	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || out.Data.Phase != "Pending" || !out.Data.CanDecide || out.Data.Actions[0].Filter != "tcp[13] & 2 != 0" || out.Data.ResultAccess.MaxBytes != 100 || *out.Data.RemainingBytes != 100 || out.Data.NavigationURI != "https://console.invalid/approvals/00000000-0000-4000-8000-0000000009a1" {
 		t.Fatalf("get_grant: %v %s", err, reply.Body)
 	}
+	if out.Data.CanResume == nil || *out.Data.CanResume || out.Data.CanResolve == nil || *out.Data.CanResolve {
+		t.Fatal("detail must carry explicit advisory flags")
+	}
 	if out.Data.CaptureDeadlineRule != "previewDeadline" || !out.Data.PreviewDeadline.Equal(uc.view.Review.Deadline) || out.Data.CaptureWindowSeconds != 0 {
 		t.Fatal("legacy timing changed")
 	}
+	uc.view.CanResume, uc.view.CanResolve = true, true
 	uc.view.Grant.Scope = []byte(`{"timing":"approvedAcceptance/v1"}`)
 	marked, e := s.Call(t.Context(), f, "get_grant", []byte(`{"grant_id":"00000000-0000-4000-8000-0000000009a1"}`))
-	if e != nil || json.Unmarshal(marked.Body, &out) != nil || out.Data.CaptureDeadlineRule != "acceptanceWithinGrant" || out.Data.CaptureWindowSeconds != 300 || !out.Data.PreviewDeadline.Equal(uc.view.Review.Deadline) {
+	if e != nil || json.Unmarshal(marked.Body, &out) != nil || out.Data.CaptureDeadlineRule != "acceptanceWithinGrant" || out.Data.CaptureWindowSeconds != 300 || !*out.Data.CanResume || !*out.Data.CanResolve || !out.Data.PreviewDeadline.Equal(uc.view.Review.Deadline) {
 		t.Fatalf("approved timing: %v %s", e, marked.Body)
 	}
 	if len(reply.Body) > 24<<10 {

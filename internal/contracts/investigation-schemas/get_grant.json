@@ -592,6 +592,14 @@
                     "type": "integer",
                     "const": 300,
                     "description": "Maximum window fixed once at acceptance, never beyond original approval expiry."
+                  },
+                  "can_resume": {
+                    "type": "boolean",
+                    "description": "Advisory current original requester/client collection eligibility under this exact approved grant. Submission rechecks all authority."
+                  },
+                  "can_resolve": {
+                    "type": "boolean",
+                    "description": "Advisory original requester/client may attempt passive original-request lookup/closure. It never authorizes a new start."
                   }
                 },
                 "required": [
@@ -615,7 +623,9 @@
                   "can_revoke",
                   "approval_navigation_uri",
                   "actions",
-                  "capture_deadline_rule"
+                  "capture_deadline_rule",
+                  "can_resume",
+                  "can_resolve"
                 ],
                 "allOf": [
                   {

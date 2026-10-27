@@ -641,7 +641,7 @@ export interface components {
         Contract_privacy_common_cf52919b29fc225a: "unknown" | "potentialPersonalData" | "personalData" | "specialCategoryPossible" | "verifiedNonPersonal";
         Contract_capture_assessment_9d972ed356c3acb3: {
             /**
-             * @description submissionPreparation measures from preparation of the first admitted submission: waiting counts and accepted retries retain the original registration. firstAcquisitionOrEarlierSource measures from acquisition or an earlier retained source.
+             * @description submissionPreparation measures every newly accepted manual capture from preparation of its first admitted submission: waiting counts and accepted retries retain the original registration. firstAcquisitionOrEarlierSource is reserved for typed existing-source snapshots and measures from the original source acquisition or an earlier retained source, never preview creation.
              * @enum {unknown}
              */
             anchorRule: "firstAcquisitionOrEarlierSource" | "submissionPreparation";
@@ -713,7 +713,9 @@ export interface components {
                 repeated_from_capture_id?: string;
                 profile_composition?: components["schemas"]["Contract_capture_composition_fea23abd809a781c"];
                 lifecycle_plan: components["schemas"]["Contract_action_lifecycle_35910c4fba296505"];
-                capture_assessment: components["schemas"]["Contract_capture_assessment_9c7f9709a5418f1b"];
+                capture_assessment: components["schemas"]["Contract_capture_assessment_9c7f9709a5418f1b"] & {
+                    actions?: unknown;
+                };
                 result_access?: components["schemas"]["Contract_investigation_access_03804ffde11279ad"];
                 preset_ref?: {
                     /** @enum {unknown} */

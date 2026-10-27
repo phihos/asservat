@@ -84,3 +84,13 @@ helm package ./charts/asservat --destination ./dist
 ```
 
 Install the resulting `.tgz` with Helm, including in disconnected environments. No image is needed with bootstrap disabled. Bootstrap requires the exact independently verified product image digest; no release image is published by this source change. The production release bundle will include verified images, CRDs, signatures, SBOMs and dependency notices alongside the OCI chart. No chart repository or OCI release has been published yet; do not substitute an unverified registry URL.
+
+
+For independent manual collection approval, set
+`bootstrap.continuation.public.approvals.stepUp` to the qualified provider's
+`acrValues` and finite `maxAgeSeconds`. Set
+`bootstrap.continuation.public.approvals.requireRecordingApproval: true` to
+require that review for metadata packet/syscall recordings as well. These are
+protected identity settings passed unchanged by the installer. Without step-up
+settings, no independent approval can be decided; an absent `approvals` value
+preserves the existing installation input.

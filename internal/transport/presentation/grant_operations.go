@@ -245,6 +245,8 @@ type grantData struct {
 	RevokedBy            *grantPrincipal    `json:"revoked_by,omitempty"`
 	ResultAccess         *grantResultAccess `json:"result_access,omitempty"`
 	RemainingBytes       *int64             `json:"remaining_bytes,omitempty"`
+	CanResume            *bool              `json:"can_resume,omitempty"`
+	CanResolve           *bool              `json:"can_resolve,omitempty"`
 	CanDecide            bool               `json:"can_decide"`
 	CanRevoke            bool               `json:"can_revoke"`
 	NavigationURI        string             `json:"approval_navigation_uri"`
@@ -290,6 +292,7 @@ func (s *GrantOperations) view(v authapp.GrantView, caller identity.Principal, f
 	if !full {
 		return d
 	}
+	d.CanResume, d.CanResolve = &v.CanResume, &v.CanResolve
 	for _, a := range r.Actions {
 		x := grantAction{ActionID: a.ActionID, Kind: a.Kind, ExecutionMode: a.ExecutionMode, Before: a.Before, After: a.After, Filter: a.Filter, FilterInstructions: a.FilterInstructions, MaxBytes: a.MaxBytes, RingMaxBytes: a.RingMaxBytes, RingMaxAge: a.RingMaxAge, Sensitive: slices.Clone(a.Sensitive)}
 		if x.Sensitive == nil {

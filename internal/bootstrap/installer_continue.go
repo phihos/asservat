@@ -675,14 +675,7 @@ func (k *InstallerContinuation) PublicSources(ctx context.Context, inventory kub
 	k.at("public/sources")
 	browser := contracts.BrowserSettings{SchemaVersion: "browser-settings/v1", Revision: 1, RootID: uuid.NewString(), SessionEpoch: uuid.NewString(),
 		Issuer: p.Issuer, ClientID: p.ClientID, Origin: p.Origin, MaxLifetimeSeconds: p.MaxLifetimeSeconds, MaxLogins: p.MaxLogins, MaxSessions: p.MaxSessions, MaxLogoutEvents: p.MaxLogoutEvents}
-	identity := contracts.IdentitySettings{SchemaVersion: "identity-settings/v1", Revision: 1, Issuer: p.Issuer, Clients: p.Clients,
-		EligibleSubjects: p.EligibleSubjects, EligibleGroups: p.EligibleGroups, GroupsAtIssueQualified: true, GroupMaxAgeSeconds: p.GroupMaxAgeSeconds}
-	if identity.EligibleSubjects == nil {
-		identity.EligibleSubjects = []contracts.IdentitySubject{}
-	}
-	if identity.EligibleGroups == nil {
-		identity.EligibleGroups = []string{}
-	}
+	identity := installerIdentitySettings(p)
 	control := cfg.NamespaceRef{Name: inventory.Namespace.Name, UID: inventory.Namespace.UID}
 	// ADR-204 decision 2: with downloads the worker profile source lives in
 	// the worker namespace and replaces the hub namespace's marker.
@@ -692,6 +685,19 @@ func (k *InstallerContinuation) PublicSources(ctx context.Context, inventory kub
 	}
 	k.sources = &sources
 	return &sources, nil
+}
+
+// installerIdentitySettings keeps the protected public approval policy unchanged.
+func installerIdentitySettings(p *contracts.InstallerPublicSettings) contracts.IdentitySettings {
+	identity := contracts.IdentitySettings{SchemaVersion: "identity-settings/v1", Revision: 1, Issuer: p.Issuer, Clients: p.Clients,
+		EligibleSubjects: p.EligibleSubjects, EligibleGroups: p.EligibleGroups, GroupsAtIssueQualified: true, GroupMaxAgeSeconds: p.GroupMaxAgeSeconds, Approvals: p.Approvals}
+	if identity.EligibleSubjects == nil {
+		identity.EligibleSubjects = []contracts.IdentitySubject{}
+	}
+	if identity.EligibleGroups == nil {
+		identity.EligibleGroups = []string{}
+	}
+	return identity
 }
 
 // processingSettings is the first download environment document. ADR-192:

@@ -55,3 +55,22 @@ export class SyntheticOperations implements Operations {
     return await this.responder(name) as Output<N>;
   }
 }
+
+export function recordingPreviewResult(from?: string): Output<'preview_capture'> {
+  const value = example('mcp-composition-preview-result.json');
+  const pod = previewResult(); if (pod.status !== 'ok') throw new Error('synthetic pod preview');
+  value.data.preview_id = id(173);
+  value.data.target_ref = pod.data.target_ref;
+  value.data.selected_pods = pod.data.selected_pods;
+  value.data.expires_at = new Date(Date.now() + 120_000).toISOString();
+  value.data.capture_assessment.generatedAt = new Date().toISOString();
+  value.data.capture_assessment.validUntil = new Date(Date.now() + 5_000).toISOString();
+  value.data.capture_enabled = false; value.data.approval_required = true;
+  value.data.blockers = [{ code: 'ApprovalRequired', message: 'Independent review is required.', responsible_role: 'approver', retryable: false }];
+  if (from) value.data.repeated_from_capture_id = from;
+  return value;
+}
+export function approvalPendingResult(): Output<'request_capture'> {
+  return { ...result<'request_capture'>({}), status: 'error', data: { code: 'ApprovalRequired', message: 'Independent approval is pending.', retryable: false,
+    responsible_role: 'approver', navigation_uri: 'https://asservat.example.invalid/approvals/' + id(41) } } as Output<'request_capture'>;
+}
