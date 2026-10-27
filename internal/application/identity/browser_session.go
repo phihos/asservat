@@ -62,6 +62,7 @@ type BrowserSessions struct {
 	Cipher                  CredentialCipher
 	Provider                BrowserProvider
 	Identities              Resolver
+	Policies                PolicyReader
 	Logout                  LogoutVerifier
 	Issuer, ClientID, Epoch string
 	Lifetime                time.Duration
@@ -127,6 +128,16 @@ func (s BrowserSessions) open(ctx context.Context, c, ad []byte, v any) error {
 	return nil
 }
 func (s BrowserSessions) Begin(ctx context.Context, returnTo string) (LoginRedirect, error) {
+	return s.begin(ctx, returnTo, false)
+}
+
+// BeginStepUp starts a fresh login with the currently protected assurance policy.
+// It neither changes the existing session nor decides any pending approval.
+func (s BrowserSessions) BeginStepUp(ctx context.Context, returnTo string) (LoginRedirect, error) {
+	return s.begin(ctx, returnTo, true)
+}
+
+func (s BrowserSessions) begin(ctx context.Context, returnTo string, stepUp bool) (LoginRedirect, error) {
 	var out LoginRedirect
 	if !s.configured() {
 		return out, value.ErrUnavailable
@@ -137,6 +148,27 @@ func (s BrowserSessions) Begin(ctx context.Context, returnTo string) (LoginRedir
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	now := s.Now()
+	var policy value.Policy
+	var stepProvider StepUpBrowserProvider
+	if stepUp {
+		var ok bool
+		stepProvider, ok = s.Provider.(StepUpBrowserProvider)
+		if s.Policies == nil || !ok {
+			return out, value.ErrUnavailable
+		}
+		var err error
+		policy, err = s.Policies.IdentityPolicy(ctx, s.Issuer)
+		if err != nil || policy.Validate(s.Now()) != nil || policy.Issuer != s.Issuer || !policy.StepUp.Configured() {
+			return out, value.ErrUnavailable
+		}
+		clientOK := false
+		for _, c := range policy.Clients {
+			clientOK = clientOK || c.ID == s.ClientID && c.Kind == value.Human && c.ClassQualified
+		}
+		if !clientOK {
+			return out, value.ErrDenied
+		}
+	}
 	out = LoginRedirect{State: randomSessionSecret(), Browser: randomSessionSecret(), ExpiresAt: now.Add(5 * time.Minute)}
 	secrets := loginSecrets{randomSessionSecret(), randomSessionSecret(), returnTo}
 	key, _ := sessionKey(out.State)
@@ -145,12 +177,19 @@ func (s BrowserSessions) Begin(ctx context.Context, returnTo string) (LoginRedir
 	if err != nil {
 		return LoginRedirect{}, err
 	}
-	out.URL, err = s.Provider.AuthorizationURL(out.State, secrets.Nonce, secrets.Verifier)
+	if stepUp {
+		out.URL, err = stepProvider.StepUpAuthorizationURL(out.State, secrets.Nonce, secrets.Verifier, policy.StepUp.ACRValues)
+	} else {
+		out.URL, err = s.Provider.AuthorizationURL(out.State, secrets.Nonce, secrets.Verifier)
+	}
 	if err != nil {
 		return LoginRedirect{}, value.ErrUnavailable
 	}
 	if s.Now().Before(now) || !s.Now().Before(out.ExpiresAt) {
 		return LoginRedirect{}, value.ErrDenied
+	}
+	if ctx.Err() != nil || stepUp && policy.Validate(s.Now()) != nil {
+		return LoginRedirect{}, value.ErrUnavailable
 	}
 	err = s.Store.PutLogin(ctx, value.BrowserLogin{ID: key, Browser: browser, Ciphertext: c, CreatedAt: now, ExpiresAt: out.ExpiresAt})
 	if err != nil {

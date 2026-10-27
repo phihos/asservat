@@ -1,5 +1,23 @@
 # Sustained implementation progress
 
+## Approval step-up sign-in (ADR-253, 2026-10-27)
+
+The approval detail now links to `/auth/step-up` and returns to that exact plan.
+The server requests current administrator-selected ACR values and `max_age=0`
+through the existing state/nonce/PKCE login challenge. Missing or stale settings
+refuse with an administrator-directed message. The redirect never decides an
+approval; signed current claims and target permissions remain mandatory.
+No migration, background task, credential or library is added.
+
+Full application-identity, OIDC and browser transport packages pass with
+`go test -race -count=1` (1.028 s, 3.163 s and 16.365 s). Console check
+(19 files/209 tests), build, built-browser checks (20 journeys/17 accessibility
+scans plus four native-download boundaries/two scans) and `make pre-push` pass.
+The provider fixture now contains a fresh-login form/callback assertion using
+Keycloak baseline ACR 1; its run remains pending. Real higher-LoA/MFA step-up
+qualification also remains pending; component tests do not establish it.
+
+
 ## S-04 increment 12: sensitive acquisition grants (ADR-249, 2026-10-27)
 
 [ADR-249](decisions/249-sensitive-acquisition-grants.md) (12a, individual approval): an

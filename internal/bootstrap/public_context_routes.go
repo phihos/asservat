@@ -66,7 +66,7 @@ func (h *publicContextRoutes) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	}
 	path := r.URL.Path
 	switch path {
-	case "/auth/login", "/auth/callback", "/auth/backchannel-logout", "/auth/csrf", "/auth/refresh", "/auth/logout", "/api/v1/session":
+	case "/auth/login", "/auth/step-up", "/auth/callback", "/auth/backchannel-logout", "/auth/csrf", "/auth/refresh", "/auth/logout", "/api/v1/session":
 		// SessionHandler owns OAuth callback, query, cookie and CSRF semantics.
 		// In particular a cross-site provider callback is not a browser mutation.
 		h.sessions.ServeHTTP(w, r)

@@ -2,6 +2,7 @@ package oidc
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -94,5 +95,29 @@ func TestBrowserTrustAndAuthorizationURL(t *testing.T) {
 	trust.Scopes = []string{"openid", "offline_access"}
 	if _, e = NewBrowser(trust, f.now); e == nil {
 		t.Fatal("offline scope accepted")
+	}
+}
+
+func TestBrowserStepUpURLRequestsFreshConfiguredAssurance(t *testing.T) {
+	p := &BrowserProvider{trust: BrowserTrust{ClientID: "console", AuthorizationEndpoint: "https://issuer.invalid/auth", RedirectURI: "https://console.invalid/auth/callback", Scopes: []string{"openid"}}}
+	s := strings.Repeat("A", 43)
+	raw, err := p.StepUpAuthorizationURL(s, s, s, []string{"gold", "silver"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	u, _ := url.Parse(raw)
+	q := u.Query()
+	if q.Get("max_age") != "0" || q.Get("acr_values") != "gold silver" || q.Get("code_challenge_method") != "S256" || q.Get("state") != s || q.Get("nonce") != s || q.Get("redirect_uri") != p.trust.RedirectURI {
+		t.Fatal("step-up lost pinned OIDC binding")
+	}
+	for _, values := range [][]string{nil, {"gold silver"}, {"gold\n"}, {"gold", "gold"}} {
+		if _, err := p.StepUpAuthorizationURL(s, s, s, values); err == nil {
+			t.Fatal("invalid ACR list accepted")
+		}
+	}
+	raw, err = p.AuthorizationURL(s, s, s)
+	u, _ = url.Parse(raw)
+	if err != nil || u.Query().Has("acr_values") || u.Query().Has("max_age") {
+		t.Fatal("normal login changed")
 	}
 }

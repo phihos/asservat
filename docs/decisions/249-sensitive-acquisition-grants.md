@@ -122,11 +122,9 @@ Benefit established, cost small: proceed.
   with their field path.
 - **Observation spend** (REQ-AUT-006 bytes/events charged before processing) needs the recorder
   (increments 4, 13–15); the limits are bound into the plan and grant now.
-- **Browser step-up login:** the console has no "sign in with step-up" button that adds
-  `acr_values`/`max_age=0` to the authorization request; a reviewer must already hold a
-  step-up-level session (for example a realm or client whose sign-in always performs the step-up
-  flow) and sign in again when `auth_time` is older than the maximum age. Keycloak LoA step-up
-  qualification in the identity fixture (plan open item 10) is pending.
+- **Browser step-up login:** [ADR-253](253-approval-stepup-login.md) adds the console
+  sign-in link and current-policy `acr_values`/`max_age=0` redirect. Real Keycloak
+  LoA step-up qualification (plan open item 10) remains pending.
 - **Preview lifetime:** a review request can only be opened while its preview is current (≤ 5
   minutes); approval may come later, but the plan's own deadline is the preview's. Increment 13
   must start an approved plan through acceptance with its own capture deadline (or extend the

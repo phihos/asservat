@@ -1,5 +1,10 @@
 # Decision records
 
+[ADR-253 — Approval step-up sign-in](253-approval-stepup-login.md) adds an explicit console
+sign-in path using current protected ACR settings and fresh authentication. The
+existing signed-claim check still decides assurance; real-provider LoA qualification
+remains pending. No migration or new credential.
+
 [ADR-249 — Sensitive acquisition grants](249-sensitive-acquisition-grants.md) is S-04 increment
 12 (12a, individual approval): an adHocCapture AccessGrant per reviewed packet/syscall plan that
 needs review (a raw-byte filter predicate, now compiled with REQ-AUT-006 observation limits, or

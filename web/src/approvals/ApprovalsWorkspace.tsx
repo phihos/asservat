@@ -54,7 +54,8 @@ function Detail({ grant, busy, onDecide, onRevoke }: { grant: Grant; busy: boole
       {grant.can_decide && <>
         <label htmlFor="approval-reason">Reason (recorded with your decision)</label>
         <textarea id="approval-reason" rows={2} maxLength={512} value={reason} onChange={event => setReason(event.target.value)}/>
-        <p className="field-help">Approving needs a recent step-up sign-in at your identity provider. You cannot decide a request you made yourself.</p>
+        <p className="field-help">Approving needs a recent step-up sign-in at your identity provider. You cannot decide a request you made yourself. Signing in returns to this plan; review it again before deciding.</p>
+        <a className="button secondary" href={'/auth/step-up?return_to=' + encodeURIComponent('/approvals/' + grant.grant_id)}>Sign in with step-up</a>
         <Button className="button" isDisabled={busy || reason.trim() === ''} onPress={() => onDecide(true, reason.trim())}>Approve</Button>
         <Button className="button secondary" isDisabled={busy || reason.trim() === ''} onPress={() => onDecide(false, reason.trim())}>Deny</Button>
       </>}

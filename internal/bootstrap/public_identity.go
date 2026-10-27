@@ -137,7 +137,7 @@ func newPublicIdentity(ctx context.Context, in *ownerInputs, files *providerInpu
 		mcp:      identities.Service{Tokens: mcpTokens, Policies: policies, Now: time.Now},
 		download: identities.Service{Tokens: downloadTokens, Policies: policies, Now: time.Now},
 		sessions: &identities.BrowserSessions{Store: store, Cipher: kms.BrowserCipher{Sealer: seal, Opener: open}, Provider: provider,
-			Identities: identities.Service{Tokens: browserTokens, Policies: policies, Now: time.Now}, Logout: provider,
+			Identities: identities.Service{Tokens: browserTokens, Policies: policies, Now: time.Now}, Policies: policies, Logout: provider,
 			Issuer: settings.Issuer, ClientID: settings.ClientID, Epoch: settings.Epoch, Lifetime: time.Duration(settings.MaxLifetimeSeconds) * time.Second, Now: time.Now}}
 	if ctx.Err() != nil {
 		return fail(mounts.ErrUnavailable)

@@ -76,6 +76,31 @@ func (p *BrowserProvider) AuthorizationURL(state, nonce, verifier string) (strin
 	u.RawQuery = url.Values{"client_id": {p.trust.ClientID}, "redirect_uri": {p.trust.RedirectURI}, "response_type": {"code"}, "response_mode": {"query"}, "scope": {strings.Join(p.trust.Scopes, " ")}, "state": {state}, "nonce": {nonce}, "code_challenge_method": {"S256"}, "code_challenge": {base64.RawURLEncoding.EncodeToString(hash[:])}}.Encode()
 	return u.String(), nil
 }
+
+// StepUpAuthorizationURL takes only administrator-selected ACR values. max_age=0
+// requests fresh authentication, while the resulting signed claims still decide
+// whether an operation has current step-up assurance (OIDC Core 3.1.2.1).
+func (p *BrowserProvider) StepUpAuthorizationURL(state, nonce, verifier string, acrValues []string) (string, error) {
+	if len(acrValues) == 0 || !identity.Strings(acrValues, 8, 128) {
+		return "", identity.ErrInvalid
+	}
+	for _, acr := range acrValues {
+		if strings.ContainsAny(acr, " \t\r\n") {
+			return "", identity.ErrInvalid
+		}
+	}
+	raw, err := p.AuthorizationURL(state, nonce, verifier)
+	if err != nil {
+		return "", err
+	}
+	u, _ := url.Parse(raw)
+	q := u.Query()
+	q.Set("acr_values", strings.Join(acrValues, " "))
+	q.Set("max_age", "0")
+	u.RawQuery = q.Encode()
+	return u.String(), nil
+}
+
 func (p *BrowserProvider) Exchange(ctx context.Context, code, verifier, nonce string) (app.BrowserTokens, error) {
 	if !identity.Text(code, 4096) || !secret(verifier) || !secret(nonce) {
 		return app.BrowserTokens{}, identity.ErrInvalid

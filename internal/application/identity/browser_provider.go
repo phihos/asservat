@@ -18,6 +18,12 @@ type BrowserProvider interface {
 	Refresh(context.Context, string, string, string, string) (BrowserTokens, error)
 }
 
+// StepUpBrowserProvider requests configured assurance during login. The redirect
+// itself never establishes assurance; signed claims are checked on every use.
+type StepUpBrowserProvider interface {
+	StepUpAuthorizationURL(state, nonce, verifier string, acrValues []string) (string, error)
+}
+
 type LogoutEvent struct {
 	Issuer, ClientID, Subject, SessionID, ID string
 	IssuedAt                                 time.Time

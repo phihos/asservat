@@ -53,6 +53,7 @@ it('shows the exact plan and records one decision with a reason', async () => {
   render(<ApprovalsWorkspace session={session} scope={new AbortController().signal} client={client} grantID={id(41)} newID={() => 'key-1'}/>);
   expect(await screen.findByText('tcp[13] & 2 != 0')).toBeTruthy();
   expect(screen.getByText(/raw byte comparison/)).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Sign in with step-up' }).getAttribute('href')).toBe('/auth/step-up?return_to=' + encodeURIComponent('/approvals/' + id(41)));
   expect(screen.getByText(/Observation limits bound by this approval/)).toBeTruthy();
   const approve = screen.getByRole('button', { name: 'Approve' });
   expect(approve.getAttribute('data-disabled')).not.toBeNull();

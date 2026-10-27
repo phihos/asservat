@@ -74,6 +74,17 @@ func (p browserFixturePolicy) IdentityPolicy(_ context.Context, issuer string) (
 	return identity.Policy{Revision: identity.Revision{UID: "synthetic-browser-policy", Generation: 1, Digest: [32]byte{1}}, Issuer: issuer, ObservedAt: now, FreshUntil: now.Add(30 * time.Second), Clients: []identity.Client{{ID: p.client, Kind: identity.Human, ClassQualified: true}}, EligibleGroups: []string{p.group}, GroupsAtIssueQualified: true, GroupMaxAge: 5 * time.Minute}, nil
 }
 
+// The browser fixture requests the provider's baseline ACR solely to qualify
+// the fresh-authentication redirect/form/callback path. This is not a higher-LoA
+// or MFA realm qualification; a redirect is never evidence of assurance.
+type browserStepUpFixturePolicy struct{ browserFixturePolicy }
+
+func (p browserStepUpFixturePolicy) IdentityPolicy(ctx context.Context, issuer string) (identity.Policy, error) {
+	policy, err := p.browserFixturePolicy.IdentityPolicy(ctx, issuer)
+	policy.StepUp = identity.StepUpPolicy{ACRValues: []string{"1"}, MaxAge: 5 * time.Minute}
+	return policy, err
+}
+
 // Real HTTPS browser/OIDC, PostgreSQL, and OpenBao. Protected root and identity
 // configuration are synthetic acceptance inputs, not production bootstrap.
 func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user, group string) {
@@ -230,7 +241,8 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		t.Fatal(err)
 	}
 	defer verifier.Close()
-	sessions := app.BrowserSessions{Store: store, Cipher: cipher, Provider: provider, Identities: app.Service{Tokens: verifier, Policies: browserFixturePolicy{f.Issuer, clientID, group}, Now: time.Now}, Logout: provider, Issuer: f.Issuer, ClientID: clientID, Epoch: epoch, Lifetime: 8 * time.Hour, Now: time.Now}
+	policy := browserStepUpFixturePolicy{browserFixturePolicy{f.Issuer, clientID, group}}
+	sessions := app.BrowserSessions{Store: store, Cipher: cipher, Provider: provider, Policies: policy, Identities: app.Service{Tokens: verifier, Policies: policy, Now: time.Now}, Logout: provider, Issuer: f.Issuer, ClientID: clientID, Epoch: epoch, Lifetime: 8 * time.Hour, Now: time.Now}
 	handler = browser.SessionHandler{Origin: server.URL, Issuer: f.Issuer, Sessions: sessions}
 	roots := x509.NewCertPool()
 	roots.AppendCertsFromPEM(ca)
@@ -259,9 +271,13 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		}
 		return resp.StatusCode, b, resp.Header
 	}
-	login := func() (string, string) {
+	loginWithMode := func(stepUp bool) (string, string) {
 		t.Helper()
-		status, _, headers := request("GET", server.URL+"/auth/login?return_to=%2Finvestigations", "", "")
+		route, returnTo := "/auth/login", "/investigations"
+		if stepUp {
+			route, returnTo = "/auth/step-up", "/approvals/00000000-0000-4000-8000-000000000001"
+		}
+		status, _, headers := request("GET", server.URL+route+"?return_to="+url.QueryEscape(returnTo), "", "")
 		if status != 303 {
 			t.Fatalf("login start %d", status)
 		}
@@ -270,7 +286,13 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		if query.Query().Get("code_challenge_method") != "S256" || query.Query().Get("nonce") == "" || strings.Contains(authURL, "offline_access") {
 			t.Fatal("login protocol bounds")
 		}
+		if stepUp && (query.Query().Get("max_age") != "0" || query.Query().Get("acr_values") != "1") {
+			t.Fatal("step-up did not request fresh configured assurance")
+		}
 		status, page, headers := request("GET", authURL, "", "")
+		if stepUp && status != 200 {
+			t.Fatalf("max_age=0 did not require active sign-in despite existing provider session: %d", status)
+		}
 		if status == 200 {
 			match := regexp.MustCompile(`<form[^>]*id="kc-form-login"[^>]*action="([^"]+)"`).FindSubmatch(page)
 			if len(match) != 2 {
@@ -290,7 +312,7 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		if status != 303 {
 			t.Fatalf("product callback %d: %s", status, b)
 		}
-		if headers.Get("Location") != "/investigations" {
+		if headers.Get("Location") != returnTo {
 			t.Fatal("return path changed")
 		}
 		for _, c := range headers.Values("Set-Cookie") {
@@ -315,7 +337,14 @@ func (f *kcFixture) browserSessions(t *testing.T, ca []byte, mappers []any, user
 		}
 		return view.CSRF, callback
 	}
+	login := func() (string, string) { return loginWithMode(false) }
 	csrf, callback := login()
+	if !t.Run("step-up-fresh-login-redirect", func(t *testing.T) {
+		csrf, _ = loginWithMode(true)
+		t.Log("actual Keycloak fresh-authentication form, PKCE callback and exact approval return passed; higher LoA/MFA not configured")
+	}) {
+		return
+	}
 	currentOrigin, _ := url.Parse(server.URL)
 	var submissionCookie string
 	for _, c := range jar.Cookies(currentOrigin) {
