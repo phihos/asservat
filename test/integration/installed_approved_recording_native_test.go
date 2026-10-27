@@ -32,6 +32,32 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
+type installedApprovedRecordingPreview struct {
+	ID       string    `json:"preview_id"`
+	Expires  time.Time `json:"expires_at"`
+	Approval bool      `json:"approval_required"`
+	Enabled  bool      `json:"capture_enabled"`
+	Digest   string    `json:"execution_digest"`
+	Blockers []struct {
+		Code string `json:"code"`
+	} `json:"blockers"`
+	Pods []struct{ UID, Name string } `json:"selected_pods"`
+}
+
+func (p installedApprovedRecordingPreview) readyForApproval(now time.Time) bool {
+	return p.ID != "" && p.Approval && !p.Enabled && len(p.Pods) == 1 && p.Pods[0].UID != "" && now.Before(p.Expires) && len(p.Blockers) == 1 && p.Blockers[0].Code == "ApprovalRequired"
+}
+
+// Retry only the ordinary typed transient refusal, within the existing four
+// read attempts. Successful plan-only previews are never retried or approved.
+func installedApprovedRecordingCanRetry(reply installedJourneyEnvelope, code string) bool {
+	var failure struct {
+		Code      string `json:"code"`
+		Retryable bool   `json:"retryable"`
+	}
+	return reply.Status == "error" && code == "NotAvailable" && json.Unmarshal(reply.Data, &failure) == nil && failure.Code == code && failure.Retryable
+}
+
 // approvedRecordingArguments is the actual public request, validated offline
 // before the expensive installed qualification. It is never authority.
 func approvedRecordingArguments(cluster, namespace, workload string) map[string]any {
@@ -217,7 +243,7 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 				}
 				return
 			}
-			if attempt == 3 {
+			if !installedApprovedRecordingCanRetry(reply, code) || attempt == 3 {
 				diagnose()
 				t.Fatal("approved recording read", name, code)
 			}
@@ -226,18 +252,11 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			}
 		}
 	}
-	var preview struct {
-		ID       string                       `json:"preview_id"`
-		Expires  time.Time                    `json:"expires_at"`
-		Approval bool                         `json:"approval_required"`
-		Enabled  bool                         `json:"capture_enabled"`
-		Digest   string                       `json:"execution_digest"`
-		Pods     []struct{ UID, Name string } `json:"selected_pods"`
-	}
+	var preview installedApprovedRecordingPreview
 	arguments := approvedRecordingArguments(cluster, namespace, workload)
 	read("preview_capture", arguments, &preview)
-	if preview.ID == "" || !preview.Approval || preview.Enabled || len(preview.Pods) != 1 || preview.Pods[0].UID == "" || !time.Now().Before(preview.Expires) {
-		t.Fatal("approved recording preview lacks original production review window", preview)
+	if !preview.readyForApproval(time.Now()) {
+		t.Fatal("approved recording preview lacks its original window or has a non-approval blocker", preview.Blockers)
 	}
 	original := map[string]any{"preview_id": preview.ID, "idempotency_key": "approved-preview-" + preview.ID}
 	pending, code := invoke("request_capture", original)

@@ -26,15 +26,19 @@ type ContextRecorders interface {
 }
 
 // packetRecorderAvailable reports whether this composition could be recorded
-// on the target's node now. Any failure is "not available".
-func (s ContextInvestigation) packetRecorderAvailable(ctx context.Context, intent value.ContextIntent, target targets.PodResolution) bool {
+// on the target's node now. Only a known unsupported result is plan-only;
+// operational failures must not create an inert reviewed scope.
+func (s ContextInvestigation) packetRecorderAvailable(ctx context.Context, intent value.ContextIntent, target targets.PodResolution) (bool, error) {
 	if s.Recorders == nil || !packetRecorderInput(intent, target.ExecutionClass) {
-		return false
+		return false, nil
 	}
 	mark := time.Now()
 	err := s.Recorders.PacketRecorder(ctx, target)
 	auditapp.MarkStep(ctx, "p-recorder", mark)
-	return err == nil
+	if errors.Is(err, targets.ErrUnsupported) {
+		return false, nil
+	}
+	return err == nil, err
 }
 
 // packetRecorderInput preserves the supported acquisition boundary before any

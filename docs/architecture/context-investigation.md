@@ -201,6 +201,15 @@ The connector rechecks the Pod's node and collector before enqueueing. Preview
 selection and its plan-only behavior remain unchanged. See the
 [target composition](workload-target-resolution.md#independent-pins-and-deadlines).
 
+Recorder composition previews preserve plan-only blockers for known unsupported
+inputs, no adapter, or a confirmed unavailable/unsupported recorder answer. An
+operational recorder read/transport/cancellation failure returns the existing
+retryable `NotAvailable` result before compilation or preview persistence. The
+installed approved-recording journey requires exactly the `ApprovalRequired`
+blocker before it requests approval, matching the console's requestability gate;
+its existing four reads retry only typed retryable unavailability. Availability
+never upgrades an already stored or approved plan; its original scope stays fixed.
+
 The existing protected approval-settings reader is consulted once per recorder
 submission. A changed administrator approval requirement invalidates the review
 in either direction. Approval presentation separates passive preview expiry from
