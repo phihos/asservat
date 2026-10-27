@@ -92,7 +92,7 @@ instantaneous deletion revocation ([documentation](https://kubernetes.io/docs/ta
 | 7 | Zero configuration knobs. The candidate finite bound is explicitly measured and limited below. |
 | 8 | Existing SQL, TLS, S3, KMS and Kubernetes attesters only; no new provider behavior is assumed. |
 | 9 | O(active responses) small identity/cutoff values; zero additional Kubernetes calls within a window. One existing owner update per newer lease; existing one-second SQL observation memo, one cursor/key opening per window, unchanged native buffering. |
-| 10 | No schema or wire-field migration. Mixed old/new peers can reject the longer command and fail closed; drain/roll matched components. No installed rolling-upgrade qualification is claimed. |
+| 10 | No schema or wire-field migration. This qualification targets fresh matched installs; mixed old/new peers can refuse the longer command. No installed rolling-upgrade qualification is claimed. Regional/download-worker upgrade support remains the existing ADR-227 backlog. |
 | 11 | Changing permission-cache timing alone leaves the defect. Smaller windows multiply audit/key work; whole-file buffering adds memory. Existing renewal is the smaller integrated change. |
 
 ## Qualification and limits

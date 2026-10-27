@@ -1,5 +1,30 @@
 # Sustained implementation progress
 
+## Paced measurement failure retained and PostgreSQL mechanism checked (2026-10-28)
+
+Native 40595384061 on `76bae03c` failed after accepted-capture resolution,
+before traffic/pacing, because setup SQL snapshots were not comparable. Actual
+Go was 596.503s; the old report writer saved no numeric edges, so the exact
+comparison failure remains unknown. Its frozen environment report is retained;
+no paced native delivery or aggregate cost is qualified.
+
+Test-only corrections persist incomplete edges plus a closed refusal reason,
+and reset the owned private statistics once after completed bootstrap, strictly
+before the initial measurement baseline. No product calls, roles, permissions,
+limits or retry behavior change. A report-persistence regression passed RED then
+GREEN; the existing PG/S3-only fixture mode also passed on `0b83e8a5` with
+PostgreSQL 18.6/default 5,000 entries and the unchanged 20s context (test 0.30s,
+Go 1.360s). It proved distinct numeric role-DDL entries, rollback, inherited
+saturation, valid post-reset counting, and refusal of midphase eviction/reset.
+Two preceding fixture failures remain unqualified and archived. All three runs
+matched 3,187 source hashes, unchanged with cleanup `[]` and exact container
+absence. See the [full evidence and limits](research/native-response-qualification.md#incomplete-sql-measurement-and-owned-postgresql-proof-2026-10-28).
+
+This remains a fresh matched-install qualification. Mixed peers may refuse the
+longer operation; regional/download-worker upgrade support remains ADR-227's
+existing backlog. No installed rolling-upgrade or new drain mechanism is claimed.
+A fresh installed pacing run with complete numeric edges is still pending.
+
 ## Installed pacing request correction (2026-10-27)
 
 The first pacing run 40591118979 failed on `fa69b019` before approval or traffic:
@@ -41,7 +66,7 @@ baseline, not a measured fit or a worst-case guarantee: preparation polling,
 in-flight calls, setup and snapshot costs can vary. No timeout or authority
 bound is increased. A timed-out or incomplete experiment cannot qualify this
 candidate. Actual paced payload/backpressure, aggregate costs and two-version
-or operational drained-rollout behavior remain unqualified.
+or installed rolling-upgrade behavior remain unqualified.
 
 Local composed verification exits 0: canonical `make pre-push` with the existing
 spec virtualenv and pinned sqlc (including 218 console checks); full affected

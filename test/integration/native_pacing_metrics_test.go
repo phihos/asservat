@@ -55,6 +55,7 @@ type nativePacingMeasurement struct {
 	Owner                                                    nativePacingOwnerReport
 	Bodies                                                   map[string]nativePacingResult
 	NearFullBytes                                            int64
+	MeasurementFailure                                       string `json:"measurement_failure,omitempty"`
 	Complete                                                 bool
 	PCAPInterfaceStatistics                                  string
 	FirstPacketAt, LastPacketAt                              time.Time
@@ -159,18 +160,22 @@ func (m *nativePacingMeasurement) begin(ctx context.Context, name string) (func(
 }
 
 func (m *nativePacingMeasurement) writeReport() error {
+	// Persist the bounded edge observations even when coverage was lost. A
+	// failed comparison never becomes a complete report or a fabricated zero.
+	m.ObservedSQLDelta, m.ObservedProviderDelta = nil, nil
+	m.MeasurementFailure = ""
+	var measurementErr error
 	if len(m.Phases) > 0 {
 		first, last := m.Phases[0].Before, m.Phases[len(m.Phases)-1].After
-		var err error
-		m.ObservedSQLDelta, err = nativePacingSQLDelta(first.SQL, last.SQL)
-		if err != nil {
-			return err
-		}
-		m.ObservedProviderDelta, err = nativeProviderDelta(first.Providers, last.Providers)
-		if err != nil {
-			return err
-		}
 		m.ObservedStartedAt, m.ObservedFinishedAt = first.StartedAt, last.FinishedAt
+		m.ObservedSQLDelta, measurementErr = nativePacingSQLDelta(first.SQL, last.SQL)
+		if measurementErr == nil {
+			m.ObservedProviderDelta, measurementErr = nativeProviderDelta(first.Providers, last.Providers)
+		}
+	}
+	if measurementErr != nil {
+		m.Complete = false
+		m.MeasurementFailure = measurementErr.Error()
 	}
 	// Unexported fixture pointers/installation IDs/SQL credentials never leave
 	// this object. An incomplete report stays explicitly incomplete.
@@ -178,5 +183,8 @@ func (m *nativePacingMeasurement) writeReport() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile("../results/native-paced-report.json", append(raw, '\n'), 0600)
+	if err = os.WriteFile("../results/native-paced-report.json", append(raw, '\n'), 0600); err != nil {
+		return err
+	}
+	return measurementErr
 }

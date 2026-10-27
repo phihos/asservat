@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -37,6 +39,10 @@ REVOKE ALL ON SCHEMA fixture_native_statistics FROM PUBLIC;
 REVOKE ALL ON ALL TABLES IN SCHEMA fixture_native_statistics FROM PUBLIC;
 REVOKE ALL ON ALL FUNCTIONS IN SCHEMA fixture_native_statistics FROM PUBLIC;
 COMMIT;`
+
+// Only the owned fixture administrator calls this once after completed
+// bootstrap, strictly before its first measurement edge. Never rearm a phase.
+const nativePacingStatisticsReset = `SELECT fixture_native_statistics.pg_stat_statements_reset()`
 
 func nativePacingSQLSnapshot(ctx context.Context, admin *pgxpool.Pool) (nativeSQLSnapshot, error) {
 	s := nativeSQLSnapshot{StartedAt: time.Now().UTC(), Roles: make(map[uint32]nativeSQLCounters)}
@@ -90,8 +96,23 @@ func (c nativeSQLCounters) valid() bool {
 // Snapshot edges span actual reads while background work continues; these are
 // background-inclusive intervals, not an atomic trace of one HTTP request.
 func nativePacingSQLDelta(before, after nativeSQLSnapshot) (map[uint32]nativeSQLCounters, error) {
-	if before.ResetAt.IsZero() || !before.ResetAt.Equal(after.ResetAt) || before.Deallocations != after.Deallocations || before.Deallocations < 0 || before.StartedAt.After(before.FinishedAt) || after.StartedAt.Before(before.FinishedAt) || after.StartedAt.After(after.FinishedAt) || len(before.Roles) > 512 || len(after.Roles) > 512 {
-		return nil, errors.New("SQL snapshots are not comparable")
+	if before.ResetAt.IsZero() || after.ResetAt.IsZero() {
+		return nil, errors.New("SQL snapshot reset timestamp missing")
+	}
+	if !before.ResetAt.Equal(after.ResetAt) {
+		return nil, errors.New("SQL snapshot reset timestamp changed")
+	}
+	if before.Deallocations < 0 || after.Deallocations < 0 {
+		return nil, errors.New("SQL snapshot deallocation count invalid")
+	}
+	if before.Deallocations != after.Deallocations {
+		return nil, errors.New("SQL snapshot entries evicted")
+	}
+	if before.StartedAt.After(before.FinishedAt) || after.StartedAt.Before(before.FinishedAt) || after.StartedAt.After(after.FinishedAt) {
+		return nil, errors.New("SQL snapshot time intervals overlap or moved backwards")
+	}
+	if len(before.Roles) > 512 || len(after.Roles) > 512 {
+		return nil, errors.New("SQL snapshot role count exceeds bound")
 	}
 	for id := range before.Roles {
 		if _, ok := after.Roles[id]; !ok {
@@ -212,10 +233,90 @@ func TestNativePacingSQLWithRealPostgres(t *testing.T) {
 	if err := admin.QueryRow(ctx, `SELECT oid FROM pg_roles WHERE rolname='fixture_native_pacing_statistics'`).Scan(&role); err != nil {
 		t.Fatal("measurement role identity unavailable")
 	}
-	before, err := nativePacingSQLSnapshot(ctx, admin)
+	// PostgreSQL 18 normalizes SET literal values. CREATE ROLE's identifier
+	// remains part of its query jumble. First require two distinct numeric
+	// entries inside one transaction; retain no role or query text afterward.
+	var maximum int
+	if err := admin.QueryRow(ctx, `SELECT current_setting('pg_stat_statements.max')::integer`).Scan(&maximum); err != nil || maximum != 5000 {
+		t.Fatal("statistics capacity differs from the pinned default", maximum, err)
+	}
+	preflight, err := admin.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer preflight.Rollback(ctx)
+	const entries = `SELECT count(*)::bigint,count(DISTINCT queryid)::bigint
+ FROM fixture_native_statistics.pg_stat_statements
+ WHERE userid=(current_user::regrole)::oid
+ AND dbid=(SELECT oid FROM pg_database WHERE datname=current_database())`
+	var beforeEntries, beforeIDs, afterEntries, afterIDs int64
+	// Warm this same numeric query before its baseline so it cannot account
+	// for one of the two new entries being tested.
+	for i := 0; i < 2; i++ {
+		if err := preflight.QueryRow(ctx, entries).Scan(&beforeEntries, &beforeIDs); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := preflight.Exec(ctx, `CREATE ROLE fixture_bootstrap_probe_a NOLOGIN; CREATE ROLE fixture_bootstrap_probe_b NOLOGIN`); err != nil {
+		t.Fatal(err)
+	}
+	if err := preflight.QueryRow(ctx, entries).Scan(&afterEntries, &afterIDs); err != nil || afterEntries-beforeEntries != 2 || afterIDs-beforeIDs != 2 {
+		t.Fatal("role identifiers did not produce two distinct tracked entries", beforeEntries, afterEntries, beforeIDs, afterIDs, err)
+	}
+	if err := preflight.Rollback(ctx); err != nil {
+		t.Fatal(err)
+	}
+	flood := func(ordinal int) {
+		t.Helper()
+		transaction, err := admin.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer transaction.Rollback(ctx)
+		var statements strings.Builder
+		for i := 0; i <= maximum; i++ {
+			fmt.Fprintf(&statements, "CREATE ROLE fixture_bootstrap_%d_%d NOLOGIN;\n", ordinal, i)
+		}
+		if _, err := transaction.Exec(ctx, statements.String()); err != nil {
+			t.Fatal("synthetic bootstrap DDL batch failed", err)
+		}
+		if err := transaction.Rollback(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	initial, err := nativePacingSQLSnapshot(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	flood(1)
+	inherited, err := nativePacingSQLSnapshot(ctx, admin)
+	if err != nil || inherited.Deallocations <= initial.Deallocations {
+		t.Fatal("DDL prefill did not reproduce inherited saturation", initial.Deallocations, inherited.Deallocations, err)
+	}
+	flood(2)
+	evicted, err := nativePacingSQLSnapshot(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := nativePacingSQLDelta(inherited, evicted); err == nil || err.Error() != "SQL snapshot entries evicted" {
+		t.Fatal("eviction inside measured interval was accepted", inherited.Deallocations, evicted.Deallocations, err)
+	}
+	var retainedRoles int
+	if err := admin.QueryRow(ctx, `SELECT count(*)::integer FROM pg_roles WHERE rolname LIKE 'fixture_bootstrap_%'`).Scan(&retainedRoles); err != nil || retainedRoles != 0 {
+		t.Fatal("synthetic bootstrap roles survived rollback", retainedRoles, err)
+	}
+	t.Logf("identifier preflight entries=%d→%d distinct IDs=%d→%d; retained bootstrap roles=%d", beforeEntries, afterEntries, beforeIDs, afterIDs, retainedRoles)
+	// This reset starts the first positive baseline only after the entire
+	// synthetic bootstrap. Lost preflight coverage was refused above, not
+	// represented as zero or retried within one measurement interval.
+	if _, err := admin.Exec(ctx, nativePacingStatisticsReset); err != nil {
+		t.Fatal("pre-baseline statistics reset failed", err)
+	}
+	before, err := nativePacingSQLSnapshot(ctx, admin)
+	if err != nil || before.Deallocations != 0 || !before.ResetAt.After(inherited.ResetAt) {
+		t.Fatal("first positive baseline retained pre-bootstrap statistics", before.Deallocations, err)
+	}
+	t.Logf("default entries=%d inherited deallocations=%d then midphase=%d; first positive baseline reset deallocations=%d", maximum, inherited.Deallocations, evicted.Deallocations, before.Deallocations)
 	cfg, err := pgxpool.ParseConfig(f.Postgres)
 	if err != nil {
 		t.Fatal("SQL fixture connection configuration invalid")
@@ -261,6 +362,16 @@ func TestNativePacingSQLWithRealPostgres(t *testing.T) {
 	}
 	if _, ok := delta[administrator]; ok {
 		t.Fatal("fixture SQL snapshot counted its own reader")
+	}
+	if _, err := admin.Exec(ctx, nativePacingStatisticsReset); err != nil {
+		t.Fatal(err)
+	}
+	reset, err := nativePacingSQLSnapshot(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := nativePacingSQLDelta(after, reset); err == nil || err.Error() != "SQL snapshot reset timestamp changed" {
+		t.Fatal("midphase reset did not refuse coverage", err)
 	}
 	t.Log("actual PostgreSQL numeric role counters isolate two statements; no query text or parameters exported")
 }
