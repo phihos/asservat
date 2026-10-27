@@ -24,6 +24,9 @@ const (
 	// ShareMaxActivePerArtifact bounds unrevoked, unexpired shares of one artifact.
 	ShareMaxActivePerArtifact = 32
 	ShareScope                = "evidence:share"
+	// ShareMaxRevision is the wire contract's revision bound; transfers past
+	// it are refused (a share lives at most seven days).
+	ShareMaxRevision = 1000000000
 )
 
 // SharePhase is derived at read time; only revocation is stored.
@@ -96,7 +99,8 @@ func (s Share) Valid() bool {
 	if !UUID(s.ID) || !UUID(s.RootID) || !UUID(s.ArtifactID) || !UUID(s.CaseID) || !s.Target.Valid() || s.Version == (artifact.Digest{}) ||
 		!s.Creator.Valid() || s.Creator.Kind != identity.Human || s.CreatedAt.IsZero() || !s.ExpiresAt.After(s.CreatedAt) || s.ExpiresAt.Sub(s.CreatedAt) > ShareMaxLifetime ||
 		len(s.Management) < 1 || len(s.Management) > ShareMaxManagers || len(s.Recipients) < 1 || len(s.Recipients) > ShareMaxRecipients ||
-		(s.Revision != 1 || !s.RevokedAt.IsZero()) && (s.Revision != 2 || s.RevokedAt.IsZero()) {
+		// Every transfer (ADR-238) and the one revocation add one revision.
+		s.Revision < 1 || s.Revision > ShareMaxRevision || !s.RevokedAt.IsZero() && s.Revision < 2 {
 		return false
 	}
 	seen := map[string]bool{}
@@ -253,7 +257,51 @@ func evaluateShare(op Operation, i identity.Identity, p Projection, t Target, e 
 // evidence:share scope and at least one contributing evidence-owner
 // assignment. It returns the assignments to pin (at most ShareMaxManagers).
 func ShareManagement(i identity.Identity, p Projection, t Target, e *Retained, now time.Time) (Result, []artifact.AudienceAssignment) {
-	if e == nil || i.Principal.Kind != identity.Human {
+	return SelectShareManagement(i, p, t, e, ManagementRequest{}, now)
+}
+
+// ManagementRequest is an explicit management selection (REQ-SHR-008,
+// ADR-238). The zero value selects the default. Mode "creator" pins the
+// caller's own individual evidence-owner assignments; mode "teams" pins the
+// caller's evidence-owner assignments of exactly the named groups (stable IDs
+// of the caller's issuer). Every selected team must be one the caller holds:
+// selecting a team the caller does not belong to needs a management
+// delegation this release does not offer, so it is refused
+// (ManagementNotHeld), never silently dropped.
+type ManagementRequest struct {
+	Mode  string
+	Teams []string
+}
+
+func (r ManagementRequest) Valid() bool {
+	switch r.Mode {
+	case "":
+		return len(r.Teams) == 0
+	case "creator":
+		return len(r.Teams) == 0
+	case "teams":
+		if len(r.Teams) < 1 || len(r.Teams) > ShareMaxManagers {
+			return false
+		}
+		seen := map[string]bool{}
+		for _, g := range r.Teams {
+			if !identity.Text(g, 256) || seen[g] {
+				return false
+			}
+			seen[g] = true
+		}
+		return true
+	}
+	return false
+}
+
+// SelectShareManagement is ShareManagement with an explicit selection. The
+// caller's current contributing evidence-owner assignments for the artifact
+// (ordinary ReadApproved, retained audience included) are the only
+// candidates, so a selection can never add a team the caller does not hold
+// now or that is outside the artifact's audience.
+func SelectShareManagement(i identity.Identity, p Projection, t Target, e *Retained, m ManagementRequest, now time.Time) (Result, []artifact.AudienceAssignment) {
+	if e == nil || i.Principal.Kind != identity.Human || !m.Valid() {
 		return Result{Reason: "InvalidRequest"}, nil
 	}
 	r := Evaluate(i, p, ReadApproved, t, e, now)
@@ -277,9 +325,29 @@ func ShareManagement(i identity.Identity, p Projection, t Target, e *Retained, n
 			personal = append(personal, a)
 		}
 	}
-	owners := teams
-	if len(owners) == 0 {
-		owners = personal
+	var owners []artifact.AudienceAssignment
+	switch m.Mode {
+	case "":
+		owners = teams
+		if len(owners) == 0 {
+			owners = personal
+		}
+	case "creator":
+		if owners = personal; len(owners) == 0 {
+			return Result{Reason: "ManagementNotHeld"}, nil
+		}
+	case "teams":
+		for _, g := range m.Teams {
+			n := len(owners)
+			for _, a := range teams {
+				if a.SubjectID == g {
+					owners = append(owners, a)
+				}
+			}
+			if len(owners) == n {
+				return Result{Reason: "ManagementNotHeld"}, nil
+			}
+		}
 	}
 	if len(owners) == 0 {
 		return Result{Reason: "NoOwnerAuthority"}, nil
@@ -288,6 +356,51 @@ func ShareManagement(i identity.Identity, p Projection, t Target, e *Retained, n
 		return Result{Reason: "ManagementTooBroad"}, nil
 	}
 	return r, owners
+}
+
+// AdministeredShareManagement is the scoped management delegation of an
+// installation administrator (ADR-238): it pins the current evidence-owner
+// Group assignments of the named teams (stable IDs of issuer) that cover the
+// target and are inside the artifact's retained audience, whether or not the
+// administrator belongs to them. Each team needs at least one such current,
+// undenied assignment (else ManagementNotHeld); more than eight assignments
+// are refused. It never adds an assignment outside the retained audience, so
+// it cannot widen who may read the artifact, and it grants the administrator
+// nothing. The caller checks the administrator authority first.
+func AdministeredShareManagement(issuer string, p Projection, t Target, e *Retained, teams []string, now time.Time) (Result, []artifact.AudienceAssignment) {
+	m := ManagementRequest{Mode: "teams", Teams: teams}
+	if e == nil || !m.Valid() || !identity.Text(issuer, 2048) || !t.Valid() || e.Target != t || !e.valid() {
+		return Result{Reason: "InvalidRequest"}, nil
+	}
+	if !projectionCurrent(p, t, now) {
+		return Result{Reason: "PermissionUnavailable"}, nil
+	}
+	until := identity.Earlier(p.FreshUntil, p.DeniesFreshUntil)
+	var owners []artifact.AudienceAssignment
+	for _, g := range teams {
+		n := len(owners)
+		for _, a := range p.Allows {
+			x := a.Audience
+			if x.Kind != "Group" || x.Issuer != issuer || x.SubjectID != g || x.Role != "evidence-owner" || !slices.Contains(e.Audience, x) || !identity.Fresh(a.ObservedAt, a.FreshUntil, now, 60*time.Second) {
+				continue
+			}
+			denied := false
+			for _, d := range p.Denies {
+				denied = denied || d.Audience.Kind == "Group" && d.Audience.Issuer == issuer && d.Audience.SubjectID == g && permits(d.Audience.Role, ReadApproved)
+			}
+			if !denied {
+				owners = append(owners, x)
+				until = identity.Earlier(until, a.FreshUntil)
+			}
+		}
+		if len(owners) == n {
+			return Result{Reason: "ManagementNotHeld"}, nil
+		}
+	}
+	if len(owners) > ShareMaxManagers {
+		return Result{Reason: "ManagementTooBroad"}, nil
+	}
+	return Result{Eligible: true, Reason: "Administered", PermissionRevision: p.Revision, ValidUntil: until, ContributingAssignments: owners}, owners
 }
 
 // ManagedBy returns the pinned management assignments that i holds now

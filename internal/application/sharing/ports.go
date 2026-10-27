@@ -2,10 +2,12 @@ package sharing
 
 import (
 	"context"
+	"time"
 
 	authapp "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/fleet"
 	"asservat.local/asservat/internal/domain/identity"
 )
 
@@ -21,20 +23,42 @@ type Request struct {
 // Revocation revokes one share. The actor is its creator or, with Managers,
 // a current manager (ADR-232 increment 4): Managers are the pinned assignment
 // IDs the service found the actor holding now; the store requires each to be
-// pinned by the row.
+// pinned by the row. Administrator marks an installation administrator's
+// revocation (ADR-238): the service checked the protected fleet
+// administration; revocation only restricts access.
 type Revocation struct {
 	ShareID          string
 	Actor            identity.Principal
 	Managers         []string
+	Administrator    bool
 	ExpectedRevision int64
 	IdempotencyKey   string
 }
 
-// Store is the SQL share ledger. Create and revoke run under the current
-// recovery fence; a replayed key returns the original row and replay=true.
-// OwnedShares returns the caller's own shares and the unrevoked, unexpired
-// shares pinning a management assignment of one of the caller's keys
-// (candidates: the service checks current management).
+// Transfer replaces the pinned management of one active share (ADR-238).
+// Managers are the pinned assignment IDs the service found the actor holding
+// now (the store requires each to be pinned by the row); Management is the
+// complete new set, all held by the actor now. Creator, recipients, artifact
+// and expiry never change.
+type Transfer struct {
+	ShareID  string
+	Actor    identity.Principal
+	Managers []string
+	// Administrator marks an installation administrator's assignment or
+	// recovery (the service checked the fleet administration); the store
+	// then requires no pinned manager.
+	Administrator    bool
+	Management       []artifact.AudienceAssignment
+	ExpectedRevision int64
+	IdempotencyKey   string
+	RequestDigest    artifact.Digest
+}
+
+// Store is the SQL share ledger. Create, revoke and transfer run under the
+// current recovery fence; a replayed key returns the original row and
+// replay=true. OwnedShares returns the caller's own shares and the
+// unrevoked, unexpired shares pinning a management assignment of one of the
+// caller's keys (candidates: the service checks current management).
 type Store interface {
 	authapp.ShareReader
 	CreateShare(context.Context, Request, artifact.RecoveryProof) (authorization.Share, bool, error)
@@ -42,4 +66,23 @@ type Store interface {
 	OwnedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error)
 	ReceivedShares(ctx context.Context, caller identity.Identity, limit int) ([]authorization.Share, error)
 	RevokeShare(context.Context, Revocation, artifact.RecoveryProof) (authorization.Share, bool, error)
+	TransferShare(context.Context, Transfer, artifact.RecoveryProof) (authorization.Share, bool, error)
+	// AdministeredShares is the administrator's management-only page of all
+	// shares, newest first, strictly after the keyset position (zero: the
+	// first page).
+	AdministeredShares(ctx context.Context, after ShareCursor, limit int) ([]authorization.Share, error)
+}
+
+// ShareCursor is a keyset position (created_at, id) of the administrator
+// listing; the zero value starts at the newest share.
+type ShareCursor struct {
+	CreatedAt time.Time
+	ID        string
+}
+
+// Administrators reads the protected fleet administration whose operators
+// are the installation administrators (ADR-237, ADR-238). It grants them no
+// evidence read: the share service uses it only to let them revoke.
+type Administrators interface {
+	FleetAdministration(context.Context) (fleet.Administration, error)
 }

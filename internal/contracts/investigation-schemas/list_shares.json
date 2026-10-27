@@ -1,6 +1,6 @@
 {
   "name": "list_shares",
-  "description": "List the shares you created (view owned, every phase) or currently manage through a pinned owner team (unrevoked, unexpired), with revision, created_by and managed_by; or the shares you can currently read (view received, Active only). Most recent first, at most limit (default 20, maximum 100).",
+  "description": "List the shares you created (view owned, every phase) or currently manage through a pinned owner team (unrevoked, unexpired), with revision, created_by and managed_by; or the shares you can currently read (view received, Active only). Installation administrators may page through every share management-only with view administration and cursor (IDs, phase, expiry, revision, created_by, managed_by; never recipients or evidence). Most recent first, at most limit (default 20, maximum 100).",
   "annotations": {
     "readOnlyHint": true,
     "destructiveHint": false,
@@ -10,6 +10,11 @@
     "type": "object",
     "additionalProperties": false,
     "properties": {
+      "cursor": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 4096
+      },
       "limit": {
         "type": "integer",
         "minimum": 1,
@@ -19,7 +24,8 @@
         "type": "string",
         "enum": [
           "owned",
-          "received"
+          "received",
+          "administration"
         ]
       }
     },
@@ -57,7 +63,16 @@
         "const": false
       },
       "next_cursor": {
-        "type": "null"
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          {
+            "type": "null"
+          }
+        ]
       },
       "narrowing_hint": {
         "type": "null"
@@ -117,6 +132,10 @@
                           "type": "string",
                           "format": "uuid"
                         },
+                        "artifact_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
                         "phase": {
                           "enum": [
                             "Active",
@@ -130,10 +149,9 @@
                           "format": "date-time"
                         },
                         "revision": {
-                          "enum": [
-                            1,
-                            2
-                          ]
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000000
                         },
                         "created_by": {
                           "$ref": "#/$defs/d0"

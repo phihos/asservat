@@ -165,6 +165,34 @@ func (s *EvidenceShares) OwnedShares(ctx context.Context, caller identity.Identi
 	return out, nil
 }
 
+// AdministeredShares returns one keyset page of all shares of this root,
+// newest first (ADR-238); the service checked the administrator authority.
+func (s *EvidenceShares) AdministeredShares(ctx context.Context, after sharing.ShareCursor, limit int) ([]authorization.Share, error) {
+	paged := after != (sharing.ShareCursor{})
+	if s == nil || ctx == nil || ctx.Err() != nil || limit < 1 || limit > 101 || paged && (!authorization.UUID(after.ID) || after.CreatedAt.IsZero()) {
+		return nil, value.ErrUnavailable
+	}
+	params := custodydb.ListAdministeredSharesParams{RootID: id(s.root), Paged: paged, RowLimit: int32(limit)}
+	if paged {
+		params.AfterCreatedAt, params.AfterID = ts(after.CreatedAt), id(after.ID)
+	} else {
+		params.AfterCreatedAt, params.AfterID = ts(time.Unix(0, 0)), id(s.root)
+	}
+	var out []authorization.Share
+	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		rows, err := q.ListAdministeredShares(ctx, params)
+		if err != nil {
+			return err
+		}
+		out, err = s.observed(ctx, q, rows)
+		return err
+	})
+	if err != nil {
+		return nil, value.ErrUnavailable
+	}
+	return out, nil
+}
+
 // Share reads one share of this root; a missing share is Denied.
 func (s *EvidenceShares) Share(ctx context.Context, shareID string) (authorization.Share, error) {
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(shareID) {
@@ -296,12 +324,12 @@ func (s *EvidenceShares) CreateShare(ctx context.Context, r sharing.Request, rec
 	return out, replay, nil
 }
 
-// RevokeShare revokes a share once for its creator or, with r.Managers, for a
+// RevokeShare revokes a share once for its creator, with r.Managers for a
 // manager the service found holding those pinned assignments now (ADR-232
-// increment 4); every named assignment must be pinned by the row, which is
-// immutable. The same key after success is a replay; another key or a stale
-// expected revision is Conflict; any other share (or none) is Denied without
-// saying which.
+// increment 4; every named assignment must be pinned by the locked row), or
+// for an administrator the service checked (ADR-238). The same key after
+// success is a replay; another key or a stale expected revision is Conflict;
+// any other share (or none) is Denied without saying which.
 func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, recovery artifact.RecoveryProof) (authorization.Share, bool, error) {
 	var zero authorization.Share
 	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !r.Actor.Valid() || len(r.Managers) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
@@ -322,7 +350,7 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, 
 		if err != nil {
 			return err
 		}
-		if (row.CreatorIssuer != r.Actor.Issuer || row.CreatorSubject != r.Actor.Subject) && !pinsAll(row.Management, r.Managers) {
+		if !r.Administrator && (row.CreatorIssuer != r.Actor.Issuer || row.CreatorSubject != r.Actor.Subject) && !pinsAll(row.Management, r.Managers) {
 			return value.ErrDenied
 		}
 		switch {
@@ -332,6 +360,74 @@ func (s *EvidenceShares) RevokeShare(ctx context.Context, r sharing.Revocation, 
 			return value.ErrConflict
 		default:
 			if row, err = q.RevokeShare(ctx, custodydb.RevokeShareParams{RootID: id(s.root), ID: id(r.ShareID), RevokeKey: pgtype.Text{String: r.IdempotencyKey, Valid: true}}); err != nil {
+				return err
+			}
+		}
+		got, err := s.observed(ctx, q, []custodydb.EvidenceShare{row})
+		if err != nil {
+			return err
+		}
+		out = got[0]
+		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
+			return err
+		}
+		return ctx.Err()
+	})
+	if err != nil {
+		return zero, false, shareError(err)
+	}
+	return out, replay, nil
+}
+
+// TransferShare replaces the management of a live share (ADR-238) for a
+// manager the service found holding r.Managers now; each must be pinned by
+// the locked row. The same key and request after success is a replay (the
+// latest transfer only); the same key for another request, another key at a
+// stale revision or a revoked share is Conflict; an expired, unknown or not
+// managed share is Denied.
+func (s *EvidenceShares) TransferShare(ctx context.Context, r sharing.Transfer, recovery artifact.RecoveryProof) (authorization.Share, bool, error) {
+	var zero authorization.Share
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.ShareID) || !r.Actor.Valid() || len(r.Managers) < 1 && !r.Administrator || len(r.Managers) > authorization.ShareMaxManagers ||
+		len(r.Management) < 1 || len(r.Management) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) || r.ExpectedRevision < 1 {
+		return zero, false, value.ErrInvalid
+	}
+	management, err := json.Marshal(r.Management)
+	if err != nil {
+		return zero, false, value.ErrInvalid
+	}
+	var out authorization.Share
+	replay := false
+	err = s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		replay = false
+		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
+		if err != nil {
+			return err
+		}
+		row, err := q.ReadShareForUpdate(ctx, custodydb.ReadShareForUpdateParams{RootID: id(s.root), ID: id(r.ShareID)})
+		if errors.Is(err, pgx.ErrNoRows) {
+			return value.ErrDenied
+		}
+		if err != nil {
+			return err
+		}
+		if !r.Administrator && !pinsAll(row.Management, r.Managers) {
+			return value.ErrDenied
+		}
+		switch {
+		case row.TransferKey == (pgtype.Text{String: r.IdempotencyKey, Valid: true}):
+			if !bytes.Equal(row.TransferDigest, r.RequestDigest[:]) {
+				return value.ErrConflict
+			}
+			replay = true
+		case row.RevokedAt.Valid || row.Revision != r.ExpectedRevision:
+			return value.ErrConflict
+		default:
+			row, err = q.TransferShare(ctx, custodydb.TransferShareParams{RootID: id(s.root), ID: id(r.ShareID), Management: management, TransferKey: r.IdempotencyKey, TransferDigest: r.RequestDigest[:]})
+			if errors.Is(err, pgx.ErrNoRows) {
+				// Expired (or at the revision bound): nothing to manage.
+				return value.ErrDenied
+			}
+			if err != nil {
 				return err
 			}
 		}

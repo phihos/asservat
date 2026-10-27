@@ -495,7 +495,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 		}
 		return json.Marshal(in)
 	}
-	if name == "create_share" || name == "list_shares" || name == "revoke_share" {
+	if name == "create_share" || name == "list_shares" || name == "revoke_share" || name == "transfer_share" {
 		var in ShareOperationInput
 		if json.Unmarshal(raw, &in) != nil {
 			return nil, contracts.ErrInvestigationWire
@@ -536,7 +536,7 @@ func (s *AuditedOperations) normalize(name string, raw []byte) ([]byte, error) {
 }
 func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationReply, callErr error, effectPossible bool) (audit.OperationOutcome, error) {
 	out := audit.OperationOutcome{Intent: in, Status: "unavailable", Reason: "authority_unavailable", Effect: "none", ClientReceipt: "unknown", MetadataUntil: in.RequestUntil, RecordedAt: s.config.Now().UTC().Truncate(time.Microsecond)}
-	if effectPossible && (in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download" || in.Name == "activate_policy" || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || queryOperation(in.Name)) {
+	if effectPossible && (in.Name == "request_capture" || in.Name == "resolve_capture_request" || in.Name == "prepare_artifact_download" || in.Name == "activate_policy" || in.Name == "deactivate_policy" || in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" || queryOperation(in.Name)) {
 		out.Effect = "unknown"
 	}
 	if queryOperation(in.Name) {
@@ -630,7 +630,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 			if in.Name == "prepare_artifact_download" && refs.DownloadID != "" {
 				out.Effect = "accepted"
 			}
-			if in.Name == "create_share" || in.Name == "revoke_share" {
+			if in.Name == "create_share" || in.Name == "revoke_share" || in.Name == "transfer_share" {
 				// ADR-232: the acknowledged share or revocation is the effect.
 				var share struct {
 					ShareID string `json:"share_id"`

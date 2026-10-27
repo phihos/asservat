@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -61,9 +62,11 @@ func (f *fixture) RecoveryState(context.Context) (artifact.RecoveryProof, error)
 // memoryStore is an in-memory share ledger with the SQL adapter's replay,
 // conflict and creator-or-pinned-manager revocation rules.
 type memoryStore struct {
-	now     func() time.Time
-	rows    []value.Share
-	created []Request
+	now       func() time.Time
+	rows      []value.Share
+	created   []Request
+	revokers  []Revocation
+	transfers map[string]Transfer
 }
 
 func (s *memoryStore) stamp(v value.Share) value.Share {
@@ -140,16 +143,71 @@ func (s *memoryStore) RevokeShare(_ context.Context, r Revocation, _ artifact.Re
 		for _, id := range r.Managers {
 			pinned = pinned && slices.ContainsFunc(s.rows[i].Management, func(a artifact.AudienceAssignment) bool { return a.AssignmentID == id })
 		}
-		if s.rows[i].ID == r.ShareID && (s.rows[i].Creator.Subject == r.Actor.Subject || pinned) {
+		if s.rows[i].ID == r.ShareID && (r.Administrator || s.rows[i].Creator.Subject == r.Actor.Subject || pinned) {
 			if !s.rows[i].RevokedAt.IsZero() {
 				return s.stamp(s.rows[i]), true, nil
 			}
 			if s.rows[i].Revision != r.ExpectedRevision {
 				return value.Share{}, false, capture.ErrConflict
 			}
-			s.rows[i].RevokedAt, s.rows[i].Revision = s.now(), 2
+			s.rows[i].RevokedAt, s.rows[i].Revision = s.now(), s.rows[i].Revision+1
+			s.revokers = append(s.revokers, r)
 			return s.stamp(s.rows[i]), false, nil
 		}
+	}
+	return value.Share{}, false, capture.ErrDenied
+}
+
+// AdministeredShares mirrors the SQL keyset page: newest first, strictly
+// after the cursor.
+func (s *memoryStore) AdministeredShares(_ context.Context, after ShareCursor, limit int) ([]value.Share, error) {
+	rows := slices.Clone(s.rows)
+	slices.SortFunc(rows, func(a, b value.Share) int {
+		if c := b.CreatedAt.Compare(a.CreatedAt); c != 0 {
+			return c
+		}
+		return strings.Compare(b.ID, a.ID)
+	})
+	var out []value.Share
+	for _, r := range rows {
+		if after != (ShareCursor{}) && (r.CreatedAt.After(after.CreatedAt) || r.CreatedAt.Equal(after.CreatedAt) && r.ID >= after.ID) {
+			continue
+		}
+		if len(out) < limit {
+			out = append(out, s.stamp(r))
+		}
+	}
+	return out, nil
+}
+
+// TransferShare mirrors the SQL adapter: pinned current managers only, the
+// latest transfer key replays, a stale revision conflicts.
+func (s *memoryStore) TransferShare(_ context.Context, t Transfer, _ artifact.RecoveryProof) (value.Share, bool, error) {
+	for i := range s.rows {
+		if s.rows[i].ID != t.ShareID {
+			continue
+		}
+		pinned := len(t.Managers) > 0
+		for _, id := range t.Managers {
+			pinned = pinned && slices.ContainsFunc(s.rows[i].Management, func(a artifact.AudienceAssignment) bool { return a.AssignmentID == id })
+		}
+		switch {
+		case !pinned && !t.Administrator:
+			return value.Share{}, false, capture.ErrDenied
+		case s.transfers[t.ShareID].IdempotencyKey == t.IdempotencyKey:
+			if s.transfers[t.ShareID].RequestDigest != t.RequestDigest {
+				return value.Share{}, false, capture.ErrConflict
+			}
+			return s.stamp(s.rows[i]), true, nil
+		case !s.rows[i].RevokedAt.IsZero() || s.rows[i].Revision != t.ExpectedRevision:
+			return value.Share{}, false, capture.ErrConflict
+		}
+		s.rows[i].Management, s.rows[i].Revision = slices.Clone(t.Management), s.rows[i].Revision+1
+		if s.transfers == nil {
+			s.transfers = map[string]Transfer{}
+		}
+		s.transfers[t.ShareID] = t
+		return s.stamp(s.rows[i]), false, nil
 	}
 	return value.Share{}, false, capture.ErrDenied
 }

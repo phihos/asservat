@@ -41,9 +41,10 @@ The machine-readable catalog is [mcp-tools.json](contracts/mcp-tools.json). A UI
 | `debugger_command` | Structured enum operation with typed arguments | Raw grant; no text command language, shell or code evaluation |
 | `pcap_query` | Bounded packet projection and typed display predicates | Raw grant if any raw artifact/fields; scan/packet/output caps |
 | `get_query_result` | Retrieve result of an explicit analysis job | Recheck current authorization at every poll/delivery |
-| `list_shares` | View owned/received concrete shares; optionally owned SharingIntents | Current personal/team-manager-only pending intents; bounded origins and combined pagination |
+| `list_shares` | View owned/received concrete shares; optionally owned SharingIntents; administrators: every share management-only (view administration) | Current personal/team-manager-only pending intents; bounded origins and combined pagination; administration view without recipients, ≤ 100 per cursor page |
 | `create_share` | Request an explicit user/group evidence share | Sharing authority; raw-sharing may be pending approval |
-| `revoke_share` | Revoke one share or an owned/admin-managed SharingIntent and its dependent shares | Exactly one target ID; expected revision and idempotency required |
+| `revoke_share` | Revoke one share or an owned/admin-managed SharingIntent and its dependent shares | Exactly one target ID; expected revision and idempotency required; current managers and installation administrators |
+| `transfer_share` | Replace the managing owner teams of one share (audited transfer or administrator recovery) | Current manager with teams they hold, or installation administrator with current owner teams (also for a Suspended share); expected revision and idempotency required; creator, recipients and expiry unchanged |
 | `explain_access` | Explain the caller's own Allow/Deny/Indeterminate decision for one workload and operation | Caller only; real evaluator; uniform reply without own assignment; no evidence lookup |
 | `list_capture_history` | Previous accepted captures for one workload/selector | Default manual origin; retained/current history rights; bounded pages |
 | `get_capture_settings` | Retained collection parameters for review/editing | Protected immutable projection; no credentials, grants or sharing; ordinary byte limit |

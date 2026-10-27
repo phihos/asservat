@@ -93,7 +93,7 @@ export async function evidenceJourney({ page, origin, output, scan, checks, capt
     await summary.click();
     await page.goto(origin + '/shares');
     await expect(page.getByRole('heading', { name: 'Shared evidence', exact: true })).toBeVisible();
-    const owned = page.getByRole('region', { name: 'Shared by me' });
+    const owned = page.getByRole('region', { name: 'Shared by me or my teams' });
     await expect(owned.getByText(/Active · until/)).toBeVisible();
     await expect(page.getByText('Nothing is shared with you right now.', { exact: true })).toBeVisible();
     await scan('shares-page');

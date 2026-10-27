@@ -4262,7 +4262,7 @@
     },
     {
       "name": "list_shares",
-      "description": "List shares managed personally or through current owner-team membership (view owned), or received concrete shares; optionally include managed sharing instructions.",
+      "description": "List shares managed personally or through current owner-team membership (view owned), or received concrete shares; optionally include managed sharing instructions. Installation administrators may list every share management-only (view administration: opaque IDs, phase, expiry, revision, creator and managers; never recipients or evidence).",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -4287,7 +4287,8 @@
             "type": "string",
             "enum": [
               "owned",
-              "received"
+              "received",
+              "administration"
             ]
           },
           "include_intents": {
@@ -4303,7 +4304,10 @@
             "if": {
               "properties": {
                 "view": {
-                  "const": "received"
+                  "enum": [
+                    "received",
+                    "administration"
+                  ]
                 }
               }
             },
@@ -4345,6 +4349,10 @@
                               "format": "uuid"
                             },
                             "case_id": {
+                              "type": "string",
+                              "format": "uuid"
+                            },
+                            "artifact_id": {
                               "type": "string",
                               "format": "uuid"
                             },
@@ -4784,7 +4792,7 @@
     },
     {
       "name": "revoke_share",
-      "description": "Revoke one share or an owned sharing instruction and its dependent shares; independent entitlements remain unchanged.",
+      "description": "Revoke one share or an owned sharing instruction and its dependent shares; independent entitlements remain unchanged. Current managers and installation administrators may revoke; revocation never grants a read.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,
@@ -4866,6 +4874,219 @@
                     "required": [
                       "phase",
                       "revision"
+                    ],
+                    "oneOf": [
+                      {
+                        "required": [
+                          "share_id"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "sharing_intent_id"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "pending"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "query_handle": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096
+                      },
+                      "retry_after_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      }
+                    },
+                    "required": [
+                      "query_handle",
+                      "retry_after_seconds"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "error"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      },
+                      "navigation_uri": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 2048
+                      },
+                      "responsible_role": {
+                        "enum": [
+                          "maintainer",
+                          "approver",
+                          "administrator",
+                          "none"
+                        ]
+                      },
+                      "retry_after_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "message",
+                      "retryable"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "transfer_share",
+      "description": "Replace the managing owner teams of one share or an owned SharingIntent (an audited transfer). A current manager may name teams they currently hold; an installation administrator (scoped management delegation) may name any current owner teams covering the target, also to recover a Suspended share. Creator, recipients, artifacts, counts and expiry are unchanged.",
+      "enabledByDefault": true,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "share_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "sharing_intent_id": {
+            "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+          },
+          "management": {
+            "$ref": "https://asservat.io/spec/v1/management.schema.json#/$defs/request"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "idempotency_key",
+          "management"
+        ],
+        "oneOf": [
+          {
+            "required": [
+              "share_id"
+            ]
+          },
+          {
+            "required": [
+              "sharing_intent_id"
+            ]
+          }
+        ]
+      },
+      "outputSchema": {
+        "allOf": [
+          {
+            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
+          },
+          {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "ok"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "share_id": {
+                        "type": "string",
+                        "format": "uuid"
+                      },
+                      "phase": {
+                        "type": "string",
+                        "enum": [
+                          "Active",
+                          "Suspended"
+                        ]
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "minimum": 2,
+                        "maximum": 1000000000
+                      },
+                      "sharing_intent_id": {
+                        "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+                      },
+                      "managed_by": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/recipient"
+                        },
+                        "minItems": 1,
+                        "maxItems": 8,
+                        "uniqueItems": true
+                      }
+                    },
+                    "required": [
+                      "phase",
+                      "revision",
+                      "managed_by"
                     ],
                     "oneOf": [
                       {

@@ -101,6 +101,80 @@ the real-PostgreSQL subtests `permission-impact-preview` and
 under `-race`) pass; see the ADR. Migration 00090 needs 00088/00089 on main first (contiguous
 schema bundle). No installed qualification.
 
+## S-06 increment 9: explicit management and administrator revocation (ADR-238, 2026-10-26)
+
+[ADR-238](decisions/238-share-management-transfer.md): `create_share` accepts the optional
+canonical `management` (`mode: teams` with 1–8 of the creator's own current owner groups, or
+`mode: creator`); a team the creator does not hold for the artifact is refused
+(`ManagementNotHeld`). New audited shared operation `transfer_share(share_id, expected_revision,
+idempotency_key, management)`: a current manager replaces the pinned set with owner assignments
+they hold now; creator, recipients and expiry never change. Operators of the protected fleet
+administration (the ADR-237 administrator check) are the scoped management delegation: they may
+assign any owner team with a current, undenied `evidence-owner` assignment inside the artifact's
+retained audience at creation (when they may share) and by `transfer_share`, also on a Suspended
+share (authority recovery, explicit resume); they may revoke any share and page every share
+management-only with `list_shares(view=administration, limit ≤ 100, cursor)` (IDs, phase, expiry,
+revision, created_by, managed_by; no recipients). None of this grants them a read. Migration 00091
+(schema head 91, floor 81): transfer key/digest columns, revision per change, listing index,
+trigger allowing one revocation or a management transfer of a live share, and the audit operation
+name `transfer_share` (the function definitions also carry `explain_access`,
+`preview_access_change`, `list_capture_history`, `get_capture_settings`). Console: "Managed by
+(optional)" with the administrator note in the Share panel; "Created by"/"Managed by" and "Transfer
+management" on `/shares`, plus "All shares (installation administrators)" with paging, revoke and
+"Assign managing teams".
+
+Migration numbering: 00089 (ADR-236) and 00090 (ADR-237) are on unmerged branches; this branch
+must merge after both (contiguous migrations). Local runs used two uncommitted no-op placeholder
+migrations 00089/00090.
+
+Verification (tracked test/results files restored after each run):
+- Unit (`go test -race`): domain/authorization (`SelectShareManagement`: held team, team not held,
+  creator mode without an individual assignment, team outside the retained audience, invalid
+  selections; `AdministeredShareManagement`: any current owner team, non-owner group, outside the
+  retained audience, denied team, other issuer; transferred/revoked revisions valid, revision 0 and
+  above the bound invalid), application/sharing (explicit management and digest; transfer to a team
+  not held refused, member choosing creator mode refused, non-manager refused before any catalog
+  read, transfer, replay, same key other request, stale revision, replaced team no longer manages or
+  lists, recipient still reads, new team lost → Suspended and unreceived, Suspended share not
+  transferable by members; administrator delegation at creation (non-admin refused, admin-owner pins
+  a team they are not in, a team outside the retained audience refused, admin without owner rights
+  cannot share); administrator recovery of a Suspended share (non-admin refused, creator mode
+  refused, new revision with creator and expiry unchanged, recipient reads again, new team manages,
+  revoked share not recoverable); administrator listing (refused without administration and to
+  non-admins, cursor pages newest first, invalid cursors and limit 101 refused); administrator
+  revoke as before), transport/presentation (management mapped, transfer reply, foreign-issuer team
+  refused without dispatch, administration rows with artifact ID, revision, creators/managers,
+  next_cursor and no recipients, cursor refused for other views, no `evidence:share` →
+  NotAvailable), domain/fleet, domain/audit, transport/browser, contracts, adapters/postgres,
+  bootstrap: PASS. Web `npm run check`: 191 PASS (including management selection, transfer,
+  administrator listing with paging, recovery and revoke).
+- Custody (real PostgreSQL, compiled hub-runtime grants), `python3 scripts/test-custody.py --run
+  '^(TestContextAdmissionWithRealServices|TestCustodyUpgradeSchemaWithRealPostgres)$/^(evidence-share-recipient-read-revocation-expiry-and-deny|capture-time-share-once-at-publication-and-owner-checked-at-admission|ordinary-case-metadata-navigation-and-private-routing)$'`:
+  PASS, go test 16.2 s, no cleanup failures (the upgrade test applies migrations through 00091).
+  The share subtest now covers: explicit team management; a team the creator does not hold refused;
+  a team mate's transfer to a team they do not hold refused, a stranger's refused; transfer
+  (revision 2, creator and expiry unchanged), replay, stale revision; the runtime role cannot
+  extend a share (42501) and the trigger refuses an owner-privileged transfer that also changes
+  recipients (23514); a non-admin's revoke and assignment refused; an administrator who cannot read
+  the case is refused a group without `evidence-owner` and assigns the owner team without being a
+  manager (revision 3, no pinned manager in SQL); the administrator listing pages all four shares
+  two per page newest first and is refused to a team member; the administrator revokes (revision 4)
+  and the recipient loses access; a revoked share is neither transferred nor recovered; the group
+  share, transferred before its owner assignment is retired, is Suspended, members cannot transfer
+  it, and administrator recovery refuses both the retired and the re-added (outside the retained
+  audience) assignment. A successful recovery of a Suspended share is proven by the unit test only:
+  the fixture has a single owner team, so no other current owner assignment exists inside the
+  artifact's audience.
+- Installed `share` focus (fast fixture, `ASSERVAT_JOURNEY_FOCUS=share python3 scripts/test-context-storage.py
+  --initial-bootstrap-chain --runtime-provider-pair --installer-continuation`, with the 00089/00090
+  placeholders, final code): PASS, go test 481.8 s (`installer-continuation` 288.0 s), wall about
+  10 min, no cleanup failures, sources unchanged during the test. The installer applied migration
+  00091; the recipient's `transfer_share` and `list_shares(view=administration)` returned
+  NotAvailable and the developer's `create_share` naming a group it does not hold returned
+  ManagementNotHeld; the existing share, download and revocation steps passed unchanged.
+  Administrator delegation, recovery, listing and revocation are not exercised installed (no fleet
+  operator session and one owner team in the fixture); they are covered by the custody run.
+
 ## S-06 increment 7: caller-only access explanation (ADR-234, 2026-10-26)
 
 [ADR-234](decisions/234-access-explanation.md) adds `explain_access(target_ref, operation)` on MCP

@@ -95,7 +95,7 @@ export interface components {
             cursor?: string;
             limit?: number;
             /** @enum {string} */
-            view: "owned" | "received";
+            view: "owned" | "received" | "administration";
             /** @default false */
             include_intents: boolean;
         } & unknown;
@@ -112,6 +112,8 @@ export interface components {
                     share_id: string;
                     /** Format: uuid */
                     case_id: string;
+                    /** Format: uuid */
+                    artifact_id?: string;
                     phase: string;
                     /** Format: date-time */
                     expires_at: string;
@@ -173,6 +175,47 @@ export interface components {
                 phase: "Revoked";
                 revision: number;
                 sharing_intent_id?: components["schemas"]["Contract_common_2224a31324a0c811"];
+            } & (unknown | unknown);
+        } | {
+            /** @constant */
+            status: "pending";
+            data: {
+                query_handle: string;
+                retry_after_seconds: number;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
+        McpInput_transfer_share: {
+            /** Format: uuid */
+            share_id?: string;
+            expected_revision: number;
+            idempotency_key: string;
+            sharing_intent_id?: components["schemas"]["Contract_common_2224a31324a0c811"];
+            management: components["schemas"]["Contract_management_0d504ecd6bc8c0fd"];
+        } & (unknown | unknown);
+        McpOutput_transfer_share: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: {
+                /** Format: uuid */
+                share_id?: string;
+                /** @enum {string} */
+                phase: "Active" | "Suspended";
+                revision: number;
+                sharing_intent_id?: components["schemas"]["Contract_common_2224a31324a0c811"];
+                managed_by: components["schemas"]["Contract_common_0e44f1278c675a38"][];
             } & (unknown | unknown);
         } | {
             /** @constant */

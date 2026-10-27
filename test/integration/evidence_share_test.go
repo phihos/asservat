@@ -19,6 +19,8 @@ import (
 	"asservat.local/asservat/internal/domain/capture"
 	value "asservat.local/asservat/internal/domain/catalog"
 	cfg "asservat.local/asservat/internal/domain/configuration"
+	"asservat.local/asservat/internal/domain/fleet"
+	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -292,11 +294,125 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		t.Fatal("revoked team share still listed for the member", err, owned)
 	}
 
+	// ADR-238: explicit management, audited transfer and administrator
+	// revocation on the real ledger, trigger and compiled grants.
+	explicit := sharing.CreateInput{CaseID: e.CaseID, ArtifactID: e.Registration.Location.ArtifactID, Version: verified.Version, Recipients: user, ExpiresAt: time.Now().Add(time.Hour), Reason: "synthetic incident review", IdempotencyKey: "share-explicit",
+		Management: authorization.ManagementRequest{Mode: "teams", Teams: []string{"other-owners"}}}
+	pinned, _, err := shares.Create(ctx, owner(), explicit)
+	if err != nil || len(pinned.Management) != 1 || pinned.Management[0].SubjectID != "other-owners" {
+		t.Fatal("explicit team management", err, pinned.Management)
+	}
+	explicit.IdempotencyKey, explicit.Management = "share-not-held", authorization.ManagementRequest{Mode: "teams", Teams: []string{"maintainers"}}
+	if _, _, err := shares.Create(ctx, owner(), explicit); !errors.Is(err, sharing.ErrManagementNotHeld) {
+		t.Fatal("management naming a team the creator does not hold as owner", err)
+	}
+	to := func(key string, revision int64, team string) sharing.TransferInput {
+		return sharing.TransferInput{ShareID: pinned.ID, ExpectedRevision: revision, Management: authorization.ManagementRequest{Mode: "teams", Teams: []string{team}}, IdempotencyKey: key}
+	}
+	if _, _, err := shares.Transfer(ctx, mate(), to("transfer-foreign", 1, "second-owners")); !errors.Is(err, sharing.ErrManagementNotHeld) {
+		t.Fatal("transfer to a team the caller does not hold", err)
+	}
+	if _, _, err := shares.Transfer(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), to("transfer-stranger", 1, "other-owners")); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("non-manager transferred", err)
+	}
+	moved, replay, err := shares.Transfer(ctx, mate(), to("transfer-1", 1, "other-owners"))
+	if err != nil || replay || moved.Revision != 2 || moved.Creator.Subject != "synthetic-share-owner" || !moved.ExpiresAt.Equal(pinned.ExpiresAt) || len(moved.Management) != 1 {
+		t.Fatal("transfer", err, replay, moved)
+	}
+	if again, replay, err := shares.Transfer(ctx, mate(), to("transfer-1", 1, "other-owners")); err != nil || !replay || again.Revision != 2 {
+		t.Fatal("transfer replay", err, replay)
+	}
+	if _, _, err := shares.Transfer(ctx, mate(), to("transfer-2", 1, "other-owners")); !errors.Is(err, capture.ErrConflict) {
+		t.Fatal("stale transfer revision", err)
+	}
+	if !reads(recipient()) {
+		t.Fatal("transferred share unreadable")
+	}
+	// A transfer changes only the management: the runtime role cannot touch
+	// other columns and the trigger refuses an owner-privileged widening.
+	var pgerr *pgconn.PgError
+	if _, err := pool.Exec(ctx, "UPDATE evidence_share SET expires_at=expires_at+interval '1 hour',revision=revision+1 WHERE id=$1", pinned.ID); !errors.As(err, &pgerr) || pgerr.Code != "42501" {
+		t.Fatal("runtime role extended a share", err)
+	}
+	if _, err := admin.Exec(ctx, "UPDATE evidence_share SET management=management,transfer_key='forged',transfer_digest=transfer_digest,recipient_keys=recipient_keys||ARRAY['User x y'],revision=revision+1 WHERE id=$1", pinned.ID); !errors.As(err, &pgerr) || pgerr.Code != "23514" {
+		t.Fatal("transfer changed the recipients", err)
+	}
+	administrators := shares
+	administrators.Administration = shareAdministration{installation: s.recovery.installation, issuer: issuer, client: s.a.Eligibility.VerifiedIdentity.Principal.ClientID}
+	if _, _, err := administrators.Revoke(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), pinned.ID, 2, "stranger-revoke"); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("non-admin non-manager revoked", err)
+	}
+	// The administrator holds no evidence right on this workload.
+	operator := as("synthetic-administrator", []string{"platform"}, "evidence:read", authorization.ShareScope)
+	if reads(operator) {
+		t.Fatal("administrator read evidence")
+	}
+	// The administrator's scoped delegation assigns a current owner team it
+	// does not belong to (no pinned manager needed in SQL); a non-admin
+	// stranger cannot, and a group that is not an owner team is refused.
+	if _, _, err := shares.Transfer(ctx, as("synthetic-stranger", []string{"maintainers"}, "evidence:read", authorization.ShareScope), to("stranger-assign", 2, "other-owners")); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("non-admin assigned management", err)
+	}
+	if _, _, err := administrators.Transfer(ctx, operator, to("admin-assign-maintainers", 2, "maintainers")); !errors.Is(err, sharing.ErrManagementNotHeld) {
+		t.Fatal("administrator assigned a group without evidence-owner", err)
+	}
+	assigned, _, err := administrators.Transfer(ctx, operator, to("admin-assign", 2, "other-owners"))
+	if err != nil || assigned.Revision != 3 || assigned.Creator.Subject != "synthetic-share-owner" || !assigned.ExpiresAt.Equal(pinned.ExpiresAt) {
+		t.Fatal("administrator assignment", err, assigned)
+	}
+	// The management-only administrator listing pages every share on the
+	// real keyset query, newest first, and is refused to non-administrators.
+	if _, _, _, err := administrators.ListAdministered(ctx, mate(), "", 2); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("non-administrator listed all shares", err)
+	}
+	var listed []authorization.Share
+	for cursor, page := "", 0; page < 20; page++ {
+		rows, next, _, err := administrators.ListAdministered(ctx, operator, cursor, 2)
+		if err != nil || len(rows) > 2 {
+			t.Fatal("administrator listing", err, len(rows))
+		}
+		for _, r := range rows {
+			listed = append(listed, r.Share)
+		}
+		if next == "" {
+			break
+		}
+		cursor = next
+	}
+	found := false
+	for n, r := range listed {
+		found = found || r.ID == pinned.ID && r.Revision == 3
+		if n > 0 && (r.CreatedAt.After(listed[n-1].CreatedAt) || r.ID == listed[n-1].ID) {
+			t.Fatal("administrator listing order or duplicate", n)
+		}
+	}
+	// Four shares exist so far (share-1, share-short, share-team and this one).
+	if !found || len(listed) != 4 {
+		t.Fatal("administrator listing misses shares", len(listed), found)
+	}
+	if revoked, _, err := administrators.Revoke(ctx, operator, pinned.ID, 3, "admin-revoke"); err != nil || revoked.Revision != 4 || revoked.RevokedAt.IsZero() {
+		t.Fatal("administrator revocation", err, revoked.Revision)
+	}
+	if reads(recipient()) {
+		t.Fatal("administrator-revoked share still readable")
+	}
+	if _, _, err := shares.Transfer(ctx, mate(), to("transfer-revoked", 4, "other-owners")); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("revoked share transferred", err)
+	}
+	if _, _, err := administrators.Transfer(ctx, operator, to("admin-revoked", 4, "other-owners")); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("administrator recovered a revoked share", err)
+	}
+
 	// A group share and a user share; then one accepted batch denies the user
 	// and retires the owners' assignment: deny wins, and the group share is
 	// Suspended (its pinned owner assignment is gone).
 	create("share-user", user, time.Now().Add(time.Hour))
 	group := create("share-group", []authorization.ShareRecipient{{Kind: "Group", Issuer: issuer, ID: "synthetic-reviewers"}}, time.Now().Add(time.Hour))
+	// The group share is a transferred one: losing its new managers below
+	// suspends it all the same.
+	if group, _, err = shares.Transfer(ctx, mate(), sharing.TransferInput{ShareID: group.ID, ExpectedRevision: 1, Management: authorization.ManagementRequest{Mode: "teams", Teams: []string{"other-owners"}}, IdempotencyKey: "transfer-group"}); err != nil || group.Revision != 2 {
+		t.Fatal("group share transfer", err)
+	}
 	reviewer := func() identities.CurrentIdentity {
 		return as("synthetic-reviewer", []string{"synthetic-reviewers"}, "evidence:read")
 	}
@@ -359,6 +475,17 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 		if _, _, err := shares.Revoke(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), group.ID, 1, "lost-team"); !errors.Is(err, capture.ErrDenied) {
 			t.Fatal(when, "team member revoked without a current pinned assignment", err)
 		}
+		// ADR-238: nobody manages a suspended share, so nobody can move it
+		// to another (for example a re-added) owner assignment.
+		if _, _, err := shares.Transfer(ctx, sharer("synthetic-team-mate", []string{"other-owners"}), sharing.TransferInput{ShareID: group.ID, ExpectedRevision: group.Revision, Management: authorization.ManagementRequest{Mode: "teams", Teams: []string{"other-owners"}}, IdempotencyKey: "lost-team-transfer"}); !errors.Is(err, capture.ErrDenied) {
+			t.Fatal(when, "suspended share transferred", err)
+		}
+		// An administrator's recovery can only pin a current owner team
+		// inside the artifact's retained audience: neither the retired nor
+		// the re-added assignment qualifies, so nothing is widened.
+		if _, _, err := administrators.Transfer(ctx, sharer("synthetic-administrator", []string{"platform"}), sharing.TransferInput{ShareID: group.ID, ExpectedRevision: group.Revision, Management: authorization.ManagementRequest{Mode: "teams", Teams: []string{"other-owners"}}, IdempotencyKey: "recover-outside-audience"}); !errors.Is(err, sharing.ErrManagementNotHeld) {
+			t.Fatal(when, "administrator recovery pinned an assignment outside the retained audience", err)
+		}
 	}
 	suspended("owner assignment retired:")
 	// A newly added owner binding for the same group is a new assignment:
@@ -405,5 +532,16 @@ func qualifyEvidenceShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool
 	if view, err := cases.GetContextCase(ctx, identityAt("synthetic-reviewer", []string{"synthetic-reviewers"}), e.CaseID); err != value.ErrUnavailable || view.CaseID != "" {
 		t.Fatal("re-added owner binding restored a share", view, err)
 	}
-	t.Log("evidence share: refusal without share, recipient-only read, concurrent revocation, expiry, deny and owner-assignment loss qualified on real PostgreSQL; team management: member revoke after creator departure, all teams lost suspends, re-added owner manages nothing")
+	t.Log("evidence share: refusal without share, recipient-only read, concurrent revocation, expiry, deny and owner-assignment loss qualified on real PostgreSQL; team management: member revoke after creator departure, all teams lost suspends, re-added owner manages nothing; ADR-238: explicit management, transfer (not-held refused, replay, stale, trigger), administrator revoke without evidence rights, transferred share suspended")
+}
+
+// shareAdministration is a synthetic protected fleet administration whose
+// operators are the "platform" group (ADR-238 test input, not authority).
+type shareAdministration struct{ installation, issuer, client string }
+
+func (a shareAdministration) FleetAdministration(context.Context) (fleet.Administration, error) {
+	now := time.Now().UTC()
+	return fleet.Administration{InstallationID: a.installation, IssuerEpoch: custodyID(), Issuer: a.issuer, Revision: identity.Revision{UID: "synthetic-administration", Generation: 1, Digest: artifact.Digest{1}},
+		ObservedAt: now, FreshUntil: now.Add(5 * time.Second), Clients: []string{a.client}, Groups: []string{"platform"}, DeliveryProfiles: []string{"enrollment"},
+		MaxActiveBootstraps: 1, MaxBootstrapHistory: 1, MaxClusters: 1}, nil
 }
