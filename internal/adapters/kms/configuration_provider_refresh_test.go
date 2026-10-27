@@ -78,9 +78,8 @@ func TestConfigurationProviderRecoveryComparisonKeepsOriginalAge(t *testing.T) {
 }
 
 func TestConfigurationProviderHealthyHintDoesNotEnterExpensiveQueue(t *testing.T) {
-	s, f := configurationJoinFixture(t)
 	fixtureNow := time.Now().UTC()
-	s.effects.wrap.control.now = func() time.Time { return fixtureNow }
+	s, f := configurationJoinFixtureWithClock(t, func() time.Time { return fixtureNow })
 	// Test-only independent setup of an already healthy finite credential; no
 	// installed authority is supplied by this existing lifetime fixture.
 	if err := s.effects.wrap.refresh(t.Context()); err != nil {
