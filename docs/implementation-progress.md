@@ -59,6 +59,18 @@ cleanup reported no failures; report SHA-256
 This is neither an installed ADR-260 pass nor evidence for extending capacity
 proofs, retrying effects or reviving the rejected proof-refresh branch.
 
+The follow-up preserves closed owner-lookup substeps through the existing
+capacity report and emits existing bounded service timings before synchronous
+audit finalization on failure. The final timing report remains. Fault-injected
+native-proof/registration lookups and blocked audit completion reproduce the
+diagnostic gaps before correction; holder/local receiver races pass (2.902s),
+as does the full presentation race suite (71.572s). These diagnostics add no
+requests, SQL, credentials, contexts, timers or authority, and do not establish
+the failed native run's actual audit-finish duration. The combined candidate's
+full pre-push passes, including 218 console tests. A fresh installed result is
+still required; the public operation and every capacity proof keep their
+original bounds.
+
 ## Approved packet request: local target composition correction (2026-10-27)
 
 Native run 40557482326 on 23bf0042 failed before admission with
