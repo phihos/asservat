@@ -5,7 +5,8 @@ package postgres
 // 00066's refresh demands (ADR-200), 00067 deletion, 00068 queries and
 // 00082's four restart-trigger tables (ADR-228), 00086's evidence shares
 // (ADR-232), 00096's three decision-time review tables (ADR-245) and 00097's
-// three AccessGrant tables (ADR-249).
+// three AccessGrant tables (ADR-249), and migration 00101's encrypted history
+// parameter/quota tables (ADR-255).
 // Missing or unknown relations reject first activation.
 // initialTransientTables exist only part way through migration replay: 00043
 // creates them and 00078 drops them (ADR-224). They never belong to a
@@ -34,6 +35,8 @@ var initialInstallationTables = []string{
 	"capture_audit_allocation",
 	"capture_audit_binding",
 	"capture_audit_root",
+	"capture_history_parameter",
+	"capture_history_quota",
 	"cluster_bootstrap_activation",
 	"cluster_enrollment_credential",
 	"cluster_enrollment_lineage",
