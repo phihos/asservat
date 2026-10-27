@@ -27,18 +27,33 @@ type restartPodItem struct {
 			Controller                  *bool
 		}
 	}
+	// Spec and Status.StartTime are read only for log and resource policies
+	// (ADR-241): container names, restart policies and resource limits.
+	Spec struct {
+		Containers, InitContainers []restartContainer
+		Resources                  *struct{ Limits map[string]string }
+	}
 	Status struct {
+		StartTime                                string
 		ContainerStatuses, InitContainerStatuses []restartContainerStatus
 	}
 }
 
+type restartContainer struct {
+	Name          string
+	RestartPolicy string
+	Resources     struct{ Limits map[string]string }
+}
+
 type restartContainerStatus struct {
+	Name         string
 	RestartCount int64
 	State        restartState
 	LastState    restartState
 }
 
 type restartState struct {
+	Running *struct{}
 	Waiting *struct {
 		Reason string
 	}
@@ -54,7 +69,10 @@ type restartState struct {
 // ReplicaSets of a Deployment: no new privilege beyond workload resolution.
 // A probe request (ADR-230) adds one namespace Event LIST (Events `list`).
 // An alert request (ADR-231) adds one GET of the configured Alertmanager; a
-// region without one answers ErrUnsupported.
+// region without one answers ErrUnsupported. A log request (ADR-241) adds
+// one pods/log GET per container of each Pod (`get` on pods/log), a
+// resource request one metrics.k8s.io PodMetrics LIST (`list` on
+// pods.metrics.k8s.io).
 // A truncated or partial LIST fails (ErrLimit/ErrUnavailable): the hub then
 // treats the poll as Unknown and fires nothing.
 func (c *PodTargets) ObserveWorkloadRestarts(ctx context.Context, r value.RestartRequest) (value.RestartObservation, error) {
@@ -97,6 +115,7 @@ func (c *PodTargets) ObserveWorkloadRestarts(ctx context.Context, r value.Restar
 	}
 	owned := map[string]bool{}
 	out := value.RestartObservation{ClusterID: r.ClusterID, Namespace: ns, Workload: workload, Pods: []value.PodRestarts{}}
+	var items []restartPodItem
 	seen := map[string]bool{}
 	for _, item := range list.Items {
 		m := item.Metadata
@@ -174,7 +193,21 @@ func (c *PodTargets) ObserveWorkloadRestarts(ctx context.Context, r value.Restar
 			pod.ExitCode = 255
 		}
 		out.Pods = append(out.Pods, pod)
+		items = append(items, item)
 	}
+	if r.Log != nil {
+		if err = c.logMatches(ctx, ns.Name, *r.Log, start, out.Pods, items); err != nil {
+			return zero, err
+		}
+		out.Log = true
+	}
+	if r.Resource != nil {
+		if err = c.resourceLevels(ctx, ns.Name, selector.String(), *r.Resource, start, out.Pods, items); err != nil {
+			return zero, err
+		}
+		out.Resource = true
+	}
+
 	if r.Probe != "" {
 		if err = c.probeFailures(ctx, ns.Name, r, start, out.Pods); err != nil {
 			return zero, err

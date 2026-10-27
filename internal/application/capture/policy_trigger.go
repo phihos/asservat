@@ -194,7 +194,7 @@ func (t PolicyTrigger) tick(ctx context.Context, p value.ActivePolicy, r *trigge
 	if err != nil {
 		return err
 	}
-	if observation.Probe != compiled.Request().Probe || observation.Alert != compiled.Request().Alert {
+	if !observation.Answers(compiled.Request()) {
 		return value.ErrUnavailable
 	}
 	if observation.Namespace.UID != a.NamespaceUID || observation.Workload.UID != a.WorkloadUID {

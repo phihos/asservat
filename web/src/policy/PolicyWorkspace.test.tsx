@@ -9,14 +9,23 @@ import type { Operations as ShareOperations } from '../sharing/http';
 import { id, result, session } from '../capture/test-fixtures';
 
 // Synthetic, content-free policy fixtures for unit tests only.
-const status = (state: string, kind: 'exit' | 'probe' | 'alert' = 'exit') => result<'get_capture'>({
+type Kind = 'exit' | 'probe' | 'alert' | 'log' | 'resource';
+const detectors: Record<Kind, unknown> = {
+  exit: { kind: 'exit', reasons: ['Error', 'OOMKilled'] },
+  probe: { kind: 'probe', probe_type: 'Readiness', minimum_failures: 2, window_seconds: 60 },
+  alert: { kind: 'alert' },
+  log: { kind: 'log', match: 'regexp', json_field: true, window_seconds: 30 },
+  resource: { kind: 'resource', metric: 'cpuQuotaRatio', operator: 'gt', threshold: 0.8, sample_interval_seconds: 60 },
+};
+const status = (state: string, kind: Kind = 'exit') => result<'get_capture'>({
   policy_uid: 'policy-uid', acceptance_id: id(9), state, generation: 1, expires_at: new Date(Date.now() + 3_600_000).toISOString(),
   executor: { kind: 'policy', policy_uid: 'policy-uid' }, executions_spent: 2, max_executions: 10, watched_pods: 3, occurrences: 2, captured: 1,
   recent: [kind !== 'exit'
     ? { occurrence_id: id(10), capture_id: id(8), outcome: 'captured', detector: kind, failed_at: '2026-10-26T12:00:00Z', created_at: new Date().toISOString() }
     : { occurrence_id: id(10), capture_id: id(8), outcome: 'captured', detector: 'exit', restarts: 1, created_at: new Date().toISOString() }],
-  suppressions: [{ reason: 'cooldown', count: 10, first_at: new Date().toISOString(), last_at: new Date().toISOString() }],
-  detector: kind === 'probe' ? { kind: 'probe', probe_type: 'Readiness', minimum_failures: 2, window_seconds: 60 } : kind === 'alert' ? { kind: 'alert' } : { kind: 'exit', reasons: ['Error', 'OOMKilled'] },
+  suppressions: [{ reason: 'cooldown', count: 10, first_at: new Date().toISOString(), last_at: new Date().toISOString() },
+    ...(kind === 'log' ? [{ reason: 'overlong', count: 3, first_at: new Date().toISOString(), last_at: new Date().toISOString() }] : [])],
+  detector: detectors[kind],
 }) as unknown as Output<'get_policy_status'>;
 const failure = (code: string, message: string) => ({ ...result<'get_capture'>({}), status: 'error', data: { code, message, retryable: false } }) as unknown as Output<Operation>;
 
@@ -24,7 +33,7 @@ class SyntheticPolicies implements Operations {
   calls: { name: Operation; input: unknown; csrf: string }[] = [];
   state = 'active';
   unknown = false;
-  kind: 'exit' | 'probe' | 'alert' = 'exit';
+  kind: Kind = 'exit';
   async call<N extends Operation>(name: N, input: Input<N>, csrf: string): Promise<Output<N>> {
     this.calls.push({ name, input: structuredClone(input), csrf });
     if (name === 'deactivate_policy') { this.state = 'deactivated'; return result({ policy_uid: 'policy-uid', acceptance_id: id(9), state: 'deactivated', replay: false }) as unknown as Output<N>; }
@@ -45,6 +54,8 @@ it('fixtures match the canonical policy contracts', () => {
   expect(validOutput_get_policy_status(status('deactivated'))).toBe(true);
   expect(validOutput_get_policy_status(status('active', 'probe'))).toBe(true);
   expect(validOutput_get_policy_status(status('active', 'alert'))).toBe(true);
+  expect(validOutput_get_policy_status(status('active', 'log'))).toBe(true);
+  expect(validOutput_get_policy_status(status('active', 'resource'))).toBe(true);
   expect(validOutput_deactivate_policy(result({ policy_uid: 'policy-uid', acceptance_id: id(9), state: 'deactivated', replay: true }))).toBe(true);
   expect(validOutput_activate_policy(failure('PolicyDeactivated', 'x'))).toBe(true);
 });
@@ -94,7 +105,22 @@ it('names the alert detector and shows an alert occurrence by its start time', a
   expect(screen.queryByText(/\(restart /)).toBeNull();
 });
 
+it('names the log and resource detectors without their pattern (ADR-241)', async () => {
+  const { client } = mount();
+  client.kind = 'log';
+  fireEvent.change(screen.getByLabelText('Policy name'), { target: { value: 'regional-logs' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Show policy' }));
+  expect(await screen.findByText('Container log records matching a regular expression in a JSON field within 30 s (Kubernetes log API)')).toBeTruthy();
+  expect(screen.getByText(/matching log record at/)).toBeTruthy();
+  expect(screen.getByText(/3 × log records longer than the record limit, not evaluated/)).toBeTruthy();
+  client.kind = 'resource';
+  fireEvent.click(screen.getByRole('button', { name: 'Check status' }));
+  expect(await screen.findByText('CPU usage / CPU limit > 0.8, samples at most 60 s old (Kubernetes metrics API)')).toBeTruthy();
+  expect(screen.getByText(/resource condition met at/)).toBeTruthy();
+});
+
 it('offers activation of a policy without status and shows the server refusal', async () => {
+
   const { client } = mount();
   client.unknown = true;
   fireEvent.change(screen.getByLabelText('Policy name'), { target: { value: 'regional-restarts' } });

@@ -1,7 +1,8 @@
 # ADR-230 — Probe-failure trigger; log and resource detectors paused
 
 Date: 2026-10-26. Status: accepted for the probe detector (implemented; qualification below);
-log and resource detectors await a maintainer decision. The recommended alert detector is
+the log and resource pause is superseded by the maintainer decision of 2026-10-26 and
+[ADR-241](241-log-resource-detectors.md), which implements both. The recommended alert detector is
 implemented by [ADR-231](231-alert-detector.md) as an Alertmanager API pull.
 Requirements: REQ-TRG-001/002/004/006/007, S-03 (TASK-04). Extends
 [ADR-228](228-restart-triggered-policy-captures.md) and [ADR-229](229-policy-deactivation-and-console.md).

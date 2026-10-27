@@ -36,6 +36,9 @@ KEYCLOAK = "quay.io/keycloak/keycloak@sha256:b0f60d489d51c5d113390bdf5461d4c06e6
 # owned node pulls it by digest: `kind load` of this multi-platform image fails
 # with Docker's containerd image store.
 ALERTMANAGER = "quay.io/prometheus/alertmanager@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba"
+# The logresource focus's official metrics-server v0.8.0 (ADR-241), pulled by
+# digest by the workload cluster node like ALERTMANAGER.
+METRICS_SERVER = "registry.k8s.io/metrics-server/metrics-server@sha256:89258156d0e9af60403eafd44da9676fd66f600c7934d468ccc17e42b199aee2"
 
 
 def run(args, *, data=None):
@@ -327,7 +330,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
     # ADR-193 step 6: the Helm registry/chart infrastructure, another test.
     helm_bootstrap = helm_bootstrap or helm_cluster
     test_pattern, cluster_count = qualification_selection(test_pattern, initial_handover, initial_schema_handover, initial_bootstrap_chain, helm_bootstrap, regional_context_start, runtime_object_roundtrip, owner_provider_auth, runtime_provider_pair, runtime_provider_worker, runtime_provider_owner, installer_continuation)
-    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "chain", "share"):
+    if installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") in ("restart", "journey", "browser", "upgrade", "policy", "alert", "logresource", "chain", "share"):
         cluster_count = 2  # these focused journeys use one workload cluster
     helm_test = "TestHelmClusterInstallWithRealServices" if helm_cluster else "TestHelmBootstrapWithRealServices"
     if helm_cluster:
@@ -353,6 +356,7 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
         upgrade_tag = None
         upgrade = installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "upgrade"
         alert = installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "alert"
+        signals = installer_continuation and os.environ.get("ASSERVAT_JOURNEY_FOCUS") == "logresource"
         registry = None
         registry_nodes = []
         build_scratch = None
@@ -489,6 +493,10 @@ def main(test_pattern=None, *, initial_handover=False, initial_schema_handover=F
             if alert:
                 fixture["alertmanagerImage"] = ALERTMANAGER
                 report["images"]["alertmanager"] = ALERTMANAGER
+            if signals:
+                fixture["metricsServerImage"] = METRICS_SERVER
+                report["images"]["metricsServer"] = METRICS_SERVER
+
             if direct_observation:
                 fixture["directObservation"] = report["directObservation"]
             # Product Pods in the second cluster need the image loaded there too.

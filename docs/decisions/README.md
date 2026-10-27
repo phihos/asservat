@@ -1,5 +1,16 @@
 # Decision records
 
+[ADR-241 — Log and resource triggers](241-log-resource-detectors.md) implements the detectors
+ADR-230 paused, after the maintainer's 2026-10-26 decision that every specified feature ships: a
+log policy's regional poll reads its Pods' containers through bounded `pods/log` GETs (≤ 32
+containers, ≤ 4 MiB, sinceSeconds = eventWindow) and matches a literal, RE2 regexp or JSON field;
+a resource policy lists the workload's `metrics.k8s.io` PodMetrics (cpuCores, cpuQuotaRatio,
+memoryBytes as working set, memoryLimitRatio). Only counts and one second per Pod leave the region;
+an unprovable Pod is Unknown for the poll. Regional connector RBAC: `get pods/log`,
+`list pods.metrics.k8s.io`. Migration 00094 widens the detector CHECKs and adds the `overlong`
+suppression reason. Cgroup-only metrics and stream filters stay rejected capability gaps.
+
+
 [ADR-240 — Retention impact preview](240-retention-impact-preview.md) is S-06 increment 11: the
 browser-only `preview_retention_change` lets a current fleet operator submit proposed
 EvidenceRetentionPolicy changes and see how many retained artifacts would be shortened per cluster

@@ -236,6 +236,10 @@ def check_cluster(directory):
     role = next(r for r in docs if r["kind"] == "ClusterRole")
     verbs = {v for rule in role["rules"] for v in rule["verbs"]}
     assert "*" not in json.dumps(role["rules"]) and not verbs & {"delete", "patch", "escalate", "bind", "impersonate", "deletecollection"}
+    # ADR-241: the installer holds the log and metrics reads it grants the
+    # connector (RBAC escalation check), read-only.
+    assert {"apiGroups": [""], "resources": ["pods/log"], "verbs": ["get"]} in role["rules"]
+    assert {"apiGroups": ["metrics.k8s.io"], "resources": ["pods"], "verbs": ["list"]} in role["rules"]
     for change in [{"mode": "hub"}, {"cluster": {"image": "registry.example/asservat:latest"}}, {"cluster": {"bootstrapSecret": ""}},
                    {"cluster": {"offer": json.dumps({"format": "other"})}}, {"cluster": {"namespace": "kube-system"}}]:
         v = json.loads(json.dumps(base))

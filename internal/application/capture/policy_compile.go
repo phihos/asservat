@@ -6,9 +6,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"maps"
+	"regexp/syntax"
 	"slices"
 	"strconv"
 	"time"
+	"unicode/utf8"
 
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
@@ -66,14 +68,16 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 		return reject(".target.adoption", "must be pinUID")
 	}
 	out.ClusterID, out.Namespace, out.WorkloadKind, out.WorkloadName = target.Cluster, target.Namespace, target.WorkloadRef.Kind, target.WorkloadRef.Name
-	// Detector: exactly one exit (ADR-228), probe (ADR-230) or alert
-	// (ADR-231) detector, referenced directly by when.
+	// Detector: exactly one exit (ADR-228), probe (ADR-230), alert
+	// (ADR-231), log or resource (ADR-241) detector, referenced directly by
+	// when.
+
 	var detectors []json.RawMessage
 	if strict(s["detectors"], &detectors) != nil || len(detectors) == 0 {
 		return reject(".detectors", "invalid")
 	}
 	if len(detectors) != 1 {
-		return reject(".detectors[1]", "exactly one exit, probe or alert detector is supported")
+		return reject(".detectors[1]", "exactly one detector is supported")
 	}
 	var detector struct {
 		ID, Kind    string
@@ -96,12 +100,16 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 		if err := compileAlert(&out, detector.Options, detector.EventWindow); err != nil {
 			return value.RestartPolicy{}, err
 		}
-	case "log", "resource":
-		// Paused by the ADR-230 complexity gate; ADR-231's alert detector lets
-		// existing log and resource alert rules trigger captures instead.
-		return reject(".detectors[0].kind", "log and resource detectors are not available in this release (ADR-230); use an alert detector with your existing alert rules (ADR-231)")
+	case "log":
+		if err := compileLog(&out, detector.Options, detector.EventWindow); err != nil {
+			return value.RestartPolicy{}, err
+		}
+	case "resource":
+		if err := compileResource(&out, detector.Options); err != nil {
+			return value.RestartPolicy{}, err
+		}
 	default:
-		return reject(".detectors[0].kind", "only exit, probe and alert detectors are supported in this release")
+		return reject(".detectors[0].kind", "only exit, probe, alert, log and resource detectors are supported in this release")
 	}
 	var when struct{ Detector string }
 	if strict(s["when"], &when) != nil || when.Detector == "" {
@@ -184,6 +192,29 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 			}
 			if rearm > out.ProbeWindow {
 				return reject(".evaluation.rearmFor", "must not exceed the probe window")
+			}
+		}
+		if out.Detector == value.DetectorLog && evaluation.RearmFor != "" {
+			// A log level re-arms at a poll whose eventWindow holds no matching
+			// record, which proves a window without a match (ADR-241).
+			rearm, ok := policyDuration(evaluation.RearmFor)
+			if !ok {
+				return reject(".evaluation.rearmFor", "invalid duration")
+			}
+			if rearm > time.Duration(out.Log.WindowSeconds)*time.Second {
+				return reject(".evaluation.rearmFor", "must not exceed the detector's eventWindow")
+			}
+		}
+		if out.Detector == value.DetectorResource && evaluation.RearmFor != "" {
+			// A resource level re-arms at a poll whose fresh sample does not
+			// satisfy the condition; the next occurrence can follow one poll
+			// later (ADR-241).
+			rearm, ok := policyDuration(evaluation.RearmFor)
+			if !ok {
+				return reject(".evaluation.rearmFor", "invalid duration")
+			}
+			if rearm > value.TriggerPollInterval {
+				return reject(".evaluation.rearmFor", "a resource condition re-arms at the next poll (15s) whose sample no longer satisfies it")
 			}
 		}
 		if out.Detector == value.DetectorAlert && evaluation.RearmFor != "" {
@@ -408,6 +439,139 @@ func compileAlert(out *value.RestartPolicy, raw, eventWindow json.RawMessage) er
 	return nil
 }
 
+// compileLog selects the ADR-241 log detector: matching records of every
+// container of the triggering Pod within eventWindow (30 s to 5 min, default
+// 30 s), read through the Kubernetes log API. The pattern is a literal
+// substring or an RE2 regular expression (Go's linear-time engine; no
+// backreferences or look-around), bounded in compiled size.
+func compileLog(out *value.RestartPolicy, raw, eventWindow json.RawMessage) error {
+	reject := func(path, reason string) error {
+		return value.PolicyFieldError{Path: "spec.detectors[0]" + path, Reason: reason}
+	}
+	var options struct {
+		Stream, Pattern, Match, JSONField, Overlong string
+		MaxRecordBytes                              int
+	}
+	if strict(raw, &options) != nil {
+		return reject(".options", "invalid")
+	}
+	m := targets.LogMatch{Pattern: options.Pattern, JSONField: options.JSONField, MaxRecordBytes: targets.MaxLogRecordBytes, WindowSeconds: 30}
+	switch options.Stream {
+	case "both":
+	case "stdout", "stderr":
+		return reject(".options.stream", "the Kubernetes log API returns stdout and stderr together; use both")
+	default:
+		return reject(".options.stream", "use both")
+	}
+	if m.Pattern == "" || len(m.Pattern) > targets.MaxLogPattern || !utf8.ValidString(m.Pattern) {
+		return reject(".options.pattern", "must be 1 to 1024 bytes of UTF-8")
+	}
+	switch options.Match {
+	case "literal":
+	case "regexp":
+		if !LogRegexp(m.Pattern) {
+			return reject(".options.pattern", "not a bounded RE2 regular expression (no backreferences or look-around; at most "+strconv.Itoa(MaxLogProgram)+" compiled instructions)")
+		}
+		m.Regexp = true
+	default:
+		return reject(".options.match", "use literal or regexp")
+	}
+	if options.MaxRecordBytes != 0 {
+		if options.MaxRecordBytes < 1 || options.MaxRecordBytes > targets.MaxLogRecordBytes {
+			return reject(".options.maxRecordBytes", "must be 1 to 65536")
+		}
+		m.MaxRecordBytes = options.MaxRecordBytes
+	}
+	switch options.Overlong {
+	case "", "drop":
+	case "matchPrefix":
+		if m.JSONField != "" {
+			return reject(".options.overlong", "a JSON field predicate never evaluates an incomplete record; use drop")
+		}
+		m.MatchPrefix = true
+	default:
+		return reject(".options.overlong", "use drop or matchPrefix")
+	}
+	if options.JSONField != "" {
+		probe := m
+		probe.MatchPrefix = false
+		if !probe.Valid() {
+			return reject(".options.jsonField", "a dotted path of at most 8 non-empty object keys, at most 128 bytes")
+		}
+	}
+	if eventWindow != nil {
+		var text string
+		if strict(eventWindow, &text) != nil {
+			return reject(".eventWindow", "invalid duration")
+		}
+		window, ok := policyDuration(text)
+		if !ok || window%time.Second != 0 || window < targets.MinProbeWindowSeconds*time.Second || window > targets.MaxProbeWindowSeconds*time.Second {
+			return reject(".eventWindow", "must be 30s to 5m in whole seconds: a shorter window could miss a record between two polls")
+		}
+		m.WindowSeconds = int64(window / time.Second)
+	}
+	if !m.Valid() {
+		return reject(".options", "invalid")
+	}
+	out.Detector, out.Log = value.DetectorLog, &m
+	return nil
+}
+
+// MaxLogProgram bounds a log regexp's compiled program (ADR-241), so a
+// record's evaluation stays linear with a small constant.
+const MaxLogProgram = 4096
+
+// LogRegexp reports whether pattern is an RE2 (Perl-syntax) regular
+// expression whose compiled program has at most MaxLogProgram instructions.
+func LogRegexp(pattern string) bool {
+	re, err := syntax.Parse(pattern, syntax.Perl)
+	if err != nil {
+		return false
+	}
+	prog, err := syntax.Compile(re.Simplify())
+	return err == nil && len(prog.Inst) <= MaxLogProgram
+}
+
+// compileResource selects the ADR-241 resource detector: one metrics API
+// (metrics.k8s.io) metric of the triggering Pod compared with a threshold.
+// The cgroup-only metrics of the specification (throttling, growth rate,
+// PSI) need a node-local reader and are rejected with their path.
+func compileResource(out *value.RestartPolicy, raw json.RawMessage) error {
+	reject := func(path, reason string) error {
+		return value.PolicyFieldError{Path: "spec.detectors[0].options" + path, Reason: reason}
+	}
+	var options struct {
+		Metric, Operator, SampleInterval string
+		Threshold                        float64
+	}
+	if strict(raw, &options) != nil {
+		return reject("", "invalid")
+	}
+	c := targets.ResourceCondition{Metric: options.Metric, Operator: options.Operator, Threshold: options.Threshold}
+	switch c.Metric {
+	case targets.MetricCPUCores, targets.MetricCPUQuotaRatio, targets.MetricMemoryBytes, targets.MetricMemoryLimitRatio:
+	case "cpuThrottledRatio", "memoryGrowthBytesPerSecond", "memoryPSI", "cpuPSI", "ioPSI":
+		return reject(".metric", "needs the node-local cgroup reader; the metrics API provides cpuCores, cpuQuotaRatio, memoryBytes and memoryLimitRatio")
+	default:
+		return reject(".metric", "use cpuCores, cpuQuotaRatio, memoryBytes or memoryLimitRatio")
+	}
+	switch c.Operator {
+	case "gt", "gte", "lt", "lte":
+	default:
+		return reject(".operator", "use gt, gte, lt or lte")
+	}
+	if !(c.Threshold >= 0 && c.Threshold <= 1e18) {
+		return reject(".threshold", "must be 0 to 1e18")
+	}
+	interval, ok := policyDuration(options.SampleInterval)
+	if !ok || interval%time.Second != 0 || interval < targets.MinResourceSampleSeconds*time.Second || interval > targets.MaxResourceSampleSeconds*time.Second {
+		return reject(".sampleInterval", "must be 30s to 5m in whole seconds: the oldest metrics sample still evaluated")
+	}
+	c.MaxAgeSeconds = int64(interval / time.Second)
+	out.Detector, out.Resource = value.DetectorResource, &c
+	return nil
+}
+
 // DescribePolicyDetector reads only the detector of a DebugPolicy spec for
 // status display; it is not a compilation and confers nothing.
 func DescribePolicyDetector(spec []byte) (value.PolicyDetector, bool) {
@@ -432,6 +596,10 @@ func DescribePolicyDetector(spec []byte) (value.PolicyDetector, bool) {
 		err = compileProbe(&p, d.Options)
 	case "alert":
 		err = compileAlert(&p, d.Options, d.EventWindow)
+	case "log":
+		err = compileLog(&p, d.Options, d.EventWindow)
+	case "resource":
+		err = compileResource(&p, d.Options)
 	default:
 		return value.PolicyDetector{}, false
 	}

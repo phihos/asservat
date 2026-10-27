@@ -192,6 +192,10 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		t.Fatal("administrator automation binding", err)
 	}
 	digest := planning.RecipeDigest()
+	if installedJourneyFocus() == "logresource" {
+		installedLogResourcePhase(t, ctx, admin, root, f, digest, read, wait, runningPods, started)
+		return
+	}
 	if installedJourneyFocus() == "alert" {
 		installedAlertPhase(t, ctx, admin, root, f, digest, read, wait, runningPods, started)
 		return

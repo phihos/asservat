@@ -26,6 +26,13 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "signals" {
+		if err := signals(); err != nil {
+			fmt.Fprintln(os.Stderr, "synthetic signal workload failed")
+			os.Exit(1)
+		}
+		return
+	}
 	if err := serve(); err != nil {
 		fmt.Fprintln(os.Stderr, "synthetic TLS provider fixture failed")
 		os.Exit(1)
@@ -143,4 +150,39 @@ func postgres(raw net.Conn, backend string, config *tls.Config) {
 	_, _ = io.Copy(conn, upstream)
 	_ = conn.Close()
 	<-joined
+}
+
+// signals is the ADR-241 installed log/resource focus workload: on GET
+// /log?line=<text> it writes one synthetic line to stdout; on GET
+// /burn?seconds=<n> it keeps one CPU busy for n seconds (at most 300). It
+// reads no input besides these parameters and exits on SIGTERM.
+func signals() error {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	mux := http.NewServeMux()
+	mux.HandleFunc("/log", func(w http.ResponseWriter, r *http.Request) {
+		line := r.URL.Query().Get("line")
+		if line == "" || len(line) > 4096 {
+			http.Error(w, "line", http.StatusBadRequest)
+			return
+		}
+		fmt.Fprintln(os.Stdout, line)
+	})
+	mux.HandleFunc("/burn", func(w http.ResponseWriter, r *http.Request) {
+		var seconds int
+		if _, err := fmt.Sscan(r.URL.Query().Get("seconds"), &seconds); err != nil || seconds < 1 || seconds > 300 {
+			http.Error(w, "seconds", http.StatusBadRequest)
+			return
+		}
+		go func() {
+			for end := time.Now().Add(time.Duration(seconds) * time.Second); time.Now().Before(end) && ctx.Err() == nil; {
+			}
+		}()
+	})
+	server := &http.Server{Addr: ":8080", Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	go func() { <-ctx.Done(); _ = server.Close() }()
+	if err := server.ListenAndServe(); err != http.ErrServerClosed {
+		return err
+	}
+	return nil
 }

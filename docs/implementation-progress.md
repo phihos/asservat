@@ -1,6 +1,57 @@
 # Sustained implementation progress
 
+## Log and resource triggers (ADR-241, 2026-10-27)
+
+[ADR-241](decisions/241-log-resource-detectors.md) implements the `log` and `resource` detectors
+that ADR-230 paused, after the maintainer's 2026-10-26 decision that every specified feature ships
+in the first release (the complexity gate governs the mechanism; its 11 answers are in the ADR).
+Both are levels on the probe/alert `ProbeDelta` path with one addition: a per-Pod `Unknown` that
+keeps the watermark (no fire, re-arm or baseline).
+
+- Log: per poll one `pods/log` GET (`sinceSeconds` = eventWindow 30 s–5 min, `timestamps`,
+  `limitBytes` = min(1 MiB ÷ Pod containers, 4 MiB ÷ all containers)) for each container that can
+  have written into the window, eight concurrent, ≤ 32 containers (else Unknown); literal, RE2
+  regexp (≤ 4096 compiled instructions) or JSON-field predicate; `maxRecordBytes` with drop or
+  matchPrefix; only match count, newest match second and an `overlong` flag leave the region.
+  Truncated/failed/malformed reads without a match are Unknown; denied fails the poll.
+  `stream: stdout|stderr` is rejected (feature-gated log API parameter).
+- Resource: one `metrics.k8s.io` PodMetrics LIST of the workload selector; cpuCores,
+  cpuQuotaRatio, memoryBytes (working set) and memoryLimitRatio against gt/gte/lt/lte; samples
+  older than `sampleInterval` (30 s–5 min) or than the Pod, or missing a running container, are
+  Unknown; 404 (no metrics API) and ratio without a finite limit are `unsupported`
+  (`DetectorUnavailable` at activation), 503 is Unknown. Throttling, growth rate and PSI metrics are
+  rejected with their path (need the node-local cgroup reader).
+- RBAC: regional connector ClusterRole `get pods/log`, `list pods.metrics.k8s.io`; chart
+  cluster-installer role the same (check-helm asserts both). Migration 00094 (schema 94, floor 81)
+  widens the detector CHECKs and adds suppression reason `overlong`. Status/MCP/OpenAPI/console
+  report the detector configuration without the pattern. Examples `policy-log.yaml`,
+  `policy-resource.yaml`; scenarios SC-TRG-012/013.
+
+Verification (tracked test/results files restored after each run):
+- Unit (`-race`): domain/capture, domain/targets, application/capture, transport/presentation,
+  transport/contextstart, adapters/mtls, adapters/postgres, contracts; Kubernetes adapter
+  `-run '^(TestWorkload|TestRegional|TestLogJSON|TestAlertmanager|TestNamedWorkload|TestPodTargets)'`:
+  PASS. Console vitest `src/policy`: PASS.
+- Custody `--run '^TestPermissionAuthorityPoliciesWithRealServices$'`: 43 PASS, 0 FAIL (go test
+  7.2 s, harness 42 s), including the new `log-resource-trigger-unknown-overlong-and-detector-switch`.
+- Installed `ASSERVAT_JOURNEY_FOCUS=logresource` (new CI suite `continuation-logresource`, fast
+  fixture): the workload cluster's node pulls the official metrics-server v0.8.0 by digest
+  (restricted `metrics` namespace, upstream RBAC/APIService, `--kubelet-insecure-tls` for kind's
+  self-signed kubelet certificates); the regional workload runs the fixture's synthetic signal
+  mode (`/provider-proxy signals`: write a requested line, keep one CPU busy). Run 1: PASS, go
+  test 573 s, harness wall 11 m 36 s. Log policy activated 6 s after start, all Pods armed after a
+  non-matching line; one matching line on one Pod yielded one occurrence and one `policy:<uid>`
+  capture pinned to that Pod 37 s after start, no log text in status, re-armed after the window
+  with still one occurrence. Resource policy (cpuQuotaRatio gt 0.5) activated 59 s after start,
+  all Pods armed from real metrics; the busy Pod yielded one occurrence and capture 1 m 51 s after
+  start. Source unchanged during the test, no cleanup failures. After the run only the generated
+  `get_policy_status.json` changed the threshold bound's notation (`1e+18` → the integer, so the
+  YAML-read design gate compares equal); behavior is unchanged.
+- Not covered: stream filters and cgroup-only metrics (rejected capability gaps), lines of a
+  restarted container instance, rotated log segments, metrics providers other than metrics-server.
+
 ## S-06 increment 11: retention impact preview (ADR-240, 2026-10-27)
+
 
 [ADR-240](decisions/240-retention-impact-preview.md): browser-only `preview_retention_change`
 for current fleet operators. Proposed EvidenceRetentionPolicy create/update/delete changes (hub or

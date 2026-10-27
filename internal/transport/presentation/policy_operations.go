@@ -146,7 +146,9 @@ type policyExecutor struct {
 
 // policyOccurrenceData is one recent occurrence: an exit occurrence's restart
 // count, or a probe occurrence's newest failure time (ADR-230) or an alert
-// occurrence's newest alert start (ADR-231), both as failed_at.
+// occurrence's newest alert start (ADR-231), or a log occurrence's newest
+// matching record or a resource occurrence's sample time (ADR-241), all as
+// failed_at.
 type policyOccurrenceData struct {
 	OccurrenceID string     `json:"occurrence_id"`
 	CaptureID    string     `json:"capture_id,omitempty"`
@@ -163,6 +165,14 @@ type policyDetectorData struct {
 	ProbeType       string   `json:"probe_type,omitempty"`
 	MinimumFailures int      `json:"minimum_failures,omitempty"`
 	WindowSeconds   int64    `json:"window_seconds,omitempty"`
+	// ADR-241: a log detector's match mode and whether it matches a JSON
+	// field (the pattern is not repeated); a resource detector's condition.
+	Match                 string   `json:"match,omitempty"`
+	JSONField             bool     `json:"json_field,omitempty"`
+	Metric                string   `json:"metric,omitempty"`
+	Operator              string   `json:"operator,omitempty"`
+	Threshold             *float64 `json:"threshold,omitempty"`
+	SampleIntervalSeconds int64    `json:"sample_interval_seconds,omitempty"`
 }
 type policySuppressionData struct {
 	Reason  string    `json:"reason"`
@@ -212,9 +222,9 @@ func publicPolicyFailure(err error) OperationFailure {
 	case errors.Is(err, value.ErrDenied), errors.Is(err, identity.ErrDenied):
 		return OperationFailure{"NotAvailable", "This operation is not available with your current access.", false}
 	case errors.Is(err, value.ErrInvalid):
-		return OperationFailure{"UnsupportedRequest", "The named policy is not a valid restart-, probe- or alert-trigger DebugPolicy.", false}
+		return OperationFailure{"UnsupportedRequest", "The named policy is not a valid restart-, probe-, alert-, log- or resource-trigger DebugPolicy.", false}
 	case errors.Is(err, targets.ErrUnsupported):
-		return OperationFailure{"DetectorUnavailable", "The workload cluster's connector cannot observe this detector. An alert policy needs the cluster's Alertmanager address (Helm value cluster.alertmanager).", false}
+		return OperationFailure{"DetectorUnavailable", "The workload cluster's connector cannot observe this detector. An alert policy needs the cluster's Alertmanager address (Helm value cluster.alertmanager); a resource policy needs the Kubernetes metrics API (metrics-server) and, for a ratio, a finite limit on every container.", false}
 	}
 	return OperationFailure{"NotAvailable", "The operation is unavailable. Check your access or retry when the service is available.", true}
 }
@@ -295,14 +305,19 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 					outcome = "pending"
 				}
 				item := policyOccurrenceData{OccurrenceID: o.ID, CaptureID: o.CaptureID, Outcome: outcome, Detector: o.Detector, Restarts: o.Restarts, CreatedAt: o.CreatedAt.UTC()}
-				if o.Detector == value.DetectorProbe || o.Detector == value.DetectorAlert {
+				if o.Detector != value.DetectorExit {
 					failed := time.Unix(o.Restarts, 0).UTC()
 					item.Restarts, item.FailedAt = 0, &failed
 				}
 				data.Recent = append(data.Recent, item)
 			}
 			if d := st.Detector; d != nil {
-				data.Detector = &policyDetectorData{Kind: d.Kind, Reasons: d.Reasons, ExitCodes: d.ExitCodes, ProbeType: d.ProbeType, MinimumFailures: d.MinimumFailures, WindowSeconds: d.WindowSeconds}
+				data.Detector = &policyDetectorData{Kind: d.Kind, Reasons: d.Reasons, ExitCodes: d.ExitCodes, ProbeType: d.ProbeType, MinimumFailures: d.MinimumFailures, WindowSeconds: d.WindowSeconds, Match: d.LogMatch, JSONField: d.LogJSON}
+				if r := d.Resource; r != nil {
+					threshold := r.Threshold
+					data.Detector.Metric, data.Detector.Operator, data.Detector.Threshold, data.Detector.SampleIntervalSeconds = r.Metric, r.Operator, &threshold, r.MaxAgeSeconds
+				}
+
 			}
 			if sh := st.Sharing; sh != nil {
 				in := sh.Instruction

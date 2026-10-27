@@ -12,6 +12,7 @@ import (
 	"errors"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -1134,7 +1135,108 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 			t.Fatal("switch back to exit fired", got)
 		}
 	})
+	t.Run("log-resource-trigger-unknown-overlong-and-detector-switch", func(t *testing.T) {
+		// ADR-241: log and resource levels on the probe path; an Unknown Pod
+		// changes no watermark; an overlong log record is a content-free
+		// suppression count; detector switches re-baseline.
+		s, l := activeTrigger(t)
+		logs := restartPolicy(s)
+		logs.Reasons, logs.ExitCodes = nil, nil
+		logs.Detector, logs.Log = capture.DetectorLog, &targets.LogMatch{Pattern: "panic", MaxRecordBytes: 4096, WindowSeconds: 30}
+		resources := restartPolicy(s)
+		resources.Reasons, resources.ExitCodes = nil, nil
+		resources.Detector, resources.Resource = capture.DetectorResource, &targets.ResourceCondition{Metric: "cpuQuotaRatio", Operator: "gt", Threshold: 0.8, MaxAgeSeconds: 60}
+		levelTick := func(p capture.RestartPolicy, pods ...targets.PodRestarts) []capture.PolicyOccurrence {
+			t.Helper()
+			o := observed(s, pods...)
+			o.Log, o.Resource = p.Detector == capture.DetectorLog, p.Detector == capture.DetectorResource
+			got, err := l.Tick(ctx, capture.PolicyTick{Policy: p, Authority: s.input.Authority, Observation: o})
+			if err != nil {
+				t.Fatal(p.Detector, "tick", err)
+			}
+			return got
+		}
+		mark := func(uid string) (detector string, value int64, armed bool) {
+			t.Helper()
+			if err := admin.QueryRow(ctx, `SELECT detector,restarts,armed FROM policy_pod_watermark WHERE root_id=$1 AND policy_uid=$2 AND pod_uid=$3`, s.input.RootID, s.input.Authority.PolicyUID, uid).Scan(&detector, &value, &armed); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+		level := func(uid string, n, at int64) targets.PodRestarts {
+			return targets.PodRestarts{Name: "app-" + uid[:8], UID: uid, ProbeFailures: n, ProbeLast: at}
+		}
+		unknown := func(uid string) targets.PodRestarts {
+			return targets.PodRestarts{Name: "app-" + uid[:8], UID: uid, Unknown: true}
+		}
+		a := custodyID()
+		const t0 = 1792000000
+		tick(t, s, l, observed(s, pod(a, 3)))
+		// Unknown is not a log baseline: the exit watermark stays untouched.
+		if got := levelTick(logs, unknown(a)); len(got) != 0 {
+			t.Fatal("unknown fired", got)
+		}
+		if d, v, _ := mark(a); d != "exit" || v != 3 {
+			t.Fatal("unknown replaced the watermark", d, v)
+		}
+		// A known quiet window is an armed log baseline; a matching record
+		// fires once, and its overlong flag counts one suppression.
+		levelTick(logs, level(a, 0, 0))
+		if d, _, armed := mark(a); d != "log" || !armed {
+			t.Fatal("log baseline", d, armed)
+		}
+		overlong := level(a, 2, t0)
+		overlong.Overlong = true
+		got := levelTick(logs, overlong)
+		if len(got) != 1 || got[0].PodUID != a || got[0].Restarts != t0 {
+			t.Fatal("log rising edge", got)
+		}
+		var count int64
+		if err := admin.QueryRow(ctx, `SELECT count FROM policy_suppression WHERE root_id=$1 AND policy_uid=$2 AND reason='overlong'`, s.input.RootID, s.input.Authority.PolicyUID).Scan(&count); err != nil || count != 1 {
+			t.Fatal("overlong suppression", count, err)
+		}
+		// Unknown and a continuing match neither re-arm nor fire.
+		if again := levelTick(logs, unknown(a)); len(again) != 0 {
+			t.Fatal("unknown fired", again)
+		}
+		if again := levelTick(logs, level(a, 3, t0+15)); len(again) != 0 {
+			t.Fatal("log level fired twice", again)
+		}
+		if d, v, armed := mark(a); d != "log" || v != t0+15 || armed {
+			t.Fatal("log watermark", d, v, armed)
+		}
+		// A log occurrence key can never be a restart count.
+		if _, err := admin.Exec(ctx, `UPDATE policy_occurrence SET restarts=5 WHERE root_id=$1 AND detector='log'`, s.input.RootID); err == nil {
+			t.Fatal("log occurrence with a restart-count key stored")
+		}
+		// Switching to resource re-baselines: a condition already true waits
+		// for a known false sample; the next true sample fires (the second
+		// token of the shared workload burst).
+		if got := levelTick(resources, level(a, 1, t0+30)); len(got) != 0 {
+			t.Fatal("detector switch fired", got)
+		}
+		levelTick(resources, level(a, 0, 0))
+		if got = levelTick(resources, level(a, 1, t0+60)); len(got) != 1 || got[0].Restarts != t0+60 {
+			t.Fatal("resource rising edge", got)
+		}
+		var detectors []string
+		rows, err := admin.Query(ctx, `SELECT detector FROM policy_occurrence WHERE root_id=$1 AND policy_uid=$2 ORDER BY restarts`, s.input.RootID, s.input.Authority.PolicyUID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			var d string
+			if rows.Scan(&d) != nil {
+				t.Fatal("scan")
+			}
+			detectors = append(detectors, d)
+		}
+		if rows.Err() != nil || strings.Join(detectors, ",") != "log,resource" {
+			t.Fatal("occurrence detectors", detectors, rows.Err())
+		}
+	})
 	t.Run("restart-trigger-spend-cap-saturation-and-single-link", func(t *testing.T) {
+
 		s, l := activeTrigger(t)
 		a := custodyID()
 		tick(t, s, l, observed(s, pod(a, 1)))

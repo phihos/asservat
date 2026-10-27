@@ -133,13 +133,13 @@ export interface components {
                     /** Format: date-time */
                     created_at: string;
                     /** @enum {unknown} */
-                    detector: "exit" | "probe" | "alert";
+                    detector: "exit" | "probe" | "alert" | "log" | "resource";
                     /** Format: date-time */
                     failed_at?: string;
                 }[];
                 suppressions: {
                     /** @enum {unknown} */
-                    reason: "cooldown" | "budget" | "coalesced" | "capacity" | "authority" | "unavailable";
+                    reason: "cooldown" | "budget" | "coalesced" | "capacity" | "authority" | "unavailable" | "overlong";
                     count: number;
                     /** Format: date-time */
                     first_at: string;
@@ -149,13 +149,22 @@ export interface components {
                 /** @description The current DebugPolicy's detector configuration (no observed content). */
                 detector?: {
                     /** @enum {unknown} */
-                    kind: "exit" | "probe" | "alert";
+                    kind: "exit" | "probe" | "alert" | "log" | "resource";
                     reasons?: ("CrashLoopBackOff" | "Error" | "OOMKilled")[];
                     exit_codes?: number[];
                     /** @enum {unknown} */
                     probe_type?: "Liveness" | "Readiness" | "Startup";
                     minimum_failures?: number;
                     window_seconds?: number;
+                    /** @enum {unknown} */
+                    match?: "literal" | "regexp";
+                    json_field?: boolean;
+                    /** @enum {unknown} */
+                    metric?: "cpuCores" | "cpuQuotaRatio" | "memoryBytes" | "memoryLimitRatio";
+                    /** @enum {unknown} */
+                    operator?: "gt" | "gte" | "lt" | "lte";
+                    threshold?: number;
+                    sample_interval_seconds?: number;
                 };
                 /** @description Recurring sharing of the acceptance (ADR-239). stopped: a manager stopped future sharing (stop_future_sharing; already claimed captures still publish); policyChanged: the DebugPolicy changed after acceptance, activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id and expected_revision = revision). */
                 sharing?: {

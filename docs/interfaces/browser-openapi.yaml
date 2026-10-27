@@ -3066,7 +3066,7 @@ paths:
   /api/v1/operations/get_policy_status:
     post:
       operationId: get_policy_status
-      summary: 'Explain an activated or deactivated restart-, probe- or alert-trigger policy (ADR-228/230/231) without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing. With recurring sharing (ADR-239) it also reports the sharing state, recipients count, captures shared so far, the limit and the end.'
+      summary: 'Explain an activated or deactivated restart-, probe-, alert-, log- or resource-trigger policy (ADR-228/230/231/241) without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing. With recurring sharing (ADR-239) it also reports the sharing state, recipients count, captures shared so far, the limit and the end.'
       tags:
       - Shared browser and MCP
       x-domain-contract: get_policy_status
@@ -3536,6 +3536,8 @@ components:
                         - exit
                         - probe
                         - alert
+                        - log
+                        - resource
                       failed_at:
                         type: string
                         format: date-time
@@ -3550,6 +3552,8 @@ components:
                           enum:
                           - probe
                           - alert
+                          - log
+                          - resource
                     then:
                       required:
                       - failed_at
@@ -3577,6 +3581,7 @@ components:
                         - capacity
                         - authority
                         - unavailable
+                        - overlong
                       count:
                         type: integer
                         minimum: 1
@@ -3603,6 +3608,8 @@ components:
                       - exit
                       - probe
                       - alert
+                      - log
+                      - resource
                     reasons:
                       type: array
                       maxItems: 3
@@ -3628,6 +3635,32 @@ components:
                       minimum: 1
                       maximum: 1000
                     window_seconds:
+                      type: integer
+                      minimum: 30
+                      maximum: 300
+                    match:
+                      enum:
+                      - literal
+                      - regexp
+                    json_field:
+                      type: boolean
+                    metric:
+                      enum:
+                      - cpuCores
+                      - cpuQuotaRatio
+                      - memoryBytes
+                      - memoryLimitRatio
+                    operator:
+                      enum:
+                      - gt
+                      - gte
+                      - lt
+                      - lte
+                    threshold:
+                      type: number
+                      minimum: 0
+                      maximum: 1000000000000000000
+                    sample_interval_seconds:
                       type: integer
                       minimum: 30
                       maximum: 300
