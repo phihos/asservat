@@ -128,3 +128,28 @@ The public deterministic key is tested against actor/client/preview changes and
 closed-preview resubmission; a new intent always requires a new preview. The
 native focus also exercises wrong-client/wrong-human submission before and after
 acceptance and a closed preview under a new key, without another capture or wait.
+
+## Collector-enabled executor input correction
+
+Exact frozen-head native attempt 40518896278/2 ended FAIL in 14m29s (Go
+583.567s). The collector enrolled/was Available, but the regional API executor
+rejected `workload/inputs` before any input metadata reads. The pure reproduction
+shows three mounted objects (`regional-inputs`, `regional-evidence`,
+`connector-nodes`) versus two executor input pins. Consequently preview returned
+NotAvailable and no approved capture/native-download outcome was qualified.
+
+The installer now carries the listener Secret's exact UID/resourceVersion from
+its existing acknowledged create/exact read into the executor settings. It adds
+GET of only that Secret to the existing connector namespace Role; Kubernetes RBAC
+cannot enforce metadata-only GET, but this same process already mounts the entire
+listener key. Runtime reads explicitly request PartialObjectMetadata. The complete
+input-set equality, live UID/version checks and all other attestation remain.
+
+Incremental cost: one metadata GET per existing input-proof rebuild, zero new
+credentials, watches, listeners, background tasks or exposure to another process.
+The collector-disabled settings bytes and startup digest match the original
+builder's captured baselines. Pure tests reject omitted/replaced/changed-version
+inputs and verify exact named GET without list/watch/update. The installed focus
+also checks actual connector-account permission reviews for the exact Secret,
+unrelated names, list/watch/update and another namespace. Those native assertions
+remain unqualified until the next agreed frozen-candidate run.

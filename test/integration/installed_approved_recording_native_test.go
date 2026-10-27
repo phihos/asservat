@@ -70,6 +70,7 @@ func installApprovedRecordingCollector(t *testing.T, ctx context.Context, api ku
 	if image == "" {
 		t.Fatal("approved collector lacks built image")
 	}
+	qualifyApprovedRecordingInputPermissions(t, ctx, api, config, connectorNamespace)
 	source, err := api.CoreV1().ConfigMaps(connectorNamespace).Get(ctx, kube.RegionalNodes, meta.GetOptions{})
 	if err != nil {
 		t.Fatal("installed collector endpoint", err)

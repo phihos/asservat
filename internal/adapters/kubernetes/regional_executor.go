@@ -116,14 +116,25 @@ func regionalExecutorSettings(p RegionalInstallPlan, out RegionalInstallation, x
 	}
 	projection := compiler.ProjectionDigest()
 	r := revision.Revision
-	return contracts.ConnectorAPIContextSettings{Format: contracts.ConnectorAPIContextFormat, RootID: p.Offer.PermissionRootID, InstallationID: b.InstallationID, ClusterID: b.ClusterID, IssuerEpoch: b.IssuerEpoch,
+	settings := contracts.ConnectorAPIContextSettings{Format: contracts.ConnectorAPIContextFormat, RootID: p.Offer.PermissionRootID, InstallationID: b.InstallationID, ClusterID: b.ClusterID, IssuerEpoch: b.IssuerEpoch,
 		ConnectorRevision: contracts.APIContextRevision{UID: r.UID, Generation: r.Generation, Digest: hex.EncodeToString(r.Digest[:])},
 		Namespace:         out.Namespace.Name, NamespaceUID: out.Namespace.UID, Account: RegionalAccount, AccountUID: out.Account.UID, Deployment: RegionalDeployment, DeploymentUID: out.Deployment.UID,
 		ImageDigest: parts[1], TemplateDigest: hex.EncodeToString(template[:]), ProjectionDigest: hex.EncodeToString(projection[:]), WorkloadProtectionDigest: hex.EncodeToString(protection[:]),
 		CapacityAccount: RegionalCapacityAccount, CapacityAccountUID: string(x.capacity.UID),
 		Inputs: []contracts.ConnectorAPIInput{{Kind: "ConfigMap", Name: RegionalInputs, UID: string(inputs.UID), ResourceVersion: inputs.ResourceVersion},
 			{Kind: "Secret", Name: RegionalEvidence, UID: x.evidence.UID, ResourceVersion: x.evidenceVersion, DedicatedToAPI: true}},
-		StartGuard: contracts.ConnectorAPIStartGuard{Name: x.startGuard.Name, PolicyUID: x.startGuard.PolicyUID, PolicyGeneration: x.startGuard.PolicyGeneration, BindingUID: x.startGuard.BindingUID, BindingResourceVersion: x.startGuard.BindingResourceVersion}}, nil
+		StartGuard: contracts.ConnectorAPIStartGuard{Name: x.startGuard.Name, PolicyUID: x.startGuard.PolicyUID, PolicyGeneration: x.startGuard.PolicyGeneration, BindingUID: x.startGuard.BindingUID, BindingResourceVersion: x.startGuard.BindingResourceVersion}}
+	if p.Collector != nil {
+		if out.Nodes == nil {
+			return contracts.ConnectorAPIContextSettings{}, cfg.ErrInvalid
+		}
+		pin := out.Nodes.serverInput
+		if pin.Kind != "Secret" || pin.Name != RegionalNodes || pin.UID == "" || pin.ResourceVersion == "" || !pin.DedicatedToAPI {
+			return contracts.ConnectorAPIContextSettings{}, cfg.ErrInvalid
+		}
+		settings.Inputs = append(settings.Inputs, pin)
+	}
+	return settings, nil
 }
 
 // proveRegionalExecutor proves the settings and trust guards with the
