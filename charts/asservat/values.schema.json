@@ -881,7 +881,7 @@
           "type": "string",
           "maxLength": 253,
           "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
-          "description": "ADR-196: existing operator Secret with evidence-storage.json, the write-only regional evidence credential; required exactly when the offer names the regional executor. Never a chart value."
+          "description": "ADR-196: existing operator Secret with evidence-storage.json and separately scoped history-storage.json, the write-only regional evidence credential; required exactly when the offer names the regional executor. Never a chart value."
         },
         "alertmanager": {
           "type": "string",

@@ -104,9 +104,9 @@ cluster:
   registrySecret: ""
   offer: ""
   bootstrapSecret: ""
-  # ADR-196: an existing operator Secret with evidence-storage.json, the
-  # write-only regional evidence credential. Required exactly when the offer
-  # names the regional executor.
+  # Existing operator Secret: evidence-storage.json is the write-only evidence
+  # capability; history-storage.json is separately restricted to history metadata
+  # read/write/inventory/delete. Both are required for a regional executor.
   evidenceSecret: ""
   # ADR-231: optional in-cluster Alertmanager base URL (http or https, no
   # credentials) that alert DebugPolicies on this cluster read, for example

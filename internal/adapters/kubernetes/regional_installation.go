@@ -59,6 +59,9 @@ type RegionalInstallPlan struct {
 	// (OwnerStorageCredential JSON). It is required exactly when the offer
 	// names the regional executor (ADR-196 decision 7).
 	Evidence []byte
+	// History is a separate read/write/inventory/delete capability restricted to
+	// history/v1/<root>/<cluster>/* in the same qualified store.
+	History []byte
 	// Alertmanager is the optional in-cluster Alertmanager base URL that
 	// alert policies read (ADR-231); only an executor uses it.
 	Alertmanager string
@@ -94,11 +97,15 @@ func (p RegionalInstallPlan) valid() bool {
 // executor offer, and a digest-pinned image for the executor's pins.
 func (p RegionalInstallPlan) executorValid() bool {
 	executor, err := p.Offer.RegionalExecutorOffered()
-	if err != nil || executor != (len(p.Evidence) > 0) || p.Alertmanager != "" && (!executor || !AlertmanagerURL(p.Alertmanager)) || len(p.IdentityMappings) > 0 && (!executor || !IdentityMappingsValid(p.IdentityMappings)) {
+	if err != nil || executor != (len(p.Evidence) > 0) || executor != (len(p.History) > 0) || p.Alertmanager != "" && (!executor || !AlertmanagerURL(p.Alertmanager)) || len(p.IdentityMappings) > 0 && (!executor || !IdentityMappingsValid(p.IdentityMappings)) {
 		return false
 	}
 	if !executor {
 		return true
+	}
+	history, historyErr := contracts.DecodeOwnerStorageCredential(bytes.NewReader(p.History))
+	if historyErr != nil || history.AccessKeyID == "" || history.SecretAccessKey == "" {
+		return false
 	}
 	c, err := contracts.DecodeOwnerStorageCredential(bytes.NewReader(p.Evidence))
 	return err == nil && c.AccessKeyID != "" && c.SecretAccessKey != "" && digestPinnedAPIImage(p.Offer.Image) && p.Offer.WorkKey.ID != "" && p.Offer.KeyService.KeyID != "" && authorization.UUID(p.Offer.EvidenceStore.StoreID) &&
@@ -336,7 +343,7 @@ func InstallRegionalConnector(ctx context.Context, config *rest.Config, p Region
 	out.Secret = ref(secret.ObjectMeta)
 	if executor {
 		step = "evidence"
-		evidence, err := ensureRegional(call, api.CoreV1().Secrets(p.Namespace), &core.Secret{ObjectMeta: meta.ObjectMeta{Name: RegionalEvidence}, Type: core.SecretTypeOpaque, Immutable: ptr.To(true), Data: map[string][]byte{"evidence-storage.json": p.Evidence}}, marker)
+		evidence, err := ensureRegional(call, api.CoreV1().Secrets(p.Namespace), &core.Secret{ObjectMeta: meta.ObjectMeta{Name: RegionalEvidence}, Type: core.SecretTypeOpaque, Immutable: ptr.To(true), Data: map[string][]byte{"evidence-storage.json": p.Evidence, contracts.RegionalHistoryCredentialFile: p.History}}, marker)
 		if err != nil {
 			return out, err
 		}
@@ -530,7 +537,7 @@ func RegionalWorkload(o contracts.RegionalOffer, executor, collector bool) *apps
 	}
 	if executor {
 		// The executor's write-only evidence credential (ADR-196 decision 7).
-		projection = append(projection, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: RegionalEvidence}, Items: []core.KeyToPath{{Key: "evidence-storage.json", Path: "evidence-storage.json"}}, Optional: ptr.To(false)}})
+		projection = append(projection, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: RegionalEvidence}, Items: []core.KeyToPath{{Key: "evidence-storage.json", Path: "evidence-storage.json"}, {Key: contracts.RegionalHistoryCredentialFile, Path: contracts.RegionalHistoryCredentialFile}}, Optional: ptr.To(false)}})
 	}
 	if collector {
 		projection = append(projection, core.VolumeProjection{Secret: &core.SecretProjection{LocalObjectReference: core.LocalObjectReference{Name: RegionalNodes},

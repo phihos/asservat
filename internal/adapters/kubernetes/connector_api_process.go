@@ -434,6 +434,16 @@ func NewConnectorAPIExecutionProcess(ctx context.Context, g *ConnectorAPIExecuti
 	s := g.installed
 	return &ConnectorAPIExecutionProcess{g, ctx, b, value.APIProcessBinding{InstallationID: s.InstallationID, ClusterID: s.ClusterID, IssuerEpoch: s.IssuerEpoch, NamespaceUID: s.NamespaceUID, AccountUID: s.AccountUID, PodUID: b.PodUID, ProcessEpoch: epoch, StartupDigest: g.startup, ImageDigest: g.image}}, nil
 }
+
+// ProcessEpoch is the immutable local writer pin, not a current observation or
+// authorization. Effects still require the native receiver and signed operation.
+func (p *ConnectorAPIExecutionProcess) ProcessEpoch() string {
+	if p == nil {
+		return ""
+	}
+	return p.binding.ProcessEpoch
+}
+
 func (p *ConnectorAPIExecutionProcess) ReadAPIProcess(ctx context.Context) (value.APIProcessObservation, error) {
 	out, _, err := p.readAPIProcess(ctx)
 	return out, err

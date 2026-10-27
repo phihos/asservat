@@ -123,8 +123,9 @@ type captureJob struct {
 	work   fleet.APIContextWork
 	signed []byte
 	// run is the ADR-171 hub-run execution over this exchange's operations.
-	run    func(context.Context, *HubOperations) (string, error)
-	result chan jobResult
+	run        func(context.Context, *HubOperations) (string, error)
+	historyRun func(context.Context, Stream) (string, error)
+	result     chan jobResult
 }
 type jobResult struct {
 	state string
@@ -271,7 +272,13 @@ func (s *Standby) Serve(stream Stream, now func() time.Time) error {
 			// waits for this handler and its socket owner before the capture slot frees.
 			call, cancel := context.WithCancel(job.ctx)
 			stop := context.AfterFunc(s.ctx, cancel)
-			state, e := ServeHubOperations(call, stream, job.work, job.signed, job.run, now)
+			var state string
+			var e error
+			if job.historyRun != nil {
+				state, e = job.historyRun(call, stream)
+			} else {
+				state, e = ServeHubOperations(call, stream, job.work, job.signed, job.run, now)
+			}
 			stop()
 			cancel()
 			clear(job.signed)

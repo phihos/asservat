@@ -300,8 +300,8 @@ def check_cluster(directory):
     render(executor, ok=False)
     executor["cluster"]["evidenceSecret"] = "operator-evidence"
     pod = next(r for r in render(executor) if r["kind"] == "Job")["spec"]["template"]["spec"]
-    assert pod["containers"][0]["command"][-2:] == ["--evidence-credential", "/run/asservat/cluster/evidence-storage.json"]
-    assert pod["volumes"][0]["projected"]["sources"][2]["secret"] == {"name": "operator-evidence", "items": [{"key": "evidence-storage.json", "path": "evidence-storage.json"}]}
+    assert pod["containers"][0]["command"][-2:] == ["--history-credential", "/run/asservat/cluster/history-storage.json"]
+    assert pod["volumes"][0]["projected"]["sources"][2]["secret"] == {"name": "operator-evidence", "items": [{"key": "evidence-storage.json", "path": "evidence-storage.json"}, {"key": "history-storage.json", "path": "history-storage.json"}]}
     # ADR-231: the optional Alertmanager URL is passed to an executor's
     # installer only; without an executor offer it is refused.
     executor["cluster"]["alertmanager"] = "http://alertmanager-operated.monitoring.svc:9093"

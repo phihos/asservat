@@ -17,6 +17,7 @@ type framePeerLease struct {
 	receiver fleet.APIContextReceiver
 	final    bool
 	regional bool
+	history  bool
 	phase    framePeerPhase
 }
 
@@ -121,7 +122,7 @@ func (s *frameStream) acceptPeer(ctx context.Context, observed fleet.APIContextR
 		if !observed.Valid(time.Now()) {
 			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
 		}
-		s.lease = &framePeerLease{receiver: observed, regional: s.awaited}
+		s.lease = &framePeerLease{receiver: observed, regional: s.awaited, history: s.historyWork}
 	case peerFinal:
 		if s.lease == nil || !s.lease.final || len(s.leaseBounds) != 1 || !s.lease.receiver.Valid(time.Now()) {
 			return fleet.APIContextReceiver{}, fleet.ErrUnavailable
@@ -193,7 +194,24 @@ func (s *frameStream) admitLeaseFrame(kind contracts.APIContextFrameKind, receiv
 		return fleet.ErrUnavailable
 	}
 	l := s.lease
+	historyKind := kind == contracts.HistoryRequestFrame || kind == contracts.HistoryResponseFrame || kind == contracts.HistoryReceiptFrame
+	if l.history != historyKind {
+		return contracts.ErrAPIContextProtocol
+	}
 	switch {
+	// One separately signed history effect, then a current-peer final reply.
+	case !l.regional && !receive && kind == contracts.HistoryRequestFrame && l.phase == peerIdentityIdle:
+		l.phase = peerIdentityReply
+	case l.regional && receive && kind == contracts.HistoryRequestFrame && l.phase == peerIdentityIdle:
+		l.phase = peerIdentityReply
+	case l.regional && !receive && kind == contracts.HistoryResponseFrame && l.phase == peerIdentityReply:
+		l.phase = peerResult
+	case !l.regional && receive && kind == contracts.HistoryResponseFrame && l.phase == peerIdentityReply:
+		l.phase = peerResult
+	case l.regional && receive && kind == contracts.HistoryReceiptFrame && l.phase == peerResult && l.final && len(s.leaseBounds) == 2:
+		l.phase = peerReceipt
+	case !l.regional && !receive && kind == contracts.HistoryReceiptFrame && l.phase == peerResult && l.final && len(s.leaseBounds) == 2:
+		l.phase = peerReceipt
 	// ADR-171: one hub operation request, then exactly one regional reply.
 	case !l.regional && !receive && kind == contracts.APIContextOperationRequestFrame && l.phase == peerIdentityIdle:
 		l.phase = peerIdentityReply
