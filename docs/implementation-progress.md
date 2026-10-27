@@ -77,6 +77,24 @@ regression failed before the correction and passes afterward; the production
 capacity adapter still returns only generic unavailability. Combined
 holder/local/adapter race tests pass (2.927s), with no new I/O or authority.
 
+Run 40576367034 on ec3983bf passed CI and review but failed its installed
+approved-recording journey (Go 576.545s; approved subtest 121.50s). It reached
+submission after the real preview-expiry wait, then returned
+`RecorderUnavailable`, with no accepted capture. The initial target query
+completed in 380ms; its separate recorder query failed at
+`local/route-read/endpoints/read/other`. Preview compilation then persisted a
+plan-only blueprint without recording facts. The native journey had checked
+approval-required/capture-disabled flags but ignored the recorder blocker, so
+it approved an inert scope. This did not exercise the corrected submission
+target path. All 3,196 hashes independently matched, source stayed unchanged,
+and cleanup reported no failures; report SHA-256
+`43a282b6534d99ca4264dd323e7b9d7d6201a8d872ce4035df85f8afb629d35c`.
+
+The endpoint label covers the entire route endpoint adapter, including final
+identity/readiness/resource-version checks; it does not prove an EndpointSlice
+HTTP error, kernel problem or expired authority. No deadline or endpoint
+consistency check is being relaxed on this evidence.
+
 ## Approved packet request: local target composition correction (2026-10-27)
 
 Native run 40557482326 on 23bf0042 failed before admission with
