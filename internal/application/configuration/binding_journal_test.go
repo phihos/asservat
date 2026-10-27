@@ -18,7 +18,7 @@ func TestBindingAcceptancePreservesAutomationEnvelope(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := j.Prepare(fence, journalID, now)
+	b, err := j.Prepare(fence, journalID, now, Inheritance{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,7 +28,7 @@ func TestBindingAcceptancePreservesAutomationEnvelope(t *testing.T) {
 	}
 	b.Bases[0].Automation.AllowedActions[0] = "liveCore"
 	b.Bases[0].Automation.MaxBytes = 1 << 40
-	again, err := j.Prepare(fence, journalID, now.Add(10*time.Second))
+	again, err := j.Prepare(fence, journalID, now.Add(10*time.Second), Inheritance{})
 	if err != nil || again.Bases[0].Automation.AllowedActions[0] != "logs" || again.Bases[0].Automation.MaxBytes != 1024 {
 		t.Fatal("caller changed an immutable pending automation acceptance", err)
 	}
@@ -72,7 +72,7 @@ func journalAck(t *testing.T, j *BindingJournal, b value.PermissionBatch) value.
 }
 func TestBindingJournalRequiresEveryOwnershipTransitionToBeAccepted(t *testing.T) {
 	j, s, f, now := journalFixture(t)
-	initial, err := j.Prepare(f, journalID, now)
+	initial, err := j.Prepare(f, journalID, now, Inheritance{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestBindingJournalRequiresEveryOwnershipTransitionToBeAccepted(t *testing.T
 	if err = j.Apply(value.BindingEvent{Type: "MODIFIED", ResourceVersion: "rv-a", Binding: &a}); err == nil {
 		t.Fatal("intermediate ownership was skipped")
 	}
-	next, err := j.Prepare(f, "22222222-2222-4222-8222-222222222222", now.Add(time.Second))
+	next, err := j.Prepare(f, "22222222-2222-4222-8222-222222222222", now.Add(time.Second), Inheritance{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestBindingJournalRequiresEveryOwnershipTransitionToBeAccepted(t *testing.T
 	if err = j.Apply(value.BindingEvent{Type: "MODIFIED", ResourceVersion: "rv-a", Binding: &a}); err != nil {
 		t.Fatal(err)
 	}
-	final, err := j.Prepare(f, "33333333-3333-4333-8333-333333333333", now.Add(2*time.Second))
+	final, err := j.Prepare(f, "33333333-3333-4333-8333-333333333333", now.Add(2*time.Second), Inheritance{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestBindingJournalRequiresEveryOwnershipTransitionToBeAccepted(t *testing.T
 }
 func TestBindingJournalDoesNotRenewCompletenessFromBookmarkOrDifferentList(t *testing.T) {
 	j, s, f, now := journalFixture(t)
-	b, err := j.Prepare(f, journalID, now)
+	b, err := j.Prepare(f, journalID, now, Inheritance{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -133,18 +133,18 @@ func TestBindingJournalDoesNotRenewCompletenessFromBookmarkOrDifferentList(t *te
 	if err = j.Confirm(changed, now.Add(time.Second)); err == nil {
 		t.Fatal("different relist asserted continuity")
 	}
-	if _, err = j.Prepare(f, "22222222-2222-4222-8222-222222222222", now.Add(5*time.Second)); err == nil {
+	if _, err = j.Prepare(f, "22222222-2222-4222-8222-222222222222", now.Add(5*time.Second), Inheritance{}); err == nil {
 		t.Fatal("bookmark renewed deny deadline")
 	}
 }
 func TestBindingJournalKeepsPendingRequestForAmbiguousCommitAfterExpiry(t *testing.T) {
 	j, _, f, now := journalFixture(t)
-	b, err := j.Prepare(f, journalID, now)
+	b, err := j.Prepare(f, journalID, now, Inheritance{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	b.Bases[0].Subjects[0].ID = "mutated-caller-copy"
-	again, err := j.Prepare(f, journalID, now.Add(10*time.Second))
+	again, err := j.Prepare(f, journalID, now.Add(10*time.Second), Inheritance{})
 	if err != nil {
 		t.Fatalf("cannot resolve an ambiguous original commit: %v", err)
 	}

@@ -75,8 +75,8 @@ type Snapshot struct {
 	InvalidSources                                []Resource
 }
 
-// NamespaceQuery is assembled internally from a source's configured keys, not
-// from a public evidence request. Only these metadata keys may leave the reader.
+// NamespaceQuery is assembled internally from configured keys, not from a
+// public evidence request. Only these metadata keys may leave the reader.
 type NamespaceQuery struct {
 	Namespace                 NamespaceRef
 	LabelKeys, AnnotationKeys []string
@@ -89,6 +89,124 @@ type NamespaceMetadata struct {
 	Deleting               bool
 	Labels, Annotations    map[string]string
 }
+
+// NamespaceKeys are the metadata keys a namespace observation records: the
+// selector labels and mapping keys of one cluster's namespaceMetadata sources.
+// Every other label and annotation stays in the cluster.
+type NamespaceKeys struct{ Labels, Annotations []string }
+
+// ObservedNamespace is one namespace reduced to the observed keys. A value is
+// kept only as the lower-case hex SHA-256 of its exact bytes; "" marks a value
+// that can never map (longer than 256 bytes or with control characters).
+// ResourceVersion is opaque and empty in an accepted NamespaceObservation.
+type ObservedNamespace struct {
+	Name, UID           string
+	ResourceVersion     string            `json:",omitempty"`
+	Deleting            bool              `json:",omitempty"`
+	Labels, Annotations map[string]string `json:",omitempty"`
+}
+
+// NamespaceList is a complete paginated LIST of one cluster's namespaces at
+// one collection resourceVersion, reduced to those carrying an observed key.
+// ObservedAt is taken before the first page was requested.
+type NamespaceList struct {
+	ClusterID, ResourceVersion string
+	Keys                       NamespaceKeys
+	ObservedAt                 time.Time
+	Namespaces                 []ObservedNamespace
+}
+
+// NamespaceEvent is one validated namespace watch transition, reduced like a
+// NamespaceList entry (a namespace without observed keys has none). Bookmarks
+// carry only the cursor.
+type NamespaceEvent struct {
+	Type, ResourceVersion string
+	Namespace             *ObservedNamespace
+}
+
+// NamespaceObservation is the accepted, minimized namespace observation of a
+// permission batch (ADR-242): keys, names, UIDs and value digests, no times or
+// resource versions. It is recorded in the authority audit event and is what
+// the impact preview evaluates proposed sources against.
+type NamespaceObservation struct {
+	ClusterID  string
+	Keys       NamespaceKeys
+	Namespaces []ObservedNamespace
+}
+
+// MaxObservedNamespaces bounds one cluster's observation; more namespaces
+// carrying an observed key make the observation unavailable, never partial.
+const MaxObservedNamespaces = 4096
+
+// Why a namespaceMetadata source grants nothing or cannot be evaluated
+// (ADR-242). Disabled, SourceUnsupported and TooManyNamespaces are settled
+// configuration: the source grants nothing. MetadataUnavailable and
+// MetadataNotObserved mean that its current namespace metadata is unknown.
+const (
+	SourceDisabled          = "Disabled"
+	SourceUnsupported       = "SourceUnsupported"
+	SourceTooManyNamespaces = "TooManyNamespaces"
+	MetadataUnavailable     = "MetadataUnavailable"
+	MetadataNotObserved     = "MetadataNotObserved"
+)
+
+// NamespaceGrant is one namespace that a source currently grants to Subjects.
+type NamespaceGrant struct {
+	Namespace       NamespaceRef
+	ResourceVersion string
+	Subjects        []Subject
+}
+
+func hexDigest(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	for _, c := range s {
+		if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f') {
+			return false
+		}
+	}
+	return true
+}
+
+func (k NamespaceKeys) Valid() bool {
+	return len(k.Labels)+len(k.Annotations) <= 32 && slices.IsSorted(k.Labels) && slices.IsSorted(k.Annotations) &&
+		identity.Strings(k.Labels, 32, 317) && identity.Strings(k.Annotations, 32, 317)
+}
+
+// Valid checks one observed namespace against keys; live requires the opaque
+// resourceVersion of a current observation, an accepted one has none.
+func (n ObservedNamespace) Valid(k NamespaceKeys, live bool) bool {
+	if !identity.Text(n.Name, 63) || !identity.Text(n.UID, 64) || live != (n.ResourceVersion != "") || len(n.ResourceVersion) > 128 || len(n.Labels)+len(n.Annotations) == 0 {
+		return false
+	}
+	for _, m := range []struct {
+		values map[string]string
+		keys   []string
+	}{{n.Labels, k.Labels}, {n.Annotations, k.Annotations}} {
+		for key, v := range m.values {
+			if !slices.Contains(m.keys, key) || v != "" && !hexDigest(v) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (o NamespaceObservation) Valid() bool {
+	if !authorization.UUID(o.ClusterID) || !o.Keys.Valid() || len(o.Keys.Labels)+len(o.Keys.Annotations) == 0 || len(o.Namespaces) > MaxObservedNamespaces {
+		return false
+	}
+	names := map[string]bool{}
+	for i, n := range o.Namespaces {
+		if !n.Valid(o.Keys, false) || names[n.Name] || i > 0 && o.Namespaces[i-1].UID >= n.UID {
+			return false
+		}
+		names[n.Name] = true
+	}
+	return true
+}
+
 type Target struct {
 	ClusterID string
 	Namespace NamespaceRef
@@ -125,54 +243,4 @@ func ProposeBinding(b Binding, target Target, now time.Time) Proposal {
 		}
 	}
 	return Proposal{Candidates: out, Reason: "RequiresAcceptance"}
-}
-
-// ProposeNamespace expands value maps only; groupID needs qualified directory
-// validation and is intentionally not guessed here. A declaration of a guard or
-// administrator review is never treated as proof that it is current/enforced.
-func ProposeNamespace(s Source, ns NamespaceMetadata, target Target, now time.Time) Proposal {
-	if s.Type != "namespaceMetadata" {
-		return Proposal{Reason: "UnsupportedSource"}
-	}
-	if !s.Enabled || s.Resource.Deleting {
-		return Proposal{Reason: "DisabledSource"}
-	}
-	if target.ClusterID != s.ClusterID || ns.ClusterID != s.ClusterID || ns.Namespace != target.Namespace || ns.Deleting || slices.Contains(s.ExcludedNamespaces, ns.Namespace.Name) {
-		return Proposal{Reason: "OutsideScope"}
-	}
-	if !identity.Fresh(ns.ObservedAt, ns.FreshUntil, now, 60*time.Second) || s.MaxDecisionAge < time.Second || s.MaxDecisionAge > time.Minute || !now.Before(ns.ObservedAt.Add(s.MaxDecisionAge)) {
-		return Proposal{Reason: "StaleNamespace"}
-	}
-	for key, value := range s.NamespaceSelector {
-		if actual, ok := ns.Labels[key]; !ok || actual != value {
-			return Proposal{Reason: "OutsideScope"}
-		}
-	}
-	var value string
-	switch s.Mapping.Field {
-	case "annotation":
-		value = ns.Annotations[s.Mapping.Key]
-	case "label":
-		value = ns.Labels[s.Mapping.Key]
-	default:
-		return Proposal{Reason: "InvalidMapping"}
-	}
-	if !identity.Text(value, 256) {
-		return Proposal{Reason: "UnmappedValue"}
-	}
-	if s.Mapping.Mode == "groupID" {
-		return Proposal{Reason: "DirectoryValidationRequired"}
-	}
-	if s.Mapping.Mode != "valueMap" {
-		return Proposal{Reason: "InvalidMapping"}
-	}
-	groups := s.Mapping.Values[value]
-	if !identity.Strings(groups, 16, 256) || len(groups) == 0 {
-		return Proposal{Reason: "UnmappedValue"}
-	}
-	var out []Candidate
-	for _, group := range groups {
-		out = append(out, Candidate{s.Resource, Subject{"Group", s.Mapping.Issuer, group}, s.Role, "Allow"})
-	}
-	return Proposal{Candidates: out, Reason: "RequiresProtectionQualification"}
 }

@@ -43,7 +43,7 @@ func TestPermissionAdmissionWithRealKubernetes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 	control, err := client.CoreV1().Namespaces().Get(ctx, "asservat-system", meta.GetOptions{})
 	if err != nil {
@@ -291,6 +291,9 @@ func TestPermissionAdmissionWithRealKubernetes(t *testing.T) {
 			testGuardedReconciliation(t, ctx, c, observer, guard, plan, fixture.Postgres, fixture.S3, fixture.Token)
 			testIdentitySettings(t, ctx, c, cluster, plan.ControlNamespace, fixture.Token)
 			testBrowserSettingsSource(t, ctx, c, cluster, plan.ControlNamespace, fixture.Token, fixture.Postgres)
+		})
+		t.Run("namespace-inheritance-with-real-namespaces-SQL-and-audit", func(t *testing.T) {
+			testInheritedReconciliation(t, c, observer, guard, plan, fixture.Postgres, fixture.S3)
 		})
 		// A probe that would pass administration is never a valid negative control.
 		badConfig := rest.CopyConfig(c)

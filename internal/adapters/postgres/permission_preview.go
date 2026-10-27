@@ -3,13 +3,16 @@ package postgres
 import (
 	"cmp"
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
+	configapp "asservat.local/asservat/internal/application/configuration"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
+	"github.com/jackc/pgx/v5"
 )
 
 // PreviewProjections reads, in one transaction under the shared permission
@@ -56,6 +59,29 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 			}
 			if !found {
 				out.Unmatched = append(out.Unmatched, ref)
+			}
+		}
+		// ADR-242: proposed sources are evaluated against the namespace
+		// observation of the current accepted batch, and the namespaces they
+		// grant join the cells read.
+		if len(r.Sources) > 0 {
+			observation, err := currentNamespaceObservation(ctx, q, s)
+			if err != nil {
+				return err
+			}
+			for _, src := range r.Sources {
+				grants, reason := configapp.NamespaceGrants(src, "", observation)
+				switch reason {
+				case cfg.MetadataUnavailable, cfg.MetadataNotObserved:
+					out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Unevaluated: reason})
+					continue
+				}
+				out.Sources = append(out.Sources, cfg.PreviewSourceGrants{Grants: grants})
+				for _, g := range grants {
+					if ns := (cfg.PreviewNamespace{ClusterID: src.ClusterID, NamespaceUID: g.Namespace.UID}); !slices.Contains(namespaces, ns) {
+						namespaces = append(namespaces, ns)
+					}
+				}
 			}
 		}
 		for _, b := range bases {
@@ -107,4 +133,30 @@ func (p *Permissions) PreviewProjections(ctx context.Context, r cfg.PreviewRead)
 		return cfg.PreviewSnapshot{}, err
 	}
 	return out, nil
+}
+
+// currentNamespaceObservation returns the namespace observation of the
+// stream's current acceptance, or nil when the stream is not current or that
+// acceptance holds none (ADR-242). Identical refreshes keep the stream's
+// sequence, so a current stream's observation is the current one.
+func currentNamespaceObservation(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream) (*cfg.NamespaceObservation, error) {
+	n, err := q.CurrentTime(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !s.InitialAuditID.Valid || s.Suspended || s.Sequence < 1 || !n.Time.Before(s.LeaseUntil.Time) || !identity.Fresh(s.ObservedAt.Time, s.FreshUntil.Time, n.Time, authorization.PermissionObservationInterval) {
+		return nil, nil
+	}
+	raw, err := q.ReadPermissionChangeRecord(ctx, custodydb.ReadPermissionChangeRecordParams{StreamID: s.ID, Epoch: s.Epoch, Sequence: s.Sequence})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var record struct{ Namespaces *cfg.NamespaceObservation }
+	if json.Unmarshal(raw, &record) != nil || record.Namespaces != nil && !record.Namespaces.Valid() {
+		return nil, cfg.ErrUnavailable
+	}
+	return record.Namespaces, nil
 }

@@ -47,7 +47,7 @@ def main():
     cache.mkdir(parents=True, exist_ok=True)
     results = ROOT/"test/results"
     results.mkdir(exist_ok=True)
-    report = {"scope": "permission observation, native admission and explicit-binding reconciliation with real SQL/encrypted audit; synthetic KMS; no public execution authority", "image": NODE}
+    report = {"scope": "permission observation, native admission, explicit-binding and namespace-inheritance reconciliation with real SQL/encrypted audit; synthetic KMS; no public execution authority", "image": NODE}
     exit_code, owned = 1, False
     containers = []
     with tempfile.TemporaryDirectory(prefix="permissions-", dir=cache) as directory:
@@ -128,7 +128,7 @@ def main():
                 run(k+["apply", "--server-side", "--force-conflicts", "--field-manager=asservat-owned-fixture"]+[a for p in chart_crds for a in ("-f", str(p))])
                 run(k+["wait", "--for=condition=Established", "--timeout=30s", "crd/evidenceretentionpolicies.asservat.io"])
                 with (results/"permission-admission.log").open("w") as log:
-                    result = subprocess.run(["go", "test", "-race", "-v", "-count=1", "-run", "TestPermissionAdmissionWithRealKubernetes|TestLocalStartWithRealKubernetes|TestRetentionWithRealKubernetes", "./test/integration"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=180)
+                    result = subprocess.run(["go", "test", "-race", "-v", "-count=1", "-run", "TestPermissionAdmissionWithRealKubernetes|TestLocalStartWithRealKubernetes|TestRetentionWithRealKubernetes", "./test/integration"], cwd=ROOT, env=env, stdout=log, stderr=subprocess.STDOUT, timeout=420)
                 exit_code = result.returncode
                 report["admissionExit"] = exit_code
             report["sourceUnchangedDuringTest"] = sources() == report["sourceHashes"]

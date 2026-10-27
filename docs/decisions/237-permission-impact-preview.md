@@ -109,10 +109,10 @@ only by reading every binding.
 
 ## Remaining limits (recorded against REQ-PER-002)
 
-- **Inherited permissions:** PermissionSource create/update is `Indeterminate`, not evaluated
-  against namespace metadata, because the product does not accept inheritance yet (above). When the
-  namespace-metadata source reconciler lands, the preview must evaluate sources against its
-  accepted metadata observation, with stale or missing metadata `Indeterminate`.
+- **Inherited permissions:** resolved by [ADR-242](242-namespace-permission-inheritance.md): source
+  create/update is evaluated against the accepted namespace observation; stale or missing metadata
+  is `Indeterminate` (`MetadataUnavailable`, `MetadataNotObserved`), replacing
+  `InheritanceNotAccepted`.
 - **Admission and automation are not simulated beyond the delegation envelope:** REQ-PER-002 asks
   for decision deltas, not an admission verdict; `kubectl --dry-run=server` remains the admission
   check. The result describes the effect once the objects are admitted and accepted.

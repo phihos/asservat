@@ -93,6 +93,49 @@ each run):
 Open: installed hub image still cgo-free (filters refused there until the recipe switches);
 syscall ABI names (increment 10); peers (increment 9); catalogs/composition (increment 11).
 
+## Namespace metadata permission inheritance (ADR-242, 2026-10-27)
+
+[ADR-242](decisions/242-namespace-permission-inheritance.md): the hub-worker's permission
+reconciler accepts `namespaceMetadata` PermissionSources (explicit value map,
+`administratorManaged`) for the hub cluster. A separate client LISTs the cluster's namespaces for
+the sources' keys and follows them with two-second watch sessions; the `NamespaceJournal` keeps
+only digests of observed keys; each granted namespace becomes one whole-namespace allow basis in
+the same audited SQL batch as the explicit bindings. Every derived-grant transition is accepted in
+order (A → B → A retires), a relist keeps an assignment only with an unchanged namespace
+resourceVersion, a source resourceVersion-only write keeps it (generation/spec digest unchanged),
+an unavailable source keeps its assignments without granting (`UnavailableSources`,
+`SourcesUnavailable`; projections skip a source allow whose basis lags the stream), explicit denies
+win. The minimized observation is part of the batch and the authority audit record, and the ADR-237
+preview evaluates PermissionSource create/update against it (`not_evaluated[].reason` now
+`MetadataUnavailable`/`MetadataNotObserved`). RBAC: hub-worker namespaces `get` → `get, list,
+watch`; chart continuation ClusterRole +`watch namespaces`. No migration (schema stays 93).
+`groupID`, `admissionEnforced`, workload/exec/access-review sources and non-hub clusters grant
+nothing (`SourceUnsupported`); exec inheritance (REQ-PER-004) is the next increment.
+
+Verification (tracked test/results files restored after each run):
+- Unit (`-race`): application/configuration (grants and every grant-nothing case, journal,
+  reconciler ordering/continuity/drop, unavailable states, budget), domain/configuration (observation
+  minimization, source preview create/update/Indeterminate), domain/audit, adapters/kubernetes
+  (`-run 'Namespace|Permission|HubWorker|HubWorkload'`: namespace LIST/watch reduction, pages,
+  ERROR/EOF), application/authorization, transport/presentation, contracts, adapters/postgres,
+  bootstrap: PASS. The unsharded `go test ./internal/adapters/kubernetes/...` exceeded Go's default
+  10-minute package timeout on this host (whole package, not sharded as in `go-check`/CI); the
+  sharded `go-check` was not run locally. Console `npm run check`: PASS (18 files, 204 tests).
+  `make pre-push`: PASS after gofmt.
+- Custody (real PostgreSQL, `scripts/test-custody.py --run '^TestPermissionAuthorityWithRealServices$'`):
+  PASS, 22 subtests, including `inherited-assignments-continuity-unavailability-and-preview` (0.36 s).
+- Permission (`make permission-integration`, owned Kind + PostgreSQL + S3): observation and
+  admission exits 0, sources unchanged, no cleanup failures. New
+  `TestPermissionAdmissionWithRealKubernetes/live-guard-proof-and-binding-revocation/namespace-inheritance-with-real-namespaces-SQL-and-audit`
+  PASS in 6.17 s: real namespace LIST/watch → SQL → encrypted audit; only the selected, mapped
+  namespace grants; an unrelated namespace label write keeps the assignment; back-to-back
+  owner A → B → A re-mints and retires the first; an explicit deny wins and its removal restores
+  access; a restarted reconciler (new epoch, relist) keeps the identity; an observer without
+  namespace list rights leaves the source unavailable (inherited allow gone, explicit binding kept,
+  assignment not retired) and recovery restores the same identity; removing the annotation revokes,
+  restoring it mints a new ID; disabling the source retires. Admission suite 116.6 s (baseline 112.0 s).
+- No installed qualification.
+
 ## S-06 increment 11: retention impact preview (ADR-240, 2026-10-27)
 
 

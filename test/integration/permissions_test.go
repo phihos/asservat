@@ -11,6 +11,7 @@ import (
 	"time"
 
 	kube "asservat.local/asservat/internal/adapters/kubernetes"
+	configapp "asservat.local/asservat/internal/application/configuration"
 	value "asservat.local/asservat/internal/domain/configuration"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,9 +98,12 @@ func TestPermissionsWithRealKubernetes(t *testing.T) {
 		if len(n.Annotations) != 1 || n.Annotations["unrelated"] != "" {
 			t.Fatal("unselected namespace data escaped")
 		}
-		p := value.ProposeNamespace(s.Sources[0], n, value.Target{ClusterID: cluster, Namespace: n.Namespace}, time.Now())
-		if len(p.Candidates) != 2 || p.Reason != "RequiresProtectionQualification" {
-			t.Fatal("synthetic review incorrectly conferred authority")
+		// The mapping keeps both owner groups; the observation it is applied
+		// to keeps only the selected keys' digests (ADR-242).
+		o := &value.NamespaceObservation{ClusterID: cluster, Keys: value.NamespaceKeys{Labels: []string{"example.invalid/managed"}, Annotations: []string{"example.invalid/owner"}},
+			Namespaces: []value.ObservedNamespace{{Name: n.Namespace.Name, UID: n.Namespace.UID, Labels: map[string]string{"example.invalid/managed": configapp.ValueDigest(n.Labels["example.invalid/managed"])}, Annotations: map[string]string{"example.invalid/owner": configapp.ValueDigest(n.Annotations["example.invalid/owner"])}}}}
+		if grants, reason := configapp.NamespaceGrants(s.Sources[0], cluster, o); reason != "" || len(grants) != 1 || len(grants[0].Subjects) != 2 {
+			t.Fatal("namespace mapping lost an owner group", reason)
 		}
 	})
 	t.Run("reader cannot write or read other scopes", func(t *testing.T) {

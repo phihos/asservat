@@ -83,7 +83,7 @@ export function AccessPreviewWorkspace({ session, scope, client = previewClient 
       <h2>Result</h2>
       <p>{preview.message}</p>
       <p>{preview.targets_evaluated} workload scopes evaluated; {preview.deltas_total} decision changes; {preview.deltas.length + preview.unavailable.length} of {preview.listed_rows} listed rows shown.{preview.fresh_until ? ` Based on permission data current until ${new Date(preview.fresh_until).toLocaleString()}.` : ''}</p>
-      {preview.not_evaluated.length > 0 && <ul>{preview.not_evaluated.map((row, index) => <li key={index}>PermissionSource {row.action}{row.uid ? <> <span className="identifier">{row.uid}</span></> : ''}: Indeterminate (inherited permissions are not yet accepted by this installation)</li>)}</ul>}
+      {preview.not_evaluated.length > 0 && <ul>{preview.not_evaluated.map((row, index) => <li key={index}>PermissionSource {row.action}{row.uid ? <> <span className="identifier">{row.uid}</span></> : ''}: Indeterminate ({row.reason === 'MetadataNotObserved' ? 'the accepted namespace observation does not record its keys yet; apply it disabled first' : 'no current namespace observation'})</li>)}</ul>}
       {preview.deltas.length > 0 && <table>
         <thead><tr><th scope="col">Workload</th><th scope="col">Subject</th><th scope="col">Operation</th><th scope="col">Now</th><th scope="col">After</th></tr></thead>
         <tbody>{preview.deltas.map((row, index) => <tr key={index}>

@@ -18,6 +18,16 @@ and `recorder-assessment/v1` assessment. Every such plan carries `RecorderUnavai
 `request_capture` refuses it before any reservation, and a composed DebugPolicy is refused at
 compile time. libpcap 1.11.0 is a static archive linked only into the hub build (`libpcap` tag).
 
+[ADR-242 — Namespace metadata permission inheritance](242-namespace-permission-inheritance.md)
+accepts `namespaceMetadata` PermissionSources (explicit value map, `administratorManaged`) for the
+hub cluster: the hub-worker LISTs and watches namespaces, keeps only digests of the configured keys,
+and accepts one whole-namespace allow per granted namespace into the same audited SQL stream as the
+explicit bindings. Every ownership transition is accepted in order; a relist keeps an assignment
+only with an unchanged namespace resourceVersion; an unavailable source keeps its assignments but
+grants nothing; explicit denies still win. The ADR-237 preview now evaluates source changes against
+the accepted observation. Exec/access-review inheritance remains a separate decision-time increment.
+No migration.
+
 [ADR-240 — Retention impact preview](240-retention-impact-preview.md) is S-06 increment 11: the
 browser-only `preview_retention_change` lets a current fleet operator submit proposed
 EvidenceRetentionPolicy changes and see how many retained artifacts would be shortened per cluster

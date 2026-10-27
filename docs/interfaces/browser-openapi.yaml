@@ -4594,7 +4594,9 @@ components:
                       decision:
                         const: Indeterminate
                       reason:
-                        const: InheritanceNotAccepted
+                        enum:
+                        - MetadataUnavailable
+                        - MetadataNotObserved
                     required:
                     - action
                     - kind

@@ -616,6 +616,8 @@ func installerContinuationRBAC(t *testing.T, ctx context.Context, api kubernetes
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"debugpolicies"}, Verbs: []string{"get", "create"}},
 		{APIGroups: []string{"asservat.io"}, Resources: []string{"evidenceretentionpolicies"}, Verbs: []string{"get", "list", "watch", "create", "update"}},
 		{APIGroups: []string{""}, Resources: []string{"namespaces", "pods"}, Verbs: []string{"get", "list"}},
+		// ADR-242: the hub-worker's namespace inheritance watch.
+		{APIGroups: []string{""}, Resources: []string{"namespaces"}, Verbs: []string{"watch"}},
 		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets"}, Verbs: []string{"get", "list"}},
 		// ADR-204: the download workers' PriorityClass and the hub-api's Job
 		// dispatch and retirement Role in the workers' namespace.

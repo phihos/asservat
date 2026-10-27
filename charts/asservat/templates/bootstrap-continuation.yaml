@@ -61,6 +61,10 @@ rules:
   - apiGroups: [""]
     resources: [namespaces, pods]
     verbs: [get, list]
+  # ADR-242: the hub-worker's namespace inheritance watches namespaces.
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [watch]
   - apiGroups: [apps]
     resources: [deployments, statefulsets]
     verbs: [get, list]

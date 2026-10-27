@@ -178,6 +178,7 @@ func cloneBatch(b value.PermissionBatch) value.PermissionBatch {
 		}
 		b.Initial = &p
 	}
+	b.UnavailableSources = slices.Clone(b.UnavailableSources)
 	b.Bases = slices.Clone(b.Bases)
 	for i := range b.Bases {
 		p := &b.Bases[i]
@@ -192,7 +193,29 @@ func cloneBatch(b value.PermissionBatch) value.PermissionBatch {
 	}
 	return b
 }
-func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now time.Time) (value.PermissionBatch, error) {
+
+// Ready reports whether a batch can be prepared at now without failing: the
+// last transition is accepted and the complete binding list is still current.
+func (j *BindingJournal) Ready(now time.Time) bool {
+	return !j.poisoned && j.pending == nil && j.accepted && identity.Fresh(j.observed, j.until, now, 5*time.Second)
+}
+
+// Budget counts the bases and assignment rows that the explicit bindings
+// would add to a batch prepared at now.
+func (j *BindingJournal) Budget(now time.Time) (bases, rows int) {
+	for _, b := range j.byUID {
+		if (b.Resource.Deleting && b.Effect == "Allow") || (!b.NotAfter.IsZero() && !now.Before(b.NotAfter)) {
+			continue
+		}
+		bases++
+		rows += len(b.Subjects) * len(b.Roles)
+	}
+	return bases, rows
+}
+
+// Prepare builds the next batch from the processed bindings and the
+// separately derived inheritance (ADR-242).
+func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now time.Time, inherited Inheritance) (value.PermissionBatch, error) {
 	if j.poisoned || !authorization.UUID(request) {
 		return value.PermissionBatch{}, value.ErrChanged
 	}
@@ -213,7 +236,17 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 		bindings = append(bindings, cloneBinding(b))
 	}
 	slices.SortFunc(bindings, func(a, b value.Binding) int { return cmp.Compare(a.Resource.UID, b.Resource.UID) })
-	encoded, err := json.Marshal(bindings)
+	// The input digest covers the explicit bindings and the derived
+	// inheritance; continuity flags never change what is accepted.
+	derived := inherited
+	derived.Bases = slices.Clone(inherited.Bases)
+	for n := range derived.Bases {
+		derived.Bases[n].Continuous = false
+	}
+	encoded, err := json.Marshal(struct {
+		Bindings  []value.Binding
+		Inherited Inheritance `json:",omitzero"`
+	}{bindings, derived})
 	if err != nil || len(encoded) > 8<<20 {
 		return value.PermissionBatch{}, value.ErrLimit
 	}
@@ -236,6 +269,10 @@ func (j *BindingJournal) Prepare(f value.PermissionFence, request string, now ti
 		p.ScopeDigest = PermissionScopeDigest(p)
 		batch.Bases = append(batch.Bases, p)
 	}
+	batch.Bases = append(batch.Bases, inherited.Bases...)
+	batch.UnavailableSources = slices.Clone(inherited.UnavailableSources)
+	batch.SourcesUnavailable = inherited.SourcesUnavailable
+	batch.Namespaces = inherited.Namespaces
 	if err = batch.Validate(now); err != nil {
 		return value.PermissionBatch{}, err
 	}

@@ -382,6 +382,25 @@ func (q *Queries) ReadPermissionAcceptance(ctx context.Context, requestID pgtype
 	return i, err
 }
 
+const readPermissionChangeRecord = `-- name: ReadPermissionChangeRecord :one
+SELECT record FROM authority_audit WHERE stream_id=$1 AND epoch=$2 AND sequence=$3 AND event_kind='permission-change'
+`
+
+type ReadPermissionChangeRecordParams struct {
+	StreamID pgtype.UUID
+	Epoch    pgtype.UUID
+	Sequence int64
+}
+
+// ADR-242: the authority event of the stream's current acceptance, which
+// carries the accepted namespace observation.
+func (q *Queries) ReadPermissionChangeRecord(ctx context.Context, arg ReadPermissionChangeRecordParams) ([]byte, error) {
+	row := q.db.QueryRow(ctx, readPermissionChangeRecord, arg.StreamID, arg.Epoch, arg.Sequence)
+	var record []byte
+	err := row.Scan(&record)
+	return record, err
+}
+
 const renewPermissionStream = `-- name: RenewPermissionStream :one
 UPDATE permission_stream SET lease_until=clock_timestamp()+interval '30 seconds' WHERE id=$1 AND epoch=$2 AND lease_until>clock_timestamp() RETURNING lease_until
 `
