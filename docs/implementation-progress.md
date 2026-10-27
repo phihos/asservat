@@ -1,5 +1,47 @@
 # Sustained implementation progress
 
+
+## Approved recording request and continuation (2026-10-27)
+
+The browser can request independent approval for an already-reviewed recorder
+composition, retain its original submission through pending review and resume it
+from the approval detail. The server computes advisory resume/resolve hints for
+the full original requester/client; current admission remains authoritative.
+One preview-bound intent key survives retries and page remounts. A grant made by
+another OAuth client is accompanied by original-client guidance, without transfer.
+This supplies continuation of existing reviews; a new packet profile editor is
+not implemented by this change.
+
+The installer and Helm input preserve the existing optional protected approval
+settings, including step-up and `requireRecordingApproval`. Absent settings keep
+old input bytes. Recorder assessment rules v2 and the manual preview contract now
+state retention from submission preparation, with old unsubmitted rule digests
+requiring fresh review. The page renders the supplied recorder assessment and
+output limit instead of pod-status-specific text; overhead remains unmeasured.
+
+Local console check passes 215 tests. The built browser checks pass 20 journeys,
+17 accessibility scans and the native restart checks. Affected capture,
+authorization, planning, presentation, installer and contract unit packages pass;
+the original-recorder-anchor regression and canonical manual-anchor validators
+pass. Helm, specification, architecture and gate self-tests pass. A broad local
+`go-check` was stopped after 12.5 minutes (exit 143): its ordinary race packages
+and first five Kubernetes groups passed, but the whole gate is incomplete and
+must not be described as passed. Established CI shards cover the full gate.
+
+The new guarded `continuation-approved-recording` focus is implemented for
+actual MCP request → independent signed browser step-up approval → real preview
+expiry → original-client submit → node Gadget recording → encrypted publication
+and authenticated native PCAPNG download opened by tshark. It retains the
+production preview lifetime and existing installer/authority guards, uses the
+published pinned Gadget, and adds no fixture grant rows. The reference provider
+uses actual fresh password LoA1, not MFA. The operator's existing reserve is sized
+for packet ciphertext while retaining four records/16 objects. Offline harness
+checks and integration compilation pass; this installed flow and its runtime
+remain **unqualified until the first disposable-runner test completes**.
+
+See [the scoped plan and complexity gate](reviews/approved-recording-workflow-2026-10-27.md).
+
+
 ## Approved capture acceptance (ADR-252, 2026-10-27)
 
 Approval-required recordings now retain their exact passive review blueprint

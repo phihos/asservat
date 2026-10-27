@@ -81,3 +81,31 @@ mutate a preview or split one oversized test to evade the bound.
 
 Freeze all relevant sources for qualification. Record actual selected tests,
 exits, original identities/deadlines, native hashes, cleanup and uncertainty.
+
+
+## Candidate fixture details
+
+`continuation-approved-recording` retains the installed fast feature fixture and
+adds an exact `approved-recording` child test. The collector image is built with
+`gadget,netgo,osusergo`; fetched OCI blobs are individually digest-checked. The
+regional installer provisions its real node endpoint and attestation RBAC; the
+official chart renders the DaemonSet. Guard absence refuses before any harness
+setup. Go execution is bounded to 18 minutes inside the existing 20-minute job.
+All collector-related sources, gadget fetch script and workflow are hashed.
+
+The distinct reviewer is a real member of the existing eligible group, whose
+focus-only operator AccessBinding includes `action-approver`. Self-approval and
+same-human cross-client continuation are refused. The real provider's built-in
+`acr` scope supplies signed assurance; this reference flow selects fresh password
+LoA1 and does not claim MFA. The same reviewer's existing browser session follows
+`/auth/step-up`, sees a fresh provider form, completes PKCE and replaces its CSRF
+before deciding. Approval/readback use public operations, not SQL grant fixtures.
+
+The existing Restricted signal workload supplies HTTP traffic on port 8080;
+only its exact reviewed Pod receives synthetic requests through Kubernetes' Pod
+proxy. The operator reserves actual packet ciphertext bytes while retaining the
+existing four-record/16-object root ceiling. The output SHA-256 and length must
+match authenticated native-download metadata and tshark must read nonempty TCP
+port-8080 packets. The report records actual original identities, review expiry,
+submit time, remaining real wait and native bytes; no first-run runtime result
+exists yet.

@@ -3,6 +3,8 @@
 import importlib.util
 from pathlib import Path
 import unittest
+from unittest.mock import patch
+import os
 
 spec = importlib.util.spec_from_file_location("context_fixture", Path(__file__).with_name("test-context-storage.py"))
 fixture = importlib.util.module_from_spec(spec)
@@ -10,6 +12,15 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_approved_recording_refuses_missing_disposable_guard_before_setup(self):
+        with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "approved-recording"}), patch.object(fixture.Path, "is_file", return_value=False):
+            with self.assertRaisesRegex(RuntimeError, "disposable-host guard"):
+                fixture.main(installer_continuation=True)
+
+    def test_approved_recording_has_finite_go_envelope(self):
+        with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "approved-recording"}):
+            self.assertEqual(fixture.qualification_go_timeout(installer_continuation=True), "18m")
+
     def test_exact_first_continuation_and_journey_selection(self):
         for mode in ("first", "continuation", "journey"):
             self.assertEqual(
