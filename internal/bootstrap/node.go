@@ -35,6 +35,9 @@ var errNodeGuard = errors.New("node collector refused: disposable-host guard abs
 
 const nodeRetry = 5 * time.Second
 
+// nodeReceiptBuffer bounds receipts not yet reported: four full reports.
+const nodeReceiptBuffer = 4 * collector.MaxReceipts
+
 func readNodeDeployment(ctx context.Context) (contracts.NodeDeployment, *x509.CertPool, error) {
 	root, err := os.OpenRoot(contracts.NodeDeploymentRoot)
 	if err != nil {
@@ -311,6 +314,22 @@ func (p *nodeProcess) statusLoop(ctx context.Context, kick <-chan struct{}) erro
 func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error {
 	var after uint64
 	for {
+		// Backpressure: while unreported receipts fill the buffer, do not
+		// poll. The cursor only moves past items that have a receipt, so no
+		// queued item is skipped; the connector returns the rest again.
+		p.mu.Lock()
+		full := len(p.receipts) >= nodeReceiptBuffer
+		p.mu.Unlock()
+		if full {
+			select {
+			case kick <- struct{}{}:
+			default:
+			}
+			if err := p.sleep(ctx, collector.StatusMinimumSpacing, nil); err != nil {
+				return err
+			}
+			continue
+		}
 		started := p.now()
 		work, err := p.client.Poll(ctx, p.epoch, after)
 		if errors.Is(err, node.ErrUnauthenticated) {
@@ -337,12 +356,14 @@ func (p *nodeProcess) pollLoop(ctx context.Context, kick chan<- struct{}) error 
 		}
 		p.mu.Lock()
 		for _, w := range work {
-			if w.Sequence > after {
-				after = w.Sequence
+			if w.Sequence <= after {
+				continue
 			}
-			if len(p.receipts) < 4*collector.MaxReceipts {
-				p.receipts = append(p.receipts, collector.Decide(w, p.now()))
+			if len(p.receipts) >= nodeReceiptBuffer {
+				break
 			}
+			p.receipts = append(p.receipts, collector.Decide(w, p.now()))
+			after = w.Sequence
 		}
 		p.cadence.Urgent()
 		p.mu.Unlock()

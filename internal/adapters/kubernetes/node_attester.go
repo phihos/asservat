@@ -2,8 +2,10 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"asservat.local/asservat/internal/application/delivery"
@@ -129,6 +131,53 @@ func exactFields(b json.RawMessage, keys ...string) error {
 		}
 	}
 	return nil
+}
+
+// PrecheckNode reads the token's unverified claims and rejects, without an
+// API call, anything TokenReview would refuse for this attester: not a
+// three-part JWT of at most 16 KiB, another audience or subject, expired, or
+// without a bound Pod. TokenReview remains the only authentication.
+func (a *NodeAttester) PrecheckNode(token []byte) error {
+	if !contracts.ValidWorkerToken(token) {
+		return delivery.ErrNodeInvalid
+	}
+	parts := strings.Split(string(token), ".")
+	if len(parts) != 3 || len(parts[1]) > 12<<10 {
+		return delivery.ErrNodeDenied
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	defer clear(payload)
+	if err != nil {
+		return delivery.ErrNodeDenied
+	}
+	var claims struct {
+		Aud json.RawMessage `json:"aud"`
+		Sub string          `json:"sub"`
+		Exp int64           `json:"exp"`
+		K8s struct {
+			Pod struct {
+				Name string `json:"name"`
+				UID  string `json:"uid"`
+			} `json:"pod"`
+		} `json:"kubernetes.io"`
+	}
+	if json.Unmarshal(payload, &claims) != nil || claims.Sub != "system:serviceaccount:"+a.namespace+":"+a.serviceAccount ||
+		claims.K8s.Pod.Name == "" || claims.K8s.Pod.UID == "" || !a.client.now().Before(time.Unix(claims.Exp, 0)) {
+		return delivery.ErrNodeDenied
+	}
+	var one string
+	var many []string
+	if json.Unmarshal(claims.Aud, &one) == nil {
+		many = []string{one}
+	} else if json.Unmarshal(claims.Aud, &many) != nil {
+		return delivery.ErrNodeDenied
+	}
+	for _, aud := range many {
+		if aud == a.audience {
+			return nil
+		}
+	}
+	return delivery.ErrNodeDenied
 }
 
 func (a *NodeAttester) AttestNode(ctx context.Context, token []byte, bootID string) (collector.Identity, error) {

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"time"
 
@@ -83,7 +84,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		der, notAfter, id, err := h.channel.Enroll(r.Context(), token, req.CSR, req.BootID, req.Epoch)
+		source, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		der, notAfter, id, err := h.channel.Enroll(r.Context(), source, token, req.CSR, req.BootID, req.Epoch)
 		if err != nil {
 			w.WriteHeader(status(err))
 			return

@@ -53,6 +53,17 @@ experiment (AGENTS.md).
    Receipts in the next status remove answered items. One current process per node: another Pod,
    boot or epoch enrolling for the node replaces the earlier process, whose certificates stop
    authenticating, whose queue is dropped and whose open poll ends.
+   **Enrollment bounds (PR #87 review).** Enrollment needs no client certificate and costs one
+   TokenReview plus three GETs, so before any API call the connector rejects tokens whose
+   unverified claims cannot pass (not a three-part JWT, another audience or subject, expired, no
+   bound Pod) and then admits at most 5 enrollments per second (burst 20: at most 20 API calls/s,
+   the attestation client's fixed QPS, above the 4.4/s a 5,000-node fleet needs for renewals),
+   one per source address per 5 seconds (burst 3, the node's retry interval) and 8 attestations
+   in flight. Refusals are 429 and the node retries; after a connector restart a 5,000-node fleet
+   re-enrolls within about 1,000 seconds. Receipts remove a queued item only when sequence and
+   work ID both match, within the reporting process's own queue. The node never moves its poll
+   cursor past an item it has not buffered a receipt for and stops polling while 256 receipts
+   are unreported.
 5. **Status cadence (S9).** One report at once after enrollment, then every 15 seconds, sooner
    (but at least 1 second apart, which the connector enforces) when receipts are pending. The
    connector keeps the latest report per node in memory and treats a node without a report for

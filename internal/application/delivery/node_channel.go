@@ -37,7 +37,103 @@ const MaxNodes = 5000
 // collector DaemonSet, and the claimed boot ID must equal its Node's
 // kubelet-reported boot ID. The returned identity has no Epoch.
 type NodeAttester interface {
+	// PrecheckNode rejects a token that cannot pass AttestNode (shape,
+	// audience, expiry, subject of the unverified claims) without any API
+	// call. Passing it proves nothing.
+	PrecheckNode(token []byte) error
 	AttestNode(ctx context.Context, token []byte, bootID string) (collector.Identity, error)
+}
+
+// Enrollment admission (Gitar review of PR #87). Enrollment is served
+// without a client certificate and costs one TokenReview plus three GETs, so
+// it is bounded before any API call: a global token bucket of 5 enrollments/s
+// with a burst of 20 (at most 20 API calls/s, the attestation client's fixed
+// QPS; a 5,000-node fleet renewing every ~19 minutes needs 4.4/s), one
+// enrollment per source address per 5 seconds with a burst of 3 (the node
+// retries every 5 seconds), and at most 8 attestations in flight. After a
+// connector restart, a 5,000-node fleet therefore re-enrolls within about
+// 1,000 seconds; refused nodes get 429 and retry.
+const (
+	enrollRate        = 5
+	enrollBurst       = 20
+	enrollSourceEvery = 5 * time.Second
+	enrollSourceBurst = 3
+	enrollInFlight    = 8
+	enrollSources     = 2 * MaxNodes
+)
+
+type bucket struct {
+	tokens float64
+	at     time.Time
+}
+
+func (b *bucket) refill(now time.Time, rate, burst float64) {
+	if now.After(b.at) {
+		b.tokens += now.Sub(b.at).Seconds() * rate
+		if b.tokens > burst {
+			b.tokens = burst
+		}
+		b.at = now
+	}
+}
+
+func (b *bucket) take(now time.Time, rate, burst float64) bool {
+	b.refill(now, rate, burst)
+	if b.tokens < 1 {
+		return false
+	}
+	b.tokens--
+	return true
+}
+
+type enrollLimiter struct {
+	mu       sync.Mutex
+	global   bucket
+	sources  map[string]*bucket
+	inFlight chan struct{}
+}
+
+func newEnrollLimiter(now time.Time) *enrollLimiter {
+	return &enrollLimiter{global: bucket{tokens: enrollBurst, at: now}, sources: map[string]*bucket{}, inFlight: make(chan struct{}, enrollInFlight)}
+}
+
+// admit takes one source and one global token; the caller must release the
+// in-flight slot it returns.
+func (l *enrollLimiter) admit(source string, now time.Time) (func(), bool) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	perSource := 1 / enrollSourceEvery.Seconds()
+	b := l.sources[source]
+	if b == nil {
+		if len(l.sources) >= enrollSources {
+			// Drop sources whose bucket has refilled: they hold no state.
+			for k, v := range l.sources {
+				if v.refill(now, perSource, enrollSourceBurst); v.tokens >= enrollSourceBurst {
+					delete(l.sources, k)
+				}
+			}
+			if len(l.sources) >= enrollSources {
+				return nil, false
+			}
+		}
+		b = &bucket{tokens: enrollSourceBurst, at: now}
+		l.sources[source] = b
+	}
+	// Check the source first so one noisy address cannot drain the global budget.
+	if b.refill(now, perSource, enrollSourceBurst); b.tokens < 1 {
+		return nil, false
+	}
+	select {
+	case l.inFlight <- struct{}{}:
+	default:
+		return nil, false
+	}
+	if !l.global.take(now, enrollRate, enrollBurst) {
+		<-l.inFlight
+		return nil, false
+	}
+	b.tokens--
+	return func() { <-l.inFlight }, true
 }
 
 // NodeIssuer signs an identity-free CSR for an attested identity and returns
@@ -84,6 +180,7 @@ type NodeChannel struct {
 	nodes    map[string]*nodeEntry
 	certs    map[[32]byte]string
 	onChange func(NodeView)
+	limit    *enrollLimiter
 }
 
 // NewNodeChannel composes the channel. onChange, when set, is called outside
@@ -92,7 +189,7 @@ func NewNodeChannel(a NodeAttester, i NodeIssuer, now func() time.Time, onChange
 	if a == nil || i == nil || now == nil {
 		return nil, ErrNodeInvalid
 	}
-	return &NodeChannel{attester: a, issuer: i, now: now, nodes: map[string]*nodeEntry{}, certs: map[[32]byte]string{}, onChange: onChange}, nil
+	return &NodeChannel{attester: a, issuer: i, now: now, nodes: map[string]*nodeEntry{}, certs: map[[32]byte]string{}, onChange: onChange, limit: newEnrollLimiter(now())}, nil
 }
 
 func validID(s string) bool {
@@ -119,10 +216,21 @@ func validID(s string) bool {
 // a certificate and keeps the previous one until it expires. Any other
 // enrollment for the node replaces the earlier process: its certificates stop
 // authenticating, its queued work is dropped and its open poll ends.
-func (c *NodeChannel) Enroll(ctx context.Context, token, csr []byte, bootID, epoch string) ([]byte, time.Time, collector.Identity, error) {
-	if ctx == nil || len(token) == 0 || len(csr) == 0 || !validID(bootID) || !validID(epoch) {
+//
+// source is the request's network source address; cheap checks and the
+// enrollment limits run before any Kubernetes API call.
+func (c *NodeChannel) Enroll(ctx context.Context, source string, token, csr []byte, bootID, epoch string) ([]byte, time.Time, collector.Identity, error) {
+	if ctx == nil || source == "" || len(token) == 0 || len(csr) == 0 || !validID(bootID) || !validID(epoch) {
 		return nil, time.Time{}, collector.Identity{}, ErrNodeInvalid
 	}
+	if c.attester.PrecheckNode(token) != nil {
+		return nil, time.Time{}, collector.Identity{}, ErrNodeDenied
+	}
+	done, ok := c.limit.admit(source, c.now())
+	if !ok {
+		return nil, time.Time{}, collector.Identity{}, ErrNodeRateLimited
+	}
+	defer done()
 	id, err := c.attester.AttestNode(ctx, token, bootID)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -290,13 +398,20 @@ func (c *NodeChannel) Report(p NodePeer, epoch string, r collector.Report) error
 		return ErrNodeRateLimited
 	}
 	changed := e.report == nil || !sameAssessment(e.report.Mechanisms, r.Mechanisms)
-	answered := map[uint64]bool{}
+	// A receipt answers exactly the item with its sequence and work ID. The
+	// queue belongs to this process (current() matched the epoch), so a
+	// receipt from a replaced process can never reach it.
+	type answer struct {
+		seq uint64
+		id  string
+	}
+	answered := map[answer]bool{}
 	for _, rc := range r.Receipts {
-		answered[rc.Sequence] = true
+		answered[answer{rc.Sequence, rc.WorkID}] = true
 	}
 	kept := e.work[:0]
 	for _, w := range e.work {
-		if !answered[w.Sequence] && now.Before(w.NotAfter) {
+		if !answered[answer{w.Sequence, w.ID}] && now.Before(w.NotAfter) {
 			kept = append(kept, w)
 		}
 	}

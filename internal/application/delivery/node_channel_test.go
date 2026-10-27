@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,12 +19,30 @@ const (
 )
 
 type fakeAttester struct {
-	mu  sync.Mutex
-	pod string
-	err error
+	mu      sync.Mutex
+	pod     string
+	err     error
+	calls   int
+	block   chan struct{}
+	started chan struct{}
+}
+
+func (a *fakeAttester) PrecheckNode(token []byte) error {
+	if string(token) == "garbage" {
+		return ErrNodeDenied
+	}
+	return nil
 }
 
 func (a *fakeAttester) AttestNode(_ context.Context, token []byte, bootID string) (collector.Identity, error) {
+	a.mu.Lock()
+	a.calls++
+	block, started := a.block, a.started
+	a.mu.Unlock()
+	if block != nil {
+		started <- struct{}{}
+		<-block
+	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	if a.err != nil {
@@ -32,11 +51,11 @@ func (a *fakeAttester) AttestNode(_ context.Context, token []byte, bootID string
 	return collector.Identity{NodeName: "node-a", NodeUID: "node-uid", PodName: "collector-x", PodUID: a.pod, BootID: bootID, Runtime: "containerd://2.1.0"}, nil
 }
 
-type fakeIssuer struct{ n int }
+type fakeIssuer struct{ n atomic.Int64 }
 
 func (i *fakeIssuer) IssueNode(csr []byte, id collector.Identity, notAfter time.Time) ([]byte, [32]byte, error) {
-	i.n++
-	der := []byte{byte(i.n), 'c', 'e', 'r', 't'}
+	n := i.n.Add(1)
+	der := []byte{byte(n), byte(n >> 8), 'c', 'e', 'r', 't'}
 	return der, sha256.Sum256(der), nil
 }
 
@@ -67,7 +86,7 @@ func newChannel(t *testing.T) (*NodeChannel, *fakeAttester, *clock, *[]NodeView)
 
 func enroll(t *testing.T, ch *NodeChannel, epoch string) (NodePeer, [32]byte) {
 	t.Helper()
-	der, notAfter, id, err := ch.Enroll(context.Background(), []byte("token"), []byte("csr"), boot, epoch)
+	der, notAfter, id, err := ch.Enroll(context.Background(), "10.0.0.1", []byte("token"), []byte("csr"), boot, epoch)
 	if err != nil || id.Epoch != epoch || notAfter.IsZero() {
 		t.Fatalf("enroll: %v %+v", err, id)
 	}
@@ -88,12 +107,12 @@ func TestEnrollValidatesInputAndAttestation(t *testing.T) {
 	ch, att, _, _ := newChannel(t)
 	ctx := context.Background()
 	for _, c := range []struct{ token, csr, boot, epoch string }{{"", "c", boot, epochA}, {"t", "", boot, epochA}, {"t", "c", "boot", epochA}, {"t", "c", boot, "EPOCH"}} {
-		if _, _, _, err := ch.Enroll(ctx, []byte(c.token), []byte(c.csr), c.boot, c.epoch); !errors.Is(err, ErrNodeInvalid) {
+		if _, _, _, err := ch.Enroll(ctx, "10.0.0.1", []byte(c.token), []byte(c.csr), c.boot, c.epoch); !errors.Is(err, ErrNodeInvalid) {
 			t.Fatalf("%+v: %v", c, err)
 		}
 	}
 	att.err = ErrNodeDenied
-	if _, _, _, err := ch.Enroll(ctx, []byte("t"), []byte("c"), boot, epochA); !errors.Is(err, ErrNodeDenied) {
+	if _, _, _, err := ch.Enroll(ctx, "10.0.0.1", []byte("t"), []byte("c"), boot, epochA); !errors.Is(err, ErrNodeDenied) {
 		t.Fatalf("attestation failure: %v", err)
 	}
 	if len(ch.Nodes()) != 0 {
@@ -267,5 +286,110 @@ func TestReportOrderingSpacingAndCurrency(t *testing.T) {
 	bad.Receipts = []collector.Receipt{{Outcome: "done"}}
 	if err := ch.Report(p, epochA, bad); !errors.Is(err, ErrNodeInvalid) {
 		t.Fatal("open receipt outcome")
+	}
+}
+
+func TestEnrollmentIsBoundedBeforeAnyAPICall(t *testing.T) {
+	ch, att, clk, _ := newChannel(t)
+	ctx := context.Background()
+	enrollFrom := func(source, token string) error {
+		_, _, _, err := ch.Enroll(ctx, source, []byte(token), []byte("csr"), boot, epochA)
+		return err
+	}
+	// A token failing the cheap precheck costs no attestation and no budget.
+	for i := 0; i < 50; i++ {
+		if err := enrollFrom("10.0.0.9", "garbage"); !errors.Is(err, ErrNodeDenied) {
+			t.Fatal(err)
+		}
+	}
+	if att.calls != 0 {
+		t.Fatalf("precheck failures reached the attester %d times", att.calls)
+	}
+	// Per source: a burst of 3, then one per 5 seconds.
+	for i := 0; i < enrollSourceBurst; i++ {
+		if err := enrollFrom("10.0.0.9", "token"); err != nil {
+			t.Fatalf("burst %d: %v", i, err)
+		}
+	}
+	if err := enrollFrom("10.0.0.9", "token"); !errors.Is(err, ErrNodeRateLimited) || att.calls != enrollSourceBurst {
+		t.Fatalf("source over its burst: %v (attestations %d)", err, att.calls)
+	}
+	clk.add(enrollSourceEvery)
+	if err := enrollFrom("10.0.0.9", "token"); err != nil {
+		t.Fatalf("after the source interval: %v", err)
+	}
+	// Globally: the bucket refilled to its burst during the 5 seconds and the
+	// last enrollment took one; the rest go to other sources, then 5 per second.
+	for i := 0; i < enrollBurst-1; i++ {
+		if err := enrollFrom("10.1.0."+string(rune('a'+i)), "token"); err != nil {
+			t.Fatalf("global burst %d: %v", i, err)
+		}
+	}
+	if err := enrollFrom("10.2.0.1", "token"); !errors.Is(err, ErrNodeRateLimited) {
+		t.Fatalf("global burst exhausted: %v", err)
+	}
+	clk.add(time.Second)
+	for i := 0; i < enrollRate; i++ {
+		if err := enrollFrom("10.3.0."+string(rune('a'+i)), "token"); err != nil {
+			t.Fatalf("global refill %d: %v", i, err)
+		}
+	}
+	if err := enrollFrom("10.4.0.1", "token"); !errors.Is(err, ErrNodeRateLimited) {
+		t.Fatal("global rate exceeded")
+	}
+}
+
+func TestEnrollmentInFlightBound(t *testing.T) {
+	ch, att, clk, _ := newChannel(t)
+	att.mu.Lock()
+	att.block, att.started = make(chan struct{}), make(chan struct{}, enrollInFlight)
+	att.mu.Unlock()
+	done := make(chan error, enrollInFlight)
+	for i := 0; i < enrollInFlight; i++ {
+		go func(i int) {
+			_, _, _, err := ch.Enroll(context.Background(), "10.5.0."+string(rune('a'+i)), []byte("token"), []byte("csr"), boot, epochA)
+			done <- err
+		}(i)
+		<-att.started
+	}
+	if _, _, _, err := ch.Enroll(context.Background(), "10.6.0.1", []byte("token"), []byte("csr"), boot, epochA); !errors.Is(err, ErrNodeRateLimited) {
+		t.Fatalf("ninth concurrent attestation: %v", err)
+	}
+	close(att.block)
+	for i := 0; i < enrollInFlight; i++ {
+		<-done
+	}
+	att.mu.Lock()
+	att.block = nil
+	att.mu.Unlock()
+	clk.add(time.Second)
+	if _, _, _, err := ch.Enroll(context.Background(), "10.6.0.1", []byte("token"), []byte("csr"), boot, epochA); err != nil {
+		t.Fatalf("slot released: %v", err)
+	}
+}
+
+func TestReceiptMustMatchSequenceAndWorkID(t *testing.T) {
+	ch, _, clk, _ := newChannel(t)
+	p, _ := enroll(t, ch, epochA)
+	w, err := ch.Enqueue("node-uid", collector.WorkSnapshot, clk.now().Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := report(1, clk.now())
+	r.Receipts = []collector.Receipt{{WorkID: "bbbbbbbb-0000-4000-8000-000000000000", Sequence: w.Sequence, Outcome: collector.OutcomeRefused}}
+	if err := ch.Report(p, epochA, r); err != nil || ch.Nodes()[0].Queued != 1 {
+		t.Fatalf("a receipt with another work ID removed the item: %v", err)
+	}
+	clk.add(time.Second)
+	r = report(2, clk.now())
+	r.Receipts = []collector.Receipt{{WorkID: w.ID, Sequence: w.Sequence + 1, Outcome: collector.OutcomeRefused}}
+	if err := ch.Report(p, epochA, r); err != nil || ch.Nodes()[0].Queued != 1 {
+		t.Fatalf("a receipt with another sequence removed the item: %v", err)
+	}
+	clk.add(time.Second)
+	r = report(3, clk.now())
+	r.Receipts = []collector.Receipt{{WorkID: w.ID, Sequence: w.Sequence, Outcome: collector.OutcomeRefused}}
+	if err := ch.Report(p, epochA, r); err != nil || ch.Nodes()[0].Queued != 0 {
+		t.Fatalf("matching receipt: %v", err)
 	}
 }

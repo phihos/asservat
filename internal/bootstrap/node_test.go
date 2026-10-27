@@ -11,6 +11,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"math/big"
 	"net"
 	"strings"
@@ -34,6 +35,8 @@ type testNodeAttester struct {
 	mu  sync.Mutex
 	pod string
 }
+
+func (a *testNodeAttester) PrecheckNode([]byte) error { return nil }
 
 func (a *testNodeAttester) AttestNode(_ context.Context, token []byte, boot string) (collector.Identity, error) {
 	a.mu.Lock()
@@ -375,5 +378,80 @@ func TestNodeDeploymentValidation(t *testing.T) {
 		if _, err := validNodeDeployment(d); err == nil {
 			t.Fatalf("%s accepted", name)
 		}
+	}
+}
+
+// sequencedChannel serves queued work like the connector: every item after
+// the cursor, at most 16 per poll, until it is answered.
+type sequencedChannel struct {
+	fakeNodeChannel
+	queue  []collector.Work
+	afters []uint64
+}
+
+func (f *sequencedChannel) Poll(ctx context.Context, _ string, after uint64) ([]collector.Work, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.afters = append(f.afters, after)
+	if len(f.afters) > 40 {
+		f.cancel()
+		return nil, node.ErrUnavailable
+	}
+	var out []collector.Work
+	for _, w := range f.queue {
+		if w.Sequence > after && len(out) < collector.MaxWorkPerPoll {
+			out = append(out, w)
+		}
+	}
+	return out, nil
+}
+
+func TestNodeReceiptBufferNeverSkipsQueuedWork(t *testing.T) {
+	clock := &fakeClock{t: time.Date(2026, 10, 27, 12, 0, 0, 0, time.UTC)}
+	ctx, cancel := context.WithCancel(context.Background())
+	ch := &sequencedChannel{fakeNodeChannel: fakeNodeChannel{clock: clock, cancel: cancel}}
+	for i := 1; i <= nodeReceiptBuffer+40; i++ {
+		ch.queue = append(ch.queue, collector.Work{ID: fmt.Sprintf("w%d", i), Sequence: uint64(i), Kind: collector.WorkSnapshot, NotAfter: clock.now().Add(time.Hour)})
+	}
+	p := testNodeProcess(&ch.fakeNodeChannel, clock)
+	p.client = ch
+	// While the buffer is full the loop only waits; end the test after a few waits.
+	waits := 0
+	p.sleep = func(ctx context.Context, d time.Duration, k <-chan struct{}) error {
+		if waits++; waits > 3 {
+			ch.mu.Lock()
+			ch.cancel()
+			ch.mu.Unlock()
+		}
+		return clock.sleep(ctx, d, k)
+	}
+	kick := make(chan struct{}, 1)
+	// No status loop runs: the buffer fills and polling must stop there.
+	if err := p.pollLoop(ctx, kick); err != nil && !errors.Is(err, context.Canceled) {
+		t.Fatal(err)
+	}
+	if len(p.receipts) != nodeReceiptBuffer {
+		t.Fatalf("buffered %d receipts", len(p.receipts))
+	}
+	for i, r := range p.receipts {
+		if r.Sequence != uint64(i+1) {
+			t.Fatalf("receipt %d has sequence %d: an item was skipped", i, r.Sequence)
+		}
+	}
+	// The last poll filled the buffer; none followed while it stayed full.
+	if last := ch.afters[len(ch.afters)-1]; last != uint64(nodeReceiptBuffer-collector.MaxWorkPerPoll) {
+		t.Fatalf("polled with cursor %d while the buffer was full", last)
+	}
+	// The receipts are reported and the connector drops the answered items;
+	// polling continues with the first unanswered one.
+	p.mu.Lock()
+	p.receipts = nil
+	p.mu.Unlock()
+	ch.queue = ch.queue[nodeReceiptBuffer:]
+	ctx, cancel = context.WithCancel(context.Background())
+	ch.cancel, ch.afters, waits = cancel, nil, -1000
+	p.pollLoop(ctx, kick)
+	if p.receipts[0].Sequence != uint64(nodeReceiptBuffer+1) || len(p.receipts) != 40 {
+		t.Fatalf("resumed at %d with %d receipts", p.receipts[0].Sequence, len(p.receipts))
 	}
 }

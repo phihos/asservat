@@ -102,6 +102,13 @@ Verification:
   log shows the probe line, one `connector unavailable` retry before the test's listener started,
   then enrollment). `make pre-push` PASS.
 
+PR #87 review fixes: enrollment claims precheck and limits (5/s, burst 20; one per source per
+5 s, burst 3; 8 in flight), receipts match sequence and work ID, poll cursor never passes an
+unbuffered item (backpressure at 256 unreported receipts). Unit tests
+`TestEnrollmentIsBoundedBeforeAnyAPICall`, `TestEnrollmentInFlightBound`,
+`TestReceiptMustMatchSequenceAndWorkID`, `TestNodeReceiptBufferNeverSkipsQueuedWork`,
+`TestNodeAttesterPrecheckNeedsNoAPI`: PASS.
+
 Open: installer provisioning of the connector's `collector` input; work producers and recorders
 (increment 4); budget-policy node limits at admission (increment 6); the full Gadget operator set.
 

@@ -2,6 +2,7 @@ package kubernetes
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -153,5 +154,47 @@ func TestNodeAttesterBindsTokenPodDaemonSetAndBoot(t *testing.T) {
 	}
 	if _, err := a.AttestNode(context.Background(), []byte("not a token!"), nodeBoot); !errors.Is(err, delivery.ErrNodeInvalid) {
 		t.Fatal("invalid token syntax reached TokenReview")
+	}
+}
+
+func nodeJWT(claims map[string]any) []byte {
+	b, _ := json.Marshal(claims)
+	return []byte("eyJhbGciOiJSUzI1NiJ9." + base64.RawURLEncoding.EncodeToString(b) + ".c2ln")
+}
+
+func TestNodeAttesterPrecheckNeedsNoAPI(t *testing.T) {
+	api := goodNodeAPI()
+	a := nodeAttester(t, api)
+	good := func() map[string]any {
+		return map[string]any{"aud": []string{contracts.NodeTokenAudience(nodeInstallation)}, "sub": "system:serviceaccount:collector:asservat-node",
+			"exp": time.Now().Add(5 * time.Minute).Unix(), "kubernetes.io": map[string]any{"pod": map[string]any{"name": "collector-abc", "uid": "pod-uid"}}}
+	}
+	if err := a.PrecheckNode(nodeJWT(good())); err != nil {
+		t.Fatal(err)
+	}
+	single := good()
+	single["aud"] = contracts.NodeTokenAudience(nodeInstallation)
+	if err := a.PrecheckNode(nodeJWT(single)); err != nil {
+		t.Fatal("a single-string audience is valid JWT")
+	}
+	for name, edit := range map[string]func(map[string]any){
+		"audience": func(c map[string]any) { c["aud"] = []string{"https://kubernetes.default.svc"} },
+		"subject":  func(c map[string]any) { c["sub"] = "system:serviceaccount:collector:default" },
+		"expired":  func(c map[string]any) { c["exp"] = time.Now().Add(-time.Second).Unix() },
+		"no pod":   func(c map[string]any) { delete(c, "kubernetes.io") },
+	} {
+		c := good()
+		edit(c)
+		if err := a.PrecheckNode(nodeJWT(c)); !errors.Is(err, delivery.ErrNodeDenied) {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+	for _, token := range [][]byte{[]byte("two.parts"), []byte("a.!!!.c"), []byte("a.bm90LWpzb24.c"), []byte("bad token")} {
+		if err := a.PrecheckNode(token); err == nil {
+			t.Fatalf("%q accepted", token)
+		}
+	}
+	if api.reviews != 0 {
+		t.Fatal("the precheck called TokenReview")
 	}
 }

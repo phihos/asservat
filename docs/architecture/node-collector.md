@@ -55,7 +55,8 @@ an initialized engine; packet additionally TCX (preferred) or tc, syscall additi
 
 ## Limits
 
-At most 5,000 nodes per connector, 64 queued items and 16 per poll, 64 receipts per report, 64 KiB
+Enrollment: claims precheck without API calls, then 5/s globally (burst 20), one per source
+address per 5 s (burst 3), 8 attestations in flight; refused with 429. At most 5,000 nodes per connector, 64 queued items and 16 per poll, 64 receipts per report, 64 KiB
 per message, two connections per node (10,016 in total), 20-minute leaves with at most two per
 process. Node ceilings default to 256 MiB ring, 256 MiB frozen, 32 MiB/s upload with a 64 MiB
 burst, and bound the container memory limit (ring + frozen + 128 MiB).
