@@ -799,3 +799,19 @@ the real typed caller-input digest. The second accepted fixture version explicit
 changes source collection intent; a sharing-only edit never reauthorizes or resets
 collection budgets. These remain synthetic authority inputs to real SQL, not
 production compiler/identity qualification. No product check or privilege changes.
+
+
+Accounting smoke 3 (`be38a13e`) failed overall later in the fixture: it derived
+synthetic Pod restart ordinals from per-acceptance execution counts. The second
+accepted scope reused ordinal 1 of the same real resolved Pod; PostgreSQL
+correctly refused policy_occurrence_root_id_policy_uid_pod_uid_restarts_key
+(23505). Actual Tick retains the Pod's monotonic restart counter across accepted
+scope changes. The fixture now keeps one monotonic ordinal across acceptances;
+the product occurrence key, deduplication and all counters remain unchanged.
+The first four captures, replay/restart and refused-fifth assertions were reached
+before the later failure, but the selected subtest is still FAIL, not a completed
+accounting qualification. Go 4.843s, child 4.39s, runner phase 23.703s, exit 1;
+unchanged 3,249 hashes, no cleanup failures and both exact owned containers absent.
+Report SHA-256
+`31af1fc2ed21e989bfac3eba92bff03eb99b89d12861a07e88db33bacfdcf556`,
+archived under `approved-workflow/policy102-accounting-smoke-3-artifacts/`.

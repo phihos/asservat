@@ -169,6 +169,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	}
 	// admit admits one policy-executor capture of the triggering Pod through
 	// the given admission adapter, with every current check.
+	var restartOrdinal int64 // the real Pod counter survives accepted-scope replacement
 	admitInput := func() capture.Admission {
 		t.Helper()
 		refresh()
@@ -218,8 +219,9 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		if _, err = admin.Exec(ctx, `UPDATE policy_acceptance SET executions_spent=executions_spent+1 WHERE id=$1`, active); err != nil {
 			t.Fatal(err)
 		}
-		if _, err = admin.Exec(ctx, `INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts) SELECT $1,$2,$3,$4,$5,$6,$7,executions_spent FROM policy_acceptance WHERE id=$4`, key, root, policyUID, active, pod.ClusterID, pod.WorkloadUID, pod.PodUID); err != nil {
-			t.Fatal(err)
+		restartOrdinal++
+		if _, err = admin.Exec(ctx, `INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, key, root, policyUID, active, pod.ClusterID, pod.WorkloadUID, pod.PodUID, restartOrdinal); err != nil {
+			t.Fatal("synthetic Tick occurrence", active, restartOrdinal, err)
 		}
 		a.Plan, a.Eligibility, a.Recovery, a.IdempotencyKey = plan, eligibility, recovery, key
 		a.Registration.Location.ArtifactID, a.Registration.Location.AttemptID = custodyID(), custodyID()
@@ -350,6 +352,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if err := admin.QueryRow(ctx, `SELECT reserved_capture_id IS NOT NULL FROM policy_occurrence WHERE id=$1`, refused.IdempotencyKey).Scan(&reserved); err != nil || reserved {
 		t.Fatal("refused capture retained a new output reservation", err)
 	}
+	t.Logf("accounting checkpoint: grant executions=%d bytes=%d; accepted executions=%d bytes=%d; fifth reservation=%t", grantExecutions, grantBytes, acceptedExecutions, acceptedBytes, reserved)
 	for _, c := range []capture.Accepted{c1, c2, c3} {
 		if w := stored(c); w == nil || w.Acceptance != first {
 			t.Fatal("capture within the limit is unshared", c.CaptureID, w)
