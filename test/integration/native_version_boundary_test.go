@@ -15,7 +15,7 @@ import (
 func TestNativeActualVersionHelperInputBoundary(t *testing.T) {
 	manifest := nativeVersionManifestFor(t)
 	for version, binary := range manifest.Binaries {
-		for _, kind := range []string{"unknown-field", "oversized", "wrong-role"} {
+		for _, kind := range []string{"unknown-field", "oversized", "wrong-role", "missing-listener"} {
 			t.Run(version+"/"+kind, func(t *testing.T) {
 				marker := "synthetic-credential-must-not-appear"
 				raw := []byte(`{"Unknown":"` + marker + `"}`)
@@ -24,6 +24,11 @@ func TestNativeActualVersionHelperInputBoundary(t *testing.T) {
 				}
 				if kind == "wrong-role" {
 					raw, _ = json.Marshal(nativeVersionInput{Action: "claim", Postgres: "postgres://postgres:" + marker + "@127.0.0.1:1/custody_test?sslmode=disable"})
+				}
+				if kind == "missing-listener" {
+					in := nativeVersionInput{Action: "hub", BodyBytes: 1}
+					in.Delivery.Length = 1
+					raw, _ = json.Marshal(in)
 				}
 				ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 				defer cancel()
@@ -42,6 +47,11 @@ func TestNativeActualVersionHelperInputBoundary(t *testing.T) {
 					want = "pool"
 					if err != nil {
 						t.Fatal("wrong-role check did not complete")
+					}
+				} else if kind == "missing-listener" {
+					want = "listener"
+					if err != nil {
+						t.Fatal("missing listener check did not complete")
 					}
 				} else if err == nil {
 					t.Fatal("invalid framing was accepted")

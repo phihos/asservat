@@ -46,16 +46,24 @@ type nativeVersionInput struct {
 	Source                         evidence.NativeContextSource
 	Warmup                         *value.NativeOperation
 	BodyBytes                      int
+	Lease                          value.NativeLease
+	Delivery                       artifact.DownloadDeliveryLease
+	Command                        contracts.NativeCommand
+	ExpectedPeer                   artifact.Digest
+	ServerCertificate, ServerKey   []byte
 }
 type nativeVersionOutput struct {
-	Format, ProductionRevision, Stage, ErrorClass string
-	CompiledSchema                                int64
-	Accepted, HasRenewer                          bool
-	OperationSHA256                               string
-	Sequence                                      int64
-	Until                                         time.Time
-	NativeState                                   contracts.NativeConversationState
-	ReaderCalls, DataFrames, DataBytes            int64
+	Format, ProductionRevision, Stage, ErrorClass          string
+	CompiledSchema                                         int64
+	Accepted, HasRenewer                                   bool
+	OperationSHA256                                        string
+	Sequence                                               int64
+	Until                                                  time.Time
+	NativeState                                            contracts.NativeConversationState
+	ReaderCalls, DataFrames, DataBytes                     int64
+	ConstructionStage, ConstructionClass, ConstructionStep string
+	AuthenticatedRequests, UpstreamOpens                   int64
+	DeliveredBytes, AcknowledgedChunks                     int64
 }
 
 type nativeVersionBinary struct {
@@ -141,7 +149,7 @@ func (b *nativeVersionBoundedOutput) Write(p []byte) (int, error) {
 	_, _ = b.Buffer.Write(p)
 	return n, nil
 }
-func invokeNativeVersion(ctx context.Context, binary nativeVersionBinary, in nativeVersionInput) (nativeVersionOutput, error) {
+func invokeNativeVersion(ctx context.Context, binary nativeVersionBinary, in nativeVersionInput, files ...*os.File) (nativeVersionOutput, error) {
 	var out nativeVersionOutput
 	raw, err := json.Marshal(in)
 	if err != nil || len(raw) > 256<<10 {
@@ -152,6 +160,7 @@ func invokeNativeVersion(ctx context.Context, binary nativeVersionBinary, in nat
 	defer cancel()
 	command := exec.CommandContext(call, binary.Path)
 	command.Stdin = bytes.NewReader(raw)
+	command.ExtraFiles = files
 	var stdout nativeVersionBoundedOutput
 	command.Stdout, command.Stderr = &stdout, io.Discard
 	command.WaitDelay = time.Second

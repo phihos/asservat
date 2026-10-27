@@ -1,8 +1,9 @@
 # Native response version boundary qualification
 
 Date: 2026-10-27. Requirements: REQ-DLD-002/003/004.
-Status: actual worker subprocess/transport and scoped shared SQL owner pair
-checks pass. Operational rollout and the remaining transport matrix are pending.
+Status: actual worker, serving-hub and connector subprocess/transport cases
+and the scoped shared SQL owner pair pass. Protected installed mixed-role
+admission and operational rollout remain unqualified.
 This is test-only qualification work.
 
 The old production tree is canonical PR100 main
@@ -11,7 +12,8 @@ The old production tree is canonical PR100 main
 The same finite [helper](../../test/fixtures/native-version-helper/main.go) is
 compiled separately in each module/worktree by
 [the build script](../../scripts/build-native-version-helpers.py). It invokes
-that tree's actual NativeOwners and RunWorkerConversation implementations.
+that tree's actual NativeOwners, RunWorkerConversation, NativeFrameGate,
+HubOperation, RelayConversation and native h2/mTLS handler implementations.
 There is no copied old predicate, import alias, module replacement, compatibility
 negotiation or product fallback. The repository's existing profiler replacement
 under vendor remains unchanged; builds use pinned modules with `-mod=readonly`
@@ -62,6 +64,59 @@ Actual first builds took 12.964s old and 1.446s new. The build manifest and resu
 logs are in `~/.cache/asservat-build/native-mixed-version-build-1/manifest.json`
 and `~/.cache/asservat-build/codex-bf86-resume/native-mixed-*.log`. Both binaries
 compile schema 100; a common schema floor does not prove native semantic support.
+
+## Actual old serving-hub and connector results
+
+`TestNativeActualVersionServingWire` adds four actual-process cases. Each old
+role first passes a three-second positive using the same certificate, listener,
+source and synthetic admission setup as its twenty-second negative. The hub
+case runs the old hub and new worker; the connector case runs the new hub,
+old relay and new worker. Each short case delivers exactly 65,536 deterministic
+bytes, acknowledges the final sink once and joins successfully. The connector
+positive opens exactly one authenticated upstream conversation.
+
+Both twenty-second cases preserve the actual old frame-gate constructor's
+`operation` refusal, classified unavailable. Neither constructs a replacement
+proof, extends processing freshness or reaches a later command predicate. The
+fixture then serves the real old h2/mTLS handler with this retained error: one
+request reaches synthetic admission with the exact verified client leaf. The
+construction refusal and authenticated request count are recorded separately.
+Neither negative delivers/acknowledges bytes or opens an upstream conversation.
+The new worker performs its separate synthetic preparation read once, then its
+actual Open fails before a response reader or data frame. This is an old gate
+refusal carried through a real wire boundary, not evidence that an old hub
+successfully constructed the long conversation or that full protected peer
+admission ran. No particular refused HTTP reply is claimed: server shutdown may
+interrupt its flush after the recorded admission refusal.
+
+The parent owns each loopback listener before starting children and passes its
+duplicated FD through `ExtraFiles`; the child accepts only an inherited loopback
+TCP listener. Existing bounded stdin/result transport and subprocess joining
+remain in use. There is no readiness endpoint, free-port reservation race,
+polling, new fixture service or extra bootstrap. Missing inherited listener
+fails closed in both binaries, alongside the existing input-boundary cases.
+
+Immutable build3 compiles the same production revisions named above: old
+1.547s, new 1.550s. Its provenance is:
+
+| Binding | SHA-256 |
+| --- | --- |
+| Fixture source | `ddd041dbd5904ecf3463ed8553154bd79460f82c2e07bd825c8ded095b2575b0` |
+| Old binary | `7cd5127ca6ea15335dd585ff1f762d6d67631eb969065a6f1439615f55b44965` |
+| New binary | `109e8e89bd46ec4ea9bc2e38e57635e3dd106eb43297c522ebe5fd35c5da7351` |
+| Build3 manifest | `e6a342c0394bffac967a7ca6f0b70ad70d0adb22168ec62122f4b7b1fd9c7692` |
+
+The new four-case normal run passes in 0.128s (subtest 0.11s). Combined worker,
+serving and eight input-boundary cases pass under parent race in 4.762s; the
+serving subtest takes 0.19s. Explicit-file helper TLS race passes in 1.064s and
+helper vet exits 0. Child binaries are ordinary, not race-instrumented. The
+initial new test compile failed on one unused import; its log remains retained.
+Logs are `native-mixed-serving-{1,2}.log`,
+`native-mixed-components-race-4.log` and `native-mixed-helper-{race,vet}-3.log`
+under `~/.cache/asservat-build/codex-bf86-resume`; the frozen manifest is
+`~/.cache/asservat-build/native-mixed-version-build-3/manifest.json`. No external
+fixture or collector ran for these additional cases. They do not supersede the
+separate build2 SQL evidence or qualify a later production source revision.
 
 ## Shared SQL owner pair and retained initial failure
 
@@ -200,14 +255,26 @@ protocol DTOs, build/provenance checks and actual transport fixtures. It reuses
 existing installation/bootstrap, guard and role setup instead of duplicating it.
 The observed benefit is direct old-worker refusal evidence that same-version
 tests could not supply, plus the scoped real SQL owner result above. Remaining
-serving-hop and operational-version behavior is unqualified. There is no
+protected installed mixed-role admission and operational-version behavior are
+unqualified. There is no
 per-deployment runtime cost and no compatibility
 mechanism to configure, upgrade or roll back.
 
-Actual old serving-hub and old connector transport boundaries remain outside
-these first cases. Installed near-full pacing/aggregate costs remain in their
-separate frozen qualification. Operational drained rollout is also pending:
+The serving extension adds 385 net test/helper lines (422 added, 37 removed),
+including eight additional subprocess invocations and four inherited listeners.
+It reuses the existing certificate/source and bounded runner instead of another
+bootstrap. Installed near-full pacing/aggregate costs remain in their separate
+frozen qualification. Operational drained rollout is also pending:
 the installer release code rolls hub processes/followers, which does not prove
 regional connector or acquisition-worker image/profile rollout. No built-in
 drain command was established. A quiet fixture or passing worker wire test must
 not be presented as a complete live rolling-upgrade or operational drain proof.
+
+ADR-227 leaves regional connector and download-worker operational upgrade work
+unfinished. The installer rolls hub-worker, hub-api and present key/publisher/
+federation followers, then checks settled image/generation state. Worker profile
+revision/suspension fences old-profile admissions and retains historical cleanup;
+it is not a graceful drain. Current qualification therefore supports the fresh
+matched-installation path, not longer-response operation across old peers or a
+live rolling upgrade. A supported stop-admissions/join/matched-image-and-profile/
+resume sequence remains later ADR-227 work; these tests add no drain framework.

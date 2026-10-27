@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"sync/atomic"
 	"time"
 
 	"asservat.local/asservat/internal/adapters/mtls"
@@ -57,16 +58,24 @@ type input struct {
 	Source                         evidence.NativeContextSource
 	Warmup                         *value.NativeOperation
 	BodyBytes                      int
+	Lease                          value.NativeLease
+	Delivery                       artifact.DownloadDeliveryLease
+	Command                        contracts.NativeCommand
+	ExpectedPeer                   artifact.Digest
+	ServerCertificate, ServerKey   []byte
 }
 type output struct {
-	Format, ProductionRevision, Stage, ErrorClass string
-	CompiledSchema                                int64
-	Accepted, HasRenewer                          bool
-	OperationSHA256                               string
-	Sequence                                      int64
-	Until                                         time.Time
-	NativeState                                   contracts.NativeConversationState
-	ReaderCalls, DataFrames, DataBytes            int64
+	Format, ProductionRevision, Stage, ErrorClass          string
+	CompiledSchema                                         int64
+	Accepted, HasRenewer                                   bool
+	OperationSHA256                                        string
+	Sequence                                               int64
+	Until                                                  time.Time
+	NativeState                                            contracts.NativeConversationState
+	ReaderCalls, DataFrames, DataBytes                     int64
+	ConstructionStage, ConstructionClass, ConstructionStep string
+	AuthenticatedRequests, UpstreamOpens                   int64
+	DeliveredBytes, AcknowledgedChunks                     int64
 }
 
 func hashOperation(o value.NativeOperation) string {
@@ -110,6 +119,8 @@ func main() {
 	defer cancel()
 	if in.Action == "worker" {
 		out = worker(ctx, in, out)
+	} else if in.Action == "hub" || in.Action == "connector" {
+		out = servingRole(ctx, in, out)
 	} else {
 		out = owner(ctx, in, out)
 	}
@@ -325,5 +336,180 @@ func worker(ctx context.Context, in input, out output) output {
 	out.ReaderCalls = source.calls
 	out.DataFrames = counted.frames
 	out.DataBytes = counted.bytes
+	return out
+}
+
+// These admissions deliberately provide synthetic operation/peer facts. The
+// gate, hub, relay, h2 handler and TLS listener are the linked production code.
+type roleAdmission struct {
+	input                input
+	owner                context.Context
+	gate                 *evidence.NativeFrameGate
+	hub                  *native.HubOperation
+	client               *mtls.NativeClient
+	construction         error
+	done                 chan error
+	authenticated, opens atomic.Int64
+}
+
+func (a *roleAdmission) finish(err error) {
+	select {
+	case a.done <- err:
+	default:
+	}
+}
+func (a *roleAdmission) OpenNative(ctx context.Context, state *tls.ConnectionState, hello contracts.NativeHello) (native.Conversation, error) {
+	if state == nil || !state.HandshakeComplete || state.NegotiatedProtocol != "h2" || len(state.VerifiedChains) == 0 || len(state.PeerCertificates) != 1 || sha256.Sum256(state.PeerCertificates[0].Raw) != a.input.ExpectedPeer {
+		return nil, artifact.ErrDownloadUnavailable
+	}
+	a.authenticated.Add(1)
+	if a.construction != nil {
+		return nil, a.construction
+	}
+	hello.Reference = a.input.Command.Reference
+	var conversation native.Conversation
+	var err error
+	if a.hub != nil {
+		conversation, err = a.hub.Attach(ctx, hello)
+	} else {
+		hello.WorkerLeaf = append([]byte(nil), state.PeerCertificates[0].Raw...)
+		defer clear(hello.WorkerLeaf)
+		var upstream *mtls.NativeClientStream
+		upstream, err = a.client.Open(a.owner, hello)
+		if err == nil {
+			a.opens.Add(1)
+			conversation, err = native.NewRelayConversation(a.gate, upstream)
+			if err != nil {
+				upstream.Close()
+			}
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &roleConversation{Conversation: conversation, admission: a}, nil
+}
+
+type roleConversation struct {
+	native.Conversation
+	admission *roleAdmission
+}
+
+func (c *roleConversation) Serve(ctx context.Context, stream native.Stream) error {
+	err := c.Conversation.Serve(ctx, stream)
+	c.admission.finish(err)
+	return err
+}
+
+type roleCertificate struct{ certificate tls.Certificate }
+
+func (c roleCertificate) GetCertificate(*tls.ClientHelloInfo) (*tls.Certificate, error) {
+	return &c.certificate, nil
+}
+
+func servingRole(ctx context.Context, in input, out output) output {
+	if in.BodyBytes < 1 || in.BodyBytes > int(artifact.DeliveryBytes) || in.Delivery.Length != int64(in.BodyBytes) {
+		return out
+	}
+	out.Stage = "listener"
+	// Only an inherited parent-owned loopback listener is accepted. No bind,
+	// endpoint discovery, readiness service or credential-bearing argv exists.
+	file := os.NewFile(3, "native-test-listener")
+	if file == nil {
+		return out
+	}
+	listener, err := net.FileListener(file)
+	file.Close()
+	if err != nil {
+		return out
+	}
+	defer listener.Close()
+	address, ok := listener.Addr().(*net.TCPAddr)
+	if !ok || !address.IP.IsLoopback() {
+		return out
+	}
+	out.Stage = "tls"
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(in.Roots) {
+		return out
+	}
+	certificate, err := tls.X509KeyPair(in.ServerCertificate, in.ServerKey)
+	if err != nil {
+		return out
+	}
+	call, cancel := context.WithCancel(ctx)
+	defer cancel()
+	a := &roleAdmission{input: in, owner: call, done: make(chan error, 1)}
+	out.ConstructionStage = "gate"
+	a.gate, err = evidence.NewNativeFrameGate(call, func(context.Context) (value.NativeLease, error) { return in.Lease, nil }, time.Now)
+	if a.gate != nil {
+		defer func() { a.gate.Close(); _ = a.gate.Wait(context.Background()) }()
+	}
+	if err == nil && in.Action == "hub" {
+		out.ConstructionStage = "hub"
+		a.hub, err = native.NewHubResponseOperation(a.gate, in.Command, in.Source, in.Delivery, func(context.Context, value.NativeLease) error { return nil })
+		if a.hub != nil {
+			defer a.hub.Close()
+		}
+	}
+	out.ConstructionClass = class(err)
+	var step interface{ FixedStep() string }
+	if errors.As(err, &step) {
+		switch fixed := step.FixedStep(); fixed {
+		case "check", "lease", "operation":
+			out.ConstructionStep = fixed
+		}
+	}
+	a.construction = err
+	if in.Action == "connector" && err == nil {
+		endpoint, e := url.Parse(in.Endpoint)
+		if e != nil || !net.ParseIP(endpoint.Hostname()).IsLoopback() {
+			return out
+		}
+		clientCertificate, e := tls.X509KeyPair(in.Certificate, in.PrivateKey)
+		if e != nil {
+			return out
+		}
+		a.client, e = mtls.NewNativeClient(in.Endpoint, &tls.Config{RootCAs: roots, Certificates: []tls.Certificate{clientCertificate}})
+		if e != nil {
+			return out
+		}
+	}
+	handler, err := native.NewHandler(contracts.NativeWorkerPath, listener.Addr().String(), a, 1)
+	if err != nil {
+		return out
+	}
+	handler.Refused = func(_ context.Context, _ string, err error) { a.finish(err) }
+	serverDone := make(chan error, 1)
+	go func() { serverDone <- native.Serve(call, listener, roots, roleCertificate{certificate}, handler, 2) }()
+	out.Stage = "serve"
+	if a.hub != nil {
+		chunk, e := a.hub.ReadChunk(call, in.Delivery, 0, in.Delivery.Length)
+		if e == nil && !bytes.Equal(chunk.Bytes, (&reader{bytes: in.BodyBytes}).body()) {
+			e = contracts.ErrNativeProtocol
+		}
+		if e == nil {
+			out.DeliveredBytes = int64(len(chunk.Bytes))
+			e = a.hub.AcknowledgeNativeChunk(call, in.Delivery, 0, in.Delivery.Length)
+			if e == nil {
+				out.AcknowledgedChunks++
+			}
+		}
+		clear(chunk.Bytes)
+		if e != nil {
+			a.finish(e)
+		}
+	}
+	select {
+	case err = <-a.done:
+	case <-call.Done():
+		err = call.Err()
+	}
+	cancel()
+	listener.Close()
+	<-serverDone
+	out.AuthenticatedRequests, out.UpstreamOpens = a.authenticated.Load(), a.opens.Load()
+	out.Accepted, out.ErrorClass = err == nil, class(err)
+	out.OperationSHA256 = hashOperation(in.Lease.Operation)
 	return out
 }

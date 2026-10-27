@@ -32,30 +32,19 @@ func TestNativeActualVersionWorkerWire(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			source := nativeVersionSource(t)
-			now := time.Now().UTC().Truncate(time.Microsecond)
-			until := now.Add(3 * time.Second)
+			duration := 3 * time.Second
 			if name == "old-long-refusal" || name == "new-long" {
-				until = now.Add(20 * time.Second)
+				duration = 20 * time.Second
 			}
-			id := source.Expectation.Registration.Location.ClusterID
-			revision := identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{7}}
-			operation := value.NativeOperation{Reference: value.NativeReference{InstallationID: id, SessionID: id, WorkerID: id, OperationID: id, Fence: 1}, Kind: value.NativeResponse, HubPodUID: id, HubProcessEpoch: id, WorkerPodUID: id, WorkerPublicKey: artifact.Digest{1}, SourceVersion: evidence.ContextCopiesDigest(source.Copies), ParentID: id, Generation: 1, StartedAt: now, Until: until}
-			operation.Path = artifact.DownloadPath{ID: id, TargetClusterID: id, StoreID: source.Expectation.Registration.StoreID, StorageRegion: "fixture", AcquisitionClusterID: id, AcquisitionRegion: "fixture", ConnectorClusterID: id, ConnectorRegion: "fixture", HubClusterID: id, HubRegion: "fixture", WorkerConfiguration: revision, HubConfiguration: revision}
-			operation.Processing = artifact.DownloadProcessingProof{RootID: id, Epoch: id, CaptureID: id, Location: source.Expectation.Registration.Location, Sequence: 1, StateDigest: artifact.Digest{8}, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
-			leaseUntil := identity.Earlier(until, now.Add(5*time.Second))
-			authority := artifact.DownloadAuthority{Scope: artifact.DownloadScope{RootID: id, ArtifactID: id, CaptureID: id, ClusterID: id, NamespaceUID: id, WorkloadUID: id, PodUID: id, Version: operation.SourceVersion, Principal: identity.Principal{Issuer: "https://synthetic.invalid", Subject: "developer", ClientID: "fixture", Kind: identity.Human}}, PermissionEpoch: id, PermissionSequence: 1, ProjectionDigest: artifact.Digest{1}, DecisionDigest: artifact.Digest{2}, IdentityRevision: revision, CheckedAt: now, ValidUntil: leaseUntil, AccessUntil: now.Add(time.Minute), DeleteBy: now.Add(2 * time.Minute)}
 			const size = 2 * int(artifact.DeliveryBytes)
-			delivery := artifact.DownloadDeliveryLease{ResponseID: id, WindowID: id, OwnerID: id, Generation: 1, Sequence: 1, Length: int64(size), StartedAt: now, Until: leaseUntil, Authority: authority}
-			lease := value.NativeLease{Operation: operation, Certificate: artifact.Digest{3}, Sequence: 1, ObservedAt: now, Until: leaseUntil}
+			source, operation, lease, delivery, command := nativeVersionOperation(t, duration, size)
+			now, id := operation.StartedAt, operation.Reference.InstallationID
 			gate, err := evidence.NewNativeFrameGate(ctx, func(context.Context) (value.NativeLease, error) { return lease, nil }, time.Now)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer func() { gate.Close(); _ = gate.Wait(context.Background()) }()
-			wire, _ := json.Marshal(operation)
-			encoded, _ := json.Marshal(source)
-			command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: contracts.NativeReference{InstallationID: id, SessionID: id, WorkerID: id, OperationID: id, Fence: 1}, Kind: string(operation.Kind), Source: encoded, Operation: wire, ParentID: id, Generation: 1, LeaseSequence: 1, Until: until.Format(time.RFC3339Nano), WindowID: id, Length: int64(size)}
+
 			hub, err := native.NewHubResponseOperation(gate, command, source, delivery, func(context.Context, value.NativeLease) error { return nil })
 			if err != nil {
 				t.Fatal(err)
@@ -157,6 +146,27 @@ func TestNativeActualVersionWorkerWire(t *testing.T) {
 		})
 	}
 }
+
+// Synthetic operation facts shared by the actual-version wire cases.
+func nativeVersionOperation(t *testing.T, duration time.Duration, size int) (evidence.NativeContextSource, value.NativeOperation, value.NativeLease, artifact.DownloadDeliveryLease, contracts.NativeCommand) {
+	source := nativeVersionSource(t)
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	until := now.Add(duration)
+	id := source.Expectation.Registration.Location.ClusterID
+	revision := identity.Revision{UID: id, Generation: 1, Digest: artifact.Digest{7}}
+	operation := value.NativeOperation{Reference: value.NativeReference{InstallationID: id, SessionID: id, WorkerID: id, OperationID: id, Fence: 1}, Kind: value.NativeResponse, HubPodUID: id, HubProcessEpoch: id, WorkerPodUID: id, WorkerPublicKey: artifact.Digest{1}, SourceVersion: evidence.ContextCopiesDigest(source.Copies), ParentID: id, Generation: 1, StartedAt: now, Until: until}
+	operation.Path = artifact.DownloadPath{ID: id, TargetClusterID: id, StoreID: source.Expectation.Registration.StoreID, StorageRegion: "fixture", AcquisitionClusterID: id, AcquisitionRegion: "fixture", ConnectorClusterID: id, ConnectorRegion: "fixture", HubClusterID: id, HubRegion: "fixture", WorkerConfiguration: revision, HubConfiguration: revision}
+	operation.Processing = artifact.DownloadProcessingProof{RootID: id, Epoch: id, CaptureID: id, Location: source.Expectation.Registration.Location, Sequence: 1, StateDigest: artifact.Digest{8}, ObservedAt: now, ValidUntil: now.Add(5 * time.Second)}
+	leaseUntil := identity.Earlier(until, now.Add(5*time.Second))
+	authority := artifact.DownloadAuthority{Scope: artifact.DownloadScope{RootID: id, ArtifactID: id, CaptureID: id, ClusterID: id, NamespaceUID: id, WorkloadUID: id, PodUID: id, Version: operation.SourceVersion, Principal: identity.Principal{Issuer: "https://synthetic.invalid", Subject: "developer", ClientID: "fixture", Kind: identity.Human}}, PermissionEpoch: id, PermissionSequence: 1, ProjectionDigest: artifact.Digest{1}, DecisionDigest: artifact.Digest{2}, IdentityRevision: revision, CheckedAt: now, ValidUntil: leaseUntil, AccessUntil: now.Add(time.Minute), DeleteBy: now.Add(2 * time.Minute)}
+	delivery := artifact.DownloadDeliveryLease{ResponseID: id, WindowID: id, OwnerID: id, Generation: 1, Sequence: 1, Length: int64(size), StartedAt: now, Until: leaseUntil, Authority: authority}
+	lease := value.NativeLease{Operation: operation, Certificate: artifact.Digest{3}, Sequence: 1, ObservedAt: now, Until: leaseUntil}
+	wire, _ := json.Marshal(operation)
+	encoded, _ := json.Marshal(source)
+	command := contracts.NativeCommand{Format: contracts.NativeExchangeFormat, Reference: contracts.NativeReference{InstallationID: id, SessionID: id, WorkerID: id, OperationID: id, Fence: 1}, Kind: string(operation.Kind), Source: encoded, Operation: wire, ParentID: id, Generation: 1, LeaseSequence: 1, Until: until.Format(time.RFC3339Nano), WindowID: id, Length: int64(size)}
+	return source, operation, lease, delivery, command
+}
+
 func nativeVersionBody(offset, length int) []byte {
 	b := make([]byte, length)
 	for i := range b {
@@ -198,13 +208,17 @@ func (a nativeVersionAdmission) OpenNative(ctx context.Context, state *tls.Conne
 	hello.Reference = a.reference
 	return a.hub.Attach(ctx, hello)
 }
-func nativeVersionServer(t *testing.T, ctx context.Context, hub *native.HubOperation, reference contracts.NativeReference, keys *keyTLSFixture, client tls.Certificate) (string, func()) {
+func nativeVersionServer(t *testing.T, ctx context.Context, hub *native.HubOperation, reference contracts.NativeReference, keys *keyTLSFixture, client tls.Certificate, paths ...string) (string, func()) {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler, err := native.NewHandler(contracts.NativeWorkerPath, listener.Addr().String(), nativeVersionAdmission{hub, sha256.Sum256(client.Certificate[0]), reference}, 1)
+	path := contracts.NativeWorkerPath
+	if len(paths) == 1 {
+		path = paths[0]
+	}
+	handler, err := native.NewHandler(path, listener.Addr().String(), nativeVersionAdmission{hub, sha256.Sum256(client.Certificate[0]), reference}, 1)
 	if err != nil {
 		listener.Close()
 		t.Fatal(err)
@@ -213,7 +227,7 @@ func nativeVersionServer(t *testing.T, ctx context.Context, hub *native.HubOpera
 	call, cancel := context.WithCancel(ctx)
 	done := make(chan error, 1)
 	go func() { done <- native.Serve(call, listener, keys.roots, serving, handler, 2) }()
-	return "https://" + listener.Addr().String() + contracts.NativeWorkerPath, func() { cancel(); listener.Close(); <-done }
+	return "https://" + listener.Addr().String() + path, func() { cancel(); listener.Close(); <-done }
 }
 func nativeVersionSource(t *testing.T) evidence.NativeContextSource {
 	t.Helper()
