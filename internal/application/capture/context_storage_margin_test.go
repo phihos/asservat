@@ -115,11 +115,11 @@ func TestContextStorageMarginDoesNotRenewEarlierAuthority(t *testing.T) {
 			}
 			_, err := f.svc.Request(t.Context(), source, p.ID, "original")
 			var stage interface{ FixedStep() string }
-			if !errors.Is(err, value.ErrChanged) || !errors.As(err, &stage) || stage.FixedStep() != "facts/current" ||
+			if !errors.Is(err, value.ErrChanged) || !errors.As(err, &stage) || stage.FixedStep() != "facts/current/"+earlier ||
 				f.admissions.Load() != 0 || len(f.accepted) != 0 || storage.reads.Load() != 2 || refresh.demands.Load() != 0 {
 				t.Fatal("storage margin revived earlier authority or repeated readiness", err, f.admissions.Load(), storage.reads.Load(), refresh.demands.Load())
 			}
-			if !slices.Equal(reports, []string{"request/facts/current"}) {
+			if !slices.Equal(reports, []string{"request/facts/current/" + earlier}) {
 				t.Fatal("request omitted its distinct expired-facts diagnostic", reports)
 			}
 		})
@@ -134,7 +134,8 @@ func TestContextStorageMarginCancellationJoinsAuthoritativeRead(t *testing.T) {
 	originalUntil, _ := ctx.Deadline()
 	entered, cancelled, release, exited := make(chan struct{}), make(chan struct{}), make(chan struct{}), make(chan struct{})
 	var advance atomic.Int64
-	storage := &marginStorageRead{investigationFixture: f, advance: &advance, until: f.now.Add(time.Second),
+	// This short parent skips the hint; its first read is authoritative.
+	storage := &marginStorageRead{investigationFixture: f, advance: &advance, until: f.now.Add(time.Second), readAt: 1,
 		finalRead: func(call context.Context) error {
 			until, ok := call.Deadline()
 			if !ok || until.After(originalUntil) {
@@ -173,7 +174,7 @@ func TestContextStorageMarginCancellationJoinsAuthoritativeRead(t *testing.T) {
 	unblock()
 	err := <-done
 	overlapSignal(t, exited, "joined authoritative read")
-	if !errors.Is(err, context.Canceled) || storage.reads.Load() != 2 || refresh.demands.Load() != 0 ||
+	if !errors.Is(err, context.Canceled) || storage.reads.Load() != 1 || refresh.demands.Load() != 0 ||
 		f.admissions.Load() != 0 || len(f.accepted) != 0 {
 		t.Fatal("cancellation performed admission or repeated readiness", err, storage.reads.Load(), refresh.demands.Load())
 	}

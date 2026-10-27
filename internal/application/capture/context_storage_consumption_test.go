@@ -140,9 +140,13 @@ func TestContextStorageConsumptionRetainsEachAuthorityBound(t *testing.T) {
 			var reports []string
 			f.svc.ReportPreviewFailure = func(stage string) { reports = append(reports, stage) }
 			_, err := f.svc.Request(t.Context(), source, p.ID, "expired-"+bound)
+			label := bound
+			if label == "eligibility-identity" {
+				label = "identity"
+			}
 			if !errors.Is(err, value.ErrChanged) || reads.Load() != 3 || refresh.demands.Load() != 1 ||
 				f.admissions.Load() != 0 || facts.caps != 1 || facts.ret != 1 || facts.eligibility != 1 ||
-				!slices.Equal(reports, []string{"request/facts/current"}) {
+				!slices.Equal(reports, []string{"request/facts/current/" + label}) {
 				t.Fatal("new storage revived an earlier authority", bound, err, reads.Load(), refresh.demands.Load(), reports)
 			}
 		})
@@ -362,7 +366,7 @@ func TestContextStorageConsumptionJoinsCancellation(t *testing.T) {
 	}
 }
 
-func TestContextStorageConsumptionTimerRetainsCallerDeadline(t *testing.T) {
+func TestContextStorageConsumptionTailRetainsCallerDeadline(t *testing.T) {
 	f, facts, owner := consumptionFixture(t)
 	ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
@@ -379,14 +383,12 @@ func TestContextStorageConsumptionTimerRetainsCallerDeadline(t *testing.T) {
 	})
 	f.svc.Refresh = consumptionRefreshFunc(func(call context.Context, _ targets.Request) error {
 		demands++
-		if until, _ := call.Deadline(); !until.Equal(original) {
-			t.Error("demand replaced original caller deadline")
-		}
+		t.Error("tail must not demand refresh")
 		return nil
 	})
 	_, err := f.svc.consumeStorage(ctx, facts, f.intent(), owner)
-	if !errors.Is(err, context.DeadlineExceeded) || reads != 1 || demands != 1 {
-		t.Fatal("timer outlived caller and read again", err, reads, demands)
+	if !errors.Is(err, value.ErrUnavailable) || ctx.Err() != nil || reads != 1 || demands != 0 {
+		t.Fatal("tail exhausted caller or repeated readiness", err, reads, demands)
 	}
 }
 

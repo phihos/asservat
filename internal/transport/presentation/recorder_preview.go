@@ -114,7 +114,7 @@ type RecorderPreviewData struct {
 
 // RecorderUnavailableBlocker is the interim blocker of every packet/syscall
 // plan, including the explicit onTrigger before:0s variant.
-var RecorderUnavailableBlocker = OperationBlocker{Code: "RecorderUnavailable", Message: "Packet and syscall recorders are not installed in this release. This preview shows the reviewed plan only and cannot be submitted.", ResponsibleRole: "administrator", Retryable: false}
+var RecorderUnavailableBlocker = OperationBlocker{Code: "RecorderUnavailable", Message: "No recorder is available for this reviewed plan. This preview shows the plan only and cannot be submitted.", ResponsibleRole: "administrator", Retryable: false}
 
 func recorderWarnings(plan planning.RecorderPlan) []string {
 	out := []string{}
@@ -174,7 +174,7 @@ func RecorderAssessment(a planning.RecorderAssessment) CaptureAssessment {
 		out.Actions = append(out.Actions, AssessmentAction{ActionID: x.ActionID, ExecutionMode: x.ExecutionMode,
 			Impact:     Impact{x.Impact.Level, x.Impact.HasUnknowns, slices.Clone(x.Impact.Effects), x.Impact.Explanation},
 			Data:       Exposure{x.Exposure.Classification, x.Exposure.Basis, slices.Clone(x.Exposure.RetainedPossible), slices.Clone(x.Exposure.TransientOnly), x.Exposure.UnknownContent},
-			Retention:  Retention{"firstAcquisitionOrEarlierSource", r.AccessAgeSeconds, r.DeleteAgeSeconds, r.MaximumAgeSeconds, r.DeletionBudgetSeconds, policies, true, true, "possible"},
+			Retention:  Retention{"submissionPreparation", r.AccessAgeSeconds, r.DeleteAgeSeconds, r.MaximumAgeSeconds, r.DeletionBudgetSeconds, policies, true, true, "possible"},
 			Quantities: quantities(x.Quantities)})
 	}
 	if a.Interaction != "" {

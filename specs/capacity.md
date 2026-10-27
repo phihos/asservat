@@ -83,6 +83,14 @@ Apply the equivalent invariant to object slots. Workload charges include committ
 
 Preserve context capacity at the hard ceiling too: expensive evidence must fit `hardLimit - contextReserve`, alongside any already occupied non-context bytes/object slots. Unused context capacity is never lent to expensive actions. Allocation moves or pool resizing cannot retract a slice with committed or uncertain reserved usage; drain/verify it or provide replacement backed capacity first. Slot size and profile protected values must agree before the allocation is Ready.
 
+The current bounded context/packet profile retains its existing finite record
+and object ceilings. Within those ceilings, the custody child must retain the
+administrator's authored context bytes up to the supported packet ciphertext
+reservation per record; it must not silently reduce a packet-funded slice to
+pod-status bytes. Correcting an existing physical projection preserves original
+allocation identity, all used/uncertain charges and deadlines. A rollback that
+cannot retain those charges must refuse without partial changes.
+
 Example: a 128 GiB accounted pool allocates 16 GiB safety headroom, 8 GiB system capacity, four protected workload allocations of 16 GiB and 40 GiB shared burst. A workload ceiling of 32 GiB allows A to use its 16 GiB and up to 16 GiB of burst. B, C and D retain their protected capacity even if A has triggered continuously. Each workload can use 1 GiB of its 16 GiB for context that its dumps cannot occupy. Object-count accounting protects against many small artifacts as well as a few large ones.
 
 The guarantee is admission within a workload's **remaining** protected capacity, provided the backing storage is healthy and provisioned. It is not unlimited history or an unconditional new core after that workload fills its own allocation. A logical prefix or S3 bucket does not reserve physical disk. Qualification requires an administrator-assigned backend capacity envelope, replication/erasure-coding overhead accounted by the operator, monitoring of free capacity and protection from unrelated writers (dedicated capacity or a backend-enforced equivalent). Shared physical storage without such a boundary is explicitly `BestEffortCapacity` and cannot satisfy the isolation release claim.

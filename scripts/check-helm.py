@@ -188,6 +188,14 @@ def check_bootstrap(directory):
     assert settings["clients"] == [{"id": "console", "kind": "human", "classQualified": True}] and settings["eligibleGroups"] == ["stable-group-id"]
     assert settings["origin"] == "https://asservat.example" and settings["groupMaxAgeSeconds"] == 300
     assert "permissionDelegations" not in settings, "empty delegations changed existing installer identities"
+    assert "approvals" not in settings, "absent approval settings changed existing installer identities"
+    approved = copy.deepcopy(public)
+    approvals = {"requireRecordingApproval": True, "stepUp": {"acrValues": ["2"], "maxAgeSeconds": 300}}
+    approved["bootstrap"]["continuation"]["public"]["approvals"] = approvals
+    adocs = render(approved)
+    ainput, = [r for r in adocs if "continuation.json" in r.get("data", {})]
+    assert json.loads(ainput["data"]["continuation.json"])["public"]["approvals"] == approvals
+    assert ainput["data"]["continuation.json"] != pinput["data"]["continuation.json"], "approval policy is not bound to installer input"
     delegated = copy.deepcopy(public)
     envelope = {"writers": [{"kind": "Group", "name": "payments-admins"}],
                 "clusterID": "10000000-0000-4000-8000-000000000001",
@@ -344,9 +352,11 @@ def check_collector(directory):
             "installationID": "10000000-0000-4000-8000-000000000001", "clusterID": "50000000-0000-4000-8000-000000000001",
             "connector": {"endpoint": "https://asservat-connector-nodes.asservat-connector.svc:8444", "serverName": "asservat-connector-nodes", "rootsPEM": roots}}}
 
-    def render(v, ok=True, namespace="asservat-region"):
+    def render(v, ok=True, namespace="asservat-region", collector_only=False):
         path.write_text(yaml.safe_dump(v))
         args = ["template", "asservat", str(CHART), "--namespace", namespace, "--kube-version", "1.37.0", "-f", str(path)]
+        if collector_only:
+            args += ["--show-only", "templates/collector.yaml"]
         result = run(args, ok=ok)
         return result if not ok else [r for r in yaml.safe_load_all(result) if r]
 
@@ -354,6 +364,14 @@ def check_collector(directory):
     collector = [r for r in docs if r["metadata"].get("namespace") == "asservat-collector" or r["kind"] == "Namespace"]
     assert sorted(r["kind"] for r in collector) == ["ConfigMap", "DaemonSet", "Namespace", "ServiceAccount"], [r["kind"] for r in collector]
     assert not any(r["kind"] in ("Role", "ClusterRole", "RoleBinding", "ClusterRoleBinding", "Secret") for r in docs), "the collector account gets no API permission"
+    # The installed CLI connector already owns its guarded namespace. Its
+    # collector stage applies only the official four collector resources;
+    # no unrelated installation-intent ConfigMap may target a release namespace.
+    stage = render(base, namespace="asservat-connector", collector_only=True)
+    assert stage == collector, "collector stage changed the official resources or includes installation intent"
+    assert all(r["kind"] == "Namespace" and r["metadata"]["name"] == "asservat-collector"
+               or r["metadata"].get("namespace") == "asservat-collector" for r in stage), "collector stage writes outside its dedicated namespace"
+
     namespace = next(r for r in collector if r["kind"] == "Namespace")
     assert namespace["metadata"]["name"] == "asservat-collector"
     assert {k: v for k, v in namespace["metadata"]["labels"].items() if k.startswith("pod-security")} == {f"pod-security.kubernetes.io/{m}": "privileged" for m in ("enforce", "audit", "warn")}

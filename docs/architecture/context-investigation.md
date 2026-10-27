@@ -46,6 +46,14 @@ labels distinguish the hub receiver cutoff from the regional resolution cutoff;
 successful transport alone is not a usable target observation. These diagnostics
 never refresh either interval or substitute another Pod.
 
+[ADR-260](../decisions/260-api-target-observation-freshness.md) separates completed
+API target metadata from the exchange used to read it. Query I/O and completion
+still require the original current source/peer bounds. After completion, exact
+UID/owner metadata keeps at most five seconds from its earliest target read;
+transport-proof expiry alone does not invalidate that delivered observation.
+All current human, recovery, grant, storage and effect guards remain binding,
+including this coordinator's original five-second request and earlier parent.
+
 The passive `ContextPreview` holds server-generated preview, capture, case,
 occurrence, artifact, attempt and assessment IDs; original actor/client; exact
 authored intent; target pin; selected storage revisions; relative retention;
@@ -103,6 +111,20 @@ one-second freshness margin may poll every 250 ms for an independently
 refreshed binding, while every retained non-storage fact remains current.
 It may use the sole demand attempt only if the hint has not already spent it.
 An early successful hint cannot satisfy the final margin check.
+
+Readiness scheduling stops at the earlier original authority cutoff or one
+second before the actual parent context deadline. That reserve uses the real
+context clock, independently of the injected authority clock. It applies only
+to the optional hint, demand and polling; it does not shorten any returned
+identity or observation, extend authority, or change the public request deadline.
+A call already in that final second skips the hint. Consumption still gets one
+fresh authoritative read under its unchanged original authority context, even
+for a parent shorter than one second. A sufficiently fresh result can succeed;
+a thin result returns the existing retryable unavailability without demand or
+polling. Ending a wait permits one final authoritative read, with the same
+selection and original fact checks. Audit completion, final identity checks and
+response delivery retain the parent context. The reserve gives those steps an
+opportunity to finish; slow reads or audit can still exhaust the request.
 
 Request pins the preview's exact storage selection; Preview and
 CheckDiagnostic pin their first valid authoritative selection. Read errors,
@@ -184,7 +206,57 @@ grant use with revocation in SQL. Accepted retries recover their original deadli
 Legacy absolute-deadline plans cannot gain this interpretation; they require a
 new preview/review. See [ADR-252](../decisions/252-approved-capture-acceptance.md).
 
+Packet submission resolves its exact approved Pod and current recorder
+availability in one regional exchange. This removes duplicate network/API work
+from the original target's five-second observation interval; it does not restart
+that interval or relax any current eligibility, retention, storage, identity or
+recovery check. Unsupported composition types still refuse before that query.
+The connector rechecks the Pod's node and collector before enqueueing. Preview
+selection and its plan-only behavior remain unchanged. See the
+[target composition](workload-target-resolution.md#independent-pins-and-deadlines).
+
+Recorder composition previews preserve plan-only blockers for known unsupported
+inputs, no adapter, or a confirmed unavailable/unsupported recorder answer. An
+operational recorder read/transport/cancellation failure returns the existing
+retryable `NotAvailable` result before compilation or preview persistence. The
+installed approved-recording journey requires exactly the `ApprovalRequired`
+blocker before it requests approval, matching the console's requestability gate;
+its existing four reads retry only typed retryable unavailability. Availability
+never upgrades an already stored or approved plan; its original scope stays fixed.
+
 The existing protected approval-settings reader is consulted once per recorder
 submission. A changed administrator approval requirement invalidates the review
 in either direction. Approval presentation separates passive preview expiry from
 the bounded execution window assigned at acceptance.
+
+
+The browser controller can submit an already-reviewed approval-required recorder
+composition. A known `ApprovalRequired` response links the existing approval and
+retains the original preview-bound intent key; it does not report capture
+acceptance. Detailed `get_grant` outputs provide advisory `can_resume` and
+`can_resolve` flags for the original full requester/client. Resume requires
+capture scope; passive resolution requires the current read scope and a
+previous approved decision, so pending/denied reviews have no close-by-lookup
+control. An explicit button names the close-if-unstarted effect.
+Resume additionally requires a currently usable marked approval and ordinary
+collection rights. Only a user action invokes the existing request operation;
+admission remains authoritative. Passive resolution can still find a previously
+accepted capture after approval expiry without starting acquisition. The server emits `resume_requires_original_client` guidance only for the same
+requesting human on another client while the marked plan is Approved; independent
+reviewers and pending/denied reviews receive no such instruction. No grant is
+transferred. The preview-bound key is stable across pending review, page remount
+and lost replies; no browser credential or private authority is persisted.
+
+Manual recorder assessment rules are `recorder-assessment/v2`: retention starts
+at submission preparation, never preview creation. This changes the reviewed
+rules digest so an unsubmitted older review must be refreshed. Existing-source
+snapshot timing remains a distinct contract and is not implemented by this UI.
+The page renders the actual supplied assessment actions, categories and output
+limits; unknown overhead remains unknown.
+
+
+The preview-derived intent key is public correlation. The current authenticated
+actor and OAuth client scope SQL lookup; the submission digest binds the preview.
+Knowing the key supplies no authority, another preview conflicts under that key,
+and a closed preview cannot start under either the same or a different key.
+A deliberate new intent requires a new review and preview ID.

@@ -51,6 +51,9 @@ type RegionalNodeEndpoint struct {
 	Endpoint   string `json:"endpoint"`
 	ServerName string `json:"serverName"`
 	RootsPEM   string `json:"rootsPEM"`
+	// serverInput is installation-only metadata from the acknowledged Secret,
+	// never another public endpoint field or copied key material.
+	serverInput contracts.ConnectorAPIInput
 }
 
 func (c *RegionalCollectorPlan) valid(connector string) bool {
@@ -73,6 +76,13 @@ func regionalCollectorRBAC(connector string, c RegionalCollectorPlan) *rbac.Role
 		{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"get"}},
 		{APIGroups: []string{"apps"}, Resources: []string{"daemonsets"}, ResourceNames: []string{c.Name}, Verbs: []string{"get"}},
 	}}
+}
+
+// regionalNodeInputReadRule permits the executor's existing input-proof check
+// to read metadata of the exact listener Secret it already projects. Kubernetes
+// RBAC cannot constrain GET to metadata, so no other name/list/watch is granted.
+func regionalNodeInputReadRule() rbac.PolicyRule {
+	return rbac.PolicyRule{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{RegionalNodes}, Verbs: []string{"get"}}
 }
 
 func regionalNodeReadRule() rbac.PolicyRule {
@@ -109,14 +119,14 @@ func ensureRegionalCollector(ctx context.Context, api kubernetes.Interface, p Re
 		return none, RegionalNodeEndpoint{}, err
 	}
 	endpoint, serverName := regionalNodeEndpoint(p.Namespace)
-	roots, err := ensureRegionalNodeSecret(ctx, api, p.Namespace, serverName, marker)
+	roots, serverInput, err := ensureRegionalNodeSecret(ctx, api, p.Namespace, serverName, marker)
 	if err != nil {
 		return none, RegionalNodeEndpoint{}, err
 	}
 	if _, err = ensureRegional(ctx, api.CoreV1().Services(p.Namespace), regionalNodeService(), marker); err != nil {
 		return none, RegionalNodeEndpoint{}, err
 	}
-	out := RegionalNodeEndpoint{Endpoint: endpoint, ServerName: serverName, RootsPEM: roots}
+	out := RegionalNodeEndpoint{Endpoint: endpoint, ServerName: serverName, RootsPEM: roots, serverInput: serverInput}
 	if _, err = ensureRegional(ctx, api.CoreV1().ConfigMaps(p.Namespace), &core.ConfigMap{ObjectMeta: meta.ObjectMeta{Name: RegionalNodes}, Immutable: ptr.To(true),
 		Data: map[string]string{"endpoint": out.Endpoint, "serverName": out.ServerName, "rootsPEM": out.RootsPEM}}, marker); err != nil {
 		return none, RegionalNodeEndpoint{}, err
@@ -127,28 +137,32 @@ func ensureRegionalCollector(ctx context.Context, api kubernetes.Interface, p Re
 // ensureRegionalNodeSecret creates the immutable listener Secret with a fresh
 // key, or reopens this installation's existing one: a rerun must not replace
 // a certificate the collectors already pin. It returns the PEM root.
-func ensureRegionalNodeSecret(ctx context.Context, api kubernetes.Interface, namespace, serverName, marker string) (string, error) {
+func ensureRegionalNodeSecret(ctx context.Context, api kubernetes.Interface, namespace, serverName, marker string) (string, contracts.ConnectorAPIInput, error) {
 	secrets := api.CoreV1().Secrets(namespace)
 	existing, err := secrets.Get(ctx, RegionalNodes, meta.GetOptions{})
 	switch {
 	case err == nil:
 		if existing.DeletionTimestamp != nil || existing.Annotations[regionalInstall] != marker {
-			return "", cfg.ErrChanged
+			return "", contracts.ConnectorAPIInput{}, cfg.ErrChanged
 		}
 	case apierrors.IsNotFound(err):
 		chain, key, err := newRegionalNodeCertificate(serverName, time.Now())
 		defer clear(key)
 		if err != nil {
-			return "", cfg.ErrUnavailable
+			return "", contracts.ConnectorAPIInput{}, cfg.ErrUnavailable
 		}
 		if existing, err = ensureRegional(ctx, secrets, &core.Secret{ObjectMeta: meta.ObjectMeta{Name: RegionalNodes}, Type: core.SecretTypeOpaque, Immutable: ptr.To(true),
 			Data: map[string][]byte{contracts.RegionalNodeServerFile: chain, contracts.RegionalNodeServerKeyFile: key}}, marker); err != nil {
-			return "", err
+			return "", contracts.ConnectorAPIInput{}, err
 		}
 	default:
-		return "", &regionalAPIError{reason: string(apierrors.ReasonForError(err))}
+		return "", contracts.ConnectorAPIInput{}, &regionalAPIError{reason: string(apierrors.ReasonForError(err))}
 	}
-	return regionalNodeRoots(existing.Data[contracts.RegionalNodeServerFile], existing.Data[contracts.RegionalNodeServerKeyFile], serverName, time.Now())
+	roots, err := regionalNodeRoots(existing.Data[contracts.RegionalNodeServerFile], existing.Data[contracts.RegionalNodeServerKeyFile], serverName, time.Now())
+	if err != nil {
+		return "", contracts.ConnectorAPIInput{}, err
+	}
+	return roots, contracts.ConnectorAPIInput{Kind: "Secret", Name: RegionalNodes, UID: string(existing.UID), ResourceVersion: existing.ResourceVersion, DedicatedToAPI: true}, nil
 }
 
 // newRegionalNodeCertificate makes a P-256 root and a server leaf for the

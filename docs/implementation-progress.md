@@ -1,5 +1,345 @@
 # Sustained implementation progress
 
+## Storage readiness response reserve (2026-10-27)
+
+Installed run 40581901798 on 1862f1bf failed during the initial preview, before
+approval or submission: HTTP/2 `INTERNAL_ERROR` and private
+`facts/current/operation` (Go 478.226s; approved subtest 6.51s). Immediate timing
+shows target below 500ms, recorder below 2s, retention below 500ms, hint at least
+3s and storage consumption below 3s; these overlap and must not be added as
+serial costs. Storage waiting consumed the original five-second public window.
+This does not identify a lost refresh demand or justify changing SQL readiness,
+proof freshness or retrying effects. Source stayed unchanged; all 3,199 hashes
+independently matched, cleanup was empty; report SHA-256
+`86e320ba861ebb47c2c5ec92261459a8591843414eec5e4da8a4c8561e69c821`.
+CI 40581516812 and review passed that candidate; installed approval remains
+unqualified.
+
+Optional readiness scheduling now stops one second before the actual parent
+context deadline, bounded by every earlier original authority cutoff. The
+original request, identity and authoritative-read context stay unchanged. A
+short parent still gets a fresh read; thin storage in the reserved tail returns
+existing retryable unavailability without demand or polling. Before that tail,
+the same single demand may run; ending the wait permits one final authoritative
+read. The hint is always joined. A fresh result never bypasses original
+selection, authority or final checks. One second is a candidate informed by
+earlier completed native Finish marks below 100ms and pre-service marks below
+250ms. The failed run does not establish its Finish duration. Slow final reads
+or audit can still consume the reserve; this is an opportunity to deliver a
+refusal, not a completion guarantee.
+
+Complexity assessment for this bounded scheduling correction:
+
+1. Observed: two installed initial-preview stream resets, latest before any
+   approval; inability to deliver a typed refusal harms the ordinary workflow.
+2. No previously accepted risk is reopened; original authority remains binding.
+3. It affects ordinary Preview, Request and CheckDiagnostic readiness waits.
+4. It uses standard parent contexts and existing typed refusal; no new remote
+   mechanism or protocol requires a project-specific precedent.
+5. Added privileges, credentials, endpoints and network requests: zero.
+6. New public failure or fallback states: zero; the existing refusal occurs sooner.
+7. New configuration: zero; the fixed reserve is scheduling only.
+8. New external dependencies: zero; current storage and audit remain dependencies.
+9. At most one extra bounded context/timer per active consumption when the
+   readiness cutoff precedes its authority deadline; the existing hint timer
+   ends earlier. No new goroutine, watch or persistent state. Poll and demand
+   counts cannot increase. Initial hint-read outcome and sole-demand duration
+   use fixed labels in the existing bounded StepTimes recorder, never per-poll
+   records or provider text. A nil demand result is not refresh acknowledgement.
+10. No schema, stored-format or wire change; rollback restores older scheduling
+    without rewriting state. Short-parent fresh success and cancellation stay
+    tested.
+11. Shortening only the hint would leave consumption polling able to exhaust
+    the request; extending authority or adding another demand is unnecessary.
+
+The focused app regression failed before the change: thin storage used its
+750ms parent, and a blocked hint used its full 1.25s parent then attempted a
+demand. After the change, the initial focused cases pass in 0.252s. Full capture
+race tests pass in 10.870s, including final fresh read, no tail hint/demand/poll,
+short-parent fresh success and original selection/cancellation checks. Two
+existing tests now explicitly cover the reserved tail rather than expecting
+optional waits to consume short parents. Earlier intermediate failures are
+retained in `storage-reserve-capture-race*.log`: the first exposed those old
+expectations, the second a duplicate equal-deadline timer race; reusing the
+original authority context when no earlier wait cutoff exists fixes that race.
+Capture vet, spec-check (13,269 assertions), architecture-check (1,326 positive
+checks) and Go architecture (66 packages, 386 edges) pass. The first contract
+invocation referenced a missing local virtualenv; the preserved second run uses
+the existing spec virtualenv and exits 0.
+
+The composed regression uses real loopback HTTP/2, MCP, audited presentation,
+current request identity, the evaluator and C09; facts, storage and audit are
+synthetic. On the old source, thin storage caused HTTP/2 `INTERNAL_ERROR` after
+5.002s (21 reads, one demand and one audit Begin/Finish). With the reserve it
+returns typed retryable `NotAvailable` after 4.110s (18 reads, one demand, no
+preview store or admission, one Begin/Finish). A fresh binding still succeeds
+with a 750ms parent in 118ms, using one authoritative read and no demand.
+The focused race regression exits 0 in 6.858s; the full MCP race suite exits 0
+in 49.857s. Application tests separately verify joined hint ownership. These
+are shared storage-path component results, not an installed packet journey.
+Installed requalification remains pending.
+
+The composed root candidate passes `make pre-push` (including 218 console
+checks), and final spec/architecture gates exit 0. Presentation race tests pass
+in 74.657s. That combined command exits 1 because the second package path was
+mistyped as `internal/application/contextstart`; its setup failure is retained
+in `storage-reserve-composed-race.log`. The corrected
+`internal/transport/contextstart` race command exits 0; no presentation rerun
+was needed. Both independent source/test reviews found no concrete blocker.
+
+## API target metadata and completed query bounds (ADR-260, 2026-10-27)
+
+The shared target/readiness candidate e6a2fbfb passed CI and review but its
+installed run 40563988015 still failed at `request/facts/current/target` before
+admission (Go 624.070s; approved subtest 129.68s includes the deliberate
+120-second preview wait). Sources stayed unchanged, all 3,193 hashes matched,
+cleanup was empty; report SHA-256
+`1356fd01e52d8ecbc07d908dc9e0b494eb5f3ee8b19750fdc39d61cb46bf6816`.
+That failure does not measure which constituent target cutoff expired.
+
+Source review found that API target metadata inherited both the regional owner
+context deadline and the hub receiver/frame proof cutoff. A composed
+noncollector regression reproduces the premature expiry through the actual
+coordinator, eligibility evaluator, router/streams and API adapter with a TLS
+fake API: query completion under 250ms transport proofs followed by a 400ms
+storage read is refused before admission. Its authority/control inputs are
+synthetic, so it is protocol/coordinator evidence only.
+
+[ADR-260](decisions/260-api-target-observation-freshness.md) revises that
+agent-authored coupling uniformly for API target metadata. Successful query I/O
+and completion retain every original source/peer/caller deadline. The returned
+observation keeps only its earliest target read's original five seconds; receipt
+cannot renew it or raise an earlier producer cutoff. C09's original request
+deadline and current identity, deny, grant, recovery and effect guards remain.
+NodeExecution and authority-bearing query answers retain their old bounds.
+The change adds no API calls, configuration, watchers, timers or stored state.
+The composed matrix passes locally (7.387s), as do independent expiry/selection
+and shorter-producer tests, final affected races (targets 1.008s, capture 10.498s,
+context-start 10.831s, bootstrap 52.215s), full pre-push and the real libpcap/static
+build check. A separate read-only review found no blocking regression. Fresh
+hosted CI/review and the installed result remain pending; no installed approved
+capture has passed yet.
+
+CI 40571631610 on 21806d0d exposed two obsolete API metadata assertions in
+the actual TLS/H2 query tests. The lifecycle test reproduced locally before
+the correction (exit 1, 0.198s): its short caller was incorrectly expected to
+truncate the completed metadata. Both tests now assert the synthetic producer's
+exact `ObservedAt + 5s` interval, while the lifecycle test separately requires
+query completion before the original short caller deadline. All three original
+cross-cutoff phases (current peer check, idle standby and separately leased
+work), their deadlines and joined cleanup remain unchanged. The complete mTLS
+package passes with race detection (exit 0, 36.692s). This changes tests only;
+it does not qualify an installed capture or change production timing.
+
+Installed run 40571692960 on 21806d0d failed earlier, during the initial
+`preview_capture` MCP call: HTTP/2 `INTERNAL_ERROR`, with the private
+`facts/current/operation` refusal (Go 476.985s; approved subtest 6.13s).
+Independent approval, the real preview-expiry wait and submission were never
+reached. The target query completed in 390ms; the enclosing public operation
+expired during storage consumption. The capacity worker separately reported
+three guarded-read failures at owner lookup, before claim. Its `read left 0s`
+is the error-path placeholder, not a measured remaining authority interval.
+The exact lookup substep and which enclosing timer fired first remain unknown.
+All 3,194 source hashes independently matched, source stayed unchanged and
+cleanup reported no failures; report SHA-256
+`6ba8ce88bba2dd19735a4f84d5e33c01bcd83b67ffa925888bbd5c4863121d5d`.
+This is neither an installed ADR-260 pass nor evidence for extending capacity
+proofs, retrying effects or reviving the rejected proof-refresh branch.
+
+The follow-up preserves closed owner-lookup substeps through the existing
+capacity report and emits existing bounded service timings before synchronous
+audit finalization on failure. The final timing report remains. Fault-injected
+native-proof/registration lookups and blocked audit completion reproduce the
+diagnostic gaps before correction; holder/local receiver races pass (2.902s),
+as does the full presentation race suite (71.572s). These diagnostics add no
+requests, SQL, credentials, contexts, timers or authority, and do not establish
+the failed native run's actual audit-finish duration. The combined candidate's
+full pre-push passes, including 218 console tests. A fresh installed result is
+still required; the public operation and every capacity proof keep their
+original bounds.
+
+Review follow-up preserves the closed `denied` cause for private owner-lookup
+diagnostics while dropping provider text. An actual TLS peer-binding denial
+regression failed before the correction and passes afterward; the production
+capacity adapter still returns only generic unavailability. Combined
+holder/local/adapter race tests pass (2.927s), with no new I/O or authority.
+
+Run 40576367034 on ec3983bf passed CI and review but failed its installed
+approved-recording journey (Go 576.545s; approved subtest 121.50s). It reached
+submission after the real preview-expiry wait, then returned
+`RecorderUnavailable`, with no accepted capture. The initial target query
+completed in 380ms; its separate recorder query failed at
+`local/route-read/endpoints/read/other`. Preview compilation then persisted a
+plan-only blueprint without recording facts. The native journey had checked
+approval-required/capture-disabled flags but ignored the recorder blocker, so
+it approved an inert scope. This did not exercise the corrected submission
+target path. All 3,196 hashes independently matched, source stayed unchanged,
+and cleanup reported no failures; report SHA-256
+`43a282b6534d99ca4264dd323e7b9d7d6201a8d872ce4035df85f8afb629d35c`.
+
+The endpoint label covers the entire route endpoint adapter, including final
+identity/readiness/resource-version checks; it does not prove an EndpointSlice
+HTTP error, kernel problem or expired authority. No deadline or endpoint
+consistency check is being relaxed on this evidence.
+
+The recorder availability port already distinguishes explicit unsupported
+answers from operational errors. Preview now preserves that distinction:
+known unsupported/no-adapter cases stay plan-only, while operational errors
+return existing retryable `NotAvailable` before compilation or blueprint storage.
+The installed journey requires exactly the approval blocker before its first
+request; its existing four read attempts retry only typed transient refusals.
+It never refreshes or upgrades an approved scope. Controlled RED/GREEN,
+native guard tests, full capture/presentation races (10.468s/72.579s) and
+wire/contract checks pass. No request, deadline, authority or stored format is
+added.
+
+Endpoint diagnostics now distinguish closed read, identity/readiness and final
+resource-version stages. Actual TLS fake-API regressions distinguish a final
+Pod-version change from an EndpointSlice HTTP 503, preserving nine/five GETs
+and the live original five-second parent. Expanded Kubernetes/fleet races pass
+(13.788s/1.016s). A separate source review found no changed validation, I/O or
+public error class; arbitrary provider diagnostic methods remain unread.
+These tests reproduce the diagnostic ambiguity, not the native failure's exact
+cause. Fresh installed qualification remains pending.
+
+The combined recorder/endpoint candidate passes full pre-push (218 console
+tests) and fresh full affected races: capture 10.495s, fleet 15.969s,
+presentation 73.796s and composed context-start 10.766s. The installed result
+remains a separate required gate.
+
+## Approved packet request: local target composition correction (2026-10-27)
+
+Native run 40557482326 on 23bf0042 failed before admission with
+`request/facts/current/target` (Go 563.658s, approval subtest 129.46s). The
+initial response was OutcomeUnknown; explicit resolution closed the unstarted
+intent. All 3,188 reported sources matched, source stayed unchanged and cleanup
+reported no failures; report SHA-256
+`8a64b558a81cd2c3fda3be8a7d1ebbae73e4fea9af4632281ceba70dbca1afb3`.
+No installed approved packet result passed. The preceding diagnostic run
+40551543601 was cancelled after slow package setup and has no terminal test or
+cleanup result; the bounded setup in 23bf0042 completed in 14s.
+
+The local correction combines exact target resolution and current recorder
+availability, removing one regional query and two Namespace/Pod GETs from the
+serial path for the installed Deployment target. Eight exact target-chain GETs
+remain. Original target/receiver
+deadlines, ordinary checks, API-only pin semantics and the queue-time node check
+remain unchanged. Preview retains its workload-selection/plan-only path; an
+unsupported peer refuses without a fallback. A deterministic serial-cost
+regression and fake-API/transport tests pass; they do not establish installed
+latency. See [the review](reviews/approved-recording-workflow-2026-10-27.md).
+
+CI also exposed a real cancellation-ordering race in admitted enrollment:
+the original HTTP owner could be cancelled before a derived context observed
+it, allowing another effect. Both enrollment paths now retain and directly
+check that owner at existing gates. Deterministic reproduction, full evidence
+race tests and 100 cancellation repetitions pass locally. No deadlines,
+interfaces, API requests, timers, goroutines or durable state were added.
+The combined candidate still needs final gates, review and native qualification.
+
+
+## Authored packet custody funding correction (2026-10-27)
+
+Installed run 40538171521 on c5db1e11 passed self-approval refusal, independent
+fresh approval and the real preview-expiry wait, then returned CapacityUnavailable
+on submission. The actual authored 39,714,816-byte/16-object context reserve was
+projected as a 6,176,768-byte custody child; one packet reservation needs 9,928,704
+bytes. [ADR-257](decisions/257-approved-recording-funding.md) and migration 00100
+correct the projection and upgrade existing already-backed children, retaining
+record/object/protocol limits, identities, all charges and original deadlines.
+
+The failing pure arithmetic regression is now green. Targeted real PostgreSQL/
+S3/OpenBao fixture `TestPacketEvidenceBackingMigrationWithRealPostgres` passes
+(Go 5.531 seconds; runner/test exit 0). It creates actual purpose-separated legacy
+SQL enrollments under two upfront authored policies, preserves a small child and
+its uncertain reservation, grows a packet-funded child, refuses a malformed
+predecessor without partial changes, proves an unspent Down/Up roundtrip, then
+accepts an actual packet custody reservation and refuses Down while retaining
+that charge. Source/administrator/history inputs remain synthetic; no collector
+or evidence output runs in this fixture. Tested sources stayed unchanged and
+cleanup is empty; report SHA-256
+`0e92b011f9f8bbff8bedfa1c09621569039719c512e0ad92cb97d8880ab223ab`.
+Two earlier local fixture attempts failed (ambiguous migration SQL alias, then
+an invalid test setup changing an enrolled policy) and were cleaned before this
+corrected run. No complete installed approved packet publication/download has
+passed yet; the corrected candidate still needs guarded remote qualification.
+
+The subsequent installed run 40546623947 on 79694a43 failed before admission
+with the private facts/current refusal. Explicit resolution safely closed the
+unstarted request, so the helper returned closed=true; it did not accept or run
+a capture. That run neither proves nor disproves the corrected physical charge.
+The fixture now retains its initial public code and resolver state without
+identifiers, and closed private bound labels distinguish the existing fact,
+storage and whole-operation checks. Pure retained-recorder tests reproduce
+refusal followed by explicit closure for identity, recovery, target, capability
+and retention expiry, with zero admissions and the original blueprint unchanged.
+No current deadline, authority check or retry policy changes. The installed
+expired bound and any justified dependency-path correction remain pending.
+
+## Approved recording request and continuation (2026-10-27)
+
+The browser can request independent approval for an already-reviewed recorder
+composition, retain its original submission through pending review and resume it
+from the approval detail. The server computes advisory resume/resolve hints for
+the full original requester/client; resolution is offered only after an approved
+decision and names its close-if-unstarted effect. Original-client guidance is
+restricted to that same requesting human on another client while the plan is
+Approved. Current admission remains authoritative.
+One preview-bound intent key survives retries and page remounts. A grant made by
+another OAuth client is accompanied by original-client guidance, without transfer.
+This supplies continuation of existing reviews; a new packet profile editor is
+not implemented by this change.
+
+The installer and Helm input preserve the existing optional protected approval
+settings, including step-up and `requireRecordingApproval`. Absent settings keep
+old input bytes. Recorder assessment rules v2 and the manual preview contract now
+state retention from submission preparation, with old unsubmitted rule digests
+requiring fresh review. The page renders the supplied recorder assessment and
+output limit instead of pod-status-specific text; overhead remains unmeasured.
+
+Local console check passes 218 tests. The built browser checks pass 20 journeys,
+17 accessibility scans and the native restart checks. Affected capture,
+authorization, planning, presentation, installer and contract unit packages pass;
+the original-recorder-anchor regression and canonical manual-anchor validators
+pass. Helm, specification, architecture and gate self-tests pass. A broad local
+`go-check` was stopped after 12.5 minutes (exit 143): its ordinary race packages
+and first five Kubernetes groups passed, but the whole gate is incomplete and
+must not be described as passed. Established CI shards cover the full gate.
+
+The new guarded `continuation-approved-recording` focus is implemented for
+actual MCP request → independent signed browser step-up approval → real preview
+expiry → original-client submit → node Gadget recording → encrypted publication
+and authenticated native PCAPNG download opened by tshark. It retains the
+production preview lifetime and existing installer/authority guards, uses the
+published pinned Gadget, and adds no fixture grant rows. The reference provider
+uses actual fresh password LoA1, not MFA. The operator's existing reserve is sized
+for packet ciphertext while retaining four records/16 objects. Offline harness
+checks and integration compilation pass; this installed flow and its runtime
+remain **unqualified until the full flow passes on a disposable runner**.
+Run 40507673537 was cancelled during setup (84 seconds) for fixture review;
+no qualification test ran in that attempt. The next frozen run,
+40511222353, failed before installation in the bootstrap fixture's topology
+assertion: the harness supplied the intended two clusters but the Go focus
+selector still expected three. Sources were unchanged, cleanup was complete and
+build scratch was removed; the 9.9-second collector build verified its pinned
+blobs but supplied no runtime qualification. A privilege-free regression
+reproduces that exact count mismatch, and the consumer now selects two for the
+new focus. Existing topology/fast-fixture cases and the strict service assertion
+are retained.
+Run 40513823733 then reached the actual guarded installer but failed the
+collector apply after 426.139 seconds of Go execution (job 12m22s): the whole
+chart also rendered an unrelated installation-intent ConfigMap into a nonexistent
+release namespace. The collector stage now renders only the official collector
+template and pins its render context to the actual installed connector namespace;
+it creates no regional namespace or extra RBAC outside installer staging. A pure
+command-stage regression fails before the fix, and the Helm render gate verifies
+that the exact original four collector resources remain unchanged. The failed
+run retained unchanged source hashes and complete cleanup; it is not an approved
+recording qualification.
+
+See [the scoped plan and complexity gate](reviews/approved-recording-workflow-2026-10-27.md).
+
+
 ## Approved capture acceptance (ADR-252, 2026-10-27)
 
 Approval-required recordings now retain their exact passive review blueprint

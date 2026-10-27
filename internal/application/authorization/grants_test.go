@@ -353,6 +353,9 @@ func TestGrantDecisionAndCoveringMatrix(t *testing.T) {
 	if _, _, err := f.svc.Decide(ctx, grantIdentity{self, &f.now}, g.ID, true, "self", "self-1"); !errors.Is(err, value.ErrSelfApproval) {
 		t.Fatal("self-approval", err)
 	}
+	if f.store.rows[g.ID].Decision != nil || len(f.store.decided) != 0 {
+		t.Fatal("immutable self-refusal mutated grant ledger")
+	}
 	f.projection = lead
 	// A distinct human without the approver role, and an approver without a
 	// current step-up, are refused; denial needs no step-up.

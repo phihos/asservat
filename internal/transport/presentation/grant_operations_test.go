@@ -15,10 +15,12 @@ import (
 )
 
 type grantUseCase struct {
-	until   time.Time
-	view    authapp.GrantView
-	err     error
-	decided struct {
+	replay                   bool
+	decideCalls, revokeCalls int
+	until                    time.Time
+	view                     authapp.GrantView
+	err                      error
+	decided                  struct {
 		id, reason, key string
 		approve         bool
 	}
@@ -31,6 +33,7 @@ func (g *grantUseCase) List(context.Context, identities.CurrentIdentity, string,
 	return []authapp.GrantView{g.view}, g.until, g.err
 }
 func (g *grantUseCase) Decide(_ context.Context, _ identities.CurrentIdentity, id string, approve bool, reason, key string) (authorization.Grant, bool, error) {
+	g.decideCalls++
 	g.decided.id, g.decided.approve, g.decided.reason, g.decided.key = id, approve, reason, key
 	out := g.view.Grant
 	out.Revision = 2
@@ -39,12 +42,13 @@ func (g *grantUseCase) Decide(_ context.Context, _ identities.CurrentIdentity, i
 	if approve {
 		out.ExpiresAt = now.Add(out.Lifetime)
 	}
-	return out, false, g.err
+	return out, g.replay, g.err
 }
 func (g *grantUseCase) Revoke(context.Context, identities.CurrentIdentity, string, int64, string) (authorization.Grant, bool, error) {
+	g.revokeCalls++
 	out := g.view.Grant
 	out.Revision = 3
-	return out, false, g.err
+	return out, g.replay, g.err
 }
 
 func grantView(now time.Time) authapp.GrantView {
@@ -81,18 +85,22 @@ func TestGrantOperationsWire(t *testing.T) {
 	if err != nil || json.Unmarshal(reply.Body, &out) != nil || out.Status != "ok" || out.Data.Phase != "Pending" || !out.Data.CanDecide || out.Data.Actions[0].Filter != "tcp[13] & 2 != 0" || out.Data.ResultAccess.MaxBytes != 100 || *out.Data.RemainingBytes != 100 || out.Data.NavigationURI != "https://console.invalid/approvals/00000000-0000-4000-8000-0000000009a1" {
 		t.Fatalf("get_grant: %v %s", err, reply.Body)
 	}
+	if out.Data.CanResume == nil || *out.Data.CanResume || out.Data.CanResolve == nil || *out.Data.CanResolve || out.Data.ResumeRequiresOriginalClient == nil || *out.Data.ResumeRequiresOriginalClient {
+		t.Fatal("detail must carry explicit advisory flags")
+	}
 	if out.Data.CaptureDeadlineRule != "previewDeadline" || !out.Data.PreviewDeadline.Equal(uc.view.Review.Deadline) || out.Data.CaptureWindowSeconds != 0 {
 		t.Fatal("legacy timing changed")
 	}
+	uc.view.CanResume, uc.view.CanResolve = true, true
 	uc.view.Grant.Scope = []byte(`{"timing":"approvedAcceptance/v1"}`)
 	marked, e := s.Call(t.Context(), f, "get_grant", []byte(`{"grant_id":"00000000-0000-4000-8000-0000000009a1"}`))
-	if e != nil || json.Unmarshal(marked.Body, &out) != nil || out.Data.CaptureDeadlineRule != "acceptanceWithinGrant" || out.Data.CaptureWindowSeconds != 300 || !out.Data.PreviewDeadline.Equal(uc.view.Review.Deadline) {
+	if e != nil || json.Unmarshal(marked.Body, &out) != nil || out.Data.CaptureDeadlineRule != "acceptanceWithinGrant" || out.Data.CaptureWindowSeconds != 300 || !*out.Data.CanResume || !*out.Data.CanResolve || !out.Data.PreviewDeadline.Equal(uc.view.Review.Deadline) {
 		t.Fatalf("approved timing: %v %s", e, marked.Body)
 	}
 	if len(reply.Body) > 24<<10 {
 		t.Fatal("get_grant exceeds the result budget")
 	}
-	if reply, err = s.Call(t.Context(), f, "list_reviews", []byte(`{"view":"pending"}`)); err != nil || !strings.Contains(string(reply.Body), `"approvals":[{`) || strings.Contains(string(reply.Body), `"actions"`) {
+	if reply, err = s.Call(t.Context(), f, "list_reviews", []byte(`{"view":"pending"}`)); err != nil || !strings.Contains(string(reply.Body), `"approvals":[{`) || strings.Contains(string(reply.Body), `"actions"`) || strings.Contains(string(reply.Body), `"can_resolve"`) || strings.Contains(string(reply.Body), `"resume_requires_original_client"`) {
 		t.Fatalf("list_reviews: %v %s", err, reply.Body)
 	}
 	if reply, err = s.Call(t.Context(), f, "decide_review", []byte(`{"grant_id":"00000000-0000-4000-8000-0000000009a1","decision":"approve","reason":"incident 42","idempotency_key":"d1"}`)); err != nil || !uc.decided.approve || uc.decided.reason != "incident 42" || !strings.Contains(string(reply.Body), `"revision":2`) {

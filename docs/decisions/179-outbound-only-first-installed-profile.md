@@ -63,7 +63,12 @@ cluster. Regional facts arrive only as delegated proof.
    Before sending each query, the hub pulls a fresh regional source and checks
    the region's receiver. The region checks the hub owner and answers from its
    own cluster, as delegated proof with its original five-second freshness. The
-   hub caps that freshness at the receiver's validity. Queries are not
+   original design capped that freshness at the receiver's validity.
+   [ADR-260](260-api-target-observation-freshness.md) revises that coupling for
+   API-class target metadata: I/O and completion retain their original checked
+   receiver deadlines, while a successfully returned observation keeps its own
+   original five-second interval. No permission or recovery proof gains that
+   interpretation. Queries are not
    operations: a region still executes no operation without verified work.
    Each exchange answers at most eight queries (four until 2026-10-24; raised after an
    installed run exhausted one standby's budget within its 30 s life; the 2 MiB exchange cap

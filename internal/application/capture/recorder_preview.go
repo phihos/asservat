@@ -64,7 +64,11 @@ func (s ContextInvestigation) PreviewComposition(ctx context.Context, source ide
 	if !target.Valid(s.Now()) {
 		return zero, previewFailure("facts/target", value.ErrChanged)
 	}
-	if s.packetRecorderAvailable(ctx, intent, target) {
+	available, err := s.packetRecorderAvailable(ctx, intent, target)
+	if err != nil {
+		return zero, previewFailure("recorder", err)
+	}
+	if available {
 		r, err := s.previewRecording(ctx, source, intent, i, recovery, target, created)
 		if !errors.Is(err, errRecordingNotAcceptable) {
 			return r, err

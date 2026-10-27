@@ -10,6 +10,7 @@ import (
 
 	"asservat.local/asservat/internal/application/evidence"
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/configuration"
 	execution "asservat.local/asservat/internal/domain/execution"
 	value "asservat.local/asservat/internal/domain/fleet"
@@ -352,8 +353,10 @@ func TestContextStartActualHTTP2TargetQueriesKeepTheStandby(t *testing.T) {
 	regional := &regionalOperationsFixture{t: t, process: f.api}
 	f.targets = regional
 	exchange, stream := f.open(t)
-	work, signer, signed, _ := f.work(t, exchange.Receiver())
-	regional.work = work
+	signer := f.workSigner(t, exchange.Receiver())
+	// Queries have target facts but create no signed effect work.
+	target := authorization.Target{ClusterID: exchange.Receiver().Channel.Connector.Binding.ClusterID, NamespaceUID: ownerTestID, WorkloadUID: ownerTestID, PodUID: ownerTestID}
+	regional.work.Target = target
 	local := contextstart.RegionalLocal{Process: regional, Targets: regional, Local: regional, Starts: regional, Output: regional, Collector: regional, Source: f.connector, Now: time.Now}
 	regionalDone := make(chan error, 1)
 	go func() {
@@ -363,9 +366,9 @@ func TestContextStartActualHTTP2TargetQueriesKeepTheStandby(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
 	hub := contextstart.Targets{Router: f.router, Now: time.Now}
-	cluster := work.Target.ClusterID
+	cluster := target.ClusterID
 	resolved, err := hub.ResolveWorkload(ctx, targets.WorkloadRequest{ClusterID: cluster, Namespace: "app", Kind: "Deployment", Name: "app"})
-	if err != nil || resolved.Request.PodName != "app-0" || resolved.Target() != work.Target || resolved.FreshUntil.After(exchange.Receiver().ValidUntil.Add(time.Second)) {
+	if err != nil || resolved.Request.PodName != "app-0" || resolved.Target() != target || !resolved.Valid(time.Now()) || !resolved.FreshUntil.Equal(resolved.ObservedAt.Add(5*time.Second)) {
 		t.Fatal("workload query", err, resolved)
 	}
 	again, err := hub.ResolvePod(ctx, resolved.Request)
@@ -391,6 +394,12 @@ func TestContextStartActualHTTP2TargetQueriesKeepTheStandby(t *testing.T) {
 	if regional.resolved != contracts.APIContextMaximumQueries {
 		t.Fatal("region answered", regional.resolved)
 	}
+	// Model CI scheduling/query time crossing the fixture's original two-second
+	// work lifetime while the existing five-second standby is still alive.
+	time.Sleep(2100 * time.Millisecond)
+	// Issue the first work only after queries. Its original two-second lifetime
+	// is unchanged and remains bounded by this original receiver.
+	work, _, signed, _ := f.workWithSigner(t, exchange.Receiver(), signer)
 	attachment, err := f.router.Attach(ctx, cluster, ownerTestID)
 	if err != nil {
 		t.Fatal("standby consumed by queries", err)

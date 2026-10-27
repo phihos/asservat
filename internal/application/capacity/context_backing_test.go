@@ -53,6 +53,44 @@ func TestCapacityContextBackingUsesActualArtifactAndNativeProtocols(t *testing.T
 	}
 }
 
+// The installed approval-required recording fixture reserves four recording
+// ciphertext obligations and sixteen objects. The metadata record ceiling must
+// stay four, while its custody child must retain those authored evidence bytes.
+func TestCapacityContextBackingFundsAuthoredPacketEvidence(t *testing.T) {
+	recordingBytes := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
+	slice := BudgetAmount{Bytes: 4 * recordingBytes, Objects: 16}
+	p, err := CompileContextProtocolBacking(slice, contextBackingHistoryFixture())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Records != 4 || p.ReplayRecords != 4 || p.Sessions != 4 || p.Evidence != slice {
+		t.Fatalf("authored recording reserve lost in custody backing: source=%+v compiled=%+v", slice, p)
+	}
+}
+
+func TestCapacityContextBackingRetainsResidualAndCapsPacketFunding(t *testing.T) {
+	unit := (artifact.Registration{NativeLimit: artifact.MaxContextBytes}).ReservedBytes()
+	packet := (artifact.Registration{NativeLimit: artifact.RecordingNativeLimit}).ReservedBytes()
+	for _, tc := range []struct {
+		name           string
+		slice          BudgetAmount
+		bytes, records int64
+	}{
+		{"exact-pod", BudgetAmount{unit, 4}, unit, 1},
+		{"authored-residual", BudgetAmount{unit + 7, 4}, unit + 7, 1},
+		{"partial-packet", BudgetAmount{packet - 1, 4}, packet - 1, 1},
+		{"objects-bind-packet-cap", BudgetAmount{10 * packet, 7}, packet, 1},
+		{"maximum-source-packet-cap", BudgetAmount{math.MaxInt64, math.MaxInt64}, 512 * packet, 512},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p, err := CompileContextProtocolBacking(tc.slice, contextBackingHistoryFixture())
+			if err != nil || p.Records != tc.records || p.Evidence != (BudgetAmount{tc.bytes, 4 * tc.records}) {
+				t.Fatalf("funding bound: source=%+v evidence=%+v records=%d err=%v", tc.slice, p.Evidence, p.Records, err)
+			}
+		})
+	}
+}
+
 func TestCapacityContextBackingNeverRoundsUpOrBorrows(t *testing.T) {
 	unit := artifact.Registration{NativeLimit: artifact.MaxContextBytes}.ReservedBytes()
 	for _, tc := range []struct {

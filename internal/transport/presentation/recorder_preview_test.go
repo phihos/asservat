@@ -111,7 +111,7 @@ func TestCompositionPreviewWire(t *testing.T) {
 	if len(d.Lifecycle.Actions) != 1 || d.Lifecycle.Actions[0]["activation"] != "manualSession" || d.Lifecycle.Actions[0]["requestedBefore"] != "30s" || len(d.Composition.ActionMap) != 1 || len(d.Composition.Authored.Components[0].Overrides) != 3 {
 		t.Fatalf("lifecycle/provenance: %s", reply.Body)
 	}
-	if d.Assessment.Actions[0].Retention.AnchorRule != "firstAcquisitionOrEarlierSource" || d.Assessment.Scope.ObservationPods != 1 || !strings.Contains(strings.Join(d.Warnings, "\n"), "no history before the request") {
+	if d.Assessment.Actions[0].Retention.AnchorRule != "submissionPreparation" || d.Assessment.Scope.ObservationPods != 1 || !strings.Contains(strings.Join(d.Warnings, "\n"), "no history before the request") {
 		t.Fatalf("assessment/warnings: %s", reply.Body)
 	}
 	if len(reply.Body) > 24<<10 {
@@ -198,4 +198,22 @@ func TestCompositionRefusalsAndRequestWire(t *testing.T) {
 func (f *recorderFixture) RequestWithResultAccess(ctx context.Context, current identities.CurrentIdentity, preview, key string, access *authorization.ResultAccess) (value.Accepted, error) {
 	f.access = access
 	return f.Request(ctx, current, preview, key)
+}
+
+func TestRecorderPreviewOperationalFailureIsTypedUnavailable(t *testing.T) {
+	s, f := recorderOperations(t, true)
+	f.compileErr = targets.ErrUnavailable
+	reply, err := s.Call(t.Context(), f, "preview_capture", []byte(wireComposition))
+	var envelope struct {
+		Status string `json:"status"`
+		Data   struct {
+			Code      string `json:"code"`
+			Retryable bool   `json:"retryable"`
+			PreviewID string `json:"preview_id"`
+			Approval  bool   `json:"approval_required"`
+		} `json:"data"`
+	}
+	if err != nil || json.Unmarshal(reply.Body, &envelope) != nil || envelope.Status != "error" || envelope.Data.Code != "NotAvailable" || !envelope.Data.Retryable || envelope.Data.PreviewID != "" || envelope.Data.Approval {
+		t.Fatal("operational failure became a reviewable or terminal preview", err, string(reply.Body))
+	}
 }

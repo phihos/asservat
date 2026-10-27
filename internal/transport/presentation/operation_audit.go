@@ -400,6 +400,12 @@ func (s *AuditedOperations) call(ctx context.Context, current identities.Current
 			return OperationReply{}, stopped("audit-result", auditapp.ErrUnavailable)
 		}
 	}
+	// A failed service's existing bounded timings must be visible even while
+	// synchronous audit completion is still pending. The deferred final report
+	// retains its original event and includes the completion stages.
+	if s.Timing != nil && (ctx.Err() != nil || !timing.call.IsZero() && (callErr != nil || out.Status != "success")) {
+		timing.report(event+"/service-failed", steps, s.Timing)
+	}
 	// Once an outcome exists, completing its audit is allowed without reviving
 	// request authority. This bounded synchronous completion never redispatches.
 	auditCtx, finishCancel := context.WithDeadline(context.WithoutCancel(ctx), intent.WriteUntil)
@@ -616,6 +622,7 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 				CaptureID  string             `json:"capture_id"`
 				ArtifactID string             `json:"artifact_id"`
 				Acceptance string             `json:"acceptance_id"`
+				GrantID    string             `json:"grant_id"`
 				DownloadID string             `json:"download_id"`
 				CaseID     string             `json:"case_id"`
 				State      string             `json:"state"`
@@ -639,6 +646,11 @@ func (s *AuditedOperations) result(in audit.OperationIntent, reply OperationRepl
 				out.ArtifactIDs = append(out.ArtifactIDs, refs.ArtifactID)
 			}
 			if (in.Name == "activate_policy" || in.Name == "deactivate_policy") && refs.Acceptance != "" {
+				out.Effect = "accepted"
+			}
+			if (in.Name == "decide_review" || in.Name == "revoke_grant") && refs.GrantID != "" {
+				// An acknowledged decision/revocation, including exact idempotent replay,
+				// is an accepted logical mutation. Service uncertainty remains unknown.
 				out.Effect = "accepted"
 			}
 			if in.Name == "prepare_artifact_download" && refs.DownloadID != "" {
