@@ -75,7 +75,8 @@ SelfSubjectRulesReview (REQ-PER-004).
 5. **Audience and reads (REQ-PER-008).** A capture's default audience contains a reviewed allow
    only when it is the capturing human's own: other principals who hold a fresh review of the same
    Pod are never enumerated, and a policy capture never takes one. Every read path (get_case,
-   approved projection read, download start, get_capture, explain_access) first repeats the
+   approved projection read, download start, get_capture, resolve_capture_request, explain_access)
+   first repeats the
    caller's *recorded* reviews of that Pod before its permission read — a fresh SAR per read and
    recorded attribute set — so access ends at the next read after RBAC removal and returns,
    with the same assignment ID, when RBAC is restored while the source is unchanged. The read
@@ -91,8 +92,32 @@ SelfSubjectRulesReview (REQ-PER-004).
    scopes fill only the room left by binding scopes (1,024 in all).
 7. **Preview.** A proposed supported `kubernetesExec`/`kubernetesAccessReview` create or update is
    `Indeterminate` with the new `not_evaluated[].reason` `DecisionTimeSource`: it grants per
-   principal and Pod at request time. explain_access reports the caller's own reviewed assignment.
-8. **SAR-derived roles stop at maintainership.** The source schema already limits roles to
+   principal and Pod at request time. Deleting or editing such a source shows the removed access of
+   the persistent assignments it minted, in the cell of each workload they were reviewed for: a
+   current allowed decision is `Allow` before; an assignment without one is `Indeterminate`
+   before (`before_unmet: DecisionTimeSource`), because its current SAR outcome cannot be known
+   without a review. explain_access reports the caller's own reviewed assignment.
+8. **Decision audit (REQ-PER-006).** The spec requires: "Audit the source UID/revision, principal
+   mapping, target UIDs, decision time/expiry and reason; do not audit bearer tokens." It does not
+   require a durable record per evaluation, so the bounded form records each decision *change* of a
+   (source, principal, Pod): first allow (`granted`), an allowed decision ended by a refusal
+   (`revoked`, with the closed outcome — `Denied`, `OutsideSource`, `TargetChanged`,
+   `MappingUnsupported`, `Unavailable` — as reason) and an allow after a refusal (`restored`). Each
+   change is one immutable `permission-review` event in the existing authority audit outbox, inside
+   the review's own SQL transaction, published, encrypted and acknowledged in batches by the
+   hub-worker's authority publisher like every other authority event. The record holds source UID,
+   generation and spec digest, the identity mapping reference, issuer and subject, assignment ID,
+   cluster/namespace/workload/Pod UIDs, decision time and lifetime, and the outcome; never a token,
+   Kubernetes user name, group, or namespace/Pod name. A review that confirms the current state
+   only updates its SQL decision row. Per read the cost is therefore one SQL row update and no
+   object write while access is unchanged. Unlike a new binding allow, a reviewed allow is not
+   held until its event is acknowledged: it rests on its source's acknowledged acceptance, and
+   holding it would put audit publication latency into every first capture.
+9. **Request resolution.** `resolve_capture_request` names only the caller's preview; before the
+   resolution re-evaluates eligibility, hub-api repeats the caller's recorded reviews of that
+   preview's Pod (found through the preview, closed or not, for its own actor only), so a revoked
+   exec right ends the decision and the resolution refuses.
+10. **SAR-derived roles stop at maintainership.** The source schema already limits roles to
    `evidence-reader`/`workload-maintainer`; sharing and owner-team management require
    `evidence-owner`, so SAR-derived maintainership supplies neither (specs/authorization.md).
 
@@ -104,11 +129,11 @@ SelfSubjectRulesReview (REQ-PER-004).
 | 2 | Risk accepted | Yes: "configurable inheritance including pod exec rights" is an accepted maintainer requirement; first-release scope by the 2026-10-26 decision. |
 | 3 | Typical deployments | Yes where teams get `kubectl exec` through OIDC groups (the common RBAC onboarding); off by default (no source, no mapping). |
 | 4 | Precedent | Request-time SubjectAccessReview with short caches is the standard Kubernetes delegation pattern: `k8s.io/apiserver` delegated authorization (aggregated API servers, 10 s allow/deny cache by default), kube-rbac-proxy (SAR per request), Kubernetes Dashboard/Headlamp ("can I" reviews). |
-| 5 | Privileges added | Connector: `create subjectaccessreviews` (cluster-scoped, only when identity mappings are configured; reveals authorizer decisions, changes nothing). Hub: SQL duty `access-review` (insert assignments/decisions, update/delete decisions); hub-worker `permission-accept` gains review-source writes and assignment retirement; every duty that reads assignments gains SELECT on the 3 tables. No credential, secret, collector or worker change; no new network path (existing hub→region query channel). |
-| 6 | Failure/degraded states | 1 new: a review that cannot be answered (SAR forbidden/unavailable, connector unreachable, oversized frame) is recorded as a refusal and grants nothing — the same state as "denied". |
+| 5 | Privileges added | Connector: `create subjectaccessreviews` (cluster-scoped, only when identity mappings are configured; reveals authorizer decisions, changes nothing). Hub: SQL duty `access-review` (insert assignments/decisions, update/delete decisions, insert decision-change events into the authority outbox); hub-worker `permission-accept` gains review-source writes and assignment retirement; every duty that reads assignments gains SELECT on the 3 tables. No credential, secret, collector or worker change; no new network path (existing hub→region query channel). |
+| 6 | Failure/degraded states | 1 new (decision events are an outbox, not a state): a review that cannot be answered (SAR forbidden/unavailable, connector unreachable, oversized frame) is recorded as a refusal and grants nothing — the same state as "denied". |
 | 7 | Self-configuration | None: existing source fields; bounds are constants. Identity mappings are semantic (must match the cluster's authenticator), not tuning. |
 | 8 | External dependencies | Kubernetes SAR API (`authorization.k8s.io/v1`, GA), the cluster's authorizer chain and its OIDC authenticator configuration (the operator attests both via `admissionParity.reviewRef` and the mapping). |
-| 9 | Cost at scale | Per capture preview, capture request and explain: 1 SAR per accepted source of the target's cluster (≤ 4, typically 1) + 1 region query round trip + 1 SQL transaction each. Per read operation: 1 indexed SQL lookup of the caller's recorded reviews of that Pod (≤ 5 rows); 0 SARs when none, else 1 per recorded (source, Pod). Measured in Kind: first review 21 ms, mean 107.0 ms over 20 (2 GETs + 1 SAR + 1 SQL transaction). No watch, no background task, no hub memory. SQL: 1 assignment per (source, principal) ≤ 4,096 per source; 1 decision row per (assignment, Pod) ≤ 1,024 per assignment (~300 B); +1 indexed query (≤ 32 rows) per projection read. Capacity scope read: +1 grouped query over decision rows. |
+| 9 | Cost at scale | Per capture preview, capture request and explain: 1 SAR per accepted source of the target's cluster (≤ 4, typically 1) + 1 region query round trip + 1 SQL transaction each. Per read operation: 1 indexed SQL lookup of the caller's recorded reviews of that Pod (≤ 5 rows); 0 SARs when none, else 1 per recorded (source, Pod). Measured in Kind: first review 29 ms, mean 106.6 ms over 20 (2 GETs + 1 SAR + 1 SQL transaction). No watch, no background task, no hub memory. SQL: 1 assignment per (source, principal) ≤ 4,096 per source; 1 decision row per (assignment, Pod) ≤ 1,024 per assignment (~300 B); +1 indexed query (≤ 32 rows) per projection read. Capacity scope read: +1 grouped query over decision rows. Audit: one outbox row and one encrypted object per decision change (first allow, revocation, restoration), none per confirming review. |
 | 10 | Upgrade/rollback/disable | Additive migration 00096 (floor stays 81). An older binary never reads the review tables and its acceptance never writes them: review grants vanish on rollback (fail closed); after re-upgrade the stale source rows lag the stream until accepted again. Disabling: `enabled: false`, deleting the source (retires, tested) or removing the mapping (`MappingUnsupported`). |
 | 11 | Smaller fix | Documentation (mirror RBAC into AccessBindings) does not meet the accepted requirement. Precomputing exec rights from RoleBindings is the partial RBAC evaluator the research rejected (aggregation, webhooks, SelfSubjectRulesReview incompleteness). Polling SARs for every user × Pod needs enumerating users, which REQ-PER-008 forbids. An in-memory merge would not reach the SQL admission facets that re-evaluate after locks, nor give a stable audience ID. Request-time reviews recorded as short SQL decisions under a persistent per-principal assignment are the smallest form; mappings ride the existing regional inputs instead of a new CRD. |
 
@@ -119,23 +144,11 @@ the request (they run within seconds); after its lifetime they fail closed.
 
 Benefit accepted (maintainer requirement), cost bounded and opt-in: proceed.
 
-## Agent-authored restrictions revised (recorded as such)
-
-- REQ-PER-006 asks to audit "source UID/revision, principal mapping, target UIDs, decision time/expiry
-  and reason". Source revisions and retirements are in the encrypted authority audit; a capture's
-  intent audit records the reviewed assignment (source UID, original spec digest, assignment ID)
-  and the target UIDs; the reading principal is in the operation audit. The individual decision
-  (time, lifetime) is SQL state only, not an immutable encrypted record per review: one encrypted
-  object write per read would dominate the read path's cost. Recorded as an open point, not a
-  silent omission.
-
 ## Open points
 
 - `qualifiedAdapter` admission parity: no adapter exists; such sources grant nothing.
-- Deleting a decision-time source in the ADR-237 preview shows no change (its per-principal
-  assignments are not configuration cells); its retirement is reported only by acceptance.
-- `resolve_capture_request` (lost-reply recovery) does not re-review; after the decision lifetime
-  a SAR-only requester resolves through get_capture or a new request.
+- A preview row whose preview has been deleted after expiry can no longer name its Pod; the
+  resolution then relies on the recorded decision's own lifetime (≤ 60 s) before failing closed.
 - No installed (Helm) qualification of the connector RBAC and inputs; the Helm render and the
   real-RBAC component test cover them.
 

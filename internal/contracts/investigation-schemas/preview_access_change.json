@@ -1038,7 +1038,8 @@
                             "ExplicitDeny",
                             "PermissionObservationStale",
                             "AudienceOverflow",
-                            "ServiceUnavailable"
+                            "ServiceUnavailable",
+                            "DecisionTimeSource"
                           ]
                         },
                         "after_unmet": {
@@ -1047,7 +1048,8 @@
                             "ExplicitDeny",
                             "PermissionObservationStale",
                             "AudienceOverflow",
-                            "ServiceUnavailable"
+                            "ServiceUnavailable",
+                            "DecisionTimeSource"
                           ]
                         },
                         "before_basis": {

@@ -106,5 +106,11 @@ BEGIN
  END LOOP;
 END $$;
 -- +goose StatementEnd
+-- REQ-PER-006: one immutable encrypted authority event per decision change of
+-- a (source, principal, Pod) review (first allow, allow -> refusal, refusal
+-- -> allow), appended by hub-api to the existing outbox and published by the
+-- hub-worker's authority publisher. A confirming review writes no event.
+ALTER TABLE authority_audit DROP CONSTRAINT authority_audit_event_kind_check,
+ ADD CONSTRAINT authority_audit_event_kind_check CHECK (event_kind IN ('permission-reset','permission-change','permission-suspend','permission-review'));
 -- No destructive Down: retired assignment IDs and recorded review targets keep
 -- historical audiences from being resurrected after a rollback.

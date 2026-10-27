@@ -45,6 +45,12 @@ func (s ContextInvestigation) ResolveContextRequest(ctx context.Context, source 
 	if err != nil {
 		return zero, err
 	}
+	if s.Reviews != nil {
+		// A revoked exec right must not resolve the request: the caller's
+		// recorded decision-time reviews of the preview's Pod are repeated
+		// before the resolution re-evaluates eligibility (ADR-245).
+		_ = s.Reviews.ReviewPreview(ctx, i, previewID)
+	}
 	d, err := s.Resolution.ResolveOrCloseContextRequest(ctx, value.ReplayQuery{RootID: s.RootID, PreviewID: previewID, IdempotencyKey: key, SubmissionDigest: ContextRequestDigest(previewID), Identity: i, Recovery: recovery})
 	if err != nil {
 		return zero, err

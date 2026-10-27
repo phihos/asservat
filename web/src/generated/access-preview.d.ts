@@ -191,9 +191,9 @@ export interface components {
                     /** @enum {unknown} */
                     after: "Allow" | "Deny" | "Indeterminate";
                     /** @enum {unknown} */
-                    before_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "PermissionObservationStale" | "AudienceOverflow" | "ServiceUnavailable";
+                    before_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "PermissionObservationStale" | "AudienceOverflow" | "ServiceUnavailable" | "DecisionTimeSource";
                     /** @enum {unknown} */
-                    after_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "PermissionObservationStale" | "AudienceOverflow" | "ServiceUnavailable";
+                    after_unmet?: "NoMatchingAllow" | "ExplicitDeny" | "PermissionObservationStale" | "AudienceOverflow" | "ServiceUnavailable" | "DecisionTimeSource";
                     before_basis: {
                         /** @enum {unknown} */
                         effect: "allow" | "deny";

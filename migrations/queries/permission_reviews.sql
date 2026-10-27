@@ -80,3 +80,26 @@ SELECT a.source_uid,d.* FROM permission_review_decision d JOIN permission_review
 JOIN context_capture c ON c.root_id=a.stream_id AND d.pod_uid=convert_from(c.pod_pin_json,'UTF8')::jsonb->>'UID' AND d.namespace_uid=convert_from(c.pod_pin_json,'UTF8')::jsonb->>'NamespaceUID'
 WHERE a.stream_id=$1 AND c.id=$2 AND a.retired_at IS NULL AND a.issuer=$3 AND a.subject_id=$4
 ORDER BY a.source_uid LIMIT 5;
+
+-- name: GetPermissionReviewDecision :one
+SELECT * FROM permission_review_decision WHERE assignment_id=$1 AND pod_uid=$2 FOR UPDATE;
+
+-- name: SelectRecordedPreviewReviews :many
+-- One principal's recorded review targets of the Pod of one of its own
+-- previews, closed or not; nothing else of the preview.
+SELECT a.source_uid,d.* FROM permission_review_decision d JOIN permission_review_assignment a ON a.id=d.assignment_id
+JOIN context_preview p ON p.root_id=a.stream_id AND d.pod_uid=convert_from(p.blueprint_json,'UTF8')::jsonb->'Target'->>'PodUID' AND d.namespace_uid=convert_from(p.blueprint_json,'UTF8')::jsonb->'Target'->'Namespace'->>'UID'
+WHERE a.stream_id=$1 AND p.id=$2 AND p.actor_key=$3 AND a.retired_at IS NULL AND a.issuer=$4 AND a.subject_id=$5
+ORDER BY a.source_uid LIMIT 5;
+
+-- name: SelectPreviewReviewAssignments :many
+-- ADR-245 preview: the current assignments a decision-time source minted, per
+-- recorded workload, with their newest decision; at most 1,001 rows.
+SELECT a.id,a.issuer,a.subject_id,a.role,a.basis_digest,d.cluster_id,d.namespace_uid,d.workload_uid,
+max(d.fresh_until)::timestamptz AS fresh_until,max(d.decided_at)::timestamptz AS decided_at
+FROM permission_review_assignment a JOIN permission_review_decision d ON d.assignment_id=a.id
+JOIN permission_review_source rs ON rs.stream_id=a.stream_id AND rs.uid=a.source_uid
+JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
+WHERE a.stream_id=$1 AND a.source_uid=$2 AND a.retired_at IS NULL AND rs.epoch=$3 AND rs.seen_sequence=$4 AND au.acknowledged_at IS NOT NULL
+GROUP BY a.id,a.issuer,a.subject_id,a.role,a.basis_digest,d.cluster_id,d.namespace_uid,d.workload_uid
+ORDER BY d.cluster_id,d.namespace_uid,d.workload_uid,a.id LIMIT 1001;

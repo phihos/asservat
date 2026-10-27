@@ -199,13 +199,15 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// and its accepted review sources under share locks, mints a
 		// principal's assignment once and records or ends a Pod decision; the
 		// capture table only names the Pod of one capture.
-		read("permission_stream", "authority_audit", "permission_review_source", "permission_review_assignment", "permission_review_decision", "context_capture")
+		read("permission_stream", "authority_audit", "permission_review_source", "permission_review_assignment", "permission_review_decision", "context_capture", "context_preview")
 		add("permission_stream", "UPDATE", "id")
 		add("permission_review_source", "UPDATE", "uid")
 		add("permission_review_assignment", "INSERT")
 		add("permission_review_decision", "INSERT")
 		add("permission_review_decision", "UPDATE", "decided_at", "fresh_until")
 		add("permission_review_decision", "DELETE")
+		// REQ-PER-006: decision-change events into the authority outbox.
+		add("authority_audit", "INSERT")
 	case "evidence-share":
 		// ADR-232: the share ledger. Shares bind to published case locators;
 		// only revocation and an ADR-238 management transfer may change a row

@@ -181,6 +181,34 @@ func (q *Queries) EndPermissionReviewDecision(ctx context.Context, arg EndPermis
 	return err
 }
 
+const getPermissionReviewDecision = `-- name: GetPermissionReviewDecision :one
+SELECT assignment_id, pod_uid, cluster_id, namespace_name, namespace_uid, workload_kind, workload_name, workload_uid, pod_name, decided_at, fresh_until FROM permission_review_decision WHERE assignment_id=$1 AND pod_uid=$2 FOR UPDATE
+`
+
+type GetPermissionReviewDecisionParams struct {
+	AssignmentID pgtype.UUID
+	PodUid       string
+}
+
+func (q *Queries) GetPermissionReviewDecision(ctx context.Context, arg GetPermissionReviewDecisionParams) (PermissionReviewDecision, error) {
+	row := q.db.QueryRow(ctx, getPermissionReviewDecision, arg.AssignmentID, arg.PodUid)
+	var i PermissionReviewDecision
+	err := row.Scan(
+		&i.AssignmentID,
+		&i.PodUid,
+		&i.ClusterID,
+		&i.NamespaceName,
+		&i.NamespaceUid,
+		&i.WorkloadKind,
+		&i.WorkloadName,
+		&i.WorkloadUid,
+		&i.PodName,
+		&i.DecidedAt,
+		&i.FreshUntil,
+	)
+	return i, err
+}
+
 const insertPermissionReviewAssignment = `-- name: InsertPermissionReviewAssignment :exec
 INSERT INTO permission_review_assignment(id,stream_id,source_uid,issuer,subject_id,role,basis_digest)
 VALUES(gen_random_uuid(),$1,$2,$3,$4,$5,$6)
@@ -405,6 +433,75 @@ func (q *Queries) SelectPermissionReviews(ctx context.Context, arg SelectPermiss
 	return items, nil
 }
 
+const selectPreviewReviewAssignments = `-- name: SelectPreviewReviewAssignments :many
+SELECT a.id,a.issuer,a.subject_id,a.role,a.basis_digest,d.cluster_id,d.namespace_uid,d.workload_uid,
+max(d.fresh_until)::timestamptz AS fresh_until,max(d.decided_at)::timestamptz AS decided_at
+FROM permission_review_assignment a JOIN permission_review_decision d ON d.assignment_id=a.id
+JOIN permission_review_source rs ON rs.stream_id=a.stream_id AND rs.uid=a.source_uid
+JOIN authority_audit au ON au.id=rs.accepted_audit_id AND au.stream_id=rs.stream_id
+WHERE a.stream_id=$1 AND a.source_uid=$2 AND a.retired_at IS NULL AND rs.epoch=$3 AND rs.seen_sequence=$4 AND au.acknowledged_at IS NOT NULL
+GROUP BY a.id,a.issuer,a.subject_id,a.role,a.basis_digest,d.cluster_id,d.namespace_uid,d.workload_uid
+ORDER BY d.cluster_id,d.namespace_uid,d.workload_uid,a.id LIMIT 1001
+`
+
+type SelectPreviewReviewAssignmentsParams struct {
+	StreamID     pgtype.UUID
+	SourceUid    string
+	Epoch        pgtype.UUID
+	SeenSequence int64
+}
+
+type SelectPreviewReviewAssignmentsRow struct {
+	ID           pgtype.UUID
+	Issuer       string
+	SubjectID    string
+	Role         string
+	BasisDigest  []byte
+	ClusterID    pgtype.UUID
+	NamespaceUid string
+	WorkloadUid  string
+	FreshUntil   pgtype.Timestamptz
+	DecidedAt    pgtype.Timestamptz
+}
+
+// ADR-245 preview: the current assignments a decision-time source minted, per
+// recorded workload, with their newest decision; at most 1,001 rows.
+func (q *Queries) SelectPreviewReviewAssignments(ctx context.Context, arg SelectPreviewReviewAssignmentsParams) ([]SelectPreviewReviewAssignmentsRow, error) {
+	rows, err := q.db.Query(ctx, selectPreviewReviewAssignments,
+		arg.StreamID,
+		arg.SourceUid,
+		arg.Epoch,
+		arg.SeenSequence,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SelectPreviewReviewAssignmentsRow{}
+	for rows.Next() {
+		var i SelectPreviewReviewAssignmentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Issuer,
+			&i.SubjectID,
+			&i.Role,
+			&i.BasisDigest,
+			&i.ClusterID,
+			&i.NamespaceUid,
+			&i.WorkloadUid,
+			&i.FreshUntil,
+			&i.DecidedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const selectRecordedCaptureReviews = `-- name: SelectRecordedCaptureReviews :many
 SELECT a.source_uid,d.assignment_id, d.pod_uid, d.cluster_id, d.namespace_name, d.namespace_uid, d.workload_kind, d.workload_name, d.workload_uid, d.pod_name, d.decided_at, d.fresh_until FROM permission_review_decision d JOIN permission_review_assignment a ON a.id=d.assignment_id
 JOIN context_capture c ON c.root_id=a.stream_id AND d.pod_uid=convert_from(c.pod_pin_json,'UTF8')::jsonb->>'UID' AND d.namespace_uid=convert_from(c.pod_pin_json,'UTF8')::jsonb->>'NamespaceUID'
@@ -449,6 +546,77 @@ func (q *Queries) SelectRecordedCaptureReviews(ctx context.Context, arg SelectRe
 	items := []SelectRecordedCaptureReviewsRow{}
 	for rows.Next() {
 		var i SelectRecordedCaptureReviewsRow
+		if err := rows.Scan(
+			&i.SourceUid,
+			&i.AssignmentID,
+			&i.PodUid,
+			&i.ClusterID,
+			&i.NamespaceName,
+			&i.NamespaceUid,
+			&i.WorkloadKind,
+			&i.WorkloadName,
+			&i.WorkloadUid,
+			&i.PodName,
+			&i.DecidedAt,
+			&i.FreshUntil,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const selectRecordedPreviewReviews = `-- name: SelectRecordedPreviewReviews :many
+SELECT a.source_uid,d.assignment_id, d.pod_uid, d.cluster_id, d.namespace_name, d.namespace_uid, d.workload_kind, d.workload_name, d.workload_uid, d.pod_name, d.decided_at, d.fresh_until FROM permission_review_decision d JOIN permission_review_assignment a ON a.id=d.assignment_id
+JOIN context_preview p ON p.root_id=a.stream_id AND d.pod_uid=convert_from(p.blueprint_json,'UTF8')::jsonb->'Target'->>'PodUID' AND d.namespace_uid=convert_from(p.blueprint_json,'UTF8')::jsonb->'Target'->'Namespace'->>'UID'
+WHERE a.stream_id=$1 AND p.id=$2 AND p.actor_key=$3 AND a.retired_at IS NULL AND a.issuer=$4 AND a.subject_id=$5
+ORDER BY a.source_uid LIMIT 5
+`
+
+type SelectRecordedPreviewReviewsParams struct {
+	StreamID  pgtype.UUID
+	ID        pgtype.UUID
+	ActorKey  []byte
+	Issuer    string
+	SubjectID string
+}
+
+type SelectRecordedPreviewReviewsRow struct {
+	SourceUid     string
+	AssignmentID  pgtype.UUID
+	PodUid        string
+	ClusterID     pgtype.UUID
+	NamespaceName string
+	NamespaceUid  string
+	WorkloadKind  string
+	WorkloadName  string
+	WorkloadUid   string
+	PodName       string
+	DecidedAt     pgtype.Timestamptz
+	FreshUntil    pgtype.Timestamptz
+}
+
+// One principal's recorded review targets of the Pod of one of its own
+// previews, closed or not; nothing else of the preview.
+func (q *Queries) SelectRecordedPreviewReviews(ctx context.Context, arg SelectRecordedPreviewReviewsParams) ([]SelectRecordedPreviewReviewsRow, error) {
+	rows, err := q.db.Query(ctx, selectRecordedPreviewReviews,
+		arg.StreamID,
+		arg.ID,
+		arg.ActorKey,
+		arg.Issuer,
+		arg.SubjectID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SelectRecordedPreviewReviewsRow{}
+	for rows.Next() {
+		var i SelectRecordedPreviewReviewsRow
 		if err := rows.Scan(
 			&i.SourceUid,
 			&i.AssignmentID,

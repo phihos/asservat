@@ -41,6 +41,9 @@ func (f *reviewFake) RecordedReviews(_ context.Context, p identity.Principal, t 
 func (f *reviewFake) RecordedCaptureReviews(context.Context, identity.Principal, string) ([]RecordedReview, error) {
 	return f.recorded, nil
 }
+func (f *reviewFake) RecordedPreviewReviews(context.Context, identity.Principal, string) ([]RecordedReview, error) {
+	return f.recorded, nil
+}
 func (f *reviewFake) RecordReview(_ context.Context, d ReviewDecision) error {
 	f.decisions = append(f.decisions, d)
 	return nil

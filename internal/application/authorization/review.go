@@ -34,6 +34,9 @@ type ReviewDecision struct {
 	Principal identity.Principal
 	Target    targets.Request
 	Allowed   bool
+	// Outcome is the connector's closed outcome, or "Unavailable" when no
+	// answer arrived; it is the audited reason of a decision change.
+	Outcome   string
 	DecidedAt time.Time
 }
 
@@ -47,6 +50,9 @@ type AccessReviewStore interface {
 	// RecordedCaptureReviews returns the principal's recorded reviews of the
 	// Pod of one capture, whoever created it; nothing else of the capture.
 	RecordedCaptureReviews(context.Context, identity.Principal, string) ([]RecordedReview, error)
+	// RecordedPreviewReviews returns the principal's recorded reviews of the
+	// Pod of one of its own previews, closed or not.
+	RecordedPreviewReviews(context.Context, identity.Principal, string) ([]RecordedReview, error)
 	RecordReview(context.Context, ReviewDecision) error
 }
 
@@ -124,6 +130,19 @@ func (s AccessReviews) ReviewCapture(ctx context.Context, i identity.Identity, c
 	return s.repeat(ctx, i, recorded[0].Target.ClusterID, recorded, func(r targets.Request) bool { return r == recorded[0].Target })
 }
 
+// ReviewPreview repeats the principal's recorded reviews of the Pod of one of
+// its previews: request resolution, which names only the preview.
+func (s AccessReviews) ReviewPreview(ctx context.Context, i identity.Identity, previewID string) error {
+	if !s.configured() || i.Principal.Kind != identity.Human || !value.UUID(previewID) {
+		return nil
+	}
+	recorded, err := s.Store.RecordedPreviewReviews(ctx, i.Principal, previewID)
+	if err != nil || len(recorded) == 0 {
+		return err
+	}
+	return s.repeat(ctx, i, recorded[0].Target.ClusterID, recorded, func(r targets.Request) bool { return r == recorded[0].Target })
+}
+
 func (s AccessReviews) repeat(ctx context.Context, i identity.Identity, cluster string, recorded []RecordedReview, matches func(targets.Request) bool) error {
 	if len(recorded) == 0 {
 		return nil
@@ -160,8 +179,15 @@ func (s AccessReviews) review(ctx context.Context, i identity.Identity, src conf
 	request := targets.ReviewRequest(src, target, i.Principal.Issuer, i.Principal.Subject, i.Groups)
 	decided := s.Now().UTC().Truncate(time.Microsecond)
 	answer, err := s.Reviewer.ReviewAccess(call, request)
-	allowed := err == nil && answer.Valid(request) && answer.Outcome == targets.AccessAllowed && i.Valid(s.Now())
-	if e := s.Store.RecordReview(ctx, ReviewDecision{Source: src, Principal: i.Principal, Target: target, Allowed: allowed, DecidedAt: decided}); e != nil {
+	outcome := "Unavailable"
+	if err == nil && answer.Valid(request) {
+		outcome = answer.Outcome
+	}
+	allowed := outcome == targets.AccessAllowed && i.Valid(s.Now())
+	if outcome == targets.AccessAllowed && !allowed {
+		outcome = "IdentityUnavailable"
+	}
+	if e := s.Store.RecordReview(ctx, ReviewDecision{Source: src, Principal: i.Principal, Target: target, Allowed: allowed, Outcome: outcome, DecidedAt: decided}); e != nil {
 		return errors.Join(err, e)
 	}
 	return err

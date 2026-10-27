@@ -9,11 +9,13 @@ import (
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	authapp "asservat.local/asservat/internal/application/authorization"
+	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/audit"
 	"asservat.local/asservat/internal/domain/authorization"
 	cfg "asservat.local/asservat/internal/domain/configuration"
 	"asservat.local/asservat/internal/domain/identity"
 	"asservat.local/asservat/internal/domain/targets"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -230,6 +232,21 @@ func (r *AccessReviews) RecordedCaptureReviews(ctx context.Context, p identity.P
 	return out, err
 }
 
+func (r *AccessReviews) RecordedPreviewReviews(ctx context.Context, p identity.Principal, preview string) ([]authapp.RecordedReview, error) {
+	var out []authapp.RecordedReview
+	if r == nil || p.Kind != identity.Human || !authorization.UUID(preview) {
+		return nil, cfg.ErrInvalid
+	}
+	err := permissionError(r.ledger.transaction(ctx, func(q *custodydb.Queries) error {
+		rows, err := q.SelectRecordedPreviewReviews(ctx, custodydb.SelectRecordedPreviewReviewsParams{StreamID: id(r.root), ID: id(preview), ActorKey: previewActorKey(p), Issuer: p.Issuer, SubjectID: p.Subject})
+		for _, row := range rows {
+			out = append(out, recordedTarget(custodydb.PermissionReviewDecision{AssignmentID: row.AssignmentID, PodUid: row.PodUid, ClusterID: row.ClusterID, NamespaceName: row.NamespaceName, NamespaceUid: row.NamespaceUid, WorkloadKind: row.WorkloadKind, WorkloadName: row.WorkloadName, WorkloadUid: row.WorkloadUid, PodName: row.PodName}, row.SourceUid))
+		}
+		return err
+	}))
+	return out, err
+}
+
 // RecordReview records one outcome under the stream's share lock and the
 // source's row lock, so a concurrent acceptance that retires the source
 // either precedes it (nothing is recorded) or follows it (the new decision is
@@ -273,7 +290,24 @@ func (r *AccessReviews) RecordReview(ctx context.Context, d authapp.ReviewDecisi
 			if err != nil {
 				return err
 			}
-			return q.EndPermissionReviewDecision(ctx, custodydb.EndPermissionReviewDecisionParams{AssignmentID: a.ID, PodUid: t.PodUID, DecidedAt: ts(decided)})
+			prior, err := q.GetPermissionReviewDecision(ctx, custodydb.GetPermissionReviewDecisionParams{AssignmentID: a.ID, PodUid: t.PodUID})
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			if err != nil {
+				return err
+			}
+			if err = q.EndPermissionReviewDecision(ctx, custodydb.EndPermissionReviewDecisionParams{AssignmentID: a.ID, PodUid: t.PodUID, DecidedAt: ts(decided)}); err != nil {
+				return err
+			}
+			if !prior.FreshUntil.Time.After(prior.DecidedAt.Time) {
+				return nil // already refused: no change
+			}
+			ended := decided
+			if prior.DecidedAt.Time.After(ended) {
+				ended = prior.DecidedAt.Time
+			}
+			return recordReviewChange(ctx, q, s, n.Time, audit.ReviewRevoked, reviewOutcome(d), src, p, uid(a.ID), t, ended, ended)
 		}
 		until := src.ReviewDecisionUntil(decided)
 		if !n.Time.Before(until) {
@@ -298,9 +332,48 @@ func (r *AccessReviews) RecordReview(ctx context.Context, d authapp.ReviewDecisi
 		if a.Role != src.Role {
 			return cfg.ErrChanged
 		}
+		change := audit.ReviewGranted
+		prior, err := q.GetPermissionReviewDecision(ctx, custodydb.GetPermissionReviewDecisionParams{AssignmentID: a.ID, PodUid: t.PodUID})
+		switch {
+		case errors.Is(err, pgx.ErrNoRows):
+		case err != nil:
+			return err
+		case prior.FreshUntil.Time.After(prior.DecidedAt.Time):
+			change = "" // confirms the current allow: SQL only
+		default:
+			change = audit.ReviewRestored
+		}
 		if err = q.UpsertPermissionReviewDecision(ctx, custodydb.UpsertPermissionReviewDecisionParams{AssignmentID: a.ID, PodUid: t.PodUID, ClusterID: id(t.ClusterID), NamespaceName: t.Namespace.Name, NamespaceUid: t.Namespace.UID, WorkloadKind: t.Workload.Kind, WorkloadName: t.Workload.Name, WorkloadUid: t.Workload.UID, PodName: t.PodName, DecidedAt: ts(decided), FreshUntil: ts(until)}); err != nil {
 			return err
 		}
-		return q.PrunePermissionReviewDecisions(ctx, a.ID)
+		if err = q.PrunePermissionReviewDecisions(ctx, a.ID); err != nil {
+			return err
+		}
+		if change == "" {
+			return nil
+		}
+		return recordReviewChange(ctx, q, s, n.Time, change, reviewOutcome(d), src, p, uid(a.ID), t, decided, until)
 	}))
+}
+
+func reviewOutcome(d authapp.ReviewDecision) string {
+	if d.Allowed {
+		return "Allowed"
+	}
+	if identity.Text(d.Outcome, 32) {
+		return d.Outcome
+	}
+	return "Unavailable"
+}
+
+// recordReviewChange appends one immutable decision-change event to the
+// stream's authority audit outbox (REQ-PER-006, ADR-245). The hub-worker's
+// authority publisher encrypts and acknowledges it like every other event.
+// A review that confirms the current state writes no event.
+func recordReviewChange(ctx context.Context, q *custodydb.Queries, s custodydb.PermissionStream, now time.Time, change, outcome string, src cfg.ReviewSource, p identity.Principal, assignment string, t targets.Request, decided, until time.Time) error {
+	c := audit.ReviewDecisionChange{Change: change, Outcome: outcome, SourceUID: src.Resource.UID, SourceGeneration: src.Resource.Generation, SourceDigest: src.Resource.SpecDigest, IdentityMapping: src.IdentityMappingRef,
+		Issuer: p.Issuer, Subject: p.Subject, AssignmentID: assignment, ClusterID: t.ClusterID, NamespaceUID: t.Namespace.UID, WorkloadUID: t.Workload.UID, PodUID: t.PodUID, DecidedAt: decided.UTC(), FreshUntil: until.UTC()}
+	var input artifact.Digest
+	copy(input[:], digest(c))
+	return insertAuthority(ctx, q, audit.AuthorityRecord{ID: uuid.NewString(), RootID: uid(s.ID), Epoch: uid(s.Epoch), Sequence: s.Sequence, Kind: "permission-review", InputDigest: input, CreatedAt: now.UTC(), Review: &c})
 }

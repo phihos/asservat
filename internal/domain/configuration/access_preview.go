@@ -92,6 +92,10 @@ type PreviewCell struct {
 	Target      authorization.Target
 	Projection  authorization.Projection
 	Unavailable string
+	// Unknown are decision-time assignments (ADR-245) recorded for this
+	// workload whose current SubjectAccessReview outcome is not known (no
+	// current allowed decision). Removing one is Indeterminate before.
+	Unknown []artifact.AudienceAssignment `json:",omitempty"`
 }
 
 func (c PreviewCell) Other() bool { return c.Target.WorkloadUID == OtherWorkloads }
@@ -386,6 +390,31 @@ func PreviewAccess(changes []AccessChange, snap PreviewSnapshot, administered []
 				rows = append(rows, PreviewAssignment{a.Effect, a.Assignment, proposed[a.Assignment.AssignmentID]})
 			}
 			return rows
+		}
+		// A removed decision-time assignment without a current decision: the
+		// access it would confer is unknown before, and known after.
+		for _, a := range cell.Unknown {
+			s := Subject{a.Kind, a.Issuer, a.SubjectID}
+			if !removedBy(changes, a) || slices.Contains(subjects, s) {
+				continue
+			}
+			i := previewIdentity(s, cell.Projection, after, policy, now)
+			assumed := cell.Projection
+			assumed.Allows = append(slices.Clone(assumed.Allows), authorization.CurrentAssignment{Audience: a, ObservedAt: now, FreshUntil: assumed.FreshUntil, Reviewed: true})
+			for _, op := range previewOperations {
+				if authorization.Decide(i, assumed, op, cell.Target, now).Decision != authorization.Allow {
+					continue
+				}
+				decided := authorization.Decide(i, after, op, cell.Target, now)
+				if decided.Decision == authorization.Allow {
+					continue
+				}
+				out.DeltasTotal++
+				if len(out.Deltas) < MaxPreviewDeltas {
+					out.Deltas = append(out.Deltas, AccessDelta{Target: cell.Target, Subject: s, Operation: op, Before: authorization.Indeterminate, After: decided.Decision,
+						BeforeUnmet: DecisionTimeSource, BeforeBasis: []PreviewAssignment{{Effect: "Allow", Assignment: a}}, AfterUnmet: decided.Unmet, AfterBasis: basis(decided), AfterValidUntil: decided.ValidUntil})
+				}
+			}
 		}
 		for _, s := range subjects {
 			i := previewIdentity(s, cell.Projection, after, policy, now)

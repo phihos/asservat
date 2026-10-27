@@ -31,6 +31,9 @@ type ContextTargets interface {
 // records allowed reviews only; it never grants by itself.
 type ContextAccessReviews interface {
 	ReviewResolved(context.Context, identity.Identity, targets.Request) error
+	// ReviewPreview repeats the caller's recorded reviews of the Pod of one
+	// of its previews (request resolution).
+	ReviewPreview(context.Context, identity.Identity, string) error
 }
 
 type ContextEligibilityReader interface {
