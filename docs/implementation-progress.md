@@ -1,5 +1,38 @@
 # Sustained implementation progress
 
+## API target metadata and completed query bounds (ADR-260, 2026-10-27)
+
+The shared target/readiness candidate e6a2fbfb passed CI and review but its
+installed run 40563988015 still failed at `request/facts/current/target` before
+admission (Go 624.070s; approved subtest 129.68s includes the deliberate
+120-second preview wait). Sources stayed unchanged, all 3,193 hashes matched,
+cleanup was empty; report SHA-256
+`1356fd01e52d8ecbc07d908dc9e0b494eb5f3ee8b19750fdc39d61cb46bf6816`.
+That failure does not measure which constituent target cutoff expired.
+
+Source review found that API target metadata inherited both the regional owner
+context deadline and the hub receiver/frame proof cutoff. A composed
+noncollector regression reproduces the premature expiry through the actual
+coordinator, eligibility evaluator, router/streams and API adapter with a TLS
+fake API: query completion under 250ms transport proofs followed by a 400ms
+storage read is refused before admission. Its authority/control inputs are
+synthetic, so it is protocol/coordinator evidence only.
+
+[ADR-260](decisions/260-api-target-observation-freshness.md) revises that
+agent-authored coupling uniformly for API target metadata. Successful query I/O
+and completion retain every original source/peer/caller deadline. The returned
+observation keeps only its earliest target read's original five seconds; receipt
+cannot renew it or raise an earlier producer cutoff. C09's original request
+deadline and current identity, deny, grant, recovery and effect guards remain.
+NodeExecution and authority-bearing query answers retain their old bounds.
+The change adds no API calls, configuration, watchers, timers or stored state.
+The composed matrix passes locally (7.387s), as do independent expiry/selection
+and shorter-producer tests, final affected races (targets 1.008s, capture 10.498s,
+context-start 10.831s, bootstrap 52.215s), full pre-push and the real libpcap/static
+build check. A separate read-only review found no blocking regression. Fresh
+hosted CI/review and the installed result remain pending; no installed approved
+capture has passed yet.
+
 ## Approved packet request: local target composition correction (2026-10-27)
 
 Native run 40557482326 on 23bf0042 failed before admission with

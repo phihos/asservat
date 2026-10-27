@@ -46,6 +46,14 @@ labels distinguish the hub receiver cutoff from the regional resolution cutoff;
 successful transport alone is not a usable target observation. These diagnostics
 never refresh either interval or substitute another Pod.
 
+[ADR-260](../decisions/260-api-target-observation-freshness.md) separates completed
+API target metadata from the exchange used to read it. Query I/O and completion
+still require the original current source/peer bounds. After completion, exact
+UID/owner metadata keeps at most five seconds from its earliest target read;
+transport-proof expiry alone does not invalidate that delivered observation.
+All current human, recovery, grant, storage and effect guards remain binding,
+including this coordinator's original five-second request and earlier parent.
+
 The passive `ContextPreview` holds server-generated preview, capture, case,
 occurrence, artifact, attempt and assessment IDs; original actor/client; exact
 authored intent; target pin; selected storage revisions; relative retention;
