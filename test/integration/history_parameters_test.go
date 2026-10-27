@@ -68,7 +68,7 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 			}
 			return set
 		}
-		reserve := func(a capture.Accepted) (capture.HistoryStorage, capture.HistoryParameters) {
+		reservation := func(a capture.Accepted) (capture.HistoryReservation, capture.HistoryParameters) {
 			set := policies()
 			now := time.Now().UTC().Truncate(time.Microsecond)
 			retention, e := privacy.Resolve(set, privacy.Input{ControlKind: "case-metadata", Target: s.a.Eligibility.Target, PrivacyClass: "potentialPersonalData", EvidenceType: "other", RequestedSeconds: 5, AnchorAt: a.CreatedAt}, now)
@@ -99,7 +99,11 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 				}
 			}
 			expect := capture.HistoryExpectation{RootID: s.a.RootID, CaptureID: a.CaptureID, Registration: r, SelectorKey: selector, SettingsKey: settings, MACVersion: mac.AccountVersion(), OriginalExecutionDigest: a.ScopeDigest}
-			h, e := ledger.ReserveHistoryParameters(ctx, capture.HistoryReservation{Expectation: expect, Identity: s.a.Eligibility.VerifiedIdentity, Recovery: recovery(), Limits: capture.HistoryLimits{PerSelector: 1, PerInstallation: 2}, SummaryExpiresAt: retention.ExpiresAt, Retention: retention, Source: a.RepeatedFrom})
+			return capture.HistoryReservation{Expectation: expect, Identity: s.a.Eligibility.VerifiedIdentity, Recovery: recovery(), Limits: capture.HistoryLimits{PerSelector: 1, PerInstallation: 2}, SummaryExpiresAt: retention.ExpiresAt, Retention: retention, Source: a.RepeatedFrom}, p
+		}
+		reserve := func(a capture.Accepted) (capture.HistoryStorage, capture.HistoryParameters) {
+			in, p := reservation(a)
+			h, e := ledger.ReserveHistoryParameters(ctx, in)
 			if e != nil {
 				t.Fatal("reserve", e)
 			}
@@ -218,6 +222,44 @@ func qualifyHistoryParameters(t *testing.T, ctx context.Context, admin *pgxpool.
 		if second.RepeatedFrom == nil || second.RepeatedFrom.CaptureID != first.CaptureID || !second.RepeatedFrom.ExpiresAt.Equal(h.Expectation.Registration.ExpiresAt) {
 			t.Fatal("accepted repeat lost independent lineage", second.RepeatedFrom)
 		}
+		// Test-induced inconsistency, not an observed production corruption:
+		// a visible old row has lost its selector counter. The root ceiling
+		// forces eviction, whose zero-row decrement must roll back EVERYTHING,
+		// including registerLocked's earlier custody reservation.
+		inconsistent, _ := reservation(second)
+		inconsistent.Limits.PerInstallation = 1
+		type historyCharges struct{ allocationBytes, allocationObjects, poolBytes, poolObjects, attempts int64 }
+		charges := func() historyCharges {
+			t.Helper()
+			var c historyCharges
+			if e := admin.QueryRow(ctx, `SELECT a.charged_bytes,a.charged_objects,p.allocated_bytes,p.allocated_objects,(SELECT count(*) FROM custody_attempt WHERE allocation_id=a.id) FROM custody_allocation a JOIN custody_pool p ON p.id=a.pool_id WHERE a.id=$1`, h.Expectation.Registration.AllocationID).Scan(&c.allocationBytes, &c.allocationObjects, &c.poolBytes, &c.poolObjects, &c.attempts); e != nil {
+				t.Fatal(e)
+			}
+			return c
+		}
+		beforeEviction := charges()
+		if changed, e := admin.Exec(ctx, `UPDATE capture_history_quota SET used=0 WHERE root_id=$1 AND selector_key=$2 AND used=1`, s.a.RootID, h.Expectation.SelectorKey[:]); e != nil || changed.RowsAffected() != 1 {
+			t.Fatal("inject inconsistent selector quota", e)
+		}
+		_, refusal := ledger.ReserveHistoryParameters(ctx, inconsistent)
+		var oldVisible, newHistory, newAttempt bool
+		var rootUsed, selectorUsed int
+		if e := admin.QueryRow(ctx, `SELECT visible,
+		 (SELECT used FROM capture_history_quota WHERE root_id=$1 AND selector_key=$3),
+		 (SELECT used FROM capture_history_quota WHERE root_id=$1 AND selector_key=$4),
+		 EXISTS(SELECT 1 FROM capture_history_parameter WHERE capture_id=$5),
+		 EXISTS(SELECT 1 FROM custody_attempt WHERE id=$6)
+		 FROM capture_history_parameter WHERE root_id=$1 AND capture_id=$2`, s.a.RootID, first.CaptureID, make([]byte, 32), h.Expectation.SelectorKey[:], second.CaptureID, inconsistent.Expectation.Registration.Location.AttemptID).Scan(&oldVisible, &rootUsed, &selectorUsed, &newHistory, &newAttempt); e != nil {
+			t.Fatal(e)
+		}
+		afterEviction := charges()
+		if !errors.Is(refusal, privacyapp.ErrFence) || !oldVisible || rootUsed != 1 || selectorUsed != 0 || newHistory || newAttempt || afterEviction != beforeEviction {
+			t.Fatalf("inconsistent eviction did not refuse atomically: err=%v visible=%t root=%d selector=%d newHistory=%t newAttempt=%t charges=%+v before=%+v", refusal, oldVisible, rootUsed, selectorUsed, newHistory, newAttempt, afterEviction, beforeEviction)
+		}
+		if changed, e := admin.Exec(ctx, `UPDATE capture_history_quota SET used=1 WHERE root_id=$1 AND selector_key=$2 AND used=0`, s.a.RootID, h.Expectation.SelectorKey[:]); e != nil || changed.RowsAffected() != 1 {
+			t.Fatal("restore fixture selector quota", e)
+		}
+		t.Log("inconsistent selector eviction refused and rolled back visibility, quota and custody; restored fixture for positive eviction")
 		h2, _ := reserve(second)
 		if h2.Expectation.Registration.ExpiresAt.After(h.Expectation.Registration.ExpiresAt) {
 			t.Fatal("repeat settings extended source lifetime")

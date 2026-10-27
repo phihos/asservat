@@ -968,3 +968,44 @@ The expanded real SQL original-grant replacement/revocation acquisition case is
 compiled but not run yet; retain that gap until the coordinated fixture completes.
 Shared accepted-policy counters in the existing policy-status route remain a
 required next public-composition step, not an optional alternative to grant status.
+
+
+### Composed installation inventory (history 3673 + policy 102)
+
+Retain history's qualified eviction mutation-count fence and exact two-table
+installation correction by merging 3673c264. The complete permanent inventory
+is 130 names (history 127 plus policy_grant_settings, policy_grant_attachment,
+policy_observation_session); the previous literal 128 rejected this supported
+first-install path. The old ordering test reproduced that rejection (exit 1,
+0.010s); no installed policy success is inferred from history's schema-101 pass.
+
+Replace only the two table-catalog bounds with the closed compiled inventory:
+complete/activation reads admit exactly 130 and fetch at most 131 rows to detect
+unknowns; partial replay permits the two exact legacy transient tables, at most
+132 known names and one overflow row. Unknown names still reject immediately,
+and complete equality, owner, permanence, RLS, pristine-table, original-prefix,
+original deadlines and binary floor 102 remain unchanged. The unrelated 128
+migration-file/version and filename bounds remain unchanged. Added real-SQL
+regressions create unknown names before/after the complete ordered inventory,
+require refusal, remove them and require successful exact replay; not yet run.
+
+Cost: zero extra catalog queries/round trips, credentials, services, watches,
+background tasks or configuration. Existing catalog reads gain parameterized
+LIMITs, replacing one unbounded read and one literal bound. Each existing
+pristine scan gains three SELECT EXISTS round trips compared with history 101
+(five compared with canonical 100); no per-workload scaling. Initial preparation
+and activation each gain SELECT and MAINTAIN on those exact three policy tables:
+12 role/privilege tuples total, and six deduplicated grant-option tuples for the
+existing setup-manager union. History's two tables account separately for eight
+role tuples/four manager tuples. No runtime role or write privilege is added by
+this inventory composition. A larger arbitrary constant or omitting tables
+would leave the observed exact-inventory failure unresolved.
+
+
+Composed local verification: initial inventory/role gates pass PostgreSQL 0.078s
+and integration compilation 0.015s; full PostgreSQL race suite passes 2.557s.
+`make pre-push` actual exit 0 includes all 229 console unit tests, canonical
+schema/SQL generation, specification, architecture and vet gates. Logs are
+archived as policy102-history-composed-{prepush,postgres-race}.log under the
+existing approved-workflow cache. No external service qualification ran during
+this composition; both new real-SQL scenarios remain pending.

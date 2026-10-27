@@ -3,6 +3,14 @@
 
 ## Team-policy grant SQL checkpoint (ADR-259, 2026-10-27)
 
+History correction 3673c264 is retained, including its eviction mutation-count
+fence and installation inventory fix. The composed schema-102 inventory is 130
+permanent tables; catalog bounds now derive from those exact names plus one
+unknown-detection row, with only the two existing replay-transient exceptions.
+The old 128-table guard reproduced a local failure. Complete schema-102 real
+installation and original-grant replacement/revocation tests still await the
+coordinated SQL fixture; history's schema-101 pass is separate evidence.
+
 The isolated policy-grants branch composes canonical main `eed85940`, history
 101 and schema 102 request/settings,
 explicit current-manager attachment and occurrence-backed capture accounting.
@@ -278,6 +286,164 @@ interfaces, API requests, timers, goroutines or durable state were added.
 The combined candidate still needs final gates, review and native qualification.
 
 ## Encrypted capture history (ADR-255, implementation checkpoint)
+
+Installed history run 40594022159 on `80386c5d` failed during initial schema
+setup, before any preview, approval, collector capture or React history path.
+Produce succeeded; schema returned the fixed saved-installation mismatch remedy
+(Go exit 1, 107.875s). All 3,249 hashes independently matched, sources were
+unchanged and cleanup was empty; environment report SHA-256
+`ac45448db577464cc363be78cd2636bdfda82c5d5b22c1c70705810dc8f234bc`.
+That broad remedy alone does not establish a changed UID or immutable input.
+
+Source analysis found a deterministic schema mismatch: migration 00101 creates
+`capture_history_parameter` and `capture_history_quota`, but the exact permanent
+installation inventory omitted both. `initialSchemaInventory` therefore rejects
+them as unknown during replay and at final equality; an ordinary Goose fixture
+does not exercise that installer boundary. The focused regression binds both
+names to the actual embedded migration and fails on unchanged production
+(exit 1, 0.009s). The correction adds only the two sorted names: 127 tables,
+within the unchanged 128-table catalog bound. Unknown schemas/relations, exact
+owner/shape, empty-table, original migration prefix, immutable root/bundle/UID,
+replay and database-incarnation checks remain binding.
+
+The shared exact inventory also feeds existing installation privileges and
+pristine checks. Preparation and activation each acquire their existing
+`SELECT`/`MAINTAIN` pair on these exact two new tables; the deduplicated setup
+manager union adds four corresponding grant-option tuples. No INSERT/UPDATE/
+DELETE, runtime role, object pattern or privilege bound is expanded. Once the
+tables exist, each relevant pristine inventory pass adds two existing-style
+`SELECT EXISTS` checks; role/history creation also includes those relations in
+its existing empty-database scan. There is no new service, credential, watch,
+configuration or background work. Excluding the tables or raising the bound
+would not satisfy this observed first-install defect.
+
+On frozen correction `1212b57b`, the existing real PostgreSQL schema test passes
+with actual exit 0: `TestInitialSchemaWithRealPostgres` 16.03s, Go 17.094s,
+runner phase 46.530s. It covers original-prefix resume and lost completion,
+exact manager grant union and extra-DELETE refusal, altered migration metadata,
+foreign/down/reordered history, changed database/process incarnation, original
+session-lock exclusion and completed read-only replay. Its existing 100-second
+context and fixture limits are unchanged. All 3,213 source hashes independently
+match; sources stayed unchanged, cleanup was empty, and the exact owned
+PostgreSQL/S3 containers were absent. Report SHA-256
+`700e8d36a1f13ec89c594110ddadc931ffc8fc32a3792223e8e81ab9d69cbc74`;
+archive `history-initial-schema-green-1-artifacts` in the local build cache.
+Full PostgreSQL adapter race checks pass (2.613s), as does canonical pre-push,
+including 227 console tests. SQL root facts are synthetic in this component
+fixture; it does not qualify native Kubernetes guards or the installed history
+workflow. Fresh installed qualification remains required. No collector or host
+Kubernetes fixture ran locally.
+
+The current history composition merges canonical main
+`eed8594020645fe6d10f8c6565e69a6235c7507d` into the isolated history branch
+(merge `e0e700d1`). PR100's exact reviewed candidate passed installed run
+40586980099: Go 620.173s, approved subtest 155.60s, actual original-expiry wait
+115.4091899s, one independently approved accepted capture, 2,360 native PCAPNG
+bytes and 21 tshark packets. The initial uncertain reply resolved to the same
+capture. Its source stayed unchanged and cleanup was empty; report SHA-256
+`d86eef8c74434bdb9240530927c3dd0edbbe6d1defb333ce432ff245843063da`.
+That run excludes history and is not installed qualification for this branch.
+
+PR102 review identified unchecked mutation counts in history eviction: hiding the
+old row and decrementing the two quota rows previously checked errors but ignored
+zero affected rows. This is a test-induced inconsistent-counter case, not an
+observed production corruption or cap bypass: the checked positive increments
+still enforce their ceilings. The correction checks all three already returned
+counts and uses the existing custody fence error, matching summary expiry. It
+adds no SQL/API calls, privileges, state, background work or configuration.
+
+The real PostgreSQL/S3 regression first sets an existing visible row's selector
+quota to zero and forces eviction through the installation limit of one. On
+unchanged production (`942a8cfb`) it fails as expected: reservation returns nil,
+hides the old row and creates a new history/attempt, charging 1,671,168 bytes
+and four objects. RED Go exit 1 (2.785s; selected case 2.34s), report SHA-256
+`77c092c2d22b46231be59c9bf1fc7fb954c34f29c26c35fe9b3a5017649f371c`.
+With the correction (`7918a152`), the same operation returns the fence error;
+old visibility, original installation count and injected selector value remain,
+and allocation/pool counters, attempt count and absence of a new reservation
+prove rollback of the earlier custody insert. The fixture restores its selector
+counter before continuing the existing positive eviction, encrypted read/write
+and real prefix inventory/retirement checks. GREEN Go exit 0 (8.705s; selected
+case 7.25s), report SHA-256
+`306bc747c14ce0b779e4d1270d27283b2bc42af9d1f7b1c1db56df507bcd5229`.
+Both runs independently match all 3,213 frozen source hashes, report unchanged
+source and empty cleanup failures, and their exact owned PostgreSQL/S3 containers
+were independently absent. Cache archives are
+`history-eviction-fence-red-2-artifacts` and
+`history-eviction-fence-green-1-artifacts`. No collector or installed browser
+ran. The first setup attempt used nonexistent pool charge columns; its actual
+exit 1 and cleanup report are retained separately as unqualified fixture failure
+(`history-eviction-fence-red-1-artifacts`), then the query was corrected to the
+existing pool allocation columns before RED. No adversarial trigger framework
+or speculative new security mechanism was added.
+Fresh canonical pre-push passes, including 227 console tests and pinned SQL
+generation; the full PostgreSQL adapter race package passes (2.661s). Final
+documentation spec-check also passes (13,279 assertions). This SQL correction
+still does not establish installed React/history qualification.
+
+The semantic merge base was the prior shared PR100 source `21806d0d`, because
+main contains its squash. The sole remaining content overlap combined history's
+original-target replacement check with main's tri-state recorder availability;
+operational failures still refuse before blueprint storage. All 21 non-overlap
+files changed since that base remain byte-identical to canonical main. The
+seven overlapping files retain history changes beside final main behavior,
+including original request/observation bounds, storage response scheduling,
+closed endpoint diagnostics and audit failure timing. Funding is still schema
+100 and history 101. No other worktree was changed.
+
+Fresh local pre-push passes, including 227 console tests, pinned SQL generation
+(61 files), spec-check (13,279 assertions), architecture-check (1,326 positive
+checks) and Go architecture (66 packages, 390 edges). Full affected race packages
+pass: capture 11.275s, presentation 86.895s, context-start 11.363s, mTLS 39.154s,
+object-store 5.405s, domain capture 1.011s and bootstrap 52.561s. Four positively
+selected Kubernetes endpoint/history checks pass in 11.704s; no unsplit broad
+Kubernetes run was repeated. The built React/Go TLS gate passes 23 synthetic
+journeys and 20 accessibility scans plus native restart (Go 21.789s). These use
+synthetic identity/evidence ports, not an installed history capture. Logs are
+`history-canonical-main-*.log` and `history-canonical-browser.log` in the local
+build cache; generated browser results were archived before restoring only
+those generated tracked outputs. The six positively selected noncollector
+harness/tunnel/approval guard tests pass under race (1.338s); the installed
+browser script passes syntax checking.
+
+The earlier `history101-parameters-native-1` SQL/S3 evidence remains attached to
+`11806a29`. Nine relevant migration/query/history custody/codec/service/domain
+and fixture files were independently compared to that environment report's
+hashes and remain identical. The report still records actual exit 0, unchanged
+source and empty cleanup. Other source has changed; that result is reused only
+for the unchanged history custody behavior, never as a new full-source or
+installed qualification.
+
+Practical fixed-budget estimate before the next hosted run: use the conservative
+964s approved baseline against the unchanged 1,200s job cap (236s remaining),
+and 620.173s Go against 1,080s (459.827s remaining). Baseline setup already
+installs the same locked console modules. The exact additional Playwright 1.64.0
+headless install command takes 0.761s with the local warm cache; one fresh
+owned-cache measurement takes 13.249s, downloads the reported 120 MiB headless
+shell and 2.2 MiB FFmpeg archives, and extracts 290,381,670 file bytes. Only that
+owned duplicate cache was then removed and its absence verified. This host uses
+the Ubuntu 24.04 fallback build; runner/network timing can differ. The initial
+measurement wrapper lacked `/usr/bin/time`; the preserved successful measurements
+use a monotonic Python clock. No package/root changes or collectors ran.
+
+The first approved path's active 40.191s excludes its measured 115.409s expiry
+wait. The repeat needs no second expiry wait and keeps the existing traffic
+loop; its edited recording is three seconds. Allowing 60–120s for React,
+encrypted settings, a new independent review and native transfer is an
+engineering estimate, not measured installed history runtime. With the measured
+cold setup it projects roughly 1,037–1,097s total, leaving 103–163s. The actual
+21.789s synthetic built-browser suite informs browser/setup feasibility only.
+Browser setup retains its 170s command cap; if it consumes that bound instead,
+the same projection can exceed 20 minutes. The existing five-minute browser
+and three-minute native helper caps are local ceilings, not reserved runtime or
+an overall extension. The unchanged job/Go bounds govern; slow, timed-out or
+incomplete runs fail. All history assertions remain mandatory, and no quota,
+source expiry or timeout is raised to fit. One guarded installed history run,
+its actual terminal result, source hashes and cleanup remain required before
+claiming that workflow qualified.
+
+Earlier composition records follow; their pending PR100 statements describe
+those historical candidates, not the merged mainline above.
 
 The next isolated composition merges exact PR100 candidate `21806d0d` and
 ADR-260 without conflicts. The four changed production target/transport files

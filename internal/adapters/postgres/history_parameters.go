@@ -245,14 +245,26 @@ func (s *HistoryParametersLedger) ReserveHistoryParameters(ctx context.Context, 
 				return err
 			}
 			for _, old := range candidates {
-				if _, err = q.HideHistoryParameter(ctx, custodydb.HideHistoryParameterParams{RootID: id(s.root), CaptureID: old.CaptureID}); err != nil {
+				changed, err := q.HideHistoryParameter(ctx, custodydb.HideHistoryParameterParams{RootID: id(s.root), CaptureID: old.CaptureID})
+				if err != nil {
 					return err
 				}
-				if _, err = q.ChangeHistoryQuota(ctx, custodydb.ChangeHistoryQuotaParams{RootID: id(s.root), SelectorKey: zero, Amount: -1, Maximum: value.MaxHistoryPerInstallation}); err != nil {
+				if changed != 1 {
+					return custodyprivacy.ErrFence
+				}
+				changed, err = q.ChangeHistoryQuota(ctx, custodydb.ChangeHistoryQuotaParams{RootID: id(s.root), SelectorKey: zero, Amount: -1, Maximum: value.MaxHistoryPerInstallation})
+				if err != nil {
 					return err
 				}
-				if _, err = q.ChangeHistoryQuota(ctx, custodydb.ChangeHistoryQuotaParams{RootID: id(s.root), SelectorKey: old.SelectorKey, Amount: -1, Maximum: value.MaxHistoryPerSelector}); err != nil {
+				if changed != 1 {
+					return custodyprivacy.ErrFence
+				}
+				changed, err = q.ChangeHistoryQuota(ctx, custodydb.ChangeHistoryQuotaParams{RootID: id(s.root), SelectorKey: old.SelectorKey, Amount: -1, Maximum: value.MaxHistoryPerSelector})
+				if err != nil {
 					return err
+				}
+				if changed != 1 {
+					return custodyprivacy.ErrFence
 				}
 				rootCount--
 				if bytes.Equal(old.SelectorKey, e.SelectorKey[:]) {
