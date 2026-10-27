@@ -125,7 +125,7 @@ func (s *RemoteContextSource) ReadChunkCurrent(ctx context.Context, current iden
 			return NativeResponseChunk{}, e
 		}
 	}
-	if lease != s.lease {
+	if lease.Sequence > s.lease.Sequence {
 		check, err := s.attachment.current(s.owner, current, s.request)
 		if err == nil && exchange.renew != nil {
 			err = exchange.renew(ctx, check, lease)
@@ -224,7 +224,7 @@ func (s *RemoteContextSource) AcknowledgeNativeChunk(ctx context.Context, lease 
 	s.mu.Lock()
 	active := s.active
 	finish := s.activeStop
-	if s.closed || s.busy || active == nil || !s.pending || s.lease != lease || offset+length != s.next {
+	if s.closed || s.busy || active == nil || !s.pending || !SameNativeWindow(s.lease, lease) || s.lease.Sequence != lease.Sequence || !lease.Allows(offset, length, s.attachment.config.Now()) || offset+length != s.next {
 		s.mu.Unlock()
 		return artifact.ErrDownloadUnavailable
 	}

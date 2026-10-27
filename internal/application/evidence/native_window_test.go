@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -70,7 +71,7 @@ func (e *windowExchange) Prepared(context.Context) (artifact.NativeDownloadMetad
 	return artifact.NativeDownloadMetadata{}, artifact.ErrDownloadUnavailable
 }
 func (e *windowExchange) ReadChunk(_ context.Context, l artifact.DownloadDeliveryLease, offset, length int64) (NativeResponseChunk, error) {
-	if l != e.delivery || offset+length > int64(len(e.body)) {
+	if !SameNativeWindow(l, e.delivery) || l.Sequence < e.delivery.Sequence || !l.Allows(offset, length, time.Now()) || offset+length > int64(len(e.body)) {
 		return NativeResponseChunk{}, artifact.ErrDownloadUnavailable
 	}
 	e.reads = append(e.reads, offset)
@@ -81,7 +82,7 @@ func (e *windowExchange) ReadChunk(_ context.Context, l artifact.DownloadDeliver
 	return NativeResponseChunk{Bytes: append([]byte(nil), e.body[offset:offset+length]...), FinalVerified: true, NativeUntil: until}, nil
 }
 func (e *windowExchange) AcknowledgeNativeChunk(_ context.Context, l artifact.DownloadDeliveryLease, offset, length int64) error {
-	if l != e.delivery || e.failAck {
+	if !SameNativeWindow(l, e.delivery) || l.Sequence < e.delivery.Sequence || !l.Allows(offset, length, time.Now()) || e.failAck {
 		return artifact.ErrDownloadUnavailable
 	}
 	e.acks = append(e.acks, offset+length)
@@ -93,7 +94,7 @@ func (e *windowExchange) AcknowledgeNativeChunk(_ context.Context, l artifact.Do
 // the window's last acknowledgement (or a failed one) closes it, and a new
 // lease opens a new conversation.
 func TestRemoteContextSourceServesWindowChunksThroughOneConversation(t *testing.T) {
-	for _, mode := range []string{"complete", "failed-ack", "missing-cutoff"} {
+	for _, mode := range []string{"complete", "failed-ack", "missing-cutoff", "representation-read", "representation-ack"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newActiveEnrollmentFixture(t)
 			body := []byte("0123456789abcdefg") // a 17-byte window read as 10+7
@@ -138,7 +139,11 @@ func TestRemoteContextSourceServesWindowChunksThroughOneConversation(t *testing.
 			if _, err = source.ReadChunkCurrent(ctx, f.f, lease, 10, 7); err == nil {
 				t.Fatal("next chunk read before the final-sink acknowledgement")
 			}
-			err = source.AcknowledgeNativeChunk(ctx, lease, 0, 10)
+			ackLease := lease
+			if mode == "representation-ack" {
+				ackLease = sameInstantWindowLease(t, lease)
+			}
+			err = source.AcknowledgeNativeChunk(ctx, ackLease, 0, 10)
 			if mode == "failed-ack" {
 				if err == nil || ports.releases != 1 {
 					t.Fatal("failed acknowledgement kept the conversation", err, ports.releases)
@@ -154,11 +159,29 @@ func TestRemoteContextSourceServesWindowChunksThroughOneConversation(t *testing.
 			if _, err = source.ReadChunkCurrent(ctx, f.f, lease, 11, 6); err == nil {
 				t.Fatal("gap admitted")
 			}
-			last, err := source.ReadChunkCurrent(ctx, f.f, lease, 10, 7)
+			readLease := lease
+			if mode == "representation-read" {
+				readLease = sameInstantWindowLease(t, lease)
+			}
+			changed := readLease
+			changed.Authority.Scope.Principal.Subject = "different-scope"
+			if _, err := source.ReadChunkCurrent(ctx, f.f, changed, 10, 7); err == nil {
+				t.Fatal("changed lease scope continued the window")
+			}
+			last, err := source.ReadChunkCurrent(ctx, f.f, readLease, 10, 7)
 			if err != nil || !bytes.Equal(last.Bytes, body[10:]) {
 				t.Fatal("last chunk", err)
 			}
-			if err = source.AcknowledgeNativeChunk(ctx, lease, 10, 7); err != nil {
+			expired := readLease
+			expired.Until = time.Now().Add(-time.Second)
+			if err = source.AcknowledgeNativeChunk(ctx, expired, 10, 7); err == nil {
+				t.Fatal("expired lease acknowledged a chunk")
+			}
+			finalLease := lease
+			if mode == "representation-read" || mode == "representation-ack" {
+				finalLease = sameInstantWindowLease(t, readLease)
+			}
+			if err = source.AcknowledgeNativeChunk(ctx, finalLease, 10, 7); err != nil {
 				t.Fatal("last acknowledgement", err)
 			}
 			if ports.registrations != 1 || ports.releases != 1 || len(ports.exchange.reads) != 2 || len(ports.exchange.acks) != 2 {
@@ -172,6 +195,23 @@ func TestRemoteContextSourceServesWindowChunksThroughOneConversation(t *testing.
 			}
 		})
 	}
+}
+
+func sameInstantWindowLease(t *testing.T, lease artifact.DownloadDeliveryLease) artifact.DownloadDeliveryLease {
+	t.Helper()
+	raw, err := json.Marshal(lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var represented artifact.DownloadDeliveryLease
+	if err := json.Unmarshal(raw, &represented); err != nil {
+		t.Fatal(err)
+	}
+	represented.Until = represented.Until.In(time.FixedZone("same-instant", 3600))
+	if represented == lease || !represented.Until.Equal(lease.Until) || !represented.StartedAt.Equal(lease.StartedAt) || !represented.Valid(time.Now()) {
+		t.Fatal("equivalent lease fixture changed validity or instants")
+	}
+	return represented
 }
 
 // Worker-side window reads: pod status is served from its single checked

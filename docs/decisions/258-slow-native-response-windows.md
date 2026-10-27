@@ -210,6 +210,19 @@ Archived final report:
 `~/.cache/asservat-build/codex-bf86-resume/slow-native-qualification/slow-native-exchange-8-environment.json`,
 SHA256 `e4ff44c6e6945dccd6f970cf06d023e581b7fdd4f1a0ff892eddcf767a553a7a`.
 
+Review regressions subsequently reproduced two implementation gaps in these
+contracts: a valid higher-sequence observation with an earlier timestamp could
+be accepted without recording its sequence, and a same-instant lease represented
+with another time zone or through JSON could trigger renewal or fail ACK. The
+gate now retains every accepted higher sequence and conservatively intersects a
+lagging same-sequence cutoff. The source renews only on sequence increase and
+matches ACK by exact window/sequence plus current expiry. Changed scope, stale
+sequence and expired ACK remain denied. Test exchanges use the same window,
+sequence and expiry semantics as the production operation. Both regressions
+failed before the corrections. The complete affected race packages pass:
+evidence 4.883 s, native transport 101.577 s and mTLS 41.284 s. The archived
+SQL/S3 and Kubernetes reports above predate these review corrections.
+
 The candidate twenty-second ceiling still implies about 0.4 MiB/s for a full
 8 MiB window before control overhead. Aggregate installed SQL/S3/KMS/API cost
 and practical slower-link qualification remain pending. No arbitrary slow-client

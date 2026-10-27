@@ -83,6 +83,15 @@ Archived report
 `~/.cache/asservat-build/codex-bf86-resume/native-response-qualification/native-response-proof-kube-2-environment.json`
 has SHA256 `b7d5db04b506d0dc5b51a68a38231daa4e8cfabf220339c61ee718a97984ab7b`.
 
+Subsequent review regressions reproduce and fix accepting a higher sequence
+without retaining it when its observation timestamp is older, and rejecting
+same-instant UTC/offset/JSON lease representations. Accepted sequences stay
+monotonic, lagging cutoffs remain conservative, and renewal/ACK use exact window
+and sequence with current expiry. Both regressions failed before their fixes;
+changed scope, lower sequence and expired ACK still deny. Full affected race
+packages pass (evidence 4.883 s, native 101.577 s, mTLS 41.284 s). The external
+reports above qualify their recorded sources and predate these review corrections.
+
 The SQL transfer's Pod-proof/bootstrap/human inputs and the Kubernetes producer
 fixture's SQL/dispatch/certificate-issuance inputs remain synthetic. Installed
 composition of both, paced composed 8 MiB transfer and aggregate installed

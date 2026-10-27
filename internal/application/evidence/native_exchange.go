@@ -199,9 +199,18 @@ func (g *NativeFrameGate) Check(ctx context.Context) (value.NativeLease, error) 
 		} else {
 			l.Until = g.until
 		}
+		if l.Operation.Kind == value.NativeResponse && l.Sequence == g.lease.Sequence && l.ObservedAt.Before(g.lease.ObservedAt) {
+			// A lagging observation of the same lease cannot undo a known
+			// restrictive cutoff. A higher sequence remains a new observation.
+			l.Until = identity.Earlier(l.Until, g.lease.Until)
+		}
 		valid = l.Valid(g.now()) && g.now().Before(g.until)
-		if valid && l.Operation.Kind == value.NativeResponse && !l.ObservedAt.Before(g.lease.ObservedAt) {
-			g.lease = l
+		if valid && l.Operation.Kind == value.NativeResponse {
+			if l.Sequence > g.lease.Sequence || !l.ObservedAt.Before(g.lease.ObservedAt) {
+				g.lease = l
+			} else {
+				g.lease.Until = l.Until
+			}
 		}
 	}
 	g.mu.Unlock()

@@ -129,3 +129,50 @@ func TestNativeResponseGateRejectsKnownSequenceDowngrade(t *testing.T) {
 		t.Fatal("known sequence rolled back")
 	}
 }
+
+// A higher sequence is authoritative even when a current cached observation
+// began earlier. Once accepted, a later callback cannot return the old sequence.
+func TestNativeResponseGateRecordsHigherSequenceFromEarlierObservation(t *testing.T) {
+	base := nativeLeaseFixture()
+	now := base.ObservedAt
+	base.Operation.Kind = value.NativeResponse
+	base.Operation.StartedAt = now.Add(-time.Second)
+	base.Operation.Processing.ObservedAt = base.Operation.StartedAt
+	next := base
+	next.Sequence++
+	next.ObservedAt = now.Add(-20 * time.Millisecond)
+	next.Until = base.Until.Add(-time.Second)
+	if !next.Valid(now) {
+		t.Fatal("earlier newer-sequence observation must itself be valid")
+	}
+	var calls int
+	gate, err := NewNativeFrameGate(t.Context(), func(context.Context) (value.NativeLease, error) {
+		calls++
+		if calls == 2 {
+			return next, nil
+		}
+		if calls == 3 {
+			lagging := next
+			lagging.ObservedAt = now.Add(-40 * time.Millisecond)
+			lagging.Until = base.Until
+			return lagging, nil
+		}
+		return base, nil
+	}, func() time.Time { return now })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer gate.Close()
+	if accepted, err := gate.Check(t.Context()); err != nil || accepted.Sequence != next.Sequence || !accepted.Until.Equal(next.Until) {
+		t.Fatal("valid newer sequence with earlier observation refused", err, accepted)
+	}
+	if terminal, err := gate.TerminalLease(t.Context()); err != nil || terminal.Sequence != next.Sequence || !terminal.Until.Equal(next.Until) {
+		t.Error("accepted sequence/cutoff not retained", err, terminal.Sequence, terminal.Until)
+	}
+	if lagging, err := gate.Check(t.Context()); err != nil || !lagging.Until.Equal(next.Until) {
+		t.Error("lagging same-sequence observation extended the known cutoff", err, lagging.Until)
+	}
+	if _, err := gate.Check(t.Context()); err == nil {
+		t.Error("known newer sequence rolled back after earlier observation")
+	}
+}
