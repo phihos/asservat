@@ -195,13 +195,14 @@ func HistoryExpectationDigest(e HistoryExpectation) artifact.Digest {
 type HistoryOperationAuthority struct {
 	Expectation                HistoryExpectation
 	Operation, RequestID       string
+	ExecutorEpoch              string
 	StartedAt, NotAfter        time.Time
 	BundleDigest, CopiesDigest artifact.Digest
 	DeletionFence              int64
 }
 
 func (a HistoryOperationAuthority) Valid(now time.Time) bool {
-	if !a.Expectation.Valid() || !authorization.UUID(a.RequestID) || a.StartedAt.After(now) || !now.Before(a.NotAfter) || !a.NotAfter.After(a.StartedAt) || a.NotAfter.After(a.StartedAt.Add(30*time.Second)) {
+	if !a.Expectation.Valid() || !authorization.UUID(a.RequestID) || !authorization.UUID(a.ExecutorEpoch) || a.StartedAt.After(now) || !now.Before(a.NotAfter) || !a.NotAfter.After(a.StartedAt) || a.NotAfter.After(a.StartedAt.Add(30*time.Second)) {
 		return false
 	}
 	switch a.Operation {
