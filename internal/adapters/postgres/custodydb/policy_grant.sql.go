@@ -233,6 +233,70 @@ func (q *Queries) InsertPolicyGrantAttachment(ctx context.Context, arg InsertPol
 	return i, err
 }
 
+const lockPolicyCaptureOccurrence = `-- name: LockPolicyCaptureOccurrence :one
+SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector, reserved_capture_id, grant_id, reserved_bytes FROM policy_occurrence WHERE root_id=$1 AND id=$2 FOR UPDATE
+`
+
+type LockPolicyCaptureOccurrenceParams struct {
+	RootID pgtype.UUID
+	ID     pgtype.UUID
+}
+
+func (q *Queries) LockPolicyCaptureOccurrence(ctx context.Context, arg LockPolicyCaptureOccurrenceParams) (PolicyOccurrence, error) {
+	row := q.db.QueryRow(ctx, lockPolicyCaptureOccurrence, arg.RootID, arg.ID)
+	var i PolicyOccurrence
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.PolicyUid,
+		&i.AcceptanceID,
+		&i.ClusterID,
+		&i.WorkloadUid,
+		&i.PodUid,
+		&i.Restarts,
+		&i.CreatedAt,
+		&i.CaptureID,
+		&i.Outcome,
+		&i.Detector,
+		&i.ReservedCaptureID,
+		&i.GrantID,
+		&i.ReservedBytes,
+	)
+	return i, err
+}
+
+const readPolicyCaptureReservation = `-- name: ReadPolicyCaptureReservation :one
+SELECT id, root_id, policy_uid, acceptance_id, cluster_id, workload_uid, pod_uid, restarts, created_at, capture_id, outcome, detector, reserved_capture_id, grant_id, reserved_bytes FROM policy_occurrence WHERE root_id=$1 AND reserved_capture_id=$2
+`
+
+type ReadPolicyCaptureReservationParams struct {
+	RootID            pgtype.UUID
+	ReservedCaptureID pgtype.UUID
+}
+
+func (q *Queries) ReadPolicyCaptureReservation(ctx context.Context, arg ReadPolicyCaptureReservationParams) (PolicyOccurrence, error) {
+	row := q.db.QueryRow(ctx, readPolicyCaptureReservation, arg.RootID, arg.ReservedCaptureID)
+	var i PolicyOccurrence
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.PolicyUid,
+		&i.AcceptanceID,
+		&i.ClusterID,
+		&i.WorkloadUid,
+		&i.PodUid,
+		&i.Restarts,
+		&i.CreatedAt,
+		&i.CaptureID,
+		&i.Outcome,
+		&i.Detector,
+		&i.ReservedCaptureID,
+		&i.GrantID,
+		&i.ReservedBytes,
+	)
+	return i, err
+}
+
 const readPolicyGrantAttachment = `-- name: ReadPolicyGrantAttachment :one
 SELECT id, root_id, installation_id, policy_uid, acceptance_id, grant_id, authority_digest, authored_grant_ref, actor_issuer, actor_subject, actor_client, actor_key, idempotency_key, request_digest, attached_at FROM policy_grant_attachment WHERE root_id=$1 AND id=$2
 `
@@ -406,6 +470,33 @@ func (q *Queries) ReadPolicyGrantSettings(ctx context.Context, rootID pgtype.UUI
 	return i, err
 }
 
+const reservePolicyOccurrenceOutput = `-- name: ReservePolicyOccurrenceOutput :execrows
+UPDATE policy_occurrence SET reserved_capture_id=$3,grant_id=$4,reserved_bytes=$5
+WHERE root_id=$1 AND id=$2 AND reserved_capture_id IS NULL AND outcome IS NULL
+`
+
+type ReservePolicyOccurrenceOutputParams struct {
+	RootID            pgtype.UUID
+	ID                pgtype.UUID
+	ReservedCaptureID pgtype.UUID
+	GrantID           pgtype.UUID
+	ReservedBytes     int64
+}
+
+func (q *Queries) ReservePolicyOccurrenceOutput(ctx context.Context, arg ReservePolicyOccurrenceOutputParams) (int64, error) {
+	result, err := q.db.Exec(ctx, reservePolicyOccurrenceOutput,
+		arg.RootID,
+		arg.ID,
+		arg.ReservedCaptureID,
+		arg.GrantID,
+		arg.ReservedBytes,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const setPolicyGrantAttachment = `-- name: SetPolicyGrantAttachment :execrows
 UPDATE policy_source SET grant_attachment_id=$1::uuid
 WHERE root_id=$2::uuid AND policy_uid=$3::text AND active_id=$4::uuid
@@ -428,6 +519,47 @@ func (q *Queries) SetPolicyGrantAttachment(ctx context.Context, arg SetPolicyGra
 		arg.AcceptanceID,
 		arg.AuthoredGrantRef,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const spendPolicyCollectedBytes = `-- name: SpendPolicyCollectedBytes :execrows
+UPDATE policy_acceptance SET collected_bytes_spent=collected_bytes_spent+$1::bigint
+WHERE root_id=$2::uuid AND id=$3::uuid
+ AND executions_spent>0 AND collected_bytes_spent<=((record#>>'{Authority,Limits,MaxBytes}')::bigint-$1::bigint)
+`
+
+type SpendPolicyCollectedBytesParams struct {
+	Bytes  int64
+	RootID pgtype.UUID
+	ID     pgtype.UUID
+}
+
+func (q *Queries) SpendPolicyCollectedBytes(ctx context.Context, arg SpendPolicyCollectedBytesParams) (int64, error) {
+	result, err := q.db.Exec(ctx, spendPolicyCollectedBytes, arg.Bytes, arg.RootID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const spendPolicyGrantCapture = `-- name: SpendPolicyGrantCapture :execrows
+UPDATE access_grant SET policy_executions_spent=policy_executions_spent+1,policy_bytes_spent=policy_bytes_spent+$1::bigint
+WHERE root_id=$2::uuid AND id=$3::uuid AND kind='policy'
+ AND decision='approved' AND revoked_at IS NULL AND clock_timestamp()<policy_not_after
+ AND policy_executions_spent<policy_max_executions AND policy_bytes_spent<=policy_max_bytes-$1::bigint
+`
+
+type SpendPolicyGrantCaptureParams struct {
+	Bytes  int64
+	RootID pgtype.UUID
+	ID     pgtype.UUID
+}
+
+func (q *Queries) SpendPolicyGrantCapture(ctx context.Context, arg SpendPolicyGrantCaptureParams) (int64, error) {
+	result, err := q.db.Exec(ctx, spendPolicyGrantCapture, arg.Bytes, arg.RootID, arg.ID)
 	if err != nil {
 		return 0, err
 	}

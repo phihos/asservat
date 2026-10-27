@@ -6,14 +6,19 @@ import (
 	"testing"
 )
 
-// This literal is the exact union of the three installed execution logins at
-// 2d02b4fe. A new table-wide write, unrelated privilege or lost column fails.
+// This literal retains the three original execution logins plus schema-102
+// original policy reservation/grant reads and a grant row lock. An unrelated
+// privilege, table-wide write or lost column fails.
 func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 	got, ok := publicRuntimeDutyGrants("api-execution")
 	if !ok {
 		t.Fatal("missing consolidated execution credential")
 	}
 	want := []publicRuntimeGrant{
+		{"table", "policy_occurrence", "", "SELECT"},
+		{"table", "policy_source", "", "SELECT"},
+		{"table", "access_grant", "", "SELECT"},
+		{"table", "access_grant", "id", "UPDATE"},
 		{"function", "lock_approved_context_grant(uuid,uuid,uuid,text,text,text,bytea)", "", "EXECUTE"},
 		{"schema", "public", "", "USAGE"},
 		{"table", "authority_audit", "", "SELECT"},

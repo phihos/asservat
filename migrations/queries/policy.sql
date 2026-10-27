@@ -13,7 +13,7 @@ UPDATE policy_source SET generation=$3,spec_digest=$4,resource_version=$5,observ
  grant_attachment_id=CASE WHEN authored_grant_ref=$11 THEN grant_attachment_id ELSE NULL END,authored_grant_ref=$11 WHERE root_id=$1 AND policy_uid=$2;
 
 -- name: ActivatePolicyAcceptance :execrows
-UPDATE policy_source SET creator_json=COALESCE(creator_json,$3),active_id=$4 WHERE root_id=$1 AND policy_uid=$2;
+UPDATE policy_source SET creator_json=COALESCE(creator_json,$3),grant_attachment_id=CASE WHEN active_id=$4 THEN grant_attachment_id ELSE NULL END,active_id=$4 WHERE root_id=$1 AND policy_uid=$2;
 
 -- name: FindPolicyNonce :one
 SELECT * FROM policy_acceptance WHERE root_id=$1 AND nonce=$2;

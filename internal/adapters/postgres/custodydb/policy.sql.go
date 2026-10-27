@@ -30,7 +30,7 @@ func (q *Queries) AcknowledgePolicyAcceptance(ctx context.Context, arg Acknowled
 }
 
 const activatePolicyAcceptance = `-- name: ActivatePolicyAcceptance :execrows
-UPDATE policy_source SET creator_json=COALESCE(creator_json,$3),active_id=$4 WHERE root_id=$1 AND policy_uid=$2
+UPDATE policy_source SET creator_json=COALESCE(creator_json,$3),grant_attachment_id=CASE WHEN active_id=$4 THEN grant_attachment_id ELSE NULL END,active_id=$4 WHERE root_id=$1 AND policy_uid=$2
 `
 
 type ActivatePolicyAcceptanceParams struct {

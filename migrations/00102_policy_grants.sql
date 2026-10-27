@@ -116,6 +116,43 @@ ALTER TABLE policy_acceptance ADD CONSTRAINT policy_acceptance_byte_pools CHECK 
  AND observed_bytes_spent BETWEEN 0 AND COALESCE((record#>>'{Authority,Limits,MaxObservedBytes}')::bigint,0)
 );
 
+-- Historical execution/occurrence state cannot prove an exact pre-102 output or
+-- observation reservation. Preserve uncertainty at the ORIGINAL authored maxima.
+-- Include pending/refused/unlinked occurrences, not just successful replies.
+-- Pristine acceptances without any execution or occurrence keep their zero pool.
+UPDATE policy_acceptance SET
+ collected_bytes_spent=COALESCE((record#>>'{Authority,Limits,MaxBytes}')::bigint,0),
+ observed_bytes_spent=COALESCE((record#>>'{Authority,Limits,MaxObservedBytes}')::bigint,0)
+WHERE executions_spent>0 OR id IN(SELECT acceptance_id FROM policy_occurrence);
+
+-- The existing trigger occurrence already spent one accepted execution.
+-- Capture admission freezes its output reservation; no second use journal.
+ALTER TABLE policy_occurrence ADD COLUMN reserved_capture_id uuid UNIQUE REFERENCES context_capture(id);
+ALTER TABLE policy_occurrence ADD COLUMN grant_id uuid;
+ALTER TABLE policy_occurrence ADD COLUMN reserved_bytes bigint NOT NULL DEFAULT 0;
+ALTER TABLE policy_occurrence ADD CONSTRAINT policy_occurrence_grant_scope
+ FOREIGN KEY(root_id,grant_id,acceptance_id,policy_uid) REFERENCES access_grant(root_id,id,policy_acceptance_id,policy_uid);
+ALTER TABLE policy_occurrence ADD CONSTRAINT policy_occurrence_reservation CHECK (
+ (reserved_capture_id IS NULL AND grant_id IS NULL AND reserved_bytes=0)
+ OR (reserved_capture_id IS NOT NULL AND reserved_bytes BETWEEN 1 AND 1099511627776)
+);
+-- +goose StatementBegin
+CREATE FUNCTION protect_policy_occurrence_reservation() RETURNS trigger
+LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+BEGIN
+ IF OLD.reserved_capture_id IS NOT NULL AND
+  (TG_OP='DELETE' OR ROW(NEW.reserved_capture_id,NEW.grant_id,NEW.reserved_bytes)
+   IS DISTINCT FROM ROW(OLD.reserved_capture_id,OLD.grant_id,OLD.reserved_bytes)) THEN
+  RAISE EXCEPTION 'policy capture reservation never changes or refunds' USING ERRCODE='23514';
+ END IF;
+ IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+ RETURN NEW;
+END $$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION protect_policy_occurrence_reservation() FROM PUBLIC;
+CREATE TRIGGER policy_occurrence_reservation_immutable BEFORE UPDATE OR DELETE ON policy_occurrence
+ FOR EACH ROW EXECUTE FUNCTION protect_policy_occurrence_reservation();
+
 ALTER TABLE policy_source ADD COLUMN authored_grant_ref text NOT NULL DEFAULT ''
  CHECK(authored_grant_ref='' OR authored_grant_ref ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$');
 
@@ -289,12 +326,17 @@ DO $$ BEGIN
  IF EXISTS(SELECT 1 FROM access_grant WHERE kind<>'adHocCapture')
   OR EXISTS(SELECT 1 FROM policy_grant_attachment)
   OR EXISTS(SELECT 1 FROM policy_observation_session)
+  OR EXISTS(SELECT 1 FROM policy_occurrence WHERE reserved_capture_id IS NOT NULL)
   OR EXISTS(SELECT 1 FROM policy_acceptance WHERE collected_bytes_spent<>0 OR observed_bytes_spent<>0)
   OR EXISTS(SELECT 1 FROM access_grant GROUP BY root_id,requester_issuer,requester_subject,idempotency_key HAVING count(*)>1) THEN
   RAISE EXCEPTION 'policy grant state prevents rollback' USING ERRCODE='23514';
  END IF;
 END $$;
 -- +goose StatementEnd
+DROP TRIGGER policy_occurrence_reservation_immutable ON policy_occurrence;
+DROP FUNCTION protect_policy_occurrence_reservation();
+ALTER TABLE policy_occurrence DROP CONSTRAINT policy_occurrence_grant_scope, DROP CONSTRAINT policy_occurrence_reservation;
+ALTER TABLE policy_occurrence DROP COLUMN reserved_capture_id, DROP COLUMN grant_id, DROP COLUMN reserved_bytes;
 DROP TABLE policy_observation_session;
 DROP FUNCTION protect_policy_observation_session();
 ALTER TABLE policy_source DROP CONSTRAINT policy_source_exact_grant_attachment;

@@ -179,6 +179,11 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// storage binding and quota/source configuration remain read-only.
 		// ADR-228: a policy executor re-checks its acceptance after locks.
 		read("policy_source", "policy_acceptance")
+		read("policy_occurrence", "policy_grant_attachment", "access_grant")
+		add("policy_source", "UPDATE", "policy_uid") // row lock only
+		add("policy_occurrence", "UPDATE", "reserved_capture_id", "grant_id", "reserved_bytes")
+		add("policy_acceptance", "UPDATE", "collected_bytes_spent")
+		add("access_grant", "UPDATE", "id", "policy_executions_spent", "policy_bytes_spent")
 		read("fleet_current_trust", "permission_stream", "permission_basis", "permission_assignment", "authority_audit", "context_storage_binding", "context_preview", "context_preview_fence", "context_control_pool", "context_control_account", "context_control_charge", "context_capture", "custody_pool", "custody_allocation", "custody_attempt", "custody_copy", "custody_event", "retention_source", "retention_checkpoint", "retention_catchup", "retention_catchup_effect", "retention_decision")
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
@@ -208,12 +213,12 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("access_grant", "UPDATE", "id") // row lock; immutable trigger refuses ID edits
 		add("policy_grant_attachment", "INSERT")
 		add("policy_acceptance", "INSERT")
-		add("policy_acceptance", "UPDATE", "acknowledged_at", "receipt_json", "executions_spent")
+		add("policy_acceptance", "UPDATE", "acknowledged_at", "receipt_json", "executions_spent", "collected_bytes_spent")
 		add("policy_pod_watermark", "INSERT")
 		add("policy_pod_watermark", "DELETE")
 		add("policy_pod_watermark", "UPDATE", "restarts", "last_seen", "detector", "armed")
 		add("policy_occurrence", "INSERT")
-		add("policy_occurrence", "UPDATE", "capture_id", "outcome")
+		add("policy_occurrence", "UPDATE", "capture_id", "outcome", "reserved_capture_id", "grant_id", "reserved_bytes")
 		add("policy_workload_window", "INSERT")
 		add("policy_workload_window", "UPDATE", "tat")
 		add("policy_suppression", "INSERT")
@@ -255,7 +260,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("permission_stream", "UPDATE", "id")
 		add("access_grant", "INSERT")
 		add("access_grant", "UPDATE", "decision", "approver_issuer", "approver_subject", "approver_client", "decision_reason", "decision_acr", "decision_auth_time", "decided_at", "decision_key", "expires_at",
-			"revoked_at", "revoker_issuer", "revoker_subject", "revoker_client", "revoke_key", "revision", "artifacts_spent", "bytes_spent", "operations_spent")
+			"revoked_at", "revoker_issuer", "revoker_subject", "revoker_client", "revoke_key", "revision", "artifacts_spent", "bytes_spent", "operations_spent", "policy_executions_spent", "policy_bytes_spent")
 		add("access_grant_child", "INSERT")
 		add("access_grant_use", "INSERT")
 	case "capture-journal":

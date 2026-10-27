@@ -317,6 +317,10 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 				return err
 			}
 		}
+		policyReservation, err := lockPolicyCaptureReservation(ctx, q, recovery, a, s.recovery.installationID())
+		if err != nil {
+			return err
+		}
 		var auditAccount audit.CaptureAuditAccount
 		var auditUntil time.Time
 		if s.auditMAC != nil {
@@ -430,6 +434,9 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 			if !a.Recovery.Valid(n.Time) || !n.Time.Before(fresh.ValidUntil) || !n.Time.Before(a.Eligibility.ValidUntil) {
 				return value.ErrDenied
 			}
+			if policyReservation != nil && !n.Time.Before(policyReservation.until) {
+				return value.ErrDenied
+			}
 			if managed && !processing.Current(n.Time) {
 				return value.ErrUnavailable
 			}
@@ -520,6 +527,9 @@ func (s *ContextAdmissions) admitContext(ctx context.Context, previewID string, 
 		}
 		row, err := q.InsertContextCapture(ctx, custodydb.InsertContextCaptureParams{ID: id(in.CaptureID), RootID: id(s.root), PreviewID: id(previewID), RequestKey: requestKey(a), SubmissionDigest: a.SubmissionDigest[:], ScopeDigest: a.Plan.ScopeDigest[:], ScopeJson: a.Plan.CanonicalScope, ExpectationJson: expectationJSON, PodPinJson: pinJSON, AttemptID: id(r.Location.AttemptID), PermissionEpoch: stream.Epoch, PermissionSequence: stream.Sequence, IdentityPolicyUid: fresh.IdentityRevision.UID, IdentityPolicyGeneration: fresh.IdentityRevision.Generation, IdentityPolicyDigest: fresh.IdentityRevision.Digest[:], Deadline: ts(in.Deadline), IntentOperationID: id(operationID), ShareInstruction: instruction, RepeatedFromCaptureID: repeatedID, RepeatedFromExpiresAt: repeatedUntil})
 		if err != nil {
+			return err
+		}
+		if err = policyReservation.spend(ctx, q, s.root, in.CaptureID); err != nil {
 			return err
 		}
 		if s.auditMAC != nil {

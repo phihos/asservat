@@ -60,3 +60,25 @@ RETURNING *;
 UPDATE policy_source SET grant_attachment_id=sqlc.arg(attachment_id)::uuid
 WHERE root_id=sqlc.arg(root_id)::uuid AND policy_uid=sqlc.arg(policy_uid)::text AND active_id=sqlc.arg(acceptance_id)::uuid
  AND authored_grant_ref=sqlc.arg(authored_grant_ref)::text AND NOT deleted AND NOT suspended AND fresh_until>clock_timestamp();
+
+
+-- name: LockPolicyCaptureOccurrence :one
+SELECT * FROM policy_occurrence WHERE root_id=$1 AND id=$2 FOR UPDATE;
+
+-- name: ReadPolicyCaptureReservation :one
+SELECT * FROM policy_occurrence WHERE root_id=$1 AND reserved_capture_id=$2;
+
+-- name: ReservePolicyOccurrenceOutput :execrows
+UPDATE policy_occurrence SET reserved_capture_id=$3,grant_id=$4,reserved_bytes=$5
+WHERE root_id=$1 AND id=$2 AND reserved_capture_id IS NULL AND outcome IS NULL;
+
+-- name: SpendPolicyCollectedBytes :execrows
+UPDATE policy_acceptance SET collected_bytes_spent=collected_bytes_spent+sqlc.arg(bytes)::bigint
+WHERE root_id=sqlc.arg(root_id)::uuid AND id=sqlc.arg(id)::uuid
+ AND executions_spent>0 AND collected_bytes_spent<=((record#>>'{Authority,Limits,MaxBytes}')::bigint-sqlc.arg(bytes)::bigint);
+
+-- name: SpendPolicyGrantCapture :execrows
+UPDATE access_grant SET policy_executions_spent=policy_executions_spent+1,policy_bytes_spent=policy_bytes_spent+sqlc.arg(bytes)::bigint
+WHERE root_id=sqlc.arg(root_id)::uuid AND id=sqlc.arg(id)::uuid AND kind='policy'
+ AND decision='approved' AND revoked_at IS NULL AND clock_timestamp()<policy_not_after
+ AND policy_executions_spent<policy_max_executions AND policy_bytes_spent<=policy_max_bytes-sqlc.arg(bytes)::bigint;

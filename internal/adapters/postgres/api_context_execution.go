@@ -603,15 +603,18 @@ func currentRecordingGrant(ctx context.Context, q *custodydb.Queries, row custod
 	if err != nil {
 		return err
 	}
+	intent, err := captureIntent(row)
+	if err != nil {
+		return err
+	}
+	if _, _, policy := authorization.PolicyExecutor(intent.Actor); policy {
+		return currentPolicyCaptureGrant(ctx, q, row, a)
+	}
 	if a.Expectation.Recording == nil || !a.Expectation.Recording.RequireApproval {
 		return nil
 	}
 	if !row.PreviewID.Valid {
 		return value.ErrDenied
-	}
-	intent, err := captureIntent(row)
-	if err != nil {
-		return err
 	}
 	actor := intent.Actor
 	until, err := q.LockApprovedContextGrant(ctx, custodydb.LockApprovedContextGrantParams{RootID: row.RootID, PreviewID: row.PreviewID, CaptureID: row.ID, Issuer: actor.Issuer, Subject: actor.Subject, ClientID: actor.ClientID, ExecutionDigest: row.ScopeDigest})

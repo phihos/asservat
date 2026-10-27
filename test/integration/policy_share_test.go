@@ -158,7 +158,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	}
 	// admit admits one policy-executor capture of the triggering Pod through
 	// the given admission adapter, with every current check.
-	admit := func(admissions *postgres.ContextAdmissions) capture.Accepted {
+	admitInput := func() capture.Admission {
 		t.Helper()
 		refresh()
 		observe()
@@ -200,20 +200,39 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		if err != nil {
 			t.Fatal(err)
 		}
-		a.Plan, a.Eligibility, a.Recovery, a.IdempotencyKey = plan, eligibility, recovery, "policy-occurrence-"+in.CaptureID
+		// Fixture only: model Tick's already-spent original occurrence. Product
+		// Tick performs these under its source lock; admission must not debit
+		// accepted execution a second time.
+		key := custodyID()
+		if _, err = admin.Exec(ctx, `UPDATE policy_acceptance SET executions_spent=executions_spent+1 WHERE id=$1`, active); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = admin.Exec(ctx, `INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts) SELECT $1,$2,$3,$4,$5,$6,$7,executions_spent FROM policy_acceptance WHERE id=$4`, key, root, policyUID, active, pod.ClusterID, pod.WorkloadUID, pod.PodUID); err != nil {
+			t.Fatal(err)
+		}
+		a.Plan, a.Eligibility, a.Recovery, a.IdempotencyKey = plan, eligibility, recovery, key
 		a.Registration.Location.ArtifactID, a.Registration.Location.AttemptID = custodyID(), custodyID()
 		a.Registration.WriteUntil = in.Deadline
 		a.CaseID, a.OccurrenceID = custodyID(), custodyID()
+		return a
+	}
+	admit := func(admissions *postgres.ContextAdmissions) capture.Accepted {
+		t.Helper()
+		a := admitInput()
 		got, err := admissions.AdmitContext(ctx, a)
 		if err != nil {
 			use := authorization.PolicyUse{PolicyUID: authority.PolicyUID, ScopeDigest: authority.ScopeDigest, Target: pod, Purpose: authorization.PolicyIncident}
 			e := (authapp.AutomationEvaluator{Accepted: reader, Current: automation, Now: time.Now}).Eligibility(ctx, use)
-			t.Fatalf("policy capture admission: %v (evaluator %s, eligible until %s, now %s)", err, e.Reason, eligibility.ValidUntil, time.Now())
+			t.Fatalf("policy capture admission: %v (evaluator %s, eligible until %s, now %s)", err, e.Reason, a.Eligibility.ValidUntil, time.Now())
 		}
 		// A replayed admission (a lost reply) returns the same capture and
 		// claims no second slot.
 		if again, err := admissions.AdmitContext(ctx, a); err != nil || again.CaptureID != got.CaptureID {
 			t.Fatal("policy capture replay", again.CaptureID, err)
+		}
+		var executions, output, reservations int64
+		if err := admin.QueryRow(ctx, `SELECT executions_spent,collected_bytes_spent,(SELECT count(*) FROM policy_occurrence WHERE acceptance_id=$1 AND reserved_capture_id IS NOT NULL) FROM policy_acceptance WHERE id=$1`, active).Scan(&executions, &output, &reservations); err != nil || output != reservations*artifact.MaxContextBytes || executions != reservations {
+			t.Fatal("capture/replay doubled execution or changed conservative output", executions, output, reservations, err)
 		}
 		return got
 	}
@@ -296,11 +315,30 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 
 	// Acceptance A of generation 1 shares at most three captures.
 	first := accept(61, 3, time.Now().Add(time.Hour))
+	firstGrant := attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority)
 	hub := captureAdmissions("policy_share_admit_a_")
 	c1, c2 := admit(hub), admit(hub)
 	// A restarted hub (a new admission adapter) continues the stored counter.
 	restarted := captureAdmissions("policy_share_admit_b_")
 	c3, c4 := admit(restarted), admit(restarted)
+	// The same original grant/acceptance pools survive a new adapter and lost
+	// admission replies. A fifth occurrence stays pre-spent, but its refused
+	// capture adds neither grant nor output spend and creates no reservation.
+	refused := admitInput()
+	if _, err := restarted.AdmitContext(ctx, refused); !errors.Is(err, capture.ErrCapacity) {
+		t.Fatal("exhausted attached grant admitted a fifth capture", err)
+	}
+	var grantExecutions, grantBytes, acceptedExecutions, acceptedBytes int64
+	if err := admin.QueryRow(ctx, `SELECT policy_executions_spent,policy_bytes_spent FROM access_grant WHERE id=$1`, firstGrant).Scan(&grantExecutions, &grantBytes); err != nil || grantExecutions != 4 || grantBytes != 4*artifact.MaxContextBytes {
+		t.Fatal("grant replay/restart/refusal refilled or overspent", grantExecutions, grantBytes, err)
+	}
+	if err := admin.QueryRow(ctx, `SELECT executions_spent,collected_bytes_spent FROM policy_acceptance WHERE id=$1`, first).Scan(&acceptedExecutions, &acceptedBytes); err != nil || acceptedExecutions != 5 || acceptedBytes != 4*artifact.MaxContextBytes {
+		t.Fatal("accepted execution double-debit or output refund", acceptedExecutions, acceptedBytes, err)
+	}
+	var reserved bool
+	if err := admin.QueryRow(ctx, `SELECT reserved_capture_id IS NOT NULL FROM policy_occurrence WHERE id=$1`, refused.IdempotencyKey).Scan(&reserved); err != nil || reserved {
+		t.Fatal("refused capture retained a new output reservation", err)
+	}
 	for _, c := range []capture.Accepted{c1, c2, c3} {
 		if w := stored(c); w == nil || w.Acceptance != first {
 			t.Fatal("capture within the limit is unshared", c.CaptureID, w)

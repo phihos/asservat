@@ -651,3 +651,115 @@ journal/conflict, immutable reply and accepted-source A → B → A clearing cas
 with synthetic protected identity/authority inputs. It does not qualify the
 public encrypted-intent boundary, node execution, or cumulative accounting.
 The earlier smoke-4 evidence remains bound only to `56e132a4`.
+
+
+### Occurrence-backed capture accounting batch
+
+Observed gap: current real trigger code spends one accepted execution before
+creating a policy_occurrence, but capture admission spends neither grant output
+nor accepted output. Every recurring collection uses this typical path; repeated
+accepted captures can therefore multiply the finite reviewed output allowance.
+This is an accepted product guarantee, not a speculative extra security check.
+Reuse that existing occurrence for the charge identity: add an immutable reserved
+capture/grant/output tuple, rather than another journal/table or generic budget
+service. Existing context_capture idempotent lookup runs before new charging.
+Require an actual pending occurrence of the exact current acceptance and real
+Pod; its already spent accepted execution is never incremented again. The
+admission transaction atomically creates the capture, increments accepted output
+and, when attached, grant execution/output, then freezes the original tuple.
+All effects roll back together on refusal. Lost commit replies recover the same
+capture; restart, attachment/grant replacement and source control/share edits do
+not alter old tuples or refund output. Unknown started effects stay reserved.
+
+Budget output by the existing native plan ceiling: 4,096 bytes for pod status or
+the frozen recorder's bounded MaxBytes, currently at most 8 MiB. These are retained
+native output ceilings, not pre-filter observation bytes. Grant/acceptance original
+expiry, current source/delegation/denies/recovery and concrete Pod remain binding.
+A policy requiring review needs an explicit exact current attachment; never find
+the newest grant or borrow the human requester. Unreviewed context policies still
+consume their accepted aggregate output. Ongoing packet/syscall observation
+credit/session/fence and all-before-filter accounting are separate pending work.
+
+Numeric cost: zero new services, tables, credentials, remote provider calls or
+connections, watches, background tasks or configuration. SQL Query/Exec calls
+are database round trips. Each new policy capture adds a source lock, accepted
+read and occurrence lock; an attachment adds receipt and grant reads. Existing
+clock queries bound those reads. Charging adds one accepted output UPDATE, one
+occurrence UPDATE and at most one grant UPDATE. Final exact round-trip counts
+will include database-time reads. No per-payload/chunk accounting. Existing root lock
+serializes source/control/revocation; lock source then occurrence/optional grant
+before storage/evidence locks. Exact counts are reviewed again against the final
+code. No global grant/occurrence ceiling is added. Down refuses a reserved tuple
+or nonzero accepted output, never deletes rows or refunds to force rollback.
+Public activation attachment/audit and ongoing-source integration remain explicit
+requirements; SQL admission does not stand in for those workflows.
+
+
+Composing a changed accepted scope also clears its old attachment in the existing
+ActivatePolicyAcceptance UPDATE; unchanged accepted scope retains the pointer.
+A newly accepted collection scope cannot inherit an old grant's approval. This
+adds the pointer column to the existing acceptor UPDATE privilege and fixture;
+it adds no request. The context-admit SQL duty gains reads of the occurrence,
+attachment and complete grant metadata, source UPDATE(policy_uid) solely for row
+locking, occurrence UPDATE of the three reservation fields, accepted-output
+UPDATE and grant execution/output UPDATE. The ordinary installed hub union
+already owns those source/grant reads; standalone capture-admit now has that
+additional SQL access. Existing immutable/monotonic triggers still constrain
+all writes. Explicit current eligibility/recovery/expiry checks remain mandatory.
+
+
+Independent review found an upgrade refill in the new counters' DEFAULT 0:
+legacy trigger executions/occurrences may already have collected or possibly
+started work. Up now conservatively fills both pools to the ORIGINAL authored
+maxima whenever executions_spent is positive OR any occurrence exists, including
+pending/refused/unlinked NULL capture replies. This is unknown conservative
+spend, never a measured byte count. Pristine scopes with neither signal remain
+zero and usable. Cost is one set-based UPDATE with an acceptance scan and
+occurrence membership set, O(acceptances + occurrences), during the existing
+migration transaction; no runtime work, parser, provider lookup or new state.
+Exact backfill from retained artifacts cannot establish all uncertain effects;
+adding historical reconstruction machinery has weaker value than this fence.
+Previously spent legacy scopes intentionally cannot start further collection.
+Restoring capacity requires explicit reauthorization/renewal under a supported
+lifecycle; same-intent recurring renewal is not implemented here, and cosmetic
+scope edits are not a reset mechanism. Down refuses these preserved nonzero
+pools rather than discard uncertainty. The schema-101 migration test now covers
+spent executions, unknown open occurrences and pristine scope with distinct SQL
+fixtures; it does not claim recovered exact historical output evidence.
+
+
+Mode check: ADR-249 items 2 and specs/authorization.md REQ-AUT-006 distinguish
+payload-sensitive rawBytePredicate observation from the administrator's optional
+recordingApprovalRequired on ordinary sanitized networkHeaders. The latter
+requires review but carries no sensitive observationLimits. Reuse the existing
+AcceptableRecorder/RecordingForContext gate: any raw predicate with observation
+limits stays RecorderUnavailable, and unsupported raw/HTTP/syscall argument
+profiles remain unsupported. No new blanket recorder refusal is introduced.
+This batch reserves output for the bounded on-trigger packet capture supported
+by that existing gate. It does not establish ongoing source arming/session credit;
+zero observed-byte authority must not be described as permitting a continuing
+source. Genuine ongoing packet/syscall policy support remains planned.
+
+Final accounting SQL cost: the new capture-only lock helper adds five database
+round trips without an attached grant (source lock, two database clocks, accepted
+read and exact occurrence lock), or eight with one (receipt, grant lock and one
+more clock). Charging adds two UPDATEs, or three with grant spend. Final checks
+reuse existing database clock results. Each later original-policy effect check
+adds three reads/clocks without a grant or five with one. No work occurs per
+packet/payload/chunk. Those original grant checks prevent replacing an attachment
+from transferring an old possibly started capture to new approval or spend.
+The existing api-execution SQL duty gains source/occurrence/grant SELECT and
+UPDATE(access_grant.id) for row locking only; no grant counter/decision writes.
+The hub union already owns those reads, but standalone purpose grants are
+explicitly expanded and their exact-grant test updated.
+
+
+Accounting source verification before the batched real-service run: integration
+package compiles; targeted domain/application authorization, capture and PostgreSQL
+race checks pass (1.014s/1.254s/1.186s/1.079s respectively), sql-check passes,
+spec-check passes 13,284 assertions, architecture-check 1,326 and Go architecture
+67 packages/393 imports. Real SQL regression scope is the revised 101→102
+historical uncertainty/pristine migration case, the existing request/settings/
+attachment case and actual policy-executor capture admission with a four-capture
+attached grant, replay/restart and refused fifth occurrence. These new accounting
+cases are pending; no executed RED/GREEN claim is made for them yet.

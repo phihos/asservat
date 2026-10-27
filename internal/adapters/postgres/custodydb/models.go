@@ -2116,18 +2116,21 @@ type PolicyObservationSession struct {
 }
 
 type PolicyOccurrence struct {
-	ID           pgtype.UUID
-	RootID       pgtype.UUID
-	PolicyUid    string
-	AcceptanceID pgtype.UUID
-	ClusterID    pgtype.UUID
-	WorkloadUid  string
-	PodUid       string
-	Restarts     int64
-	CreatedAt    pgtype.Timestamptz
-	CaptureID    pgtype.UUID
-	Outcome      pgtype.Text
-	Detector     string
+	ID                pgtype.UUID
+	RootID            pgtype.UUID
+	PolicyUid         string
+	AcceptanceID      pgtype.UUID
+	ClusterID         pgtype.UUID
+	WorkloadUid       string
+	PodUid            string
+	Restarts          int64
+	CreatedAt         pgtype.Timestamptz
+	CaptureID         pgtype.UUID
+	Outcome           pgtype.Text
+	Detector          string
+	ReservedCaptureID pgtype.UUID
+	GrantID           pgtype.UUID
+	ReservedBytes     int64
 }
 
 type PolicyPodWatermark struct {

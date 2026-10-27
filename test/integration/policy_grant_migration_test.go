@@ -135,7 +135,56 @@ func TestCustodyPolicyGrantMigrationWithRealPostgres(t *testing.T) {
 	if err = scratch.QueryRow(ctx, `SELECT obj_description('public.goose_db_version'::regclass,'pg_class')`).Scan(&floor); err != nil || floor != "asservat:oldest-binary-schema=81" {
 		t.Fatal("compatible Down did not restore original floor", floor, err)
 	}
+	// Actual schema-101 historical SQL shapes, not product-authority fixtures:
+	// one spent execution, one unknown/unlinked occurrence, one pristine scope.
+	// There is deliberately no claim of an exact measured historical byte count.
+	legacyRoot := custodyID()
+	if _, err = scratch.Exec(ctx, `INSERT INTO permission_stream(id,epoch,trust_digest,lease_until) VALUES($1,$2,sha256('legacy'::bytea),clock_timestamp()+interval '1 hour')`, legacyRoot, custodyID()); err != nil {
+		t.Fatal(err)
+	}
+	legacy := make([]string, 3)
+	for i := range legacy {
+		legacy[i] = custodyID()
+		policy := custodyID()
+		if _, err = scratch.Exec(ctx, `INSERT INTO policy_source(root_id,policy_uid,installation_id,cluster_id,namespace_uid,name,generation,spec_digest,resource_version,observed_at,fresh_until,deleted,suspended,collection_digest) SELECT $1,$2,$3,$4,'namespace','legacy',1,sha256('scope'::bytea),'1',n,n+interval '5 seconds',false,false,sha256('collection'::bytea) FROM(SELECT clock_timestamp() n)t`, legacyRoot, policy, custodyID(), custodyID()); err != nil {
+			t.Fatal(err)
+		}
+		spent := int64(0)
+		if i == 0 {
+			spent = 1
+		}
+		if _, err = scratch.Exec(ctx, `INSERT INTO policy_acceptance(id,root_id,policy_uid,generation,nonce,scope_digest,request_digest,record_digest,record,accepted_at,executions_spent) VALUES($1,$2,$3,1,$4,sha256('scope'::bytea),sha256('request'::bytea),sha256('record'::bytea),'{"Authority":{"Limits":{"MaxExecutions":100,"MaxBytes":4096,"MaxObservedBytes":8192}}}'::jsonb,clock_timestamp(),$5)`, legacy[i], legacyRoot, policy, custodyID(), spent); err != nil {
+			t.Fatal(err)
+		}
+		if i == 1 {
+			if _, err = scratch.Exec(ctx, `INSERT INTO policy_occurrence(id,root_id,policy_uid,acceptance_id,cluster_id,workload_uid,pod_uid,restarts) VALUES($1,$2,$3,$4,$5,'workload','pod',1)`, custodyID(), legacyRoot, policy, legacy[i], custodyID()); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
 	if _, err = provider.UpTo(ctx, 102); err != nil {
 		t.Fatal("schema 102 reapply", err)
+	}
+	for i, id := range legacy {
+		var collected, observed int64
+		if err = scratch.QueryRow(ctx, `SELECT collected_bytes_spent,observed_bytes_spent FROM policy_acceptance WHERE id=$1`, id).Scan(&collected, &observed); err != nil {
+			t.Fatal(err)
+		}
+		wantCollected, wantObserved := int64(4096), int64(8192)
+		if i == 2 {
+			wantCollected, wantObserved = 0, 0
+		}
+		if collected != wantCollected || observed != wantObserved {
+			t.Fatal("upgrade replenished unknown historical pools or fenced pristine scope", i, collected, observed)
+		}
+		if i < 2 {
+			result, err := scratch.Exec(ctx, `UPDATE policy_acceptance SET collected_bytes_spent=collected_bytes_spent+1 WHERE id=$1 AND collected_bytes_spent<4096`, id)
+			if err != nil || result.RowsAffected() != 0 {
+				t.Fatal("historical scope gained additional output after upgrade", i, err)
+			}
+		}
+	}
+	if _, err = provider.Down(ctx); err == nil {
+		t.Fatal("rollback discarded conservative historical spend")
 	}
 }
