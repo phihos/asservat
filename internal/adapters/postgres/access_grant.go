@@ -28,6 +28,8 @@ type AccessGrants struct {
 }
 
 var _ authapp.GrantStore = (*AccessGrants)(nil)
+var _ authapp.PolicyGrantRequestReader = (*AccessGrants)(nil)
+var _ authapp.PolicyApprovalSettingsReader = (*AccessGrants)(nil)
 
 func NewAccessGrants(ctx context.Context, pool *pgxpool.Pool, root string, recovery *RecoveryTransactionGuard) (*AccessGrants, error) {
 	if !authorization.UUID(root) || recovery == nil || recovery.root != root {
@@ -73,7 +75,7 @@ func grantFromRow(r custodydb.AccessGrant) (authorization.Grant, error) {
 		return authorization.Grant{}, authapp.ErrGrantUnavailable
 	}
 	g := authorization.Grant{ID: uid(r.ID), RootID: uid(r.RootID), Kind: r.Kind, PreviewID: uid(r.PreviewID), CaptureID: uid(r.CaptureID),
-		Target:    authorization.Target{ClusterID: uid(r.ClusterID), NamespaceUID: r.NamespaceUid, WorkloadUID: r.WorkloadUid, PodUID: r.PodUid},
+		Target:    authorization.Target{ClusterID: uid(r.ClusterID), NamespaceUID: r.NamespaceUid, WorkloadUID: r.WorkloadUid, PodUID: r.PodUid.String},
 		DataClass: r.DataClass, Scope: bytes.Clone(r.Scope), Review: bytes.Clone(r.Review),
 		Requester:   identity.Principal{Issuer: r.RequesterIssuer, Subject: r.RequesterSubject, ClientID: r.RequesterClient, Kind: identity.Human},
 		RequestedAt: r.RequestedAt.Time, ReviewUntil: r.ReviewUntil.Time, Lifetime: time.Duration(r.LifetimeSeconds) * time.Second,
@@ -81,6 +83,22 @@ func grantFromRow(r custodydb.AccessGrant) (authorization.Grant, error) {
 		Spent: authorization.GrantSpend{Artifacts: int(r.ArtifactsSpent), Bytes: r.BytesSpent, Operations: r.OperationsSpent}}
 	copy(g.ExecutionDigest[:], r.ExecutionDigest)
 	copy(g.ReviewDigest[:], r.ReviewDigest)
+	if r.Kind == authorization.GrantPolicy {
+		var scope authorization.PolicyGrantScope
+		if strictJSON(string(r.PolicyScope), &scope) != nil || !r.PolicyUid.Valid || r.PolicyUid.String != scope.Authority.PolicyUID || !r.PolicyAcceptanceID.Valid ||
+			r.PreviewID.Valid || r.CaptureID.Valid || r.PodUid.Valid ||
+			g.Target.ClusterID != scope.Authority.ClusterID || g.Target.NamespaceUID != scope.Authority.NamespaceUID || g.Target.WorkloadUID != scope.Authority.WorkloadUID ||
+			r.RequestOperation != "requestPolicyGrant" || !r.PolicyMaxExecutions.Valid || r.PolicyMaxExecutions.Int64 != scope.Limits.MaxExecutions ||
+			!r.PolicyMaxBytes.Valid || r.PolicyMaxBytes.Int64 != scope.Limits.MaxBytes || !r.PolicyMaxObservedBytes.Valid || r.PolicyMaxObservedBytes.Int64 != scope.Limits.MaxObservedBytes {
+			return authorization.Grant{}, authapp.ErrGrantUnavailable
+		}
+		g.Target = authorization.Target{}
+		g.Policy, g.PolicyNotAfter = &scope, optionalTime(r.PolicyNotAfter)
+		g.Requester.Kind = identity.Kind(r.RequesterKind)
+		g.PolicySpend = authorization.PolicyGrantSpend{Executions: r.PolicyExecutionsSpent, CollectedBytes: r.PolicyBytesSpent, ObservedBytes: r.PolicyObservedBytesSpent}
+	} else if r.Kind != authorization.GrantAdHocCapture || r.RequesterKind != string(identity.Human) || r.RequestOperation != "requestGrant" {
+		return authorization.Grant{}, authapp.ErrGrantUnavailable
+	}
 	for _, x := range reasons {
 		g.Reasons = append(g.Reasons, authorization.SensitiveReason{ActionID: x.ActionID, Code: x.Code})
 	}
@@ -132,6 +150,9 @@ func (s *AccessGrants) RequestGrant(ctx context.Context, r authapp.StoredGrantRe
 	g := r.Grant
 	if s == nil || ctx == nil || ctx.Err() != nil || g.RootID != s.root || g.Decision != nil || !g.RevokedAt.IsZero() || !identity.Text(r.IdempotencyKey, 128) || r.RequestDigest == (artifact.Digest{}) {
 		return zero, false, authorization.ErrGrantInvalid
+	}
+	if g.Kind == authorization.GrantPolicy {
+		return s.requestPolicyGrant(ctx, r, recovery)
 	}
 	reasons := make([]grantReasonWire, 0, len(g.Reasons))
 	for _, x := range g.Reasons {
@@ -280,7 +301,7 @@ func (s *AccessGrants) RequestedGrants(ctx context.Context, requester identity.P
 		return nil, authorization.ErrGrantInvalid
 	}
 	return s.list(ctx, func(q *custodydb.Queries) ([]custodydb.AccessGrant, error) {
-		return q.ListRequestedGrants(ctx, custodydb.ListRequestedGrantsParams{RootID: id(s.root), RequesterIssuer: requester.Issuer, RequesterSubject: requester.Subject, RowLimit: int32(limit)})
+		return q.ListRequestedGrants(ctx, custodydb.ListRequestedGrantsParams{RootID: id(s.root), RequesterIssuer: requester.Issuer, RequesterSubject: requester.Subject, RequesterKind: string(requester.Kind), RequesterClient: requester.ClientID, RowLimit: int32(limit)})
 	})
 }
 

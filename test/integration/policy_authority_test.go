@@ -8,6 +8,7 @@ import (
 	"crypto/cipher"
 	"crypto/ed25519"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"net/url"
@@ -226,6 +227,19 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		}
 		s.batch.ExpectedSequence = r.Sequence
 	}
+
+	t.Run("policy-grants-original-request-periods-and-client-journal", func(t *testing.T) {
+		s := newSetup(t)
+		// Real SQL/audit acceptance, with a synthetic exact recorder scope. No
+		// collector, public review or execution authority is supplied by this test.
+		scope := []byte(`{"format":"synthetic-policy-recorder/v1"}`)
+		s.input.Authority.ScopeDigest = sha256.Sum256(scope)
+		s.input.Submission.ScopeDigest = s.input.Authority.ScopeDigest
+		s.input.Verification = syntheticSubmissionCheck(s.input, clock())
+		r := accept(t, s)
+		flush(t, s)
+		qualifyPolicyGrantPersistence(t, ctx, admin, poolFor, s.input.RootID, s.input.Authority, r.Record.ID, scope, s.input.Recovery)
+	})
 
 	t.Run("audit-gated-durable-and-no-personal-session-dependency", func(t *testing.T) {
 		s := newSetup(t)

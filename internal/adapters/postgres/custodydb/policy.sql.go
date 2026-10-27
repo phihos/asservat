@@ -54,7 +54,7 @@ func (q *Queries) ActivatePolicyAcceptance(ctx context.Context, arg ActivatePoli
 }
 
 const findPolicyNonce = `-- name: FindPolicyNonce :one
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND nonce=$2
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key, collected_bytes_spent, observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND nonce=$2
 `
 
 type FindPolicyNonceParams struct {
@@ -84,6 +84,8 @@ func (q *Queries) FindPolicyNonce(ctx context.Context, arg FindPolicyNonceParams
 		&i.SharingRevokeKey,
 		&i.SharingStoppedAt,
 		&i.SharingStopKey,
+		&i.CollectedBytesSpent,
+		&i.ObservedBytesSpent,
 	)
 	return i, err
 }
@@ -107,7 +109,7 @@ func (q *Queries) FindPolicyScope(ctx context.Context, arg FindPolicyScopeParams
 
 const insertPolicyAcceptance = `-- name: InsertPolicyAcceptance :one
 INSERT INTO policy_acceptance(id,root_id,policy_uid,generation,nonce,request_digest,record_digest,record,accepted_at,scope_digest)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key, collected_bytes_spent, observed_bytes_spent
 `
 
 type InsertPolicyAcceptanceParams struct {
@@ -156,13 +158,15 @@ func (q *Queries) InsertPolicyAcceptance(ctx context.Context, arg InsertPolicyAc
 		&i.SharingRevokeKey,
 		&i.SharingStoppedAt,
 		&i.SharingStopKey,
+		&i.CollectedBytesSpent,
+		&i.ObservedBytesSpent,
 	)
 	return i, err
 }
 
 const insertPolicySource = `-- name: InsertPolicySource :exec
-INSERT INTO policy_source(root_id,policy_uid,installation_id,cluster_id,namespace_uid,name,generation,spec_digest,resource_version,observed_at,fresh_until,deleted,suspended,collection_digest)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT(root_id,policy_uid) DO NOTHING
+INSERT INTO policy_source(root_id,policy_uid,installation_id,cluster_id,namespace_uid,name,generation,spec_digest,resource_version,observed_at,fresh_until,deleted,suspended,collection_digest,authored_grant_ref)
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT(root_id,policy_uid) DO NOTHING
 `
 
 type InsertPolicySourceParams struct {
@@ -180,6 +184,7 @@ type InsertPolicySourceParams struct {
 	Deleted          bool
 	Suspended        bool
 	CollectionDigest []byte
+	AuthoredGrantRef string
 }
 
 func (q *Queries) InsertPolicySource(ctx context.Context, arg InsertPolicySourceParams) error {
@@ -198,12 +203,13 @@ func (q *Queries) InsertPolicySource(ctx context.Context, arg InsertPolicySource
 		arg.Deleted,
 		arg.Suspended,
 		arg.CollectionDigest,
+		arg.AuthoredGrantRef,
 	)
 	return err
 }
 
 const lockPolicyAcceptance = `-- name: LockPolicyAcceptance :one
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND id=$2 FOR UPDATE
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key, collected_bytes_spent, observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND id=$2 FOR UPDATE
 `
 
 type LockPolicyAcceptanceParams struct {
@@ -233,12 +239,14 @@ func (q *Queries) LockPolicyAcceptance(ctx context.Context, arg LockPolicyAccept
 		&i.SharingRevokeKey,
 		&i.SharingStoppedAt,
 		&i.SharingStopKey,
+		&i.CollectedBytesSpent,
+		&i.ObservedBytesSpent,
 	)
 	return i, err
 }
 
 const lockPolicySource = `-- name: LockPolicySource :one
-SELECT root_id, policy_uid, installation_id, cluster_id, namespace_uid, name, generation, spec_digest, resource_version, observed_at, fresh_until, deleted, suspended, collection_digest, intent_version, active_id, creator_json FROM policy_source WHERE root_id=$1 AND policy_uid=$2 FOR UPDATE
+SELECT root_id, policy_uid, installation_id, cluster_id, namespace_uid, name, generation, spec_digest, resource_version, observed_at, fresh_until, deleted, suspended, collection_digest, intent_version, active_id, creator_json, authored_grant_ref, grant_attachment_id FROM policy_source WHERE root_id=$1 AND policy_uid=$2 FOR UPDATE
 `
 
 type LockPolicySourceParams struct {
@@ -267,6 +275,8 @@ func (q *Queries) LockPolicySource(ctx context.Context, arg LockPolicySourcePara
 		&i.IntentVersion,
 		&i.ActiveID,
 		&i.CreatorJson,
+		&i.AuthoredGrantRef,
+		&i.GrantAttachmentID,
 	)
 	return i, err
 }
@@ -283,7 +293,7 @@ func (q *Queries) NewPolicyAcceptanceID(ctx context.Context) (pgtype.UUID, error
 }
 
 const pendingPolicyAcceptances = `-- name: PendingPolicyAcceptances :many
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND acknowledged_at IS NULL ORDER BY accepted_at,id LIMIT 2
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key, collected_bytes_spent, observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND acknowledged_at IS NULL ORDER BY accepted_at,id LIMIT 2
 `
 
 func (q *Queries) PendingPolicyAcceptances(ctx context.Context, rootID pgtype.UUID) ([]PolicyAcceptance, error) {
@@ -314,6 +324,8 @@ func (q *Queries) PendingPolicyAcceptances(ctx context.Context, rootID pgtype.UU
 			&i.SharingRevokeKey,
 			&i.SharingStoppedAt,
 			&i.SharingStopKey,
+			&i.CollectedBytesSpent,
+			&i.ObservedBytesSpent,
 		); err != nil {
 			return nil, err
 		}
@@ -326,7 +338,7 @@ func (q *Queries) PendingPolicyAcceptances(ctx context.Context, rootID pgtype.UU
 }
 
 const readPolicyAcceptance = `-- name: ReadPolicyAcceptance :one
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND id=$2
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key, collected_bytes_spent, observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND id=$2
 `
 
 type ReadPolicyAcceptanceParams struct {
@@ -356,12 +368,14 @@ func (q *Queries) ReadPolicyAcceptance(ctx context.Context, arg ReadPolicyAccept
 		&i.SharingRevokeKey,
 		&i.SharingStoppedAt,
 		&i.SharingStopKey,
+		&i.CollectedBytesSpent,
+		&i.ObservedBytesSpent,
 	)
 	return i, err
 }
 
 const sharePolicySource = `-- name: SharePolicySource :one
-SELECT root_id, policy_uid, installation_id, cluster_id, namespace_uid, name, generation, spec_digest, resource_version, observed_at, fresh_until, deleted, suspended, collection_digest, intent_version, active_id, creator_json FROM policy_source WHERE root_id=$1 AND policy_uid=$2 FOR SHARE
+SELECT root_id, policy_uid, installation_id, cluster_id, namespace_uid, name, generation, spec_digest, resource_version, observed_at, fresh_until, deleted, suspended, collection_digest, intent_version, active_id, creator_json, authored_grant_ref, grant_attachment_id FROM policy_source WHERE root_id=$1 AND policy_uid=$2 FOR SHARE
 `
 
 type SharePolicySourceParams struct {
@@ -390,12 +404,14 @@ func (q *Queries) SharePolicySource(ctx context.Context, arg SharePolicySourcePa
 		&i.IntentVersion,
 		&i.ActiveID,
 		&i.CreatorJson,
+		&i.AuthoredGrantRef,
+		&i.GrantAttachmentID,
 	)
 	return i, err
 }
 
 const updatePolicySource = `-- name: UpdatePolicySource :exec
-UPDATE policy_source SET generation=$3,spec_digest=$4,resource_version=$5,observed_at=$6,fresh_until=$7,deleted=$8,suspended=$9,intent_version=CASE WHEN collection_digest=$10 AND generation>=($3::bigint-1) THEN intent_version ELSE intent_version+1 END,collection_digest=$10 WHERE root_id=$1 AND policy_uid=$2
+UPDATE policy_source SET generation=$3,spec_digest=$4,resource_version=$5,observed_at=$6,fresh_until=$7,deleted=$8,suspended=$9,intent_version=CASE WHEN collection_digest=$10 AND generation>=($3::bigint-1) THEN intent_version ELSE intent_version+1 END,collection_digest=$10,authored_grant_ref=$11 WHERE root_id=$1 AND policy_uid=$2
 `
 
 type UpdatePolicySourceParams struct {
@@ -409,6 +425,7 @@ type UpdatePolicySourceParams struct {
 	Deleted          bool
 	Suspended        bool
 	CollectionDigest []byte
+	AuthoredGrantRef string
 }
 
 func (q *Queries) UpdatePolicySource(ctx context.Context, arg UpdatePolicySourceParams) error {
@@ -423,6 +440,7 @@ func (q *Queries) UpdatePolicySource(ctx context.Context, arg UpdatePolicySource
 		arg.Deleted,
 		arg.Suspended,
 		arg.CollectionDigest,
+		arg.AuthoredGrantRef,
 	)
 	return err
 }

@@ -444,7 +444,9 @@ Packet funding remains 00100, encrypted history 00101, policy grants 00102.
 Later 100 diagnostics are intentionally excluded until their canonical result.
 The one code conflict preserved both current policy metadata rights and ad hoc
 continuation hints; policy grants explicitly offer no personal resume/resolve.
-No SQL 00102 file or runtime/public/node wiring exists at this checkpoint.
+At that merge checkpoint no SQL 00102 file or runtime/public/node wiring existed.
+The source-only SQL draft below is now being implemented; runtime/public/node
+wiring remains absent.
 
 1. Extend the existing AccessGrant row with a closed discriminated policy shape.
    Preserve legacy ad hoc required preview/capture/Pod IDs, human requester,
@@ -526,3 +528,27 @@ revoke must be able to inspect the attached grant's finite state/expiry after th
 original requester leaves. Existing nonrequester Get is approver-only; decide a
 minimal current-manager view when composing those controls, without a grant-head
 service or broader collection/disclosure authority. This does not block SQL scope.
+
+
+### SQL draft smoke checkpoint
+
+The schema-102 draft now has conditional workload-grant rows, original full-actor
+request keys, accepted-settings storage and atomic lower-period clamping. It adds
+immutable explicit attachment receipts and cumulative session/fence/sequence row
+shapes, but their accounting/activation composition is not implemented or qualified.
+The raw-predicate refusal remains. The targeted first owned PostgreSQL/S3 smoke
+checks actual migration syntax, historical ad hoc Up/Down, incompatible-survivor
+refusal and the request/settings component under compiled SQL roles; it is not
+final schema-102 or public/executor/collector qualification.
+
+No new credentials, Kubernetes permissions, network requests, watchers or timers
+are added by these SQL adapters. The existing permission-accept credential gains
+settings read/write, root-lock UPDATE(id), five grant metadata SELECT columns and
+UPDATE(policy_not_after,expires_at), with the trigger limiting that update to a
+monotonic overlay. It cannot inspect review/scope payloads, decide or refill spend.
+The existing hub grant duty reads the accepted source/settings under its root lock.
+Original observation endpoints are rounded down to PostgreSQL microseconds,
+never extended. The compatibility floor is 102; a compatible Down restores 81,
+while policy/session/attachment survivors refuse rollback without deletion/refund.
+The simple set-based clamp retains the earlier measured complexity decision; no
+revision history or new global row ceiling is introduced.

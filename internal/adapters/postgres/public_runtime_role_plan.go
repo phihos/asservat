@@ -203,7 +203,7 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 		add("policy_source", "INSERT")
-		add("policy_source", "UPDATE", "generation", "spec_digest", "resource_version", "observed_at", "fresh_until", "deleted", "suspended", "intent_version", "collection_digest", "creator_json", "active_id")
+		add("policy_source", "UPDATE", "generation", "spec_digest", "resource_version", "observed_at", "fresh_until", "deleted", "suspended", "intent_version", "collection_digest", "creator_json", "active_id", "authored_grant_ref")
 		add("policy_acceptance", "INSERT")
 		add("policy_acceptance", "UPDATE", "acknowledged_at", "receipt_json", "executions_spent")
 		add("policy_pod_watermark", "INSERT")
@@ -246,6 +246,10 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		// decision, one revocation and monotonic pool spend may change a row
 		// (its trigger enforces it); children and uses are append-only.
 		read("access_grant", "access_grant_child", "access_grant_use")
+		// Policy requests reuse the current accepted-policy read and settings
+		// projection, serialized by the existing permission root.
+		read("permission_stream", "policy_source", "policy_grant_settings")
+		add("permission_stream", "UPDATE", "id")
 		add("access_grant", "INSERT")
 		add("access_grant", "UPDATE", "decision", "approver_issuer", "approver_subject", "approver_client", "decision_reason", "decision_acr", "decision_auth_time", "decided_at", "decision_key", "expires_at",
 			"revoked_at", "revoker_issuer", "revoker_subject", "revoker_client", "revoke_key", "revision", "artifacts_spent", "bytes_spent", "operations_spent")
@@ -289,6 +293,15 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		read("permission_stream", "permission_basis", "permission_assignment", "permission_acceptance", "authority_audit")
 		add("permission_stream", "INSERT")
 		add("permission_stream", "UPDATE", "epoch", "sequence", "initial_audit_id", "trust_digest", "projection_digest", "lease_until", "observed_at", "fresh_until", "suspended")
+		// The joined protected-settings observer uses this existing credential.
+		// Grant updates can only shorten effective periods; its trigger forbids
+		// changing scope, decisions, revision or spend in the same statement.
+		add("permission_stream", "UPDATE", "id")
+		read("policy_grant_settings")
+		add("access_grant", "SELECT", "root_id", "kind", "decision", "requested_at", "policy_not_after")
+		add("policy_grant_settings", "INSERT")
+		add("policy_grant_settings", "UPDATE", "issuer", "source_uid", "source_generation", "source_digest", "observed_at", "fresh_until", "default_age_seconds", "max_age_seconds", "renewal_notice_seconds")
+		add("access_grant", "UPDATE", "policy_not_after", "expires_at")
 		add("permission_acceptance", "INSERT")
 		add("permission_basis", "INSERT")
 		add("permission_basis", "UPDATE", "generation", "resource_version", "spec_digest", "scope_digest", "workload_uids", "effect", "not_after", "seen_sequence", "observation_version", "automation_json", "automation_audit_id")

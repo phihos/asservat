@@ -214,7 +214,7 @@ func (q *Queries) InsertPolicyOccurrence(ctx context.Context, arg InsertPolicyOc
 }
 
 const latestPolicyAcceptance = `-- name: LatestPolicyAcceptance :one
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND policy_uid=$2 ORDER BY accepted_at DESC, id DESC LIMIT 1
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key, collected_bytes_spent, observed_bytes_spent FROM policy_acceptance WHERE root_id=$1 AND policy_uid=$2 ORDER BY accepted_at DESC, id DESC LIMIT 1
 `
 
 type LatestPolicyAcceptanceParams struct {
@@ -244,6 +244,8 @@ func (q *Queries) LatestPolicyAcceptance(ctx context.Context, arg LatestPolicyAc
 		&i.SharingRevokeKey,
 		&i.SharingStoppedAt,
 		&i.SharingStopKey,
+		&i.CollectedBytesSpent,
+		&i.ObservedBytesSpent,
 	)
 	return i, err
 }
@@ -492,7 +494,7 @@ func (q *Queries) ReadPolicyOccurrence(ctx context.Context, arg ReadPolicyOccurr
 
 const readPolicySourceRow = `-- name: ReadPolicySourceRow :one
 
-SELECT root_id, policy_uid, installation_id, cluster_id, namespace_uid, name, generation, spec_digest, resource_version, observed_at, fresh_until, deleted, suspended, collection_digest, intent_version, active_id, creator_json FROM policy_source WHERE root_id=$1 AND policy_uid=$2
+SELECT root_id, policy_uid, installation_id, cluster_id, namespace_uid, name, generation, spec_digest, resource_version, observed_at, fresh_until, deleted, suspended, collection_digest, intent_version, active_id, creator_json, authored_grant_ref, grant_attachment_id FROM policy_source WHERE root_id=$1 AND policy_uid=$2
 `
 
 type ReadPolicySourceRowParams struct {
@@ -522,6 +524,8 @@ func (q *Queries) ReadPolicySourceRow(ctx context.Context, arg ReadPolicySourceR
 		&i.IntentVersion,
 		&i.ActiveID,
 		&i.CreatorJson,
+		&i.AuthoredGrantRef,
+		&i.GrantAttachmentID,
 	)
 	return i, err
 }

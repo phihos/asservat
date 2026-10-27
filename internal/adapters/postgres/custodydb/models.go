@@ -9,54 +9,67 @@ import (
 )
 
 type AccessGrant struct {
-	ID                 pgtype.UUID
-	RootID             pgtype.UUID
-	Kind               string
-	PreviewID          pgtype.UUID
-	CaptureID          pgtype.UUID
-	ClusterID          pgtype.UUID
-	NamespaceUid       string
-	WorkloadUid        string
-	PodUid             string
-	ExecutionDigest    []byte
-	ResultAccessDigest []byte
-	ReviewDigest       []byte
-	DataClass          string
-	Reasons            []byte
-	Review             []byte
-	Scope              []byte
-	RequesterIssuer    string
-	RequesterSubject   string
-	RequesterClient    string
-	LifetimeSeconds    int32
-	ResultAccess       []byte
-	NotAfter           pgtype.Timestamptz
-	MaxArtifacts       int32
-	MaxBytes           int64
-	MaxOperations      int64
-	ArtifactsSpent     int32
-	BytesSpent         int64
-	OperationsSpent    int64
-	IdempotencyKey     string
-	RequestDigest      []byte
-	RequestedAt        pgtype.Timestamptz
-	ReviewUntil        pgtype.Timestamptz
-	Decision           pgtype.Text
-	ApproverIssuer     pgtype.Text
-	ApproverSubject    pgtype.Text
-	ApproverClient     pgtype.Text
-	DecisionReason     pgtype.Text
-	DecisionAcr        pgtype.Text
-	DecisionAuthTime   pgtype.Timestamptz
-	DecidedAt          pgtype.Timestamptz
-	DecisionKey        pgtype.Text
-	ExpiresAt          pgtype.Timestamptz
-	RevokedAt          pgtype.Timestamptz
-	RevokerIssuer      pgtype.Text
-	RevokerSubject     pgtype.Text
-	RevokerClient      pgtype.Text
-	RevokeKey          pgtype.Text
-	Revision           int16
+	ID                       pgtype.UUID
+	RootID                   pgtype.UUID
+	Kind                     string
+	PreviewID                pgtype.UUID
+	CaptureID                pgtype.UUID
+	ClusterID                pgtype.UUID
+	NamespaceUid             string
+	WorkloadUid              string
+	PodUid                   pgtype.Text
+	ExecutionDigest          []byte
+	ResultAccessDigest       []byte
+	ReviewDigest             []byte
+	DataClass                string
+	Reasons                  []byte
+	Review                   []byte
+	Scope                    []byte
+	RequesterIssuer          string
+	RequesterSubject         string
+	RequesterClient          string
+	LifetimeSeconds          int32
+	ResultAccess             []byte
+	NotAfter                 pgtype.Timestamptz
+	MaxArtifacts             int32
+	MaxBytes                 int64
+	MaxOperations            int64
+	ArtifactsSpent           int32
+	BytesSpent               int64
+	OperationsSpent          int64
+	IdempotencyKey           string
+	RequestDigest            []byte
+	RequestedAt              pgtype.Timestamptz
+	ReviewUntil              pgtype.Timestamptz
+	Decision                 pgtype.Text
+	ApproverIssuer           pgtype.Text
+	ApproverSubject          pgtype.Text
+	ApproverClient           pgtype.Text
+	DecisionReason           pgtype.Text
+	DecisionAcr              pgtype.Text
+	DecisionAuthTime         pgtype.Timestamptz
+	DecidedAt                pgtype.Timestamptz
+	DecisionKey              pgtype.Text
+	ExpiresAt                pgtype.Timestamptz
+	RevokedAt                pgtype.Timestamptz
+	RevokerIssuer            pgtype.Text
+	RevokerSubject           pgtype.Text
+	RevokerClient            pgtype.Text
+	RevokeKey                pgtype.Text
+	Revision                 int16
+	RequesterKind            string
+	RequestOperation         string
+	RequesterKey             []byte
+	PolicyUid                pgtype.Text
+	PolicyAcceptanceID       pgtype.UUID
+	PolicyScope              []byte
+	PolicyNotAfter           pgtype.Timestamptz
+	PolicyMaxExecutions      pgtype.Int8
+	PolicyMaxBytes           pgtype.Int8
+	PolicyMaxObservedBytes   pgtype.Int8
+	PolicyExecutionsSpent    int64
+	PolicyBytesSpent         int64
+	PolicyObservedBytesSpent int64
 }
 
 type AccessGrantChild struct {
@@ -2031,24 +2044,75 @@ type PermissionStream struct {
 }
 
 type PolicyAcceptance struct {
+	ID                  pgtype.UUID
+	RootID              pgtype.UUID
+	PolicyUid           string
+	Generation          int64
+	Nonce               pgtype.UUID
+	ScopeDigest         []byte
+	RequestDigest       []byte
+	RecordDigest        []byte
+	Record              []byte
+	AcceptedAt          pgtype.Timestamptz
+	AcknowledgedAt      pgtype.Timestamptz
+	ReceiptJson         []byte
+	ExecutionsSpent     int64
+	SharesSpent         int32
+	SharingRevokedAt    pgtype.Timestamptz
+	SharingRevokeKey    pgtype.Text
+	SharingStoppedAt    pgtype.Timestamptz
+	SharingStopKey      pgtype.Text
+	CollectedBytesSpent int64
+	ObservedBytesSpent  int64
+}
+
+type PolicyGrantAttachment struct {
 	ID               pgtype.UUID
 	RootID           pgtype.UUID
+	InstallationID   pgtype.UUID
 	PolicyUid        string
-	Generation       int64
-	Nonce            pgtype.UUID
-	ScopeDigest      []byte
+	AcceptanceID     pgtype.UUID
+	GrantID          pgtype.UUID
+	AuthorityDigest  []byte
+	AuthoredGrantRef string
+	ActorIssuer      string
+	ActorSubject     string
+	ActorClient      string
+	ActorKey         []byte
+	IdempotencyKey   string
 	RequestDigest    []byte
-	RecordDigest     []byte
-	Record           []byte
-	AcceptedAt       pgtype.Timestamptz
-	AcknowledgedAt   pgtype.Timestamptz
-	ReceiptJson      []byte
-	ExecutionsSpent  int64
-	SharesSpent      int32
-	SharingRevokedAt pgtype.Timestamptz
-	SharingRevokeKey pgtype.Text
-	SharingStoppedAt pgtype.Timestamptz
-	SharingStopKey   pgtype.Text
+	AttachedAt       pgtype.Timestamptz
+}
+
+type PolicyGrantSetting struct {
+	RootID               pgtype.UUID
+	InstallationID       pgtype.UUID
+	Issuer               string
+	SourceUid            string
+	SourceGeneration     int64
+	SourceDigest         []byte
+	ObservedAt           pgtype.Timestamptz
+	FreshUntil           pgtype.Timestamptz
+	DefaultAgeSeconds    int32
+	MaxAgeSeconds        int32
+	RenewalNoticeSeconds int32
+}
+
+type PolicyObservationSession struct {
+	ID                pgtype.UUID
+	RootID            pgtype.UUID
+	PolicyUid         string
+	AcceptanceID      pgtype.UUID
+	GrantID           pgtype.UUID
+	CaptureID         pgtype.UUID
+	Fence             pgtype.UUID
+	StartedAt         pgtype.Timestamptz
+	SessionUntil      pgtype.Timestamptz
+	LeaseUntil        pgtype.Timestamptz
+	Sequence          int64
+	Credit            int64
+	MaxBytesPerSecond int64
+	EndedAt           pgtype.Timestamptz
 }
 
 type PolicyOccurrence struct {
@@ -2077,23 +2141,25 @@ type PolicyPodWatermark struct {
 }
 
 type PolicySource struct {
-	RootID           pgtype.UUID
-	PolicyUid        string
-	InstallationID   pgtype.UUID
-	ClusterID        pgtype.UUID
-	NamespaceUid     string
-	Name             string
-	Generation       int64
-	SpecDigest       []byte
-	ResourceVersion  string
-	ObservedAt       pgtype.Timestamptz
-	FreshUntil       pgtype.Timestamptz
-	Deleted          bool
-	Suspended        bool
-	CollectionDigest []byte
-	IntentVersion    int64
-	ActiveID         pgtype.UUID
-	CreatorJson      []byte
+	RootID            pgtype.UUID
+	PolicyUid         string
+	InstallationID    pgtype.UUID
+	ClusterID         pgtype.UUID
+	NamespaceUid      string
+	Name              string
+	Generation        int64
+	SpecDigest        []byte
+	ResourceVersion   string
+	ObservedAt        pgtype.Timestamptz
+	FreshUntil        pgtype.Timestamptz
+	Deleted           bool
+	Suspended         bool
+	CollectionDigest  []byte
+	IntentVersion     int64
+	ActiveID          pgtype.UUID
+	CreatorJson       []byte
+	AuthoredGrantRef  string
+	GrantAttachmentID pgtype.UUID
 }
 
 type PolicySuppression struct {

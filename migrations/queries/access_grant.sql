@@ -1,7 +1,7 @@
 -- ADR-249 adHocCapture AccessGrants, exact child grants and pool spend.
 
 -- name: ReadGrantByKey :one
-SELECT * FROM access_grant WHERE root_id=$1 AND requester_issuer=$2 AND requester_subject=$3 AND idempotency_key=$4;
+SELECT * FROM access_grant WHERE root_id=$1 AND requester_issuer=$2 AND requester_subject=$3 AND idempotency_key=$4 AND kind='adHocCapture';
 
 -- name: ReadGrantByCapture :one
 SELECT * FROM access_grant WHERE root_id=$1 AND capture_id=$2;
@@ -28,9 +28,10 @@ SELECT * FROM access_grant WHERE root_id=$1 AND id=$2 FOR UPDATE;
 -- expiry starts at the decision, from the lifetime pinned at request time.
 UPDATE access_grant g SET decision= @decision::text, approver_issuer= @approver_issuer::text, approver_subject= @approver_subject::text, approver_client= @approver_client::text,
  decision_reason= @decision_reason::text, decision_acr=sqlc.narg(decision_acr)::text, decision_auth_time=sqlc.narg(decision_auth_time)::timestamptz, decided_at=t.n, decision_key= @decision_key::text,
- expires_at=CASE WHEN @decision::text='approved' THEN LEAST(t.n+make_interval(secs => g.lifetime_seconds),COALESCE(g.not_after,'infinity'::timestamptz)) END, revision=g.revision+1
+ expires_at=CASE WHEN @decision::text='approved' THEN CASE WHEN g.kind='policy' THEN g.policy_not_after ELSE LEAST(t.n+make_interval(secs => g.lifetime_seconds),COALESCE(g.not_after,'infinity'::timestamptz)) END END, revision=g.revision+1
 FROM (SELECT clock_timestamp() AS n) t
 WHERE g.root_id= @root_id::uuid AND g.id= @id::uuid AND g.decision IS NULL AND g.revoked_at IS NULL AND g.review_until>t.n AND g.revision=1
+ AND (g.kind<>'policy' OR g.policy_not_after>t.n)
  AND NOT (g.requester_issuer= @approver_issuer::text AND g.requester_subject= @approver_subject::text)
 RETURNING g.*;
 
@@ -42,10 +43,13 @@ WHERE root_id= @root_id::uuid AND id= @id::uuid AND revoked_at IS NULL AND revis
 -- The approver inbox: reviewable requests newest first. Candidates only; the
 -- service lists a row only while the caller is a current approver for it.
 SELECT * FROM access_grant WHERE root_id=$1 AND decision IS NULL AND revoked_at IS NULL AND review_until>clock_timestamp()
+ AND (kind<>'policy' OR policy_not_after>clock_timestamp())
 ORDER BY requested_at DESC, id LIMIT @row_limit;
 
 -- name: ListRequestedGrants :many
-SELECT * FROM access_grant WHERE root_id=$1 AND requester_issuer=$2 AND requester_subject=$3
+SELECT * FROM access_grant WHERE root_id=sqlc.arg(root_id)::uuid AND requester_issuer=sqlc.arg(requester_issuer)::text AND requester_subject=sqlc.arg(requester_subject)::text
+ AND requester_kind=sqlc.arg(requester_kind)::text
+ AND (requester_kind='human' OR requester_client=sqlc.arg(requester_client)::text)
 ORDER BY requested_at DESC, id LIMIT @row_limit;
 
 -- name: ReadGrantChild :one

@@ -43,7 +43,7 @@ func NewPolicies(ctx context.Context, pool *pgxpool.Pool, root, installation str
 	return &Policies{l, root, installation, guard}, nil
 }
 func policySource(row custodydb.PolicySource) value.PolicySource {
-	s := value.PolicySource{InstallationID: uid(row.InstallationID), ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, Name: row.Name, Revision: identity.Revision{UID: row.PolicyUid, Generation: row.Generation}, ResourceVersion: row.ResourceVersion, ObservedAt: row.ObservedAt.Time.UTC(), FreshUntil: row.FreshUntil.Time.UTC(), Deleted: row.Deleted, Suspended: row.Suspended}
+	s := value.PolicySource{InstallationID: uid(row.InstallationID), ClusterID: uid(row.ClusterID), NamespaceUID: row.NamespaceUid, Name: row.Name, Revision: identity.Revision{UID: row.PolicyUid, Generation: row.Generation}, ResourceVersion: row.ResourceVersion, ObservedAt: row.ObservedAt.Time.UTC(), FreshUntil: row.FreshUntil.Time.UTC(), Deleted: row.Deleted, Suspended: row.Suspended, AuthoredGrantRef: row.AuthoredGrantRef}
 	copy(s.Revision.Digest[:], row.SpecDigest)
 	copy(s.CollectionDigest[:], row.CollectionDigest)
 	return s
@@ -70,7 +70,7 @@ func (s *Policies) ObservePolicy(ctx context.Context, in value.PolicySource) err
 		if !in.Valid(now.Time) {
 			return value.ErrChanged
 		}
-		err = q.InsertPolicySource(ctx, custodydb.InsertPolicySourceParams{RootID: id(s.root), PolicyUid: in.Revision.UID, InstallationID: id(s.installation), ClusterID: id(in.ClusterID), NamespaceUid: in.NamespaceUID, Name: in.Name, Generation: in.Revision.Generation, SpecDigest: in.Revision.Digest[:], ResourceVersion: in.ResourceVersion, ObservedAt: ts(in.ObservedAt), FreshUntil: ts(in.FreshUntil), Deleted: in.Deleted, Suspended: in.Suspended, CollectionDigest: in.CollectionDigest[:]})
+		err = q.InsertPolicySource(ctx, custodydb.InsertPolicySourceParams{RootID: id(s.root), PolicyUid: in.Revision.UID, InstallationID: id(s.installation), ClusterID: id(in.ClusterID), NamespaceUid: in.NamespaceUID, Name: in.Name, Generation: in.Revision.Generation, SpecDigest: in.Revision.Digest[:], ResourceVersion: in.ResourceVersion, ObservedAt: ts(in.ObservedAt), FreshUntil: ts(in.FreshUntil), Deleted: in.Deleted, Suspended: in.Suspended, CollectionDigest: in.CollectionDigest[:], AuthoredGrantRef: in.AuthoredGrantRef})
 		if err != nil {
 			return err
 		}
@@ -86,7 +86,7 @@ func (s *Policies) ObservePolicy(ctx context.Context, in value.PolicySource) err
 			if in != old {
 				return value.ErrChanged
 			}
-		} else if err = q.UpdatePolicySource(ctx, custodydb.UpdatePolicySourceParams{RootID: id(s.root), PolicyUid: in.Revision.UID, Generation: in.Revision.Generation, SpecDigest: in.Revision.Digest[:], ResourceVersion: in.ResourceVersion, ObservedAt: ts(in.ObservedAt), FreshUntil: ts(in.FreshUntil), Deleted: in.Deleted, Suspended: in.Suspended, CollectionDigest: in.CollectionDigest[:]}); err != nil {
+		} else if err = q.UpdatePolicySource(ctx, custodydb.UpdatePolicySourceParams{RootID: id(s.root), PolicyUid: in.Revision.UID, Generation: in.Revision.Generation, SpecDigest: in.Revision.Digest[:], ResourceVersion: in.ResourceVersion, ObservedAt: ts(in.ObservedAt), FreshUntil: ts(in.FreshUntil), Deleted: in.Deleted, Suspended: in.Suspended, CollectionDigest: in.CollectionDigest[:], AuthoredGrantRef: in.AuthoredGrantRef}); err != nil {
 			return err
 		}
 		now, err = q.CurrentTime(ctx)
