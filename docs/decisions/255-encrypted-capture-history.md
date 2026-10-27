@@ -35,8 +35,14 @@ credentials remain write-only and no key is delivered to the collector or node.
 
 Summary visibility and settings readability are separate from durable execution,
 audience, accounting and audit records. History quotas cannot roll back capture
-admission. Settings become available only after the exact immutable encrypted
-snapshot verifies. Unknown writes retain their charges. Typed current signed
+admission. Settings become available only after four acknowledged, version-pinned
+receipts bind the exact sealed input and its manifest commit. This is advisory
+settings availability, never an evidence verification or publication verdict.
+Before returning any plaintext or preparing a repeat, the reader verifies all
+four objects, the authenticated manifest/commit and the keyed settings identity.
+There are **zero eager verification GETs** on the write path. Unknown or incomplete
+writes remain unavailable and charged; corrupt reads return unavailable without
+reconstructing parameters from plaintext execution scope. Typed current signed
 operation authority and independently established writer completion precede
 physical cleanup; neither expiry, local Close nor a lookup refunds storage.
 
@@ -60,7 +66,7 @@ Opaque repeat lineage has its own finite deadline and never grants source access
 | 6 | Degraded states | SettingsUnavailable and HistoryUnavailable; reuse reserved/stored/deleting/deleted custody states. |
 | 7 | Configuration | Required administrator-lowerable history ceilings; no self-tuning machinery knobs. |
 | 8 | External dependency | Existing connector, S3 backend and KMS only; no new storage engine or component. |
-| 9 | Aggregate cost | Four PUTs and four exact verification GETs per snapshot; three key wraps. Up to four GETs/three unwraps per settings read/repeat. Work scales with captures, never packets/Pods. Retirement uses existing version/upload inventory and bounded sweep. Counts and combined workflow cost require native measurement. |
+| 9 | Aggregate cost | Three wraps and four PUTs per snapshot, zero eager verification GETs; four version-pinned GETs and three unwraps per settings read/repeat. Each preview still uses the existing current identity, workload, capability, permission, retention and capacity checks. Added SQL transactions reserve history quota/custody, claim a selected regional writer and settle its receipts; reads authorize before and after remote/KMS work. One supervised, joined cleanup loop per hub checks a small SQL candidate page every three seconds (0.33 idle SQL reads/s/replica, zero idle API/KMS/S3); it processes at most 16 records serially, drains successful full pages and paces failures. Retirement inventories object versions/uploads and deletes them before typed completion/refund. Work scales with captures, never packets/Pods. Combined installed workflow latency remains to be measured. |
 | 10 | Upgrade/rollback | Additive schema; old pod-status history remains compatible. Stopping new history writes cannot abandon retained cleanup or charges. |
 | 11 | Smaller alternative | Plaintext parameters, uncharged objects and durable audit retention violate the accepted contract. A single-object ledger would add a second lifecycle instead of reusing four receipts. |
 
@@ -83,8 +89,65 @@ payload entered the key service. Key wrapping was an explicit test-only adapter,
 so these are codec costs, not native provider or installed workflow measurements.
 
 The history-specific role limits (192 KiB data, 4 KiB index, 128 KiB encrypted
-manifest, 32 KiB commit) fit within a 512 KiB base64/JSON bundle. Both endpoints
-must enforce it before allocation, including exact four-object cardinality.
+manifest, 32 KiB commit) derive an exact **486,077-byte** JSON/base64 bundle bound:
+13 JSON punctuation bytes plus `4 * sum(ceil(roleMaximum / 3))`. Both endpoints
+enforce the total and each encoded role before allocating decoded ciphertext,
+including exact four-object cardinality. The existing common 32 KiB frames are
+unchanged. Only signed history operations use the separately derived finite
+authority, bundle and escaped receipt envelope bounds.
 
-SQL, protected provider/connector composition, actual retirement and full
-filter/window repeat qualification remain pending while implementation proceeds.
+The focused real PostgreSQL/S3 run `history-parameters-native-9` passed encrypted
+write/read, own-selector eviction without premature refund, ordinary evidence
+deletion-path refusal and actual history-prefix inventory before charge release.
+It measured **4,216 physical ciphertext bytes** against **1,671,168 reserved
+bytes** for its synthetic parameter record. The selected subtest took 7.16 s;
+the Go fixture took 8.61 s, with unchanged relevant sources and no
+cleanup failures. This is component evidence, not installed recorder performance.
+Run 9 additionally covers positive persisted lineage, source-expiry extension
+and unknown-source refusal, nanosecond request-deadline normalization, required
+encrypted snapshots with no scope fallback, and settled projection/counter
+pruning. Runs 1–5 exposed fixture role/eligibility/time issues and a production
+registration normalization mismatch; run 6 passed the initial custody slice.
+Run 7 found a source-read fixture permission omission. Run 8 reproduced a real
+ordering bug: per-selector eviction hid the chosen source before the new
+snapshot's source check. Source authority now precedes eviction in the same
+locked transaction, and its original expiry bounds the final check. All earlier
+actual failure reports remain retained alongside run 9.
+
+## Composition and independent lifetimes
+
+`public_context_compose.go` composes the existing protected account-key MAC and
+control sealer/opener with the typed SQL history facet and regional dispatcher.
+The dispatcher uses the existing outbound `contextstart.Router`, selecting the
+actual executor epoch before SQL issues a writer claim. The regional adapter uses
+its separately projected `history-storage.json` capability on the existing store
+and bucket, restricted to `history/v1/<root>/<cluster>/`; it cannot access evidence
+or another root/cluster prefix. No hub S3 address or evidence credential is added.
+The provider recipe proposes the exact prefix policy; existing external provider
+provisioning remains administrator-owned.
+
+Metadata policy uses the existing explicit case-metadata defaults/maxima and
+general privacy restrictions, independently of evidence lifetime. New history
+never uses scope JSON as parameter storage. Source-derived repeats retain their
+original content cutoff and policy origins; rereading or repeating cannot renew
+that deadline. Lowered quotas hide oldest history only from the originating
+allocation, with physical obligations retained until verified cleanup. Original
+summary deadlines and unknown writer spend are never rewritten to meet a lower
+limit. Expired, fully settled projections and unused zero counters are pruned in
+bounded pages; durable execution/audit records remain independent.
+
+A deterministic scheduling audit also found that always retrying the first 16
+due records would starve another region behind a persistently unavailable one.
+This is a reproduced algorithmic case, not a measured production outage. The
+existing indexed capture-ID keyset and one process-local cursor now advance past
+failed candidates, including partial passes stopped by the original budget, and
+reset at the end. The hint grants no authority; every candidate still needs its
+own current SQL authority and exact completion. No retry map, durable phase,
+extra request, configuration or overlapping pass is added. Deterministic
+two-region and partial-pass regressions verify both progress and retained spend.
+
+Current unit/race regressions cover fresh workload Pod selection, exact explicit
+Pod refusal, original filter/window/composition restoration, edited retention,
+collector/compiler drift refusal, policy current-Pod selection, final authority
+and expiry shortening during reads, and cursor audience/target/deadline binding.
+Full installed browser/MCP capture→settings→repeat qualification remains pending.

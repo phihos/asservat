@@ -68,7 +68,12 @@ func TestContextPreviewCloneAndReasonDeadline(t *testing.T) {
 	if !p.Valid() {
 		t.Fatal("valid protected reference rejected")
 	}
+	p.Intent.RepeatedFrom = &HistoryLineage{CaptureID: "00000000-0000-4000-8000-000000000098", ExpiresAt: p.Deadline}
 	copy := p.Clone()
+	copy.Intent.RepeatedFrom.CaptureID = "00000000-0000-4000-8000-000000000097"
+	if p.Intent.RepeatedFrom.CaptureID == copy.Intent.RepeatedFrom.CaptureID {
+		t.Fatal("clone aliases repeat source")
+	}
 	copy.CanonicalScope[0] = '!'
 	copy.Audience[0].SubjectID = "other"
 	copy.Retention.Policies[0].UID = "other"

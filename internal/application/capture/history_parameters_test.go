@@ -56,3 +56,27 @@ func TestHistoryKeysSeparateAuthoredSettingsFromExecutionFacts(t *testing.T) {
 		t.Fatal("MAC domains overlap")
 	}
 }
+
+func TestHistoryCanonicalLabelsSeparateAuthoredSelectors(t *testing.T) {
+	k, e := auditapp.NewOperationMAC("input-v1", bytes.Repeat([]byte{1}, 32), "account-v1", bytes.Repeat([]byte{2}, 32))
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer k.Close()
+	root := "10000000-0000-4000-8000-000000000001"
+	p := value.HistoryParameters{Format: value.HistoryParametersFormat, Target: targets.WorkloadRequest{ClusterID: root, Namespace: "payments", Kind: "Deployment", Name: "api"}, NamespaceUID: "namespace", WorkloadUID: "workload", Diagnostic: value.ContextDiagnosticName, RecipeJSON: json.RawMessage(`{"actions":[]}`), DependencyJSON: json.RawMessage(`[]`), RequestedSeconds: 120, OriginalEffectiveSeconds: 60, OriginalExecutionDigest: artifact.Digest{1}, SelectorIdentity: &value.HistorySelector{ClusterID: root, NamespaceUID: "namespace", MatchLabels: map[string]string{"app": "api", "tier": "web"}}}
+	one, _, e := HistoryParameterKeys(k, root, p)
+	if e != nil {
+		t.Fatal(e)
+	}
+	p.SelectorIdentity.MatchLabels = map[string]string{"tier": "web", "app": "api"}
+	reordered, _, e := HistoryParameterKeys(k, root, p)
+	if e != nil || one != reordered {
+		t.Fatal("map order regrouped authored selector", e)
+	}
+	p.SelectorIdentity.MatchLabels["tier"] = "workers"
+	different, _, e := HistoryParameterKeys(k, root, p)
+	if e != nil || one == different {
+		t.Fatal("different expression grouped by resolved members", e)
+	}
+}

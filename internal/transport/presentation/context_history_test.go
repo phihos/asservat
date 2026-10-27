@@ -1,6 +1,8 @@
 package presentation
 
 import (
+	auditapp "asservat.local/asservat/internal/application/audit"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -12,6 +14,7 @@ import (
 
 	app "asservat.local/asservat/internal/application/capture"
 	identities "asservat.local/asservat/internal/application/identity"
+	"asservat.local/asservat/internal/domain/authorization"
 	value "asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/targets"
 )
@@ -36,7 +39,7 @@ const historyCapture = "00000000-0000-4000-8000-000000000041"
 func (h *historyFixture) List(_ context.Context, _ identities.CurrentIdentity, ref targets.WorkloadRequest, origins []value.HistoryOrigin, after *value.HistoryCursor, limit int) (value.HistoryPage, error) {
 	h.listed, h.origins, h.after, h.limit = ref, origins, after, limit
 	entry := value.HistoryEntry{CaptureID: historyCapture, Origin: value.HistoryManual, AcceptedAt: h.accepted, ExpiresAt: h.accepted.Add(value.HistoryLifetime), Phase: "Succeeded", EvidenceState: "available"}
-	return value.HistoryPage{Entries: []value.HistoryEntry{entry}, Next: h.next, ValidUntil: h.untilList}, h.err
+	return value.HistoryPage{Target: authorization.WorkloadScope(ref.ClusterID, "ns", "workload"), AuthorizationRevision: h.ops.i.Policy, Entries: []value.HistoryEntry{entry}, Next: h.next, ValidUntil: h.untilList}, h.err
 }
 func (h *historyFixture) settings() value.CaptureSettings {
 	return value.CaptureSettings{CaptureID: historyCapture, Origin: value.HistoryManual, ClusterID: "00000000-0000-4000-8000-000000000001", NamespaceUID: "ns", WorkloadUID: "workload", AcceptedAt: h.accepted, ExpiresAt: h.accepted.Add(value.HistoryLifetime),
@@ -60,6 +63,13 @@ func (h *historyFixture) PreviewRepeat(ctx context.Context, current identities.C
 func historyOperations(t *testing.T) (*ContextOperations, *contextOperationFixture, *historyFixture) {
 	t.Helper()
 	base, f := operationFixture(t, true)
+	mac, err := auditapp.NewOperationMAC("synthetic-input", bytes.Repeat([]byte{1}, 32), "synthetic-account", bytes.Repeat([]byte{2}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(mac.Close)
+	base.config.HistoryRootID = "00000000-0000-4000-8000-000000000001"
+	base.config.HistoryCursorKeys = mac
 	h := &historyFixture{ops: f, accepted: f.i.VerifiedAt.Add(-time.Hour).UTC(), untilList: f.metadataUntil}
 	s, err := NewContextOperationsWithHistory(base.config, f, f, h)
 	if err != nil {

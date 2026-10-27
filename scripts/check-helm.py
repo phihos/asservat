@@ -189,6 +189,14 @@ def check_bootstrap(directory):
     assert settings["origin"] == "https://asservat.example" and settings["groupMaxAgeSeconds"] == 300
     assert "permissionDelegations" not in settings, "empty delegations changed existing installer identities"
     assert "approvals" not in settings, "absent approval settings changed existing installer identities"
+    assert "captureHistory" not in settings, "absent history limits changed existing installer identities"
+    bounded = copy.deepcopy(public)
+    bounded["bootstrap"]["continuation"]["public"]["captureHistory"] = {"perSelector": 200, "perInstallation": 10000}
+    bdocs = render(bounded)
+    binput, = [r for r in bdocs if "continuation.json" in r.get("data", {})]
+    assert json.loads(binput["data"]["continuation.json"])["public"]["captureHistory"] == {"perSelector": 200, "perInstallation": 10000}
+    for limits in ({"perSelector": 0,"perInstallation":1000},{"perSelector":1001,"perInstallation":1000},{"perSelector":1,"perInstallation":100001},{"perSelector":1}):
+        bad=copy.deepcopy(public);bad["bootstrap"]["continuation"]["public"]["captureHistory"]=limits;render(bad,ok=False)
     approved = copy.deepcopy(public)
     approvals = {"requireRecordingApproval": True, "stepUp": {"acrValues": ["2"], "maxAgeSeconds": 300}}
     approved["bootstrap"]["continuation"]["public"]["approvals"] = approvals

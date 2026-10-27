@@ -58,9 +58,15 @@ type OwnerInitialHistoryProbe struct {
 // OwnerPublicDeployment enables hub-api's browser/MCP/download layer
 // (ADR-180). It requires Native. Credentials and keys are fixed projected
 // files, never fields; no request can select an origin or endpoint.
+type CaptureHistoryLimits struct {
+	PerSelector     int `json:"perSelector"`
+	PerInstallation int `json:"perInstallation"`
+}
+
 type OwnerPublicDeployment struct {
-	Format string `json:"format"`
-	Origin string `json:"origin"`
+	CaptureHistory *CaptureHistoryLimits `json:"captureHistory,omitempty"`
+	Format         string                `json:"format"`
+	Origin         string                `json:"origin"`
 	// Identity (ADR-180 decision 3): the pinned browser settings supply the
 	// issuer, client and session epoch; the Keycloak profile derives the
 	// provider endpoints from that issuer. BrowserAudience is the one access

@@ -687,10 +687,7 @@ func installerEvidenceCredential(t *testing.T, ctx context.Context, p *initialRu
 		t.Fatal("owned exact IAM provisioning command unavailable", e)
 	}
 	policy := installerEvidenceBucketPolicy(bucket)
-	store := s3.New(s3.Options{Region: p.desired.AuditStore.Region, BaseEndpoint: aws.String(p.desired.AuditStore.Endpoint), UsePathStyle: true, Credentials: credentials.NewStaticCredentialsProvider("synthetic-only", "synthetic-only-secret", ""), HTTPClient: p.client, RetryMaxAttempts: 1})
-	if _, err = store.PutBucketPolicy(ctx, &s3.PutBucketPolicyInput{Bucket: &bucket, Policy: &policy}); err != nil {
-		t.Fatal("regional deletion denial", err)
-	}
+	installerMergeBucketPolicy(t, ctx, p, bucket, []byte(policy))
 	out, _ := json.Marshal(contracts.OwnerStorageCredential{AccessKeyID: key, SecretAccessKey: secret})
 	return out
 }

@@ -59,7 +59,12 @@ func (s RetentionShortener) Reconcile(ctx context.Context, loc artifact.Location
 	if !r.Valid() || r.Registration.Location != loc {
 		return value.ErrInvalid
 	}
-	resolved, err := s.Resolver.ResolveRetained(ctx, r.Input, r.Effective, r.OriginPolicies)
+	var resolved value.RetainedResolution
+	if r.Input.ControlKind == "case-metadata" {
+		resolved, err = s.Resolver.ResolveRetainedCaseMetadata(ctx, r.Input, r.Effective, r.OriginPolicies)
+	} else {
+		resolved, err = s.Resolver.ResolveRetained(ctx, r.Input, r.Effective, r.OriginPolicies)
+	}
 	if err != nil {
 		return err
 	}

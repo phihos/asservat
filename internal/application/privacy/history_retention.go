@@ -19,6 +19,7 @@ type RetainedCaseMetadataPolicyReader interface {
 // the same accepted source/topology/selector boundary as evidence. It cannot
 // substitute evidence defaults or invent a seven-day authority on an outage.
 func (r RetentionResolver) ResolveCaseMetadata(ctx context.Context, in value.Input) (value.Resolution, error) {
+	in.ControlKind = "case-metadata"
 	reader, ok := r.Policies.(CaseMetadataPolicyReader)
 	if !ok || r.Now == nil || ctx == nil || ctx.Err() != nil {
 		return value.Resolution{}, value.ErrUnavailable
@@ -30,6 +31,7 @@ func (r RetentionResolver) ResolveCaseMetadata(ctx context.Context, in value.Inp
 	return value.Resolve(set, in, r.Now())
 }
 func (r RetentionResolver) ResolveRetainedCaseMetadata(ctx context.Context, in value.Input, previous value.Deadlines, origins []artifact.RetentionRule) (value.RetainedResolution, error) {
+	in.ControlKind = "case-metadata"
 	reader, ok := r.RetainedPolicies.(RetainedCaseMetadataPolicyReader)
 	if !ok || r.Now == nil || ctx == nil || ctx.Err() != nil || !value.ValidPolicyOrigins(origins) {
 		return value.RetainedResolution{}, value.ErrUnavailable

@@ -230,6 +230,22 @@ func (s *ContextProgressReads) ReadContextProgress(ctx context.Context, request 
 		if err != nil {
 			return err
 		}
+		if c.RepeatedFromCaptureID.Valid && n.Time.Before(c.RepeatedFromExpiresAt.Time) {
+			accepted, e := admittedRecord(c)
+			if e != nil {
+				return e
+			}
+			historical := authorization.CaptureHistoryEligibility(request.Identity, projection, intent.Target, intent.Actor, accepted.Expectation.Audience, n.Time)
+			if historical.Eligible {
+				out.RepeatedFrom = &value.HistoryLineage{CaptureID: uid(c.RepeatedFromCaptureID), ExpiresAt: c.RepeatedFromExpiresAt.Time}
+			}
+		}
+		if c.HistoryParametersRequired {
+			out.HistoryState = "unavailable"
+			if f.HistoryParametersState.String == "available" && f.HistoryVisible.Bool && n.Time.Before(f.HistorySummaryExpires.Time) && n.Time.Before(f.HistorySettingsExpires.Time) {
+				out.HistoryState = "available"
+			}
+		}
 		out.ObservedAt = first.Time
 		out.ValidUntil = identity.Earlier(first.Time.Add(5*time.Second), identity.Earlier(eligible.ValidUntil, request.Recovery.FreshUntil))
 		if err = s.recovery.check(ctx, q, recovery, s.root, request.Recovery); err != nil {

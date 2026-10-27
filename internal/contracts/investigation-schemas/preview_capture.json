@@ -90,6 +90,16 @@
         "type": "string",
         "format": "uuid"
       },
+      "repeated_from_capture_id": {
+        "type": "string",
+        "format": "uuid"
+      },
+      "history_selection": {
+        "enum": [
+          "currentEligiblePod"
+        ],
+        "description": "Explicit manual selection when repeating a policy triggeringPod occurrence; the preview selects a current eligible Pod under the original workload identity."
+      },
       "profile_composition": {
         "$ref": "#/$defs/d2"
       }
@@ -165,6 +175,29 @@
             {
               "required": [
                 "profile_composition"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "allOf": [
+      {
+        "if": {
+          "required": [
+            "history_selection"
+          ]
+        },
+        "then": {
+          "anyOf": [
+            {
+              "required": [
+                "history_capture_id"
+              ]
+            },
+            {
+              "required": [
+                "repeated_from_capture_id"
               ]
             }
           ]
@@ -1205,11 +1238,6 @@
                         {
                           "required": [
                             "pod_selection"
-                          ]
-                        },
-                        {
-                          "required": [
-                            "repeated_from_capture_id"
                           ]
                         }
                       ]

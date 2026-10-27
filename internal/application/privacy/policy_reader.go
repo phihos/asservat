@@ -158,7 +158,7 @@ func (r AcceptedRetentionReader) readKind(ctx context.Context, t authorization.T
 			if !ok {
 				return out, value.ErrUnavailable
 			}
-			p.DefaultSeconds, p.MaximumSeconds = source.CaseDefaultSeconds, source.CaseMaximumSeconds
+			p = value.CaseMetadataPolicy(source)
 			policies[i] = p
 		}
 	}

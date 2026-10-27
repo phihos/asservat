@@ -7,6 +7,7 @@ import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/planning"
 )
 
 // HistoryLifetime bounds how long an accepted capture appears in history and
@@ -38,20 +39,25 @@ const (
 // HistoryCursor is the keyset position after the last examined row. It only
 // positions a page: every page authorizes every row again.
 type HistoryCursor struct {
-	AcceptedAt time.Time
-	CaptureID  string
+	Target                    authorization.Target
+	SnapshotBefore, ExpiresAt time.Time
+	AuthorizationRevision     identity.Revision
+	AcceptedAt                time.Time
+	CaptureID                 string
 }
 
 // HistoryQuery names one current workload identity, resolved under current
 // authority by the caller, and the origins to list.
 type HistoryQuery struct {
-	RootID   string
-	Target   authorization.Target // workload scope (authorization.WorkloadScope) or an explicit Pod; rows keep their own Pod
-	Origins  []HistoryOrigin
-	After    *HistoryCursor
-	Limit    int
-	Identity identity.Identity
-	Recovery artifact.RecoveryProof
+	SelectorKey    artifact.Digest
+	SnapshotBefore time.Time
+	RootID         string
+	Target         authorization.Target // workload scope (authorization.WorkloadScope) or an explicit Pod; rows keep their own Pod
+	Origins        []HistoryOrigin
+	After          *HistoryCursor
+	Limit          int
+	Identity       identity.Identity
+	Recovery       artifact.RecoveryProof
 }
 
 func (q HistoryQuery) Valid(now time.Time) bool {
@@ -68,15 +74,23 @@ func (q HistoryQuery) Valid(now time.Time) bool {
 
 // HistoryEntry is a content-minimized summary of one accepted capture.
 type HistoryEntry struct {
-	CaptureID     string
-	Origin        HistoryOrigin
-	AcceptedAt    time.Time
-	ExpiresAt     time.Time // AcceptedAt + HistoryLifetime: summary and settings
-	Phase         string    // the get_capture phase
-	EvidenceState string    // pending, available, expired or unavailable
+	Requester         identity.Principal
+	ActionKinds       []string
+	RepeatState       string
+	SettingsExpiresAt time.Time
+	RepeatedFrom      string
+	CaptureID         string
+	Origin            HistoryOrigin
+	AcceptedAt        time.Time
+	ExpiresAt         time.Time // AcceptedAt + HistoryLifetime: summary and settings
+	Phase             string    // the get_capture phase
+	EvidenceState     string    // pending, available, expired or unavailable
 }
 
 type HistoryPage struct {
+	Target                 authorization.Target
+	SnapshotBefore         time.Time
+	AuthorizationRevision  identity.Revision
 	Entries                []HistoryEntry
 	Next                   *HistoryCursor
 	ObservedAt, ValidUntil time.Time
@@ -97,20 +111,29 @@ func (q SettingsQuery) Valid(now time.Time) bool {
 // capture: its authored target, recipe and dependency pins and requested
 // retention. It carries no reason, sharing, grant, credential or old pod.
 type CaptureSettings struct {
-	CaptureID              string
-	Origin                 HistoryOrigin
-	ClusterID              string
-	NamespaceUID           string
-	WorkloadUID            string
-	AcceptedAt, ExpiresAt  time.Time
-	TargetJSON             []byte // the accepted collection target (target.schema.json)
-	DependencyJSON         []byte // the accepted dependency pins
-	Namespace              string
-	WorkloadKind           string
-	WorkloadName           string
-	RequestedSeconds       int64
-	ExecutionDigest        artifact.Digest
-	ObservedAt, ValidUntil time.Time
+	FrozenFilters            []byte
+	ExplicitPodUID           string
+	Selection                string
+	PolicyOrigins            []HistoryPolicyOrigin
+	Composition              *planning.ProfileComposition
+	CompositionJSON          []byte
+	RecipeJSON               []byte
+	SettingsKey              artifact.Digest
+	OriginalEffectiveSeconds int64
+	CaptureID                string
+	Origin                   HistoryOrigin
+	ClusterID                string
+	NamespaceUID             string
+	WorkloadUID              string
+	AcceptedAt, ExpiresAt    time.Time
+	TargetJSON               []byte // the accepted collection target (target.schema.json)
+	DependencyJSON           []byte // the accepted dependency pins
+	Namespace                string
+	WorkloadKind             string
+	WorkloadName             string
+	RequestedSeconds         int64
+	ExecutionDigest          artifact.Digest
+	ObservedAt, ValidUntil   time.Time
 }
 
 // HistoryEvidenceState derives the evidence state of a summary from its

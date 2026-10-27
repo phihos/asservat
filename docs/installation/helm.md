@@ -110,6 +110,15 @@ projected API token has one audience; set it explicitly for ambiguous profiles.
 After the references and public values exist, the fresh operation is one Helm
 invocation (apply/upgrade the CRDs separately as documented):
 
+Public continuation optionally accepts `bootstrap.continuation.public.captureHistory`
+with both `perSelector` (1–1,000) and `perInstallation` (1–100,000). Omission uses
+1,000 and 100,000 respectively. These are retained history-entry ceilings, in
+addition to existing storage capacity; encrypted settings reserve four object
+slots and up to 1,671,168 bytes each. Lower limits evict the oldest eligible
+history from its originating allocation. Physical charges remain until cleanup
+confirms deletion. History exhaustion reports unavailable settings while the
+accepted capture continues. These settings do not change evidence retention.
+
 ```sh
 helm upgrade --install asservat ./asservat-0.1.0-dev.1.tgz \
   --kube-context MANAGEMENT_CONTEXT --namespace asservat-bootstrap \

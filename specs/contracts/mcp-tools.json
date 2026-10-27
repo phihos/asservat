@@ -6879,6 +6879,12 @@
                           "collect",
                           "recordingSave"
                         ]
+                      },
+                      "history_state": {
+                        "enum": [
+                          "available",
+                          "unavailable"
+                        ]
                       }
                     },
                     "required": [
@@ -7826,6 +7832,12 @@
             "minimum": 1,
             "maximum": 315360000,
             "description": "Requested evidence-access lifetime in seconds. Omission uses the administrator default; effective access and managed deletion remain bounded by current retention policy and its deletion budget. History restoration preserves its original request; use a normal edited preview to change it."
+          },
+          "history_selection": {
+            "enum": [
+              "currentEligiblePod"
+            ],
+            "description": "Explicit manual selection when repeating a policy triggeringPod occurrence; the preview selects a current eligible Pod under the original workload identity."
           }
         },
         "required": [],
@@ -7963,6 +7975,29 @@
                 {
                   "required": [
                     "requested_retention_seconds"
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "allOf": [
+          {
+            "if": {
+              "required": [
+                "history_selection"
+              ]
+            },
+            "then": {
+              "anyOf": [
+                {
+                  "required": [
+                    "history_capture_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "repeated_from_capture_id"
                   ]
                 }
               ]
@@ -8651,6 +8686,12 @@
                         },
                         "required": [
                           "state"
+                        ]
+                      },
+                      "history_state": {
+                        "enum": [
+                          "available",
+                          "unavailable"
                         ]
                       }
                     },

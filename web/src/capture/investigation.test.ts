@@ -1,8 +1,78 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { Investigation } from './investigation';
-import { SyntheticOperations, session, target, id, previewResult, acceptedResult, progressResult, catalogResult, resolvedAcceptedResult, resolvedClosedResult, recordingPreviewResult, approvalPendingResult } from './test-fixtures';
+import { SyntheticOperations, session, target, id, previewResult, acceptedResult, progressResult, catalogResult, resolvedAcceptedResult, resolvedClosedResult, recordingPreviewResult, approvalPendingResult, settingsResult, historyResult } from './test-fixtures';
 
 const controllers: Investigation[] = [];
+it('reviews edited recorder parameters under the same source and version pins without restoring old authority', async () => {
+  const { controller, client } = await ready('3600');
+  client.responder = name => name === 'get_capture_settings' ? settingsResult() : recordingPreviewResult(id(41));
+  await controller.showSettings(id(41));
+  expect(controller.snapshot().settings?.capture_id).toBe(id(41));
+  const saved = recordingPreviewResult(); if (saved.status !== 'ok') throw new Error();
+  const edited = structuredClone(saved.data.profile_composition!.authored);
+  edited.components[0].overrides![0].value = 'tcp port 8443'; edited.maxDuration = '15s';
+  await controller.previewComposition(edited, id(41));
+  const inputs = client.calls.filter(c => c.name === 'preview_capture').map(c => c.input);
+  expect(inputs.at(-1)).toEqual({ target_ref: target, profile_composition: edited, repeated_from_capture_id: id(41) });
+  expect(controller.snapshot()).toMatchObject({ stage: 'review', repeatedFrom: id(41) });
+  await controller.preview();
+  expect(client.calls.filter(c => c.name === 'preview_capture').at(-1)!.input).toEqual(inputs.at(-1));
+  expect(client.calls.some(c => c.name === 'request_capture')).toBe(false);
+  expect(edited.components.map(c => c.profileRef)).toEqual(saved.data.profile_composition!.authored.components.map(c => c.profileRef));
+});
+it('preserves explicit current policy Pod selection and edited retention on refresh', async () => {
+  const { controller, client } = await ready();
+  client.responder = () => recordingPreviewResult(id(41));
+  await controller.repeat(id(41), 'currentEligiblePod');
+  expect(client.calls.at(-1)!.input).toEqual({ history_capture_id: id(41), history_selection: 'currentEligiblePod' });
+  const saved = recordingPreviewResult(); if (saved.status !== 'ok') throw new Error();
+  await controller.previewComposition(saved.data.profile_composition!.authored, id(41), 'currentEligiblePod', '90');
+  await controller.preview();
+  expect(client.calls.at(-1)!.input).toMatchObject({ repeated_from_capture_id: id(41), history_selection: 'currentEligiblePod', requested_retention_seconds: 90 });
+  expect(client.calls.some(c => c.name === 'request_capture')).toBe(false);
+});
+it('filters history origins and refuses expired settings without preparing a capture', async () => {
+  const { controller, client } = await ready();
+  client.responder = () => historyResult(); await controller.historyOrigin('policy');
+  expect(client.calls.at(-1)!.input).toMatchObject({ origin: 'policy' });
+  const settings = settingsResult(); if (settings.status !== 'ok') throw new Error();
+  settings.data.expires_at = new Date(Date.now() - 1).toISOString();
+  client.responder = () => settings;
+  await controller.showSettings(id(41));
+  expect(controller.snapshot().settings).toBeUndefined();
+  expect(controller.snapshot().error).toMatch(/could not be verified/);
+  expect(client.calls.filter(c => c.name === 'preview_capture')).toHaveLength(1);
+});
+it('drops saved settings at their original source expiry and on session cancellation', async () => {
+  vi.useFakeTimers();
+  const { controller, client, scope } = await ready();
+  client.responder = () => settingsResult();
+  await controller.showSettings(id(41));
+  expect(controller.snapshot().settings).toBeDefined();
+  await vi.advanceTimersByTimeAsync(60_001);
+  expect(controller.snapshot().settings).toBeUndefined();
+  await controller.showSettings(id(41));
+  expect(controller.snapshot().settings).toBeDefined();
+  scope.abort();
+  expect(controller.snapshot().settings).toBeUndefined();
+  expect(client.calls.filter(call => call.name === 'preview_capture')).toHaveLength(1);
+});
+it('pages with the opaque authorized cursor, removes duplicates and expires its cached history', async () => {
+  vi.useFakeTimers();
+  const { controller, client } = await ready();
+  const page = historyResult([id(41)]); if (page.status !== 'ok') throw new Error();
+  page.next_cursor = 'opaque-server-cursor';
+  page.data.history[0].summary_expires_at = new Date(Date.now() + 30_000).toISOString();
+  client.responder = () => page; await controller.historyOrigin('all');
+  client.responder = () => historyResult([id(42), id(41)]);
+  await controller.moreHistory();
+  expect(client.calls.at(-1)!.input).toMatchObject({ cursor: 'opaque-server-cursor', origin: 'all' });
+  expect(controller.snapshot().history?.map(row => row.capture_id)).toEqual([id(41), id(42)]);
+  expect(controller.snapshot().historyCursor).toBeUndefined();
+  await vi.advanceTimersByTimeAsync(30_001);
+  expect(controller.snapshot().history).toBeUndefined();
+  expect(controller.snapshot().historyMessage).toMatch(/Refresh history/);
+});
 afterEach(() => { for (const c of controllers) c.reset(); controllers.length = 0; vi.useRealTimers(); window.history.replaceState(null, '', '/'); });
 async function ready(retention = '3600', newID = () => id(4)) {
   const client = new SyntheticOperations();

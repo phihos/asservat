@@ -263,3 +263,20 @@ func (s HistoryObjects) Purge(ctx context.Context, e value.HistoryExpectation) e
 	}
 	return s.Store.purgePrefix(ctx, historyPrefix(e))
 }
+
+// HistoryCodec is composed only with the protected control-data key facets.
+// Regional transport receives ciphertext and never this key opener.
+type HistoryCodec struct {
+	Sealer evidence.KeySealer
+	Opener evidence.KeyOpener
+	Keys   app.HistoryKeys
+}
+
+func (c HistoryCodec) SealHistory(ctx context.Context, e value.HistoryExpectation, p value.HistoryParameters) (value.HistoryCiphertexts, error) {
+	return SealHistoryParameters(ctx, e, p, c.Sealer, c.Keys)
+}
+func (c HistoryCodec) OpenHistory(ctx context.Context, e value.HistoryExpectation, copies artifact.Copies, b value.HistoryCiphertexts) (value.HistoryParameters, error) {
+	return OpenHistoryParameters(ctx, e, copies, b, c.Opener, c.Keys)
+}
+
+var _ app.HistoryParameterCodec = HistoryCodec{}

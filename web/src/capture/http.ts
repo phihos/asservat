@@ -1,7 +1,7 @@
 import type { components } from '../generated/capture';
 import * as validators from '../generated/validate-capture';
 
-export type Operation = 'list_diagnostics' | 'preview_capture' | 'request_capture' | 'resolve_capture_request' | 'get_capture' | 'list_capture_history';
+export type Operation = 'list_diagnostics' | 'preview_capture' | 'request_capture' | 'resolve_capture_request' | 'get_capture' | 'list_capture_history' | 'get_capture_settings';
 export type Input<N extends Operation> = components['schemas'][`McpInput_${N}`];
 export type Output<N extends Operation> = components['schemas'][`McpOutput_${N}`];
 export type Data<N extends Operation> = Extract<Output<N>, { status: 'ok' }>['data'];

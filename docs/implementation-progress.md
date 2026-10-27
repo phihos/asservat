@@ -1,5 +1,41 @@
 # Sustained implementation progress
 
+## Encrypted capture history (ADR-255, implementation checkpoint)
+
+Migration 00100 and the typed history service add bounded encrypted parameter
+snapshots on the existing regional store, separate history-prefix capabilities,
+keyed selector/settings lookup, independent case-metadata retention, quota
+eviction and typed physical retirement. New captures cannot reconstruct missing
+settings from execution scope. Recorder repeats retain authored filters/windows,
+profile versions and policy-source provenance, persist opaque source lineage and
+use current preview/admission/approval. A source deadline also bounds approved
+acceptance; a later grant cannot renew it. History failure leaves an independently
+accepted incident and its start intact. Browser settings/pagination are bounded
+in memory and clear at their original deadlines and session/scope changes.
+
+Focused real SQL/S3 `history-parameters-native-9` passed: actual exit 0, unchanged
+source hashes, empty cleanup failures; selected subtest 7.16 s. It covers
+encrypted roundtrip, persisted lineage and source-cutoff/unknown-source refusal,
+own-selector eviction, no plaintext fallback, nanosecond deadline normalization,
+ordinary evidence-prefix deletion refusal, actual matching-prefix inventory before
+refund, and settled projection/counter pruning. Its synthetic snapshot used
+4,216 physical ciphertext bytes against 1,671,168 reserved bytes. Reports/logs
+for all runs 1–9 remain in the local qualification cache. Earlier failures are
+retained: role/identity/time fixture corrections, UTC registration normalization,
+and source authority checked too late after self-eviction. This is component
+evidence, with explicit synthetic authority/process inputs.
+
+Affected package race tests, console checks, specification/architecture/design,
+SQL generation and Helm render/schema gates pass at the recorded checkpoints.
+The browser/restart gate passed 20 synthetic journeys / 17 accessibility scans
+and four restart boundaries / two scans before the final pagination additions;
+final frozen checks remain required. The actual installed recorder → protected
+settings → edited React repeat → new independent grant → native result journey
+is being composed using the existing installed OIDC/recorder fixture. Neither
+API parity nor synthetic UI tests qualify that full workflow. Max-scale cleanup
+query cost and final installed qualification remain pending; REQ-HIS-001–004 and
+the full increment are not marked complete by this checkpoint.
+
 ## Approved capture acceptance (ADR-252, 2026-10-27)
 
 Approval-required recordings now retain their exact passive review blueprint

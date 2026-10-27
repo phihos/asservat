@@ -4,7 +4,9 @@ import (
 	"time"
 
 	"asservat.local/asservat/internal/domain/artifact"
+	"asservat.local/asservat/internal/domain/authorization"
 	"asservat.local/asservat/internal/domain/identity"
+	"asservat.local/asservat/internal/domain/privacy"
 )
 
 type HistoryLimits struct{ PerSelector, PerInstallation int }
@@ -25,13 +27,29 @@ type HistoryReservation struct {
 	Recovery         artifact.RecoveryProof
 	Limits           HistoryLimits
 	SummaryExpiresAt time.Time
+	Retention        privacy.Resolution
+	Source           *HistoryLineage
 }
+type HistoryRetention struct {
+	Input        privacy.Input
+	Origins      []artifact.RetentionRule
+	SourceCutoff time.Time
+}
+
+func (r HistoryRetention) Valid() bool {
+	return r.Input.Target.Valid() && r.Input.ControlKind == "case-metadata" && r.Input.EvidenceType == "other" && r.Input.RequestedSeconds > 0 && privacy.ValidPolicyOrigins(r.Origins)
+}
+
 type HistoryStorage struct {
+	Origin                 HistoryOrigin
 	Expectation            HistoryExpectation
 	Copies                 artifact.Copies
 	State                  string
 	SummaryExpiresAt       time.Time
 	ObservedAt, ValidUntil time.Time
+	Target                 authorization.Target
+	Retention              HistoryRetention
+	Effective              privacy.Deadlines
 }
 type HistoryWriteRequest struct {
 	Storage       HistoryStorage
@@ -48,6 +66,7 @@ type HistoryWriteResult struct {
 	Recovery   artifact.RecoveryProof
 }
 type HistoryReadRequest struct {
+	Retention     privacy.RetainedResolution
 	Query         SettingsQuery
 	RequestID     string
 	ExecutorEpoch string
@@ -61,3 +80,9 @@ type HistoryDeletePermission struct {
 	Authority HistoryOperationAuthority
 	Writer    HistoryWriterCompletion
 }
+type HistoryDeleteRequest struct {
+	CaptureID, RequestID, ExecutorEpoch string
+	Recovery                            artifact.RecoveryProof
+}
+
+type HistoryRetirementCandidate struct{ CaptureID, ClusterID, State string }

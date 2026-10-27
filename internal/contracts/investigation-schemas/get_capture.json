@@ -218,6 +218,10 @@
                     "minItems": 0,
                     "maxItems": 32
                   },
+                  "repeated_from_capture_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
                   "operation": {
                     "enum": [
                       "collect",
@@ -243,6 +247,12 @@
                     },
                     "required": [
                       "state"
+                    ]
+                  },
+                  "history_state": {
+                    "enum": [
+                      "available",
+                      "unavailable"
                     ]
                   }
                 },

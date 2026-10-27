@@ -776,6 +776,26 @@
                       "type": "boolean"
                     }
                   }
+                },
+                "captureHistory": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "perSelector",
+                    "perInstallation"
+                  ],
+                  "properties": {
+                    "perSelector": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000
+                    },
+                    "perInstallation": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 100000
+                    }
+                  }
                 }
               }
             }

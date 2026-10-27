@@ -10228,7 +10228,10 @@ components:
         continue_acquisition:
           type: boolean
           const: true
-          description: Explicitly continue acquisition for an already accepted original preview and request key using current permissions. Omission preserves passive accepted replay. This cannot admit a missing request, create another attempt, renew a start interval, or retry uncertain key preparation.
+          description: Explicitly continue acquisition for an already accepted original preview
+            and request key using current permissions. Omission preserves passive accepted replay.
+            This cannot admit a missing request, create another attempt, renew a start interval,
+            or retry uncertain key preparation.
       required:
       - idempotency_key
       oneOf:
@@ -10294,6 +10297,10 @@ components:
                   enum:
                   - collect
                   - recordingSave
+                history_state:
+                  enum:
+                  - available
+                  - unavailable
               required:
               - capture_id
               - phase
@@ -10808,10 +10815,15 @@ components:
           type: integer
           minimum: 1
           maximum: 315360000
-          description: Requested evidence-access lifetime in seconds. Omission uses the administrator default;
-            effective access and managed deletion remain bounded by current retention policy and its deletion
-            budget. History restoration preserves its original request; use a normal edited preview to change
-            it.
+          description: Requested evidence-access lifetime in seconds. Omission uses the administrator
+            default; effective access and managed deletion remain bounded by current retention policy
+            and its deletion budget. History restoration preserves its original request; use a normal
+            edited preview to change it.
+        history_selection:
+          enum:
+          - currentEligiblePod
+          description: Explicit manual selection when repeating a policy triggeringPod occurrence;
+            the preview selects a current eligible Pod under the original workload identity.
       required: []
       oneOf:
       - allOf:
@@ -10872,6 +10884,16 @@ components:
             - profile_composition
           - required:
             - requested_retention_seconds
+      allOf:
+      - if:
+          required:
+          - history_selection
+        then:
+          anyOf:
+          - required:
+            - history_capture_id
+          - required:
+            - repeated_from_capture_id
     McpOutput_preview_capture:
       allOf:
       - $ref: https://asservat.io/spec/v1/mcp-result.schema.json
@@ -11063,8 +11085,8 @@ components:
                   enum:
                   - explicitPod
                   - lexicalEligiblePod
-                  description: Selection for the fixed pod-status/v1 preset. This describes the reviewed pod,
-                    never ongoing monitoring coverage or authority to select a replacement.
+                  description: Selection for the fixed pod-status/v1 preset. This describes the
+                    reviewed pod, never ongoing monitoring coverage or authority to select a replacement.
               required:
               - preview_id
               - expires_at
@@ -11340,9 +11362,9 @@ components:
                   type: object
                   additionalProperties: false
                   description: Capture-time sharing status, reported separately from collection
-                    progress. Present only when the request included sharing. Shared names the
-                    concrete share; SharingUnavailable means the result was not shared (collection
-                    outcome is unaffected).
+                    progress. Present only when the request included sharing. Shared names the concrete
+                    share; SharingUnavailable means the result was not shared (collection outcome
+                    is unaffected).
                   properties:
                     state:
                       enum:
@@ -11354,6 +11376,10 @@ components:
                       format: uuid
                   required:
                   - state
+                history_state:
+                  enum:
+                  - available
+                  - unavailable
               required:
               - capture_id
               - revision

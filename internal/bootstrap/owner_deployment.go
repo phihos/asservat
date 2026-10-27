@@ -68,6 +68,7 @@ type OwnerDeployment struct {
 	policyTrigger *captureapp.PolicyTrigger
 	// recordingCollect is the ADR-248 collect loop; RunPublic supervises it.
 	recordingCollect *RegionalRecordingCollect
+	history          *captureapp.HistoryParameterService
 	shared           publicShared
 	// ADR-182: backend and public input roots (the owner root in the legacy
 	// layout) and, in the installed layout, the provider effects.
@@ -508,6 +509,13 @@ func (d *OwnerDeployment) RunPublic(listener net.Listener) error {
 		go func() {
 			defer d.owners.Done()
 			_ = d.recordingCollect.Run(d.root)
+		}()
+	}
+	if d.history != nil {
+		d.owners.Add(1)
+		go func() {
+			defer d.owners.Done()
+			_ = d.history.Run(d.root, eventLog(os.Stderr, "history retirement refused"))
 		}()
 	}
 	err := server.ServeTLS(listener, "", "")

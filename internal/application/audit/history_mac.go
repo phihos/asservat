@@ -11,7 +11,7 @@ import (
 // through newPublicOperationMAC's protected root/setup projection. Ordinary
 // audit input-key rotation cannot regroup selectors or reset settings identity.
 func (m *OperationMAC) HistoryDigest(domain string, canonical []byte) (artifact.Digest, error) {
-	if m == nil || (domain != "selector" && domain != "settings") || len(canonical) == 0 || len(canonical) > (128<<10)+512 {
+	if m == nil || (domain != "selector" && domain != "settings" && domain != "cursor") || len(canonical) == 0 || len(canonical) > (128<<10)+512 {
 		return artifact.Digest{}, ErrUnavailable
 	}
 	m.mu.Lock()

@@ -12,23 +12,27 @@ import (
 )
 
 const listCaptureHistory = `-- name: ListCaptureHistory :many
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin FROM context_capture
-WHERE root_id=$1 AND history_cluster_id=$2 AND history_namespace_uid=$3::text AND history_workload_uid=$4::text
- AND history_origin=ANY($5::text[]) AND created_at>$6::timestamptz
- AND ($7::timestamptz IS NULL OR (created_at,id)<($7::timestamptz,$8::uuid))
-ORDER BY created_at DESC,id DESC LIMIT $9
+SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at FROM context_capture c
+WHERE c.root_id=$1 AND c.history_cluster_id=$2 AND c.history_namespace_uid=$3::text AND c.history_workload_uid=$4::text
+ AND c.history_origin=ANY($5::text[])
+ AND c.created_at<=$6::timestamptz
+ AND ((NOT c.history_parameters_required AND c.created_at>$7::timestamptz) OR (c.history_parameters_required AND EXISTS(SELECT 1 FROM capture_history_parameter h WHERE h.capture_id=c.id AND h.root_id=c.root_id AND h.visible AND h.selector_key=$8::bytea AND h.summary_expires_at>clock_timestamp())))
+ AND ($9::timestamptz IS NULL OR (c.created_at,c.id)<($9::timestamptz,$10::uuid))
+ORDER BY c.created_at DESC,c.id DESC LIMIT $11
 `
 
 type ListCaptureHistoryParams struct {
-	RootID       pgtype.UUID
-	ClusterID    pgtype.UUID
-	NamespaceUid string
-	WorkloadUid  string
-	Origins      []string
-	NotBefore    pgtype.Timestamptz
-	AfterAt      pgtype.Timestamptz
-	AfterID      pgtype.UUID
-	PageLimit    int32
+	RootID         pgtype.UUID
+	ClusterID      pgtype.UUID
+	NamespaceUid   string
+	WorkloadUid    string
+	Origins        []string
+	SnapshotBefore pgtype.Timestamptz
+	NotBefore      pgtype.Timestamptz
+	SelectorKey    []byte
+	AfterAt        pgtype.Timestamptz
+	AfterID        pgtype.UUID
+	PageLimit      int32
 }
 
 // ADR-236: one keyset page of a workload's accepted captures, newest first.
@@ -40,7 +44,9 @@ func (q *Queries) ListCaptureHistory(ctx context.Context, arg ListCaptureHistory
 		arg.NamespaceUid,
 		arg.WorkloadUid,
 		arg.Origins,
+		arg.SnapshotBefore,
 		arg.NotBefore,
+		arg.SelectorKey,
 		arg.AfterAt,
 		arg.AfterID,
 		arg.PageLimit,
@@ -86,6 +92,9 @@ func (q *Queries) ListCaptureHistory(ctx context.Context, arg ListCaptureHistory
 			&i.HistoryNamespaceUid,
 			&i.HistoryWorkloadUid,
 			&i.HistoryOrigin,
+			&i.HistoryParametersRequired,
+			&i.RepeatedFromCaptureID,
+			&i.RepeatedFromExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -145,16 +154,19 @@ func (q *Queries) ReadAPIExecutions(ctx context.Context, arg ReadAPIExecutionsPa
 }
 
 const readCaptureHistoryFacts = `-- name: ReadCaptureHistoryFacts :many
-SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin,a.state AS custody_state,a.request_digest,
+SELECT c.id, c.root_id, c.request_key, c.submission_digest, c.scope_digest, c.scope_json, c.expectation_json, c.pod_pin_json, c.attempt_id, c.permission_epoch, c.permission_sequence, c.identity_policy_uid, c.identity_policy_generation, c.identity_policy_digest, c.created_at, c.deadline, c.state, c.intent_acknowledged_at, c.intent_digest, c.intent_object_key, c.intent_object_version, c.intent_object_etag, c.intent_object_bytes, c.intent_object_sha256, c.progress_revision, c.deadline_observed_at, c.preview_id, c.intent_operation_id, c.share_instruction, c.history_cluster_id, c.history_namespace_uid, c.history_workload_uid, c.history_origin, c.history_parameters_required, c.repeated_from_capture_id, c.repeated_from_expires_at,a.state AS custody_state,a.request_digest,
  a.copies_digest,a.effective_expires_at,a.effective_delete_by,
  v.capture_id AS verified_capture_id,v.root_id AS verified_root_id,v.verified_at,
  v.expectation_digest,v.copies_digest AS verified_copies_digest,v.intent_digest AS verified_intent_digest,
  v.authority_digest,v.permission_epoch,v.permission_sequence,v.audit_acknowledged_at,v.audit_digest,
- cat.artifact_id AS catalog_artifact_id,cat.published_at
+ cat.artifact_id AS catalog_artifact_id,cat.published_at,
+ hp.state AS history_parameters_state,hp.visible AS history_visible,hp.summary_expires_at AS history_summary_expires,ha.effective_expires_at AS history_settings_expires
 FROM context_capture c
 JOIN custody_attempt a ON a.id=c.attempt_id
 LEFT JOIN context_verification v ON v.capture_id=c.id AND v.root_id=c.root_id
 LEFT JOIN context_catalog cat ON cat.capture_id=c.id AND cat.root_id=c.root_id
+LEFT JOIN capture_history_parameter hp ON hp.capture_id=c.id AND hp.root_id=c.root_id
+LEFT JOIN custody_attempt ha ON ha.id=hp.attempt_id
 WHERE c.root_id=$1 AND c.id=ANY($2::uuid[])
 `
 
@@ -164,25 +176,29 @@ type ReadCaptureHistoryFactsParams struct {
 }
 
 type ReadCaptureHistoryFactsRow struct {
-	ContextCapture       ContextCapture
-	CustodyState         string
-	RequestDigest        []byte
-	CopiesDigest         []byte
-	EffectiveExpiresAt   pgtype.Timestamptz
-	EffectiveDeleteBy    pgtype.Timestamptz
-	VerifiedCaptureID    pgtype.UUID
-	VerifiedRootID       pgtype.UUID
-	VerifiedAt           pgtype.Timestamptz
-	ExpectationDigest    []byte
-	VerifiedCopiesDigest []byte
-	VerifiedIntentDigest []byte
-	AuthorityDigest      []byte
-	PermissionEpoch      pgtype.UUID
-	PermissionSequence   pgtype.Int8
-	AuditAcknowledgedAt  pgtype.Timestamptz
-	AuditDigest          []byte
-	CatalogArtifactID    pgtype.UUID
-	PublishedAt          pgtype.Timestamptz
+	ContextCapture         ContextCapture
+	CustodyState           string
+	RequestDigest          []byte
+	CopiesDigest           []byte
+	EffectiveExpiresAt     pgtype.Timestamptz
+	EffectiveDeleteBy      pgtype.Timestamptz
+	VerifiedCaptureID      pgtype.UUID
+	VerifiedRootID         pgtype.UUID
+	VerifiedAt             pgtype.Timestamptz
+	ExpectationDigest      []byte
+	VerifiedCopiesDigest   []byte
+	VerifiedIntentDigest   []byte
+	AuthorityDigest        []byte
+	PermissionEpoch        pgtype.UUID
+	PermissionSequence     pgtype.Int8
+	AuditAcknowledgedAt    pgtype.Timestamptz
+	AuditDigest            []byte
+	CatalogArtifactID      pgtype.UUID
+	PublishedAt            pgtype.Timestamptz
+	HistoryParametersState pgtype.Text
+	HistoryVisible         pgtype.Bool
+	HistorySummaryExpires  pgtype.Timestamptz
+	HistorySettingsExpires pgtype.Timestamptz
 }
 
 // The progress facts of several captures in one snapshot (same shape as
@@ -230,6 +246,9 @@ func (q *Queries) ReadCaptureHistoryFacts(ctx context.Context, arg ReadCaptureHi
 			&i.ContextCapture.HistoryNamespaceUid,
 			&i.ContextCapture.HistoryWorkloadUid,
 			&i.ContextCapture.HistoryOrigin,
+			&i.ContextCapture.HistoryParametersRequired,
+			&i.ContextCapture.RepeatedFromCaptureID,
+			&i.ContextCapture.RepeatedFromExpiresAt,
 			&i.CustodyState,
 			&i.RequestDigest,
 			&i.CopiesDigest,
@@ -248,6 +267,10 @@ func (q *Queries) ReadCaptureHistoryFacts(ctx context.Context, arg ReadCaptureHi
 			&i.AuditDigest,
 			&i.CatalogArtifactID,
 			&i.PublishedAt,
+			&i.HistoryParametersState,
+			&i.HistoryVisible,
+			&i.HistorySummaryExpires,
+			&i.HistorySettingsExpires,
 		); err != nil {
 			return nil, err
 		}
@@ -260,7 +283,7 @@ func (q *Queries) ReadCaptureHistoryFacts(ctx context.Context, arg ReadCaptureHi
 }
 
 const readHistoryCapture = `-- name: ReadHistoryCapture :one
-SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin FROM context_capture WHERE root_id=$1 AND id=$2 AND history_workload_uid IS NOT NULL
+SELECT id, root_id, request_key, submission_digest, scope_digest, scope_json, expectation_json, pod_pin_json, attempt_id, permission_epoch, permission_sequence, identity_policy_uid, identity_policy_generation, identity_policy_digest, created_at, deadline, state, intent_acknowledged_at, intent_digest, intent_object_key, intent_object_version, intent_object_etag, intent_object_bytes, intent_object_sha256, progress_revision, deadline_observed_at, preview_id, intent_operation_id, share_instruction, history_cluster_id, history_namespace_uid, history_workload_uid, history_origin, history_parameters_required, repeated_from_capture_id, repeated_from_expires_at FROM context_capture WHERE root_id=$1 AND id=$2 AND history_workload_uid IS NOT NULL
 `
 
 type ReadHistoryCaptureParams struct {
@@ -305,6 +328,9 @@ func (q *Queries) ReadHistoryCapture(ctx context.Context, arg ReadHistoryCapture
 		&i.HistoryNamespaceUid,
 		&i.HistoryWorkloadUid,
 		&i.HistoryOrigin,
+		&i.HistoryParametersRequired,
+		&i.RepeatedFromCaptureID,
+		&i.RepeatedFromExpiresAt,
 	)
 	return i, err
 }
