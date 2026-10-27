@@ -1,5 +1,73 @@
 # Sustained implementation progress
 
+## Storage readiness response reserve (2026-10-27)
+
+Installed run 40581901798 on 1862f1bf failed during the initial preview, before
+approval or submission: HTTP/2 `INTERNAL_ERROR` and private
+`facts/current/operation` (Go 478.226s; approved subtest 6.51s). Immediate timing
+shows target below 500ms, recorder below 2s, retention below 500ms, hint at least
+3s and storage consumption below 3s; these overlap and must not be added as
+serial costs. Storage waiting consumed the original five-second public window.
+This does not identify a lost refresh demand or justify changing SQL readiness,
+proof freshness or retrying effects. Source stayed unchanged; all 3,199 hashes
+independently matched, cleanup was empty; report SHA-256
+`86e320ba861ebb47c2c5ec92261459a8591843414eec5e4da8a4c8561e69c821`.
+CI 40581516812 and review passed that candidate; installed approval remains
+unqualified.
+
+Optional readiness scheduling now stops one second before the actual parent
+context deadline, bounded by every earlier original authority cutoff. The
+original request, identity and authoritative-read context stay unchanged. A
+short parent still gets a fresh read; thin storage in the reserved tail returns
+existing retryable unavailability without demand or polling. Before that tail,
+the same single demand may run; ending the wait permits one final authoritative
+read. The hint is always joined. A fresh result never bypasses original
+selection, authority or final checks. One second is a candidate informed by
+earlier completed native Finish marks below 100ms and pre-service marks below
+250ms. The failed run does not establish its Finish duration. Slow final reads
+or audit can still consume the reserve; this is an opportunity to deliver a
+refusal, not a completion guarantee.
+
+Complexity assessment for this bounded scheduling correction:
+
+1. Observed: two installed initial-preview stream resets, latest before any
+   approval; inability to deliver a typed refusal harms the ordinary workflow.
+2. No previously accepted risk is reopened; original authority remains binding.
+3. It affects ordinary Preview, Request and CheckDiagnostic readiness waits.
+4. It uses standard parent contexts and existing typed refusal; no new remote
+   mechanism or protocol requires a project-specific precedent.
+5. Added privileges, credentials, endpoints and network requests: zero.
+6. New public failure or fallback states: zero; the existing refusal occurs sooner.
+7. New configuration: zero; the fixed reserve is scheduling only.
+8. New external dependencies: zero; current storage and audit remain dependencies.
+9. At most one extra bounded context/timer per active consumption when the
+   readiness cutoff precedes its authority deadline; the existing hint timer
+   ends earlier. No new goroutine, watch or persistent state. Poll and demand
+   counts cannot increase. Initial hint-read outcome and sole-demand duration
+   use fixed labels in the existing bounded StepTimes recorder, never per-poll
+   records or provider text. A nil demand result is not refresh acknowledgement.
+10. No schema, stored-format or wire change; rollback restores older scheduling
+    without rewriting state. Short-parent fresh success and cancellation stay
+    tested.
+11. Shortening only the hint would leave consumption polling able to exhaust
+    the request; extending authority or adding another demand is unnecessary.
+
+The focused app regression failed before the change: thin storage used its
+750ms parent, and a blocked hint used its full 1.25s parent then attempted a
+demand. After the change, the initial focused cases pass in 0.252s. Full capture
+race tests pass in 10.870s, including final fresh read, no tail hint/demand/poll,
+short-parent fresh success and original selection/cancellation checks. Two
+existing tests now explicitly cover the reserved tail rather than expecting
+optional waits to consume short parents. Earlier intermediate failures are
+retained in `storage-reserve-capture-race*.log`: the first exposed those old
+expectations, the second a duplicate equal-deadline timer race; reusing the
+original authority context when no earlier wait cutoff exists fixes that race.
+Capture vet, spec-check (13,269 assertions), architecture-check (1,326 positive
+checks) and Go architecture (66 packages, 386 edges) pass. The first contract
+invocation referenced a missing local virtualenv; the preserved second run uses
+the existing spec virtualenv and exits 0. Installed requalification and composed
+HTTP/2 regression results remain separate pending gates.
+
 ## API target metadata and completed query bounds (ADR-260, 2026-10-27)
 
 The shared target/readiness candidate e6a2fbfb passed CI and review but its
