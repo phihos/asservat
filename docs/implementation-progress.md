@@ -1,5 +1,38 @@
 # Sustained implementation progress
 
+## API target metadata and completed query bounds (ADR-260, 2026-10-27)
+
+The shared target/readiness candidate e6a2fbfb passed CI and review but its
+installed run 40563988015 still failed at `request/facts/current/target` before
+admission (Go 624.070s; approved subtest 129.68s includes the deliberate
+120-second preview wait). Sources stayed unchanged, all 3,193 hashes matched,
+cleanup was empty; report SHA-256
+`1356fd01e52d8ecbc07d908dc9e0b494eb5f3ee8b19750fdc39d61cb46bf6816`.
+That failure does not measure which constituent target cutoff expired.
+
+Source review found that API target metadata inherited both the regional owner
+context deadline and the hub receiver/frame proof cutoff. A composed
+noncollector regression reproduces the premature expiry through the actual
+coordinator, eligibility evaluator, router/streams and API adapter with a TLS
+fake API: query completion under 250ms transport proofs followed by a 400ms
+storage read is refused before admission. Its authority/control inputs are
+synthetic, so it is protocol/coordinator evidence only.
+
+[ADR-260](decisions/260-api-target-observation-freshness.md) revises that
+agent-authored coupling uniformly for API target metadata. Successful query I/O
+and completion retain every original source/peer/caller deadline. The returned
+observation keeps only its earliest target read's original five seconds; receipt
+cannot renew it or raise an earlier producer cutoff. C09's original request
+deadline and current identity, deny, grant, recovery and effect guards remain.
+NodeExecution and authority-bearing query answers retain their old bounds.
+The change adds no API calls, configuration, watchers, timers or stored state.
+The composed matrix passes locally (7.387s), as do independent expiry/selection
+and shorter-producer tests, final affected races (targets 1.008s, capture 10.498s,
+context-start 10.831s, bootstrap 52.215s), full pre-push and the real libpcap/static
+build check. A separate read-only review found no blocking regression. Fresh
+hosted CI/review and the installed result remain pending; no installed approved
+capture has passed yet.
+
 ## Approved packet request: local target composition correction (2026-10-27)
 
 Native run 40557482326 on 23bf0042 failed before admission with
@@ -31,6 +64,25 @@ interfaces, API requests, timers, goroutines or durable state were added.
 The combined candidate still needs final gates, review and native qualification.
 
 ## Encrypted capture history (ADR-255, implementation checkpoint)
+
+The next isolated composition merges exact PR100 candidate `21806d0d` and
+ADR-260 without conflicts. The four changed production target/transport files
+remain byte-identical to that candidate. API metadata retains its earliest-read
+five-second interval after a successfully completed authenticated query; I/O,
+current authority, the original Request context, exact target identity and
+queue-time checks keep their independent bounds. History schema 101, encrypted
+settings, source-cutoff repeat and the canonical installed browser caller remain
+unchanged. PR100's installed run was still pending at composition.
+
+Selected race tests across Kubernetes, context transport, bootstrap, capture
+and the object-store codec passed; domain capture compiled with no matching
+tests in that selection. Coverage includes the composed short
+transport-proof/longer target-observation regression and its original-authority
+negative cases. Specification, architecture, Go dependency rules and pinned
+61-file SQL generation passed. No unsplit Kubernetes package or external fixture
+was repeated. Existing SQL/S3 evidence stays attached to `11806a29`, and the
+prior built-browser evidence stays attached to its recorded source; neither
+is relabeled as installed history qualification for this new candidate.
 
 The current isolated composition also merges exact approved-recording candidate
 `e6a2fbfb`, including combined packet target/recorder observation and its original

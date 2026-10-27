@@ -51,6 +51,7 @@ func TestTargetQueryReportsFinalValidationInsteadOfTransportSuccess(t *testing.T
 		change      func(*targets.PodResolution, *time.Time)
 	}{
 		{name: "accepted", label: "ok"},
+		{name: "producer-shorter", label: "ok", change: func(out *targets.PodResolution, _ *time.Time) { out.FreshUntil = now.Add(500 * time.Millisecond) }},
 		{name: "receiver-expired", label: "result/receiver-expired", change: func(_ *targets.PodResolution, until *time.Time) { *until = now }},
 		{name: "resolution-expired", label: "result/resolution-expired", change: func(out *targets.PodResolution, _ *time.Time) { out.FreshUntil = now }},
 		{name: "both-expired", label: "result/both-expired", change: func(out *targets.PodResolution, until *time.Time) { out.FreshUntil, *until = now, now }},
@@ -117,8 +118,8 @@ func TestTargetQueryReportsFinalValidationInsteadOfTransportSuccess(t *testing.T
 			job.result <- queryResult{until: until}
 			got := <-done
 			if tc.label == "ok" {
-				if got.err != nil || !got.pod.Valid(now) || !got.pod.FreshUntil.Equal(until) || got.pod.ObservedAt != out.ObservedAt {
-					t.Fatal("accepted resolution lost an original bound", got)
+				if got.err != nil || !got.pod.Valid(now) || !got.pod.FreshUntil.Equal(out.FreshUntil) || got.pod.ObservedAt != out.ObservedAt {
+					t.Fatal("accepted metadata lost its original observation bound", got)
 				}
 			} else if !errors.Is(got.err, targets.ErrUnavailable) || got.pod != (targets.PodResolution{}) {
 				t.Fatal("invalid resolution was accepted", got)

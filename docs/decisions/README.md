@@ -1021,3 +1021,5 @@ The brief's domain-registration and trademark work remains a maintainer-owned pu
 - [252 — Approved capture acceptance](252-approved-capture-acceptance.md): retain bounded immutable review blueprints and fix a separately bounded capture deadline under the original current grant.
 
 - [ADR-257: preserve authored packet evidence funding](257-approved-recording-funding.md)
+
+- [ADR-260: API target observations after completed authenticated queries](260-api-target-observation-freshness.md)

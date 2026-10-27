@@ -67,9 +67,9 @@ func (c *PodTargets) resolveAPIContextPodWithPacketNode(ctx context.Context, r v
 	if last.owner != nil {
 		out.Pin.ControllerUID = string(last.owner.UID)
 	}
-	if deadline, ok := ctx.Deadline(); ok && deadline.Before(out.FreshUntil) {
-		out.FreshUntil = deadline
-	}
+	// The completed API snapshot keeps its own first-read observation window.
+	// The original context still bounds every read and the current check below;
+	// a shorter transport/owner lease is not the lifetime of this metadata.
 	if c.client.current(ctx, start, 5*time.Second) != nil || !out.Valid(c.client.now()) {
 		return value.PodResolution{}, "", value.ErrUnavailable
 	}

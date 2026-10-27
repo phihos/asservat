@@ -78,13 +78,22 @@ Before any capture exists, preview and request target resolution use pre-work
 target queries on an idle standby under
 [ADR-179](../docs/decisions/179-outbound-only-first-installed-profile.md). The
 region answers while it still waits for work, from its own cluster, after a
-current check of the hub owner. The hub uses an answer only while the region
-receiver checked for that query remains valid. A query executes no operation
+current check of the hub owner. Source/receiver authentication, frame I/O and
+matched completion must finish within their original bounds. Under
+[ADR-260](../docs/decisions/260-api-target-observation-freshness.md), successfully
+returned API-class target metadata retains at most five seconds from its
+earliest constituent target read, even if that particular transport proof
+expires afterward. Nested selection/resolution never restarts that interval;
+an earlier producer cutoff is never raised. Current caller, identity,
+permission, recovery, grant and effect deadlines remain independently binding.
+Other authority-bearing answers retain their receiver-result bounds.
+A query executes no operation
 and confers no capture authority. Each exchange answers at most eight queries.
 Under [ADR-211](../docs/decisions/211-completed-query-standby-transition.md), a
 fully matched and completed hub query may return its socket deadlines to the
 original passive standby cutoff after joining its I/O callbacks. Its result
-retains the original target/receiver freshness. Queries exclusively reserve
+retains its applicable original observation/authority bounds; it never starts a
+new lifetime at completion. Queries exclusively reserve
 their standby until completion; capture attachment cannot interleave source
 reads. Failed, cancelled, expired or uncertain exchanges never regain time,
 and an attempted work lease permanently excludes this passive transition.
