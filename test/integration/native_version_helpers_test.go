@@ -28,6 +28,9 @@ const nativeMixedNew = "fa69b01948edf9d7baf1f00453e1482a224fd4ea"
 type nativeVersionInput struct {
 	Action                         string
 	Postgres                       string
+	SQLRoots                       []byte
+	SQLServerName                  string
+	SQLMinimumVersion              uint16
 	Root, Installation             string
 	TopologySource                 privacy.PolicySourceRef
 	Profile                        value.DownloadWorkerProfile
@@ -170,6 +173,6 @@ func runNativeVersion(t *testing.T, ctx context.Context, binary nativeVersionBin
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("version=%s action=%s stage=%s accepted=%t class=%s elapsed=%s readerCalls=%d dataFrames=%d dataBytes=%d", binary.Revision[:8], in.Action, out.Stage, out.Accepted, out.ErrorClass, time.Since(started), out.ReaderCalls, out.DataFrames, out.DataBytes)
+	t.Logf("version=%s action=%s stage=%s accepted=%t class=%s elapsed=%s sequence=%d operationSHA256=%s leaseUntil=%s readerCalls=%d dataFrames=%d dataBytes=%d", binary.Revision[:8], in.Action, out.Stage, out.Accepted, out.ErrorClass, time.Since(started), out.Sequence, out.OperationSHA256, out.Until.UTC().Format(time.RFC3339Nano), out.ReaderCalls, out.DataFrames, out.DataBytes)
 	return out
 }

@@ -1,8 +1,9 @@
 # Native response version boundary qualification
 
 Date: 2026-10-27. Requirements: REQ-DLD-002/003/004.
-Status: actual worker subprocess/transport checks pass; shared SQL pair and
-operational rollout remain unrun. This is test-only qualification work.
+Status: actual worker subprocess/transport checks pass; the first shared SQL
+pair attempt failed before claim. Its fixture TLS correction and operational
+rollout remain unqualified. This is test-only qualification work.
 
 The old production tree is canonical PR100 main
 `eed8594020645fe6d10f8c6565e69a6235c7507d`; the new tree is PR101
@@ -62,7 +63,7 @@ logs are in `~/.cache/asservat-build/native-mixed-version-build-1/manifest.json`
 and `~/.cache/asservat-build/codex-bf86-resume/native-mixed-*.log`. Both binaries
 compile schema 100; a common schema floor does not prove native semantic support.
 
-## Shared SQL owner pair prepared, not run
+## Shared SQL owner pair remains unqualified
 
 The additional `download-worker-native-owner-mixed` case reuses the existing
 native exchange's real PostgreSQL, encrypted S3 audit, enrollment/certificate,
@@ -94,8 +95,42 @@ operation checks identity preservation. An existing-admin fixture snapshot check
 that source/window identities, original deadlines, allocations, spent/uncertain
 charges and used-key masks never reset or refill. No payload success is claimed
 by this SQL-only sequence. The case retains the existing 20s native phase bound.
-Compilation passes; no real SQL execution or SQL syntax qualification is claimed.
-The external PG/S3 slot must be coordinated before running it.
+The first owned SQL attempt on 517ce699 failed at the old helper's constructor,
+before any old claim/observation/renewal effect: Go 6.088s, selected subtest 5.64s,
+runner phase 8.878s, exit 1 and no passing selected tests. All 3,191 frozen source
+hashes matched, cleanup was empty, and both owned containers and their network
+were absent. The environment report SHA-256 is
+`b3a87db33b2a3b87891ad7fe124e29ad81a10f37dd08b30f00120e930c2c7f6a`;
+report, Go/provider logs and the original frozen build manifest are archived in
+`~/.cache/asservat-build/codex-bf86-resume/native-owner-mixed-1-artifacts`.
+This is a fixture setup failure, not a mixed-version refusal qualification.
+
+The fixture pool installs verified pgTLSBridge TLSConfig separately from its
+original `sslmode=disable` connection string. Serializing only ConnString dropped
+that configuration; the helper rebuilt TLS=nil and the unchanged ledger
+constructor correctly refused it. The correction acquires an existing pool
+connection, reads its verified tls.Conn chain, transfers only the public root
+plus the configured ServerName/minimum version through bounded private stdin,
+and releases the connection before child work. It adds no SQL query, bridge,
+probe, new trust source or insecure fallback. Helpers restore verified TLS and
+clear fallback connections; the ledger validation is unchanged.
+
+An explicit-file real local TLS unit proves preserved trust succeeds while a
+wrong root/name and absent TLS fail closed (parent race exit 0, 1.065s). Its first
+negative test accidentally reused httptest's same default certificate as the
+wrong root; that failed fixture is retained, and the corrected test generates
+a distinct unrelated CA. This checks helper configuration, not PostgreSQL
+startup/authentication or mixed adapter effects. Rebuilt old/new executables
+retain their exact production trees, with fixture SHA-256
+`79b4e18e4381a82ea05f5c4be198856c81f24259ea5686f23ab2d6f8795de748`
+and the new immutable build2 manifest. Build1 remains unchanged.
+The corrected build2 worker/boundary parent race suite exits 0 in 4.504s, and
+full canonical pre-push plus explicit-file helper vet exit 0. These checks do
+not qualify a mixed SQL claim or the actual PostgreSQL authentication path.
+The next owned PG/S3 run requires root coordination and fresh source freezing;
+no retry has run. Initial accounting counters and their snapshot hash are now
+logged without identities or payloads, alongside operation hashes/sequences and
+actual old cleanup results.
 
 Canonical `make pre-push` exits 0 with the existing spec virtualenv and pinned
 sqlc, including 218 console checks; explicit-file helper vet and Python syntax

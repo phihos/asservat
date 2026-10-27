@@ -3,8 +3,10 @@ package integration
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"testing"
 	"time"
 
@@ -22,6 +24,9 @@ import (
 func qualifyNativeMixedOwners(t *testing.T, ctx context.Context, f nativeExchangeFixture, owners *postgres.NativeOwners, pool *pgxpool.Pool, enrollment value.WorkerEnrollment, peer value.KeyPeer, session artifact.DownloadSession, metadata artifact.NativeDownloadMetadata, objects *objectstore.DownloadWindowAuditObjects) {
 	t.Helper()
 	manifest := nativeVersionManifestFor(t)
+	// Export only the public root of the existing, verified SQL connection.
+	// No new bridge, SQL query or trust source is created for the subprocess.
+	sqlRoots, sqlServerName, sqlMinimumVersion := nativeVersionSQLTrust(t, ctx, pool)
 	responseID, ownerID, windowID := custodyID(), custodyID(), custodyID()
 	plan := artifact.DownloadResponsePlan{Version: artifact.DownloadResponseVersion, Selection: artifact.DownloadSelection{Length: metadata.Size}, WholeFile: true, WindowReadLimit: evidence.NativeWindowReadWork(f.published.Expectation.Type())}
 	response, err := f.runtime.BeginDownloadResponse(ctx, session.ID, f.authority(), artifact.DownloadResponse{ID: responseID, SessionID: session.ID, OwnerID: ownerID, Plan: plan, Until: session.Deadline})
@@ -64,6 +69,12 @@ func qualifyNativeMixedOwners(t *testing.T, ctx context.Context, f nativeExchang
 		return encoded
 	}
 	initial := snapshot()
+	var counters []json.RawMessage
+	if json.Unmarshal([]byte(initial), &counters) != nil || len(counters) != 27 {
+		t.Fatal("invalid accounting snapshot shape")
+	}
+	digest := sha256.Sum256([]byte(initial))
+	t.Logf("mixed initial accounting SHA256=%x chargedOutput=%s chargedRead=%s requests=%s reservedResponses=%s reservedWindows=%s chargedRows=%s chargedKeys=%s preparationUsedRoles=%s nativeKeyCount=%s nativeUsedRoles=%s", digest, counters[4], counters[5], counters[6], counters[8], counters[9], counters[11], counters[12], counters[24], counters[25], counters[26])
 	unchanged := func() {
 		t.Helper()
 		if snapshot() != initial {
@@ -88,7 +99,7 @@ func qualifyNativeMixedOwners(t *testing.T, ctx context.Context, f nativeExchang
 		if action == "claim" {
 			authority = claimAuthority[operation.Reference.OperationID]
 		}
-		return nativeVersionInput{Action: action, Postgres: pool.Config().ConnConfig.ConnString(), Root: f.allocation.RootID, Installation: enrollment.Worker.Binding.InstallationID, TopologySource: f.topologySource, Profile: enrollment.Worker.Intent.Profile, Enrollment: enrollment, Authority: authority, Operation: operation, Peer: peer}
+		return nativeVersionInput{Action: action, Postgres: pool.Config().ConnConfig.ConnString(), SQLRoots: sqlRoots, SQLServerName: sqlServerName, SQLMinimumVersion: sqlMinimumVersion, Root: f.allocation.RootID, Installation: enrollment.Worker.Binding.InstallationID, TopologySource: f.topologySource, Profile: enrollment.Worker.Intent.Profile, Enrollment: enrollment, Authority: authority, Operation: operation, Peer: peer}
 	}
 	accepted := func(version, action string, operation value.NativeOperation) nativeVersionOutput {
 		t.Helper()
@@ -183,4 +194,28 @@ func qualifyNativeMixedOwners(t *testing.T, ctx context.Context, f nativeExchang
 	nextDelivery()
 	denied("new", "renew", long)
 	t.Log("actual old-created short owner/new observation and expiry; new long owner/old refusal; monotonic renewal, observed version-specific cleanup, no refill; original window stays conservatively charged")
+}
+
+func nativeVersionSQLTrust(t *testing.T, ctx context.Context, pool *pgxpool.Pool) ([]byte, string, uint16) {
+	t.Helper()
+	config := pool.Config().ConnConfig.TLSConfig
+	if config == nil || config.InsecureSkipVerify || config.ServerName == "" || config.MinVersion < tls.VersionTLS12 {
+		t.Fatal("existing SQL pool has no verified TLS configuration")
+	}
+	acquired, err := pool.Acquire(ctx)
+	if err != nil {
+		t.Fatal("existing SQL connection unavailable")
+	}
+	defer acquired.Release()
+	conn, ok := acquired.Conn().PgConn().Conn().(*tls.Conn)
+	if !ok {
+		t.Fatal("existing SQL connection is not TLS")
+	}
+	state := conn.ConnectionState()
+	if !state.HandshakeComplete || len(state.VerifiedChains) == 0 || len(state.VerifiedChains[0]) == 0 {
+		t.Fatal("existing SQL TLS chain was not verified")
+	}
+	chain := state.VerifiedChains[0]
+	root := chain[len(chain)-1]
+	return pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: root.Raw}), config.ServerName, config.MinVersion
 }

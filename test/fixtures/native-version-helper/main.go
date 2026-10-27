@@ -39,6 +39,9 @@ var productionRevision string
 type input struct {
 	Action                         string
 	Postgres                       string
+	SQLRoots                       []byte
+	SQLServerName                  string
+	SQLMinimumVersion              uint16
 	Root, Installation             string
 	TopologySource                 privacy.PolicySourceRef
 	Profile                        value.DownloadWorkerProfile
@@ -128,6 +131,20 @@ type renewer interface {
 	RenewNativeOperation(context.Context, value.NativeReference, artifact.DownloadAuthority, value.KeyPeer) (value.NativeLease, error)
 }
 
+func postgresConfig(in input) (*pgxpool.Config, error) {
+	config, err := pgxpool.ParseConfig(in.Postgres)
+	if err != nil || config.ConnConfig.User != "native_owner_runtime" || config.ConnConfig.Database != "custody_test" || in.SQLServerName == "" || in.SQLMinimumVersion < tls.VersionTLS12 {
+		return nil, artifact.ErrInvalid
+	}
+	roots := x509.NewCertPool()
+	if !roots.AppendCertsFromPEM(in.SQLRoots) {
+		return nil, artifact.ErrInvalid
+	}
+	config.ConnConfig.TLSConfig = &tls.Config{RootCAs: roots, ServerName: in.SQLServerName, MinVersion: in.SQLMinimumVersion}
+	config.ConnConfig.Fallbacks = nil
+	return config, nil
+}
+
 func owner(ctx context.Context, in input, out output) output {
 	switch in.Action {
 	case "claim", "observe", "renew", "release":
@@ -135,8 +152,8 @@ func owner(ctx context.Context, in input, out output) output {
 		return out
 	}
 	out.Stage = "pool"
-	config, err := pgxpool.ParseConfig(in.Postgres)
-	if err != nil || config.ConnConfig.User != "native_owner_runtime" || config.ConnConfig.Database != "custody_test" {
+	config, err := postgresConfig(in)
+	if err != nil {
 		return out
 	}
 	config.MaxConns = 1
