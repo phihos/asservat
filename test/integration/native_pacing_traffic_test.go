@@ -1,13 +1,19 @@
 package integration
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
-	"net/http/httptest"
-	"strconv"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,46 +31,12 @@ const nativeTrafficPhase = 8500 * time.Millisecond
 type nativeTrafficResult struct {
 	Batches, Records, Bytes int64
 	Elapsed                 time.Duration
-}
-
-// The installed caller supplies a stream to the exact selected Pod's existing
-// /traffic endpoint, after the exact accepted source reports Running. Capture/traffic timestamp overlap
-// must be measured by the installed caller. No retry/target choice
-// occurs here. Sixteen batches spread finite traffic over a ten-second capture.
-func nativePacingTraffic(ctx context.Context, open func(context.Context, int) (*http.Response, error)) (out nativeTrafficResult, err error) {
-	started := time.Now()
-	defer func() { out.Elapsed = time.Since(started) }()
-	if ctx == nil || open == nil || ctx.Err() != nil {
-		return out, errors.New("traffic caller unavailable")
-	}
-	phase, cancel := context.WithTimeout(ctx, nativeTrafficPhase)
-	defer cancel()
-	for i := range nativeTrafficBatches {
-		wait := time.NewTimer(max(0, time.Until(started.Add(time.Duration(i)*nativeTrafficInterval))))
-		select {
-		case <-phase.Done():
-			wait.Stop()
-			return out, phase.Err()
-		case <-wait.C:
-		}
-		response, err := open(phase, nativeTrafficRecordsPerBatch)
-		if err != nil {
-			return out, err
-		}
-		if response == nil || response.Body == nil {
-			return out, errors.New("traffic stream missing")
-		}
-		expected := int64(nativeTrafficRecordsPerBatch * nativeTrafficRecordBytes)
-		read, readErr := io.Copy(io.Discard, io.LimitReader(response.Body, expected+1))
-		response.Body.Close()
-		out.Bytes += read
-		if readErr != nil || response.StatusCode != http.StatusOK || read != expected || response.Header.Get("X-Fixture-Traffic-Max-Bytes") != strconv.FormatInt(expected, 10) || response.Trailer.Get("X-Fixture-Traffic-Writes") != strconv.Itoa(nativeTrafficRecordsPerBatch) || response.Trailer.Get("X-Fixture-Traffic-Bytes") != strconv.FormatInt(expected, 10) || response.Trailer.Get("X-Fixture-Traffic-Complete") != "true" {
-			return out, errors.New("traffic did not acknowledge exact bounded batch")
-		}
-		out.Batches++
-		out.Records += nativeTrafficRecordsPerBatch
-	}
-	return out, phase.Err()
+	Failure                 string
+	LastStatus              int
+	LastBodyBytes           int64
+	LastAcknowledged        bool
+	ClientElapsed           time.Duration
+	ReceiptValid            bool
 }
 
 // A measured small artifact never qualifies the near-full-window experiment.
@@ -76,52 +48,7 @@ func nativePacingRequireNearFullRecording(size int64) error {
 	return nil
 }
 
-func TestNativePacingTrafficBoundedBatches(t *testing.T) {
-	// The runner consumes the same bounded receipt protocol. The actual
-	// ignored provider handler has separate explicit-file HTTP unit tests.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		records, err := strconv.Atoi(r.URL.Query().Get("records"))
-		if err != nil || records != nativeTrafficRecordsPerBatch {
-			t.Error("unexpected batch request")
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		w.Header().Set("X-Fixture-Traffic-Max-Bytes", strconv.Itoa(records*nativeTrafficRecordBytes))
-		w.Header().Set("Trailer", "X-Fixture-Traffic-Writes, X-Fixture-Traffic-Bytes, X-Fixture-Traffic-Complete")
-		var record [nativeTrafficRecordBytes]byte
-		for range records {
-			if _, err := w.Write(record[:]); err != nil {
-				return
-			}
-			w.(http.Flusher).Flush()
-		}
-		w.Header().Set("X-Fixture-Traffic-Writes", strconv.Itoa(records))
-		w.Header().Set("X-Fixture-Traffic-Bytes", strconv.Itoa(records*nativeTrafficRecordBytes))
-		w.Header().Set("X-Fixture-Traffic-Complete", "true")
-	}))
-	defer server.Close()
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	var calls int
-	result, err := nativePacingTraffic(ctx, func(ctx context.Context, records int) (*http.Response, error) {
-		calls++
-		request, _ := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+"/traffic?records="+strconv.Itoa(records), nil)
-		return server.Client().Do(request)
-	})
-	if err != nil || calls != nativeTrafficBatches || result.Records != nativeTrafficRecords || result.Bytes != nativeTrafficPayload || result.Elapsed > nativeTrafficPhase {
-		t.Fatal("traffic exceeded finite application budget or missed completion", err, calls, result)
-	}
-	t.Logf("loopback traffic: %d batches/%d writes/%d application bytes in %.3fs; packet/native size remains unmeasured", result.Batches, result.Records, result.Bytes, result.Elapsed.Seconds())
-}
-
-func TestNativePacingTrafficNoRetryAndMeasuredSizeGate(t *testing.T) {
-	var calls int
-	if _, err := nativePacingTraffic(t.Context(), func(context.Context, int) (*http.Response, error) {
-		calls++
-		return nil, errors.New("synthetic unknown batch outcome")
-	}); err == nil || calls != 1 {
-		t.Fatal("unknown traffic batch retried", calls, err)
-	}
+func TestNativePacingMeasuredSizeGate(t *testing.T) {
 	for _, size := range []int64{4096, artifact.RecordingNativeLimit - nativePacingWindow - 1, artifact.RecordingNativeLimit + 1} {
 		if nativePacingRequireNearFullRecording(size) == nil {
 			t.Fatal("tiny or oversized artifact relabeled as near-full", size)
@@ -129,5 +56,144 @@ func TestNativePacingTrafficNoRetryAndMeasuredSizeGate(t *testing.T) {
 	}
 	if err := nativePacingRequireNearFullRecording(artifact.RecordingNativeLimit - nativePacingWindow); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// This binary was built CGO_ENABLED=0 by the existing fixture runner, copied
+// before collection, and hash-checked on each exact owned regional Kind node.
+type nativeTrafficHelper struct {
+	Cluster, SHA256 string
+	Nodes           []string
+}
+
+type nativeTrafficOutput struct{ bytes.Buffer }
+
+func (b *nativeTrafficOutput) Write(p []byte) (int, error) {
+	if b.Len()+len(p) > 2048 {
+		return 0, errors.New("traffic receipt exceeds bound")
+	}
+	return b.Buffer.Write(p)
+}
+
+func nativePacingNodeTraffic(ctx context.Context, helper nativeTrafficHelper, node, podIP string) (out nativeTrafficResult, err error) {
+	started := time.Now()
+	defer func() { out.Elapsed = time.Since(started) }()
+	ip := net.ParseIP(podIP)
+	if ctx == nil || ctx.Err() != nil || helper.Cluster == "" || len(helper.SHA256) != 64 || !slices.Contains(helper.Nodes, node) || ip == nil || !ip.IsPrivate() || ip.IsLoopback() {
+		return out, errors.New("exact owned traffic target unavailable")
+	}
+	phase, cancel := context.WithTimeout(ctx, nativeTrafficPhase)
+	defer cancel()
+	deadline, _ := phase.Deadline()
+	command := exec.CommandContext(phase, "docker", "exec", "-i", node, "/asservat-fixture-traffic", "traffic-client", ip.String(), deadline.UTC().Format(time.RFC3339Nano))
+	input, err := command.StdinPipe()
+	if err != nil {
+		return out, err
+	}
+	defer input.Close()
+	var output nativeTrafficOutput
+	command.Stdout = &output
+	command.Stderr = io.Discard
+	// EOF reaches the helper's cancellation reader. A failed join is a failed
+	// experiment; no detached helper is accepted as a successful traffic phase.
+	command.Cancel = func() error { return input.Close() }
+	command.WaitDelay = 250 * time.Millisecond
+	if err = command.Start(); err != nil {
+		return out, errors.New("owned traffic process unavailable")
+	}
+	stop := context.AfterFunc(phase, func() { _ = input.Close() })
+	processErr := command.Wait()
+	stop()
+	decoder := json.NewDecoder(bytes.NewReader(output.Bytes()))
+	decoder.DisallowUnknownFields()
+	if err = decoder.Decode(&out); err != nil {
+		out.Failure = "receipt"
+		return out, errors.New("owned traffic receipt unavailable")
+	}
+	out.ClientElapsed = out.Elapsed
+	if out.Batches < 0 || out.Batches > nativeTrafficBatches || out.Records != out.Batches*nativeTrafficRecordsPerBatch || out.Bytes < 0 || out.Bytes > nativeTrafficPayload+1 || out.LastBodyBytes < 0 || out.LastBodyBytes > nativeTrafficRecordsPerBatch*nativeTrafficRecordBytes+1 || out.Elapsed < 0 || !slices.Contains([]string{"", "deadline", "request", "acknowledgement"}, out.Failure) {
+		out.ReceiptValid = false
+		out.Failure = "receipt_shape"
+		return out, errors.New("owned traffic receipt exceeds finite shape")
+	}
+	var extra any
+	if decoder.Decode(&extra) != io.EOF {
+		out.ReceiptValid = false
+		out.Failure = "receipt_extra"
+		return out, errors.New("owned traffic receipt has extra output")
+	}
+	out.ReceiptValid = true
+	if processErr != nil && out.Failure == "" {
+		out.Failure = "process"
+	}
+	if processErr != nil || out.Failure != "" || out.Batches != nativeTrafficBatches || out.Records != nativeTrafficRecords || out.Bytes != nativeTrafficPayload || !out.LastAcknowledged || out.LastStatus != http.StatusOK || out.LastBodyBytes != nativeTrafficRecordsPerBatch*nativeTrafficRecordBytes || phase.Err() != nil {
+		return out, errors.New("owned traffic phase incomplete")
+	}
+	return out, nil
+}
+
+func TestNativePacingNodeTrafficCancellationClosesInputAndJoins(t *testing.T) {
+	work := t.TempDir()
+	marker := filepath.Join(work, "joined")
+	// A synthetic command observes EOF, writes its closed receipt and exits.
+	// It performs no Docker operation or network request.
+	script := "#!/bin/sh\n/bin/cat >/dev/null\nprintf joined > \"$ASSERVAT_TRAFFIC_JOIN_MARKER\"\nprintf '%s\\n' '{\"Failure\":\"deadline\"}'\nexit 1\n"
+	if err := os.WriteFile(filepath.Join(work, "docker"), []byte(script), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", work)
+	t.Setenv("ASSERVAT_TRAFFIC_JOIN_MARKER", marker)
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	result, err := nativePacingNodeTraffic(ctx, nativeTrafficHelper{Cluster: "owned", SHA256: strings.Repeat("1", 64), Nodes: []string{"owned-worker"}}, "owned-worker", "10.0.0.2")
+	if err == nil || result.Failure != "deadline" || result.Elapsed > time.Second {
+		t.Fatal("cancelled command accepted or did not join", result, err)
+	}
+	if b, e := os.ReadFile(marker); e != nil || string(b) != "joined" {
+		t.Fatal("EOF did not complete original process", e)
+	}
+}
+
+func TestNativePacingNodeTrafficRefusesForeignOrLoopbackTarget(t *testing.T) {
+	helper := nativeTrafficHelper{Cluster: "owned", SHA256: strings.Repeat("1", 64), Nodes: []string{"owned-worker"}}
+	for _, target := range []struct{ node, ip string }{{"foreign-worker", "10.0.0.2"}, {"owned-worker", "127.0.0.1"}, {"owned-worker", "example.invalid"}, {"owned-worker", "8.8.8.8"}} {
+		if _, err := nativePacingNodeTraffic(t.Context(), helper, target.node, target.ip); err == nil {
+			t.Fatal("unowned traffic destination admitted", target)
+		}
+	}
+}
+
+func TestNativePacingNodeTrafficRequiresClosedCompleteReceipt(t *testing.T) {
+	work := t.TempDir()
+	response := filepath.Join(work, "receipt")
+	if err := os.WriteFile(filepath.Join(work, "docker"), []byte("#!/bin/sh\n/bin/cat \"$ASSERVAT_TRAFFIC_RESPONSE\"\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", work)
+	t.Setenv("ASSERVAT_TRAFFIC_RESPONSE", response)
+	complete := `{"Batches":16,"Records":65536,"Bytes":4194304,"Elapsed":7500000000,"LastStatus":200,"LastBodyBytes":262144,"LastAcknowledged":true}`
+	for _, tc := range []struct {
+		name, receipt string
+		valid         bool
+	}{
+		{"complete", complete, true},
+		{"partial", `{"Batches":7,"Records":28672,"Bytes":1863232,"Failure":"deadline"}`, false},
+		{"missing acknowledgement", strings.Replace(complete, `"LastAcknowledged":true`, `"LastAcknowledged":false`, 1), false},
+		{"extra JSON", complete + `{}`, false},
+		{"unknown field", strings.TrimSuffix(complete, "}") + `,"unknown":1}`, false},
+		{"unbounded output", strings.Repeat("x", 2049), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := os.WriteFile(response, []byte(tc.receipt), 0600); err != nil {
+				t.Fatal(err)
+			}
+			result, err := nativePacingNodeTraffic(t.Context(), nativeTrafficHelper{Cluster: "owned", SHA256: strings.Repeat("1", 64), Nodes: []string{"owned-worker"}}, "owned-worker", "10.0.0.2")
+			if (err == nil) != tc.valid {
+				t.Fatal("synthetic process receipt wrongly accepted/refused", result, err)
+			}
+			if tc.valid && !result.ReceiptValid {
+				t.Fatal("complete synthetic receipt not marked valid")
+			}
+		})
 	}
 }

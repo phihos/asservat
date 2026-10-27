@@ -46,6 +46,7 @@ type nativePacingPhase struct {
 }
 
 type nativePacingMeasurement struct {
+	traffic                                                  nativeTrafficHelper
 	admin                                                    *pgxpool.Pool
 	root                                                     string
 	providers                                                *initialRuntimeNativeProviders

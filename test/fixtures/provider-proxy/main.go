@@ -29,6 +29,23 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 4 && os.Args[1] == "traffic-client" {
+		deadline, err := time.Parse(time.RFC3339Nano, os.Args[3])
+		ip := net.ParseIP(os.Args[2])
+		if err != nil || ip == nil || !ip.IsPrivate() || ip.IsLoopback() || !deadline.After(time.Now()) || time.Until(deadline) > 8500*time.Millisecond {
+			fmt.Fprintln(os.Stderr, "traffic client input refused")
+			os.Exit(1)
+		}
+		ctx, cancel := context.WithDeadline(context.Background(), deadline)
+		defer cancel()
+		go func() { var one [1]byte; _, _ = os.Stdin.Read(one[:]); cancel() }()
+		receipt := runTrafficClient(ctx, "http://"+net.JoinHostPort(ip.String(), "8080"))
+		_ = json.NewEncoder(os.Stdout).Encode(receipt)
+		if receipt.Failure != "" {
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) == 2 && os.Args[1] == "signals" {
 		if err := signals(); err != nil {
 			fmt.Fprintln(os.Stderr, "synthetic signal workload failed")
@@ -404,4 +421,65 @@ func (c *providerCounters) handler(next http.Handler) http.Handler {
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(c.snapshot())
 	})
+}
+
+// Fixed owned-node traffic client. It uses the selected Pod IP directly;
+// no proxy environment, redirect, replacement target or retry is available.
+type trafficClientReceipt struct {
+	Batches, Records, Bytes int64
+	Elapsed                 time.Duration
+	Failure                 string
+	LastStatus              int
+	LastBodyBytes           int64
+	LastAcknowledged        bool
+}
+
+func runTrafficClient(ctx context.Context, endpoint string) (out trafficClientReceipt) {
+	started := time.Now()
+	defer func() { out.Elapsed = time.Since(started) }()
+	transport := &http.Transport{Proxy: nil, MaxConnsPerHost: 1}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	for i := 0; i < 16; i++ {
+		wait := time.NewTimer(max(0, time.Until(started.Add(time.Duration(i)*500*time.Millisecond))))
+		select {
+		case <-ctx.Done():
+			wait.Stop()
+			out.Failure = "deadline"
+			return out
+		case <-wait.C:
+		}
+		out.LastStatus = 0
+		out.LastBodyBytes = 0
+		out.LastAcknowledged = false
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/traffic?records=4096", nil)
+		if err != nil {
+			out.Failure = "request"
+			return out
+		}
+		response, err := client.Do(request)
+		if err != nil {
+			out.Failure = "request"
+			return out
+		}
+		out.LastStatus = response.StatusCode
+		n, err := io.Copy(io.Discard, io.LimitReader(response.Body, 262145))
+		response.Body.Close()
+		out.Bytes += n
+		out.LastBodyBytes = n
+		if err != nil || response.StatusCode != http.StatusOK || n != 262144 || response.Header.Get("X-Fixture-Traffic-Max-Bytes") != "262144" || response.Trailer.Get("X-Fixture-Traffic-Writes") != "4096" || response.Trailer.Get("X-Fixture-Traffic-Bytes") != "262144" || response.Trailer.Get("X-Fixture-Traffic-Complete") != "true" {
+			out.Failure = "acknowledgement"
+			if ctx.Err() != nil {
+				out.Failure = "deadline"
+			}
+			return out
+		}
+		out.LastAcknowledged = true
+		out.Batches++
+		out.Records += 4096
+	}
+	if ctx.Err() != nil {
+		out.Failure = "deadline"
+	}
+	return out
 }

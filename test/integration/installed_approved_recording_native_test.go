@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"html"
 	"io"
 	"mime"
@@ -31,7 +30,6 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -371,8 +369,8 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 		t.Fatal("real preview has not expired")
 	}
 	realWait := time.Since(waitStarted)
-	// Real synthetic HTTP traffic goes through the Kubernetes Pod proxy to the
-	// exact selected Pod. No replacement target or local host collector is used.
+	// Ordinary approved HTTP traffic uses the exact selected Pod proxy.
+	// The paced branch below uses its owned node directly to that same Pod.
 	cfg, err := clientcmd.BuildConfigFromFlags("", regionalConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -381,12 +379,6 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 	if err != nil {
 		t.Fatal(err)
 	}
-	trafficTransport, err := rest.TransportFor(cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	trafficClient := &http.Client{Transport: trafficTransport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	defer trafficClient.CloseIdleConnections()
 	traffic, endTraffic := context.WithCancel(ctx)
 	joined := make(chan struct{})
 	go func() {
@@ -437,14 +429,14 @@ func qualifyInstalledApprovedRecording(t *testing.T, ctx context.Context, identi
 			if err != nil {
 				t.Fatal(err)
 			}
+			// Keep traffic off the serialized API Pod proxy while targeting the
+			// same selected Pod UID/IP from its exact owned node network.
+			pod, e := region.CoreV1().Pods(namespace).Get(ctx, preview.Pods[0].Name, meta.GetOptions{})
+			if e != nil || string(pod.UID) != preview.Pods[0].UID || pod.Spec.NodeName == "" {
+				t.Fatal("exact traffic Pod is unavailable", e)
+			}
 			measurement.TrafficStartedAt = time.Now().UTC()
-			measurement.Traffic, err = nativePacingTraffic(ctx, func(c context.Context, records int) (*http.Response, error) {
-				request, err := http.NewRequestWithContext(c, http.MethodGet, strings.TrimSuffix(cfg.Host, "/")+"/api/v1/namespaces/"+url.PathEscape(namespace)+"/pods/"+url.PathEscape(preview.Pods[0].Name+":8080")+"/proxy/traffic?records="+fmt.Sprint(records), nil)
-				if err != nil {
-					return nil, err
-				}
-				return trafficClient.Do(request)
-			})
+			measurement.Traffic, err = nativePacingNodeTraffic(ctx, measurement.traffic, pod.Spec.NodeName, pod.Status.PodIP)
 			measurement.TrafficFinishedAt = time.Now().UTC()
 			if err != nil {
 				t.Fatal("bounded exact-target traffic", err)

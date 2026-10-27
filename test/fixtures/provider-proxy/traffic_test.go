@@ -7,6 +7,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
+	"net/url"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -78,4 +81,53 @@ func TestTrafficFullApplicationBudget(t *testing.T) {
 		t.Fatal("actual traffic handler did not complete finite maximum", n, err, response.Trailer)
 	}
 	t.Logf("actual fixture handler: %d application bytes, 65536 completed flushed writes; packet count unmeasured", n)
+}
+
+// Model only the serialized route's observed per-batch delay. This is not a
+// measurement of Kubernetes proxy internals or the installed capture path.
+func TestTrafficClientDirectAvoidsSerializedProxyDelay(t *testing.T) {
+	target := httptest.NewServer(trafficHandler())
+	defer target.Close()
+	parsed, _ := url.Parse(target.URL)
+	proxy := httputil.NewSingleHostReverseProxy(parsed)
+	delayed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		timer := time.NewTimer(1100 * time.Millisecond)
+		defer timer.Stop()
+		select {
+		case <-r.Context().Done():
+			return
+		case <-timer.C:
+		}
+		proxy.ServeHTTP(w, r)
+	}))
+	defer delayed.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), 8500*time.Millisecond)
+	indirect := runTrafficClient(ctx, delayed.URL)
+	cancel()
+	// The bounded delayed proxy must remain a failed measurement.
+	if indirect.Failure == "" || indirect.Batches == 16 {
+		t.Fatal("serialized proxy route unexpectedly completed the fixed traffic budget", indirect)
+	}
+	ctx, cancel = context.WithTimeout(t.Context(), 8500*time.Millisecond)
+	defer cancel()
+	direct := runTrafficClient(ctx, target.URL)
+	if direct.Failure != "" || direct.Batches != 16 || direct.Records != 65536 || direct.Bytes != 4194304 {
+		t.Fatal("direct traffic incomplete", direct)
+	}
+	t.Logf("synthetic proxy: batches=%d bytes=%d elapsed=%s failure=%s; direct: batches=%d bytes=%d elapsed=%s", indirect.Batches, indirect.Bytes, indirect.Elapsed, indirect.Failure, direct.Batches, direct.Bytes, direct.Elapsed)
+}
+
+func TestTrafficClientNeverRetriesUnknownBatch(t *testing.T) {
+	var calls atomic.Int64
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	result := runTrafficClient(ctx, server.URL)
+	if result.Failure != "acknowledgement" || result.Batches != 0 || calls.Load() != 1 {
+		t.Fatal("unknown batch retried", result, calls.Load())
+	}
 }
