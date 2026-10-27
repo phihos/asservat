@@ -75,8 +75,11 @@ func TestDownloadPolicyObservationNewRequestNearExpiry(t *testing.T) {
 			out, err := s.DownloadEnvironment(ctx, r, actor)
 			t.Logf("short=%t raw_reads=%d processing_bound_after_old=%s err=%v", short, reads, processingUntil.Sub(old.FreshUntil), err)
 			if short {
-				if err == nil || processingUntil.After(original) || ctx.Err() == nil {
-					t.Fatal("refresh extended original short caller", err)
+				// Compare the wall clock, not ctx.Err(): a nested WithDeadline at
+				// the same instant owns a separate timer, so the product can
+				// observe expiry and return before this caller's timer fires.
+				if err == nil || processingUntil.After(original) || time.Now().Before(original) {
+					t.Fatal("refresh extended original short caller", err, processingUntil.Sub(original), time.Since(original))
 				}
 				return
 			}
