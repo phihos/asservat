@@ -12,6 +12,17 @@ spec.loader.exec_module(fixture)
 
 
 class RegionalContextSelection(unittest.TestCase):
+    def test_numeric_statistics_are_an_explicit_fixture_option(self):
+        ordinary = fixture.postgres_fixture_options()
+        measured = fixture.postgres_fixture_options(native_statistics=True)
+        self.assertEqual(measured[:len(ordinary)], ordinary)
+        self.assertNotIn("shared_preload_libraries=pg_stat_statements", ordinary)
+        self.assertIn("shared_preload_libraries=pg_stat_statements", measured)
+        self.assertIn("pg_stat_statements.save=off", measured)
+        self.assertIn("fsync=on", measured)
+        self.assertIn("synchronous_commit=on", measured)
+        self.assertEqual(measured.count("max_connections=48"), 1)
+
     def test_approved_recording_refuses_missing_disposable_guard_before_setup(self):
         with patch.dict(os.environ, {"ASSERVAT_JOURNEY_FOCUS": "approved-recording"}), patch.object(fixture.Path, "is_file", return_value=False):
             with self.assertRaisesRegex(RuntimeError, "disposable-host guard"):

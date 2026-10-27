@@ -46,7 +46,7 @@ def run(args, *, data=None):
 
 
 
-def postgres_fixture_options(regional_context_start=None, lock_waits=False, installed_budget=None):
+def postgres_fixture_options(regional_context_start=None, lock_waits=False, installed_budget=None, native_statistics=False):
     if regional_context_start not in (None, "first", "continuation", "journey"):
         raise ValueError("unknown regional context qualification")
     options = ["-c", "max_connections=48", "-c", "shared_buffers=128MB", "-c", "fsync=on", "-c", "synchronous_commit=on"]
@@ -73,6 +73,13 @@ def postgres_fixture_options(regional_context_start=None, lock_waits=False, inst
                     "-c", "log_lock_waits=on", "-c", "deadlock_timeout=300ms", "-c", "log_connections=on", "-c", "log_disconnections=on",
                     "-c", "log_statement=none", "-c", "log_min_error_statement=panic",
                     "-c", "log_parameter_max_length=0", "-c", "log_parameter_max_length_on_error=0"]
+    if native_statistics:
+        # Owned measurement fixture only. No product tracer or statement logging.
+        # Numeric per-role counters are read by the existing fixture administrator;
+        # extension text/parameters are never exported. Do not persist its state.
+        options += ["-c", "shared_preload_libraries=pg_stat_statements",
+                    "-c", "pg_stat_statements.save=off",
+                    "-c", "pg_stat_statements.track=top"]
     if regional_context_start == "journey":
         # Owned synthetic fixture only. Diagnose the actual refused connection
         # without adding a pgx tracer (forbidden by product SQL constructors).

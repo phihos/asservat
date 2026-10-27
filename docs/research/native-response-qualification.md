@@ -128,12 +128,21 @@ request counts rather than subtracting them and calling the result exact.
   bounded method/operation counters and response-header latency snapshots, as
   defined below. Count no object names, query values, bodies, wrapped keys or
   credentials. Keep its current forwarding behavior. S3 audit/artifact effects
-  remain ambiguous within a method category; report that limitation. Key
-  operation totals can check the absence of per-piece provider unwraps.
+  remain ambiguous within a method category; report that limitation. These Bao
+  operation totals describe provider control work; installed artifact unwraps
+  use the separate local A-KEY service.
+- Local artifact keys: pin the existing SQL native owner/window and its single
+  native-key row. `used_roles=7` records three irreversible role authorizations
+  (data, index, manifest), consumed before backend crypto. Combined with a
+  successful authenticated native transfer/hash, this supports the inference
+  that its three required opens succeeded and renewal added no authorized opens.
+  Report `ConsumedKeySlots=3`, not a direct successful-decrypt or HTTP-attempt
+  count. Rejected requests and crypto followed by a failed post-check remain
+  unmeasured. Keep preparation and publisher verification separate.
 - SQL: use the owned PostgreSQL server's standard `pg_stat_statements` extension
   in fixture configuration only, if available in the pinned image. Read numeric
   call/time/row counters by the generated installation roles, without query text
-  or parameters. Snapshot statement identifiers and aggregates; label background
+  or parameters. Snapshot numeric per-role aggregates; label background
   activity. Calls count statement executions, not wire round trips;
   `total_exec_time` excludes planning time by default, and top-level execution
   includes stored-function work. These values are not exact end-to-end SQL

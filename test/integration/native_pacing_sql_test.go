@@ -1,0 +1,242 @@
+package integration
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"math"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+)
+
+// Owned-fixture measurements only. Counts are statements, not wire attempts;
+// execution time excludes planning by default. No SQL text, parameters, role
+// names or credentials enter the report. The snapshot reader's role is excluded.
+type nativeSQLCounters struct {
+	Calls, Rows, Statements int64
+	ExecutionMilliseconds   float64
+}
+
+type nativeSQLSnapshot struct {
+	StartedAt, FinishedAt, ResetAt time.Time
+	Deallocations                  int64
+	Roles                          map[uint32]nativeSQLCounters
+}
+
+func nativePacingSQLSnapshot(ctx context.Context, admin *pgxpool.Pool) (nativeSQLSnapshot, error) {
+	s := nativeSQLSnapshot{StartedAt: time.Now().UTC(), Roles: make(map[uint32]nativeSQLCounters)}
+	if ctx == nil || ctx.Err() != nil || admin == nil {
+		return s, errors.New("SQL measurement unavailable")
+	}
+	call, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	const info = `SELECT stats_reset,dealloc FROM pg_stat_statements_info`
+	if err := admin.QueryRow(call, info).Scan(&s.ResetAt, &s.Deallocations); err != nil {
+		return s, errors.New("SQL measurement extension unavailable")
+	}
+	// This fixture database belongs to one installation. Include every other
+	// role, including background services, rather than guessing attribution
+	// from query text. Numeric deltas and an idle baseline remain separate.
+	rows, err := admin.Query(call, `SELECT userid,sum(calls)::bigint,sum(rows)::bigint,
+ sum(total_exec_time)::double precision,count(*)::bigint
+ FROM pg_stat_statements WHERE userid<>(current_user::regrole)::oid
+ AND dbid=(SELECT oid FROM pg_database WHERE datname=current_database())
+ GROUP BY userid ORDER BY userid LIMIT 513`)
+	if err != nil {
+		return s, errors.New("SQL counters unavailable")
+	}
+	for rows.Next() {
+		var id uint32
+		var c nativeSQLCounters
+		if err := rows.Scan(&id, &c.Calls, &c.Rows, &c.ExecutionMilliseconds, &c.Statements); err != nil || !c.valid() || len(s.Roles) == 512 {
+			rows.Close()
+			return s, errors.New("SQL counter snapshot exceeds its finite shape")
+		}
+		s.Roles[id] = c
+	}
+	rows.Close()
+	if rows.Err() != nil {
+		return s, errors.New("SQL counter read failed")
+	}
+	var reset time.Time
+	var deallocations int64
+	if err := admin.QueryRow(call, info).Scan(&reset, &deallocations); err != nil || !reset.Equal(s.ResetAt) || deallocations != s.Deallocations {
+		return s, errors.New("SQL counters reset or evicted during snapshot")
+	}
+	s.FinishedAt = time.Now().UTC()
+	return s, nil
+}
+
+func (c nativeSQLCounters) valid() bool {
+	return c.Calls >= 0 && c.Rows >= 0 && c.Statements >= 0 && c.ExecutionMilliseconds >= 0 && !math.IsInf(c.ExecutionMilliseconds, 0) && !math.IsNaN(c.ExecutionMilliseconds)
+}
+
+// Reject lost statistics instead of reporting a negative/zero invented cost.
+// Snapshot edges span actual reads while background work continues; these are
+// background-inclusive intervals, not an atomic trace of one HTTP request.
+func nativePacingSQLDelta(before, after nativeSQLSnapshot) (map[uint32]nativeSQLCounters, error) {
+	if before.ResetAt.IsZero() || !before.ResetAt.Equal(after.ResetAt) || before.Deallocations != after.Deallocations || before.Deallocations < 0 || before.StartedAt.After(before.FinishedAt) || after.StartedAt.Before(before.FinishedAt) || after.StartedAt.After(after.FinishedAt) || len(before.Roles) > 512 || len(after.Roles) > 512 {
+		return nil, errors.New("SQL snapshots are not comparable")
+	}
+	for id := range before.Roles {
+		if _, ok := after.Roles[id]; !ok {
+			return nil, errors.New("SQL role counters disappeared")
+		}
+	}
+	out := make(map[uint32]nativeSQLCounters, len(after.Roles))
+	for id, current := range after.Roles {
+		old := before.Roles[id]
+		d := nativeSQLCounters{Calls: current.Calls - old.Calls, Rows: current.Rows - old.Rows, Statements: current.Statements - old.Statements, ExecutionMilliseconds: current.ExecutionMilliseconds - old.ExecutionMilliseconds}
+		if !old.valid() || !current.valid() || !d.valid() {
+			return nil, errors.New("SQL counters moved backwards")
+		}
+		out[id] = d
+	}
+	return out, nil
+}
+
+func TestNativePacingSQLDeltaRejectsLostOrResetStatistics(t *testing.T) {
+	now := time.Now().UTC()
+	before := nativeSQLSnapshot{StartedAt: now, FinishedAt: now.Add(time.Millisecond), ResetAt: now.Add(-time.Hour), Roles: map[uint32]nativeSQLCounters{42: {Calls: 3, Rows: 7, Statements: 2, ExecutionMilliseconds: 1.25}}}
+	after := nativeSQLSnapshot{StartedAt: now.Add(time.Second), FinishedAt: now.Add(time.Second + time.Millisecond), ResetAt: before.ResetAt, Roles: map[uint32]nativeSQLCounters{42: {Calls: 5, Rows: 10, Statements: 2, ExecutionMilliseconds: 1.75}, 43: {Calls: 1, Rows: 1, Statements: 1, ExecutionMilliseconds: .1}}}
+	d, err := nativePacingSQLDelta(before, after)
+	if err != nil || d[42].Calls != 2 || d[42].Rows != 3 || d[42].ExecutionMilliseconds != .5 || d[43].Calls != 1 || before.Roles[42].Calls != 3 {
+		t.Fatal("valid numeric deltas changed or mutated their baseline", d, err)
+	}
+	for _, mode := range []string{"reset", "eviction", "missing role", "backwards", "overlap", "nonfinite"} {
+		t.Run(mode, func(t *testing.T) {
+			bad := after
+			bad.Roles = map[uint32]nativeSQLCounters{42: after.Roles[42]}
+			switch mode {
+			case "reset":
+				bad.ResetAt = bad.ResetAt.Add(time.Second)
+			case "eviction":
+				bad.Deallocations++
+			case "missing role":
+				delete(bad.Roles, 42)
+			case "backwards":
+				bad.Roles[42] = nativeSQLCounters{Calls: 1}
+			case "overlap":
+				bad.StartedAt = before.StartedAt
+			case "nonfinite":
+				bad.Roles[42] = nativeSQLCounters{ExecutionMilliseconds: math.NaN()}
+			}
+			if _, err := nativePacingSQLDelta(before, bad); err == nil {
+				t.Fatal("incomplete measurement accepted", mode)
+			}
+		})
+	}
+}
+
+// Explicit owned SQL fixture only; ordinary integration runs do not enable
+// this measurement extension. This verifies the real query, pgx types and
+// exclusion of the fixture administrator, not installed runtime attribution.
+func TestNativePacingSQLWithRealPostgres(t *testing.T) {
+	path := os.Getenv("ASSERVAT_CONTEXT_FIXTURES")
+	if path == "" {
+		t.Skip("owned numeric SQL measurement fixture not selected")
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal("SQL measurement fixture unavailable")
+	}
+	var f struct {
+		Postgres            string
+		NativeSQLStatistics bool
+	}
+	if json.Unmarshal(raw, &f) != nil {
+		t.Fatal("SQL measurement fixture is invalid")
+	}
+	if !f.NativeSQLStatistics {
+		t.Skip("numeric SQL measurement is not enabled in this fixture")
+	}
+	if f.Postgres == "" {
+		t.Fatal("owned SQL measurement fixture has no connection")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+	defer cancel()
+	admin, err := pgxpool.New(ctx, f.Postgres)
+	if err != nil {
+		t.Fatal("SQL measurement administrator unavailable")
+	}
+	var reader, otherDatabase *pgxpool.Pool
+	created := false
+	defer func() {
+		if otherDatabase != nil {
+			otherDatabase.Close()
+		}
+		if reader != nil {
+			reader.Close()
+		}
+		if created {
+			cleanup, end := context.WithTimeout(context.Background(), 5*time.Second)
+			defer end()
+			if _, err := admin.Exec(cleanup, `DROP ROLE fixture_native_pacing_statistics`); err != nil {
+				t.Error("owned measurement role cleanup failed")
+			}
+		}
+		admin.Close()
+	}()
+	if _, err := admin.Exec(ctx, `CREATE ROLE fixture_native_pacing_statistics LOGIN PASSWORD 'synthetic-only'`); err != nil {
+		t.Fatal("owned measurement role creation failed")
+	}
+	created = true
+	var role uint32
+	if err := admin.QueryRow(ctx, `SELECT oid FROM pg_roles WHERE rolname='fixture_native_pacing_statistics'`).Scan(&role); err != nil {
+		t.Fatal("measurement role identity unavailable")
+	}
+	before, err := nativePacingSQLSnapshot(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := pgxpool.ParseConfig(f.Postgres)
+	if err != nil {
+		t.Fatal("SQL fixture connection configuration invalid")
+	}
+	cfg.ConnConfig.User = "fixture_native_pacing_statistics"
+	cfg.ConnConfig.Password = "synthetic-only"
+	cfg.MaxConns = 1
+	reader, err = pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		t.Fatal("measurement role connection failed")
+	}
+	for range 2 {
+		var count int
+		if err := reader.QueryRow(ctx, `SELECT count(*) FROM generate_series(1,3)`).Scan(&count); err != nil || count != 3 {
+			t.Fatal("synthetic measured statement failed")
+		}
+	}
+	// The same login can have instance-wide statistics in another database.
+	// Its statement must not inflate this database's measured workflow.
+	if cfg.ConnConfig.Database != "postgres" {
+		other := cfg.Copy()
+		other.ConnConfig.Database = "postgres"
+		otherDatabase, err = pgxpool.NewWithConfig(ctx, other)
+		if err != nil {
+			t.Fatal("second fixture database connection failed")
+		}
+		var value int
+		if err := otherDatabase.QueryRow(ctx, `SELECT 7`).Scan(&value); err != nil || value != 7 {
+			t.Fatal("second database synthetic statement failed")
+		}
+	}
+	after, err := nativePacingSQLSnapshot(ctx, admin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delta, err := nativePacingSQLDelta(before, after)
+	if err != nil || delta[role].Calls != 2 || delta[role].Rows != 2 || delta[role].Statements != 1 {
+		t.Fatal("actual SQL counters did not isolate two role statements", err, delta)
+	}
+	var administrator uint32
+	if err := admin.QueryRow(ctx, `SELECT (current_user::regrole)::oid`).Scan(&administrator); err != nil {
+		t.Fatal("fixture administrator identity unavailable")
+	}
+	if _, ok := delta[administrator]; ok {
+		t.Fatal("fixture SQL snapshot counted its own reader")
+	}
+	t.Log("actual PostgreSQL numeric role counters isolate two statements; no query text or parameters exported")
+}
