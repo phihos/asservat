@@ -520,3 +520,97 @@ func TestPolicyGrantMetadataNeverOffersPersonalCaptureContinuation(t *testing.T)
 		}
 	}
 }
+
+func TestPolicyGrantCurrentSponsorCanInspectAfterRequesterDepartureWithoutDecisionAuthority(t *testing.T) {
+	f, in := newPolicyGrantFixture(t)
+	g, _, err := f.svc.RequestPolicy(t.Context(), grantIdentity{f.requester, &f.now}, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bob := f.requester
+	bob.Principal.Subject = "current-team-manager"
+	bob.Assurance = f.approver.Assurance
+	f.requester.Groups = nil
+	old := f.svc.WorkloadPermissions
+	reads := 0
+	f.svc.WorkloadPermissions = workloadProjectionFunc(func(ctx context.Context, target value.WorkloadTarget) (value.WorkloadProjection, error) {
+		reads++
+		return old.WorkloadPermissions(ctx, target)
+	})
+	v, until, err := f.svc.Get(t.Context(), grantIdentity{bob, &f.now}, g.ID)
+	if err != nil || v.Grant.ID != g.ID || !v.CanRevoke || v.Approver || v.CanResume || v.CanResolve || v.ResumeRequiresOriginalClient || !until.After(f.now) || reads != 1 {
+		t.Fatal("current sponsor cannot manage original team grant without becoming approver", v, until, reads, err)
+	}
+	if _, _, err = f.svc.Decide(t.Context(), grantIdentity{bob, &f.now}, g.ID, true, "current sponsor cannot review", "no-review"); !errors.Is(err, value.ErrNotApprover) {
+		t.Fatal("management implied decision authority", err)
+	}
+}
+
+func TestPolicyGrantManagerMetadataRefusesUnrelatedOrStaleAuthority(t *testing.T) {
+	for _, name := range []string{"wrong-workload", "stale-denies", "unavailable", "reader-only", "other-basis", "replaced-assignment", "changed-basis-digest", "lost-group"} {
+		t.Run(name, func(t *testing.T) {
+			f, in := newPolicyGrantFixture(t)
+			g, _, err := f.svc.RequestPolicy(t.Context(), grantIdentity{f.requester, &f.now}, in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			bob := f.requester
+			bob.Principal.Subject = "current-team-manager"
+			old := f.svc.WorkloadPermissions
+			reads := 0
+			f.svc.WorkloadPermissions = workloadProjectionFunc(func(ctx context.Context, target value.WorkloadTarget) (value.WorkloadProjection, error) {
+				reads++
+				p, err := old.WorkloadPermissions(ctx, target)
+				switch name {
+				case "wrong-workload":
+					p.Target.WorkloadUID = "another-workload"
+				case "stale-denies":
+					p.DeniesFreshUntil = f.now
+				case "unavailable":
+					return value.WorkloadProjection{}, errors.New("synthetic unavailable")
+				case "reader-only":
+					p.Allows[0].Audience.Role = "evidence-reader"
+				case "other-basis":
+					p.Allows[0].Audience.BasisUID = "different-binding"
+				case "replaced-assignment":
+					p.Allows[0].Audience.AssignmentID = grantID(999)
+				case "changed-basis-digest":
+					p.Allows[0].Audience.BasisDigest[0]++
+				}
+				return p, err
+			})
+			if name == "lost-group" {
+				bob.Groups = nil
+			}
+			if v, _, err := f.svc.Get(t.Context(), grantIdentity{bob, &f.now}, g.ID); !errors.Is(err, ErrGrantNotFound) || v.Grant.ID != "" || reads != 1 {
+				t.Fatal("historical/other team obtained policy configuration", name, v.Grant.ID, reads, err)
+			}
+		})
+	}
+}
+
+func TestPolicyGrantRequesterWithoutPinnedManagementGetsNoRevocationHint(t *testing.T) {
+	f, in := newPolicyGrantFixture(t)
+	current := grantIdentity{f.requester, &f.now}
+	g, _, err := f.svc.RequestPolicy(t.Context(), current, in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	old := f.svc.WorkloadPermissions
+	reads := 0
+	f.svc.WorkloadPermissions = workloadProjectionFunc(func(ctx context.Context, target value.WorkloadTarget) (value.WorkloadProjection, error) {
+		reads++
+		p, err := old.WorkloadPermissions(ctx, target)
+		p.Allows[0].Audience.AssignmentID = grantID(999)
+		return p, err
+	})
+	v, _, err := f.svc.Get(t.Context(), current, g.ID)
+	if err != nil || v.Grant.ID != g.ID || v.CanRevoke || v.Approver || reads != 1 {
+		t.Fatal("collection provenance implied current pinned team management", v.CanRevoke, v.Approver, reads, err)
+	}
+	reads = 0
+	rows, _, err := f.svc.List(t.Context(), current, "requested", 10)
+	if err != nil || len(rows) != 1 || rows[0].CanRevoke || reads != 1 {
+		t.Fatal("requested list offered unavailable revocation", len(rows), reads, err)
+	}
+}

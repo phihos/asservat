@@ -61,7 +61,15 @@ Policy-grant requester metadata is also subject to current authorization: get an
 requested-list require current whole-workload collection rights on the exact
 approved workload, as request/replay already do. A former requester without those
 rights receives no grant detail and no requested-list row. Independent current
-approvers retain their review/inbox access. Service requester matching includes
+approvers retain their review/inbox access. Direct get_grant also permits an
+exact current pinned sponsoring workload-maintainer to inspect the existing
+policy configuration, finite original/effective dates and grant reservations,
+so team management remains usable after requester departure. It does not grant
+independent decision authority, a broader inbox, evidence/history access or
+personal capture continuation. The existing can_revoke flag reflects actual
+current reviewer or pinned-manager eligibility, not requester provenance;
+a requester retaining general collection rights but losing that management
+basis may inspect their grant but cannot revoke it. Service requester matching includes
 issuer, subject, client and principal kind; same-human metadata access across
 clients does not transfer a request journal or policy execution authority. Check
 identity/permission validity after blocking reads. Losing personal metadata access

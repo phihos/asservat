@@ -170,7 +170,7 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	// admit admits one policy-executor capture of the triggering Pod through
 	// the given admission adapter, with every current check.
 	var restartOrdinal int64 // the real Pod counter survives accepted-scope replacement
-	admitInput := func() capture.Admission {
+	admitInput := func(asAPI bool) capture.Admission {
 		t.Helper()
 		refresh()
 		observe()
@@ -195,6 +195,10 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		in := a.Plan.Input
 		in.CaptureID, in.Executor = custodyID(), executor.Principal
 		in.Deadline = now.Add(time.Minute)
+		if asAPI {
+			in.Target.ExecutionClass, in.Capability.ExecutionClass = artifact.ContextAPIExecution, artifact.ContextAPIExecution
+			in.Target.NodeUID, in.Target.NodeBootID, in.Target.Pin.NodeName = "", "", ""
+		}
 		// The test spans minutes: renew the scenario's synthetic Pod, capability,
 		// retention and storage-binding observations as the hub's readers would.
 		in.Target.ObservedAt, in.Target.FreshUntil = now, now.Add(5*time.Second)
@@ -229,9 +233,9 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		a.CaseID, a.OccurrenceID = custodyID(), custodyID()
 		return a
 	}
-	admit := func(admissions *postgres.ContextAdmissions) capture.Accepted {
+	admit := func(admissions *postgres.ContextAdmissions, asAPI ...bool) capture.Accepted {
 		t.Helper()
-		a := admitInput()
+		a := admitInput(len(asAPI) > 0 && asAPI[0])
 		got, err := admissions.AdmitContext(ctx, a)
 		if err != nil {
 			use := authorization.PolicyUse{PolicyUID: authority.PolicyUID, ScopeDigest: authority.ScopeDigest, Target: pod, Purpose: authorization.PolicyIncident}
@@ -328,16 +332,16 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 
 	// Acceptance A of generation 1 shares at most three captures.
 	first := accept(61, 3, time.Now().Add(time.Hour))
-	firstGrant := attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope)
+	firstGrant := attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope, "accounting-review")
 	hub := captureAdmissions("policy_share_admit_a_")
 	c1, c2 := admit(hub), admit(hub)
 	// A restarted hub (a new admission adapter) continues the stored counter.
 	restarted := captureAdmissions("policy_share_admit_b_")
-	c3, c4 := admit(restarted), admit(restarted)
+	c3, c4 := admit(restarted), admit(restarted, true)
 	// The same original grant/acceptance pools survive a new adapter and lost
 	// admission replies. A fifth occurrence stays pre-spent, but its refused
 	// capture adds neither grant nor output spend and creates no reservation.
-	refused := admitInput()
+	refused := admitInput(false)
 	if _, err := restarted.AdmitContext(ctx, refused); !errors.Is(err, capture.ErrCapacity) {
 		t.Fatal("exhausted attached grant admitted a fifth capture", err)
 	}
@@ -367,6 +371,12 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	f1, f2 := prepare(t, s, c1, true), prepare(t, s, c2, false)
 	publish(f1)
 	publish(f2)
+	// Existing intent publishers have now acknowledged all four original
+	// captures. Only c4 uses API execution, so this is the actual acquisition
+	// reader/gate without altering the existing Node publication fixtures.
+	qualifyOriginalPolicyGrantAcquisition(t, ctx, admin, poolFor, s, authority, c4, firstGrant, func() string {
+		return attachPolicyAccountingGrant(t, ctx, admin, poolFor, s, authority, authorityScope, "replacement-review")
+	}, func() { refresh(); observe() })
 	got := shares()
 	if len(got) != 2 || got["capture:"+c1.CaptureID].Acceptance != first || got["capture:"+c2.CaptureID].Acceptance != first || got["capture:"+c1.CaptureID].ID != stored(c1).ShareID {
 		t.Fatal("published policy captures were not shared under their acceptance", got)

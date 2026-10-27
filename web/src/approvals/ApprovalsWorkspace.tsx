@@ -27,10 +27,11 @@ function Rows({ rows, empty, label }: { rows?: ReviewRow[]; empty: string; label
 
 function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { grant: Grant; busy: boolean; onDecide: (approve: boolean, reason: string) => void; onRevoke: () => void; onResume: () => void; onResolve: () => void }) {
   const [reason, setReason] = useState('');
+  const policy = grant.kind === 'policy' ? grant.policy : undefined;
   return <>
     <section className="review-section" aria-labelledby="approval-plan">
       <h2 id="approval-plan">What would be recorded</h2>
-      <p>{grant.target.workload_kind} <strong>{grant.target.workload_name}</strong>, Pod {grant.target.pod_name} in namespace {grant.target.namespace} (cluster <span className="identifier">{grant.target.cluster_id}</span>). Data class: {grant.data_class}.</p>
+      <p>{grant.target.workload_kind} <strong>{grant.target.workload_name}</strong>{grant.kind === 'adHocCapture' && <>, Pod {grant.target.pod_name}</>} in namespace {grant.target.namespace} (cluster <span className="identifier">{grant.target.cluster_id}</span>). Data class: {grant.data_class}.</p>
       <p>Needs approval because {grant.reasons.map(r => reasons[r.code] ?? r.code).join('; ')}.</p>
       <table>
         <thead><tr><th scope="col">Action</th><th scope="col">Mode</th><th scope="col">Window</th><th scope="col">Filter</th><th scope="col">Ring</th><th scope="col">Output limit</th></tr></thead>
@@ -45,13 +46,18 @@ function Detail({ grant, busy, onDecide, onRevoke, onResume, onResolve }: { gran
       </table>
       {grant.observation_limits && <p>Observation limits bound by this approval: {grant.observation_limits.max_session_seconds} s per session, {bytes(grant.observation_limits.max_observed_bytes)} in total, {bytes(grant.observation_limits.max_bytes_per_second)} per second, {grant.observation_limits.max_concurrent_sessions} concurrent session.</p>}
       {grant.result_access && <p>Follow-up access for the requester only: {grant.result_access.operations.join(', ')} by clients {grant.result_access.client_ids.join(', ')}, at most {grant.result_access.max_artifacts} artifacts and {bytes(grant.result_access.max_bytes)} in total until {date(grant.result_access.not_after)} (used: {grant.result_access.artifacts_used} artifacts, {bytes(grant.result_access.bytes_used)}).</p>}
-      <p className="field-help">Plan digest <span className="identifier">{grant.execution_digest}</span>. Requested by {grant.requested_by.subject} (client {grant.requested_by.client_id}) on {date(grant.requested_at)}; the preview was valid until {date(grant.preview_deadline)}. {grant.capture_deadline_rule === 'acceptanceWithinGrant' ? `After approval, submitting this plan starts a capture window of at most ${Math.round(grant.capture_window_seconds! / 60)} minutes, bounded by the approval expiry.` : 'This legacy plan must start before its preview deadline; create a new preview if it has expired.'} An approval lasts {Math.round(grant.lifetime_seconds / 60)} minutes and covers only this exact plan and requester.</p>
+      {policy ? <>
+        <p>Team policy <span className="identifier">{policy.uid}</span> runs as <span className="identifier">{policy.executor.subject}</span> under the reviewed team authority from {date(policy.authority_issued_at)} until {date(policy.authority_not_after)}.</p>
+        <p>Grant reservations: {policy.executions_used} of {policy.max_executions} executions; {bytes(policy.collected_bytes_used)} of {bytes(policy.max_collected_bytes)} output; {bytes(policy.observed_bytes_used)} of {bytes(policy.max_observed_bytes)} sensitive observation. Reservations include uncertain work and are not refunded by replacing an approval. Team, workload and admission limits can further restrict collection.</p>
+        <p className="field-help">Plan digest <span className="identifier">{grant.execution_digest}</span>. Requested by {grant.requested_by.subject} on {date(grant.requested_at)}. This approval expires {date(grant.not_after!)} from its original request; requester credentials do not renew team execution. Current team authority and permissions still apply.</p>
+        <p>This approval grants no evidence access. Inspect or download gathered user data through your current evidence permissions.</p>
+      </> : <p className="field-help">Plan digest <span className="identifier">{grant.execution_digest}</span>. Requested by {grant.requested_by.subject} (client {grant.requested_by.client_id}) on {date(grant.requested_at)}; the preview was valid until {date(grant.preview_deadline!)}. {grant.capture_deadline_rule === 'acceptanceWithinGrant' ? `After approval, submitting this plan starts a capture window of at most ${Math.round(grant.capture_window_seconds! / 60)} minutes, bounded by the approval expiry.` : 'This legacy plan must start before its preview deadline; create a new preview if it has expired.'} An approval lasts {Math.round(grant.lifetime_seconds / 60)} minutes and covers only this exact plan and requester.</p>}
     </section>
     <section className="review-section" aria-labelledby="approval-state">
       <h2 id="approval-state">Decision</h2>
       <p role="status">{phases[grant.phase] ?? grant.phase}{grant.phase === 'Pending' && <> until {date(grant.review_until)}</>}
         {grant.decision && <> · {grant.decision.decision} by {grant.decision.decided_by.subject} on {date(grant.decision.decided_at)}: {grant.decision.reason}</>}
-        {grant.not_after && grant.phase === 'Approved' && <> · valid until {date(grant.not_after)}</>}
+        {grant.not_after && (grant.kind === 'policy' || grant.phase === 'Approved') && <> · valid until {date(grant.not_after)}</>}
         {grant.revoked_at && <> · revoked {date(grant.revoked_at)}</>}</p>
       {grant.can_decide && <>
         <label htmlFor="approval-reason">Reason (recorded with your decision)</label>
@@ -116,7 +122,7 @@ export function ApprovalsWorkspace({ session, scope, grantID, client = defaultOp
   };
   const continueRequest = async (resolve: boolean) => {
     const original = grant;
-    if (!original || busy || scope.aborted || (resolve ? !original.can_resolve : !original.can_resume)) return;
+    if (!original || original.kind !== 'adHocCapture' || !original.preview_id || busy || scope.aborted || (resolve ? !original.can_resolve : !original.can_resume)) return;
     command.current?.abort();
     const request = new AbortController(); command.current = request;
     const abort = () => request.abort(); scope.addEventListener('abort', abort, { once: true });

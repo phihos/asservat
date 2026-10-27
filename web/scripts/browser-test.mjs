@@ -230,6 +230,28 @@ try {
   await expect(page.getByRole('alert')).toContainText('Saved settings are unavailable');
   await expect(page.getByRole('heading', { name: 'Saved settings' })).toHaveCount(0);
   checks.push('direct capture unavailable history offers a new investigation; expiry between progress and settings read exposes no saved settings or implicit repeat');
+
+  // Actual built React and canonical Go/C03 manager route; identity, store and
+  // protected projection remain synthetic fixtures, with no evidence authority.
+  await control('ready');
+  await page.goto(origin + '/approvals/00000000-0000-4000-8000-000000000702');
+  await expect(page.getByText('team-policy-uid', { exact: true })).toBeVisible();
+  await expect(page.getByText(/4 of 10 executions/)).toBeVisible();
+  await expect(page.getByText(/32 MiB of 64 MiB output/)).toBeVisible();
+  await expect(page.getByText(/Team, workload and admission limits/)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Sign in with step-up' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continue approved capture' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Find capture; otherwise close request' })).toHaveCount(0);
+  await expect(page.getByText(/Pod undefined/)).toHaveCount(0);
+  await scan('current-policy-manager');
+  await page.screenshot({ path: output + '/policy-manager.png', fullPage: true });
+  await page.getByRole('button', { name: 'Revoke approval', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Revoke approval', exact: true })).toHaveCount(0);
+  const managerStats = await (await page.request.get(origin + '/test/policy-grant-stats')).json();
+  assert.deepEqual(managerStats, { revocations: 1, executions_used: 4, collected_bytes_used: 32 << 20 });
+  checks.push('current team manager views original policy/workload/expiry/reservations through real C03 and built React; revokes once without review, personal capture or budget reset');
+
   await page.goto(origin + '/');
 
   await control('unavailable');
@@ -290,7 +312,7 @@ try {
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);
   assert.deepEqual(violations, []);
-  await writeFile(output + '/report.json', JSON.stringify({ passed: true, checks, errors, external, violations, authority: 'synthetic session, typed capture and C16 case metadata; real HTTPS Go handlers, canonical operations and built React; no native-download service, IdP/SQL/collection/audit/deployment qualification' }, null, 2) + '\n');
+  await writeFile(output + '/report.json', JSON.stringify({ passed: true, checks, errors, external, violations, authority: 'synthetic session, capture/C16 facts and grant store/projections; real C03 policy-manager eligibility/control, HTTPS Go handlers, canonical operations and built React; no native-download service, IdP/SQL/collection/audit/deployment qualification' }, null, 2) + '\n');
   console.log(`Console browser checks passed: ${checks.length} journeys, ${scans} accessibility scans, no external requests or CSP/runtime errors.`);
 } catch (error) {
   const visiblePage = await page.locator('body').ariaSnapshot().catch(() => 'Page unavailable');

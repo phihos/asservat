@@ -15,6 +15,7 @@ var publicRuntimeHubExtensionGrantTable = map[string][]publicRuntimeGrant{
 	"api-execution": {
 		// Original policy reservation and grant are rechecked before effects.
 		{"table", "policy_occurrence", "", "SELECT"},
+		{"table", "policy_acceptance", "", "SELECT"},
 		{"table", "policy_source", "", "SELECT"},
 		{"table", "access_grant", "", "SELECT"},
 		{"table", "access_grant", "id", "UPDATE"},

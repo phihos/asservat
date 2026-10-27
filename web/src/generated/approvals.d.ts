@@ -38,12 +38,12 @@ export interface components {
                 /** @enum {unknown} */
                 phase: "Pending" | "Approved" | "Denied" | "Revoked" | "Expired" | "Exhausted";
                 revision: number;
-                /** @constant */
-                kind: "adHocCapture";
+                /** @enum {unknown} */
+                kind: "adHocCapture" | "policy";
                 /** Format: uuid */
-                capture_id: string;
+                capture_id?: string;
                 /** Format: uuid */
-                preview_id: string;
+                preview_id?: string;
                 execution_digest: string;
                 review_digest: string;
                 target: {
@@ -53,7 +53,9 @@ export interface components {
                     /** @enum {unknown} */
                     workload_kind: "Deployment" | "StatefulSet" | "Pod";
                     workload_name: string;
-                    pod_name: string;
+                    pod_name?: string;
+                    namespace_uid?: string;
+                    workload_uid?: string;
                 };
                 /** @enum {unknown} */
                 data_class: "metadata" | "extract" | "raw";
@@ -144,12 +146,12 @@ export interface components {
                  * Format: date-time
                  * @description Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
                  */
-                preview_deadline: string;
+                preview_deadline?: string;
                 /**
-                 * @description Whether the frozen plan uses its preview deadline, or fixes one capture window at acceptance under the original approval expiry.
+                 * @description Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry.
                  * @enum {unknown}
                  */
-                capture_deadline_rule: "previewDeadline" | "acceptanceWithinGrant";
+                capture_deadline_rule: "previewDeadline" | "acceptanceWithinGrant" | "policyAuthority";
                 /**
                  * @description Maximum window fixed once at acceptance, never beyond original approval expiry.
                  * @constant
@@ -161,7 +163,25 @@ export interface components {
                 can_resolve: boolean;
                 /** @description Guidance only for the same requesting human on another OAuth client while this marked plan is Approved. It confers no authority or grant transfer. */
                 resume_requires_original_client: boolean;
-            } & unknown;
+                policy?: {
+                    uid: string;
+                    executor: {
+                        issuer: string;
+                        subject: string;
+                        client_id: string;
+                    };
+                    /** Format: date-time */
+                    authority_issued_at: string;
+                    /** Format: date-time */
+                    authority_not_after: string;
+                    max_executions: number;
+                    executions_used: number;
+                    max_collected_bytes: number;
+                    max_observed_bytes: number;
+                    collected_bytes_used: number;
+                    observed_bytes_used: number;
+                };
+            } & (unknown & unknown & unknown);
         } | {
             /** @constant */
             status: "pending";
@@ -198,12 +218,12 @@ export interface components {
                     /** @enum {unknown} */
                     phase: "Pending" | "Approved" | "Denied" | "Revoked" | "Expired" | "Exhausted";
                     revision: number;
-                    /** @constant */
-                    kind: "adHocCapture";
+                    /** @enum {unknown} */
+                    kind: "adHocCapture" | "policy";
                     /** Format: uuid */
-                    capture_id: string;
+                    capture_id?: string;
                     /** Format: uuid */
-                    preview_id: string;
+                    preview_id?: string;
                     execution_digest: string;
                     review_digest: string;
                     target: {
@@ -213,7 +233,9 @@ export interface components {
                         /** @enum {unknown} */
                         workload_kind: "Deployment" | "StatefulSet" | "Pod";
                         workload_name: string;
-                        pod_name: string;
+                        pod_name?: string;
+                        namespace_uid?: string;
+                        workload_uid?: string;
                     };
                     /** @enum {unknown} */
                     data_class: "metadata" | "extract" | "raw";
@@ -272,18 +294,36 @@ export interface components {
                      * Format: date-time
                      * @description Original passive preview expiry; bounds opening a new approval review, and also start for legacy previewDeadline plans.
                      */
-                    preview_deadline: string;
+                    preview_deadline?: string;
                     /**
-                     * @description Whether the frozen plan uses its preview deadline, or fixes one capture window at acceptance under the original approval expiry.
+                     * @description Manual preview/acceptance window, or the separately accepted team-policy authority bound by original request-anchored grant expiry.
                      * @enum {unknown}
                      */
-                    capture_deadline_rule: "previewDeadline" | "acceptanceWithinGrant";
+                    capture_deadline_rule: "previewDeadline" | "acceptanceWithinGrant" | "policyAuthority";
                     /**
                      * @description Maximum window fixed once at acceptance, never beyond original approval expiry.
                      * @constant
                      */
                     capture_window_seconds?: 300;
-                } & unknown)[];
+                    policy?: {
+                        uid: string;
+                        executor: {
+                            issuer: string;
+                            subject: string;
+                            client_id: string;
+                        };
+                        /** Format: date-time */
+                        authority_issued_at: string;
+                        /** Format: date-time */
+                        authority_not_after: string;
+                        max_executions: number;
+                        executions_used: number;
+                        max_collected_bytes: number;
+                        max_observed_bytes: number;
+                        collected_bytes_used: number;
+                        observed_bytes_used: number;
+                    };
+                } & (unknown & unknown & unknown))[];
             };
         } | {
             /** @constant */

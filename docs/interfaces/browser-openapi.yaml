@@ -569,7 +569,7 @@ paths:
   /api/v1/operations/get_grant:
     post:
       operationId: get_grant
-      summary: "Read one approval request or grant for its requester or a current approver: phase, exact reviewed plan, decision with authentication context, expiry, revocation and remaining result-access pool (ADR-249)."
+      summary: "Read exact grant configuration, expiry and reservations for an eligible requester, independent reviewer or current pinned policy manager; policy controls confer no personal capture or evidence access (ADR-249/259)."
       tags:
       - Shared browser and MCP
       x-domain-contract: get_grant
@@ -4320,7 +4320,9 @@ components:
                         minimum: 1
                         maximum: 3
                       kind:
-                        const: adHocCapture
+                        enum:
+                        - adHocCapture
+                        - policy
                       capture_id:
                         type: string
                         format: uuid
@@ -4357,12 +4359,19 @@ components:
                             type: string
                             minLength: 1
                             maxLength: 253
+                          namespace_uid:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          workload_uid:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
                         required:
                         - cluster_id
                         - namespace
                         - workload_kind
                         - workload_name
-                        - pod_name
                       data_class:
                         enum:
                         - metadata
@@ -4440,8 +4449,8 @@ components:
                         format: date-time
                       lifetime_seconds:
                         type: integer
-                        minimum: 60
-                        maximum: 28800
+                        minimum: 1
+                        maximum: 31536000
                       decision:
                         type: object
                         additionalProperties: false
@@ -4533,26 +4542,93 @@ components:
                       preview_deadline:
                         type: string
                         format: date-time
-                        description: Original passive preview expiry; bounds opening a new approval review,
-                          and also start for legacy previewDeadline plans.
+                        description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy
+                          previewDeadline plans.
                       capture_deadline_rule:
                         enum:
                         - previewDeadline
                         - acceptanceWithinGrant
-                        description: Whether the frozen plan uses its preview deadline, or fixes one capture
-                          window at acceptance under the original approval expiry.
+                        - policyAuthority
+                        description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original
+                          request-anchored grant expiry.
                       capture_window_seconds:
                         type: integer
                         const: 300
-                        description: Maximum window fixed once at acceptance, never beyond original approval
-                          expiry.
+                        description: Maximum window fixed once at acceptance, never beyond original approval expiry.
+                      policy:
+                        type: object
+                        additionalProperties: false
+                        properties:
+                          uid:
+                            type: string
+                            minLength: 1
+                            maxLength: 64
+                          executor:
+                            type: object
+                            additionalProperties: false
+                            properties:
+                              issuer:
+                                type: string
+                                minLength: 1
+                                maxLength: 2048
+                              subject:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                              client_id:
+                                type: string
+                                minLength: 1
+                                maxLength: 256
+                            required:
+                            - issuer
+                            - subject
+                            - client_id
+                          authority_issued_at:
+                            type: string
+                            format: date-time
+                          authority_not_after:
+                            type: string
+                            format: date-time
+                          max_executions:
+                            type: integer
+                            minimum: 1
+                            maximum: 10000
+                          executions_used:
+                            type: integer
+                            minimum: 0
+                            maximum: 10000
+                          max_collected_bytes:
+                            type: integer
+                            minimum: 1
+                            maximum: 1099511627776
+                          max_observed_bytes:
+                            type: integer
+                            minimum: 0
+                            maximum: 1099511627776
+                          collected_bytes_used:
+                            type: integer
+                            minimum: 0
+                            maximum: 1099511627776
+                          observed_bytes_used:
+                            type: integer
+                            minimum: 0
+                            maximum: 1099511627776
+                        required:
+                        - uid
+                        - executor
+                        - authority_issued_at
+                        - authority_not_after
+                        - max_executions
+                        - executions_used
+                        - max_collected_bytes
+                        - max_observed_bytes
+                        - collected_bytes_used
+                        - observed_bytes_used
                     required:
                     - grant_id
                     - phase
                     - revision
                     - kind
-                    - capture_id
-                    - preview_id
                     - execution_digest
                     - review_digest
                     - target
@@ -4561,7 +4637,6 @@ components:
                     - requested_by
                     - requested_at
                     - review_until
-                    - preview_deadline
                     - lifetime_seconds
                     - can_decide
                     - can_revoke
@@ -4579,6 +4654,73 @@ components:
                         not:
                           required:
                           - capture_window_seconds
+                    - if:
+                        properties:
+                          kind:
+                            const: adHocCapture
+                      then:
+                        required:
+                        - capture_id
+                        - preview_id
+                        - preview_deadline
+                        properties:
+                          lifetime_seconds:
+                            minimum: 60
+                            maximum: 28800
+                          target:
+                            required:
+                            - pod_name
+                            not:
+                              anyOf:
+                              - required:
+                                - namespace_uid
+                              - required:
+                                - workload_uid
+                          capture_deadline_rule:
+                            enum:
+                            - previewDeadline
+                            - acceptanceWithinGrant
+                        not:
+                          anyOf:
+                          - required:
+                            - policy
+                    - if:
+                        properties:
+                          kind:
+                            const: policy
+                      then:
+                        required:
+                        - policy
+                        - not_after
+                        properties:
+                          target:
+                            required:
+                            - namespace_uid
+                            - workload_uid
+                            not:
+                              anyOf:
+                              - required:
+                                - pod_name
+                          capture_deadline_rule:
+                            const: policyAuthority
+                          can_resume:
+                            const: false
+                          can_resolve:
+                            const: false
+                          resume_requires_original_client:
+                            const: false
+                        not:
+                          anyOf:
+                          - required:
+                            - capture_id
+                          - required:
+                            - preview_id
+                          - required:
+                            - preview_deadline
+                          - required:
+                            - result_access
+                          - required:
+                            - remaining_bytes
               required:
               - approvals
           required:
@@ -8366,7 +8508,9 @@ components:
                   minimum: 1
                   maximum: 3
                 kind:
-                  const: adHocCapture
+                  enum:
+                  - adHocCapture
+                  - policy
                 capture_id:
                   type: string
                   format: uuid
@@ -8403,12 +8547,19 @@ components:
                       type: string
                       minLength: 1
                       maxLength: 253
+                    namespace_uid:
+                      type: string
+                      minLength: 1
+                      maxLength: 64
+                    workload_uid:
+                      type: string
+                      minLength: 1
+                      maxLength: 64
                   required:
                   - cluster_id
                   - namespace
                   - workload_kind
                   - workload_name
-                  - pod_name
                 data_class:
                   enum:
                   - metadata
@@ -8486,8 +8637,8 @@ components:
                   format: date-time
                 lifetime_seconds:
                   type: integer
-                  minimum: 60
-                  maximum: 28800
+                  minimum: 1
+                  maximum: 31536000
                 decision:
                   type: object
                   additionalProperties: false
@@ -8723,22 +8874,23 @@ components:
                 preview_deadline:
                   type: string
                   format: date-time
-                  description: Original passive preview expiry; bounds opening a new approval review, and
-                    also start for legacy previewDeadline plans.
+                  description: Original passive preview expiry; bounds opening a new approval review, and also start for legacy
+                    previewDeadline plans.
                 capture_deadline_rule:
                   enum:
                   - previewDeadline
                   - acceptanceWithinGrant
-                  description: Whether the frozen plan uses its preview deadline, or fixes one capture window
-                    at acceptance under the original approval expiry.
+                  - policyAuthority
+                  description: Manual preview/acceptance window, or the separately accepted team-policy authority bound by original
+                    request-anchored grant expiry.
                 capture_window_seconds:
                   type: integer
                   const: 300
                   description: Maximum window fixed once at acceptance, never beyond original approval expiry.
                 can_resume:
                   type: boolean
-                  description: Advisory current original requester/client collection eligibility under this
-                    exact approved grant. Submission rechecks all authority.
+                  description: Advisory current original requester/client collection eligibility under this exact approved grant.
+                    Submission rechecks all authority.
                 can_resolve:
                   type: boolean
                   description: Advisory original requester/client may recover a possibly accepted request after an approved decision.
@@ -8747,13 +8899,80 @@ components:
                   type: boolean
                   description: Guidance only for the same requesting human on another OAuth client while this marked plan is Approved.
                     It confers no authority or grant transfer.
+                policy:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    uid:
+                      type: string
+                      minLength: 1
+                      maxLength: 64
+                    executor:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        issuer:
+                          type: string
+                          minLength: 1
+                          maxLength: 2048
+                        subject:
+                          type: string
+                          minLength: 1
+                          maxLength: 256
+                        client_id:
+                          type: string
+                          minLength: 1
+                          maxLength: 256
+                      required:
+                      - issuer
+                      - subject
+                      - client_id
+                    authority_issued_at:
+                      type: string
+                      format: date-time
+                    authority_not_after:
+                      type: string
+                      format: date-time
+                    max_executions:
+                      type: integer
+                      minimum: 1
+                      maximum: 10000
+                    executions_used:
+                      type: integer
+                      minimum: 0
+                      maximum: 10000
+                    max_collected_bytes:
+                      type: integer
+                      minimum: 1
+                      maximum: 1099511627776
+                    max_observed_bytes:
+                      type: integer
+                      minimum: 0
+                      maximum: 1099511627776
+                    collected_bytes_used:
+                      type: integer
+                      minimum: 0
+                      maximum: 1099511627776
+                    observed_bytes_used:
+                      type: integer
+                      minimum: 0
+                      maximum: 1099511627776
+                  required:
+                  - uid
+                  - executor
+                  - authority_issued_at
+                  - authority_not_after
+                  - max_executions
+                  - executions_used
+                  - max_collected_bytes
+                  - max_observed_bytes
+                  - collected_bytes_used
+                  - observed_bytes_used
               required:
               - grant_id
               - phase
               - revision
               - kind
-              - capture_id
-              - preview_id
               - execution_digest
               - review_digest
               - target
@@ -8762,7 +8981,6 @@ components:
               - requested_by
               - requested_at
               - review_until
-              - preview_deadline
               - lifetime_seconds
               - can_decide
               - can_revoke
@@ -8784,6 +9002,73 @@ components:
                   not:
                     required:
                     - capture_window_seconds
+              - if:
+                  properties:
+                    kind:
+                      const: adHocCapture
+                then:
+                  required:
+                  - capture_id
+                  - preview_id
+                  - preview_deadline
+                  properties:
+                    lifetime_seconds:
+                      minimum: 60
+                      maximum: 28800
+                    target:
+                      required:
+                      - pod_name
+                      not:
+                        anyOf:
+                        - required:
+                          - namespace_uid
+                        - required:
+                          - workload_uid
+                    capture_deadline_rule:
+                      enum:
+                      - previewDeadline
+                      - acceptanceWithinGrant
+                  not:
+                    anyOf:
+                    - required:
+                      - policy
+              - if:
+                  properties:
+                    kind:
+                      const: policy
+                then:
+                  required:
+                  - policy
+                  - not_after
+                  properties:
+                    target:
+                      required:
+                      - namespace_uid
+                      - workload_uid
+                      not:
+                        anyOf:
+                        - required:
+                          - pod_name
+                    capture_deadline_rule:
+                      const: policyAuthority
+                    can_resume:
+                      const: false
+                    can_resolve:
+                      const: false
+                    resume_requires_original_client:
+                      const: false
+                  not:
+                    anyOf:
+                    - required:
+                      - capture_id
+                    - required:
+                      - preview_id
+                    - required:
+                      - preview_deadline
+                    - required:
+                      - result_access
+                    - required:
+                      - remaining_bytes
           required:
           - status
           - data

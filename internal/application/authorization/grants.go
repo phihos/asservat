@@ -148,8 +148,10 @@ type GrantView struct {
 	Grant  value.Grant
 	Phase  value.GrantPhase
 	Review GrantReview
-	// Approver reports that the caller may decide or revoke it now.
+	// Approver reports independent review authority; manager control is separate.
 	Approver bool
+	// CanRevoke is current team/approver control, never inferred from provenance.
+	CanRevoke bool
 	// CanResume is an advisory hint for the current original requester/client.
 	// Capture admission remains authoritative.
 	CanResume bool
@@ -494,7 +496,8 @@ func (s GrantService) Revoke(ctx context.Context, current identities.CurrentIden
 
 func sameHuman(a, b identity.Principal) bool { return a.Issuer == b.Issuer && a.Subject == b.Subject }
 
-// Get returns grant metadata to its requester or a current target approver.
+// Get returns grant metadata to its requester, current reviewer, or exact
+// current pinned policy manager. Management never implies review authority.
 // Policy requesters additionally need current collection rights on the exact
 // workload; historical provenance is not perpetual visibility. Ad hoc behavior
 // remains unchanged. Others get ErrGrantNotFound (no existence disclosure).
@@ -523,11 +526,19 @@ func (s GrantService) Get(ctx context.Context, current identities.CurrentIdentit
 	}
 	until := i.ValidUntil
 	v := GrantView{Grant: g, Phase: g.Phase(s.Now()), CanResolve: g.Kind == value.GrantAdHocCapture && i.Principal == g.Requester && g.Decision != nil && g.Decision.Approved}
-	if grantRequesterMatches(g, i.Principal) && g.Kind == value.GrantPolicy {
-		r, err := s.grantEligibility(ctx, i, g, value.CollectContext)
-		if err != nil || !r.Eligible {
+	if g.Kind == value.GrantPolicy {
+		if g.Policy == nil || s.WorkloadPermissions == nil {
 			return GrantView{}, time.Time{}, ErrGrantNotFound
 		}
+		p, err := s.WorkloadPermissions.WorkloadPermissions(ctx, g.Policy.Workload())
+		if err != nil {
+			return GrantView{}, time.Time{}, ErrGrantNotFound
+		}
+		r, approver, revoke := policyGrantMetadataRights(i, g, p, s.Now())
+		if !r.Eligible {
+			return GrantView{}, time.Time{}, ErrGrantNotFound
+		}
+		v.Approver, v.CanRevoke = approver, revoke
 		until = identity.Earlier(until, r.ValidUntil)
 	} else if !grantRequesterMatches(g, i.Principal) {
 		r, err := s.grantEligibility(ctx, i, g, value.ApproveAction)
@@ -594,60 +605,57 @@ func (s GrantService) List(ctx context.Context, current identities.CurrentIdenti
 	}
 	until := i.ValidUntil
 	results := map[value.Target]value.Result{}
-	workloadResults := map[value.WorkloadTarget]value.Result{}
+	workloadResults := map[value.WorkloadTarget]value.WorkloadProjection{}
 	out := make([]GrantView, 0, min(limit, len(rows)))
 	for _, g := range rows {
 		if len(out) == limit {
 			break
 		}
 		v := GrantView{Grant: g, Phase: g.Phase(s.Now())}
-		if view == "pending" {
+		if g.Kind == value.GrantPolicy {
+			if g.Policy == nil || s.WorkloadPermissions == nil {
+				return nil, time.Time{}, ErrGrantUnavailable
+			}
+			if view == "pending" && (sameHuman(g.Requester, i.Principal) || v.Phase != value.GrantPending) {
+				continue
+			}
+			if view == "requested" && !grantRequesterMatches(g, i.Principal) {
+				continue
+			}
+			target := g.Policy.Workload()
+			p, ok := workloadResults[target]
+			if !ok {
+				p, err = s.WorkloadPermissions.WorkloadPermissions(ctx, target)
+				if err != nil {
+					p = value.WorkloadProjection{}
+				}
+				workloadResults[target] = p
+			}
+			r, approver, revoke := policyGrantMetadataRights(i, g, p, s.Now())
+			// A manager's direct lookup never adds a team-wide pending inbox.
+			if !r.Eligible || view == "pending" && !approver {
+				continue
+			}
+			v.Approver, v.CanRevoke = approver, revoke
+			until = identity.Earlier(until, r.ValidUntil)
+		} else if view == "pending" {
 			if sameHuman(g.Requester, i.Principal) || v.Phase != value.GrantPending {
 				continue
 			}
 			r, ok := results[g.Target]
-			if g.Kind == value.GrantPolicy && g.Policy != nil {
-				r, ok = workloadResults[g.Policy.Workload()]
-			}
 			if !ok {
-				if r, err = s.grantEligibility(ctx, i, g, value.ApproveAction); err != nil {
+				r, err = s.grantEligibility(ctx, i, g, value.ApproveAction)
+				if err != nil {
 					r = value.Result{}
 				}
-				if g.Kind == value.GrantPolicy && g.Policy != nil {
-					workloadResults[g.Policy.Workload()] = r
-				} else {
-					results[g.Target] = r
-				}
+				results[g.Target] = r
 			}
 			if !r.Eligible {
 				continue
 			}
 			v.Approver, until = true, identity.Earlier(until, r.ValidUntil)
-		} else {
-			if !grantRequesterMatches(g, i.Principal) || i.Principal.Kind != identity.Human && (g.Kind != value.GrantPolicy || g.Requester != i.Principal) {
-				if g.Kind == value.GrantPolicy {
-					continue
-				}
-				return nil, time.Time{}, ErrGrantUnavailable
-			}
-			if g.Kind == value.GrantPolicy {
-				if g.Policy == nil {
-					return nil, time.Time{}, ErrGrantUnavailable
-				}
-				target := g.Policy.Workload()
-				r, ok := workloadResults[target]
-				if !ok {
-					r, err = s.grantEligibility(ctx, i, g, value.CollectContext)
-					if err != nil {
-						r = value.Result{}
-					}
-					workloadResults[target] = r
-				}
-				if !r.Eligible {
-					continue
-				}
-				until = identity.Earlier(until, r.ValidUntil)
-			}
+		} else if !grantRequesterMatches(g, i.Principal) || i.Principal.Kind != identity.Human {
+			return nil, time.Time{}, ErrGrantUnavailable
 		}
 		if json.Unmarshal(g.Review, &v.Review) != nil {
 			return nil, time.Time{}, ErrGrantUnavailable

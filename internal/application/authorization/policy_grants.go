@@ -276,3 +276,31 @@ func (s GrantService) finalGrantMetadata(ctx context.Context, current identities
 	}
 	return nil
 }
+
+// policyGrantMetadataRights evaluates one already-read workload projection.
+// Management can inspect/revoke an original team grant without becoming its
+// independent reviewer. It grants no evidence or personal continuation rights.
+func policyGrantMetadataRights(i identity.Identity, g value.Grant, p value.WorkloadProjection, now time.Time) (value.Result, bool, bool) {
+	if g.Policy == nil {
+		return value.Result{}, false, false
+	}
+	target := g.Policy.Workload()
+	approve := value.WorkloadScopeEligibility(i, p, value.ApproveAction, target, now)
+	revoke := approve
+	if !revoke.Eligible {
+		revoke = value.PolicyGrantManagementEligibility(i, p, g.Policy.Authority, now)
+	}
+	var read value.Result
+	if grantRequesterMatches(g, i.Principal) {
+		read = value.WorkloadScopeEligibility(i, p, value.CollectContext, target, now)
+	} else if approve.Eligible {
+		read = approve
+	} else {
+		read = revoke
+	}
+	canRevoke := value.CanRevoke(g, i, revoke, now)
+	if read.Eligible && canRevoke {
+		read.ValidUntil = identity.Earlier(read.ValidUntil, revoke.ValidUntil)
+	}
+	return read, !sameHuman(g.Requester, i.Principal) && approve.Eligible, canRevoke
+}

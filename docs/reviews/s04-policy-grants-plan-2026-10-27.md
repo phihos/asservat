@@ -883,3 +883,88 @@ Those browser reports do not qualify real SQL/IdP/collectors or native transfer.
 Reports/screenshots are archived in the local build cache; generated test results
 were restored after archival. No extra SQL fixture, collector or hosted run was
 launched, and no push/publication is implied by these local gates.
+
+
+### Current-manager metadata and original-grant acquisition batch
+
+Observed defect: after the requester leaves, the exact current sponsoring team
+member may attach/revoke the team grant but Get returns not found because it
+requires action-approver. The service regression reproduced this (exit 1) before
+fixing it. Team continuity is a maintainer requirement; the earlier requester/
+approver-only metadata rule was an agent implementation choice, now explicitly
+extended for exact current pinned managers. Ordinary readers/unrelated managers,
+stale denies and replaced assignment/basis identities still reveal nothing.
+
+Reuse one GrantView and the existing get_grant/list_reviews DTO. Add a closed
+adHocCapture/policy discrimination: real workload UID scope, policy UID/executor,
+original authority dates and finite ceilings/spend; no fake capture/preview/Pod.
+Effective grant expiry stays request-anchored. Manager visibility does not confer
+independent review, evidence/history/download rights, personal continuation or a
+team-wide inbox. Existing can_revoke comes from current actual control rights,
+not requester provenance; Approver remains review authority. Old ad hoc shape
+and behavior remain unchanged. The same browser/MCP contract and generated
+validators retain parity; the existing React detail displays the finite team
+scope and available control, never substitutes a new page/model or endpoint.
+
+Numeric cost: zero new services, providers, credentials, network requests,
+background tasks, configuration or durable rows. Get still reads one existing
+workload projection; list still reads at most one per distinct workload in its
+existing 100-row bound. Derive collection/reviewer/manager flags locally from the
+same projection (at most three bounded assignment scans); final identity and
+original freshness checks remain. Existing response limits stay unchanged.
+The added policy metadata is identifiers, configuration and numeric counters,
+not gathered user data, credentials or content authority.
+
+Original-grant acquisition testing reuses the fourth admitted capture as an API
+pod-status capture (same recipe), after its existing encrypted intent publisher.
+A replacement grant cannot change that capture's immutable charged grant or
+spent tuple; revoking the original stops its acquisition read while the unused
+replacement remains approved. Completion/publication semantics remain separate.
+The standalone api-execution SQL duty additionally needs policy_acceptance SELECT
+for its already-existing contextEligibilityIn accepted-authority read. The actual
+installed hub union already has that read; no grant/acceptance write is added.
+New external qualification waits for root's coordinated free fixture slot.
+
+
+Manager metadata verification: the old C03 Get reproduced not-found for the
+current exact sponsor after requester departure (actual RED exit 1, 0.002s).
+After the policy-only fix, the complete authorization suite passes, including
+single-projection manager access/revoke without review, lost requester rights,
+wrong workload, unavailable/stale denies, ordinary reader/unrelated basis and
+replaced assignment/digest cases. Real C03 → canonical presentation tests exercise
+correct workload/expiry/spend, refused review, one revocation with unchanged
+spend, and no metadata after replacement of the manager assignment. Ad hoc
+continuation and requester behavior remain under their existing regressions.
+
+The same public DTO now discriminates adHocCapture/policy in browser/MCP and its
+offline runtime bundle. Policy adds real namespace/workload UIDs, policy/executor,
+original authority dates, finite grant ceilings/reservations and effective
+request-anchored expiry; capture/preview/Pod and personal result-access fields
+are forbidden. Policy continuation hints must be false. The React page displays
+grant reservations with an explicit reminder that shared team/workload/admission
+limits still apply; it never promises that grant remainder is usable capacity.
+The existing production grant service now wires its previously unused
+WorkloadPermissions port to the same existing accepted SQL permissions adapter.
+No collector or public policy-execution path is enabled by this metadata wiring.
+
+Full affected race suites passed authorization 1.359s, presentation 79.936s,
+PostgreSQL 3.019s and bootstrap 54.591s. Final pre-push exit 0 includes 229 console
+unit tests, canonical generation, SQL generation, specification/architecture and
+vet. The first TypeScript check correctly found the newly optional preview ID in
+manual continuation code; the handler now explicitly requires the existing ad
+hoc mode/preview before using that path. No policy can enter personal continuation.
+
+Actual console build/browser-check passed, Go 21.887s: 24 journeys/21 accessibility
+scans plus four native-restart boundaries/two scans. Its new policy-manager
+journey uses real built React → HTTPS/cookie/CSRF → canonical Go presentation →
+real C03 with synthetic identity/store/projections. It shows original
+workload/executor/expiry and 4 of 10 executions/32 of 64 MiB reservations, offers
+no review/step-up/personal continuation, and revokes exactly once without changing
+spend. No external browser requests or accessibility/CSP/runtime violations.
+Browser reports/screenshots were archived before restoring tracked test outputs.
+These facts are not SQL, IdP, encrypted-audit, native collector or deployment proof.
+
+The expanded real SQL original-grant replacement/revocation acquisition case is
+compiled but not run yet; retain that gap until the coordinated fixture completes.
+Shared accepted-policy counters in the existing policy-status route remain a
+required next public-composition step, not an optional alternative to grant status.

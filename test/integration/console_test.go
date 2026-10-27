@@ -82,6 +82,10 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 	if composed, err = presentation.NewInvestigationShareOperations(composed, shareOperations); err != nil {
 		t.Fatal(err)
 	}
+	grantOperations, managerGrants := newConsoleManagerGrants(t, origin)
+	if composed, err = presentation.NewInvestigationGrantOperations(composed, grantOperations); err != nil {
+		t.Fatal(err)
+	}
 	investigations, err := browser.NewInvestigationHandler(sessionHandler, composed, 4)
 	if err != nil {
 		t.Fatal(err)
@@ -93,6 +97,10 @@ func TestConsoleBrowserWithBuiltPackage(t *testing.T) {
 		}
 		if r.URL.Path == "/test/evidence" || r.URL.Path == "/test/evidence-stats" {
 			caseService.control(w, r, origin)
+			return
+		}
+		if r.URL.Path == "/test/policy-grant-stats" {
+			managerGrants.stats(w, r)
 			return
 		}
 		if strings.HasPrefix(r.URL.Path, "/test/") {
@@ -205,7 +213,7 @@ func (s *consoleSyntheticSessions) Resolve(_ context.Context, cookie string, ref
 		s.state = "ready"
 	}
 	now := time.Now()
-	return app.SessionView{Identity: identity.Identity{Principal: identity.Principal{Issuer: "https://identity.invalid", Subject: "synthetic-developer", ClientID: "console", Kind: identity.Human}, Policy: identity.Revision{UID: "synthetic-policy", Generation: 1, Digest: [32]byte{1}}, Scopes: []string{"evidence:read", "evidence:capture", "evidence:share"}, VerifiedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), s.expiresAt)}, CSRF: strings.Repeat("C", 43), ExpiresAt: s.expiresAt}, nil
+	return app.SessionView{Identity: identity.Identity{Principal: identity.Principal{Issuer: "https://identity.invalid", Subject: "synthetic-developer", ClientID: "console", Kind: identity.Human}, Policy: identity.Revision{UID: "synthetic-policy", Generation: 1, Digest: [32]byte{1}}, Scopes: []string{"evidence:read", "evidence:capture", "evidence:share"}, Groups: []string{"maintainers"}, VerifiedAt: now, ValidUntil: identity.Earlier(now.Add(5*time.Second), s.expiresAt)}, CSRF: strings.Repeat("C", 43), ExpiresAt: s.expiresAt}, nil
 }
 
 func (s *consoleSyntheticSessions) CSRF(_ context.Context, cookie string) (string, error) {

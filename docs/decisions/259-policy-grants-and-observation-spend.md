@@ -147,3 +147,17 @@ refused fifth trigger. Exact source-bound reports and failed fixture runs are in
 the implementation plan. The identity/review/control inputs remain synthetic;
 public audit/request/review/UI/runtime composition, original-grant revocation
 races and installed recorder/session qualification are still pending.
+
+
+Current pinned sponsoring managers may directly inspect the existing grant's
+policy/workload scope, original/effective dates and grant reservations after the
+requester leaves. The earlier requester/approver-only engineering restriction
+would make already-authorized attachment/revocation unusable; it is explicitly
+revised. Reuse get_grant's existing mode-discriminated DTO and canonical browser/
+MCP schema, never fake a Pod or create a second view model. Review authority stays
+separate. Existing can_revoke reflects current real control rights, not immutable
+requester provenance. One current workload projection supports all local checks;
+there is no extra provider/SQL read, broader list visibility or evidence access.
+Shared accepted-policy pools remain independently binding and must be visible in
+the existing policy-status workflow; grant counters alone are not available
+collection capacity.

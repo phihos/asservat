@@ -16,6 +16,7 @@ func TestPublicAPIExecutionHasExactFormerGrantUnion(t *testing.T) {
 	}
 	want := []publicRuntimeGrant{
 		{"table", "policy_occurrence", "", "SELECT"},
+		{"table", "policy_acceptance", "", "SELECT"},
 		{"table", "policy_source", "", "SELECT"},
 		{"table", "access_grant", "", "SELECT"},
 		{"table", "access_grant", "id", "UPDATE"},
