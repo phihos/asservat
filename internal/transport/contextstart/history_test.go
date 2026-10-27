@@ -60,10 +60,15 @@ func historyFixture() (fleetapp.HistoryWork, fleet.APIContextReceiver, capture.H
 // Synthetic effect authority and storage, actual bounded stream framing. Real
 // signatures are separately tested; these doubles confer no runtime authority.
 func TestHistoryEffectsUseDistinctBoundedStreamAndTypedCompletions(t *testing.T) {
-	for _, op := range []string{"write", "read", "purge"} {
+	for _, op := range []string{"write", "read", "purge", "purge-unclaimed"} {
 		t.Run(op, func(t *testing.T) {
 			w, r, b, copies := historyFixture()
 			a := &w.Authority
+			if op == "purge-unclaimed" {
+				op = "purge"
+				copies = artifact.Copies{}
+				a.Expectation.Registration.WriteUntil = a.StartedAt
+			}
 			a.Operation = op
 			if op != "write" {
 				a.BundleDigest = artifact.Digest{}
