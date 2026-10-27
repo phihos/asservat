@@ -115,6 +115,28 @@ Verification (tracked test/results files restored after each run):
   loaded workstation; PASS in 4.26 s).
 - Gates: `make pre-push` PASS; `make permission-schema-check`, `helm-check`, `spec-check`, `architecture-check` PASS. All fixture runs after the rebase onto main with the final sources (unchanged during each run, no cleanup failures). The timing test `TestDownloadPolicyObservationNewRequestNearExpiry` failed in two parallel whole-tree runs and passed alone (`-count=3`); it does not use the review port. The sharded `go-check` (race) was not run locally. No installed qualification.
 
+## Installed transient start failures: standby residency (ADR-245, 2026-10-27)
+
+[ADR-245](decisions/245-standby-residency-and-unstarted-acquisition.md): intermittent installed
+`OutcomeUnknown` from `request_capture` (runs 40446978365, 40450514312, 40410495985, 40406894497,
+40447076912) came from the hub router attaching regional work and target queries to the oldest
+standby exchange, whose 30-second residency cut the region's observations and stream mid-run.
+Attach/Query now take the standby with the latest residency end covering the work's deadline plus
+3 s and retire idle standbys that can no longer cover work; a start refused before any start
+effect reports the retryable `AcquisitionNotStarted`; the share and history focuses resolve,
+continue and re-review like the journey. A connector proof reuse floor was tried and reverted
+(it moved proof production into requests; ADR-245 records the evidence and the remaining
+limitation).
+
+Verification: `make pre-push` passes. Native dispatches of the final commit 7d25c44f:
+continuation-share 40467820813, 40467823133, 40467825793, 40467828341 all passed (one
+`AcquisitionNotStarted` and one resolved `OutcomeUnknown` recovered by continuation/resolution).
+continuation-clusters 40467830901 and 40467833301 failed in the second cluster's regional capacity
+setup (`regional workload did not reach ready_at`, `regional binding was not refreshed on demand`),
+a separate pre-existing failure also seen on 40447076912 and 40373324359; three further
+continuation-clusters dispatches of 7d25c44f (40470203413, 40470205846, 40470208985) and earlier
+ones with the router change (40461390503, 40461393332, 40465624580, 40465627749) passed.
+
 ## S-04 increment 2: native artifact types and larger saves (ADR-244, 2026-10-27)
 
 [ADR-244](decisions/244-native-artifact-types.md): artifact-type registry (pod status unchanged;
