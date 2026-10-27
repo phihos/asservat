@@ -33,6 +33,17 @@ build check. A separate read-only review found no blocking regression. Fresh
 hosted CI/review and the installed result remain pending; no installed approved
 capture has passed yet.
 
+CI 40571631610 on 21806d0d exposed two obsolete API metadata assertions in
+the actual TLS/H2 query tests. The lifecycle test reproduced locally before
+the correction (exit 1, 0.198s): its short caller was incorrectly expected to
+truncate the completed metadata. Both tests now assert the synthetic producer's
+exact `ObservedAt + 5s` interval, while the lifecycle test separately requires
+query completion before the original short caller deadline. All three original
+cross-cutoff phases (current peer check, idle standby and separately leased
+work), their deadlines and joined cleanup remain unchanged. The complete mTLS
+package passes with race detection (exit 0, 36.692s). This changes tests only;
+it does not qualify an installed capture or change production timing.
+
 ## Approved packet request: local target composition correction (2026-10-27)
 
 Native run 40557482326 on 23bf0042 failed before admission with

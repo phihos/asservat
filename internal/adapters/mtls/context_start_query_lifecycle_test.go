@@ -109,8 +109,14 @@ func contextStartCompletedQueryLifecycle(t *testing.T, phase string) {
 	if err != nil {
 		t.Fatal("first query", err)
 	}
-	if resolved.FreshUntil.After(firstUntil) {
-		t.Fatal("first answer outlived its original caller")
+	if first.Err() != nil || !time.Now().Before(firstUntil) {
+		t.Fatal("first query did not complete within its original caller bound", first.Err())
+	}
+	// ADR-260 keeps the completed API metadata's original producer interval.
+	// firstUntil still bounds the query I/O and drives the socket-cutoff checks
+	// below; it does not replace the producer's first-read observation cutoff.
+	if !resolved.Valid(time.Now()) || !resolved.FreshUntil.Equal(resolved.ObservedAt.Add(5*time.Second)) {
+		t.Fatal("first answer changed the producer's API observation interval", resolved)
 	}
 	if phase == "work" {
 		ctx, end := context.WithTimeout(context.Background(), time.Second)
