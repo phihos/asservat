@@ -100,6 +100,7 @@ Verification:
 
 Open: installer provisioning of the connector's `collector` input; work producers and recorders
 (increment 4); budget-policy node limits at admission (increment 6); the full Gadget operator set.
+
 ## Log and resource triggers (ADR-241, 2026-10-27)
 
 [ADR-241](decisions/241-log-resource-detectors.md) implements the `log` and `resource` detectors
