@@ -296,6 +296,10 @@ func publicCaptureFailure(err error, request bool) OperationFailure {
 		return OperationFailure{"SharingNotPermitted", "Sharing the result needs the evidence-owner role on this workload and the evidence:share scope. No capture was started. Remove the recipients, or ask an administrator for the role.", false}
 	case errors.Is(err, value.ErrPreparationUncertain):
 		return OperationFailure{"AcquisitionUncertain", "Collection may already be in progress, or this attempt may no longer be usable. Check its status before starting a new investigation. The original may still produce a result.", false}
+	case request && errors.Is(err, value.ErrAcquisitionNotStarted):
+		// Admitted, and its start was refused before any start effect
+		// (ADR-212): a passive same-key retry would only replay acceptance.
+		return OperationFailure{"AcquisitionNotStarted", "The capture was accepted, but collection has not started. Continue the original capture with the same preview and request key (continue_acquisition: true); do not create another capture.", true}
 	case errors.Is(err, value.ErrAcquisitionClosed):
 		return OperationFailure{"AcquisitionClosed", "The original collection interval has ended. Check its status for any recorded result. To collect again, start a new investigation explicitly.", false}
 	case errors.Is(err, value.ErrConflict):

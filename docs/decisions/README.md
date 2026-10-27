@@ -18,6 +18,14 @@ review mints one persistent assignment per source and principal (the capturing p
 audience) and a per-Pod decision of at most `maxDecisionAgeSeconds`; a refusal or SAR outage ends it
 at once; explicit denies still win; reads repeat the recorded review. Migration 00096.
 
+[ADR-250 — Standby residency for regional work and unstarted acquisition](250-standby-residency-and-unstarted-acquisition.md)
+fixes intermittent installed `OutcomeUnknown` starts: the hub router attached regional work to the
+oldest standby exchange, whose 30-second residency cut the region's observations and stream
+mid-run. Attach and target queries now take the standby with the latest residency end that
+covers the work's deadline plus 3 s, and an idle standby that can no longer cover work is retired
+so the region reopens at once. A start refused before any start effect reports the retryable
+`AcquisitionNotStarted` naming `continue_acquisition`.
+
 [ADR-244 — Native artifact types and larger saves](244-native-artifact-types.md) is S-04
 increment 2: an artifact-type registry (pod status, PCAPNG, syscall JSON Lines, HTTP header JSON)
 with media type, format, safe filename and coverage; typed expectations with verified

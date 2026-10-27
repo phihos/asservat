@@ -21,6 +21,9 @@ var (
 	ErrConflict             = errors.New("capture idempotency conflict")
 	ErrAcquisitionClosed    = errors.New("original capture acquisition interval ended")
 	ErrPreparationUncertain = errors.New("original capture preparation already owned or spent")
+	// ErrAcquisitionNotStarted: the capture is admitted and its start was
+	// refused before any start effect; an explicit continuation may start it.
+	ErrAcquisitionNotStarted = errors.New("accepted capture acquisition not started")
 )
 
 const PendingAudit = "accepted_pending_audit"

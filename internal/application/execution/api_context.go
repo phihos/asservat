@@ -233,11 +233,14 @@ func (s APIContextRunner) execute(ctx context.Context, current identities.Curren
 	defer stop()
 	check, err := s.checkObserved(startCtx, current, w, original, capability, recovery)
 	if err != nil {
+		// The check only reads; nothing was prepared or started. The runner
+		// never inspects a dependency's error: the composing start classifies
+		// a temporary unavailability from the fixed Check step (ADR-250).
 		return zero, executeStep{"Check", err}
 	}
 	r, mayCreate, err := s.Prepare.PrepareAPIExecution(startCtx, check)
 	if err != nil {
-		return zero, executeStep{"PrepareAPIExecution", err}
+		return zero, executeStep{"PrepareAPIExecution[" + check.limit(original, s.Now()) + "]", err}
 	}
 	if !r.Valid() || r.Process != check.Process.Binding || r.ExpectationDigest != evidence.ContextExpectationDigest(w.Accepted.Expectation) {
 		return zero, executeStep{"PrepareAPIExecution", value.ErrConflict}

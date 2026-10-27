@@ -18,6 +18,10 @@ var (
 	ErrConflict             = errors.New("local start binding changed")
 	ErrExpired              = errors.New("local start authority expired")
 	ErrDenied               = errors.New("local start denied")
+	// ErrNotStarted marks a refusal known to precede every start effect: only
+	// reads ran, or the preparation transaction rolled back before its insert
+	// (ADR-212). It is joined with the refusal's own class, never alone.
+	ErrNotStarted = errors.New("refused before any start effect")
 )
 
 // Binding is frozen only after every required grant and capacity reservation is

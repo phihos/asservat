@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -52,6 +53,9 @@ func (f *apiRunnerFixture) Resolve(ctx context.Context, _ string) (identity.Iden
 	return i, nil
 }
 func (f *apiRunnerFixture) Permissions(ctx context.Context, t authorization.Target) (authorization.Projection, error) {
+	if f.mode == "eligibility-denied" {
+		return authorization.Projection{}, value.ErrDenied
+	}
 	return authorization.Projection{Target: t, Revision: identity.Revision{UID: "permissions", Generation: 1, Digest: [32]byte{1}}, ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second), DeniesObservedAt: f.now, DeniesFreshUntil: f.now.Add(5 * time.Second), DeniesComplete: true, Allows: []authorization.CurrentAssignment{{Audience: f.work.Accepted.Expectation.Audience[0], ObservedAt: f.now, FreshUntil: f.now.Add(5 * time.Second)}}}, nil
 }
 func (f *apiRunnerFixture) ReadAPIContextWork(context.Context, string, identity.Identity, artifact.RecoveryProof) (APIContextWork, error) {
@@ -61,7 +65,60 @@ func (f *apiRunnerFixture) ResolvePod(context.Context, targets.Request) (targets
 	if f.mode == "replacement-pod" && f.prepares.Load() > 0 {
 		return targets.PodResolution{}, targets.ErrChanged
 	}
+	switch f.mode {
+	case "target-unavailable":
+		return targets.PodResolution{}, targets.ErrUnavailable
+	case "target-denied":
+		return targets.PodResolution{}, targets.ErrDenied
+	case "target-changed":
+		return targets.PodResolution{}, targets.ErrChanged
+	case "target-private":
+		return targets.PodResolution{}, uninspectableError{}
+	}
 	return f.target, nil
+}
+
+// The runner never marks a check failure itself: it keeps the dependency's
+// error under the fixed Check step. A composer classifies it, so only a
+// temporary unavailability counts as not started; a denial (target or
+// eligibility) or a changed target keeps its class. A lost preparation reply
+// is never marked not started.
+func TestAPIContextRunnerLeavesCheckClassificationToTheComposer(t *testing.T) {
+	for mode, want := range map[string]bool{"target-unavailable": true, "target-denied": false, "target-changed": false, "eligibility-denied": false} {
+		t.Run(mode, func(t *testing.T) {
+			f, s, current := apiRunner(t)
+			f.mode = mode
+			_, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
+			var fixed interface{ FixedStep() string }
+			if err == nil || errors.Is(err, value.ErrNotStarted) || !errors.As(err, &fixed) || !strings.HasPrefix(fixed.FixedStep(), "Check") || TemporarilyUnavailable(err) != want || f.captures.Load() != 0 {
+				t.Fatal("check classification", err, want)
+			}
+		})
+	}
+	f, s, current := apiRunner(t)
+	f.mode = "lost-preparation-reply"
+	_, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
+	if err == nil || errors.Is(err, value.ErrNotStarted) {
+		t.Fatal("a possibly committed preparation was marked not started", err)
+	}
+}
+
+// The runner must not inspect a dependency's private error (diagnostics
+// contract); a check failure passes it through unexamined.
+type uninspectableError struct{}
+
+func (uninspectableError) Error() string { panic("rendered") }
+func (uninspectableError) Unwrap() error { panic("unwrapped") }
+func (uninspectableError) Is(error) bool { panic("inspected") }
+
+func TestAPIContextRunnerDoesNotInspectCheckErrors(t *testing.T) {
+	f, s, current := apiRunner(t)
+	f.mode = "target-private"
+	_, err := s.Execute(t.Context(), current, f.work.Accepted.CaptureID)
+	var step executeStep
+	if !errors.As(err, &step) || step.step != "Check" {
+		t.Fatal("private check failure lost its fixed step")
+	}
 }
 func (f *apiRunnerFixture) ContextCapability(context.Context, authorization.Target) (planning.ContextCapability, error) {
 	return f.cap, nil

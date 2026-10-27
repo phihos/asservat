@@ -770,7 +770,7 @@ func installedJourneyRecoverCapture(ctx context.Context, code string, resolve fu
 			return false, err
 		}
 		switch code {
-		case "OutcomeUnknown", "ReviewChanged", "NotAvailable":
+		case "OutcomeUnknown", "AcquisitionNotStarted", "ReviewChanged", "NotAvailable":
 		default:
 			return false, fmt.Errorf("original capture request failed: %s", code)
 		}
@@ -797,7 +797,7 @@ func installedJourneyRecoverCapture(ctx context.Context, code string, resolve fu
 				return false, errors.New("original capture request remains unresolved")
 			}
 		}
-		if code != "OutcomeUnknown" {
+		if code != "OutcomeUnknown" && code != "AcquisitionNotStarted" {
 			return false, fmt.Errorf("original accepted capture remains unavailable: %s", code)
 		}
 		current, err := observe(acceptedID)
@@ -843,6 +843,103 @@ func installedJourneyRecoverCapture(ctx context.Context, code string, resolve fu
 		return false, err
 	}
 	return false, ctx.Err()
+}
+
+// errInstalledRequestClosed: the resolver acknowledged that the request was
+// never admitted; only then may a fresh review follow.
+var errInstalledRequestClosed = errors.New("capture request closed without admission")
+
+// installedJourneyReviewAndSubmit is a focus's preview and request_capture
+// with the journey's own recovery: a retryable reply is resolved under the
+// original preview and key, an accepted capture whose start was refused
+// before any effect (ADR-212) is continued explicitly, and only an
+// acknowledged closed request is reviewed again (at most four reviews, each
+// with its own key). review returns the request arguments of one review.
+func installedJourneyReviewAndSubmit(ctx context.Context, call func(name string, arguments any, data any) (string, string), review func(attempt int) (map[string]any, error)) (string, error) {
+	for attempt := 1; ; attempt++ {
+		request, err := review(attempt)
+		if err != nil {
+			return "", err
+		}
+		id, err := installedJourneySubmit(ctx, call, request)
+		if !errors.Is(err, errInstalledRequestClosed) || attempt == 4 {
+			return id, err
+		}
+		if err = installedJourneyPause(ctx, 2*time.Second); err != nil {
+			return "", err
+		}
+	}
+}
+
+// installedJourneySubmit submits one review; call returns the validated
+// status and error code.
+func installedJourneySubmit(ctx context.Context, call func(name string, arguments any, data any) (string, string), request map[string]any) (string, error) {
+	var accepted struct {
+		CaptureID string `json:"capture_id"`
+	}
+	status, code := call("request_capture", request, &accepted)
+	if status == "ok" {
+		if accepted.CaptureID == "" {
+			return "", errors.New("accepted capture identity is missing")
+		}
+		return accepted.CaptureID, nil
+	}
+	acceptedID := ""
+	closed, err := installedJourneyRecoverCapture(ctx, code, func() (installedJourneyDisposition, error) {
+		var d installedJourneyDisposition
+		if s, c := call("resolve_capture_request", request, &d); s != "ok" {
+			return d, fmt.Errorf("original capture request remains unresolved: %s", c)
+		}
+		if d.State == "accepted" {
+			acceptedID = d.CaptureID
+		}
+		return d, nil
+	}, func() (string, string) {
+		continued := map[string]any{"continue_acquisition": true}
+		for k, v := range request {
+			continued[k] = v
+		}
+		var r struct {
+			CaptureID string `json:"capture_id"`
+		}
+		_, c := call("request_capture", continued, &r)
+		return c, r.CaptureID
+	}, func() error { return nil }, installedJourneyPause, func(id string) (installedJourneyCaptureProgress, error) {
+		var p installedJourneyCaptureProgress
+		if s, c := call("get_capture", map[string]string{"capture_id": id}, &p); s != "ok" {
+			return p, fmt.Errorf("original accepted capture progress is unavailable: %s", c)
+		}
+		return p, nil
+	})
+	if err != nil {
+		return "", err
+	}
+	if closed {
+		return "", errInstalledRequestClosed
+	}
+	if acceptedID == "" {
+		return "", errors.New("capture request was not accepted")
+	}
+	return acceptedID, nil
+}
+
+// installedJourneyRetryUnavailable retries a read or preview, as the journey's
+// own call does, while it is retryably unavailable: a NotAvailable reply (a
+// gathered fact lapsed, "facts/current") or a bare 503 whose reply metadata
+// expired before delivery ("reply-expired"). attempt reports a transport error
+// as err. Only an operation expected to succeed may use it.
+func installedJourneyRetryUnavailable(ctx context.Context, attempt func() (status, code string, err error)) (status, code string, err error) {
+	for i := 1; i <= 4; i++ {
+		if status, code, err = attempt(); err == nil && code != "NotAvailable" {
+			return status, code, nil
+		}
+		if i < 4 {
+			if e := installedJourneyPause(ctx, 2*time.Second); e != nil {
+				return status, code, e
+			}
+		}
+	}
+	return status, code, err
 }
 
 // installedJourneyReplyCode validates a reply like installedJourneyReply but

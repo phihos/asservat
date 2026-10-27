@@ -341,7 +341,7 @@ func apiPreparationRefusalError(err error, headroomRefused bool) error {
 	// Expiry during rollback instead reports "deadline" and must survive.
 	var cause ledgerCause
 	if headroomRefused && errors.As(err, &cause) && cause.cause == "client" {
-		return value.ErrUnavailable
+		return errors.Join(value.ErrUnavailable, value.ErrNotStarted)
 	}
 	return err
 }

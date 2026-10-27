@@ -34,6 +34,7 @@ func TestInstalledJourneyResolvesCaptureBeforeContinuationOrReplacement(t *testi
 		{name: "unavailable-needs-close", code: "NotAvailable", dispositions: []installedJourneyDisposition{{State: "closed"}}, wantClosed: true, wantCalls: []string{"resolve"}},
 		{name: "lost-resolution", code: "OutcomeUnknown", resolveErr: errors.New("lost response"), wantErr: true, wantCalls: []string{"resolve"}},
 		{name: "missing-disposition", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{}}, wantErr: true, wantCalls: []string{"resolve"}},
+		{name: "not-started-continues", code: "AcquisitionNotStarted", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, nextCodes: []string{""}, nextID: "original", wantCalls: []string{"resolve", "observe", "pause", "continue"}},
 		{name: "accepted-continues", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, nextCodes: []string{""}, nextID: "original", wantCalls: []string{"resolve", "observe", "pause", "continue"}},
 		{name: "successful-continuation-cannot-change", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, nextCodes: []string{""}, nextID: "replacement", wantErr: true, wantCalls: []string{"resolve", "observe", "pause", "continue"}},
 		{name: "successful-continuation-needs-capture", code: "OutcomeUnknown", dispositions: []installedJourneyDisposition{{State: "accepted", CaptureID: "original"}}, nextCodes: []string{""}, wantErr: true, wantCalls: []string{"resolve", "observe", "pause", "continue"}},
@@ -642,5 +643,92 @@ func TestInstalledJourneyPartialRequiresExactStrongRange(t *testing.T) {
 		if _, _, err := installedJourneyPartial(r, 2, 3, 10); err == nil {
 			t.Fatal("inexact partial accepted", r.StatusCode, r.Header)
 		}
+	}
+}
+
+func TestInstalledJourneySubmitContinuesAcceptedRefusedStart(t *testing.T) {
+	var calls []string
+	requests := 0
+	id, err := installedJourneySubmit(t.Context(), func(name string, arguments any, data any) (string, string) {
+		calls = append(calls, name)
+		switch name {
+		case "request_capture":
+			requests++
+			if requests == 1 {
+				return "error", "OutcomeUnknown"
+			}
+			if arguments.(map[string]any)["continue_acquisition"] != true || arguments.(map[string]any)["idempotency_key"] != "key" {
+				t.Fatal("continuation lost its original key", arguments)
+			}
+			data.(*struct {
+				CaptureID string `json:"capture_id"`
+			}).CaptureID = "original"
+			return "ok", ""
+		case "resolve_capture_request":
+			*data.(*installedJourneyDisposition) = installedJourneyDisposition{State: "accepted", CaptureID: "original"}
+		case "get_capture":
+			*data.(*installedJourneyCaptureProgress) = installedJourneyCaptureProgress{CaptureID: "original", Phase: "Pending"}
+		}
+		return "ok", ""
+	}, map[string]any{"preview_id": "preview", "idempotency_key": "key"})
+	if err != nil || id != "original" || !reflect.DeepEqual(calls, []string{"request_capture", "resolve_capture_request", "get_capture", "request_capture"}) {
+		t.Fatal(id, err, calls)
+	}
+	if _, err = installedJourneySubmit(t.Context(), func(name string, arguments any, data any) (string, string) {
+		if name == "resolve_capture_request" {
+			*data.(*installedJourneyDisposition) = installedJourneyDisposition{State: "closed"}
+			return "ok", ""
+		}
+		return "error", "OutcomeUnknown"
+	}, map[string]any{"preview_id": "preview", "idempotency_key": "key"}); err == nil {
+		t.Fatal("a closed request was reported as accepted")
+	}
+}
+
+func TestInstalledJourneyReviewsAgainOnlyAfterAcknowledgedClosure(t *testing.T) {
+	var keys []any
+	id, err := installedJourneyReviewAndSubmit(t.Context(), func(name string, arguments any, data any) (string, string) {
+		switch name {
+		case "request_capture":
+			keys = append(keys, arguments.(map[string]any)["idempotency_key"])
+			if len(keys) == 1 {
+				return "error", "OutcomeUnknown"
+			}
+			data.(*struct {
+				CaptureID string `json:"capture_id"`
+			}).CaptureID = "second"
+			return "ok", ""
+		case "resolve_capture_request":
+			*data.(*installedJourneyDisposition) = installedJourneyDisposition{State: "closed"}
+		}
+		return "ok", ""
+	}, func(attempt int) (map[string]any, error) {
+		return map[string]any{"preview_id": "preview", "idempotency_key": attempt}, nil
+	})
+	if err != nil || id != "second" || !reflect.DeepEqual(keys, []any{1, 2}) {
+		t.Fatal(id, err, keys)
+	}
+}
+
+func TestInstalledJourneyRetriesOnlyRetryableUnavailability(t *testing.T) {
+	replies := []struct {
+		code string
+		err  error
+	}{{"", errors.New("Service Unavailable")}, {"NotAvailable", nil}, {"", nil}}
+	n := 0
+	status, code, err := installedJourneyRetryUnavailable(t.Context(), func() (string, string, error) {
+		r := replies[n]
+		n++
+		if r.code == "" && r.err == nil {
+			return "ok", "", nil
+		}
+		return "error", r.code, r.err
+	})
+	if status != "ok" || code != "" || err != nil || n != 3 {
+		t.Fatal(status, code, err, n)
+	}
+	n = 0
+	if status, code, err = installedJourneyRetryUnavailable(t.Context(), func() (string, string, error) { n++; return "error", "UnsupportedRequest", nil }); code != "UnsupportedRequest" || err != nil || n != 1 {
+		t.Fatal(status, code, err, n)
 	}
 }

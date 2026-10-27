@@ -2,6 +2,7 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -36,12 +37,13 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 	outsiderTokens := owner.unrelated().mcpTokenSource(origin)
 	outsider := connect("installed-history-outsider", outsiderTokens.Token)
 	defer outsider.Close()
-	call := func(session *sdk.ClientSession, name string, arguments any, data any) (string, string) {
+	// try reports a transport error; call fails the test on it.
+	try := func(session *sdk.ClientSession, name string, arguments any, data any) (string, string, error) {
 		t.Helper()
 		result, err := session.CallTool(ctx, &sdk.CallToolParams{Name: name, Arguments: arguments})
 		if err != nil {
-			diagnose()
-			t.Fatal("installed history call", name, err)
+			t.Logf("installed history: %s -> transport %v", name, err)
+			return "", "", err
 		}
 		reply, code, err := installedJourneyReplyCode(wire, name, result)
 		if err != nil {
@@ -54,7 +56,16 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 			}
 		}
 		t.Logf("installed history: %s -> %s %s request %s", name, reply.Status, code, reply.RequestID)
-		return reply.Status, code
+		return reply.Status, code, nil
+	}
+	call := func(session *sdk.ClientSession, name string, arguments any, data any) (string, string) {
+		t.Helper()
+		status, code, err := try(session, name, arguments, data)
+		if err != nil {
+			diagnose()
+			t.Fatal("installed history call", name, err)
+		}
+		return status, code
 	}
 	type page struct {
 		History []struct {
@@ -120,31 +131,33 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 	// before the others are read ("facts/current"), e.g. while the workload's
 	// storage binding is refreshed after the capture-time-share capture just
 	// used it. Like the journey's own preview, retry up to four reviews.
-	status, code = "", ""
-	for attempt := 1; attempt <= 4; attempt++ {
-		if status, code = call(developer, "preview_capture", map[string]string{"history_capture_id": captureID}, &preview); status == "ok" || code != "NotAvailable" {
-			break
-		}
-		if attempt < 4 && installedJourneyPause(ctx, 2*time.Second) != nil {
-			t.Fatal("installed repeat preview", ctx.Err())
-		}
-	}
-	if status != "ok" || preview.PreviewID == "" || preview.Repeated != captureID || !preview.Enabled || len(preview.SelectedPods) != 1 {
-		diagnose()
-		t.Fatal("installed repeat preview", status, code, preview)
-	}
-	request := map[string]string{"preview_id": preview.PreviewID, "idempotency_key": "installed-history-repeat"}
 	var accepted struct {
-		CaptureID string `json:"capture_id"`
+		CaptureID string
 	}
-	if status, code := call(developer, "request_capture", request, &accepted); status != "ok" {
-		// An uncertain reply is resolved under the original preview and key.
-		var resolved installedJourneyDisposition
-		if s, c := call(developer, "resolve_capture_request", request, &resolved); s != "ok" || resolved.State != "accepted" {
-			diagnose()
-			t.Fatal("installed repeat request", status, code, s, c, resolved.State)
+	var err error
+	accepted.CaptureID, err = installedJourneyReviewAndSubmit(ctx, func(name string, arguments any, data any) (string, string) {
+		// A lost request reply is an unknown outcome, resolved like the journey's.
+		if name == "request_capture" {
+			if status, code, err := try(developer, name, arguments, data); err == nil {
+				return status, code
+			}
+			return "error", "OutcomeUnknown"
 		}
-		accepted.CaptureID = resolved.CaptureID
+		return call(developer, name, arguments, data)
+	}, func(attempt int) (map[string]any, error) {
+		preview.PreviewID, preview.Repeated, preview.Enabled, preview.SelectedPods = "", "", false, nil
+		status, code, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) {
+			return try(developer, "preview_capture", map[string]string{"history_capture_id": captureID}, &preview)
+		})
+		if err != nil || status != "ok" || preview.PreviewID == "" || preview.Repeated != captureID || !preview.Enabled || len(preview.SelectedPods) != 1 {
+			diagnose()
+			t.Fatal("installed repeat preview", status, code, err, preview)
+		}
+		return map[string]any{"preview_id": preview.PreviewID, "idempotency_key": fmt.Sprintf("installed-history-repeat-%d", attempt)}, nil
+	})
+	if err != nil {
+		diagnose()
+		t.Fatal("installed repeat request", err)
 	}
 	if accepted.CaptureID == "" || accepted.CaptureID == captureID {
 		t.Fatal("installed repeat did not create a new capture", accepted.CaptureID)
@@ -168,7 +181,7 @@ func installedJourneyHistory(t *testing.T, ctx context.Context, wire *contracts.
 		}
 	}
 	var after page
-	if status, _ := call(developer, "list_capture_history", list, &after); status != "ok" || len(after.History) != len(before.History)+1 || after.History[0].CaptureID != accepted.CaptureID || after.History[listed+1].CaptureID != captureID {
+	if status, _, err := installedJourneyRetryUnavailable(ctx, func() (string, string, error) { return try(developer, "list_capture_history", list, &after) }); err != nil || status != "ok" || len(after.History) != len(before.History)+1 || after.History[0].CaptureID != accepted.CaptureID || after.History[listed+1].CaptureID != captureID {
 		t.Fatal("installed history after repeat", after)
 	}
 	t.Logf("installed history: listed capture %s, refused the unrelated principal, collected again as capture %s", captureID, accepted.CaptureID)

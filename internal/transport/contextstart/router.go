@@ -44,6 +44,47 @@ type Router struct {
 // itself and the caller's later checks when waiting for a standby to register.
 const queryReserve = 2500 * time.Millisecond
 
+// standbyMargin is the residency a selected standby must keep beyond the work's
+// own deadline. The region's exchange began, and ends, its opening's setup
+// (about a second) before this registration; near that end the region cuts its
+// observations to it and the exchange closes mid-work (installed native:
+// headroom refusals with seconds left, stream loss before preparation).
+const standbyMargin = 3 * time.Second
+
+// standbyWork is the longest work or query deadline Attach and Query accept.
+// An idle standby that can no longer cover it is retired, so the region opens
+// its replacement at once instead of at the end of the full residency.
+const standbyWork = 5 * time.Second
+
+// selectLocked returns the idle live standby of cluster with the latest
+// residency end still covering until plus standbyMargin, or nil. The newest
+// standby is preferred: the oldest is the one about to end. It only reads.
+func (r *Router) selectLocked(cluster string, until time.Time, eligible func(*Standby) bool) *Standby {
+	var selected *Standby
+	var end time.Time
+	for _, s := range r.standby {
+		d, ok := s.ctx.Deadline()
+		if !ok || s.channel.Connector.Binding.ClusterID != cluster || s.attached || s.queryBusy || !eligible(s) || !s.liveLocked() || d.Before(until.Add(standbyMargin)) {
+			continue
+		}
+		if selected == nil || d.After(end) || d.Equal(end) && s.order > selected.order {
+			selected, end = s, d
+		}
+	}
+	return selected
+}
+
+// pruneLocked retires the idle standbys of cluster that can no longer cover
+// any work, so the region opens their replacements at once. Attach and Query
+// call it before selecting; each standby's own timer does the same.
+func (r *Router) pruneLocked(cluster string) {
+	for _, s := range r.standby {
+		if s.channel.Connector.Binding.ClusterID == cluster {
+			s.retireIdleLocked()
+		}
+	}
+}
+
 // ReceiverCheck rechecks the same actual TLS peer and accepted local process.
 // A successful fresh check may authorize attachment, never restore a lost human
 // owner. The channel identity must remain exactly the original registered one.
@@ -61,6 +102,7 @@ type Standby struct {
 	attached  bool
 	queryBusy bool
 	queries   int
+	retire    *time.Timer
 	once      sync.Once
 	// Protected by router.mu. Selection observes stream cancellation directly,
 	// including the interval before its cancellation callback runs.
@@ -138,6 +180,15 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 	call, cancel := context.WithTimeout(ctx, 30*time.Second)
 	r.serial++
 	s := &Standby{router: r, channel: receiver.Channel, check: check, order: r.serial, ctx: call, cancel: cancel, job: make(chan *captureJob, 1), query: make(chan *queryJob), done: make(chan struct{})}
+	if end, ok := call.Deadline(); ok {
+		if usable := time.Until(end.Add(-(standbyWork + standbyMargin))); usable > 0 {
+			s.retire = time.AfterFunc(usable, func() {
+				r.mu.Lock()
+				defer r.mu.Unlock()
+				s.retireIdleLocked()
+			})
+		}
+	}
 	r.standby[s.channel.ExchangeID] = s
 	cluster.standby++
 	close(r.registered)
@@ -145,6 +196,16 @@ func (r *Router) RegisterStandby(ctx context.Context, receiver fleet.APIContextR
 	return s, nil
 }
 func (s *Standby) Context() context.Context { return s.ctx }
+
+// retireIdleLocked ends an idle standby that can no longer cover any work, so
+// its handler returns and the region opens a replacement. Attached or querying
+// standbys are left to their own work.
+func (s *Standby) retireIdleLocked() {
+	end, ok := s.ctx.Deadline()
+	if ok && !s.attached && !s.queryBusy && end.Before(time.Now().Add(standbyWork+standbyMargin)) {
+		s.cancel()
+	}
+}
 func (s *Standby) liveLocked() bool {
 	if s.ctx.Err() != nil {
 		return false
@@ -162,6 +223,9 @@ func (s *Standby) Finish() {
 	}
 	s.once.Do(func() {
 		s.cancel()
+		if s.retire != nil {
+			s.retire.Stop()
+		}
 		s.router.mu.Lock()
 		if s.router.standby[s.channel.ExchangeID] == s {
 			delete(s.router.standby, s.channel.ExchangeID)
@@ -262,11 +326,8 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	var selected *Standby
 	for {
 		r.mu.Lock()
-		for _, s := range r.standby {
-			if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && !s.queryBusy && s.queries < contracts.APIContextMaximumQueries && s.liveLocked() && (selected == nil || s.order < selected.order) {
-				selected = s
-			}
-		}
+		r.pruneLocked(cluster)
+		selected = r.selectLocked(cluster, deadline, func(s *Standby) bool { return s.queries < contracts.APIContextMaximumQueries })
 		if r.closed {
 			r.mu.Unlock()
 			return time.Time{}, fleet.ErrUnavailable
@@ -297,6 +358,7 @@ func (r *Router) Query(ctx context.Context, cluster, method string, in, out any)
 	defer func() {
 		r.mu.Lock()
 		selected.queryBusy = false
+		selected.retireIdleLocked()
 		if !r.closed && selected.liveLocked() {
 			close(r.registered)
 			r.registered = make(chan struct{})
@@ -331,12 +393,8 @@ func (r *Router) Attach(ctx context.Context, cluster, capture string) (*Attachme
 	if r.closed || c == nil || len(r.captures) >= r.limits.Captures || c.captures >= c.limit.Captures || r.captures[capture] != nil {
 		return nil, fleet.ErrCapacity
 	}
-	var selected *Standby
-	for _, s := range r.standby {
-		if s.channel.Connector.Binding.ClusterID == cluster && !s.attached && !s.queryBusy && s.liveLocked() && (selected == nil || s.order < selected.order) {
-			selected = s
-		}
-	}
+	r.pruneLocked(cluster)
+	selected := r.selectLocked(cluster, deadline, func(*Standby) bool { return true })
 	if selected == nil {
 		return nil, fleet.ErrUnavailable
 	}

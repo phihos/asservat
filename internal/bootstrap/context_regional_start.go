@@ -4,6 +4,7 @@ import (
 	auditapp "asservat.local/asservat/internal/application/audit"
 	"context"
 	"errors"
+	"sync"
 
 	"time"
 
@@ -42,6 +43,16 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	if ctx == nil || ctx.Err() != nil || current == nil || !authorization.UUID(id) || s.Runner.Read == nil || s.Runner.Capabilities == nil || s.Runner.Recovery == nil || s.Signer == nil || s.Router == nil || s.Now == nil {
 		return execution.ErrInvalid
 	}
+	// A temporary unavailability before the run, or a run that failed as
+	// temporarily unavailable without entering the one-use SQL preparation
+	// (or whose preparation rolled back before its insert, ADR-212), leaves
+	// the admitted capture unstarted: only reads happened, so an explicit
+	// continuation may start it (ADR-134/250). A denial, expiry or any other
+	// run failure keeps its own class.
+	notStarted := errors.Join(execution.ErrUnavailable, capturevalue.ErrAcquisitionNotStarted)
+	// Dispatch can return early, without joining the run, when its exchange
+	// or attachment ends; the gate then refuses any later preparation.
+	gate := &preparationGate{}
 	started := s.Now().UTC().Truncate(time.Microsecond)
 	call, cancel := context.WithDeadline(ctx, started.Add(5*time.Second))
 	defer cancel()
@@ -73,7 +84,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	narrow("identity", caller.ValidUntil)
 	recovery, e := s.Runner.Recovery.RecoveryState(call)
 	if e != nil || !recovery.Valid(s.Now()) {
-		return execution.ErrUnavailable
+		return notStarted
 	}
 	narrow("recovery", recovery.FreshUntil)
 	mark = time.Now()
@@ -93,7 +104,7 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	capability, e := s.Runner.Capabilities.ContextCapability(call, target)
 	auditapp.MarkStep(ctx, "st-capability", mark)
 	if e != nil || !capability.Valid(s.Now()) {
-		return execution.ErrUnavailable
+		return notStarted
 	}
 	narrow("capability", capability.FreshUntil)
 	// Reservation happens before signing/attachment. A closing old exchange stays
@@ -102,14 +113,14 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	attachment, e := s.Router.Attach(call, target.ClusterID, id)
 	auditapp.MarkStep(ctx, "st-attach", mark)
 	if e != nil {
-		return execution.ErrUnavailable
+		return notStarted
 	}
 	defer attachment.Close()
 	mark = time.Now()
 	receiver, e := attachment.Receiver(call)
 	auditapp.MarkStep(ctx, "st-receiver", mark)
 	if e != nil {
-		return execution.ErrUnavailable
+		return notStarted
 	}
 	narrow("receiver", receiver.ValidUntil)
 	if receiver.Channel.Connector.Binding.InstallationID != recovery.InstallationID || receiver.Channel.Connector.Binding.IssuerEpoch != recovery.IssuerEpoch {
@@ -129,13 +140,15 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 	// Signing and every prior blocking read retain their original bounds. The
 	// same retained CurrentIdentity answers regional requests on this attachment.
 	if call.Err() != nil || !s.Now().Before(until) {
-		return execution.ErrUnavailable
+		return execution.ErrUnavailable // the original interval ended: not retryable as not-started
 	}
 	mark = time.Now()
 	state, e := attachment.Run(work, signed, func(ctx context.Context, ops *contextstart.HubOperations) (string, error) {
 		r := s.Runner
 		r.Process, r.Targets, r.Local, r.Starts, r.Output, r.Collector = ops, ops, ops, ops, ops, ops
+		r.Prepare = gatedPreparer{r.Prepare, gate}
 		result, err := r.ExecuteObserved(ctx, current, caller, accepted, capability, recovery)
+		gate.finish(err)
 		if err != nil && s.Report != nil {
 			step := "execute"
 			var fixed interface{ FixedStep() string }
@@ -153,9 +166,13 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		return "Unavailable", err
 	})
 	auditapp.MarkStep(ctx, "st-run", mark)
+	gate.close()
 	if e != nil && state == "" {
 		if s.Report != nil {
 			s.Report("dispatch (" + regionalOutcome(e) + ") start-left" + fleetapp.RemainingBucket(call, s.Now()) + " bound=" + bound)
+		}
+		if gate.notStarted() {
+			return notStarted
 		}
 		return execution.ErrUnavailable
 	}
@@ -164,9 +181,76 @@ func (s RegionalAPIContextStart) StartContext(ctx context.Context, current ident
 		return nil
 	case "PreparationUncertain":
 		return capturevalue.ErrPreparationUncertain
-	default:
-		return execution.ErrUnavailable
 	}
+	if gate.notStarted() {
+		return notStarted
+	}
+	return execution.ErrUnavailable
+}
+
+// preparationGate records whether a run entered the one-use SQL preparation
+// and how the run ended. A preparation refused before its insert (ADR-212
+// headroom) does not count. After close no preparation begins.
+type preparationGate struct {
+	mu                       sync.Mutex
+	closed, active, finished bool
+	runErr                   error
+}
+
+func (g *preparationGate) finish(err error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.finished, g.runErr = true, err
+}
+
+// notStarted is true after close for a run that never entered preparation
+// and either failed as temporarily unavailable or was abandoned when its
+// exchange ended. A denied, expired or otherwise definite run never is.
+func (g *preparationGate) notStarted() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	return g.closed && !g.active && (!g.finished || executionapp.TemporarilyUnavailable(g.runErr))
+}
+
+func (g *preparationGate) enter() bool {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.closed {
+		return false
+	}
+	g.active = true
+	return true
+}
+
+func (g *preparationGate) rolledBack() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if !g.closed {
+		g.active = false
+	}
+}
+
+func (g *preparationGate) close() (entered bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.closed = true
+	return g.active
+}
+
+type gatedPreparer struct {
+	executionapp.APIExecutionPreparer
+	gate *preparationGate
+}
+
+func (p gatedPreparer) PrepareAPIExecution(ctx context.Context, c executionapp.APIExecutionCheck) (execution.APIExecution, bool, error) {
+	if !p.gate.enter() {
+		return execution.APIExecution{}, false, errors.Join(execution.ErrUnavailable, execution.ErrNotStarted)
+	}
+	r, first, err := p.APIExecutionPreparer.PrepareAPIExecution(ctx, c)
+	if err != nil && errors.Is(err, execution.ErrNotStarted) {
+		p.gate.rolledBack()
+	}
+	return r, first, err
 }
 
 // Diagnostic only: a retained caller deadline is not a fresh start interval.

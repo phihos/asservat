@@ -372,12 +372,15 @@ func TestContextStreamDiagnosticOriginalHubRunErrorAndJoinedAttachment(t *testin
 	if e != nil {
 		t.Fatal(e)
 	}
-	ctx, cancel := context.WithDeadline(context.Background(), w.ValidUntil)
+	// The standby keeps its own residency beyond the attachment's deadline.
+	resident, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	ctx, record := NewStreamDiagnosticContext(ctx)
+	resident, record := NewStreamDiagnosticContext(resident)
+	ctx, end := context.WithDeadline(resident, w.ValidUntil)
+	defer end()
 	receiver := fleet.APIContextReceiver{Channel: w.Work.Channel, ObservedAt: w.VerifiedAt, ValidUntil: w.ValidUntil}
 	check := func(context.Context) (fleet.APIContextReceiver, error) { return receiver, nil }
-	standby, e := router.RegisterStandby(ctx, receiver, check)
+	standby, e := router.RegisterStandby(resident, receiver, check)
 	if e != nil {
 		t.Fatal(e)
 	}

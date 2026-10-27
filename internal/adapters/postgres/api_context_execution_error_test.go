@@ -34,9 +34,11 @@ func TestAPIPreparationRefusalPreservesRollbackDeadline(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			got := apiPreparationRefusalError(tc.input, tc.refused)
 			if tc.restore {
-				if got != value.ErrUnavailable {
-					t.Fatal("known headroom refusal lost its execution domain", got)
+				if !errors.Is(got, value.ErrUnavailable) || !errors.Is(got, value.ErrNotStarted) {
+					t.Fatal("known headroom refusal lost its execution domain or pre-effect class", got)
 				}
+			} else if errors.Is(got, value.ErrNotStarted) {
+				t.Fatal("an unknown rollback was classified as before any start effect", got)
 			} else if got != tc.input {
 				t.Fatal("normalization replaced the original cause or error chain", got)
 			}
