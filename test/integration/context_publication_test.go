@@ -641,7 +641,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 			t.Fatal(err)
 		}
 		return f.scenario, published
-	})
+	}, releaseBurstConnections)
 	releaseBurstConnections()
 	qualifyDownloadControl(t, ctx, admin, poolFor, store, keys, func(t *testing.T) (captureAdmissionScenario, artifact.PublishedContext) {
 		f := setup(t)

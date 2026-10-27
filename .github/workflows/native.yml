@@ -29,7 +29,7 @@ jobs:
         run: |
           all=$(scripts/ci-native.sh --list)
           if [[ $SUITE == all ]]; then echo "suites=$all" >> "$GITHUB_OUTPUT"; exit; fi
-          python3 -c 'import json,sys; assert sys.argv[2] in json.loads(sys.argv[1]) + ["context"], "unknown suite"' "$all" "$SUITE"
+          python3 -c 'import json,sys; assert sys.argv[2] in json.loads(sys.argv[1]) + ["context", "custody"], "unknown suite"' "$all" "$SUITE"
           echo "suites=[\"$SUITE\"]" >> "$GITHUB_OUTPUT"
 
   native:

@@ -6,7 +6,13 @@
 set -euo pipefail
 context="python3 scripts/test-context-storage.py"
 declare -A suites=(
-  [custody]="make custody-integration"
+  # The custody suite (make custody-integration, about 15 minutes, too long
+  # for one run) in four disjoint shards (CUSTODY_SHARDS in
+  # scripts/test-custody.py).
+  [custody-1]="python3 scripts/test-custody.py --shard 1"
+  [custody-2]="python3 scripts/test-custody.py --shard 2"
+  [custody-3]="python3 scripts/test-custody.py --shard 3"
+  [custody-4]="python3 scripts/test-custody.py --shard 4"
   [fleet]="make fleet-integration"
   [database-recovery]="make database-recovery-integration"
   [initial-installation]="make initial-installation-integration"
@@ -69,13 +75,14 @@ if [[ ${1:-} == --list ]]; then
   printf '%s\n' "${!suites[@]}" | sort | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read().split()))'
   exit
 fi
-# context exists only for filtered dispatch (ci-native.sh context PATTERN): the
-# whole suite exceeds the 20-minute limit, so it is not in --list.
-if [[ ${1:-} == context && -z ${2:-} ]]; then
-  echo "context needs a --run filter; use context-1/context-2 for the whole suite" >&2; exit 2
+# context and custody exist only for filtered dispatch (ci-native.sh SUITE
+# PATTERN): each whole suite exceeds the 20-minute limit, so neither is in
+# --list; their numbered shards run the whole suite.
+if [[ ${1:-} == context || ${1:-} == custody ]] && [[ -z ${2:-} ]]; then
+  echo "$1 needs a --run filter; use its numbered shards for the whole suite" >&2; exit 2
 fi
 command=${suites[${1:?suite}]:-}
-[[ -n $command || $1 == context ]] || { echo "unknown suite $1" >&2; exit 2; }
+[[ -n $command || $1 == context || $1 == custody ]] || { echo "unknown suite $1" >&2; exit 2; }
 # A filter selects tests inside a suite's own fixture: custody/fleet and context only.
 if [[ -n ${2:-} ]]; then
   case $1 in

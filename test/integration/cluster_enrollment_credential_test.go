@@ -20,6 +20,7 @@ import (
 func qualifyClusterEnrollmentCredential(t *testing.T, ctx context.Context, poolFor func(string, string) *pgxpool.Pool, f *connectorSQLFixture) {
 	t.Helper()
 	pool := poolFor("cluster_credential_runtime", "synthetic-cluster-credential")
+	defer pool.Close()
 	store, err := postgres.NewClusterCredentials(ctx, pool, f.scenario.a.RootID)
 	if err != nil {
 		t.Fatal("cluster credential store", err)

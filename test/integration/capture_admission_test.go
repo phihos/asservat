@@ -199,6 +199,12 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 	}
 	seedRetention := newRetentionEffectFixtures(t, ctx, poolFor, store, keys)
 	seedRecovery := newRecoveryEffectFixtures(t, ctx, admin, poolFor)
+	if native == nil {
+		// Every pool opened below the shared fixtures above must be closed by
+		// its own subtest or helper; leaked idle connections exhausted the
+		// unchanged 48-connection server for later cases.
+		defer requireOnlySQLRoles(t, ctx, admin, "postgres", "authority_runtime", "capture_runtime", "custody_runtime", "context_control_config_runtime", "capture_audit_runtime", "retention_source_runtime", "retention_source_read_runtime", "peer_read_runtime")
+	}
 	type scenario = captureAdmissionScenario
 	createForTargetWithControl := func(t *testing.T, slots, full, replay int64, source func(context.Context) (targets.PodResolution, error), image artifact.Digest) scenario {
 		t.Helper()
@@ -697,4 +703,39 @@ func TestContextAdmissionWithRealServices(t *testing.T) {
 		}
 		charges(t, s, 1)
 	})
+}
+
+// requireOnlySQLRoles fails when a client connection of any other role is still
+// open: a helper or subtest kept its pool past its own scope. Closing a pool
+// ends its sessions, so a short wait covers only server-side session exit.
+func requireOnlySQLRoles(t *testing.T, ctx context.Context, admin *pgxpool.Pool, allowed ...string) {
+	t.Helper()
+	if t.Failed() {
+		return
+	}
+	var open []string
+	for deadline := time.Now().Add(5 * time.Second); ; {
+		open = nil
+		rows, err := admin.Query(ctx, "SELECT usename||':'||count(*) FROM pg_stat_activity WHERE backend_type='client backend' AND datname=current_database() AND NOT usename=ANY($1) GROUP BY usename ORDER BY usename", allowed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			var s string
+			if err = rows.Scan(&s); err != nil {
+				t.Fatal(err)
+			}
+			open = append(open, s)
+		}
+		if err = rows.Err(); err != nil {
+			t.Fatal(err)
+		}
+		if len(open) == 0 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if len(open) > 0 {
+		t.Errorf("SQL pools left open by their subtest or helper: %v", open)
+	}
 }

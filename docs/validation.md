@@ -77,7 +77,16 @@ schema, SQL, Helm and console gates run as parallel jobs. Native suites run only
 on dispatch (`native.yml`, suites from `scripts/ci-native.sh --list`), each on a
 fresh runner; their `test/results` output is uploaded as a run artifact. A CI run
 is recorded like a local run: run URL, exit, selected tests and the harness's
-source hashes.
+source hashes. The custody suite (`make custody-integration`, about 16 minutes
+locally) runs in CI as `custody-1` … `custody-4` (`CUSTODY_SHARDS` in
+`scripts/test-custody.py`): three shards split
+`TestContextAdmissionWithRealServices` by the first character of its
+first-level subtests, the fourth runs the other custody tests;
+`scripts/test-custody-shard-selection.py` (a gate self-test) checks that every
+test and subtest runs in exactly one shard. That test also fails when any SQL
+role other than its shared fixtures still has a connection at its end, so a
+helper or subtest that leaks a pool cannot exhaust the fixed 48-connection
+server for later cases.
 
 `main` accepts changes only through squash-merged pull requests (repository
 ruleset `protect-main`: no direct push, force push or deletion; review threads

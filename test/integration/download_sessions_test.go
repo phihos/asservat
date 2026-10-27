@@ -87,7 +87,7 @@ func (e downloadTestEnvironment) DownloadEnvironment(ctx context.Context, record
 // Real PostgreSQL/S3/encrypted audit against actual published synthetic context.
 // Human identity, protected installation observations, regional/recovery
 // authorization and capacities remain fixture inputs. This does not confer public download authority or qualify HTTP relay.
-func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, func(string) (evidence.KeySealer, evidence.KeyOpener)) (captureAdmissionScenario, artifact.PublishedContext)) {
+func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, func(string) (evidence.KeySealer, evidence.KeyOpener)) (captureAdmissionScenario, artifact.PublishedContext), releaseIdle func()) {
 	t.Helper()
 	runtimePool := poolFor("download_runtime", "synthetic-download")
 	auditPool := poolFor("download_audit_runtime", "synthetic-download-audit")
@@ -216,6 +216,14 @@ func qualifyDownloadSessions(t *testing.T, ctx context.Context, admin *pgxpool.P
 				f = setupWithKeys(t, func(string) (evidence.KeySealer, evidence.KeyOpener) { return keys, keys })
 			} else {
 				f = setup(t)
+			}
+			// Setup's publication burst is complete. Drop the idle connections
+			// that the shared long-lived pools keep from it (and from earlier
+			// cases): the native exchange below alone needs about 40 of the
+			// unchanged 48 server connections.
+			releaseIdle()
+			for _, p := range []*pgxpool.Pool{runtimePool, auditPool, configPool, recoveryPool, catalogPool} {
+				p.Reset()
 			}
 			if f.s.nativeSources != nil {
 				ctx = f.s.nativeSources.ctx
