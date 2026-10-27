@@ -186,6 +186,10 @@ func publicRuntimeDutyGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("evidence_share", "INSERT")
 		add("evidence_share", "UPDATE", "revoked_at", "revoke_key", "revision", "management", "transfer_key", "transfer_digest")
+		// ADR-239: revoke-all of a policy acceptance's recurring sharing reads
+		// its instruction and marks it stopped or revoked once (a trigger keeps it so).
+		read("policy_acceptance")
+		add("policy_acceptance", "UPDATE", "sharing_revoked_at", "sharing_revoke_key", "sharing_stopped_at", "sharing_stop_key")
 	case "capture-journal":
 		for _, signature := range []string{"read_capture_operation(uuid,uuid)", "capture_audit_journal(uuid,jsonb,text,jsonb)", "claim_capture_reconciliation(uuid,jsonb,text)"} {
 			out = append(out, publicRuntimeGrant{"function", signature, "", "EXECUTE"})

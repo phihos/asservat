@@ -94,7 +94,7 @@ await operationBundle(['list_diagnostics', 'preview_capture', 'request_capture',
 await operationBundle(['get_case', 'prepare_artifact_download', 'get_artifact_download', 'cancel_artifact_download'], 'evidence');
 await operationBundle(['get_file_excerpt', 'get_query_result'], 'projection');
 await operationBundle(['activate_policy', 'deactivate_policy', 'get_policy_status'], 'policy');
-await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_share'], 'sharing');
+await operationBundle(['create_share', 'list_shares', 'revoke_share', 'transfer_share', 'stop_future_sharing'], 'sharing');
 await operationBundle(['explain_access'], 'access');
 await operationBundle(['preview_access_change'], 'access-preview');
 

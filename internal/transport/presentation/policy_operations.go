@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/url"
 	"slices"
+	"strconv"
 	"time"
 
 	app "asservat.local/asservat/internal/application/capture"
@@ -19,7 +20,7 @@ import (
 
 // PolicyActivationUseCase and PolicyStatusUseCase are the ADR-228 services.
 type PolicyActivationUseCase interface {
-	Activate(context.Context, identities.CurrentIdentity, string, string) (app.PolicyActivationResult, error)
+	Activate(context.Context, identities.CurrentIdentity, string, string, bool) (app.PolicyActivationResult, error)
 }
 type PolicyStatusUseCase interface {
 	Get(context.Context, identities.CurrentIdentity, string) (value.PolicyStatus, time.Time, error)
@@ -73,16 +74,65 @@ func (s *PolicyOperations) Tool(name string) (contracts.InvestigationTool, bool)
 type PolicyOperationInput struct {
 	PolicyName     string `json:"policy_name"`
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
+	// SharingReviewed accepts a policy's reviewed recurring sharing (ADR-239).
+	SharingReviewed bool `json:"sharing_reviewed,omitempty"`
 }
 
 type policyActivationData struct {
-	PolicyUID     string    `json:"policy_uid"`
-	AcceptanceID  string    `json:"acceptance_id"`
-	State         string    `json:"state"`
-	ExpiresAt     time.Time `json:"expires_at"`
-	MaxExecutions int64     `json:"max_executions"`
-	Replay        bool      `json:"replay"`
+	PolicyUID     string                   `json:"policy_uid"`
+	AcceptanceID  string                   `json:"acceptance_id"`
+	State         string                   `json:"state"`
+	ExpiresAt     time.Time                `json:"expires_at"`
+	MaxExecutions int64                    `json:"max_executions"`
+	Replay        bool                     `json:"replay"`
+	Sharing       *policyActivationSharing `json:"sharing,omitempty"`
 }
+
+// policyActivationSharing is the review statement of an activation that
+// shares its repeated collections (ADR-239, REQ-SHR-005).
+type policyActivationSharing struct {
+	Statement   string    `json:"statement"`
+	Recipients  int       `json:"recipients"`
+	MaxCaptures int       `json:"max_captures"`
+	NotAfter    time.Time `json:"not_after"`
+}
+
+// policyStatusSharing is the content-free recurring sharing status (ADR-239).
+type policyStatusSharing struct {
+	State          string     `json:"state"`
+	Recipients     int        `json:"recipients"`
+	SharedCaptures int64      `json:"shared_captures"`
+	MaxCaptures    int        `json:"max_captures"`
+	NotAfter       time.Time  `json:"not_after"`
+	Revision       int64      `json:"revision"`
+	StoppedAt      *time.Time `json:"stopped_at,omitempty"`
+	RevokedAt      *time.Time `json:"revoked_at,omitempty"`
+}
+
+// policySharingReview is the pre-activation review (REQ-SHR-005): the
+// statement and the maximum scope — every recipient while the message fits,
+// the capture limit and the end — and how to accept it.
+func policySharingReview(s value.PolicyShareInstruction) string {
+	who := ""
+	for i, r := range s.Recipients {
+		if i > 0 {
+			who += ", "
+		}
+		who += r.Kind + " " + r.ID
+	}
+	tail := ": at most the next " + strconv.Itoa(s.MaxCaptures) + " capture(s) of this policy until " + s.NotAfter.UTC().Format(time.RFC3339) + ", each share for at most seven days. Repeat activate_policy with sharing_reviewed true to activate and share."
+	if len(who)+len(tail)+64 > 1024 {
+		who = strconv.Itoa(len(s.Recipients)) + " recipients of your identity provider (see spec.sharing.recipients)"
+	}
+	return value.PolicySharingStatement + " with " + who + tail
+}
+
+// policySharingStatement is the activation warning that names who receives
+// the repeated collections, how many and until when.
+func policySharingStatement(s *value.PolicyShareInstruction) string {
+	return value.PolicySharingStatement + " with " + strconv.Itoa(len(s.Recipients)) + " recipient(s): at most the next " + strconv.Itoa(s.MaxCaptures) + " capture(s) of this policy until " + s.NotAfter.UTC().Format(time.RFC3339) + ". Existing shares stay until they expire or are revoked."
+}
+
 type policyDeactivationData struct {
 	PolicyUID    string `json:"policy_uid"`
 	AcceptanceID string `json:"acceptance_id"`
@@ -135,16 +185,22 @@ type policyStatusData struct {
 	Recent          []policyOccurrenceData  `json:"recent"`
 	Suppressions    []policySuppressionData `json:"suppressions"`
 	Detector        *policyDetectorData     `json:"detector,omitempty"`
+	Sharing         *policyStatusSharing    `json:"sharing,omitempty"`
 }
 
 func publicPolicyFailure(err error) OperationFailure {
 	var field value.PolicyFieldError
+	var review app.PolicySharingReview
 	switch {
 	case errors.As(err, &field):
 		// Fixed reviewed reasons with a field path; never a user-authored value.
 		return OperationFailure{"PolicyRejected", "This release cannot activate the policy: " + field.Error() + ".", false}
 	case errors.Is(err, app.ErrPolicyDeactivated):
 		return OperationFailure{"PolicyDeactivated", "This policy revision was deactivated and cannot be activated again, so its spend and expiry are never reset. Change the DebugPolicy to activate a new revision.", false}
+	case errors.Is(err, value.ErrSharingDenied):
+		return OperationFailure{"SharingNotPermitted", "The policy shares its captures (spec.sharing), which needs the evidence:share scope and an evidence-owner group of the workload's automation AccessBinding that you belong to. Remove spec.sharing or ask a permission administrator to add evidence-owner to that binding.", false}
+	case errors.As(err, &review):
+		return OperationFailure{"SharingReviewRequired", policySharingReview(review.Instruction), false}
 	case errors.Is(err, app.ErrPolicyDelegation):
 		return OperationFailure{"DelegationRequired", "No sole automation AccessBinding covers this workload for one of your groups, or its envelope does not allow pod-status snapshots. Ask a permission administrator to add spec.automation to the team's AccessBinding.", false}
 	case errors.Is(err, value.ErrCapacity):
@@ -199,13 +255,18 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 			break
 		}
 		var r app.PolicyActivationResult
-		r, operationErr = s.activation.Activate(ctx, current, in.PolicyName, in.IdempotencyKey)
+		r, operationErr = s.activation.Activate(ctx, current, in.PolicyName, in.IdempotencyKey, in.SharingReviewed)
 		if operationErr == nil {
 			state := "active"
 			if !r.Audited {
 				state = "pendingAudit"
 			}
-			out.Data = policyActivationData{PolicyUID: r.PolicyUID, AcceptanceID: r.AcceptanceID, State: state, ExpiresAt: r.NotAfter.UTC(), MaxExecutions: r.MaxExecutions, Replay: r.Replay}
+			data := policyActivationData{PolicyUID: r.PolicyUID, AcceptanceID: r.AcceptanceID, State: state, ExpiresAt: r.NotAfter.UTC(), MaxExecutions: r.MaxExecutions, Replay: r.Replay}
+			if sh := r.Sharing; sh != nil {
+				data.Sharing = &policyActivationSharing{Statement: value.PolicySharingStatement, Recipients: len(sh.Recipients), MaxCaptures: sh.MaxCaptures, NotAfter: sh.NotAfter.UTC()}
+				out.Warnings = append(out.Warnings, policySharingStatement(sh))
+			}
+			out.Data = data
 		}
 	case "deactivate_policy":
 		if !slices.Contains(i.Scopes, "evidence:capture") {
@@ -242,6 +303,19 @@ func (s *PolicyOperations) CallWithContext(ctx context.Context, current identiti
 			}
 			if d := st.Detector; d != nil {
 				data.Detector = &policyDetectorData{Kind: d.Kind, Reasons: d.Reasons, ExitCodes: d.ExitCodes, ProbeType: d.ProbeType, MinimumFailures: d.MinimumFailures, WindowSeconds: d.WindowSeconds}
+			}
+			if sh := st.Sharing; sh != nil {
+				in := sh.Instruction
+				data.Sharing = &policyStatusSharing{State: sh.State(s.now(), st.AcceptedGeneration, st.Generation), Recipients: len(in.Recipients), SharedCaptures: sh.Spent, MaxCaptures: in.MaxCaptures, NotAfter: in.NotAfter.UTC()}
+				data.Sharing.Revision = sh.Revision()
+				if !sh.StoppedAt.IsZero() {
+					at := sh.StoppedAt.UTC()
+					data.Sharing.StoppedAt = &at
+				}
+				if !sh.RevokedAt.IsZero() {
+					at := sh.RevokedAt.UTC()
+					data.Sharing.RevokedAt = &at
+				}
 			}
 			for _, x := range st.Suppressions {
 				data.Suppressions = append(data.Suppressions, policySuppressionData{Reason: x.Reason, Count: x.Count, FirstAt: x.FirstAt.UTC(), LastAt: x.LastAt.UTC()})

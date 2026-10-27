@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 
 	"asservat.local/asservat/internal/adapters/postgres/custodydb"
 	authapp "asservat.local/asservat/internal/application/authorization"
@@ -190,11 +191,24 @@ func (s *Policies) AcceptPolicy(ctx context.Context, in value.PolicyAdmission) (
 		if !eligibility.Eligible {
 			return value.ErrDenied
 		}
+		// ADR-239: a sharing instruction's management must still be exactly the
+		// activating human's evidence-owner teams of this delegation, on the
+		// projection evaluated after these locks.
+		if in.Sharing != nil {
+			var sponsors []string
+			for _, o := range in.Authority.Owners {
+				sponsors = append(sponsors, o.SubjectID)
+			}
+			result, management := authorization.PolicyShareManagement(in.Author, current.Permissions, in.Target, in.Authority.Delegation.UID, sponsors, now.Time)
+			if !result.Eligible || !slices.Equal(management, in.Sharing.Management) || !in.Sharing.NotAfter.After(now.Time) {
+				return value.ErrSharingDenied
+			}
+		}
 		event, err := q.NewPolicyAcceptanceID(ctx)
 		if err != nil {
 			return err
 		}
-		record := value.PolicyAcceptance{ID: uid(event), RootID: s.root, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: in.Author.Principal, IdentityRevision: in.Author.Policy, PermissionRevision: current.Permissions.Revision, Recovery: in.Recovery, AcceptedAt: now.Time, IntentVersion: row.IntentVersion}
+		record := value.PolicyAcceptance{ID: uid(event), RootID: s.root, Source: source, Submission: in.Submission, Authority: in.Authority, Submitter: in.Author.Principal, IdentityRevision: in.Author.Policy, PermissionRevision: current.Permissions.Revision, Recovery: in.Recovery, AcceptedAt: now.Time, IntentVersion: row.IntentVersion, Sharing: in.Sharing}
 		if !record.Valid() {
 			return value.ErrInvalid
 		}

@@ -2,7 +2,7 @@ import type { components } from '../generated/sharing';
 import * as validators from '../generated/validate-sharing';
 import { postOperation } from '../capture/http';
 
-export type Operation = 'create_share' | 'list_shares' | 'revoke_share' | 'transfer_share';
+export type Operation = 'create_share' | 'list_shares' | 'revoke_share' | 'transfer_share' | 'stop_future_sharing';
 export type Input<N extends Operation> = components['schemas'][`McpInput_${N}`];
 export type Output<N extends Operation> = components['schemas'][`McpOutput_${N}`];
 export type Data<N extends Operation> = Extract<Output<N>, { status: 'ok' }>['data'];

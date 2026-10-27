@@ -31,7 +31,7 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 	}
 	for key := range s {
 		switch key {
-		case "target", "detectors", "when", "recipeRef", "budgets", "retention", "suspended", "observation", "evaluation", "recordingSaves":
+		case "target", "detectors", "when", "recipeRef", "budgets", "retention", "suspended", "observation", "evaluation", "recordingSaves", "sharing":
 		default:
 			return reject("."+key, "unsupported in this release (ADR-228)")
 		}
@@ -205,6 +205,88 @@ func CompileRestartPolicy(spec []byte, recipeName string, recipeDigest artifact.
 			return reject(".recordingSaves", "no ongoing recording exists for a context diagnostic")
 		}
 	}
+	if raw, present := s["sharing"]; present {
+		sharing, err := compileSharing(raw)
+		if err != nil {
+			return value.RestartPolicy{}, err
+		}
+		out.Sharing = &sharing
+	}
+	if !out.Valid() {
+		return reject("", "invalid")
+	}
+	return out, nil
+}
+
+// compileSharing selects the ADR-239 recurring sharing block: recipients
+// (1–8 User/Group stable IDs of one issuer), futureCaptures.maxCaptures
+// (1–100) and an absolute notAfter. Output selection, a reason override and
+// explicit management are not available for the single-output pod-status
+// capture; management is the policy's owner teams. Only the shape is checked
+// here: the end and the activating human's authority are checked at
+// activation, so a later poll never fails because the end has passed.
+func compileSharing(raw json.RawMessage) (value.PolicySharing, error) {
+	reject := func(path, reason string) (value.PolicySharing, error) {
+		return value.PolicySharing{}, value.PolicyFieldError{Path: "spec.sharing" + path, Reason: reason}
+	}
+	var fields map[string]json.RawMessage
+	if strict(raw, &fields) != nil {
+		return reject("", "invalid")
+	}
+	for _, key := range slices.Sorted(maps.Keys(fields)) {
+		switch key {
+		case "recipients", "notAfter", "futureCaptures":
+		case "outputSelection", "maxArtifactsPerCapture":
+			return reject("."+key, "a pod-status capture has one output, which is shared")
+		case "management":
+			return reject(".management", "management is the policy's owner teams: the automation AccessBinding's evidence-owner groups")
+		case "reason":
+			return reject(".reason", "unsupported in this release (ADR-239)")
+		default:
+			return reject("."+key, "unsupported")
+		}
+	}
+	var out value.PolicySharing
+	var recipients []struct{ Kind, Issuer, ID string }
+	if strict(fields["recipients"], &recipients) != nil || len(recipients) < 1 {
+		return reject(".recipients", "invalid")
+	}
+	if len(recipients) > authorization.ShareMaxRecipients {
+		return reject(".recipients", "at most "+strconv.Itoa(authorization.ShareMaxRecipients)+" recipients")
+	}
+	for i, r := range recipients {
+		x := authorization.ShareRecipient{Kind: r.Kind, Issuer: r.Issuer, ID: r.ID}
+		if !x.Valid() {
+			return reject(".recipients["+strconv.Itoa(i)+"]", "name a User or Group stable ID and its issuer")
+		}
+		if x.Issuer != recipients[0].Issuer {
+			return reject(".recipients["+strconv.Itoa(i)+"].issuer", "all recipients must use one issuer")
+		}
+		if slices.Contains(out.Recipients, x) {
+			return reject(".recipients["+strconv.Itoa(i)+"]", "duplicate recipient")
+		}
+		out.Recipients = append(out.Recipients, x)
+	}
+	var future struct {
+		Enabled     bool
+		MaxCaptures int
+	}
+	if strict(fields["futureCaptures"], &future) != nil || !future.Enabled {
+		return reject(".futureCaptures", "invalid")
+	}
+	if future.MaxCaptures < 1 || future.MaxCaptures > value.PolicyShareMaxCaptures {
+		return reject(".futureCaptures.maxCaptures", "must be 1 to "+strconv.Itoa(value.PolicyShareMaxCaptures))
+	}
+	out.MaxCaptures = future.MaxCaptures
+	var end string
+	if strict(fields["notAfter"], &end) != nil {
+		return reject(".notAfter", "an absolute time is required")
+	}
+	at, err := time.Parse(time.RFC3339, end)
+	if err != nil {
+		return reject(".notAfter", "an absolute RFC 3339 time is required")
+	}
+	out.NotAfter = at.UTC().Truncate(time.Second)
 	if !out.Valid() {
 		return reject("", "invalid")
 	}

@@ -1,6 +1,6 @@
 {
   "name": "revoke_share",
-  "description": "Revoke a share you created or currently manage through a pinned owner team; installation administrators may revoke any share. Each transfer and the revocation add one revision (list_shares shows the current one). Recipients lose access at their next read; independent rights are unchanged and revoking never grants a read. Repeating with the same idempotency key is harmless.",
+  "description": "Revoke a share you created or currently manage through a pinned owner team; installation administrators may revoke any share. Each transfer and the revocation add one revision (list_shares shows the current one). With sharing_intent_id (a policy's acceptance_id, expected_revision 1) revoke every share of that policy acceptance's recurring sharing and its future sharing. Recipients lose access at their next read; independent rights are unchanged and revoking never grants a read. Repeating with the same idempotency key is harmless.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": true,
@@ -23,13 +23,33 @@
         "type": "string",
         "minLength": 1,
         "maxLength": 128
+      },
+      "sharing_intent_id": {
+        "$ref": "#/$defs/d0"
       }
     },
     "required": [
-      "share_id",
       "expected_revision",
       "idempotency_key"
-    ]
+    ],
+    "oneOf": [
+      {
+        "required": [
+          "share_id"
+        ]
+      },
+      {
+        "required": [
+          "sharing_intent_id"
+        ]
+      }
+    ],
+    "$defs": {
+      "d0": {
+        "type": "string",
+        "format": "uuid"
+      }
+    }
   },
   "outputSchema": {
     "title": "Asservat mcp-result v1",
@@ -118,12 +138,26 @@
                     "type": "integer",
                     "minimum": 2,
                     "maximum": 1000000000
+                  },
+                  "sharing_intent_id": {
+                    "$ref": "#/$defs/d0"
                   }
                 },
                 "required": [
-                  "share_id",
                   "phase",
                   "revision"
+                ],
+                "oneOf": [
+                  {
+                    "required": [
+                      "share_id"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "sharing_intent_id"
+                    ]
+                  }
                 ]
               }
             },
@@ -188,6 +222,12 @@
           }
         ]
       }
-    ]
+    ],
+    "$defs": {
+      "d0": {
+        "type": "string",
+        "format": "uuid"
+      }
+    }
   }
 }

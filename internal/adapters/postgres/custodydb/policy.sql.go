@@ -54,7 +54,7 @@ func (q *Queries) ActivatePolicyAcceptance(ctx context.Context, arg ActivatePoli
 }
 
 const findPolicyNonce = `-- name: FindPolicyNonce :one
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent FROM policy_acceptance WHERE root_id=$1 AND nonce=$2
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND nonce=$2
 `
 
 type FindPolicyNonceParams struct {
@@ -79,6 +79,11 @@ func (q *Queries) FindPolicyNonce(ctx context.Context, arg FindPolicyNonceParams
 		&i.AcknowledgedAt,
 		&i.ReceiptJson,
 		&i.ExecutionsSpent,
+		&i.SharesSpent,
+		&i.SharingRevokedAt,
+		&i.SharingRevokeKey,
+		&i.SharingStoppedAt,
+		&i.SharingStopKey,
 	)
 	return i, err
 }
@@ -102,7 +107,7 @@ func (q *Queries) FindPolicyScope(ctx context.Context, arg FindPolicyScopeParams
 
 const insertPolicyAcceptance = `-- name: InsertPolicyAcceptance :one
 INSERT INTO policy_acceptance(id,root_id,policy_uid,generation,nonce,request_digest,record_digest,record,accepted_at,scope_digest)
-VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent
+VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key
 `
 
 type InsertPolicyAcceptanceParams struct {
@@ -146,6 +151,11 @@ func (q *Queries) InsertPolicyAcceptance(ctx context.Context, arg InsertPolicyAc
 		&i.AcknowledgedAt,
 		&i.ReceiptJson,
 		&i.ExecutionsSpent,
+		&i.SharesSpent,
+		&i.SharingRevokedAt,
+		&i.SharingRevokeKey,
+		&i.SharingStoppedAt,
+		&i.SharingStopKey,
 	)
 	return i, err
 }
@@ -193,7 +203,7 @@ func (q *Queries) InsertPolicySource(ctx context.Context, arg InsertPolicySource
 }
 
 const lockPolicyAcceptance = `-- name: LockPolicyAcceptance :one
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent FROM policy_acceptance WHERE root_id=$1 AND id=$2 FOR UPDATE
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND id=$2 FOR UPDATE
 `
 
 type LockPolicyAcceptanceParams struct {
@@ -218,6 +228,11 @@ func (q *Queries) LockPolicyAcceptance(ctx context.Context, arg LockPolicyAccept
 		&i.AcknowledgedAt,
 		&i.ReceiptJson,
 		&i.ExecutionsSpent,
+		&i.SharesSpent,
+		&i.SharingRevokedAt,
+		&i.SharingRevokeKey,
+		&i.SharingStoppedAt,
+		&i.SharingStopKey,
 	)
 	return i, err
 }
@@ -268,7 +283,7 @@ func (q *Queries) NewPolicyAcceptanceID(ctx context.Context) (pgtype.UUID, error
 }
 
 const pendingPolicyAcceptances = `-- name: PendingPolicyAcceptances :many
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent FROM policy_acceptance WHERE root_id=$1 AND acknowledged_at IS NULL ORDER BY accepted_at,id LIMIT 2
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND acknowledged_at IS NULL ORDER BY accepted_at,id LIMIT 2
 `
 
 func (q *Queries) PendingPolicyAcceptances(ctx context.Context, rootID pgtype.UUID) ([]PolicyAcceptance, error) {
@@ -294,6 +309,11 @@ func (q *Queries) PendingPolicyAcceptances(ctx context.Context, rootID pgtype.UU
 			&i.AcknowledgedAt,
 			&i.ReceiptJson,
 			&i.ExecutionsSpent,
+			&i.SharesSpent,
+			&i.SharingRevokedAt,
+			&i.SharingRevokeKey,
+			&i.SharingStoppedAt,
+			&i.SharingStopKey,
 		); err != nil {
 			return nil, err
 		}
@@ -306,7 +326,7 @@ func (q *Queries) PendingPolicyAcceptances(ctx context.Context, rootID pgtype.UU
 }
 
 const readPolicyAcceptance = `-- name: ReadPolicyAcceptance :one
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent FROM policy_acceptance WHERE root_id=$1 AND id=$2
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND id=$2
 `
 
 type ReadPolicyAcceptanceParams struct {
@@ -331,6 +351,11 @@ func (q *Queries) ReadPolicyAcceptance(ctx context.Context, arg ReadPolicyAccept
 		&i.AcknowledgedAt,
 		&i.ReceiptJson,
 		&i.ExecutionsSpent,
+		&i.SharesSpent,
+		&i.SharingRevokedAt,
+		&i.SharingRevokeKey,
+		&i.SharingStoppedAt,
+		&i.SharingStopKey,
 	)
 	return i, err
 }

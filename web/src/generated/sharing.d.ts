@@ -238,6 +238,34 @@ export interface components {
                 retry_after_seconds?: number;
             };
         });
+        McpInput_stop_future_sharing: {
+            sharing_intent_id: components["schemas"]["Contract_common_2224a31324a0c811"];
+            expected_revision: number;
+            idempotency_key: string;
+        };
+        McpOutput_stop_future_sharing: components["schemas"]["Contract_mcp_result"] & ({
+            /** @constant */
+            status: "ok";
+            data: {
+                sharing_intent_id: components["schemas"]["Contract_common_2224a31324a0c811"];
+                /** @constant */
+                state: "Stopped";
+                revision: number;
+            };
+        } | {
+            /** @constant */
+            status: "error";
+            data: {
+                code: string;
+                message: string;
+                retryable: boolean;
+                /** Format: uri */
+                navigation_uri?: string;
+                /** @enum {unknown} */
+                responsible_role?: "maintainer" | "approver" | "administrator" | "none";
+                retry_after_seconds?: number;
+            };
+        });
     };
     responses: never;
     parameters: never;

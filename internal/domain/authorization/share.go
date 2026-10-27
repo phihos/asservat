@@ -140,17 +140,21 @@ func (s Share) Phase(p Projection, now time.Time) SharePhase {
 // user deny suspends the share too. A projection for another target manages
 // nothing.
 func (s Share) managers(p Projection, now time.Time) []CurrentAssignment {
-	if p.Target != s.Target {
+	return currentManagers(s.Creator, s.Management, s.Target, p, now)
+}
+
+func currentManagers(creatorPrincipal identity.Principal, management []artifact.AudienceAssignment, target Target, p Projection, now time.Time) []CurrentAssignment {
+	if p.Target != target {
 		return nil
 	}
-	creator := identity.Identity{Principal: s.Creator}
+	creator := identity.Identity{Principal: creatorPrincipal}
 	for _, d := range p.Denies {
 		if matches(d.Audience, creator) && permits(d.Audience.Role, ReadApproved) {
 			return nil
 		}
 	}
 	var out []CurrentAssignment
-	for _, pinned := range s.Management {
+	for _, pinned := range management {
 		named := false
 		for _, d := range p.Denies {
 			if d.Audience.Kind == pinned.Kind && d.Audience.Issuer == pinned.Issuer && d.Audience.SubjectID == pinned.SubjectID && permits(d.Audience.Role, ReadApproved) {
@@ -412,7 +416,25 @@ func AdministeredShareManagement(issuer string, p Projection, t Target, e *Retai
 // binding is a new assignment ID and manages no older share. The second
 // result bounds the answer's validity.
 func (s Share) ManagedBy(i identity.Identity, p Projection, now time.Time) ([]artifact.AudienceAssignment, time.Time) {
-	if !s.Valid() || !i.Valid(now) || i.Principal.Kind != identity.Human || !slices.Contains(i.Scopes, ShareScope) || !projectionCurrent(p, s.Target, now) {
+	if !s.Valid() {
+		return nil, time.Time{}
+	}
+	return managedBy(s.Creator, s.Management, s.Target, i, p, now)
+}
+
+// PolicySharingManagedBy is ManagedBy for a recurring policy sharing
+// instruction (ADR-239): the pinned owner-team assignments of the policy's
+// workload that i holds now. A current manager may revoke every share of the
+// acceptance at once.
+func PolicySharingManagedBy(creator identity.Principal, management []artifact.AudienceAssignment, t Target, i identity.Identity, p Projection, now time.Time) ([]artifact.AudienceAssignment, time.Time) {
+	if !creator.Valid() || len(management) < 1 || len(management) > ShareMaxManagers || !t.Valid() {
+		return nil, time.Time{}
+	}
+	return managedBy(creator, management, t, i, p, now)
+}
+
+func managedBy(creator identity.Principal, management []artifact.AudienceAssignment, target Target, i identity.Identity, p Projection, now time.Time) ([]artifact.AudienceAssignment, time.Time) {
+	if !i.Valid(now) || i.Principal.Kind != identity.Human || !slices.Contains(i.Scopes, ShareScope) || !projectionCurrent(p, target, now) {
 		return nil, time.Time{}
 	}
 	until := identity.Earlier(i.ValidUntil, identity.Earlier(p.FreshUntil, p.DeniesFreshUntil))
@@ -423,7 +445,7 @@ func (s Share) ManagedBy(i identity.Identity, p Projection, now time.Time) ([]ar
 		until = identity.Earlier(until, d.FreshUntil)
 	}
 	var held []artifact.AudienceAssignment
-	for _, a := range s.managers(p, now) {
+	for _, a := range currentManagers(creator, management, target, p, now) {
 		if matches(a.Audience, i) {
 			held = append(held, a.Audience)
 			until = identity.Earlier(until, a.FreshUntil)
@@ -439,4 +461,39 @@ func (s Share) ManagedBy(i identity.Identity, p Projection, now time.Time) ([]ar
 func projectionCurrent(p Projection, t Target, now time.Time) bool {
 	return p.Revision.Valid() && p.Target == t && p.DeniesComplete && identity.Fresh(p.ObservedAt, p.FreshUntil, now, 60*time.Second) &&
 		identity.Fresh(p.DeniesObservedAt, p.DeniesFreshUntil, now, PermissionObservationInterval) && rowsValid(p.Allows) && rowsValid(p.Denies)
+}
+
+// PolicyShareManagement checks an activating human's authority to attach a
+// recurring sharing instruction to a policy (ADR-239): ordinary scope
+// eligibility to read the workload's evidence (current, no deny), the
+// evidence:share scope, and at least one contributing evidence-owner Group
+// assignment of the policy's automation AccessBinding (delegation) for one of
+// its sponsoring groups. Those assignments are the policy's owner teams and
+// become the pinned management (default management, REQ-SHR-008); the
+// automation binding must therefore already hold evidence-owner.
+func PolicyShareManagement(i identity.Identity, p Projection, t Target, delegation string, sponsors []string, now time.Time) (Result, []artifact.AudienceAssignment) {
+	if i.Principal.Kind != identity.Human || delegation == "" {
+		return Result{Reason: "InvalidRequest"}, nil
+	}
+	r := ScopeEligibility(i, p, ReadApproved, t, now)
+	if !r.Eligible {
+		return r, nil
+	}
+	if !slices.Contains(i.Scopes, ShareScope) {
+		return Result{Reason: "InsufficientScope"}, nil
+	}
+	var owners []artifact.AudienceAssignment
+	for _, a := range r.ContributingAssignments {
+		if a.Role == "evidence-owner" && a.Kind == "Group" && a.BasisKind == "AccessBinding" && a.BasisUID == delegation && a.Issuer == i.Principal.Issuer && slices.Contains(sponsors, a.SubjectID) {
+			owners = append(owners, a)
+		}
+	}
+	if len(owners) == 0 {
+		return Result{Reason: "NoOwnerAuthority"}, nil
+	}
+	if len(owners) > ShareMaxManagers {
+		return Result{Reason: "ManagementTooBroad"}, nil
+	}
+	slices.SortFunc(owners, func(a, b artifact.AudienceAssignment) int { return strings.Compare(a.AssignmentID, b.AssignmentID) })
+	return r, owners
 }

@@ -1,6 +1,6 @@
 {
   "name": "activate_policy",
-  "description": "Activate the current revision of a hub-held restart-trigger DebugPolicy for your team (ADR-228). Requires whole-pod collection rights and membership in a sponsoring group of the workload's automation AccessBinding. The policy then captures pod status automatically on Pod restarts within the team's finite envelope. Retry an uncertain result with the same idempotency key.",
+  "description": "Activate the current revision of a hub-held restart-trigger DebugPolicy for your team (ADR-228). Requires whole-pod collection rights and membership in a sponsoring group of the workload's automation AccessBinding. The policy then captures pod status automatically on Pod restarts within the team's finite envelope. Retry an uncertain result with the same idempotency key. A DebugPolicy with spec.sharing (ADR-239) also shares each of its next maxCaptures captures until notAfter with the named recipients: this needs the evidence:share scope and an evidence-owner group of the automation AccessBinding: the first call returns SharingReviewRequired with the review (repeated collections will be shared, recipients, maximum captures, end); activate again with sharing_reviewed true to accept it.",
   "annotations": {
     "readOnlyHint": false,
     "destructiveHint": false,
@@ -20,6 +20,10 @@
         "type": "string",
         "minLength": 1,
         "maxLength": 128
+      },
+      "sharing_reviewed": {
+        "type": "boolean",
+        "description": "Accept the reviewed recurring sharing of a DebugPolicy with spec.sharing (ADR-239). Without it such a policy is not activated; the reply SharingReviewRequired states that repeated collections will be shared, with whom, how many captures and until when."
       }
     },
     "required": [
@@ -129,6 +133,36 @@
                   },
                   "replay": {
                     "type": "boolean"
+                  },
+                  "sharing": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "description": "Recurring sharing of this acceptance (ADR-239): repeated collections will be shared with these recipients, at most max_captures captures, until not_after.",
+                    "properties": {
+                      "statement": {
+                        "const": "Repeated collections will be shared"
+                      },
+                      "recipients": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 8
+                      },
+                      "max_captures": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      },
+                      "not_after": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    },
+                    "required": [
+                      "statement",
+                      "recipients",
+                      "max_captures",
+                      "not_after"
+                    ]
                   }
                 },
                 "required": [

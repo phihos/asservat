@@ -1477,30 +1477,31 @@ type DownloadWorkerOwner struct {
 }
 
 type EvidenceShare struct {
-	ID             pgtype.UUID
-	RootID         pgtype.UUID
-	ArtifactID     pgtype.UUID
-	CaseID         pgtype.UUID
-	ClusterID      pgtype.UUID
-	NamespaceUid   string
-	WorkloadUid    string
-	PodUid         string
-	Version        []byte
-	CreatorIssuer  string
-	CreatorSubject string
-	CreatorClient  string
-	Management     []byte
-	Recipients     []byte
-	RecipientKeys  []string
-	IdempotencyKey string
-	RequestDigest  []byte
-	CreatedAt      pgtype.Timestamptz
-	ExpiresAt      pgtype.Timestamptz
-	RevokedAt      pgtype.Timestamptz
-	RevokeKey      pgtype.Text
-	Revision       int64
-	TransferKey    pgtype.Text
-	TransferDigest []byte
+	ID                 pgtype.UUID
+	RootID             pgtype.UUID
+	ArtifactID         pgtype.UUID
+	CaseID             pgtype.UUID
+	ClusterID          pgtype.UUID
+	NamespaceUid       string
+	WorkloadUid        string
+	PodUid             string
+	Version            []byte
+	CreatorIssuer      string
+	CreatorSubject     string
+	CreatorClient      string
+	Management         []byte
+	Recipients         []byte
+	RecipientKeys      []string
+	IdempotencyKey     string
+	RequestDigest      []byte
+	CreatedAt          pgtype.Timestamptz
+	ExpiresAt          pgtype.Timestamptz
+	RevokedAt          pgtype.Timestamptz
+	RevokeKey          pgtype.Text
+	Revision           int64
+	TransferKey        pgtype.Text
+	TransferDigest     []byte
+	PolicyAcceptanceID pgtype.UUID
 }
 
 type FleetBootstrap struct {
@@ -1874,19 +1875,24 @@ type PermissionStream struct {
 }
 
 type PolicyAcceptance struct {
-	ID              pgtype.UUID
-	RootID          pgtype.UUID
-	PolicyUid       string
-	Generation      int64
-	Nonce           pgtype.UUID
-	ScopeDigest     []byte
-	RequestDigest   []byte
-	RecordDigest    []byte
-	Record          []byte
-	AcceptedAt      pgtype.Timestamptz
-	AcknowledgedAt  pgtype.Timestamptz
-	ReceiptJson     []byte
-	ExecutionsSpent int64
+	ID               pgtype.UUID
+	RootID           pgtype.UUID
+	PolicyUid        string
+	Generation       int64
+	Nonce            pgtype.UUID
+	ScopeDigest      []byte
+	RequestDigest    []byte
+	RecordDigest     []byte
+	Record           []byte
+	AcceptedAt       pgtype.Timestamptz
+	AcknowledgedAt   pgtype.Timestamptz
+	ReceiptJson      []byte
+	ExecutionsSpent  int64
+	SharesSpent      int32
+	SharingRevokedAt pgtype.Timestamptz
+	SharingRevokeKey pgtype.Text
+	SharingStoppedAt pgtype.Timestamptz
+	SharingStopKey   pgtype.Text
 }
 
 type PolicyOccurrence struct {

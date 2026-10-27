@@ -57,11 +57,13 @@ type PolicyAdmission struct {
 	Authority    authorization.AcceptedPolicyAuthority
 	Target       authorization.Target
 	Recovery     artifact.RecoveryProof
+	// Sharing is the activation's recurring sharing decision (ADR-239).
+	Sharing *PolicyShareInstruction
 }
 
 func (a PolicyAdmission) Valid(now time.Time) bool {
 	s, p := a.Submission, a.Authority
-	return authorization.UUID(a.RootID) && s.Valid(now) && a.Verification.Valid(now) && a.Verification.Submission == s && a.Verification.RootID == a.RootID && a.Verification.InstallationID == p.InstallationID && a.Verification.IssuerEpoch == a.Recovery.IssuerEpoch && a.Author.Valid(now) && a.Author.Principal == s.Actor && p.Valid(now) && a.Target.Valid() && a.Target.ClusterID == p.ClusterID && a.Target.NamespaceUID == p.NamespaceUID && a.Target.WorkloadUID == p.WorkloadUID && s.Source.UID == p.PolicyUID && s.ScopeDigest == p.ScopeDigest && a.Recovery.Valid(now) && a.Recovery.InstallationID == p.InstallationID
+	return authorization.UUID(a.RootID) && s.Valid(now) && a.Verification.Valid(now) && a.Verification.Submission == s && a.Verification.RootID == a.RootID && a.Verification.InstallationID == p.InstallationID && a.Verification.IssuerEpoch == a.Recovery.IssuerEpoch && a.Author.Valid(now) && a.Author.Principal == s.Actor && p.Valid(now) && a.Target.Valid() && a.Target.ClusterID == p.ClusterID && a.Target.NamespaceUID == p.NamespaceUID && a.Target.WorkloadUID == p.WorkloadUID && s.Source.UID == p.PolicyUID && s.ScopeDigest == p.ScopeDigest && a.Recovery.Valid(now) && a.Recovery.InstallationID == p.InstallationID && (a.Sharing == nil || a.Sharing.Valid() && a.Sharing.Creator == a.Author.Principal && a.Sharing.NotAfter.After(now))
 }
 
 // PolicyAcceptance is immutable provenance, not a permit or current eligibility.
@@ -77,11 +79,14 @@ type PolicyAcceptance struct {
 	Recovery                             artifact.RecoveryProof
 	IntentVersion                        int64
 	AcceptedAt                           time.Time
+	// Sharing is the immutable recurring sharing instruction (ADR-239); its
+	// counter and revocation live beside the record, never in it.
+	Sharing *PolicyShareInstruction `json:",omitempty"`
 }
 
 func (r PolicyAcceptance) Valid() bool {
 	a, s := r.Authority, r.Submission
-	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.Source.Valid(r.AcceptedAt) && !r.Source.Deleted && !r.Source.Suspended && r.IntentVersion > 0 && s.Valid(r.AcceptedAt) && a.Valid(r.AcceptedAt) && r.Submitter == s.Actor && r.IdentityRevision.Valid() && r.PermissionRevision.Valid() && r.Recovery.Valid(r.AcceptedAt) && r.Source.InstallationID == a.InstallationID && r.Recovery.InstallationID == a.InstallationID && r.Source.Revision == s.Source && s.Source.UID == a.PolicyUID && r.Source.ClusterID == s.ClusterID && r.Source.NamespaceUID == s.NamespaceUID && r.Source.Name == s.Name && a.ScopeDigest == s.ScopeDigest
+	return authorization.UUID(r.ID) && authorization.UUID(r.RootID) && r.Source.Valid(r.AcceptedAt) && !r.Source.Deleted && !r.Source.Suspended && r.IntentVersion > 0 && s.Valid(r.AcceptedAt) && a.Valid(r.AcceptedAt) && r.Submitter == s.Actor && r.IdentityRevision.Valid() && r.PermissionRevision.Valid() && r.Recovery.Valid(r.AcceptedAt) && r.Source.InstallationID == a.InstallationID && r.Recovery.InstallationID == a.InstallationID && r.Source.Revision == s.Source && s.Source.UID == a.PolicyUID && r.Source.ClusterID == s.ClusterID && r.Source.NamespaceUID == s.NamespaceUID && r.Source.Name == s.Name && a.ScopeDigest == s.ScopeDigest && (r.Sharing == nil || r.Sharing.Valid() && r.Sharing.Creator == r.Submitter)
 }
 
 type AcceptedPolicy struct {

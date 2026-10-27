@@ -65,3 +65,32 @@ WHERE root_id=sqlc.arg(root_id)::uuid AND id=sqlc.arg(id)::uuid AND revoked_at I
 SELECT * FROM evidence_share WHERE root_id=sqlc.arg(root_id)::uuid
  AND (NOT sqlc.arg(paged)::boolean OR (created_at,id)<(sqlc.arg(after_created_at)::timestamptz,sqlc.arg(after_id)::uuid))
 ORDER BY created_at DESC, id DESC LIMIT sqlc.arg(row_limit);
+
+-- ADR-239 recurring policy sharing: revoke-all by acceptance ID.
+
+-- name: ReadPolicySharingAcceptance :one
+SELECT * FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing';
+
+-- name: LockPolicySharingAcceptance :one
+-- Orders revoke-all before any later claim (the admission trigger's UPDATE)
+-- and against publication's KEY SHARE lock.
+SELECT * FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing' FOR UPDATE;
+
+-- name: StopPolicySharing :execrows
+-- Stop future sharing: no further slot is claimed; already claimed captures
+-- still publish their shares before notAfter (REQ-SHR-007 Draining).
+UPDATE policy_acceptance SET sharing_stopped_at=clock_timestamp(), sharing_stop_key=$3
+WHERE root_id=$1 AND id=$2 AND sharing_stopped_at IS NULL AND sharing_revoked_at IS NULL AND record ? 'Sharing';
+
+-- name: RevokePolicySharing :execrows
+UPDATE policy_acceptance SET sharing_revoked_at=clock_timestamp(), sharing_revoke_key=$3
+WHERE root_id=$1 AND id=$2 AND sharing_revoked_at IS NULL AND record ? 'Sharing';
+
+-- name: RevokePolicyShares :many
+-- Every still-unrevoked share materialized from exactly this acceptance; at
+-- most its capture limit (100).
+UPDATE evidence_share SET revoked_at=clock_timestamp(), revoke_key=$3, revision=revision+1
+WHERE root_id=$1 AND policy_acceptance_id=$2 AND revoked_at IS NULL RETURNING id;
+
+-- name: CountPolicyShareRevocations :one
+SELECT count(*) FROM evidence_share WHERE root_id=$1 AND policy_acceptance_id=$2 AND revoke_key=$3;

@@ -87,7 +87,26 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		t.Fatal("installed MCP session", err)
 	}
 	defer session.Close()
-	read := func(callCtx context.Context, name string, arguments any) (installedJourneyEnvelope, error) {
+	// ADR-239: the same user activates the restart policy with evidence:share
+	// (its recurring sharing), and the unrelated principal is the recipient.
+	connect := func(name string, token func(context.Context) (string, error)) *sdk.ClientSession {
+		t.Helper()
+		c := sdk.NewClient(&sdk.Implementation{Name: name, Version: "1"}, &sdk.ClientOptions{Capabilities: &sdk.ClientCapabilities{}})
+		s, err := c.Connect(ctx, &sdk.StreamableClientTransport{Endpoint: strings.TrimSuffix(origin, "/") + "/mcp", HTTPClient: &http.Client{Transport: installedJourneyBearer{transport, token}, Timeout: 60 * time.Second}, MaxRetries: -1, DisableStandaloneSSE: true}, nil)
+		if err != nil {
+			t.Fatal("installed MCP session", name, err)
+		}
+		return s
+	}
+	sharer := connect("installed-policy-sharer", identity.shareTokenSource(origin).Token)
+	defer sharer.Close()
+	outsiderTokens := identity.unrelated().mcpTokenSource(origin)
+	if _, err := outsiderTokens.Token(ctx); err != nil || outsiderTokens.subject == "" {
+		t.Fatal("installed recurring-share recipient token", err)
+	}
+	recipient := connect("installed-policy-share-recipient", outsiderTokens.Token)
+	defer recipient.Close()
+	readWith := func(session *sdk.ClientSession, callCtx context.Context, name string, arguments any) (installedJourneyEnvelope, error) {
 		result, err := session.CallTool(callCtx, &sdk.CallToolParams{Name: name, Arguments: arguments})
 		if err != nil {
 			return installedJourneyEnvelope{}, err
@@ -100,6 +119,9 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			t.Fatal("installed response contract", name, err)
 		}
 		return reply, nil
+	}
+	read := func(callCtx context.Context, name string, arguments any) (installedJourneyEnvelope, error) {
+		return readWith(session, callCtx, name, arguments)
 	}
 	wait := func(what string, limit time.Duration, done func(context.Context) bool) {
 		t.Helper()
@@ -163,7 +185,7 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	// The administrator's automation envelope for the team: the existing
 	// maintainer binding's group and scope, kubernetesSnapshot only.
 	binding := map[string]any{"apiVersion": "asservat.io/v1alpha1", "kind": "AccessBinding", "metadata": map[string]any{"name": "policy-automation"}, "spec": map[string]any{
-		"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer"}, "scope": f.binding["scope"], "reason": "ADR-228 installed policy journey",
+		"effect": "Allow", "subjects": f.binding["subjects"], "roles": []any{"workload-maintainer", "evidence-owner"}, "scope": f.binding["scope"], "reason": "ADR-228 installed policy journey",
 		"automation": map[string]any{"allowedActions": []any{"kubernetesSnapshot"}, "maxLifetimeSeconds": 3600, "maxExecutions": 10, "maxBytes": 1073741824, "maxObservedBytes": 0}}}
 	body, _ := json.Marshal(binding)
 	if err = f.hub.Post().AbsPath(f.base + "accessbindings").Body(body).Do(ctx).Error(); err != nil {
@@ -183,7 +205,10 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		"budgets":   map[string]any{"cooldown": "5m", "burst": 2, "maxOccurrencesPerHour": 12, "maxConcurrentActions": 1},
 		"retention": fmt.Sprintf("%ds", installedJourneyRetention), "suspended": false,
 		"observation": map[string]any{"mode": "allAuthorized"},
-		"evaluation":  map[string]any{"scope": "pod", "fireOnActivation": false, "rearmFor": "10s"}}}
+		"evaluation":  map[string]any{"scope": "pod", "fireOnActivation": false, "rearmFor": "10s"},
+		// ADR-239: the first capture is shared with the unrelated principal.
+		"sharing": map[string]any{"recipients": []any{map[string]any{"kind": "User", "issuer": identity.Issuer, "id": outsiderTokens.subject}},
+			"futureCaptures": map[string]any{"enabled": true, "maxCaptures": 1}, "notAfter": time.Now().Add(time.Hour).UTC().Format(time.RFC3339)}}}
 	body, _ = json.Marshal(policy)
 	if err = f.hub.Post().AbsPath(f.base + "debugpolicies").Body(body).Do(ctx).Error(); err != nil {
 		t.Fatal("maintainer applies the hub-held DebugPolicy", err)
@@ -198,10 +223,18 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 		State         string    `json:"state"`
 		ExpiresAt     time.Time `json:"expires_at"`
 		MaxExecutions int64     `json:"max_executions"`
+		Sharing       *struct {
+			Statement   string `json:"statement"`
+			Recipients  int    `json:"recipients"`
+			MaxCaptures int    `json:"max_captures"`
+		} `json:"sharing"`
 	}
-	activation := map[string]string{"policy_name": installedPolicyName, "idempotency_key": "installed-policy-activation"}
+	// ADR-239: the first activation returns the sharing review; the user then
+	// activates with sharing_reviewed.
+	activation := map[string]any{"policy_name": installedPolicyName, "idempotency_key": "installed-policy-activation"}
+	reviewed := ""
 	wait("an active policy", 3*time.Minute, func(poll context.Context) bool {
-		reply, err := read(poll, "activate_policy", activation)
+		reply, err := readWith(sharer, poll, "activate_policy", activation)
 		if err != nil {
 			t.Logf("installed activate_policy transport: %v", err)
 			return false
@@ -210,6 +243,13 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			var failure struct{ Code, Message string }
 			_ = json.Unmarshal(reply.Data, &failure)
 			t.Logf("installed activate_policy %s: %s (request %s)", failure.Code, failure.Message, reply.RequestID)
+			if failure.Code == "SharingReviewRequired" {
+				if reviewed != "" || !strings.HasPrefix(failure.Message, "Repeated collections will be shared with User "+outsiderTokens.subject+": at most the next 1 capture(s)") {
+					t.Fatal("installed sharing review", failure.Message)
+				}
+				reviewed = failure.Message
+				activation["sharing_reviewed"] = true
+			}
 			return false
 		}
 		if installedJourneyDecode(reply.Data, &activated) != nil {
@@ -219,6 +259,12 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	})
 	if activated.MaxExecutions != 10 || !activated.ExpiresAt.After(time.Now()) || activated.ExpiresAt.After(time.Now().Add(time.Hour)) {
 		t.Fatal("activation did not take the envelope's finite limits", activated)
+	}
+	if reviewed == "" {
+		t.Fatal("the sharing policy was activated without a review")
+	}
+	if activated.Sharing == nil || activated.Sharing.Statement != "Repeated collections will be shared" || activated.Sharing.Recipients != 1 || activated.Sharing.MaxCaptures != 1 {
+		t.Fatal("activation does not state its recurring sharing", activated.Sharing)
 	}
 	t.Logf("installed policy journey: policy %s activated (acceptance %s) %s after start", activated.PolicyUID, activated.AcceptanceID, time.Since(started).Round(time.Second))
 	watched := func() int64 {
@@ -299,6 +345,39 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	wait("the published policy artifact", 2*time.Minute, func(poll context.Context) bool {
 		return observe(poll, "get_case", map[string]string{"case_id": progress.CaseID}, &investigation) && len(investigation.Artifacts) == 1
 	})
+	// ADR-239: the policy's first capture was shared at publication with the
+	// recipient, who reads exactly that case; the one-capture limit is reached.
+	var sharedProgress struct {
+		Sharing struct {
+			State   string `json:"state"`
+			ShareID string `json:"share_id"`
+		} `json:"sharing"`
+	}
+	wait("the policy capture's recurring share", time.Minute, func(poll context.Context) bool {
+		return observe(poll, "get_capture", map[string]string{"capture_id": captureID}, &sharedProgress) && sharedProgress.Sharing.State == "Shared"
+	})
+	var sharedCase struct {
+		Case struct {
+			Access string `json:"access"`
+		} `json:"case"`
+		Artifacts []struct {
+			ArtifactID string `json:"artifact_id"`
+		} `json:"artifacts"`
+	}
+	if reply, err := readWith(recipient, ctx, "get_case", map[string]string{"case_id": progress.CaseID}); err != nil || reply.Status != "ok" || installedJourneyDecode(reply.Data, &sharedCase) != nil || sharedCase.Case.Access != "shared" || len(sharedCase.Artifacts) != 1 || sharedCase.Artifacts[0].ArtifactID != investigation.Artifacts[0].ArtifactID {
+		diagnose()
+		t.Fatal("installed recurring-share recipient could not read the policy capture", reply.Status, err, sharedCase)
+	}
+	var sharingStatus struct {
+		Sharing *struct {
+			State          string `json:"state"`
+			SharedCaptures int    `json:"shared_captures"`
+		} `json:"sharing"`
+	}
+	if !observe(ctx, "get_policy_status", map[string]string{"policy_name": installedPolicyName}, &sharingStatus) || sharingStatus.Sharing == nil || sharingStatus.Sharing.State != "limitReached" || sharingStatus.Sharing.SharedCaptures != 1 {
+		t.Fatal("installed policy sharing status", sharingStatus.Sharing)
+	}
+	t.Logf("installed policy journey: the policy capture was shared with the unrelated principal (share %s), %s after start", sharedProgress.Sharing.ShareID, time.Since(started).Round(time.Second))
 	prepare := map[string]string{"artifact_id": investigation.Artifacts[0].ArtifactID, "idempotency_key": "installed-policy-download"}
 	var download installedJourneyDownload
 	wait("a prepared policy download", 3*time.Minute, func(poll context.Context) bool {

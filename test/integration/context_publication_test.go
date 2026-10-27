@@ -64,6 +64,7 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		publisher                      evidence.ContextPublisher
 		gate                           contextPublicationTestGate
 	}
+	var prepareAdmitted func(t *testing.T, ctx context.Context, s captureAdmissionScenario, accepted capture.Accepted, seal evidence.KeySealer, open evidence.KeyOpener, processingCheck func(fixture, *processingTestFixture), initialize bool) fixture
 	// admit, when set, replaces the direct admission (ADR-235 admits a
 	// reviewed preview carrying a sharing instruction).
 	setupAdmitted := func(t *testing.T, provider func(string) (evidence.KeySealer, evidence.KeyOpener), processingCheck func(fixture, *processingTestFixture), admit func(*testing.T, *captureAdmissionScenario) capture.Accepted) fixture {
@@ -88,12 +89,24 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 		} else if accepted, err = s.s.AdmitContext(ctx, s.a); err != nil {
 			t.Fatal(err)
 		}
+		return prepareAdmitted(t, ctx, s, accepted, seal, open, processingCheck, true)
+	}
+	// prepareAdmitted stores, verifies and audits one admitted capture of s so
+	// that it is ready to publish. A scenario's processing root is accepted and
+	// initialized once (initialize), by its first prepared capture; later
+	// captures of the same root are covered by it.
+	prepareAdmitted = func(t *testing.T, ctx context.Context, s captureAdmissionScenario, accepted capture.Accepted, seal evidence.KeySealer, open evidence.KeyOpener, processingCheck func(fixture, *processingTestFixture), initialize bool) fixture {
+		t.Helper()
+		var err error
 		var f fixture
 		f.scenario = s
 		f.e = accepted.Expectation
-		processing := newProcessingTestFixture(t, ctx, poolFor, store, keys, s, f.e)
-		defer processing.Close()
-		initializeProcessingTestFixtureWith(t, ctx, processing)
+		var processing *processingTestFixture
+		if initialize {
+			processing = newProcessingTestFixture(t, ctx, poolFor, store, keys, s, f.e)
+			defer processing.Close()
+			initializeProcessingTestFixtureWith(t, ctx, processing)
+		}
 		for _, pair := range []struct {
 			pool *pgxpool.Pool
 			dst  **postgres.ContextPublications
@@ -103,7 +116,9 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 				t.Fatal(err)
 			}
 		}
-		if _, err = f.verify.AcceptedContextForPublication(ctx, accepted.CaptureID); err == nil {
+		// A later capture of the root may already be audited: the first
+		// preparation's publisher writes every pending capture intent.
+		if _, err = f.verify.AcceptedContextForPublication(ctx, accepted.CaptureID); err == nil && initialize {
 			t.Fatal("unaudited capture accepted for publication")
 		}
 		if _, err = f.reader.RetainedAudience(ctx, f.e.Registration.Location.ArtifactID); err == nil {
@@ -295,6 +310,13 @@ func qualifyContextPublications(t *testing.T, ctx context.Context, admin *pgxpoo
 					}
 					return err
 				}}
+		})
+	})
+
+	t.Run("policy-share-counter-limit-end-stop-and-revoke-all", func(t *testing.T) {
+		qualifyPolicyShare(t, ctx, admin, poolFor, store, keys, create, func(t *testing.T, s captureAdmissionScenario, accepted capture.Accepted, initialize bool) captureShareFixture {
+			f := prepareAdmitted(t, ctx, s, accepted, keys, keys, nil, initialize)
+			return captureShareFixture{scenario: f.scenario, e: f.e, reader: f.reader, publish: func() (artifact.PublishedContext, error) { return f.publisher.Publish(ctx, f.e.CaptureUID, f.copies) }}
 		})
 	})
 

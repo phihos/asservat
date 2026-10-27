@@ -75,3 +75,14 @@ the verified copy digest and the published locator's target; its expiry is bound
 artifact's effective access end. An expired instruction or no unretired pinned management
 assignment skips the share without blocking publication (`get_capture` reports
 `SharingUnavailable`). See [ADR-235](../decisions/235-capture-time-sharing.md).
+
+## Recurring policy share (ADR-239)
+
+A policy executor's capture receives its instruction at admission, not from a reviewed preview:
+the owner-privileged `claim_policy_capture_share` BEFORE INSERT trigger on `context_capture`
+(migration 00092) consumes one slot of the policy's current acceptance counter
+(`policy_acceptance.shares_spent`) while under `maxCaptures`, before `notAfter`, unrevoked and with
+the DebugPolicy at the accepted generation, and copies an ADR-235 instruction naming the
+acceptance. The replaced `materialize_capture_share` records `evidence_share.policy_acceptance_id`
+and materializes nothing for a revoked acceptance (it takes a KEY SHARE lock on the acceptance row,
+which revoke-all locks FOR UPDATE). See [ADR-239](../decisions/239-recurring-policy-sharing.md).

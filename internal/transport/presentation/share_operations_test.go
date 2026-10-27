@@ -160,7 +160,9 @@ func TestShareOperationsContract(t *testing.T) {
 	for name, input := range map[string]string{
 		"create_share": `{"case_id":"22222222-2222-4222-8222-222222222222","artifacts":[{"artifactID":"33333333-3333-4333-8333-333333333333","digest":"` + "0a" + `0000000000000000000000000000000000000000000000000000000000000a"}],"recipients":[{"kind":"User","issuer":"https://id.example.invalid","id":"outsider"}],"data_classes":["metadata","raw"],"operations":["get_case"],"expires_at":"2026-10-27T12:00:00Z","reason":"r","idempotency_key":"k"}`,
 		"list_shares":  `{"view":"owned","include_intents":true}`,
-		"revoke_share": `{"sharing_intent_id":"11111111-1111-4111-8111-111111111111","expected_revision":1,"idempotency_key":"r"}`,
+		// ADR-239 accepts sharing_intent_id (a policy acceptance), but never
+		// together with share_id.
+		"revoke_share": `{"share_id":"11111111-1111-4111-8111-111111111111","sharing_intent_id":"11111111-1111-4111-8111-111111111111","expected_revision":1,"idempotency_key":"r"}`,
 	} {
 		if _, err := s.CallWithContext(context.Background(), f, OperationCall{requestID: "88888888-8888-4888-8888-888888888888"}, name, json.RawMessage(input)); err == nil {
 			t.Fatal("unsupported share input accepted", name)
