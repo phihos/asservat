@@ -34,7 +34,7 @@ func NewContextProducer(store *CustodyStore, keys evidence.KeySealer, now func()
 	return &ContextProducer{store, keys, contracts, now}, nil
 }
 func (p *ContextProducer) PrepareContext(ctx context.Context, e artifact.ContextExpectation) (evidence.PreparedContext, error) {
-	if e.Validate() != nil || e.Registration.StoreID != p.store.storeID || e.Registration.NativeLimit != artifact.MaxContextBytes || e.DataClass != "metadata" || !p.now().Before(e.Registration.WriteUntil) {
+	if e.Validate() != nil || e.NativeType != artifact.PodStatusArtifact || e.Registration.StoreID != p.store.storeID || e.Registration.NativeLimit != artifact.MaxContextBytes || e.DataClass != "metadata" || !p.now().Before(e.Registration.WriteUntil) {
 		return nil, artifact.ErrInvalid
 	}
 	ctx, cancel := context.WithDeadline(ctx, minDeadline(e.Registration.WriteUntil, p.now().Add(5*time.Second)))

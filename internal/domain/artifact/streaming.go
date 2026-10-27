@@ -2,12 +2,14 @@ package artifact
 
 import "time"
 
-// ADR-166 initial qualification bounds: not a product size limit. Larger
-// native limits need their own part-size and resource qualification.
+// ADR-166 qualification bounds, raised by ADR-244 from 128 MiB to 256 MiB, the
+// largest S-04 frozen recording ceiling. Not a product size limit: larger
+// native limits need their own part-size and resource qualification. 256 MiB
+// plus 32 frames of cipher overhead needs 33 parts of 8 MiB.
 const (
-	StreamingNativeLimit int64 = 128 << 20
+	StreamingNativeLimit int64 = 256 << 20
 	StreamingPartBytes   int64 = 8 << 20
-	StreamingMaxParts          = 17
+	StreamingMaxParts          = 33
 )
 
 // StreamingPlan extends one storage obligation above a single frame. It grants

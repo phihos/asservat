@@ -14,7 +14,7 @@ def main():
     parser.add_argument("--bundle", choices=["manifest", "permissions", "control", "policies"], default="manifest")
     args=parser.parse_args()
     dest=ROOT/("internal/adapters/objectstore/manifest/schemas" if args.bundle=="manifest" else "internal/adapters/kubernetes/permission-schemas")
-    pending=(["manifest.schema.json","framed-storage.schema.json","pod-status.schema.json"] if args.bundle=="manifest" else ["access-binding.schema.json","permission-source.schema.json","identity-settings.schema.json","browser-settings.schema.json","submission-trust.schema.json","work-trust.schema.json","fleet-settings.schema.json","installation-witness.schema.json","retention-policy.schema.json","retention-topology.schema.json"])
+    pending=(["manifest.schema.json","framed-storage.schema.json","pod-status.schema.json","syscall-results.schema.json"] if args.bundle=="manifest" else ["access-binding.schema.json","permission-source.schema.json","identity-settings.schema.json","browser-settings.schema.json","submission-trust.schema.json","work-trust.schema.json","fleet-settings.schema.json","installation-witness.schema.json","retention-policy.schema.json","retention-topology.schema.json"])
     if args.bundle=="control":
         dest=ROOT/"internal/adapters/jose/schemas"
         pending=["internal-work.schema.json"]

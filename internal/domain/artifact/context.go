@@ -27,10 +27,13 @@ type RetentionRule struct {
 
 // ContextExpectation is constructed from accepted execution/provenance and
 // retention facts, independently of the writer's manifest. It confers no rights.
-// This first verification profile supports acquired manual, on-trigger pod status
-// only; other mechanisms need their own semantic/native-format qualification.
+// NativeType selects a registered native artifact type (ADR-244); the empty
+// historical value is pod status, whose serialized form and digest are
+// unchanged. Lifecycle is set only for a save from an ongoing source.
 type ContextExpectation struct {
 	ExecutionClass                                                    ContextExecutionClass `json:",omitempty"`
+	NativeType                                                        string                `json:",omitempty"`
+	Lifecycle                                                         *OngoingLifecycle     `json:",omitempty"`
 	Registration                                                      Registration
 	CaseID, OccurrenceID                                              string
 	NodeUID, NodeBootID, PodUID, Namespace, NamespaceUID, WorkloadUID string
@@ -43,20 +46,32 @@ type ContextExpectation struct {
 	TriggeredAt                                                       time.Time
 }
 
+// Type returns the registered native type; Validate rejects unknown names.
+func (e ContextExpectation) Type() NativeType {
+	t, _ := LookupNativeType(e.NativeType)
+	return t
+}
+
 func (e ContextExpectation) Binding() Binding {
 	l := e.Registration.Location
-	return Binding{ClusterID: l.ClusterID, ArtifactID: l.ArtifactID, AttemptID: l.AttemptID, MediaType: "application/json"}
+	return Binding{ClusterID: l.ClusterID, ArtifactID: l.ArtifactID, AttemptID: l.AttemptID, MediaType: e.Type().MediaType}
 }
 
 func (e ContextExpectation) Validate() error {
 	r := e.Registration
-	if r.Validate() != nil || r.NativeLimit > MaxContextBytes || !uuid(e.CaseID) || !uuid(e.OccurrenceID) || !e.ExecutionClass.ValidNodeIdentity(e.NodeUID, e.NodeBootID) || !uuid(e.CaptureUID) || e.TriggeredAt.IsZero() || e.TriggeredAt.After(r.WriteUntil) {
+	t, known := LookupNativeType(e.NativeType)
+	if !known || r.Validate() != nil || r.NativeLimit > t.MaxBytes || !uuid(e.CaseID) || !uuid(e.OccurrenceID) || !e.ExecutionClass.ValidNodeIdentity(e.NodeUID, e.NodeBootID) || !uuid(e.CaptureUID) || e.TriggeredAt.IsZero() || e.TriggeredAt.After(r.WriteUntil) {
 		return ErrInvalid
 	}
-	if e.DataClass != "raw" && e.DataClass != "metadata" {
+	if !t.AllowsClass(e.DataClass) {
 		return ErrInvalid
 	}
-	if e.ExecutionClass == ContextAPIExecution && (e.ActionID != "pod-status" || e.DataClass != "metadata" || r.NativeLimit != MaxContextBytes) {
+	if e.ExecutionClass == ContextAPIExecution && (e.NativeType != PodStatusArtifact || e.ActionID != "pod-status" || e.DataClass != "metadata" || r.NativeLimit != MaxContextBytes) {
+		return ErrInvalid
+	}
+	// Pod status is an onTrigger snapshot; only recorder types save from an
+	// ongoing source, whose window and coverage are checked against t0.
+	if e.Lifecycle != nil && (e.NativeType == PodStatusArtifact || e.Lifecycle.Validate(e.TriggeredAt) != nil) {
 		return ErrInvalid
 	}
 	for _, s := range []string{e.PodUID, e.NamespaceUID, e.WorkloadUID, e.CollectorVersion} {

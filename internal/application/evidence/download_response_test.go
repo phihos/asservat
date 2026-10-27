@@ -27,6 +27,10 @@ type responseTransferFixture struct {
 	fail                                                       string
 	badHash, unverified                                        bool
 	advanceBetweenWindows                                      bool
+	slowRead                                                   int // chunk ordinal whose read outlasts its lease
+	denyAfterSlow                                              bool
+	batchLife                                                  time.Duration // identity observation length after the slow read; 5 s when zero
+	minWriteLease                                              time.Duration // least lease time left at any chunk write
 	backing                                                    []byte
 	windowWrite                                                time.Time
 }
@@ -57,7 +61,11 @@ func (f *responseTransferFixture) BeginBatch(context.Context) (identities.Identi
 	}
 	f.active = true
 	f.batches++
-	return &responseTestBatch{f: f, until: f.now.Add(5 * time.Second)}, nil
+	life := 5 * time.Second
+	if f.batchLife > 0 && f.slowRead < 0 {
+		life = f.batchLife
+	}
+	return &responseTestBatch{f: f, until: f.now.Add(life)}, nil
 }
 func (f *responseTransferFixture) Close() { f.closed++ }
 func (f *responseTransferFixture) CheckDownloadCurrent(ctx context.Context, b identities.CurrentIdentity, s artifact.DownloadScope) (artifact.DownloadAuthority, error) {
@@ -68,7 +76,7 @@ func (f *responseTransferFixture) CheckDownloadCurrent(ctx context.Context, b id
 	a := f.a
 	a.CheckedAt = f.now
 	a.ValidUntil = i.ValidUntil
-	if f.fail == "authority" {
+	if f.fail == "authority" || f.denyAfterSlow && f.slowRead < 0 {
 		return a, artifact.ErrDownloadUnavailable
 	}
 	return a, nil
@@ -177,6 +185,10 @@ func (f *responseTransferFixture) ReadChunk(_ context.Context, l artifact.Downlo
 		return NativeResponseChunk{}, artifact.ErrDownloadUnavailable
 	}
 	f.backing = make([]byte, length)
+	if f.slowRead > 0 && f.chunks+1 == f.slowRead {
+		f.now = f.now.Add(6 * time.Second) // a frame load outlasted the lease
+		f.slowRead = -1
+	}
 	return NativeResponseChunk{Bytes: f.backing, ReadWork: length, FinalVerified: offset+length == f.size && !f.unverified}, nil
 }
 func (f *responseTransferFixture) SelectDownloadResponse(m artifact.NativeDownloadMetadata) (artifact.DownloadSelection, error) {
@@ -190,6 +202,9 @@ func (f *responseTransferFixture) WriteChunk(_ context.Context, l artifact.Downl
 		return 0, artifact.ErrDownloadExpired
 	}
 	f.chunks++
+	if left := l.Until.Sub(f.now); f.minWriteLease == 0 || left < f.minWriteLease {
+		f.minWriteLease = left
+	}
 	if f.fail == "write" {
 		f.emitted++
 		return 1, artifact.ErrDownloadUnavailable
@@ -230,6 +245,43 @@ func TestResponseTransferMultipleWindowsReuseLeaseAndFinishWholeFile(t *testing.
 		}
 	}
 }
+
+// ADR-244: a local source's read that outlasts its lease is written only under
+// a fresh lease with fresh current authority; a denial then emits nothing more.
+func TestResponseTransferRenewsLeaseAfterSlowLocalRead(t *testing.T) {
+	f, service, req := newResponseTransferFixture(t, 3*artifact.DeliveryBytes)
+	f.slowRead = 2
+	if e := service.Transfer(context.Background(), f, req, f, f); e != nil {
+		t.Fatal(e)
+	}
+	if f.s.State != artifact.DownloadCompleted || f.emitted != f.size || f.leases != 2 || f.batches < 2 || f.minWriteLease < localWriteMargin {
+		t.Fatal("slow read not delivered under a fresh lease", f.s.State, f.emitted, f.leases, f.batches, f.minWriteLease)
+	}
+	// A renewal that cannot give the margin (identity about to expire) writes
+	// nothing; every earlier write started with at least the margin.
+	f, service, req = newResponseTransferFixture(t, 3*artifact.DeliveryBytes)
+	f.slowRead, f.batchLife = 2, time.Second
+	if e := service.Transfer(context.Background(), f, req, f, f); !errors.Is(e, artifact.ErrDownloadExpired) {
+		t.Fatal("short renewal accepted", e)
+	}
+	if f.emitted != artifact.DeliveryBytes || f.minWriteLease < localWriteMargin {
+		t.Fatal("chunk written with less than the margin", f.emitted, f.minWriteLease)
+	}
+	f, service, req = newResponseTransferFixture(t, 3*artifact.DeliveryBytes)
+	f.slowRead, f.denyAfterSlow = 2, true
+	if e := service.Transfer(context.Background(), f, req, f, f); e == nil {
+		t.Fatal("revoked authority after a slow read still delivered")
+	}
+	if f.emitted != artifact.DeliveryBytes || f.s.State == artifact.DownloadCompleted {
+		t.Fatal("chunk read under an expired lease was written", f.emitted)
+	}
+	for _, b := range f.backing {
+		if b != 0 {
+			t.Fatal("refused chunk retained")
+		}
+	}
+}
+
 func TestResponseTransferFailureKeepsPrepaidSpendNoAutomaticRetry(t *testing.T) {
 	for _, failure := range []string{"identity", "authority", "source", "intent", "intent-ack", "read", "write", "outcome", "outcome-ack"} {
 		t.Run(failure, func(t *testing.T) {

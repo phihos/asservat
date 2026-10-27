@@ -3,6 +3,7 @@ package evidence
 import (
 	"asservat.local/asservat/internal/domain/artifact"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 )
 
@@ -21,3 +22,7 @@ func ContextCopiesDigest(c artifact.Copies) artifact.Digest {
 	}
 	return artifact.Digest(sha256.Sum256(b))
 }
+
+// NativeETag is the strong opaque version validator of one immutable copy set
+// (the same "v1-<copies digest>" form the pod-status download uses).
+func NativeETag(version artifact.Digest) string { return `"v1-` + hex.EncodeToString(version[:]) + `"` }

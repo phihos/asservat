@@ -21,7 +21,7 @@ type NativeContextSource struct {
 }
 
 func (s NativeContextSource) Valid(version artifact.Digest) bool {
-	return s.Expectation.Validate() == nil && s.Expectation.DataClass == "metadata" && s.Copies.Validate(s.Expectation.Registration) == nil && ContextCopiesDigest(s.Copies) == version
+	return s.Expectation.Validate() == nil && s.Expectation.NativeType == artifact.PodStatusArtifact && s.Expectation.DataClass == "metadata" && s.Copies.Validate(s.Expectation.Registration) == nil && ContextCopiesDigest(s.Copies) == version
 }
 func cloneNativeSource(s NativeContextSource) NativeContextSource {
 	s.Expectation.Audience = slices.Clone(s.Expectation.Audience)

@@ -1,5 +1,58 @@
 # Sustained implementation progress
 
+## S-04 increment 2: native artifact types and larger saves (ADR-244, 2026-10-27)
+
+[ADR-244](decisions/244-native-artifact-types.md): artifact-type registry (pod status unchanged;
+PCAPNG `application/x-pcapng` `.pcapng`; syscall records as JSON Lines `application/x-ndjson`
+`.jsonl`; HTTP header projection `application/json` `.json`) with format, safe filename and
+coverage text; `ContextExpectation.NativeType`/`Lifecycle` (omitted when empty, so stored
+pod-status expectations and digests are unchanged); verified `actionLifecycle` provenance for
+ongoing saves (source session, snapshot, t0, requested window, history/window coverage, gap
+reasons, `sourceStoppedAt`, recording-save origin); streaming native checks (PCAPNG blocks, syscall
+events against the newly embedded `syscall-results` event schema, strict HTTP JSON);
+`objectstore.ArtifactProducer` (framed encoder into the ADR-166 multipart writer) and full
+recorder verification; ADR-166 raised to 256 MiB/33 parts by migration 00095 (checks widened
+only, floor 81); `objectstore.FramedNativeSource` for the ADR-113 windowed transfer; and a lease
+margin: a local source's chunk is written only under a lease with at least two seconds left,
+renewed with fresh current authority otherwise (four of the first five 200 MiB runs failed without
+it: frame load or 1 MiB write ran past the five-second lease).
+
+Verification (sources unchanged during each run; tracked test/results files restored):
+- Real PostgreSQL/S3 custody fixture, `scripts/test-custody.py --run
+  '^TestCustodyWithRealServices$/^native_artifact'` (race-instrumented), three consecutive passes
+  after the final transfer change (runs 7, 8 and the final-source run): a 209,715,120-byte
+  synthetic PCAPNG ongoing save registered at the 256 MiB bound (final + temporary charge exact),
+  streamed in 20 parts, `stored_unpublished`, temporary charge released exactly; full
+  verification against the independent expectation, and refusal of a changed snapshot, source
+  session, window coverage, invented source stop, onTrigger claim, syscall type and HTTP type;
+  whole native download over TLS through `DownloadResponseTransfer` and the real HTTP sink
+  (4 windows, real encrypted window audit, SHA-256 equal, filename `artifact-<id>.pcapng`,
+  `application/octet-stream`, strong ETag, `Accept-Ranges: bytes`), interrupted at 70 MiB and
+  resumed with `Range` + `If-Match` (206, exact `Content-Range`, assembled file SHA-256 equal,
+  structurally valid PCAPNG), If-Match mismatch 412 without body, unsatisfiable range 416,
+  If-Range mismatch full 200; a worst-case incompressible 256 MiB attempt in 33 parts,
+  completed create-only, reread and released exactly. Times (race binary, local SeaweedFS):
+  store 22 s, verification 5 s, whole download 5.5 s; subtest 48–50 s.
+- Full default custody suite (`scripts/test-custody.py`, before the rebase onto main): 501 passing
+  test/subtest results in 852.8 s; the only failure is `TestCustodyUpgradeSchemaWithRealPostgres`,
+  which builds the contiguous migration bundle (see below). The suite is within its 900 s budget
+  but close to it; this subtest adds about 50 s.
+- Unit (`-race`): domain/artifact (registry, lifecycle coverage rules, schema durations, typed
+  expectation bounds, 33-part journal within its 16 KiB SQL bound), objectstore/manifest
+  (recorder manifest round trip and 16 rejected mutations, PCAPNG/syscall/HTTP checks at
+  arbitrary chunk boundaries), application/evidence (lease renewal after a slow local read;
+  revoked authority then emits nothing), objectstore, framed, privacy, transport/browser: PASS.
+  `adapters/postgres` initial-schema bundle tests fail on this branch alone because the bundle
+  requires contiguous migrations and 00095/00096 belong to parallel branches (as does the
+  upgrade-schema integration test); they pass once those land.
+- Gates: `make pre-push` after the rebase onto main (with #82/#84/#85): PASS; the targeted
+  custody subtest passed again on the final rebased source (48.5 s).
+
+Open: installed composition (regional worker exchange, first-context SQL response facet, catalog
+publication trigger and recorder admission) is increment 4; `tshark -r` was not run (not installed
+locally or on the runner); slow clients below about 0.2–0.5 MiB/s per chunk are interrupted and
+must resume.
+
 ## Log and resource triggers (ADR-241, 2026-10-27)
 
 [ADR-241](decisions/241-log-resource-detectors.md) implements the `log` and `resource` detectors
