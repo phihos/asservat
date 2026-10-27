@@ -77,7 +77,9 @@ func (s *EvidenceShares) RevokePolicySharing(ctx context.Context, r sharing.Poli
 	replay, err := s.changePolicySharing(ctx, r, recovery, func(q *custodydb.Queries, row custodydb.PolicyAcceptance, key pgtype.Text) (bool, error) {
 		revoked = 0
 		if row.SharingRevokedAt.Valid {
-			if row.SharingRevokeKey != key {
+			// A replay must name the revision the revocation started from,
+			// so the reported revision (expected+1) is the stored one.
+			if row.SharingRevokeKey != key || r.ExpectedRevision != policySharingRevision(row)-1 {
 				return false, value.ErrConflict
 			}
 			n, err := q.CountPolicyShareRevocations(ctx, custodydb.CountPolicyShareRevocationsParams{RootID: id(s.root), PolicyAcceptanceID: row.ID, RevokeKey: key})
@@ -112,6 +114,10 @@ func (s *EvidenceShares) RevokePolicySharing(ctx context.Context, r sharing.Poli
 func (s *EvidenceShares) StopPolicySharing(ctx context.Context, r sharing.PolicyRevocation, recovery artifact.RecoveryProof) (bool, error) {
 	return s.changePolicySharing(ctx, r, recovery, func(q *custodydb.Queries, row custodydb.PolicyAcceptance, key pgtype.Text) (bool, error) {
 		if row.SharingStoppedAt.Valid && row.SharingStopKey == key {
+			// The original Stop started from revision 1; a replay must too.
+			if r.ExpectedRevision != 1 {
+				return false, value.ErrConflict
+			}
 			return true, nil
 		}
 		if row.SharingStoppedAt.Valid || row.SharingRevokedAt.Valid || r.ExpectedRevision != 1 {

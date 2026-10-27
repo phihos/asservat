@@ -396,6 +396,11 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if again, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), first, 1, "revoke-all"); err != nil || !again.Replay || again.Revoked != 2 {
 		t.Fatal("revoke-all replay", again, err)
 	}
+	// A replay with a stale expected revision cannot report a revision the
+	// store never produced.
+	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), first, 2, "revoke-all"); !errors.Is(err, capture.ErrConflict) {
+		t.Fatal("replay with another expected revision", err)
+	}
 	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), first, 1, "another-key"); !errors.Is(err, capture.ErrConflict) {
 		t.Fatal("second revoke-all under another key", err)
 	}
