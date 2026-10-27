@@ -1,5 +1,15 @@
 # Decision records
 
+[ADR-244 — Native artifact types and larger saves](244-native-artifact-types.md) is S-04
+increment 2: an artifact-type registry (pod status, PCAPNG, syscall JSON Lines, HTTP header JSON)
+with media type, format, safe filename and coverage; typed expectations with verified
+`actionLifecycle` provenance for ongoing saves; streaming native checks; a framed producer and
+full verifier; ADR-166 streaming custody raised to 256 MiB/33 parts (migration 00097); and a
+multi-frame `NativeResponseSource` whose transfer renews the delivery lease before a chunk write
+with less than two seconds left. A 200 MiB synthetic PCAPNG is stored, verified and downloaded
+whole and resumed on real PostgreSQL/S3; the installed worker path stays pod-status-only until
+increment 4.
+
 [ADR-241 — Log and resource triggers](241-log-resource-detectors.md) implements the detectors
 ADR-230 paused, after the maintainer's 2026-10-26 decision that every specified feature ships: a
 log policy's regional poll reads its Pods' containers through bounded `pods/log` GETs (≤ 32

@@ -15,7 +15,7 @@ func streamingTestPlan(t *testing.T, native int64) StreamingPlan {
 func TestStreamingPlanBounds(t *testing.T) {
 	p := streamingTestPlan(t, StreamingNativeLimit)
 	if p.Validate() != nil || p.PartLimit() != StreamingMaxParts || p.TemporaryBytes() != p.Registration.Limits()[0] {
-		t.Fatal("128 MiB plan", p.PartLimit(), p.TemporaryBytes())
+		t.Fatal("256 MiB plan", p.PartLimit(), p.TemporaryBytes())
 	}
 	for _, native := range []int64{FrameBytes, StreamingNativeLimit + 1} {
 		if streamingTestPlan(t, native).Validate() == nil {

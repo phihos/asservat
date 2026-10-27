@@ -58,11 +58,22 @@ func (c *responseCurrent) closeBatch() {
 		c.batch = nil
 	}
 }
+
+// localWriteMargin is the least lease time a local source's chunk write starts
+// with (ADR-244): a 1 MiB write then needs a client of at least 0.5 MiB/s.
+const localWriteMargin = 2 * time.Second
+
 func (c *responseCurrent) get(ctx context.Context) (artifact.DownloadAuthority, error) {
+	return c.fresh(ctx, 0)
+}
+
+// fresh returns the current authority, observing it again when the retained
+// one has less than margin left.
+func (c *responseCurrent) fresh(ctx context.Context, margin time.Duration) (artifact.DownloadAuthority, error) {
 	if ctx.Err() != nil {
 		return artifact.DownloadAuthority{}, ctx.Err()
 	}
-	if c.batch != nil && c.value.Valid(c.now()) {
+	if c.batch != nil && c.value.Valid(c.now()) && c.now().Add(margin).Before(c.value.ValidUntil) {
 		return c.value, nil
 	}
 	c.closeBatch()
@@ -411,17 +422,41 @@ func (t DownloadResponseTransfer) transfer(ctx context.Context, reader identitie
 				piece, stop := context.WithDeadline(work, lease.Until)
 				var chunk NativeResponseChunk
 				var e error
+				local := false
 				if native, ok := source.(*ContextNativeResponse); ok {
 					chunk, e = native.readChunkChecked(piece, current.batch, lease, offset, length)
 				} else if remote, ok := source.(CurrentNativeResponseSource); ok {
 					chunk, e = remote.ReadChunkCurrent(piece, current.batch, lease, offset, length)
 				} else {
 					chunk, e = source.ReadChunk(piece, lease, offset, length)
+					local = true
 				}
 				if e != nil {
 					clear(chunk.Bytes)
 					stop()
 					return e
+				}
+				// ADR-244: a local multi-frame source may need longer than the
+				// rest of the lease to authenticate its next 8 MiB frame, and a
+				// 1 MiB socket write needs time under client backpressure. Reading
+				// discloses nothing; a chunk is written only under a lease with at
+				// least localWriteMargin left, renewed with fresh current authority
+				// when shorter, or cleared. Remote sources keep their chunk
+				// acknowledgement bound to the original lease.
+				if local && t.Now().Add(localWriteMargin).After(lease.Until) && work.Err() == nil {
+					stop()
+					stage = "lease"
+					if a, e = current.fresh(work, localWriteMargin); e == nil {
+						lease, e = t.Responses.LeaseDownloadResponse(work, session.ID, r.ID, r.OwnerID, windowID, a)
+					}
+					if e == nil && (!lease.Valid(t.Now()) || lease.ResponseID != r.ID || lease.WindowID != windowID || lease.OwnerID != r.OwnerID || lease.Generation != r.Generation || lease.Authority.Scope != session.Scope || lease.Until.After(a.ValidUntil)) {
+						e = artifact.ErrIntegrity
+					}
+					if e != nil {
+						clear(chunk.Bytes)
+						return e
+					}
+					piece, stop = context.WithDeadline(work, lease.Until)
 				}
 				if int64(len(chunk.Bytes)) != length || chunk.ReadWork < 0 || chunk.ReadWork > intent.Window.ReadLimit-readWork || !lease.Allows(offset, length, t.Now()) || piece.Err() != nil {
 					clear(chunk.Bytes)

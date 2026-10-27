@@ -582,6 +582,9 @@ func TestCustodyWithRealServices(t *testing.T) {
 	t.Run("bounded streaming custody (ADR-166)", func(t *testing.T) {
 		qualifyStreamingCustody(t, ctx, admin, ledger, store, s3Admin, bucket, charge)
 	})
+	t.Run("native artifact types and 256 MiB streaming (ADR-244)", func(t *testing.T) {
+		qualifyNativeArtifacts(t, ctx, admin, ledger, store, charge)
+	})
 }
 
 func qualifySchemaCompatibility(t *testing.T, ctx context.Context, admin, pool *pgxpool.Pool) {

@@ -86,18 +86,64 @@ type provenanceDTO struct {
 	ParentArtifacts  []json.RawMessage `json:"parentArtifacts"`
 	ToolDigests      []string          `json:"toolDigests"`
 	BuildIDs         []string          `json:"buildIDs"`
-	ProjectionDigest string            `json:"projectionDigest"`
+	ProjectionDigest string            `json:"projectionDigest,omitempty"`
 }
 type originDTO struct {
 	CaptureUID string `json:"captureUID"`
 	ActionID   string `json:"actionID"`
 	PlanDigest string `json:"planDigest"`
 }
-type lifecycleDTO struct {
-	ExecutionMode string    `json:"executionMode"`
-	TriggeredAt   time.Time `json:"triggeredAt"`
-	TriggerKind   string    `json:"triggerKind"`
+type originRefDTO struct {
+	PolicyUID             string `json:"policyUID"`
+	PolicyExecutionDigest string `json:"policyExecutionDigest"`
 }
+
+// The ongoing fields are present exactly for a save from an ongoing source
+// (action-lifecycle.schema.json#/$defs/acquisition); gapReasons is then
+// present even when empty.
+type lifecycleDTO struct {
+	ExecutionMode       string        `json:"executionMode"`
+	TriggeredAt         time.Time     `json:"triggeredAt"`
+	TriggerKind         string        `json:"triggerKind"`
+	SourceSessionID     string        `json:"sourceSessionID,omitempty"`
+	SourceStartedAt     time.Time     `json:"sourceStartedAt,omitzero"`
+	SnapshotID          string        `json:"snapshotID,omitempty"`
+	RequestedBefore     string        `json:"requestedBefore,omitempty"`
+	After               string        `json:"after,omitempty"`
+	HistoryCoverage     string        `json:"historyCoverage,omitempty"`
+	GapReasons          *[]string     `json:"gapReasons,omitempty"`
+	SourceStoppedAt     time.Time     `json:"sourceStoppedAt,omitzero"`
+	WindowCoverage      string        `json:"windowCoverage,omitempty"`
+	RecordingSaveOrigin *originRefDTO `json:"recordingSaveOrigin,omitempty"`
+}
+
+func lifecycle(e artifact.ContextExpectation) lifecycleDTO {
+	l := e.Lifecycle
+	if l == nil {
+		return lifecycleDTO{ExecutionMode: "onTrigger", TriggeredAt: e.TriggeredAt.UTC(), TriggerKind: "manual"}
+	}
+	gaps := append([]string{}, l.GapReasons...)
+	d := lifecycleDTO{ExecutionMode: "ongoing", TriggeredAt: e.TriggeredAt.UTC(), TriggerKind: l.TriggerKind, SourceSessionID: l.SourceSessionID, SourceStartedAt: l.SourceStartedAt.UTC(), SnapshotID: l.SnapshotID, RequestedBefore: artifact.LifecycleDuration(l.RequestedBefore), After: artifact.LifecycleDuration(l.After), HistoryCoverage: l.HistoryCoverage, GapReasons: &gaps, WindowCoverage: l.WindowCoverage}
+	if !l.SourceStoppedAt.IsZero() {
+		d.SourceStoppedAt = l.SourceStoppedAt.UTC()
+	}
+	if l.Origin != nil {
+		d.RecordingSaveOrigin = &originRefDTO{l.Origin.PolicyUID, hash(l.Origin.PolicyExecutionDigest)}
+	}
+	return d
+}
+
+// completeness reports a save's source coverage truthfully: only a fully
+// covered window is complete; its gap reasons are the recorded gaps.
+func completeness(e artifact.ContextExpectation) completenessDTO {
+	l := e.Lifecycle
+	if l == nil {
+		return completenessDTO{"complete", "complete", "true", []string{}}
+	}
+	source := map[string]string{"full": "complete", "partial": "partial", "none": "partial", "unknown": "unknown"}[l.WindowCoverage]
+	return completenessDTO{source, "complete", "true", append([]string{}, l.GapReasons...)}
+}
+
 type identityDTO struct {
 	ETag      string  `json:"etag"`
 	VersionID *string `json:"versionID"`
@@ -152,7 +198,8 @@ func decode(b []byte, out any) error {
 }
 
 func contextDocument(e artifact.ContextExpectation, l artifact.Layout, c artifact.Copies, started, completed time.Time) (contextDTO, error) {
-	if e.Validate() != nil || l.Validate() != nil || l.Binding != e.Binding() || l.NativeBytes > e.Registration.NativeLimit || l.NativeBytes > artifact.MaxContextBytes {
+	t := e.Type()
+	if e.Validate() != nil || l.Validate() != nil || l.Binding != e.Binding() || l.NativeBytes > e.Registration.NativeLimit || l.NativeBytes > t.MaxBytes {
 		return contextDTO{}, artifact.ErrInvalid
 	}
 	for i := 0; i < 2; i++ {
@@ -164,7 +211,13 @@ func contextDocument(e artifact.ContextExpectation, l artifact.Layout, c artifac
 		return contextDTO{}, artifact.ErrIntegrity
 	}
 	r := e.Registration
-	if started.IsZero() || completed.IsZero() || started.Before(r.AnchorAt) || completed.Before(started) || !completed.Before(r.WriteUntil) || e.TriggeredAt.After(started) {
+	if started.IsZero() || completed.IsZero() || started.Before(r.AnchorAt) || completed.Before(started) || !completed.Before(r.WriteUntil) {
+		return contextDTO{}, artifact.ErrInvalid
+	}
+	// An onTrigger acquisition starts at or after its trigger. A save from an
+	// ongoing source may start before t0 (its prehistory), never before the
+	// source itself started recording.
+	if e.Lifecycle == nil && e.TriggeredAt.After(started) || e.Lifecycle != nil && started.Before(e.Lifecycle.SourceStartedAt) {
 		return contextDTO{}, artifact.ErrInvalid
 	}
 	encryption, err := framed.MarshalLayout(l)
@@ -179,17 +232,22 @@ func contextDocument(e artifact.ContextExpectation, l artifact.Layout, c artifac
 	for i, p := range e.RetentionRules {
 		rules[i] = ruleDTO{p.UID, p.Generation, hash(p.Digest)}
 	}
-	projection := artifact.Digest(sha256.Sum256([]byte(artifact.ContextProjectionDefinition)))
+	// Only pod status has a fixed projection definition; recorder projections
+	// (packet sanitizer, HTTP field set) are bound by their producing increments.
+	projection := ""
+	if e.NativeType == artifact.PodStatusArtifact {
+		projection = hash(artifact.Digest(sha256.Sum256([]byte(artifact.ContextProjectionDefinition))))
+	}
 	return contextDTO{
 		SchemaVersion: "artifact/v1", ArtifactID: r.Location.ArtifactID, CaseID: e.CaseID, OccurrenceID: e.OccurrenceID,
 		Target: targetDTO{ExecutionClass: e.ExecutionClass, ClusterID: r.Location.ClusterID, NodeUID: e.NodeUID, NodeBootID: e.NodeBootID, PodUID: e.PodUID, Namespace: e.Namespace, WorkloadUID: e.WorkloadUID, Scope: "pod"},
-		Kind:   "kubernetesSnapshot", MediaType: "application/json", Format: artifact.ContextFormat, DataClass: e.DataClass,
+		Kind:   t.Kind, MediaType: t.MediaType, Format: t.Format, DataClass: e.DataClass,
 		Collector: collectorDTO{e.CollectorVersion, hash(e.CollectorImageDigest), hash(e.RecipeDigest)}, StartedAt: started.UTC(), CompletedAt: completed.UTC(), ExpiresAt: r.ExpiresAt.UTC(),
-		Completeness: completenessDTO{"complete", "complete", "true", []string{}}, Sizes: sizesDTO{l.NativeBytes, l.DataBytes}, Hashes: hashesDTO{hash(l.NativeSHA256), hash(l.DataSHA256)}, Encryption: encryption,
-		Provenance:       provenanceDTO{[]json.RawMessage{}, []string{hash(e.CollectorImageDigest)}, []string{}, hash(projection)},
-		AccessProvenance: accessDTO{e.NamespaceUID, assignments}, Privacy: privacyDTO{"potentialPersonalData", "context", e.PurposeRef, "default"},
+		Completeness: completeness(e), Sizes: sizesDTO{l.NativeBytes, l.DataBytes}, Hashes: hashesDTO{hash(l.NativeSHA256), hash(l.DataSHA256)}, Encryption: encryption,
+		Provenance:       provenanceDTO{[]json.RawMessage{}, []string{hash(e.CollectorImageDigest)}, []string{}, projection},
+		AccessProvenance: accessDTO{e.NamespaceUID, assignments}, Privacy: privacyDTO{"potentialPersonalData", t.EvidenceType, e.PurposeRef, "default"},
 		Retention:            retentionDTO{r.AnchorAt.UTC(), "acquisition", e.RequestedAgeSeconds, e.MaximumAgeSeconds, e.DeletionBudgetSeconds, r.DeleteBy.UTC(), rules},
-		CollectionProvenance: originDTO{e.CaptureUID, e.ActionID, hash(e.PlanDigest)}, ActionLifecycle: lifecycleDTO{"onTrigger", e.TriggeredAt.UTC(), "manual"}, StorageObjects: storageDTO{identity(c[0]), identity(c[1])},
+		CollectionProvenance: originDTO{e.CaptureUID, e.ActionID, hash(e.PlanDigest)}, ActionLifecycle: lifecycle(e), StorageObjects: storageDTO{identity(c[0]), identity(c[1])},
 	}, nil
 }
 
@@ -243,6 +301,8 @@ func (v *Validator) ParseContext(b []byte, e artifact.ContextExpectation, c arti
 	actual.Retention.AnchorAt = actual.Retention.AnchorAt.UTC()
 	actual.Retention.DeleteBy = actual.Retention.DeleteBy.UTC()
 	actual.ActionLifecycle.TriggeredAt = actual.ActionLifecycle.TriggeredAt.UTC()
+	actual.ActionLifecycle.SourceStartedAt = actual.ActionLifecycle.SourceStartedAt.UTC()
+	actual.ActionLifecycle.SourceStoppedAt = actual.ActionLifecycle.SourceStoppedAt.UTC()
 	if !reflect.DeepEqual(actual, expected) {
 		return result, artifact.ErrIntegrity
 	}
@@ -267,7 +327,7 @@ type podDTO struct {
 }
 
 func (v *Validator) ValidateNative(b []byte, e artifact.ContextExpectation, m ContextManifest) error {
-	if e.Validate() != nil {
+	if e.Validate() != nil || e.NativeType != artifact.PodStatusArtifact {
 		return artifact.ErrInvalid
 	}
 	if err := validate(v.pod, b, artifact.MaxContextBytes); err != nil {

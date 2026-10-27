@@ -21,7 +21,7 @@ type denyLoader struct{}
 
 func (denyLoader) Load(string) (any, error) { return nil, artifact.ErrInvalid }
 
-type Validator struct{ manifest, commit, pod *jsonschema.Schema }
+type Validator struct{ manifest, commit, pod, syscallEvent *jsonschema.Schema }
 
 func New() (*Validator, error) {
 	c := jsonschema.NewCompiler()
@@ -49,7 +49,7 @@ func New() (*Validator, error) {
 	for _, pair := range []struct {
 		id  string
 		out **jsonschema.Schema
-	}{{"manifest.schema.json", &v.manifest}, {"framed-storage.schema.json#/$defs/commit", &v.commit}, {"pod-status.schema.json", &v.pod}} {
+	}{{"manifest.schema.json", &v.manifest}, {"framed-storage.schema.json#/$defs/commit", &v.commit}, {"pod-status.schema.json", &v.pod}, {"syscall-results.schema.json#/$defs/event", &v.syscallEvent}} {
 		*pair.out, err = c.Compile("https://asservat.io/spec/v1/" + pair.id)
 		if err != nil {
 			return nil, artifact.ErrInvalid

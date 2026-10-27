@@ -59,61 +59,74 @@ func (s *Store) readSmall(ctx context.Context, o Object, limit int64) ([]byte, e
 // returned, and no result is published. Bootstrap must gate this role by current
 // execution/audit authority; the hub never receives an unwrap capability.
 func (v *ContextVerifier) VerifyContext(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies) error {
+	if e.NativeType != artifact.PodStatusArtifact {
+		return v.verifyStream(ctx, e, c)
+	}
 	native, err := v.readContext(ctx, e, c, e.Registration.WriteUntil)
 	clear(native)
 	return err
 }
 
+// verifyBound is the verification interval: 30 seconds, plus one second per
+// 8 MiB frame for multi-frame artifacts (62 seconds at 256 MiB). The original
+// write cutoff still applies first.
+func verifyBound(r artifact.Registration) time.Duration {
+	frames := max(int64(1), (r.NativeLimit+artifact.FrameBytes-1)/artifact.FrameBytes)
+	if frames == 1 {
+		return 30 * time.Second
+	}
+	return 30*time.Second + time.Duration(frames)*time.Second
+}
+
+// verifyStream fully verifies a registered recorder artifact (ADR-244): the
+// exact commit and manifest against the independent expectation, then every
+// authenticated frame, the whole-file native/data/index hashes and the type's
+// streaming native check. No plaintext is retained beyond one bounded record.
+func (v *ContextVerifier) verifyStream(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies) error {
+	cutoff := e.Registration.WriteUntil
+	ctx, cancel := context.WithDeadline(ctx, minDeadline(cutoff, time.Now().Add(verifyBound(e.Registration))))
+	defer cancel()
+	reader, m, err := v.open(ctx, e, c, cutoff)
+	if err != nil {
+		return err
+	}
+	check, err := v.contracts.NativeCheck(e, m)
+	if err != nil {
+		return readStage(ctx, "validate", err)
+	}
+	if err = reader.Read(ctx, 0, m.Layout.NativeBytes, checkSink{check}); err != nil {
+		return readStage(ctx, "data-read", err)
+	}
+	if err = check.Close(); err != nil {
+		return readStage(ctx, "validate", err)
+	}
+	if err = ctx.Err(); err != nil {
+		return readStage(ctx, "cancelled", err)
+	}
+	if !time.Now().Before(cutoff) {
+		return readStage(ctx, "cutoff", artifact.ErrInvalid)
+	}
+	return nil
+}
+
+type checkSink struct{ check manifest.NativeCheck }
+
+func (s checkSink) Send(ctx context.Context, p []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return s.check.Write(p)
+}
+
 func (v *ContextVerifier) readContext(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, cutoff time.Time) ([]byte, error) {
-	if e.Validate() != nil || c.Validate(e.Registration) != nil || e.Registration.StoreID != v.store.storeID {
+	if e.NativeType != artifact.PodStatusArtifact {
 		return nil, readStage(ctx, "expectation", artifact.ErrInvalid)
 	}
-	if err := ctx.Err(); err != nil {
-		return nil, readStage(ctx, "cancelled", err)
-	}
-	r := e.Registration
 	ctx, cancel := context.WithDeadline(ctx, minDeadline(cutoff, time.Now().Add(30*time.Second)))
 	defer cancel()
-	if !time.Now().Before(cutoff) {
-		return nil, readStage(ctx, "cutoff", artifact.ErrInvalid)
-	}
-	commit, err := v.store.store.readSmall(ctx, object(r.Location, 3, c[3]), 32<<10)
+	reader, m, err := v.open(ctx, e, c, cutoff)
 	if err != nil {
-		return nil, readStage(ctx, "commit-get", err)
-	}
-	defer clear(commit)
-	key, err := v.contracts.ParseCommit(commit, r.Location, c[2])
-	if err != nil {
-		return nil, readStage(ctx, "commit-parse", err)
-	}
-	cipher, err := v.store.store.readSmall(ctx, object(r.Location, 2, c[2]), artifact.MaxRootBytes+artifact.CipherOverhead)
-	if err != nil {
-		return nil, readStage(ctx, "manifest-get", err)
-	}
-	defer clear(cipher)
-	plain, err := framed.OpenManifest(ctx, e.Binding(), v.keys, key, cipher, c[2].SHA256)
-	if err != nil {
-		return nil, readStage(ctx, "manifest-open", err)
-	}
-	defer clear(plain)
-	m, err := v.contracts.ParseContext(plain, e, c)
-	if err != nil {
-		return nil, readStage(ctx, "manifest-parse", err)
-	}
-	if m.CompletedAt.After(time.Now()) {
-		return nil, readStage(ctx, "manifest-time", artifact.ErrIntegrity)
-	}
-	data, err := v.store.store.Pin(object(r.Location, 0, c[0]))
-	if err != nil {
-		return nil, readStage(ctx, "data-pin", err)
-	}
-	index, err := v.store.store.Pin(object(r.Location, 1, c[1]))
-	if err != nil {
-		return nil, readStage(ctx, "index-pin", err)
-	}
-	reader, err := framed.Open(ctx, m.Layout, v.keys, data, index)
-	if err != nil {
-		return nil, readStage(ctx, "data-open", err)
+		return nil, err
 	}
 	var native contextBuffer
 	defer func() { clear(native.Bytes()) }()
@@ -130,6 +143,62 @@ func (v *ContextVerifier) readContext(ctx context.Context, e artifact.ContextExp
 		return nil, readStage(ctx, "cutoff", artifact.ErrInvalid)
 	}
 	return bytes.Clone(native.Bytes()), nil
+}
+
+// open reads and authenticates the exact commit and manifest, matches every
+// control field to the independent expectation and opens the framed reader
+// (one data and one index key). The caller bounds ctx; no bytes are read yet.
+func (v *ContextVerifier) open(ctx context.Context, e artifact.ContextExpectation, c artifact.Copies, cutoff time.Time) (*framed.Reader, manifest.ContextManifest, error) {
+	var m manifest.ContextManifest
+	if e.Validate() != nil || c.Validate(e.Registration) != nil || e.Registration.StoreID != v.store.storeID {
+		return nil, m, readStage(ctx, "expectation", artifact.ErrInvalid)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, m, readStage(ctx, "cancelled", err)
+	}
+	r := e.Registration
+	if !time.Now().Before(cutoff) {
+		return nil, m, readStage(ctx, "cutoff", artifact.ErrInvalid)
+	}
+	commit, err := v.store.store.readSmall(ctx, object(r.Location, 3, c[3]), 32<<10)
+	if err != nil {
+		return nil, m, readStage(ctx, "commit-get", err)
+	}
+	defer clear(commit)
+	key, err := v.contracts.ParseCommit(commit, r.Location, c[2])
+	if err != nil {
+		return nil, m, readStage(ctx, "commit-parse", err)
+	}
+	cipher, err := v.store.store.readSmall(ctx, object(r.Location, 2, c[2]), artifact.MaxRootBytes+artifact.CipherOverhead)
+	if err != nil {
+		return nil, m, readStage(ctx, "manifest-get", err)
+	}
+	defer clear(cipher)
+	plain, err := framed.OpenManifest(ctx, e.Binding(), v.keys, key, cipher, c[2].SHA256)
+	if err != nil {
+		return nil, m, readStage(ctx, "manifest-open", err)
+	}
+	defer clear(plain)
+	m, err = v.contracts.ParseContext(plain, e, c)
+	if err != nil {
+		return nil, m, readStage(ctx, "manifest-parse", err)
+	}
+	if m.CompletedAt.After(time.Now()) {
+		return nil, m, readStage(ctx, "manifest-time", artifact.ErrIntegrity)
+	}
+	data, err := v.store.store.Pin(object(r.Location, 0, c[0]))
+	if err != nil {
+		return nil, m, readStage(ctx, "data-pin", err)
+	}
+	index, err := v.store.store.Pin(object(r.Location, 1, c[1]))
+	if err != nil {
+		return nil, m, readStage(ctx, "index-pin", err)
+	}
+	reader, err := framed.Open(ctx, m.Layout, v.keys, data, index)
+	if err != nil {
+		return nil, m, readStage(ctx, "data-open", err)
+	}
+	return reader, m, nil
 }
 
 type contextBuffer struct{ bytes.Buffer }
