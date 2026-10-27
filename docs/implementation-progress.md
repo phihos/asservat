@@ -65,8 +65,27 @@ original authority context when no earlier wait cutoff exists fixes that race.
 Capture vet, spec-check (13,269 assertions), architecture-check (1,326 positive
 checks) and Go architecture (66 packages, 386 edges) pass. The first contract
 invocation referenced a missing local virtualenv; the preserved second run uses
-the existing spec virtualenv and exits 0. Installed requalification and composed
-HTTP/2 regression results remain separate pending gates.
+the existing spec virtualenv and exits 0.
+
+The composed regression uses real loopback HTTP/2, MCP, audited presentation,
+current request identity, the evaluator and C09; facts, storage and audit are
+synthetic. On the old source, thin storage caused HTTP/2 `INTERNAL_ERROR` after
+5.002s (21 reads, one demand and one audit Begin/Finish). With the reserve it
+returns typed retryable `NotAvailable` after 4.110s (18 reads, one demand, no
+preview store or admission, one Begin/Finish). A fresh binding still succeeds
+with a 750ms parent in 118ms, using one authoritative read and no demand.
+The focused race regression exits 0 in 6.858s; the full MCP race suite exits 0
+in 49.857s. Application tests separately verify joined hint ownership. These
+are shared storage-path component results, not an installed packet journey.
+Installed requalification remains pending.
+
+The composed root candidate passes `make pre-push` (including 218 console
+checks), and final spec/architecture gates exit 0. Presentation race tests pass
+in 74.657s. That combined command exits 1 because the second package path was
+mistyped as `internal/application/contextstart`; its setup failure is retained
+in `storage-reserve-composed-race.log`. The corrected
+`internal/transport/contextstart` race command exits 0; no presentation rerun
+was needed. Both independent source/test reviews found no concrete blocker.
 
 ## API target metadata and completed query bounds (ADR-260, 2026-10-27)
 
