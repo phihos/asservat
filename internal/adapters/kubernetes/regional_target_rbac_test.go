@@ -9,7 +9,7 @@ import (
 // (ADR-179): namespace, workload, the Pod list by selector and the
 // Pod → ReplicaSet → Deployment chain. Native 59 answered denied without the
 // ReplicaSet read outside the connector namespace. ADR-230 adds the Event
-// LIST of a probe policy's poll.
+// LIST of a probe policy's poll; ADR-241 the log GET and metrics LIST.
 func TestRegionalExecutorCanReadTargetChain(t *testing.T) {
 	cluster, _, _ := regionalExecutorRBAC("region")
 	can := func(group, resource, verb string) bool {
@@ -20,14 +20,14 @@ func TestRegionalExecutorCanReadTargetChain(t *testing.T) {
 		}
 		return false
 	}
-	for _, need := range [][3]string{{"", "namespaces", "get"}, {"", "pods", "get"}, {"", "pods", "list"}, {"apps", "deployments", "get"}, {"apps", "statefulsets", "get"}, {"apps", "replicasets", "get"}, {"", "events", "list"}} {
+	for _, need := range [][3]string{{"", "namespaces", "get"}, {"", "pods", "get"}, {"", "pods", "list"}, {"apps", "deployments", "get"}, {"apps", "statefulsets", "get"}, {"apps", "replicasets", "get"}, {"", "events", "list"}, {"", "pods/log", "get"}, {"metrics.k8s.io", "pods", "list"}} {
 		if !can(need[0], need[1], need[2]) {
 			t.Errorf("connector cannot %s %s/%s cluster-wide", need[2], need[0], need[1])
 		}
 	}
 	for _, r := range cluster {
 		for _, v := range r.Verbs {
-			if (slices.Contains(r.Resources, "replicasets") || slices.Contains(r.Resources, "pods") || slices.Contains(r.Resources, "events")) && v != "get" && v != "list" {
+			if (slices.Contains(r.Resources, "replicasets") || slices.Contains(r.Resources, "pods") || slices.Contains(r.Resources, "events") || slices.Contains(r.Resources, "pods/log")) && v != "get" && v != "list" {
 				t.Fatalf("target reads must stay read-only: %v", r)
 			}
 		}

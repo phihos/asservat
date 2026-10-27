@@ -51,6 +51,11 @@ type RestartPolicy struct {
 	// AlertLabels are an alert detector's (ADR-231) label matchers besides
 	// namespace and pod; empty for every other detector.
 	AlertLabels map[string]string `json:",omitempty"`
+	// Log and Resource are a log or resource detector's (ADR-241) record
+	// predicate or condition; nil for every other detector, so other
+	// policies' scope digests are unchanged.
+	Log      *targets.LogMatch          `json:",omitempty"`
+	Resource *targets.ResourceCondition `json:",omitempty"`
 	// Sharing is the optional spec.sharing block (ADR-239). It is nil for a
 	// policy without one, so such a policy's scope digest is unchanged.
 	Sharing *PolicySharing `json:",omitempty"`
@@ -62,6 +67,9 @@ const (
 	DetectorExit  = "exit"
 	DetectorProbe = "probe"
 	DetectorAlert = "alert"
+	// DetectorLog and DetectorResource are ADR-241's (migration 00094).
+	DetectorLog      = "log"
+	DetectorResource = "resource"
 )
 
 // AlertReceiver is the only alert receiverRef of this release (ADR-231): the
@@ -92,6 +100,16 @@ func (p RestartPolicy) Request() targets.RestartRequest {
 				r.AlertLabels[k] = v
 			}
 		}
+	case DetectorLog:
+		if p.Log != nil {
+			m := *p.Log
+			r.Log = &m
+		}
+	case DetectorResource:
+		if p.Resource != nil {
+			c := *p.Resource
+			r.Resource = &c
+		}
 	}
 	return r
 }
@@ -100,10 +118,12 @@ func (p RestartPolicy) Valid() bool {
 	if !authorization.UUID(p.ClusterID) || !identity.Text(p.Namespace, 63) || (p.WorkloadKind != "Deployment" && p.WorkloadKind != "StatefulSet") || !identity.Text(p.WorkloadName, 253) || p.Interval < time.Second || p.Interval > 24*time.Hour || p.Burst < 1 || p.Burst > 10 || p.RetentionSeconds < 1 || p.RetentionSeconds > privacy.MaxAgeSeconds || p.ObservedPods < 1 || p.ObservedPods > targets.MaxRestartPods {
 		return false
 	}
-	if p.Detector != DetectorAlert && len(p.AlertLabels) != 0 || p.Sharing != nil && !p.Sharing.Valid() {
+	if p.Detector != DetectorAlert && len(p.AlertLabels) != 0 || p.Sharing != nil && !p.Sharing.Valid() || (p.Detector == DetectorLog) != (p.Log != nil) || (p.Detector == DetectorResource) != (p.Resource != nil) {
 		return false
 	}
 	switch p.Detector {
+	case DetectorLog, DetectorResource:
+		return len(p.Reasons) == 0 && len(p.ExitCodes) == 0 && p.ProbeType == "" && p.MinimumFailures == 0 && p.ProbeWindow == 0 && p.Request().Valid()
 	case DetectorAlert:
 		return len(p.Reasons) == 0 && len(p.ExitCodes) == 0 && p.ProbeType == "" && p.MinimumFailures == 0 && p.ProbeWindow == 0 && p.Request().Valid()
 	case DetectorProbe:
@@ -190,7 +210,7 @@ type PodMark struct {
 // previous holds only watermarks of this detector kind; a watermark of
 // another kind is unknown, so the Pod is a new baseline.
 func TriggerDelta(p RestartPolicy, previous map[string]PodMark, o targets.RestartObservation) (next map[string]PodMark, fired []RestartCandidate) {
-	if p.Detector != DetectorProbe && p.Detector != DetectorAlert {
+	if p.Kind() == DetectorExit {
 		counts := make(map[string]int64, len(previous))
 		for pod, m := range previous {
 			counts[pod] = m.Value
@@ -216,11 +236,23 @@ func TriggerDelta(p RestartPolicy, previous map[string]PodMark, o targets.Restar
 // The alert detector (ADR-231) uses the same level: a Pod is failing while
 // at least one matching alert is active, keyed by the newest alert's
 // startsAt second, and re-arms at the first poll with no matching alert.
+//
+// The log detector (ADR-241) is a level over the matching records within
+// its eventWindow, keyed by the newest match second; the resource detector
+// a level over its condition, keyed by the metrics sample second. A Pod
+// reported Unknown keeps its previous watermark: it neither fires, re-arms
+// nor becomes a baseline.
 func ProbeDelta(p RestartPolicy, previous map[string]PodMark, o targets.RestartObservation) (next map[string]PodMark, fired []RestartCandidate) {
 	threshold := int64(max(p.MinimumFailures, 1))
 	next = make(map[string]PodMark, len(o.Pods))
 	for _, pod := range o.Pods {
 		before, known := previous[pod.UID]
+		if pod.Unknown {
+			if known {
+				next[pod.UID] = before
+			}
+			continue
+		}
 		if !known {
 			next[pod.UID] = PodMark{Value: pod.ProbeLast, Armed: pod.ProbeFailures == 0}
 			continue
@@ -292,16 +324,37 @@ type PolicyDetector struct {
 	ProbeType       string
 	MinimumFailures int
 	WindowSeconds   int64
+	// LogMatch is a log detector's match mode (literal or regexp) and LogJSON
+	// whether it matches a JSON field; the pattern itself is not repeated
+	// (ADR-241).
+	LogMatch string
+	LogJSON  bool
+	// Resource is a resource detector's condition (ADR-241).
+	Resource *targets.ResourceCondition
 }
 
 // Describe returns the policy's detector configuration.
 func (p RestartPolicy) Describe() PolicyDetector {
-	return PolicyDetector{Kind: p.Kind(), Reasons: slices.Clone(p.Reasons), ExitCodes: slices.Clone(p.ExitCodes), ProbeType: p.ProbeType, MinimumFailures: p.MinimumFailures, WindowSeconds: int64(p.ProbeWindow / time.Second)}
+	d := PolicyDetector{Kind: p.Kind(), Reasons: slices.Clone(p.Reasons), ExitCodes: slices.Clone(p.ExitCodes), ProbeType: p.ProbeType, MinimumFailures: p.MinimumFailures, WindowSeconds: int64(p.ProbeWindow / time.Second)}
+	if p.Log != nil {
+		d.LogMatch, d.LogJSON, d.WindowSeconds = "literal", p.Log.JSONField != "", p.Log.WindowSeconds
+		if p.Log.Regexp {
+			d.LogMatch = "regexp"
+		}
+	}
+	if p.Resource != nil {
+		c := *p.Resource
+		d.Resource = &c
+	}
+	return d
 }
 
 // PolicyOccurrenceStatus is one recent occurrence. Restarts is the restart
-// count of an exit occurrence, the failure second of a probe occurrence or
-// the alert startsAt second of an alert occurrence (ADR-231).
+// count of an exit occurrence, the failure second of a probe occurrence,
+// the alert startsAt second of an alert occurrence (ADR-231), the newest
+// matching record second of a log occurrence or the metrics sample second
+// of a resource occurrence (ADR-241).
+
 type PolicyOccurrenceStatus struct {
 	ID, CaptureID, Outcome, Detector string
 	Restarts                         int64

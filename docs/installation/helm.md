@@ -266,6 +266,17 @@ with the Pod's `namespace` and `pod`. The address is a fixed regional input:
 choose it at installation. Without it, activating an alert policy on that
 cluster is refused with `DetectorUnavailable`.
 
+Log and resource DebugPolicies ([ADR-241](../decisions/241-log-resource-detectors.md))
+need no installer option. The connector's ClusterRole includes `get` on
+`pods/log` and `list` on `pods.metrics.k8s.io` (the cluster-installer role holds
+both so that it may grant them). A log policy reads the container logs of its
+own workload's Pods only while it is active, and only match counts and times
+leave the cluster. A resource policy needs the Kubernetes metrics API, normally
+served by [metrics-server](https://github.com/kubernetes-sigs/metrics-server):
+without it, activation is refused with `DetectorUnavailable`. A connector
+installed by an earlier release lacks these permissions until it is installed
+again, and its log and resource polls stay Unknown.
+
 The regional cluster needs outbound HTTPS to the federation endpoint in the
 offer. The hub operator can pin the federation's node port with
 `federation.nodePort` so the endpoint is known before installation. If the

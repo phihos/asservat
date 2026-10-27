@@ -301,6 +301,7 @@ requirements:
   spec: specs/triggers.md
   scenarios:
   - SC-TRG-003
+  - SC-TRG-012
   tasks:
   - TASK-04
 - requirement: REQ-TRG-004
@@ -323,6 +324,7 @@ requirements:
   - SC-TRG-006
   - SC-TRG-010
   - SC-TRG-011
+  - SC-TRG-013
   tasks:
   - TASK-04
 - requirement: REQ-PRF-001

@@ -10,7 +10,13 @@ const states: Record<string, string> = {
 const reasons: Record<string, string> = {
   cooldown: 'cooldown or workload budget', budget: 'execution limit reached', coalesced: 'restarts between two polls',
   capacity: 'collection capacity', authority: 'access no longer sufficient', unavailable: 'target or service unavailable',
+  overlong: 'log records longer than the record limit, not evaluated',
 };
+
+const metrics: Record<string, string> = {
+  cpuCores: 'CPU usage (cores)', cpuQuotaRatio: 'CPU usage / CPU limit', memoryBytes: 'memory working set (bytes)', memoryLimitRatio: 'memory working set / memory limit',
+};
+const operators: Record<string, string> = { gt: '>', gte: '≥', lt: '<', lte: '≤' };
 
 type Status = NonNullable<Entry['status']>;
 
@@ -27,9 +33,16 @@ function sharing(s: NonNullable<Status['sharing']>): string {
   return `Repeated collections will be shared with ${n} until ${new Date(s.not_after).toLocaleString()}: ${s.shared_captures} of ${s.max_captures} captures shared (${sharingStates[s.state] ?? s.state})`;
 }
 
-// The current DebugPolicy's detector (ADR-228/230/231), configuration only.
+// The current DebugPolicy's detector (ADR-228/230/231/241), configuration only.
 function detector(d: NonNullable<Status['detector']>): string {
   if (d.kind === 'alert') return 'Firing Alertmanager alerts naming a pod of the workload';
+  if (d.kind === 'log') {
+    const field = d.json_field ? ' in a JSON field' : '';
+    return `Container log records matching a ${d.match === 'regexp' ? 'regular expression' : 'text'}${field} within ${d.window_seconds ?? 0} s (Kubernetes log API)`;
+  }
+  if (d.kind === 'resource') {
+    return `${metrics[d.metric ?? ''] ?? d.metric ?? ''} ${operators[d.operator ?? ''] ?? d.operator ?? ''} ${d.threshold ?? ''}, samples at most ${d.sample_interval_seconds ?? 0} s old (Kubernetes metrics API)`;
+  }
   if (d.kind === 'probe') {
     const n = d.minimum_failures ?? 1;
     return `${d.probe_type ?? ''} probe failures: ${n} ${n === 1 ? 'failure' : 'failures'} within ${d.window_seconds ?? 0} s (Kubernetes Events)`;
@@ -40,6 +53,8 @@ function detector(d: NonNullable<Status['detector']>): string {
 
 function occurrence(o: Status['recent'][number]): string {
   if (o.detector === 'alert' && o.failed_at) return `alert started at ${new Date(o.failed_at).toLocaleString()}`;
+  if (o.detector === 'log' && o.failed_at) return `matching log record at ${new Date(o.failed_at).toLocaleString()}`;
+  if (o.detector === 'resource' && o.failed_at) return `resource condition met at ${new Date(o.failed_at).toLocaleString()}`;
   return o.detector === 'probe' && o.failed_at ? `probe failure at ${new Date(o.failed_at).toLocaleString()}` : `restart ${o.restarts ?? ''}`;
 }
 
@@ -78,7 +93,7 @@ function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies
   </article>;
 }
 
-// Hub-held restart-, probe- and alert-trigger DebugPolicies (ADR-228/229/230/231). Activation, status and
+// Hub-held restart-, probe-, alert-, log- and resource-trigger DebugPolicies (ADR-228/229/230/231/241). Activation, status and
 // deactivation are the shared browser/MCP operations; nothing is decided here.
 export function PolicyWorkspace({ session, scope, controller }: { session: Session; scope: AbortSignal; controller: Policies }) {
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
@@ -88,7 +103,8 @@ export function PolicyWorkspace({ session, scope, controller }: { session: Sessi
   useEffect(() => { heading.current?.focus(); }, []);
   return <div className="capture-workspace">
     <div className="page-intro"><h1 ref={heading} tabIndex={-1}>Automatic policies</h1>
-      <p>Activate a hub-held restart, probe-failure or alert policy for your team, check what it captured and stop it. A permission administrator can also stop a policy by suspending it in Kubernetes. <a href="/captures/new">Collect evidence manually</a>.</p>
+      <p>Activate a hub-held restart, probe-failure, alert, log or resource policy for your team, check what it captured and stop it.
+ A permission administrator can also stop a policy by suspending it in Kubernetes. <a href="/captures/new">Collect evidence manually</a>.</p>
     </div>
     <form onSubmit={event => { event.preventDefault(); void controller.lookup(name); }}>
       <label>Policy name<input name="policy" value={name} required maxLength={253} pattern="[a-z0-9]([\-a-z0-9.]*[a-z0-9])?" onChange={event => setName(event.target.value)} autoComplete="off" spellCheck={false}/></label>

@@ -90,12 +90,15 @@ func TestRestartPolicyRejectsUnsupportedFieldsWithPath(t *testing.T) {
 		path   string
 		change func(map[string]any)
 	}{
-		{"spec.detectors[0].kind", func(s map[string]any) {
+		// ADR-241: log and resource detectors compile; their unsupported
+		// options are rejected with their own paths.
+		{"spec.detectors[0].options.stream", func(s map[string]any) {
 			s["detectors"] = []any{map[string]any{"id": "crash", "kind": "log", "options": map[string]any{"stream": "stderr", "pattern": "panic", "match": "literal"}}}
 		}},
-		{"spec.detectors[0].kind", func(s map[string]any) {
+		{"spec.detectors[0].options.sampleInterval", func(s map[string]any) {
 			s["detectors"] = []any{map[string]any{"id": "crash", "kind": "resource", "options": map[string]any{"metric": "memoryLimitRatio", "operator": "gte", "threshold": 0.9, "sampleInterval": "5s"}}}
 		}},
+
 		{"spec.detectors[0].kind", func(s map[string]any) {
 			s["detectors"] = []any{map[string]any{"id": "crash", "kind": "schedule", "options": map[string]any{"cron": "* * * * *", "timeZone": "Etc/UTC", "jitter": "0s"}}}
 		}},

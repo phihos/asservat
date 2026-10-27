@@ -518,9 +518,10 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 			defer end()
 			installedPodDiagnostics(t, c, api, contracts.DownloadWorkerNamespaceName(installation), "download-worker", "")
 		}
-		if focus := installedJourneyFocus(); focus == "policy" || focus == "alert" {
+		if focus := installedJourneyFocus(); focus == "policy" || focus == "alert" || focus == "logresource" {
 			// ADR-228: the restart-trigger policy journey (ADR-231: its alert
-			// phase in the alert focus) replaces the manual journey.
+			// phase in the alert focus, ADR-241: its log and resource phases in
+			// the logresource focus) replaces the manual journey.
 			installedPolicyJourney(t, ctx, admin, p.RootID, identity, publicRoot, publicAddress, origin, diagnose)
 			return
 		}
@@ -566,7 +567,7 @@ func qualifyInstallerContinuationNative(t *testing.T, ctx context.Context, kc *r
 	}
 	hubKubeconfig := installedUnifiedRunnerKubeconfig(t, f.Clusters[0].Config, desired)
 	qualifyRegionalInstall(t, ctx, f, 1, admin, runnerAPI, api, hubKubeconfig, desired.TargetNamespace, issuer, journey, providers, offerMap.Data[contracts.RegionalOfferFile], installation)
-	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "chain" || focus == "share" {
+	if focus := installedJourneyFocus(); focus == "restart" || focus == "journey" || focus == "browser" || focus == "upgrade" || focus == "policy" || focus == "alert" || focus == "logresource" || focus == "chain" || focus == "share" {
 		t.Log("focused " + focus + " run complete: the second workload cluster and replay checks were not run")
 		return
 	}

@@ -1026,6 +1026,8 @@ func installedJourneyHold(t *testing.T, ctx context.Context, dir string, wire *c
 // journey, the PostgreSQL restart and another short journey. "clusters":
 // install and short journeys in both workload clusters, then the replay.
 // "alert": install with an in-cluster Alertmanager and the alert policy phase.
+// "logresource": install with metrics-server and the ADR-241 log and resource
+// policy phases.
 // "share": install, a short journey and the ADR-232 share/read/revoke checks.
 // Empty runs everything in one (longer) run.
 func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS") }
@@ -1041,7 +1043,7 @@ func installedJourneyFocus() string { return os.Getenv("ASSERVAT_JOURNEY_FOCUS")
 // 20-minute limit; docs/implementation-progress.md records the split.
 func installedFastFixture() bool {
 	switch installedJourneyFocus() {
-	case "policy", "alert", "browser", "restart", "upgrade", "journey", "clusters", "share":
+	case "policy", "alert", "logresource", "browser", "restart", "upgrade", "journey", "clusters", "share":
 		return true
 	}
 	return false

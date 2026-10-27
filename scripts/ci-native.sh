@@ -45,6 +45,9 @@ declare -A suites=(
   # ADR-231: the alert-trigger policy against a real in-cluster Alertmanager
   # (occurrence, capture, dedup while firing, re-arm after resolution).
   [continuation-alert]="env ASSERVAT_JOURNEY_FOCUS=alert $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
+  # ADR-241: log (pods/log) and resource (metrics-server metrics API)
+  # policies against the synthetic signal workload (one capture each).
+  [continuation-logresource]="env ASSERVAT_JOURNEY_FOCUS=logresource $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"
   # ADR-232: a short journey, then share the artifact with the unrelated
   # principal over MCP (get_case works, download refused, revoke refuses).
   [continuation-share]="env ASSERVAT_JOURNEY_FOCUS=share $context --initial-bootstrap-chain --runtime-provider-pair --installer-continuation"

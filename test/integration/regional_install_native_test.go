@@ -118,6 +118,11 @@ func qualifyRegionalInstall(t *testing.T, ctx context.Context, f fixture, index 
 		// ADR-231: the operator's in-cluster Alertmanager, named at install.
 		args = append(args, "--alertmanager", installAlertmanager(t, ctx, region, f.AlertmanagerImage))
 	}
+	if executor && installedJourneyFocus() == "logresource" && index == 1 {
+		// ADR-241: the workload cluster's metrics API, started early for its
+		// warm-up (no installer input names it).
+		installMetricsServer(t, ctx, region, f.MetricsServerImage)
+	}
 	var first bytes.Buffer
 	if err := bootstrap.RunInstallerCluster(ctx, args, &first); err != nil {
 		t.Fatal("installer-cluster", err)
@@ -933,12 +938,18 @@ func createRegionalWorkload(t *testing.T, ctx context.Context, region kubernetes
 		t.Fatal("regional workload namespace", err)
 	}
 	labels := map[string]string{"app": "regional-app"}
+	command := []string{"/provider-proxy", "http://127.0.0.1:1", "http://127.0.0.1:1", "127.0.0.1:1"}
+	if installedJourneyFocus() == "logresource" {
+		// ADR-241: the fixture's synthetic signal workload, which writes a
+		// requested line or keeps its CPU busy on demand.
+		command = []string{"/provider-proxy", "signals"}
+	}
 	// One running replica the installed journey captures from: the product
 	// image's idle proxy under a restricted security context.
 	app, err := region.AppsV1().Deployments(ns.Name).Create(ctx, &apps.Deployment{ObjectMeta: meta.ObjectMeta{Name: "regional-app"}, Spec: apps.DeploymentSpec{Replicas: ptr.To(int32(1)), Selector: &meta.LabelSelector{MatchLabels: labels},
 		Template: core.PodTemplateSpec{ObjectMeta: meta.ObjectMeta{Labels: labels}, Spec: core.PodSpec{AutomountServiceAccountToken: ptr.To(false), TerminationGracePeriodSeconds: ptr.To(int64(3)),
 			SecurityContext: &core.PodSecurityContext{RunAsNonRoot: ptr.To(true), RunAsUser: ptr.To(int64(65532)), SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}},
-			Containers: []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: []string{"/provider-proxy", "http://127.0.0.1:1", "http://127.0.0.1:1", "127.0.0.1:1"},
+			Containers: []core.Container{{Name: "app", Image: image, ImagePullPolicy: core.PullIfNotPresent, Command: command,
 				Resources:       core.ResourceRequirements{Requests: core.ResourceList{core.ResourceCPU: resource.MustParse("5m"), core.ResourceMemory: resource.MustParse("16Mi")}, Limits: core.ResourceList{core.ResourceCPU: resource.MustParse("100m"), core.ResourceMemory: resource.MustParse("64Mi")}},
 				SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: ptr.To(false), ReadOnlyRootFilesystem: ptr.To(true), Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}}}}}}}}, meta.CreateOptions{})
 	if err != nil {

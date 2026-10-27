@@ -43,7 +43,10 @@ type fixture struct {
 	// AlertmanagerImage is the alert focus's digest-pinned official
 	// Alertmanager image, pulled by the workload cluster node (ADR-231).
 	AlertmanagerImage string
-	NativeProviders   struct {
+	// MetricsServerImage is the log/resource focus's digest-pinned official
+	// metrics-server image, pulled by the workload cluster node (ADR-241).
+	MetricsServerImage string
+	NativeProviders    struct {
 		S3, KMS, Postgres string
 		Root              []byte
 	}

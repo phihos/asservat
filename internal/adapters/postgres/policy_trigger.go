@@ -45,7 +45,7 @@ func NewPolicyTriggers(ctx context.Context, pool *pgxpool.Pool, root, installati
 // ceiling all hold before an occurrence exists.
 func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value.PolicyOccurrence, error) {
 	a, o := in.Authority, in.Observation
-	if s == nil || !in.Policy.Valid() || a.InstallationID != s.installation || o.ClusterID != a.ClusterID || o.Namespace.UID != a.NamespaceUID || o.Workload.UID != a.WorkloadUID || in.Policy.ClusterID != a.ClusterID || len(o.Pods) > in.Policy.ObservedPods || o.Probe != in.Policy.Request().Probe || o.Alert != in.Policy.Request().Alert {
+	if s == nil || !in.Policy.Valid() || a.InstallationID != s.installation || o.ClusterID != a.ClusterID || o.Namespace.UID != a.NamespaceUID || o.Workload.UID != a.WorkloadUID || in.Policy.ClusterID != a.ClusterID || len(o.Pods) > in.Policy.ObservedPods || !o.Answers(in.Policy.Request()) {
 		return nil, value.ErrInvalid
 	}
 	detector := in.Policy.Kind()
@@ -107,6 +107,13 @@ func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value
 			}
 		}
 		suppress := map[string]int64{}
+		// ADR-241: a log Pod whose window held a record longer than
+		// maxRecordBytes that was dropped, counted once per Pod and poll.
+		for _, p := range o.Pods {
+			if p.Overlong {
+				suppress["overlong"]++
+			}
+		}
 		for _, c := range fired {
 			if c.Missed > 0 {
 				suppress["coalesced"] += c.Missed
@@ -161,7 +168,8 @@ func (s *PolicyTriggers) Tick(ctx context.Context, in value.PolicyTick) ([]value
 			}
 			out = append(out, occurrence)
 		}
-		for _, reason := range []string{"budget", "coalesced", "cooldown"} {
+		for _, reason := range []string{"budget", "coalesced", "cooldown", "overlong"} {
+
 			if suppress[reason] > 0 {
 				if err = s.suppress(ctx, q, a.PolicyUID, reason, n, suppress[reason]); err != nil {
 					return err

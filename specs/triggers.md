@@ -4,9 +4,9 @@
 
 | Detector | Initial source | Semantics and limits |
 | --- | --- | --- |
-| Log pattern | Node CRI log tail; Kubernetes `pods/log` degraded fallback | Literal/RE2-compatible regexp or structured JSON field predicate, stream filters and pod-scoped attribution, count within window, bounded multiline assembly |
-| CPU | cgroup v2 `cpu.stat` deltas | Cores consumed, fraction of CPU quota where finite, fraction of throttled scheduling periods; requests are not capacity |
-| Memory | cgroup `memory.current`, `memory.max`, `memory.events` | Absolute bytes, fraction of finite limit, growth rate, OOM/high counters; no ratio when limit is unlimited |
+| Log pattern | Node CRI log tail; Kubernetes `pods/log` degraded fallback, implemented as a bounded `pods/log` poll (ADR-241) | Literal/RE2-compatible regexp or structured JSON field predicate, stream filters and pod-scoped attribution, count within window, bounded multiline assembly |
+| CPU | cgroup v2 `cpu.stat` deltas; cores and quota fraction implemented from the `metrics.k8s.io` API (ADR-241) | Cores consumed, fraction of CPU quota where finite, fraction of throttled scheduling periods; requests are not capacity |
+| Memory | cgroup `memory.current`, `memory.max`, `memory.events`; working-set bytes and limit fraction implemented from the `metrics.k8s.io` API (ADR-241) | Absolute bytes, fraction of finite limit, growth rate, OOM/high counters; no ratio when limit is unlimited |
 | Pressure | cgroup CPU/memory/I/O PSI | Sustained stall fraction over configured windows, only where available |
 | Probe failure | Kubelet probe metrics where allowed; Kubernetes Events/status fallback | Liveness/readiness/startup distinguished; Event aggregation/loss explicitly reported |
 | Exit/restart | Pod status and local runtime/kernel observation | Signal, exit code, OOMKilled, restart delta, CrashLoopBackOff; no inference that an exit code proves a core |
@@ -164,10 +164,10 @@ REQ-TRG-002/006/007 for this source:
 - Changing a policy's detector (exit ↔ probe) re-baselines every Pod: a watermark of another
   detector is never compared.
 
-Log and resource detectors remain rejected at activation (`spec.detectors[0].kind`): the
-[ADR-230](../docs/decisions/230-s03-detectors.md) complexity gate paused both. Log and resource
-conditions trigger captures through the `alert` detector below, from the operator's existing
-Prometheus and log-stack alert rules.
+Log and resource detectors, paused by the [ADR-230](../docs/decisions/230-s03-detectors.md)
+complexity gate, are implemented by [ADR-241](../docs/decisions/241-log-resource-detectors.md)
+below after the maintainer's 2026-10-26 decision. The `alert` detector remains the route for
+conditions that the operator's Prometheus and log-stack rules already express.
 
 ### SC-TRG-010
 
@@ -228,13 +228,98 @@ namespace, on another Pod or without a pod label create no occurrence; no alert 
 appears in status, occurrences, logs or the capture request; and while Alertmanager is unreachable
 no occurrence is created and the Pod does not re-arm.
 
+## Log-pattern triggers (ADR-241)
+
+The `log` detector uses the Kubernetes log API (the catalogue's degraded fallback; no node agent
+runs), on the same hub-held policy shape, recipe, budgets, suppression reasons and capture path.
+A log policy's 15-second poll adds, for each container of each observed Pod that can have written
+into the window (running, or terminated after it started; never-started containers are skipped),
+one `GET pods/<pod>/log?container=<c>&sinceSeconds=<eventWindow>&timestamps=true&limitBytes=<n>`
+made by the regional connector (`get` on `pods/log`). These semantics refine
+REQ-TRG-001/002/003/004/007 for this source:
+
+- Options: `stream: both` only (`stdout`/`stderr` are rejected: the log API's stream filter is a
+  feature-gated parameter that is silently ignored where the gate is off); `match` literal
+  (substring) or regexp (Go's RE2 engine, Perl syntax, no backreferences or look-around, at most
+  4096 compiled instructions); `pattern` 1–1024 bytes; optional `jsonField`, a dotted path of at
+  most 8 object keys whose value (a string's text, a number's or boolean's literal) is matched
+  instead of the record; `maxRecordBytes` 1–65536 (default 65536); `overlong` drop (default) or
+  matchPrefix, which is rejected with `jsonField` (incomplete JSON is never evaluated);
+  `eventWindow` 30 s–5 min (default 30 s). `evaluation.rearmFor` must not exceed `eventWindow`.
+- Bounds: at most 32 containers per poll (more is Unknown); `limitBytes` is 1 MiB divided by the
+  Pod's read containers and at most 4 MiB divided by all read containers; eight reads run at once.
+- Level: a Pod is failing while at least one record within (now − eventWindow, now] matches.
+  One occurrence fires on a rising edge, keyed (policy, Pod UID, newest matching record second);
+  re-reading the window on the next poll is deduplicated by that key and the level. The first
+  observation of a Pod is its baseline, armed only without a match; after an occurrence the Pod
+  re-arms at the first poll whose window holds no match, which proves `eventWindow` seconds
+  without one. A record time later than the region's clock counts as now.
+- Unknown (per Pod; neither fires, re-arms nor sets a baseline): a read that failed, was cut at
+  `limitBytes` (the newest records are the ones missing) or had a malformed timestamp, unless
+  another container of the Pod matched. A denied read or more than 32 containers make the whole
+  poll Unknown.
+- Overlong records are dropped (or their prefix matched with matchPrefix) and counted: each Pod
+  observation whose window held one adds one to the content-free suppression reason `overlong`
+  (a count of polls, since the window is re-read every poll).
+- Reduced coverage of this fallback (REQ-TRG-003): only the current instance of each container is
+  read, so lines of an instance that restarted inside the window are missed (the exit detector
+  observes the restart); rotated segments are not read; multi-line records beyond kubelet's CRI
+  partial-line joining are not assembled; the API load is stated in ADR-241.
+- Only the per-Pod number of matching records, the newest match second and the overlong flag leave
+  the region. Record text never appears in status, occurrences, logs or the capture request.
+
+### SC-TRG-012
+
+Given an activated log policy (regexp `SYNTHETIC-PANIC [0-9]+`, eventWindow 30 s) on a workload
+whose replicas log only non-matching lines, when one Pod writes a matching line, then exactly one
+pod-status capture of that Pod runs under the policy executor; polls while the line stays in the
+window create no occurrence; no log text appears in status, occurrences or the capture request;
+the Pod re-arms after the window passes without a match; and a Pod whose log read fails or is
+truncated without a match neither fires nor re-arms.
+
+## Resource triggers (ADR-241)
+
+The `resource` detector reads the Kubernetes resource metrics API (`metrics.k8s.io`, served by
+metrics-server), on the same policy shape and capture path. A resource policy's poll adds one
+`GET /apis/metrics.k8s.io/v1beta1/namespaces/<ns>/pods?labelSelector=<workload selector>` made by
+the regional connector (`list` on `pods.metrics.k8s.io`; at most 1024 items). These semantics
+refine REQ-TRG-002/006/007 and the resource units below for this source:
+
+- Options: `metric` cpuCores, cpuQuotaRatio, memoryBytes or memoryLimitRatio; `operator`
+  gt/gte/lt/lte; `threshold` ≥ 0 (ratios may exceed one); `sampleInterval` 30 s–5 min, the oldest
+  sample still evaluated. cpuThrottledRatio, memoryGrowthBytesPerSecond and the PSI metrics need
+  the node-local cgroup reader and are rejected with their path. `evaluation.rearmFor` may be at
+  most one 15 s poll.
+- Value: the Pod's sum over its containers of CPU usage in cores or memory working set in bytes; a
+  ratio divides it by the Pod's finite effective limit (the Pod-level limit if set, otherwise the
+  sum of the limits of every container and sidecar init container). A Pod without a finite limit
+  refuses a ratio policy as an unsupported capability (no ratio when the limit is unlimited).
+- Level: a Pod is failing while its fresh sample satisfies the condition. One occurrence fires on a
+  rising edge, keyed (policy, Pod UID, sample second); the first observation is a baseline armed
+  only when false; the Pod re-arms at a poll whose fresh sample does not satisfy it. A sample time
+  later than the region's clock counts as now.
+- Unknown (per Pod): no sample, a sample older than `sampleInterval` or older than the Pod's start
+  (an earlier Pod of the same name), or a sample missing a running container. A malformed or
+  unavailable (503) metrics API makes the poll Unknown. The metrics API being absent (404) refuses
+  activation (`DetectorUnavailable`) and leaves later polls Unknown: absence is never read as zero.
+- Only a level and the sample second leave the region; metric labels never do.
+
+### SC-TRG-013
+
+Given an activated resource policy (cpuQuotaRatio gt 0.5, sampleInterval 60 s) on a workload with
+CPU limits whose replicas are idle, when one Pod's CPU stays at its limit, then exactly one
+pod-status capture of that Pod runs under the policy executor and further polls while it stays
+busy create no occurrence; while metrics-server is unavailable no occurrence is created and no Pod
+re-arms; and a cluster without the metrics API refuses the policy's activation.
+
 ## Trigger-to-action lifecycle
 
 A detector firing is an occurrence signal, not a request to restart every collector. [Action lifecycle](action-lifecycle.md) resolution produces already armed ongoing sources and onTrigger actions. After ordinary admission, preserve matching source windows and dispatch independent onTrigger work. Cooldowns/deduplication suppress saves and actions while admitted continuous observation can continue. A late event or pending dump approval never shifts an existing window forward. Source readiness/coverage is separate from detector freshness and per-incident selection; missing required source history is visible while permitted context proceeds.
 
 ## Resource units and reset behavior
 
-These definitions refine REQ-TRG-002/007; reported values always name the metric, unit, sample interval and contributing cgroup identities.
+These definitions refine REQ-TRG-002/007; reported values always name the metric, unit, sample interval and contributing cgroup identities. The metrics-API resource detector (ADR-241) provides cpuCores as the API's CPU usage rate over its scrape window (kubelet's rate of the cumulative usage counter) and memoryBytes as the memory working set (`memory.current` minus inactive file pages, never above `memory.current`), each summed over the Pod's containers; the other metrics of this table need the node-local reader.
+
 
 | Metric | Canonical calculation |
 | --- | --- |

@@ -51,7 +51,7 @@ the probe type and window to the `observe-workload-restarts` query, the regional
 one field-selected namespace Event LIST (regional connector ClusterRole: `list` on core `events`),
 and `TriggerDelta`/`ProbeDelta` evaluate the level with re-arm against migration 00084's
 per-detector watermarks (`detector`, `armed`). Budgets, spend, suppression and the capture path are
-unchanged. Log and resource detectors are paused by the ADR-230 complexity gate.
+unchanged. ADR-230 paused the log and resource detectors; ADR-241 below implements them.
 
 [ADR-231](../decisions/231-alert-detector.md) adds the `alert` detector: `RestartPolicy.Request()`
 carries `Alert` and the label matchers, the regional `PodTargets` (given the installation's
@@ -59,6 +59,19 @@ carries `Alert` and the label matchers, the regional `PodTargets` (given the ins
 `GET /api/v2/alerts` and reports per Pod the count of matching alerts and the newest `startsAt` in
 the probe fields, and `ProbeDelta` evaluates the same level. Migration 00085 widens the detector
 CHECKs. A region without an Alertmanager answers `unsupported`, so activation refuses the policy.
+
+[ADR-241](../decisions/241-log-resource-detectors.md) adds the `log` and `resource` detectors,
+lifting ADR-230's pause: `RestartPolicy.Request()` carries a `LogMatch` (pattern, match mode, JSON
+field, record bound, window) or a `ResourceCondition` (metric, operator, threshold, sample age).
+The regional `PodTargets` adds, for a log policy, one bounded `pods/log` GET per container that can
+have written into the window (eight concurrent, ≤ 32 containers, ≤ 4 MiB; `workload_logs.go`) and,
+for a resource policy, one `metrics.k8s.io` PodMetrics LIST (`workload_resources.go`); both report
+per Pod only the probe-field level and second, plus a per-Pod `Unknown` and a log `Overlong` flag.
+`ProbeDelta` keeps an Unknown Pod's watermark unchanged; the ledger counts overlong Pods under the
+suppression reason `overlong`. Regional connector ClusterRole: `get` on `pods/log`, `list` on
+`pods.metrics.k8s.io` (also in the chart's cluster-installer role). Migration 00094 widens the
+detector and suppression CHECKs.
+
 
 ## Runtime composition still required
 

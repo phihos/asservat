@@ -62,7 +62,12 @@ func regionalExecutorRBAC(namespace string) (cluster []rbac.PolicyRule, connecto
 		{APIGroups: []string{"apps"}, Resources: []string{"deployments", "statefulsets", "replicasets"}, Verbs: []string{"get"}},
 		// ADR-230: a probe policy's poll lists the namespace's kubelet
 		// Unhealthy Pod Events (message text never leaves the region).
-		{APIGroups: []string{""}, Resources: []string{"events"}, Verbs: []string{"list"}}}
+		{APIGroups: []string{""}, Resources: []string{"events"}, Verbs: []string{"list"}},
+		// ADR-241: a log policy's poll reads its Pods' container logs (only
+		// counts and times leave the region); a resource policy's poll lists
+		// the workload's metrics API PodMetrics.
+		{APIGroups: []string{""}, Resources: []string{"pods/log"}, Verbs: []string{"get"}},
+		{APIGroups: []string{"metrics.k8s.io"}, Resources: []string{"pods"}, Verbs: []string{"list"}}}
 	connector = []rbac.PolicyRule{
 		// get for the settings/trust reads; update only for their dry-run probes.
 		{APIGroups: []string{""}, Resources: []string{"configmaps"}, ResourceNames: []string{RegionalSettings, RegionalWorkTrust}, Verbs: []string{"get", "update"}},

@@ -11038,7 +11038,7 @@
     },
     {
       "name": "get_policy_status",
-      "description": "Explain an activated or deactivated restart-, probe- or alert-trigger policy (ADR-228/230/231) without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing. With recurring sharing (ADR-239) it also reports the sharing state, recipients count, captures shared so far, the limit and the end.",
+      "description": "Explain an activated or deactivated restart-, probe-, alert-, log- or resource-trigger policy (ADR-228/230/231/241) without content (REQ-TRG-005): state, expiry, execution spend, watched Pod count, recent occurrences with their captures and suppression counts by reason. Reading status collects nothing. With recurring sharing (ADR-239) it also reports the sharing state, recipients count, captures shared so far, the limit and the end.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": true,
@@ -11183,7 +11183,9 @@
                               "enum": [
                                 "exit",
                                 "probe",
-                                "alert"
+                                "alert",
+                                "log",
+                                "resource"
                               ]
                             },
                             "failed_at": {
@@ -11202,7 +11204,9 @@
                               "detector": {
                                 "enum": [
                                   "probe",
-                                  "alert"
+                                  "alert",
+                                  "log",
+                                  "resource"
                                 ]
                               }
                             }
@@ -11243,7 +11247,8 @@
                                 "coalesced",
                                 "capacity",
                                 "authority",
-                                "unavailable"
+                                "unavailable",
+                                "overlong"
                               ]
                             },
                             "count": {
@@ -11277,7 +11282,9 @@
                             "enum": [
                               "exit",
                               "probe",
-                              "alert"
+                              "alert",
+                              "log",
+                              "resource"
                             ]
                           },
                           "reasons": {
@@ -11313,6 +11320,41 @@
                             "maximum": 1000
                           },
                           "window_seconds": {
+                            "type": "integer",
+                            "minimum": 30,
+                            "maximum": 300
+                          },
+                          "match": {
+                            "enum": [
+                              "literal",
+                              "regexp"
+                            ]
+                          },
+                          "json_field": {
+                            "type": "boolean"
+                          },
+                          "metric": {
+                            "enum": [
+                              "cpuCores",
+                              "cpuQuotaRatio",
+                              "memoryBytes",
+                              "memoryLimitRatio"
+                            ]
+                          },
+                          "operator": {
+                            "enum": [
+                              "gt",
+                              "gte",
+                              "lt",
+                              "lte"
+                            ]
+                          },
+                          "threshold": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 1000000000000000000
+                          },
+                          "sample_interval_seconds": {
                             "type": "integer",
                             "minimum": 30,
                             "maximum": 300
