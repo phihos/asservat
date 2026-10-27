@@ -203,7 +203,10 @@ func publicRuntimeDutyBaseGrants(purpose string) ([]publicRuntimeGrant, bool) {
 		add("fleet_current_trust", "UPDATE", "installation_id")
 		add("permission_stream", "UPDATE", "id")
 		add("policy_source", "INSERT")
-		add("policy_source", "UPDATE", "generation", "spec_digest", "resource_version", "observed_at", "fresh_until", "deleted", "suspended", "intent_version", "collection_digest", "creator_json", "active_id", "authored_grant_ref")
+		add("policy_source", "UPDATE", "generation", "spec_digest", "resource_version", "observed_at", "fresh_until", "deleted", "suspended", "intent_version", "collection_digest", "creator_json", "active_id", "authored_grant_ref", "grant_attachment_id")
+		read("access_grant", "policy_grant_attachment")
+		add("access_grant", "UPDATE", "id") // row lock; immutable trigger refuses ID edits
+		add("policy_grant_attachment", "INSERT")
 		add("policy_acceptance", "INSERT")
 		add("policy_acceptance", "UPDATE", "acknowledged_at", "receipt_json", "executions_spent")
 		add("policy_pod_watermark", "INSERT")

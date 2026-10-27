@@ -590,3 +590,49 @@ No request/settings data or Unicode/check proof resulted yet; group exit 1,
 Go test 3.879 seconds (runner phase 59.802 including race compilation), unchanged
 sources, cleanup empty, containers absent. Report SHA-256
 `20f4186fb34e8f9ad310f6b53db891d03023e0f3f5a6e24db09abd8c6ee4efdd`.
+
+
+Smoke 4 (`56e132a4`) passed the selected real PostgreSQL/S3 request/settings
+case: `TestPermissionAuthorityPoliciesWithRealServices/policy-grants-original-request-periods-and-client-journal`
+(3.32 seconds; Go 5.838 seconds; runner phase 8.926 seconds), exit 0,
+unchanged 3,244 source hashes and no cleanup failures. It qualifies conditional
+rows, full-client/Unicode journal lookup, original-anchor lower/raise and refusal
+of unsafe rollback for that source snapshot, with synthetic protected identities
+and authority inputs. It does not qualify attachment or execution accounting.
+Report SHA-256
+`2e3c1c40fda99e051e7a8d533347ddd6e632bda29cd769b470fd3bb554e396c6`.
+The archived report and Go log are under the local build cache's
+`approved-workflow/policy102-smoke-4-artifacts/` directory.
+
+The next source batch adds an unwired attachment store on the existing
+`policy-automation` SQL duty. Recovery → permission root → source → grant locks
+serialize the control against source changes and review/revocation. A fresh
+current sponsoring manager is checked for both new control and historical reply;
+creator/requester identity is not management authority. The full actor/client/key
+and original policy/grant input identify an immutable reply. Replay returns its
+old receipt without restoring a cleared source pointer. Accepted authored-grantRef
+changes clear that pointer, so A → B → A needs another explicit control; an
+unchanged reference preserves it. No acceptance, expiry or spent counter changes.
+The existing duty gains full access_grant SELECT, attachment SELECT/INSERT,
+grant UPDATE(id) solely for row locking (the immutable trigger refuses ID
+changes), and source UPDATE(grant_attachment_id). The full SELECT reuses the
+existing locked grant decoder and all conditional immutable-field checks; a
+partial reader would introduce a second verification path. The ordinary
+hub-runtime role union already has full grant SELECT through its grant duty,
+but the standalone policy-automation duty now reads that additional metadata. There are no new credentials, provider requests,
+watches, timers or background tasks. The public activate_policy encrypted-intent
+acknowledgement/outcome boundary remains unwired; this store is not independently
+public execution authority. Real role-bounded attachment/ABA/replay qualification
+is pending the next coordinated frozen-source run.
+
+
+Attachment source gates (not SQL behavior qualification): sql-check passed with
+62 generated-query files; targeted race checks passed for domain authorization
+1.010s, application authorization 1.031s and PostgreSQL adapter 1.073s. The
+integration package compiled and its external cases skipped without fixture opt-in
+(1.072s); no real attachment behavior is inferred from that result. spec-check
+passed 13,284 assertions, architecture-check 1,326 positive checks and Go
+architecture 67 packages/393 imports. The first spec invocation used the system
+Python without development dependencies and failed; the retained second run uses
+the existing canonical spec virtual environment and passed. Actual role/ABA
+cases remain pending a frozen-source PostgreSQL/S3 run.

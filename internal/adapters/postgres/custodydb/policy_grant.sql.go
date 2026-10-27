@@ -167,6 +167,137 @@ func (q *Queries) InsertPolicyGrant(ctx context.Context, arg InsertPolicyGrantPa
 	return i, err
 }
 
+const insertPolicyGrantAttachment = `-- name: InsertPolicyGrantAttachment :one
+INSERT INTO policy_grant_attachment(id,root_id,installation_id,policy_uid,acceptance_id,grant_id,authority_digest,authored_grant_ref,
+ actor_issuer,actor_subject,actor_client,actor_key,idempotency_key,request_digest)
+VALUES($1::uuid,$2::uuid,$3::uuid,$4::text,
+ $5::uuid,$6::uuid,$7::bytea,$8::text,
+ $9::text,$10::text,$11::text,
+ sha256(int4send(octet_length(convert_to($9::text,'UTF8'))) || convert_to($9::text,'UTF8')
+  || int4send(octet_length(convert_to($10::text,'UTF8'))) || convert_to($10::text,'UTF8')
+  || int4send(octet_length(convert_to($11::text,'UTF8'))) || convert_to($11::text,'UTF8')
+  || int4send(5) || convert_to('human','UTF8')),$12::text,$13::bytea)
+RETURNING id, root_id, installation_id, policy_uid, acceptance_id, grant_id, authority_digest, authored_grant_ref, actor_issuer, actor_subject, actor_client, actor_key, idempotency_key, request_digest, attached_at
+`
+
+type InsertPolicyGrantAttachmentParams struct {
+	ID               pgtype.UUID
+	RootID           pgtype.UUID
+	InstallationID   pgtype.UUID
+	PolicyUid        string
+	AcceptanceID     pgtype.UUID
+	GrantID          pgtype.UUID
+	AuthorityDigest  []byte
+	AuthoredGrantRef string
+	ActorIssuer      string
+	ActorSubject     string
+	ActorClient      string
+	IdempotencyKey   string
+	RequestDigest    []byte
+}
+
+func (q *Queries) InsertPolicyGrantAttachment(ctx context.Context, arg InsertPolicyGrantAttachmentParams) (PolicyGrantAttachment, error) {
+	row := q.db.QueryRow(ctx, insertPolicyGrantAttachment,
+		arg.ID,
+		arg.RootID,
+		arg.InstallationID,
+		arg.PolicyUid,
+		arg.AcceptanceID,
+		arg.GrantID,
+		arg.AuthorityDigest,
+		arg.AuthoredGrantRef,
+		arg.ActorIssuer,
+		arg.ActorSubject,
+		arg.ActorClient,
+		arg.IdempotencyKey,
+		arg.RequestDigest,
+	)
+	var i PolicyGrantAttachment
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.InstallationID,
+		&i.PolicyUid,
+		&i.AcceptanceID,
+		&i.GrantID,
+		&i.AuthorityDigest,
+		&i.AuthoredGrantRef,
+		&i.ActorIssuer,
+		&i.ActorSubject,
+		&i.ActorClient,
+		&i.ActorKey,
+		&i.IdempotencyKey,
+		&i.RequestDigest,
+		&i.AttachedAt,
+	)
+	return i, err
+}
+
+const readPolicyGrantAttachment = `-- name: ReadPolicyGrantAttachment :one
+SELECT id, root_id, installation_id, policy_uid, acceptance_id, grant_id, authority_digest, authored_grant_ref, actor_issuer, actor_subject, actor_client, actor_key, idempotency_key, request_digest, attached_at FROM policy_grant_attachment WHERE root_id=$1 AND id=$2
+`
+
+type ReadPolicyGrantAttachmentParams struct {
+	RootID pgtype.UUID
+	ID     pgtype.UUID
+}
+
+func (q *Queries) ReadPolicyGrantAttachment(ctx context.Context, arg ReadPolicyGrantAttachmentParams) (PolicyGrantAttachment, error) {
+	row := q.db.QueryRow(ctx, readPolicyGrantAttachment, arg.RootID, arg.ID)
+	var i PolicyGrantAttachment
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.InstallationID,
+		&i.PolicyUid,
+		&i.AcceptanceID,
+		&i.GrantID,
+		&i.AuthorityDigest,
+		&i.AuthoredGrantRef,
+		&i.ActorIssuer,
+		&i.ActorSubject,
+		&i.ActorClient,
+		&i.ActorKey,
+		&i.IdempotencyKey,
+		&i.RequestDigest,
+		&i.AttachedAt,
+	)
+	return i, err
+}
+
+const readPolicyGrantAttachmentByKey = `-- name: ReadPolicyGrantAttachmentByKey :one
+SELECT id, root_id, installation_id, policy_uid, acceptance_id, grant_id, authority_digest, authored_grant_ref, actor_issuer, actor_subject, actor_client, actor_key, idempotency_key, request_digest, attached_at FROM policy_grant_attachment WHERE root_id=$1 AND actor_key=$2 AND idempotency_key=$3
+`
+
+type ReadPolicyGrantAttachmentByKeyParams struct {
+	RootID         pgtype.UUID
+	ActorKey       []byte
+	IdempotencyKey string
+}
+
+func (q *Queries) ReadPolicyGrantAttachmentByKey(ctx context.Context, arg ReadPolicyGrantAttachmentByKeyParams) (PolicyGrantAttachment, error) {
+	row := q.db.QueryRow(ctx, readPolicyGrantAttachmentByKey, arg.RootID, arg.ActorKey, arg.IdempotencyKey)
+	var i PolicyGrantAttachment
+	err := row.Scan(
+		&i.ID,
+		&i.RootID,
+		&i.InstallationID,
+		&i.PolicyUid,
+		&i.AcceptanceID,
+		&i.GrantID,
+		&i.AuthorityDigest,
+		&i.AuthoredGrantRef,
+		&i.ActorIssuer,
+		&i.ActorSubject,
+		&i.ActorClient,
+		&i.ActorKey,
+		&i.IdempotencyKey,
+		&i.RequestDigest,
+		&i.AttachedAt,
+	)
+	return i, err
+}
+
 const readPolicyGrantByKey = `-- name: ReadPolicyGrantByKey :one
 SELECT id, root_id, kind, preview_id, capture_id, cluster_id, namespace_uid, workload_uid, pod_uid, execution_digest, result_access_digest, review_digest, data_class, reasons, review, scope, requester_issuer, requester_subject, requester_client, lifetime_seconds, result_access, not_after, max_artifacts, max_bytes, max_operations, artifacts_spent, bytes_spent, operations_spent, idempotency_key, request_digest, requested_at, review_until, decision, approver_issuer, approver_subject, approver_client, decision_reason, decision_acr, decision_auth_time, decided_at, decision_key, expires_at, revoked_at, revoker_issuer, revoker_subject, revoker_client, revoke_key, revision, requester_kind, request_operation, requester_key, policy_uid, policy_acceptance_id, policy_scope, policy_not_after, policy_max_executions, policy_max_bytes, policy_max_observed_bytes, policy_executions_spent, policy_bytes_spent, policy_observed_bytes_spent FROM access_grant WHERE root_id=$1::uuid AND kind='policy'
  AND requester_key=$2::bytea
@@ -273,6 +404,34 @@ func (q *Queries) ReadPolicyGrantSettings(ctx context.Context, rootID pgtype.UUI
 		&i.RenewalNoticeSeconds,
 	)
 	return i, err
+}
+
+const setPolicyGrantAttachment = `-- name: SetPolicyGrantAttachment :execrows
+UPDATE policy_source SET grant_attachment_id=$1::uuid
+WHERE root_id=$2::uuid AND policy_uid=$3::text AND active_id=$4::uuid
+ AND authored_grant_ref=$5::text AND NOT deleted AND NOT suspended AND fresh_until>clock_timestamp()
+`
+
+type SetPolicyGrantAttachmentParams struct {
+	AttachmentID     pgtype.UUID
+	RootID           pgtype.UUID
+	PolicyUid        string
+	AcceptanceID     pgtype.UUID
+	AuthoredGrantRef string
+}
+
+func (q *Queries) SetPolicyGrantAttachment(ctx context.Context, arg SetPolicyGrantAttachmentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setPolicyGrantAttachment,
+		arg.AttachmentID,
+		arg.RootID,
+		arg.PolicyUid,
+		arg.AcceptanceID,
+		arg.AuthoredGrantRef,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const writePolicyGrantSettings = `-- name: WritePolicyGrantSettings :exec

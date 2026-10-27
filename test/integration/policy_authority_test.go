@@ -238,7 +238,7 @@ func TestPermissionAuthorityPoliciesWithRealServices(t *testing.T) {
 		s.input.Verification = syntheticSubmissionCheck(s.input, clock())
 		r := accept(t, s)
 		flush(t, s)
-		qualifyPolicyGrantPersistence(t, ctx, admin, poolFor, s.input.RootID, s.input.Authority, r.Record.ID, scope, s.input.Recovery)
+		qualifyPolicyGrantPersistence(t, ctx, admin, poolFor, s.source, s.observation, s.input.Author, s.input.RootID, s.input.Authority, r.Record.ID, scope, s.input.Recovery)
 	})
 
 	t.Run("audit-gated-durable-and-no-personal-session-dependency", func(t *testing.T) {

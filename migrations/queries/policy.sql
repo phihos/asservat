@@ -9,7 +9,8 @@ SELECT * FROM policy_source WHERE root_id=$1 AND policy_uid=$2 FOR UPDATE;
 SELECT * FROM policy_source WHERE root_id=$1 AND policy_uid=$2 FOR SHARE;
 
 -- name: UpdatePolicySource :exec
-UPDATE policy_source SET generation=$3,spec_digest=$4,resource_version=$5,observed_at=$6,fresh_until=$7,deleted=$8,suspended=$9,intent_version=CASE WHEN collection_digest=$10 AND generation>=($3::bigint-1) THEN intent_version ELSE intent_version+1 END,collection_digest=$10,authored_grant_ref=$11 WHERE root_id=$1 AND policy_uid=$2;
+UPDATE policy_source SET generation=$3,spec_digest=$4,resource_version=$5,observed_at=$6,fresh_until=$7,deleted=$8,suspended=$9,intent_version=CASE WHEN collection_digest=$10 AND generation>=($3::bigint-1) THEN intent_version ELSE intent_version+1 END,collection_digest=$10,
+ grant_attachment_id=CASE WHEN authored_grant_ref=$11 THEN grant_attachment_id ELSE NULL END,authored_grant_ref=$11 WHERE root_id=$1 AND policy_uid=$2;
 
 -- name: ActivatePolicyAcceptance :execrows
 UPDATE policy_source SET creator_json=COALESCE(creator_json,$3),active_id=$4 WHERE root_id=$1 AND policy_uid=$2;

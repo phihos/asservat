@@ -37,3 +37,26 @@ UPDATE access_grant SET policy_not_after=requested_at+make_interval(secs=>sqlc.a
  expires_at=CASE WHEN decision='approved' THEN requested_at+make_interval(secs=>sqlc.arg(max_age_seconds)::integer) ELSE NULL END
 WHERE root_id=sqlc.arg(root_id)::uuid AND kind='policy' AND (decision IS NULL OR decision='approved')
  AND policy_not_after>requested_at+make_interval(secs=>sqlc.arg(max_age_seconds)::integer);
+
+-- name: ReadPolicyGrantAttachmentByKey :one
+SELECT * FROM policy_grant_attachment WHERE root_id=$1 AND actor_key=$2 AND idempotency_key=$3;
+
+-- name: ReadPolicyGrantAttachment :one
+SELECT * FROM policy_grant_attachment WHERE root_id=$1 AND id=$2;
+
+-- name: InsertPolicyGrantAttachment :one
+INSERT INTO policy_grant_attachment(id,root_id,installation_id,policy_uid,acceptance_id,grant_id,authority_digest,authored_grant_ref,
+ actor_issuer,actor_subject,actor_client,actor_key,idempotency_key,request_digest)
+VALUES(sqlc.arg(id)::uuid,sqlc.arg(root_id)::uuid,sqlc.arg(installation_id)::uuid,sqlc.arg(policy_uid)::text,
+ sqlc.arg(acceptance_id)::uuid,sqlc.arg(grant_id)::uuid,sqlc.arg(authority_digest)::bytea,sqlc.arg(authored_grant_ref)::text,
+ sqlc.arg(actor_issuer)::text,sqlc.arg(actor_subject)::text,sqlc.arg(actor_client)::text,
+ sha256(int4send(octet_length(convert_to(sqlc.arg(actor_issuer)::text,'UTF8'))) || convert_to(sqlc.arg(actor_issuer)::text,'UTF8')
+  || int4send(octet_length(convert_to(sqlc.arg(actor_subject)::text,'UTF8'))) || convert_to(sqlc.arg(actor_subject)::text,'UTF8')
+  || int4send(octet_length(convert_to(sqlc.arg(actor_client)::text,'UTF8'))) || convert_to(sqlc.arg(actor_client)::text,'UTF8')
+  || int4send(5) || convert_to('human','UTF8')),sqlc.arg(idempotency_key)::text,sqlc.arg(request_digest)::bytea)
+RETURNING *;
+
+-- name: SetPolicyGrantAttachment :execrows
+UPDATE policy_source SET grant_attachment_id=sqlc.arg(attachment_id)::uuid
+WHERE root_id=sqlc.arg(root_id)::uuid AND policy_uid=sqlc.arg(policy_uid)::text AND active_id=sqlc.arg(acceptance_id)::uuid
+ AND authored_grant_ref=sqlc.arg(authored_grant_ref)::text AND NOT deleted AND NOT suspended AND fresh_until>clock_timestamp();

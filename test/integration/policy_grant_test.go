@@ -13,6 +13,7 @@ import (
 	app "asservat.local/asservat/internal/application/authorization"
 	"asservat.local/asservat/internal/domain/artifact"
 	"asservat.local/asservat/internal/domain/authorization"
+	"asservat.local/asservat/internal/domain/capture"
 	"asservat.local/asservat/internal/domain/identity"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -21,7 +22,7 @@ import (
 // Component proof: actual grant/settings transactions and compiled role grants,
 // with the parent's real acceptance/audit and explicit synthetic source/KMS.
 // It does not qualify public requester/reviewer authentication or recording.
-func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, root string, authority authorization.AcceptedPolicyAuthority, acceptance string, scope []byte, recovery artifact.RecoveryProof) {
+func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, source *postgres.Policies, observation capture.PolicySource, manager identity.Identity, root string, authority authorization.AcceptedPolicyAuthority, acceptance string, scope []byte, recovery artifact.RecoveryProof) {
 	t.Helper()
 	rolePool := func(purpose, prefix string) *pgxpool.Pool {
 		t.Helper()
@@ -148,6 +149,7 @@ func qualifyPolicyGrantPersistence(t *testing.T, ctx context.Context, admin *pgx
 	if err != nil || replay || !g.ExpiresAt.Equal(g.PolicyNotAfter) {
 		t.Fatal("decision must retain original request anchor", g, replay, err)
 	}
+	qualifyPolicyGrantAttachmentControl(t, ctx, admin, hub, source, observation, manager, g, recovery)
 	settings.Revision.Generation++
 	settings.Revision.Digest[0]++
 	settings.ObservedAt = time.Now().UTC().Truncate(time.Microsecond)
