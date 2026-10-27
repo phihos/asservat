@@ -1891,6 +1891,8 @@ type PolicyAcceptance struct {
 	SharesSpent      int32
 	SharingRevokedAt pgtype.Timestamptz
 	SharingRevokeKey pgtype.Text
+	SharingStoppedAt pgtype.Timestamptz
+	SharingStopKey   pgtype.Text
 }
 
 type PolicyOccurrence struct {

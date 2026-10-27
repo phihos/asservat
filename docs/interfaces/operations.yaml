@@ -169,6 +169,13 @@ operations:
   - mcp
   effect: command
   contract: specs/contracts/mcp-tools.json
+- operation: stop_future_sharing
+  path: /api/v1/operations/stop_future_sharing
+  transport:
+  - browser
+  - mcp
+  effect: command
+  contract: specs/contracts/mcp-tools.json
 - operation: request_capture
   path: /api/v1/operations/request_capture
   transport:
@@ -336,13 +343,6 @@ operations:
   - browser
   effect: command
   role: authorized-grant-revoker
-  contract: docs/interfaces/browser-openapi.yaml
-- operation: stop_future_sharing
-  path: /api/v1/console/stop_future_sharing
-  transport:
-  - browser
-  effect: command
-  role: current-sharing-manager
   contract: docs/interfaces/browser-openapi.yaml
 - operation: apply_privacy_action
   path: /api/v1/console/apply_privacy_action

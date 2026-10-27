@@ -345,15 +345,16 @@
                   "sharing": {
                     "type": "object",
                     "additionalProperties": false,
-                    "description": "Recurring sharing of the acceptance (ADR-239). stopped: the DebugPolicy changed after acceptance; activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id).",
+                    "description": "Recurring sharing of the acceptance (ADR-239). stopped: a manager stopped future sharing (stop_future_sharing; already claimed captures still publish); policyChanged: the DebugPolicy changed after acceptance, activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id and expected_revision = revision).",
                     "properties": {
                       "state": {
                         "enum": [
                           "active",
                           "limitReached",
                           "expired",
-                          "revoked",
-                          "stopped"
+                          "stopped",
+                          "policyChanged",
+                          "revoked"
                         ]
                       },
                       "recipients": {
@@ -378,6 +379,15 @@
                       "revoked_at": {
                         "type": "string",
                         "format": "date-time"
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3
+                      },
+                      "stopped_at": {
+                        "type": "string",
+                        "format": "date-time"
                       }
                     },
                     "required": [
@@ -385,7 +395,8 @@
                       "recipients",
                       "shared_captures",
                       "max_captures",
-                      "not_after"
+                      "not_after",
+                      "revision"
                     ]
                   }
                 },

@@ -76,6 +76,12 @@ SELECT * FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing
 -- and against publication's KEY SHARE lock.
 SELECT * FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing' FOR UPDATE;
 
+-- name: StopPolicySharing :execrows
+-- Stop future sharing: no further slot is claimed; already claimed captures
+-- still publish their shares before notAfter (REQ-SHR-007 Draining).
+UPDATE policy_acceptance SET sharing_stopped_at=clock_timestamp(), sharing_stop_key=$3
+WHERE root_id=$1 AND id=$2 AND sharing_stopped_at IS NULL AND sharing_revoked_at IS NULL AND record ? 'Sharing';
+
 -- name: RevokePolicySharing :execrows
 UPDATE policy_acceptance SET sharing_revoked_at=clock_timestamp(), sharing_revoke_key=$3
 WHERE root_id=$1 AND id=$2 AND sharing_revoked_at IS NULL AND record ? 'Sharing';

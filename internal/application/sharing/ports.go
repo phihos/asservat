@@ -96,6 +96,7 @@ type PolicySharing struct {
 	Instruction  capture.PolicyShareInstruction
 	Target       authorization.Target
 	RevokedAt    time.Time
+	StoppedAt    time.Time
 }
 
 // PolicyRevocation revokes every share of one acceptance and its future
@@ -118,4 +119,5 @@ type PolicyRevocation struct {
 type PolicySharingStore interface {
 	PolicySharing(ctx context.Context, acceptanceID string) (PolicySharing, error)
 	RevokePolicySharing(context.Context, PolicyRevocation, artifact.RecoveryProof) (revoked int, replay bool, err error)
+	StopPolicySharing(context.Context, PolicyRevocation, artifact.RecoveryProof) (replay bool, err error)
 }

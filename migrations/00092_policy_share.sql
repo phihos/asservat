@@ -11,18 +11,24 @@
 -- binary's, so the ADR-227 compatibility floor stays at 81.
 
 -- shares_spent only rises (one slot per admitted capture, never refunded) and
--- never exceeds the accepted limit; a revocation is terminal and happens once.
+-- never exceeds the accepted limit. Stop (no further claims; already claimed
+-- captures still publish their shares) and revocation (every share revoked,
+-- nothing further materialized) are terminal and happen once each.
 ALTER TABLE policy_acceptance ADD COLUMN shares_spent integer NOT NULL DEFAULT 0;
 ALTER TABLE policy_acceptance ADD COLUMN sharing_revoked_at timestamptz;
 ALTER TABLE policy_acceptance ADD COLUMN sharing_revoke_key text CHECK (octet_length(sharing_revoke_key) BETWEEN 1 AND 128);
+ALTER TABLE policy_acceptance ADD COLUMN sharing_stopped_at timestamptz;
+ALTER TABLE policy_acceptance ADD COLUMN sharing_stop_key text CHECK (octet_length(sharing_stop_key) BETWEEN 1 AND 128);
 ALTER TABLE policy_acceptance ADD CONSTRAINT policy_acceptance_shares CHECK (shares_spent>=0 AND shares_spent<=COALESCE((record#>>'{Sharing,MaxCaptures}')::integer,0) AND COALESCE((record#>>'{Sharing,MaxCaptures}')::integer,0)<=100);
 ALTER TABLE policy_acceptance ADD CONSTRAINT policy_acceptance_sharing_revocation CHECK ((sharing_revoked_at IS NULL)=(sharing_revoke_key IS NULL) AND (sharing_revoked_at IS NULL OR record ? 'Sharing'));
+ALTER TABLE policy_acceptance ADD CONSTRAINT policy_acceptance_sharing_stop CHECK ((sharing_stopped_at IS NULL)=(sharing_stop_key IS NULL) AND (sharing_stopped_at IS NULL OR record ? 'Sharing'));
 
 -- +goose StatementBegin
 CREATE FUNCTION protect_policy_sharing() RETURNS trigger
 LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
 BEGIN
- IF NEW.shares_spent<OLD.shares_spent OR (OLD.sharing_revoked_at IS NOT NULL AND ROW(NEW.sharing_revoked_at,NEW.sharing_revoke_key) IS DISTINCT FROM ROW(OLD.sharing_revoked_at,OLD.sharing_revoke_key)) THEN
+ IF NEW.shares_spent<OLD.shares_spent OR (OLD.sharing_revoked_at IS NOT NULL AND ROW(NEW.sharing_revoked_at,NEW.sharing_revoke_key) IS DISTINCT FROM ROW(OLD.sharing_revoked_at,OLD.sharing_revoke_key))
+  OR (OLD.sharing_stopped_at IS NOT NULL AND ROW(NEW.sharing_stopped_at,NEW.sharing_stop_key) IS DISTINCT FROM ROW(OLD.sharing_stopped_at,OLD.sharing_stop_key)) THEN
   RAISE EXCEPTION 'policy sharing spend and revocation are monotonic' USING ERRCODE='23514';
  END IF;
  RETURN NEW;
@@ -41,7 +47,7 @@ CREATE INDEX evidence_share_policy_acceptance ON evidence_share(root_id,policy_a
 -- acceptance at insert, inside the admission transaction, so a replayed
 -- admission (which inserts nothing) never spends twice and a restarted hub
 -- continues the stored counter. No slot is claimed after the end, at the
--- limit, after revoke-all, or once the DebugPolicy has a newer generation than
+-- limit, after Stop or revoke-all, or once the DebugPolicy has a newer generation than
 -- the acceptance (Stop by editing the policy; a new activation starts its own
 -- counter and never backfills earlier captures). Human captures and
 -- reviewed capture-time instructions (ADR-235) are untouched. The runtime
@@ -67,7 +73,7 @@ BEGIN
   RETURN NEW;
  END IF;
  UPDATE public.policy_acceptance a SET shares_spent=a.shares_spent+1
- WHERE a.id=src.active_id AND a.root_id=NEW.root_id AND a.policy_uid=policy AND a.record ? 'Sharing' AND a.sharing_revoked_at IS NULL
+ WHERE a.id=src.active_id AND a.root_id=NEW.root_id AND a.policy_uid=policy AND a.record ? 'Sharing' AND a.sharing_revoked_at IS NULL AND a.sharing_stopped_at IS NULL
   AND a.generation=src.generation AND a.shares_spent<(a.record#>>'{Sharing,MaxCaptures}')::integer AND (a.record#>>'{Sharing,NotAfter}')::timestamptz>at
  RETURNING * INTO acc;
  IF NOT FOUND THEN
@@ -142,4 +148,25 @@ BEGIN
 END $$;
 -- +goose StatementEnd
 REVOKE ALL ON FUNCTION materialize_capture_share() FROM PUBLIC;
--- No destructive Down: spend, revocations and shares are audit-relevant history.
+-- ADR-239 adds one public operation, stop_future_sharing, on the normal audit
+-- lane. These definitions keep every name of migrations 00086–00091
+-- (including preview_access_change, ADR-237, and transfer_share, ADR-238).
+-- +goose StatementBegin
+CREATE OR REPLACE FUNCTION operation_audit_lane(operation_name text) RETURNS text
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+ SELECT CASE WHEN operation_name IN ('connector_process_enrollment','connector_client_certificate','connector_server_certificate','connector_backing_acceptance','connector_retirement') THEN 'identity'
+ WHEN operation_name='persist_capture_intent' THEN 'capture' WHEN operation_name='release_processing' THEN 'processing'
+ WHEN operation_name='resolve_capture_request' THEN 'resolution'
+ WHEN operation_name IN ('list_diagnostics','preview_capture','request_capture','get_capture','get_case','prepare_artifact_download','get_artifact_download','invalid_operation','download_artifact_content','initialize_processing','restrict_processing','get_file_excerpt','get_query_result','activate_policy','get_policy_status','deactivate_policy','create_share','list_shares','revoke_share','explain_access','preview_access_change','list_capture_history','get_capture_settings','transfer_share','stop_future_sharing') THEN 'normal' ELSE NULL END
+$$;
+CREATE OR REPLACE FUNCTION operation_audit_human_input_valid(operation_name text,input_format text) RETURNS boolean
+LANGUAGE sql IMMUTABLE SET search_path=pg_catalog,pg_temp AS $$
+ SELECT CASE WHEN operation_name IN ('get_file_excerpt','get_query_result') THEN input_format='context-query-input/v1'
+ WHEN operation_name='download_artifact_content' THEN input_format='native-content-input/v1'
+ WHEN operation_name='persist_capture_intent' THEN input_format='capture-intent/v2'
+ WHEN operation_name IN ('initialize_processing','restrict_processing','release_processing') THEN input_format='processing-input/v1'
+ WHEN operation_name IN ('list_diagnostics','preview_capture','request_capture','resolve_capture_request','get_capture','get_case','prepare_artifact_download','get_artifact_download','invalid_operation','activate_policy','get_policy_status','deactivate_policy','create_share','list_shares','revoke_share','explain_access','preview_access_change','list_capture_history','get_capture_settings','transfer_share','stop_future_sharing') THEN input_format IN ('context-input/v1','invalid-input/v1') ELSE false END
+$$;
+-- +goose StatementEnd
+REVOKE ALL ON FUNCTION operation_audit_lane(text),operation_audit_human_input_valid(text,text) FROM PUBLIC;
+-- No destructive Down: spend, stops, revocations and shares are audit-relevant history.

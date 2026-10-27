@@ -30,6 +30,9 @@ func policySharingFrom(row custodydb.PolicyAcceptance) (sharing.PolicySharing, e
 	if row.SharingRevokedAt.Valid {
 		out.RevokedAt = row.SharingRevokedAt.Time.UTC()
 	}
+	if row.SharingStoppedAt.Valid {
+		out.StoppedAt = row.SharingStoppedAt.Time.UTC()
+	}
 	return out, nil
 }
 
@@ -50,6 +53,19 @@ func (s *EvidenceShares) PolicySharing(ctx context.Context, acceptanceID string)
 	return policySharingFrom(row)
 }
 
+// policySharingRevision is the sharing's revision: 1, plus one for a Stop and
+// one for a revocation.
+func policySharingRevision(row custodydb.PolicyAcceptance) int64 {
+	n := int64(1)
+	if row.SharingStoppedAt.Valid {
+		n++
+	}
+	if row.SharingRevokedAt.Valid {
+		n++
+	}
+	return n
+}
+
 // RevokePolicySharing marks the acceptance's sharing revoked and revokes
 // every still-unrevoked share it materialized, in one transaction under the
 // current recovery fence. The acceptance row lock orders it before any later
@@ -57,14 +73,68 @@ func (s *EvidenceShares) PolicySharing(ctx context.Context, acceptanceID string)
 // nothing. The same key after success is a replay; another key or a stale
 // expected revision is Conflict.
 func (s *EvidenceShares) RevokePolicySharing(ctx context.Context, r sharing.PolicyRevocation, recovery artifact.RecoveryProof) (int, bool, error) {
-	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.AcceptanceID) || !r.Actor.Valid() || len(r.Managers) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
-		return 0, false, value.ErrInvalid
-	}
 	var revoked int
+	replay, err := s.changePolicySharing(ctx, r, recovery, func(q *custodydb.Queries, row custodydb.PolicyAcceptance, key pgtype.Text) (bool, error) {
+		revoked = 0
+		if row.SharingRevokedAt.Valid {
+			if row.SharingRevokeKey != key {
+				return false, value.ErrConflict
+			}
+			n, err := q.CountPolicyShareRevocations(ctx, custodydb.CountPolicyShareRevocationsParams{RootID: id(s.root), PolicyAcceptanceID: row.ID, RevokeKey: key})
+			revoked = int(n)
+			return true, err
+		}
+		if r.ExpectedRevision != policySharingRevision(row) {
+			return false, value.ErrConflict
+		}
+		n, err := q.RevokePolicySharing(ctx, custodydb.RevokePolicySharingParams{RootID: id(s.root), ID: row.ID, SharingRevokeKey: key})
+		if err != nil {
+			return false, err
+		}
+		if n != 1 {
+			return false, value.ErrConflict
+		}
+		ids, err := q.RevokePolicyShares(ctx, custodydb.RevokePolicySharesParams{RootID: id(s.root), PolicyAcceptanceID: row.ID, RevokeKey: key})
+		revoked = len(ids)
+		return false, err
+	})
+	if err != nil {
+		return 0, false, err
+	}
+	return revoked, replay, nil
+}
+
+// StopPolicySharing stops future sharing (REQ-SHR-007): no further capture
+// claims a slot, while captures that already claimed one still publish their
+// shares before notAfter, and existing shares stay until they expire or are
+// revoked. Expected must be revision 1; the same key after success is a
+// replay; a stopped or revoked sharing otherwise is Conflict.
+func (s *EvidenceShares) StopPolicySharing(ctx context.Context, r sharing.PolicyRevocation, recovery artifact.RecoveryProof) (bool, error) {
+	return s.changePolicySharing(ctx, r, recovery, func(q *custodydb.Queries, row custodydb.PolicyAcceptance, key pgtype.Text) (bool, error) {
+		if row.SharingStoppedAt.Valid && row.SharingStopKey == key {
+			return true, nil
+		}
+		if row.SharingStoppedAt.Valid || row.SharingRevokedAt.Valid || r.ExpectedRevision != 1 {
+			return false, value.ErrConflict
+		}
+		n, err := q.StopPolicySharing(ctx, custodydb.StopPolicySharingParams{RootID: id(s.root), ID: row.ID, SharingStopKey: key})
+		if err == nil && n != 1 {
+			err = value.ErrConflict
+		}
+		return false, err
+	})
+}
+
+// changePolicySharing locks the acceptance under the current recovery fence,
+// authorizes the actor (creator, a pinned current manager the service found,
+// or an administrator) and applies change.
+func (s *EvidenceShares) changePolicySharing(ctx context.Context, r sharing.PolicyRevocation, recovery artifact.RecoveryProof, change func(*custodydb.Queries, custodydb.PolicyAcceptance, pgtype.Text) (bool, error)) (bool, error) {
+	if s == nil || ctx == nil || ctx.Err() != nil || !authorization.UUID(r.AcceptanceID) || !r.Actor.Valid() || len(r.Managers) > authorization.ShareMaxManagers || !identity.Text(r.IdempotencyKey, 128) || r.ExpectedRevision < 1 {
+		return false, value.ErrInvalid
+	}
 	replay := false
 	key := pgtype.Text{String: r.IdempotencyKey, Valid: true}
 	err := s.ledger.transaction(ctx, func(q *custodydb.Queries) error {
-		revoked, replay = 0, false
 		trust, err := s.recovery.lock(ctx, q, s.root, recovery)
 		if err != nil {
 			return err
@@ -88,29 +158,8 @@ func (s *EvidenceShares) RevokePolicySharing(ctx context.Context, r sharing.Poli
 		if !r.Administrator && (creator.Issuer != r.Actor.Issuer || creator.Subject != r.Actor.Subject) && !pinsAll(management, r.Managers) {
 			return value.ErrDenied
 		}
-		switch {
-		case row.SharingRevokedAt.Valid && row.SharingRevokeKey == key:
-			replay = true
-			n, err := q.CountPolicyShareRevocations(ctx, custodydb.CountPolicyShareRevocationsParams{RootID: id(s.root), PolicyAcceptanceID: row.ID, RevokeKey: key})
-			if err != nil {
-				return err
-			}
-			revoked = int(n)
-		case row.SharingRevokedAt.Valid || r.ExpectedRevision != 1:
-			return value.ErrConflict
-		default:
-			n, err := q.RevokePolicySharing(ctx, custodydb.RevokePolicySharingParams{RootID: id(s.root), ID: row.ID, SharingRevokeKey: key})
-			if err != nil {
-				return err
-			}
-			if n != 1 {
-				return value.ErrConflict
-			}
-			ids, err := q.RevokePolicyShares(ctx, custodydb.RevokePolicySharesParams{RootID: id(s.root), PolicyAcceptanceID: row.ID, RevokeKey: key})
-			if err != nil {
-				return err
-			}
-			revoked = len(ids)
+		if replay, err = change(q, row, key); err != nil {
+			return err
 		}
 		if err = s.recovery.check(ctx, q, trust, s.root, recovery); err != nil {
 			return err
@@ -118,7 +167,7 @@ func (s *EvidenceShares) RevokePolicySharing(ctx context.Context, r sharing.Poli
 		return ctx.Err()
 	})
 	if err != nil {
-		return 0, false, shareError(err)
+		return false, shareError(err)
 	}
-	return revoked, replay, nil
+	return replay, nil
 }

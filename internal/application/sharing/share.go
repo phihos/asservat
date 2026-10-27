@@ -632,39 +632,69 @@ type PolicyRevokeResult struct {
 }
 
 // RevokePolicySharing revokes every share of one policy acceptance's
-// recurring sharing and stops its future sharing (ADR-239, REQ-SHR-007), for
-// the instruction's creator, a current manager (a principal holding one of
-// the pinned owner-team assignments now on the policy's workload) or an
-// installation administrator (ADR-238). Revocation only restricts access.
-// Expected is the sharing's revision: 1 before revocation; the same key after
-// success is a replay. An acceptance without sharing, or one the caller may
-// not revoke, is NotAvailable.
+// recurring sharing and stops its future sharing (ADR-239, REQ-SHR-007).
+// Expected is the sharing's revision (1, or 2 after a Stop); the same key
+// after success is a replay.
 func (s Service) RevokePolicySharing(ctx context.Context, current identities.CurrentIdentity, acceptanceID string, expected int64, key string) (PolicyRevokeResult, error) {
-	var zero PolicyRevokeResult
+	var out PolicyRevokeResult
+	err := s.changePolicySharing(ctx, current, acceptanceID, expected, key, func(ctx context.Context, r PolicyRevocation, recovery artifact.RecoveryProof) error {
+		revoked, replay, err := s.Policies.RevokePolicySharing(ctx, r, recovery)
+		out = PolicyRevokeResult{AcceptanceID: acceptanceID, Revoked: revoked, Replay: replay}
+		return err
+	})
+	if err != nil {
+		return PolicyRevokeResult{}, err
+	}
+	return out, nil
+}
+
+// StopPolicySharing stops future sharing of one policy acceptance
+// (REQ-SHR-007): no further capture claims a slot; captures that already
+// claimed one still publish their shares before notAfter; existing shares
+// stay until they expire or are revoked. Expected must be revision 1.
+func (s Service) StopPolicySharing(ctx context.Context, current identities.CurrentIdentity, acceptanceID string, expected int64, key string) (PolicyRevokeResult, error) {
+	var out PolicyRevokeResult
+	err := s.changePolicySharing(ctx, current, acceptanceID, expected, key, func(ctx context.Context, r PolicyRevocation, recovery artifact.RecoveryProof) error {
+		replay, err := s.Policies.StopPolicySharing(ctx, r, recovery)
+		out = PolicyRevokeResult{AcceptanceID: acceptanceID, Replay: replay}
+		return err
+	})
+	if err != nil {
+		return PolicyRevokeResult{}, err
+	}
+	return out, nil
+}
+
+// changePolicySharing authorizes a Stop or revoke-all for the instruction's
+// creator, a current manager (a principal holding one of the pinned
+// owner-team assignments now on the policy's workload) or an installation
+// administrator (ADR-238). Both only restrict access. An acceptance without
+// sharing, or one the caller may not change, is NotAvailable.
+func (s Service) changePolicySharing(ctx context.Context, current identities.CurrentIdentity, acceptanceID string, expected int64, key string, apply func(context.Context, PolicyRevocation, artifact.RecoveryProof) error) error {
 	if ctx == nil || ctx.Err() != nil || current == nil || !s.ready() || s.Policies == nil {
-		return zero, capture.ErrUnavailable
+		return capture.ErrUnavailable
 	}
 	if !value.UUID(acceptanceID) || expected < 1 || !identity.Text(key, 128) {
-		return zero, capture.ErrInvalid
+		return capture.ErrInvalid
 	}
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	i, err := s.caller(ctx, current)
 	if err != nil {
-		return zero, err
+		return err
 	}
 	recovery, err := s.recovery(ctx)
 	if err != nil {
-		return zero, err
+		return err
 	}
 	sharing, err := s.Policies.PolicySharing(ctx, acceptanceID)
 	if errors.Is(err, capture.ErrDenied) {
-		return zero, capture.ErrDenied
+		return capture.ErrDenied
 	}
 	if err != nil || sharing.AcceptanceID != acceptanceID {
-		return zero, capture.ErrUnavailable
+		return capture.ErrUnavailable
 	}
-	revocation := PolicyRevocation{AcceptanceID: acceptanceID, Actor: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}
+	r := PolicyRevocation{AcceptanceID: acceptanceID, Actor: i.Principal, ExpectedRevision: expected, IdempotencyKey: key}
 	in := sharing.Instruction
 	if in.Creator.Issuer != i.Principal.Issuer || in.Creator.Subject != i.Principal.Subject {
 		var held []artifact.AudienceAssignment
@@ -672,16 +702,12 @@ func (s Service) RevokePolicySharing(ctx context.Context, current identities.Cur
 			held, _ = value.PolicySharingManagedBy(in.Creator, in.Management, sharing.Target, i, p, s.Now())
 		}
 		if len(held) == 0 && !s.administrator(ctx, i) {
-			return zero, capture.ErrDenied
+			return capture.ErrDenied
 		}
-		revocation.Administrator = len(held) == 0
+		r.Administrator = len(held) == 0
 		for _, a := range held {
-			revocation.Managers = append(revocation.Managers, a.AssignmentID)
+			r.Managers = append(r.Managers, a.AssignmentID)
 		}
 	}
-	revoked, replay, err := s.Policies.RevokePolicySharing(ctx, revocation, recovery)
-	if err != nil {
-		return zero, err
-	}
-	return PolicyRevokeResult{AcceptanceID: acceptanceID, Revoked: revoked, Replay: replay}, nil
+	return apply(ctx, r, recovery)
 }

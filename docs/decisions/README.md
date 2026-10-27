@@ -5,9 +5,11 @@ a DebugPolicy's `spec.sharing` (≤ 8 recipients, `maxCaptures` 1–100, absolut
 is accepted by `activate_policy` only with `evidence:share` and an evidence-owner group of the
 automation AccessBinding (the pinned management) and stored in the acceptance record; each admitted
 capture claims one slot of a counter on the acceptance (migration 00092) and receives an ADR-235
-instruction while under both limits and the policy unchanged. Stop = policy edit (no backfill);
-revoke-all = `revoke_share(sharing_intent_id = acceptance ID)`; activation states "Repeated
-collections will be shared" and `get_policy_status` reports the sharing state.
+instruction while under both limits, unstopped and the policy unchanged. `activate_policy` first
+returns the review ("Repeated collections will be shared", recipients, limit, end) and accepts only
+with `sharing_reviewed`; `stop_future_sharing` stops claims (claimed captures still publish), a
+policy edit stops them too (no backfill); revoke-all = `revoke_share(sharing_intent_id)`;
+`get_policy_status` reports the sharing state.
 
 [ADR-236 — Recent captures and Collect again](236-capture-history-collect-again.md) is S-06
 increment 6: migration 00089 records each accepted capture's cluster, namespace UID, workload UID

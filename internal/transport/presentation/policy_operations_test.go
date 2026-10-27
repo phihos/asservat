@@ -23,7 +23,7 @@ func (f *policyOperationsFixture) ResolveIdentity(context.Context) (identity.Ide
 	now := time.Now()
 	return identity.Identity{Principal: identity.Principal{Issuer: "https://id.example.invalid", Subject: "developer", ClientID: "console", Kind: identity.Human}, Scopes: f.scopes, Policy: identity.Revision{UID: "identity", Generation: 1, Digest: artifact.Digest{1}}, VerifiedAt: now, ValidUntil: now.Add(30 * time.Second)}, nil
 }
-func (f *policyOperationsFixture) Activate(context.Context, identities.CurrentIdentity, string, string) (app.PolicyActivationResult, error) {
+func (f *policyOperationsFixture) Activate(context.Context, identities.CurrentIdentity, string, string, bool) (app.PolicyActivationResult, error) {
 	return app.PolicyActivationResult{}, app.ErrPolicyDeactivated
 }
 func (f *policyOperationsFixture) Get(context.Context, identities.CurrentIdentity, string) (value.PolicyStatus, time.Time, error) {

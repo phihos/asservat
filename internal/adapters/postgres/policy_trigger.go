@@ -345,6 +345,9 @@ func (s *PolicyTriggers) Status(ctx context.Context, policy string) (value.Polic
 			if accepted.SharingRevokedAt.Valid {
 				out.Sharing.RevokedAt = accepted.SharingRevokedAt.Time.UTC()
 			}
+			if accepted.SharingStoppedAt.Valid {
+				out.Sharing.StoppedAt = accepted.SharingStoppedAt.Time.UTC()
+			}
 		}
 		if out.WatchedPods, err = q.CountPolicyWatermarks(ctx, custodydb.CountPolicyWatermarksParams{RootID: id(s.root), PolicyUid: policy}); err != nil {
 			return err

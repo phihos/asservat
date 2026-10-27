@@ -27,11 +27,20 @@ type ShareUseCase interface {
 	ListAdministered(context.Context, identities.CurrentIdentity, string, int) ([]sharing.View, string, time.Time, error)
 }
 
-// PolicySharingRevoker revokes a policy acceptance's recurring sharing
-// (ADR-239, revoke_share with sharing_intent_id). A share service without it
-// refuses that form as unavailable.
+// PolicySharingRevoker stops or revokes a policy acceptance's recurring
+// sharing (ADR-239: stop_future_sharing, and revoke_share with
+// sharing_intent_id). A share service without it refuses both as
+// unavailable.
 type PolicySharingRevoker interface {
 	RevokePolicySharing(context.Context, identities.CurrentIdentity, string, int64, string) (sharing.PolicyRevokeResult, error)
+	StopPolicySharing(context.Context, identities.CurrentIdentity, string, int64, string) (sharing.PolicyRevokeResult, error)
+}
+
+// policySharingStopData is the stop_future_sharing reply.
+type policySharingStopData struct {
+	SharingIntentID string `json:"sharing_intent_id"`
+	State           string `json:"state"`
+	Revision        int64  `json:"revision"`
 }
 
 // ShareOperations serves create_share, list_shares and revoke_share to MCP
@@ -63,7 +72,7 @@ func (s *ShareOperations) PublicOrigin() string {
 	return s.origin
 }
 func (s *ShareOperations) ToolNames() []string {
-	return []string{"create_share", "list_shares", "revoke_share", "transfer_share"}
+	return []string{"create_share", "list_shares", "revoke_share", "transfer_share", "stop_future_sharing"}
 }
 func (s *ShareOperations) Tool(name string) (contracts.InvestigationTool, bool) {
 	if s == nil || !slices.Contains(s.ToolNames(), name) {
@@ -221,7 +230,7 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 	noDispatch := false
 	// Creating and revoking need the evidence:share scope before dispatch;
 	// listing received shares needs only evidence:read.
-	if (name == "create_share" || name == "revoke_share" || name == "transfer_share" || name == "list_shares" && in.View != "received") && !slices.Contains(i.Scopes, authorization.ShareScope) {
+	if (name == "create_share" || name == "revoke_share" || name == "transfer_share" || name == "stop_future_sharing" || name == "list_shares" && in.View != "received") && !slices.Contains(i.Scopes, authorization.ShareScope) {
 		noDispatch, operationErr = true, value.ErrDenied
 	} else {
 		switch name {
@@ -292,7 +301,7 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 				var r sharing.PolicyRevokeResult
 				r, operationErr = revoker.RevokePolicySharing(ctx, current, in.SharingIntentID, in.ExpectedRevision, in.IdempotencyKey)
 				if operationErr == nil {
-					out.Data = shareRevokeData{SharingIntentID: r.AcceptanceID, Phase: string(authorization.ShareRevoked), Revision: 2}
+					out.Data = shareRevokeData{SharingIntentID: r.AcceptanceID, Phase: string(authorization.ShareRevoked), Revision: in.ExpectedRevision + 1}
 				}
 				break
 			}
@@ -300,6 +309,17 @@ func (s *ShareOperations) CallWithContext(ctx context.Context, current identitie
 			share, _, operationErr = s.shares.Revoke(ctx, current, in.ShareID, in.ExpectedRevision, in.IdempotencyKey)
 			if operationErr == nil {
 				out.Data = shareRevokeData{ShareID: share.ID, Phase: string(authorization.ShareRevoked), Revision: share.Revision}
+			}
+		case "stop_future_sharing":
+			revoker, ok := s.shares.(PolicySharingRevoker)
+			if !ok {
+				operationErr = value.ErrUnavailable
+				break
+			}
+			var r sharing.PolicyRevokeResult
+			r, operationErr = revoker.StopPolicySharing(ctx, current, in.SharingIntentID, in.ExpectedRevision, in.IdempotencyKey)
+			if operationErr == nil {
+				out.Data = policySharingStopData{SharingIntentID: r.AcceptanceID, State: "Stopped", Revision: 2}
 			}
 		case "transfer_share":
 			input := sharing.TransferInput{ShareID: in.ShareID, ExpectedRevision: in.ExpectedRevision, IdempotencyKey: in.IdempotencyKey}

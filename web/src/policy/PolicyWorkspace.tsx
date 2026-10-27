@@ -16,7 +16,8 @@ type Status = NonNullable<Entry['status']>;
 
 const sharingStates: Record<string, string> = {
   active: 'sharing', limitReached: 'capture limit reached', expired: 'ended', revoked: 'revoked',
-  stopped: 'stopped: the DebugPolicy changed; activate the new revision to share again',
+  stopped: 'future sharing stopped; existing shares stay until they expire or are revoked',
+  policyChanged: 'stopped: the DebugPolicy changed; activate the new revision to share again',
 };
 
 // ADR-239: repeated collections will be shared; existing shares stay until
@@ -65,9 +66,12 @@ function PolicyEntry({ entry, controller }: { entry: Entry; controller: Policies
       {s.state === 'deactivated' && <p>Existing captures and evidence are kept. This revision cannot be activated again; change the DebugPolicy to activate a new revision.</p>}
     </> : !entry.busy && !entry.message && <p role="status">No status yet.</p>}
     {entry.message && <p role="alert" className="notice">{entry.message}</p>}
+    {entry.review && <div role="alert" className="notice"><p>{entry.review}</p>
+      <Button className="button" isDisabled={entry.busy} onPress={() => void controller.activateSharing(entry.name)}>Activate and share</Button></div>}
     <div className="actions">
       {!active && s?.state !== 'deactivated' && <Button className="button" isDisabled={entry.busy} onPress={() => void controller.activate(entry.name)}>Activate</Button>}
       {s && s.state !== 'deactivated' && <Button className={active ? 'button' : 'button secondary'} isDisabled={entry.busy} onPress={() => void controller.deactivate(entry.name)}>Deactivate</Button>}
+      {s?.sharing && s.sharing.state !== 'revoked' && s.sharing.state !== 'stopped' && <Button className="button secondary" isDisabled={entry.busy} onPress={() => void controller.stopSharing(entry.name)}>Stop future sharing</Button>}
       {s?.sharing && s.sharing.state !== 'revoked' && <Button className="button secondary" isDisabled={entry.busy} onPress={() => void controller.revokeSharing(entry.name)}>Revoke all shares</Button>}
       <Button className="button secondary" isDisabled={entry.busy} onPress={() => void controller.refresh(entry.name)}>Check status</Button>
     </div>

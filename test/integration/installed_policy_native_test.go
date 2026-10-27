@@ -229,7 +229,10 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			MaxCaptures int    `json:"max_captures"`
 		} `json:"sharing"`
 	}
-	activation := map[string]string{"policy_name": installedPolicyName, "idempotency_key": "installed-policy-activation"}
+	// ADR-239: the first activation returns the sharing review; the user then
+	// activates with sharing_reviewed.
+	activation := map[string]any{"policy_name": installedPolicyName, "idempotency_key": "installed-policy-activation"}
+	reviewed := ""
 	wait("an active policy", 3*time.Minute, func(poll context.Context) bool {
 		reply, err := readWith(sharer, poll, "activate_policy", activation)
 		if err != nil {
@@ -240,6 +243,13 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 			var failure struct{ Code, Message string }
 			_ = json.Unmarshal(reply.Data, &failure)
 			t.Logf("installed activate_policy %s: %s (request %s)", failure.Code, failure.Message, reply.RequestID)
+			if failure.Code == "SharingReviewRequired" {
+				if reviewed != "" || !strings.HasPrefix(failure.Message, "Repeated collections will be shared with User "+outsiderTokens.subject+": at most the next 1 capture(s)") {
+					t.Fatal("installed sharing review", failure.Message)
+				}
+				reviewed = failure.Message
+				activation["sharing_reviewed"] = true
+			}
 			return false
 		}
 		if installedJourneyDecode(reply.Data, &activated) != nil {
@@ -249,6 +259,9 @@ func installedPolicyJourney(t *testing.T, ctx context.Context, admin *pgxpool.Po
 	})
 	if activated.MaxExecutions != 10 || !activated.ExpiresAt.After(time.Now()) || activated.ExpiresAt.After(time.Now().Add(time.Hour)) {
 		t.Fatal("activation did not take the envelope's finite limits", activated)
+	}
+	if reviewed == "" {
+		t.Fatal("the sharing policy was activated without a review")
 	}
 	if activated.Sharing == nil || activated.Sharing.Statement != "Repeated collections will be shared" || activated.Sharing.Recipients != 1 || activated.Sharing.MaxCaptures != 1 {
 		t.Fatal("activation does not state its recurring sharing", activated.Sharing)

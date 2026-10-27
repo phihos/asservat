@@ -330,7 +330,7 @@ func (q *Queries) ListReceivedShares(ctx context.Context, arg ListReceivedShares
 }
 
 const lockPolicySharingAcceptance = `-- name: LockPolicySharingAcceptance :one
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing' FOR UPDATE
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing' FOR UPDATE
 `
 
 type LockPolicySharingAcceptanceParams struct {
@@ -360,6 +360,8 @@ func (q *Queries) LockPolicySharingAcceptance(ctx context.Context, arg LockPolic
 		&i.SharesSpent,
 		&i.SharingRevokedAt,
 		&i.SharingRevokeKey,
+		&i.SharingStoppedAt,
+		&i.SharingStopKey,
 	)
 	return i, err
 }
@@ -378,7 +380,7 @@ func (q *Queries) LockShareArtifact(ctx context.Context, artifactKey string) err
 
 const readPolicySharingAcceptance = `-- name: ReadPolicySharingAcceptance :one
 
-SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing'
+SELECT id, root_id, policy_uid, generation, nonce, scope_digest, request_digest, record_digest, record, accepted_at, acknowledged_at, receipt_json, executions_spent, shares_spent, sharing_revoked_at, sharing_revoke_key, sharing_stopped_at, sharing_stop_key FROM policy_acceptance WHERE root_id=$1 AND id=$2 AND record ? 'Sharing'
 `
 
 type ReadPolicySharingAcceptanceParams struct {
@@ -407,6 +409,8 @@ func (q *Queries) ReadPolicySharingAcceptance(ctx context.Context, arg ReadPolic
 		&i.SharesSpent,
 		&i.SharingRevokedAt,
 		&i.SharingRevokeKey,
+		&i.SharingStoppedAt,
+		&i.SharingStopKey,
 	)
 	return i, err
 }
@@ -696,6 +700,27 @@ func (q *Queries) RevokeShare(ctx context.Context, arg RevokeShareParams) (Evide
 		&i.PolicyAcceptanceID,
 	)
 	return i, err
+}
+
+const stopPolicySharing = `-- name: StopPolicySharing :execrows
+UPDATE policy_acceptance SET sharing_stopped_at=clock_timestamp(), sharing_stop_key=$3
+WHERE root_id=$1 AND id=$2 AND sharing_stopped_at IS NULL AND sharing_revoked_at IS NULL AND record ? 'Sharing'
+`
+
+type StopPolicySharingParams struct {
+	RootID         pgtype.UUID
+	ID             pgtype.UUID
+	SharingStopKey pgtype.Text
+}
+
+// Stop future sharing: no further slot is claimed; already claimed captures
+// still publish their shares before notAfter (REQ-SHR-007 Draining).
+func (q *Queries) StopPolicySharing(ctx context.Context, arg StopPolicySharingParams) (int64, error) {
+	result, err := q.db.Exec(ctx, stopPolicySharing, arg.RootID, arg.ID, arg.SharingStopKey)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const transferShare = `-- name: TransferShare :one

@@ -3,7 +3,9 @@ import { OperationFailure, operationMessage } from '../capture/http';
 import { operations, type Data, type Input, type Operation, type Operations, type Output, type Status } from './http';
 import { operations as shareOperations, type Operations as ShareOperations } from '../sharing/http';
 
-export type Entry = { name: string; status?: Status; message?: string; busy: boolean };
+// review is the server's recurring-sharing review (ADR-239), shown before the
+// user activates a policy that shares its captures.
+export type Entry = { name: string; status?: Status; message?: string; review?: string; busy: boolean };
 export type State = { entries: Entry[] };
 
 // UI coordination is not authority: the server rechecks every operation. The
@@ -53,7 +55,8 @@ export class Policies {
       if (!scope.aborted) {
         // A canonical domain refusal is definite: the next command gets a new key.
         if (error instanceof OperationFailure && error.detail) this.keys.delete(operation + '\n' + name);
-        this.update(name, { message: operationMessage(error) });
+        if (error instanceof OperationFailure && error.code === 'SharingReviewRequired') this.update(name, { review: error.detail });
+        else this.update(name, { message: operationMessage(error) });
       }
       return;
     } finally { if (!scope.aborted) this.update(name, { busy: false }); }
@@ -74,30 +77,39 @@ export class Policies {
     if (data) this.update(name, { status: data });
   };
 
-  private async command(name: string, operation: 'activate_policy' | 'deactivate_policy') {
+  private async command(name: string, operation: 'activate_policy' | 'deactivate_policy', reviewed = false) {
     const slot = operation + '\n' + name;
     const key = this.keys.get(slot) ?? this.newID();
     this.keys.set(slot, key);
-    const data = await this.run(name, operation, { policy_name: name, idempotency_key: key });
+    this.update(name, { review: undefined });
+    const input = operation === 'activate_policy' && reviewed ? { policy_name: name, idempotency_key: key, sharing_reviewed: true } : { policy_name: name, idempotency_key: key };
+    const data = await this.run(name, operation, input);
     if (!data) return;
     this.keys.delete(slot);
     await this.refresh(name);
   }
   activate = (name: string) => this.command(name, 'activate_policy');
+  // ADR-239: activation after the user reviewed the recurring sharing.
+  activateSharing = (name: string) => this.command(name, 'activate_policy', true);
 
-  // ADR-239: revoke every share of the acceptance's recurring sharing and
-  // stop its future sharing (revoke_share with sharing_intent_id). The server
-  // checks that the caller created or currently manages it.
-  revokeSharing = async (name: string) => {
+  // ADR-239: stop future sharing (stop_future_sharing) or revoke every share
+  // of the acceptance's recurring sharing and stop it (revoke_share with
+  // sharing_intent_id). The server checks that the caller created or
+  // currently manages it.
+  stopSharing = (name: string) => this.changeSharing(name, 'stop_future_sharing');
+  revokeSharing = (name: string) => this.changeSharing(name, 'revoke_share');
+  private changeSharing = async (name: string, operation: 'stop_future_sharing' | 'revoke_share') => {
     const session = this.session, scope = this.scope;
-    const acceptance = this.state.entries.find(entry => entry.name === name)?.status?.acceptance_id;
+    const status = this.state.entries.find(entry => entry.name === name)?.status;
+    const acceptance = status?.acceptance_id;
     if (!session || !scope || scope.aborted || !acceptance) return;
-    const slot = 'revoke_share\n' + acceptance;
+    const slot = operation + '\n' + acceptance;
     const key = this.keys.get(slot) ?? this.newID();
     this.keys.set(slot, key);
     this.update(name, { busy: true, message: undefined });
     try {
-      const reply = await this.shares.call('revoke_share', { sharing_intent_id: acceptance, expected_revision: 1, idempotency_key: key }, session.csrf_token, scope);
+      const input = { sharing_intent_id: acceptance, expected_revision: operation === 'revoke_share' ? status?.sharing?.revision ?? 1 : 1, idempotency_key: key };
+      const reply = await this.shares.call(operation, input, session.csrf_token, scope);
       if (scope.aborted) return;
       if (reply.status !== 'ok') throw new OperationFailure(503, reply.status === 'error' ? reply.data.code : 'Pending', reply.status === 'error' ? reply.data.message : 'This operation is still pending.');
       this.keys.delete(slot);

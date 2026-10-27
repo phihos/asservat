@@ -72,24 +72,40 @@ func (s PolicyShareInstruction) Valid() bool {
 	return true
 }
 
-// Policy sharing states reported by get_policy_status. Only revocation is
-// stored; the others are derived from the counter, the end and the source.
+// Policy sharing states reported by get_policy_status. Stop and revocation
+// are stored; the others are derived from the counter, the end and the
+// source.
 const (
 	PolicySharingActive       = "active"
 	PolicySharingLimitReached = "limitReached"
 	PolicySharingExpired      = "expired"
 	PolicySharingRevoked      = "revoked"
-	// PolicySharingStopped: the DebugPolicy changed after acceptance (a new
-	// generation), which stops sharing until a new revision is activated.
+	// PolicySharingStopped: a manager stopped future sharing (REQ-SHR-007);
+	// captures that already claimed a slot still publish their shares.
 	PolicySharingStopped = "stopped"
+	// PolicySharingPolicyChanged: the DebugPolicy changed after acceptance (a
+	// new generation), which stops sharing until a new revision is activated.
+	PolicySharingPolicyChanged = "policyChanged"
 )
 
 // PolicySharingStatus is the content-free sharing projection of one
 // acceptance.
 type PolicySharingStatus struct {
-	Instruction PolicyShareInstruction
-	Spent       int64
-	RevokedAt   time.Time
+	Instruction          PolicyShareInstruction
+	Spent                int64
+	StoppedAt, RevokedAt time.Time
+}
+
+// Revision is 1, plus one for a Stop and one for a revocation.
+func (s PolicySharingStatus) Revision() int64 {
+	n := int64(1)
+	if !s.StoppedAt.IsZero() {
+		n++
+	}
+	if !s.RevokedAt.IsZero() {
+		n++
+	}
+	return n
 }
 
 // State derives the sharing state at now for a policy observed at generation.
@@ -97,8 +113,10 @@ func (s PolicySharingStatus) State(now time.Time, accepted, observed int64) stri
 	switch {
 	case !s.RevokedAt.IsZero():
 		return PolicySharingRevoked
-	case observed != accepted:
+	case !s.StoppedAt.IsZero():
 		return PolicySharingStopped
+	case observed != accepted:
+		return PolicySharingPolicyChanged
 	case !now.Before(s.Instruction.NotAfter):
 		return PolicySharingExpired
 	case s.Spent >= int64(s.Instruction.MaxCaptures):

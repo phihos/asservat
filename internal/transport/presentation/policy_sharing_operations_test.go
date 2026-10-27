@@ -23,7 +23,7 @@ type sharingActivationFixture struct {
 	err    error
 }
 
-func (f *sharingActivationFixture) Activate(context.Context, identities.CurrentIdentity, string, string) (app.PolicyActivationResult, error) {
+func (f *sharingActivationFixture) Activate(context.Context, identities.CurrentIdentity, string, string, bool) (app.PolicyActivationResult, error) {
 	return f.result, f.err
 }
 
@@ -31,6 +31,12 @@ type policyRevokeFixture struct {
 	shareOperationsFixture
 	acceptance string
 	expected   int64
+	stopped    bool
+}
+
+func (f *policyRevokeFixture) StopPolicySharing(_ context.Context, _ identities.CurrentIdentity, acceptance string, expected int64, _ string) (sharing.PolicyRevokeResult, error) {
+	f.acceptance, f.expected, f.stopped = acceptance, expected, true
+	return sharing.PolicyRevokeResult{AcceptanceID: acceptance}, nil
 }
 
 func (f *policyRevokeFixture) RevokePolicySharing(_ context.Context, _ identities.CurrentIdentity, acceptance string, expected int64, _ string) (sharing.PolicyRevokeResult, error) {
@@ -62,6 +68,17 @@ func TestPolicyActivationStatesThatRepeatedCollectionsWillBeShared(t *testing.T)
 	if len(warnings) != 1 || !strings.HasPrefix(warnings[0].(string), "Repeated collections will be shared with 2 recipient(s)") {
 		t.Fatal("activation warning", warnings)
 	}
+	// Without sharing_reviewed the server returns the review: the statement,
+	// the recipients, the capture limit and the end.
+	f.result, f.err = app.PolicyActivationResult{}, app.PolicySharingReview{Instruction: *policyShareInstruction(end)}
+	out = policyCall(t, s, &f.policyOperationsFixture, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`)
+	review, _ := out["data"].(map[string]any)
+	if out["status"] != "error" || review["code"] != "SharingReviewRequired" || !strings.HasPrefix(review["message"].(string), "Repeated collections will be shared with Group incident, User oncall: at most the next 10 capture(s) of this policy until 2026-10-28T18:00:00Z") {
+		t.Fatal("sharing review", out)
+	}
+	if out = policyCall(t, s, &f.policyOperationsFixture, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k","sharing_reviewed":true}`); out["status"] != "error" {
+		t.Fatal("reviewed activation input refused", out)
+	}
 	f.result, f.err = app.PolicyActivationResult{}, value.ErrSharingDenied
 	if out = policyCall(t, s, &f.policyOperationsFixture, "activate_policy", `{"policy_name":"restarts","idempotency_key":"k"}`); out["status"] != "error" || out["data"].(map[string]any)["code"] != "SharingNotPermitted" {
 		t.Fatal("sharing refusal", out)
@@ -71,8 +88,13 @@ func TestPolicyActivationStatesThatRepeatedCollectionsWillBeShared(t *testing.T)
 		Sharing: &value.PolicySharingStatus{Instruction: *policyShareInstruction(time.Now().Add(time.Hour)), Spent: 4}}
 	out = policyCall(t, s, &f.policyOperationsFixture, "get_policy_status", `{"policy_name":"restarts"}`)
 	status, _ := out["data"].(map[string]any)["sharing"].(map[string]any)
-	if out["status"] != "ok" || status["state"] != "stopped" || status["shared_captures"] != float64(4) || status["max_captures"] != float64(10) || status["recipients"] != float64(2) {
+	if out["status"] != "ok" || status["state"] != "policyChanged" || status["revision"] != float64(1) || status["shared_captures"] != float64(4) || status["max_captures"] != float64(10) || status["recipients"] != float64(2) {
 		t.Fatal("status sharing", out)
+	}
+	f.status.Sharing.StoppedAt = time.Now()
+	out = policyCall(t, s, &f.policyOperationsFixture, "get_policy_status", `{"policy_name":"restarts"}`)
+	if status, _ = out["data"].(map[string]any)["sharing"].(map[string]any); status["state"] != "stopped" || status["revision"] != float64(2) || status["stopped_at"] == nil {
+		t.Fatal("stopped sharing status", out)
 	}
 }
 
@@ -86,6 +108,10 @@ func TestRevokeShareBySharingIntentRevokesTheAcceptance(t *testing.T) {
 	data, _ := out["data"].(map[string]any)
 	if out["status"] != "ok" || data["sharing_intent_id"] != "99999999-9999-4999-8999-999999999999" || data["revision"] != float64(2) || data["phase"] != "Revoked" || data["share_id"] != nil || f.acceptance != "99999999-9999-4999-8999-999999999999" || f.expected != 1 || len(f.calls) != 0 {
 		t.Fatal("revoke-all reply", out, f.calls)
+	}
+	out = shareCall(t, s, &f.shareOperationsFixture, "stop_future_sharing", `{"sharing_intent_id":"99999999-9999-4999-8999-999999999999","expected_revision":1,"idempotency_key":"s"}`)
+	if data, _ := out["data"].(map[string]any); out["status"] != "ok" || data["state"] != "Stopped" || data["revision"] != float64(2) || !f.stopped {
+		t.Fatal("stop reply", out)
 	}
 	// Exactly one target: both or neither is invalid input.
 	if _, err := s.CallWithContext(context.Background(), &f.shareOperationsFixture, OperationCall{requestID: "88888888-8888-4888-8888-888888888888"}, "revoke_share", []byte(`{"share_id":"11111111-1111-4111-8111-111111111111","sharing_intent_id":"99999999-9999-4999-8999-999999999999","expected_revision":1,"idempotency_key":"r"}`)); err == nil {

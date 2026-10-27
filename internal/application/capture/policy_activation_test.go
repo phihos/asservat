@@ -131,7 +131,7 @@ func (f *activationFixture) activation() PolicyActivation {
 
 func TestPolicyActivationAcceptsTheTeamScopeWithEnvelopeLimits(t *testing.T) {
 	f := newActivationFixture(t)
-	r, err := f.activation().Activate(context.Background(), f, "restarts", "key-1")
+	r, err := f.activation().Activate(context.Background(), f, "restarts", "key-1", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -149,14 +149,14 @@ func TestPolicyActivationAcceptsTheTeamScopeWithEnvelopeLimits(t *testing.T) {
 	// The same key retries into the original acceptance without accepting again.
 	f.previous = &value.PolicyAcceptance{ID: r.AcceptanceID, Authority: a, Submitter: f.author.Principal}
 	f.status = value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: r.AcceptanceID, Authority: a, NotAfter: a.NotAfter, MaxExecutions: 10}
-	again, err := f.activation().Activate(context.Background(), f, "restarts", "key-1")
+	again, err := f.activation().Activate(context.Background(), f, "restarts", "key-1", true)
 	if err != nil || !again.Replay || again.AcceptanceID != r.AcceptanceID || len(f.accepted) != 1 {
 		t.Fatal("retry was not the original acceptance", again, err)
 	}
 	// An already accepted, unchanged scope is never accepted again.
 	f.previous = nil
 	f.status = value.PolicyStatus{PolicyUID: "policy-uid", ActiveID: r.AcceptanceID, Authority: a, NotAfter: a.NotAfter, MaxExecutions: 10}
-	unchanged, err := f.activation().Activate(context.Background(), f, "restarts", "key-2")
+	unchanged, err := f.activation().Activate(context.Background(), f, "restarts", "key-2", true)
 	if err != nil || !unchanged.Replay || len(f.accepted) != 1 {
 		t.Fatal("unchanged source accepted twice", unchanged, err)
 	}
@@ -180,7 +180,7 @@ func TestPolicyActivationRefusesWithoutTeamDelegation(t *testing.T) {
 			case "missing-capture-scope":
 				f.author.Scopes = []string{"evidence:read"}
 			}
-			if _, err := f.activation().Activate(context.Background(), f, "restarts", "key"); !errors.Is(err, want) || len(f.accepted) != 0 {
+			if _, err := f.activation().Activate(context.Background(), f, "restarts", "key", true); !errors.Is(err, want) || len(f.accepted) != 0 {
 				t.Fatal("activation not refused", err)
 			}
 		})
@@ -205,7 +205,7 @@ func (f *activationFixture) deactivation() PolicyDeactivation {
 
 func TestPolicyDeactivationIsIdempotentAndBlocksReactivationOfTheSameScope(t *testing.T) {
 	f := newActivationFixture(t)
-	r, err := f.activation().Activate(context.Background(), f, "restarts", "key-1")
+	r, err := f.activation().Activate(context.Background(), f, "restarts", "key-1", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,11 +227,11 @@ func TestPolicyDeactivationIsIdempotentAndBlocksReactivationOfTheSameScope(t *te
 	}
 	// Neither a retried activation nor a new key revives the deactivated scope.
 	f.previous = &value.PolicyAcceptance{ID: r.AcceptanceID, Authority: a, Submitter: f.author.Principal}
-	if _, err := f.activation().Activate(context.Background(), f, "restarts", "key-1"); !errors.Is(err, ErrPolicyDeactivated) {
+	if _, err := f.activation().Activate(context.Background(), f, "restarts", "key-1", true); !errors.Is(err, ErrPolicyDeactivated) {
 		t.Fatal("retried activation reported a deactivated acceptance", err)
 	}
 	f.previous = nil
-	if _, err := f.activation().Activate(context.Background(), f, "restarts", "key-2"); !errors.Is(err, ErrPolicyDeactivated) || len(f.accepted) != 1 {
+	if _, err := f.activation().Activate(context.Background(), f, "restarts", "key-2", true); !errors.Is(err, ErrPolicyDeactivated) || len(f.accepted) != 1 {
 		t.Fatal("deactivated scope accepted again", err)
 	}
 	// A workload identity, or a never-accepted policy, cannot be deactivated.
@@ -264,7 +264,12 @@ func TestPolicyActivationAcceptsBoundedSharingWithTheOwnerTeams(t *testing.T) {
 	end := time.Now().UTC().Add(48 * time.Hour).Truncate(time.Second)
 	owner := f.withPolicySharing(end)
 	f.author.Principal.Issuer = "https://id.example.invalid"
-	r, err := f.activation().Activate(context.Background(), f, "restarts", "key-1")
+	// Without review nothing is accepted and the review names the scope.
+	var review PolicySharingReview
+	if _, err := f.activation().Activate(context.Background(), f, "restarts", "key-1", false); !errors.As(err, &review) || !errors.Is(err, ErrSharingReviewRequired) || review.Instruction.MaxCaptures != 10 || len(f.accepted) != 0 {
+		t.Fatal("sharing policy activated without review", err)
+	}
+	r, err := f.activation().Activate(context.Background(), f, "restarts", "key-1", true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -307,7 +312,7 @@ func TestPolicyActivationRefusesSharingWithoutOwnerAuthority(t *testing.T) {
 				}
 				want = value.ErrInvalid
 			}
-			if _, err := f.activation().Activate(context.Background(), f, "restarts", "key"); !errors.Is(err, want) || len(f.accepted) != 0 {
+			if _, err := f.activation().Activate(context.Background(), f, "restarts", "key", true); !errors.Is(err, want) || len(f.accepted) != 0 {
 				t.Fatal("sharing activation not refused", err, len(f.accepted))
 			}
 		})

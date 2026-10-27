@@ -27,7 +27,7 @@ func TestPolicySharingStateIsDerived(t *testing.T) {
 		{0, false, now, 1, 1, PolicySharingActive},
 		{2, false, now, 1, 1, PolicySharingLimitReached},
 		{1, false, now.Add(time.Hour), 1, 1, PolicySharingExpired},
-		{1, false, now, 1, 2, PolicySharingStopped},
+		{1, false, now, 1, 2, PolicySharingPolicyChanged},
 		{2, true, now.Add(2 * time.Hour), 1, 2, PolicySharingRevoked},
 	} {
 		s := PolicySharingStatus{Instruction: in, Spent: c.spent}
@@ -37,6 +37,14 @@ func TestPolicySharingStateIsDerived(t *testing.T) {
 		if got := s.State(c.at, c.accepted, c.observed); got != c.want {
 			t.Fatalf("%+v: got %s", c, got)
 		}
+	}
+	stopped := PolicySharingStatus{Instruction: in, Spent: 1, StoppedAt: now}
+	if stopped.State(now, 1, 2) != PolicySharingStopped || stopped.Revision() != 2 {
+		t.Fatal("explicit stop", stopped.State(now, 1, 2), stopped.Revision())
+	}
+	stopped.RevokedAt = now
+	if stopped.State(now, 1, 1) != PolicySharingRevoked || stopped.Revision() != 3 {
+		t.Fatal("revoked after stop", stopped.Revision())
 	}
 	bad := in
 	bad.Recipients = []authorization.ShareRecipient{{Kind: "Group", Issuer: "https://other.example.invalid", ID: "x"}}

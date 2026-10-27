@@ -125,9 +125,25 @@ func policyNonce(actor identity.Principal, policy, key string) string {
 	return x[0:8] + "-" + x[8:12] + "-" + x[12:16] + "-" + x[16:20] + "-" + x[20:32]
 }
 
+// ErrSharingReviewRequired refuses the first activation of a policy that
+// shares its captures (ADR-239, REQ-SHR-005): the caller must review that
+// repeated collections will be shared and with whom, then activate again with
+// sharingReviewed. PolicySharingReview carries the reviewed scope.
+var ErrSharingReviewRequired = errors.New("policy sharing review required")
+
+// PolicySharingReview is the review statement of a policy's recurring
+// sharing, returned before acceptance: who receives the repeated collections,
+// how many captures at most and until when.
+type PolicySharingReview struct{ Instruction value.PolicyShareInstruction }
+
+func (r PolicySharingReview) Error() string { return ErrSharingReviewRequired.Error() }
+func (r PolicySharingReview) Unwrap() error { return ErrSharingReviewRequired }
+
 // Activate accepts the current revision of one policy. A retry under the same
-// key returns the original acceptance; a changed policy needs a new key.
-func (s PolicyActivation) Activate(ctx context.Context, current identities.CurrentIdentity, name, key string) (PolicyActivationResult, error) {
+// key returns the original acceptance; a changed policy needs a new key. A
+// policy with spec.sharing is accepted only with sharingReviewed; otherwise
+// every check runs and the review statement is returned instead.
+func (s PolicyActivation) Activate(ctx context.Context, current identities.CurrentIdentity, name, key string, sharingReviewed bool) (PolicyActivationResult, error) {
 	var zero PolicyActivationResult
 	if !s.configured() || ctx == nil || current == nil || ctx.Err() != nil {
 		return zero, value.ErrUnavailable
@@ -271,6 +287,9 @@ func (s PolicyActivation) Activate(ctx context.Context, current identities.Curre
 	sharing, err := s.sharing(author, compiled.Sharing, projection, target, delegation.UID, owners, issued)
 	if err != nil {
 		return zero, s.refused("sharing", err)
+	}
+	if sharing != nil && !sharingReviewed {
+		return zero, PolicySharingReview{Instruction: *sharing}
 	}
 	now := s.Now().UTC().Truncate(time.Microsecond)
 	submission := value.VerifiedPolicySubmission{ReplacesID: status.ActiveID, Nonce: nonce, Actor: author.Principal, Source: source.Revision, ClusterID: source.ClusterID, NamespaceUID: source.NamespaceUID, Name: source.Name, ScopeDigest: authority.ScopeDigest, IssuedAt: now, ExpiresAt: now.Add(30 * time.Second)}

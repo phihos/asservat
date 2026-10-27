@@ -34,7 +34,10 @@ publishes exactly one pod-status artifact.
    automation binding must therefore already hold `evidence-owner`; no schema field is added.
    Those assignments (≤ 8) are the pinned management — the policy's owner teams (default
    management, REQ-SHR-008). `notAfter` must be in the future and at most seven days after
-   activation (`ShareMaxLifetime`), and the recipients must be of the human's issuer. Otherwise
+   activation — the spec's installation maximum for every sharing intent (REQ-SHR-004: "an
+   installation maximum of 7 days that administrators may tighten; an explicit notAfter must be
+   future and within that bound"), which REQ-SHR-005's "same sharing declaration" inherits — and
+   the recipients must be of the human's issuer. Otherwise
    the activation is refused (`SharingNotPermitted`, or `PolicyRejected` with the field path) and
    no acceptance exists. The SQL acceptance transaction re-derives the management after its locks
    and refuses a difference. The instruction (creator, management, recipients, `maxCaptures`,
@@ -56,36 +59,47 @@ publishes exactly one pod-status artifact.
    with the row) and nothing is materialized once that acceptance's sharing is revoked. Share
    expiry is `min(notAfter, publication + 7 d, the artifact's access end)`; a capture published
    at or after `notAfter` is not shared. The share is an ordinary ADR-232 share afterwards.
-5. **Stop = policy edit.** Any later DebugPolicy generation stops sharing for the old acceptance
-   (the claim requires the accepted generation). Activating the new revision is a new acceptance
-   with its own counter and end; earlier captures are never backfilled and the old counter never
-   resets. Deactivation (ADR-229) stops collection and so sharing.
+5. **Stop future sharing (REQ-SHR-007).** The new shared browser/MCP operation
+   `stop_future_sharing(sharing_intent_id = acceptance ID, expected_revision 1)` sets the
+   acceptance's terminal `sharing_stopped_at` (once, idempotent by key): no further capture claims
+   a slot, while captures that already claimed one still publish their shares before `notAfter`
+   (the spec's Draining outcome, derived, no state machine) and existing shares stay until they
+   expire or are revoked. It replaces the spec's console-only `/api/v1/console/stop_future_sharing`
+   route with `/api/v1/operations/stop_future_sharing` (MCP parity). Editing the DebugPolicy
+   (a later generation) also stops claims for the old acceptance; activating the new revision is a
+   new acceptance with its own counter and end, earlier captures are never backfilled and the old
+   counter never resets. Deactivation (ADR-229) stops collection and so sharing.
 6. **Revoke-all by acceptance ID.** `revoke_share` accepts the canonical `sharing_intent_id`
-   (the policy's `acceptance_id` from `get_policy_status`) with `expected_revision: 1`: under the
-   acceptance row lock it marks the acceptance's sharing revoked (terminal, once, idempotent by
-   key) and revokes every still-unrevoked share with that `policy_acceptance_id` — exactly that
-   acceptance's shares. Pending captures of the acceptance are never shared afterwards and no
-   further slot is claimed. The creator or any current manager (a current holder of a pinned
-   owner-team assignment, `authorization.PolicySharingManagedBy`) may revoke; others get
+   (the policy's `acceptance_id`) with `expected_revision` = the sharing's revision (1, or 2 after
+   a Stop): under the acceptance row lock it marks the sharing revoked (terminal, once, idempotent
+   by key) and revokes every still-unrevoked share with that `policy_acceptance_id` — exactly that
+   acceptance's shares (each share's revision +1, ADR-238). Pending captures are never shared
+   afterwards and no further slot is claimed. Stop and revoke-all are for the creator, any current
+   manager (a current holder of a pinned owner-team assignment,
+   `authorization.PolicySharingManagedBy`) or an installation administrator (ADR-238); others get
    NotAvailable.
-7. **Statement and status.** The activation reply carries `sharing` (statement "Repeated
-   collections will be shared", recipient count, `max_captures`, `not_after`) and a warning
-   naming them; `get_policy_status` reports `sharing.state` — `active`, `limitReached`,
-   `expired`, `stopped` (policy changed) or `revoked`, all derived except revocation — with the
-   recipient count, `shared_captures`, the limit and the end. Console: the policy page shows the
-   sharing line and "Revoke all shares".
+7. **Review before activation (REQ-SHR-005).** `activate_policy` gains `sharing_reviewed`.
+   Without it, a policy with sharing runs every activation check and then returns
+   `SharingReviewRequired` with the review — "Repeated collections will be shared with" every
+   recipient (or their count when too long), the capture limit, the end and the seven-day share
+   bound — and nothing is accepted; with it, the policy is accepted. The activation reply carries
+   `sharing` (statement, recipient count, `max_captures`, `not_after`) and a warning;
+   `get_policy_status` reports `sharing.state` — `active`, `limitReached`, `expired`, `stopped`,
+   `policyChanged` or `revoked` — with `revision`, the recipient count, `shared_captures`, the
+   limit, the end and the stop/revoke times. Console: the review with "Activate and share", the
+   sharing line, "Stop future sharing" and "Revoke all shares".
 
 ### Spec narrowing (agent-authored, recorded in specs/authorization.md)
 
-- No SharingIntent record, registrations, selections, publication slots or
-  PendingApproval/Draining/Completed states: one instruction in the acceptance and one counter
-  beside it (plan §2.3). The acceptance ID is the intent ID of `revoke_share`/`sharing_intent_id`.
-- No preview before activation exists for policies (ADR-228): the DebugPolicy declares sharing,
-  the activation reply states it and status shows it. No independent sharing approval: the
-  policy carries metadata only (pod-status), and owner approval suffices (REQ-SHR-005).
-- Stop is a policy edit (or deactivation), not a separate Stop operation; there is no Draining:
-  a capture whose slot was claimed before the edit still publishes its share before `notAfter`.
-- `notAfter` is bounded by seven days after activation (`ShareMaxLifetime`), as for every share.
+- No SharingIntent record, registrations, selections, publication slots or stored
+  PendingApproval/Draining/Completed states: one instruction in the acceptance, one counter and
+  two terminal markers beside it (plan §2.3, accepted as outcome-preserving). Draining is the
+  derived outcome of Stop (claimed captures still publish); the acceptance ID is the intent ID.
+- No output selection or projection catalog: a pod-status capture has one metadata output.
+  No independent sharing approval: raw selections do not exist and owner approval of metadata
+  suffices where the installation permits it (REQ-SHR-005).
+- Spec-required, not narrowings: the review before activation (decision 7), an explicit Stop
+  (decision 5) and the seven-day `notAfter` bound (decision 2, REQ-SHR-004 installation maximum).
 
 ## Complexity gate (AGENTS.md)
 
@@ -97,11 +111,14 @@ publishes exactly one pod-status artifact.
 4. **Precedent:** scheduled report/alert sharing to a fixed recipient list with an end date
    (e.g. Grafana report schedules); general product knowledge, not a verified research baseline.
 5. **Privileges added:** 1 owner-privileged trigger function (admission claim) and 1 replaced
-   (publication); runtime grants: `evidence-share` gains SELECT and UPDATE(`sharing_revoked_at`,
-   `sharing_revoke_key`) on `policy_acceptance` for revoke-all. No Kubernetes, network, collector
+   (publication); runtime grants: `evidence-share` gains SELECT and UPDATE(`sharing_stopped_at`,
+   `sharing_stop_key`, `sharing_revoked_at`, `sharing_revoke_key`) on `policy_acceptance` for Stop
+   and revoke-all. One new audited operation name, `stop_future_sharing` (the operation-name
+   functions are redefined with every name of migrations 00086–00091). No Kubernetes, network, collector
    or worker change. Recipients gain what an ADR-232 share grants.
-6. **Failure/degraded states:** 0 new phases; `limitReached`, `expired` and `stopped` are derived
-   from stored facts; `revoked` is the one stored state. A capture without a claimed slot is
+6. **Failure/degraded states:** 0 new phases; `limitReached`, `expired` and `policyChanged` are
+   derived from stored facts; `stopped` and `revoked` are the stored terminal markers; one refusal
+   (`SharingReviewRequired`) before acceptance. A capture without a claimed slot is
    simply unshared (ADR-235's SharingUnavailable when a claimed one cannot be materialized).
 7. **Configuration for its own machinery:** no (constants: 100 captures, 8 recipients, 7 days).
 8. **Outside Asservat's control:** IdP stable user/group IDs (as ADR-232).
@@ -113,10 +130,10 @@ publishes exactly one pod-status artifact.
     field and the columns, and its policy captures are claimed by the same triggers. Disable by
     removing `spec.sharing` (edit stops it), revoke-all, or withholding `evidence:share` /
     `evidence-owner`. As for ADR-232, an in-place `installer-upgrade` applies no new runtime
-    grants (ADR-227): revoke-all is unavailable on an upgraded installation until role
+    grants (ADR-227): Stop and revoke-all are unavailable on an upgraded installation until role
     re-production exists; claiming, materialization, status and single-share revocation are not
     affected. Rollback leaves claimed instructions materializing (the trigger is in the schema);
-    revoke-all needs this binary.
+    Stop and revoke-all need this binary.
 11. **Smaller fix:** documenting "share each capture by hand" leaves the accepted requirement
     unmet; this is the plan's smallest form (one counter, one trigger, one reused instruction).
 

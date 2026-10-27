@@ -4986,6 +4986,139 @@
       }
     },
     {
+      "name": "stop_future_sharing",
+      "description": "Stop the future sharing of a recurring policy sharing (sharing_intent_id = the policy's acceptance_id from get_policy_status, expected_revision 1). No further capture is shared; captures already selected for sharing still publish their shares before the end, and existing shares stay until they expire or are revoked (revoke_share with the same sharing_intent_id revokes them). For its creator, a current member of a managing owner team or an installation administrator; it changes no collection authority.",
+      "enabledByDefault": true,
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sharing_intent_id": {
+            "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "idempotency_key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": [
+          "sharing_intent_id",
+          "expected_revision",
+          "idempotency_key"
+        ]
+      },
+      "outputSchema": {
+        "allOf": [
+          {
+            "$ref": "https://asservat.io/spec/v1/mcp-result.schema.json"
+          },
+          {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "ok"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "sharing_intent_id": {
+                        "$ref": "https://asservat.io/spec/v1/common.schema.json#/$defs/uuid"
+                      },
+                      "state": {
+                        "const": "Stopped"
+                      },
+                      "revision": {
+                        "type": "integer",
+                        "minimum": 2,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "required": [
+                      "sharing_intent_id",
+                      "state",
+                      "revision"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "const": "error"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "code": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      "message": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 1024
+                      },
+                      "retryable": {
+                        "type": "boolean"
+                      },
+                      "navigation_uri": {
+                        "type": "string",
+                        "format": "uri",
+                        "maxLength": 2048
+                      },
+                      "responsible_role": {
+                        "enum": [
+                          "maintainer",
+                          "approver",
+                          "administrator",
+                          "none"
+                        ]
+                      },
+                      "retry_after_seconds": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 60
+                      }
+                    },
+                    "required": [
+                      "code",
+                      "message",
+                      "retryable"
+                    ]
+                  }
+                },
+                "required": [
+                  "status",
+                  "data"
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "name": "transfer_share",
       "description": "Replace the managing owner teams of one share or an owned SharingIntent (an audited transfer). A current manager may name teams they currently hold; an installation administrator (scoped management delegation) may name any current owner teams covering the target, also to recover a Suspended share. Creator, recipients, artifacts, counts and expiry are unchanged.",
       "enabledByDefault": true,
@@ -10586,7 +10719,7 @@
     },
     {
       "name": "activate_policy",
-      "description": "Activate the current revision of a hub-held restart-trigger DebugPolicy for your team (ADR-228). Requires whole-pod collection rights and membership in a sponsoring group of the workload's automation AccessBinding. The policy then captures pod status automatically on Pod restarts within the team's finite envelope. Retry an uncertain result with the same idempotency key. A DebugPolicy with spec.sharing (ADR-239) also shares each of its next maxCaptures captures until notAfter with the named recipients: this needs the evidence:share scope and an evidence-owner group of the automation AccessBinding, and the reply states that repeated collections will be shared.",
+      "description": "Activate the current revision of a hub-held restart-trigger DebugPolicy for your team (ADR-228). Requires whole-pod collection rights and membership in a sponsoring group of the workload's automation AccessBinding. The policy then captures pod status automatically on Pod restarts within the team's finite envelope. Retry an uncertain result with the same idempotency key. A DebugPolicy with spec.sharing (ADR-239) also shares each of its next maxCaptures captures until notAfter with the named recipients: this needs the evidence:share scope and an evidence-owner group of the automation AccessBinding: the first call returns SharingReviewRequired with the review (repeated collections will be shared, recipients, maximum captures, end); activate again with sharing_reviewed true to accept it.",
       "enabledByDefault": true,
       "annotations": {
         "readOnlyHint": false,
@@ -10607,6 +10740,10 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 128
+          },
+          "sharing_reviewed": {
+            "type": "boolean",
+            "description": "Accept the reviewed recurring sharing of a DebugPolicy with spec.sharing (ADR-239). Without it such a policy is not activated; the reply SharingReviewRequired states that repeated collections will be shared, with whom, how many captures and until when."
           }
         },
         "required": [
@@ -11188,15 +11325,16 @@
                       "sharing": {
                         "type": "object",
                         "additionalProperties": false,
-                        "description": "Recurring sharing of the acceptance (ADR-239). stopped: the DebugPolicy changed after acceptance; activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id).",
+                        "description": "Recurring sharing of the acceptance (ADR-239). stopped: a manager stopped future sharing (stop_future_sharing; already claimed captures still publish); policyChanged: the DebugPolicy changed after acceptance, activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id and expected_revision = revision).",
                         "properties": {
                           "state": {
                             "enum": [
                               "active",
                               "limitReached",
                               "expired",
-                              "revoked",
-                              "stopped"
+                              "stopped",
+                              "policyChanged",
+                              "revoked"
                             ]
                           },
                           "recipients": {
@@ -11221,6 +11359,15 @@
                           "revoked_at": {
                             "type": "string",
                             "format": "date-time"
+                          },
+                          "revision": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 3
+                          },
+                          "stopped_at": {
+                            "type": "string",
+                            "format": "date-time"
                           }
                         },
                         "required": [
@@ -11228,7 +11375,8 @@
                           "recipients",
                           "shared_captures",
                           "max_captures",
-                          "not_after"
+                          "not_after",
+                          "revision"
                         ]
                       }
                     },

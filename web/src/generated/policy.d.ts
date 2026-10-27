@@ -6,6 +6,8 @@ export interface components {
         McpInput_activate_policy: {
             policy_name: string;
             idempotency_key: string;
+            /** @description Accept the reviewed recurring sharing of a DebugPolicy with spec.sharing (ADR-239). Without it such a policy is not activated; the reply SharingReviewRequired states that repeated collections will be shared, with whom, how many captures and until when. */
+            sharing_reviewed?: boolean;
         };
         /** Asservat mcp-result v1 */
         Contract_mcp_result: {
@@ -155,10 +157,10 @@ export interface components {
                     minimum_failures?: number;
                     window_seconds?: number;
                 };
-                /** @description Recurring sharing of the acceptance (ADR-239). stopped: the DebugPolicy changed after acceptance; activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id). */
+                /** @description Recurring sharing of the acceptance (ADR-239). stopped: a manager stopped future sharing (stop_future_sharing; already claimed captures still publish); policyChanged: the DebugPolicy changed after acceptance, activate the new revision to share again. Existing shares stay until they expire or are revoked (revoke_share with sharing_intent_id = acceptance_id and expected_revision = revision). */
                 sharing?: {
                     /** @enum {unknown} */
-                    state: "active" | "limitReached" | "expired" | "revoked" | "stopped";
+                    state: "active" | "limitReached" | "expired" | "stopped" | "policyChanged" | "revoked";
                     recipients: number;
                     shared_captures: number;
                     max_captures: number;
@@ -166,6 +168,9 @@ export interface components {
                     not_after: string;
                     /** Format: date-time */
                     revoked_at?: string;
+                    revision: number;
+                    /** Format: date-time */
+                    stopped_at?: string;
                 };
             };
         } | {

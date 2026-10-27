@@ -34,7 +34,7 @@ import (
 // pending captures from being shared.
 func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, poolFor func(string, string) *pgxpool.Pool, store *objectstore.Store, keys authorityTestKeys, create func(*testing.T, int64) captureAdmissionScenario, prepare func(*testing.T, captureAdmissionScenario, capture.Accepted, bool) captureShareFixture) {
 	t.Helper()
-	s := create(t, 8)
+	s := create(t, 12)
 	root, installation := s.a.RootID, s.recovery.installation
 	pod := s.a.Plan.Input.Target.Target()
 	workload := authorization.WorkloadScope(pod.ClusterID, pod.NamespaceUID, pod.WorkloadUID)
@@ -403,6 +403,44 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 	if !got["capture:"+c1.CaptureID].Revoked || !got["capture:"+c2.CaptureID].Revoked || got["capture:"+c5.CaptureID].Revoked {
 		t.Fatal("revoke-all did not revoke exactly its acceptance's shares", got)
 	}
+	// Stop future sharing (REQ-SHR-007) of acceptance C (generation 3): a
+	// current team member stops it; the capture that claimed its slot before
+	// the Stop still publishes its share, the next capture claims none, and
+	// revoke-all at revision 2 then revokes that share.
+	third := accept(63, 3, time.Now().Add(time.Hour))
+	c8 := admit(hub)
+	if w := stored(c8); w == nil || w.Acceptance != third {
+		t.Fatal("acceptance C does not share", w)
+	}
+	if _, err := service.StopPolicySharing(ctx, as("synthetic-policy-recipient", nil), third, 1, "stop"); !errors.Is(err, capture.ErrDenied) {
+		t.Fatal("a recipient stopped the policy's sharing", err)
+	}
+	if r, err := service.StopPolicySharing(ctx, as("synthetic-team-mate", []string{"maintainers"}), third, 1, "stop"); err != nil || r.Replay {
+		t.Fatal("stop future sharing", r, err)
+	}
+	if r, err := service.StopPolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 1, "stop"); err != nil || !r.Replay {
+		t.Fatal("stop replay", r, err)
+	}
+	if _, err := service.StopPolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 1, "stop-again"); !errors.Is(err, capture.ErrConflict) {
+		t.Fatal("second stop under another key", err)
+	}
+	if c9 := admit(hub); stored(c9) != nil || spent(third) != 1 {
+		t.Fatal("a stopped sharing claimed a slot", stored(c9), spent(third))
+	}
+	f8 := prepare(t, s, c8, false)
+	publish(f8)
+	if r := shares()["capture:"+c8.CaptureID]; r.Acceptance != third || r.Revoked {
+		t.Fatal("a capture claimed before the Stop did not publish its share", r)
+	}
+	if _, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 1, "revoke-third"); !errors.Is(err, capture.ErrConflict) {
+		t.Fatal("revoke-all at a stale revision", err)
+	}
+	if r, err := service.RevokePolicySharing(ctx, as(creator.Subject, []string{"maintainers"}), third, 2, "revoke-third"); err != nil || r.Revoked != 1 {
+		t.Fatal("revoke-all after stop", r, err)
+	}
+	if !shares()["capture:"+c8.CaptureID].Revoked || shares()["capture:"+c5.CaptureID].Revoked {
+		t.Fatal("revoke-all after stop did not revoke exactly C's share")
+	}
 	// A's pending capture is never shared after revoke-all, and A claims no
 	// further slot.
 	f3 := prepare(t, s, c3, false)
@@ -422,6 +460,9 @@ func qualifyPolicyShare(t *testing.T, ctx context.Context, admin *pgxpool.Pool, 
 		if _, err := admin.Exec(ctx, statement, first); err == nil {
 			t.Fatal("policy sharing state is mutable", statement)
 		}
+	}
+	if _, err := admin.Exec(ctx, "UPDATE policy_acceptance SET sharing_stopped_at=NULL,sharing_stop_key=NULL WHERE id=$1", third); err == nil {
+		t.Fatal("a stop is reversible")
 	}
 	if n := spent(first); n != 3 {
 		t.Fatal("counter changed", n)

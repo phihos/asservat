@@ -8,3 +8,5 @@ export declare function validInput_revoke_share(value: unknown): value is compon
 export declare function validOutput_revoke_share(value: unknown): value is components['schemas']['McpOutput_revoke_share'];
 export declare function validInput_transfer_share(value: unknown): value is components['schemas']['McpInput_transfer_share'];
 export declare function validOutput_transfer_share(value: unknown): value is components['schemas']['McpOutput_transfer_share'];
+export declare function validInput_stop_future_sharing(value: unknown): value is components['schemas']['McpInput_stop_future_sharing'];
+export declare function validOutput_stop_future_sharing(value: unknown): value is components['schemas']['McpOutput_stop_future_sharing'];
