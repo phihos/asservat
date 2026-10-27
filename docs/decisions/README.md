@@ -4,6 +4,7 @@
 sign-in path using current protected ACR settings and fresh authentication. The
 existing signed-claim check still decides assurance; real-provider LoA qualification
 remains pending. No migration or new credential.
+- **ADR-255 — Encrypted parameterized capture history:** [Bounded immutable settings and faithful repeat](255-encrypted-capture-history.md); implementation in progress, native qualification pending.
 
 [ADR-249 — Sensitive acquisition grants](249-sensitive-acquisition-grants.md) is S-04 increment
 12 (12a, individual approval): an adHocCapture AccessGrant per reviewed packet/syscall plan that
